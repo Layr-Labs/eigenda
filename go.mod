@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.1
 
 require (
+	github.com/Layr-Labs/eigenda/api v0.0.0
 	github.com/Layr-Labs/eigensdk-go v0.0.8
 	github.com/aws/aws-sdk-go-v2 v1.21.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.43
@@ -196,3 +197,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace github.com/Layr-Labs/eigenda/api => ./api
