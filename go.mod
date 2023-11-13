@@ -26,7 +26,7 @@ require (
 	github.com/urfave/cli v1.22.14
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/wealdtech/go-merkletree v1.0.1-0.20230205101955-ec7a95ea11ca
-	go.uber.org/automaxprocs v1.5.2
+	go.uber.org/automaxprocs v1.5.3
 	go.uber.org/goleak v1.2.0
 	google.golang.org/grpc v1.59.0
 )
