@@ -60,6 +60,7 @@ func NewDispersalServer(
 		logger:      logger,
 		ratelimiter: ratelimiter,
 		rateConfig:  rateConfig,
+		mu:          &sync.Mutex{},
 	}
 }
 
