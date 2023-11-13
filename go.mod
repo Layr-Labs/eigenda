@@ -6,7 +6,7 @@ toolchain go1.21.1
 
 require (
 	github.com/Layr-Labs/eigensdk-go v0.0.8
-	github.com/aws/aws-sdk-go-v2 v1.21.2
+	github.com/aws/aws-sdk-go-v2 v1.22.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.43
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.10.40
 	github.com/consensys/gnark-crypto v0.12.1
@@ -54,7 +54,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.15.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.17.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.23.2 // indirect
-	github.com/aws/smithy-go v1.15.0 // indirect
+	github.com/aws/smithy-go v1.16.0 // indirect
 	github.com/bits-and-blooms/bitset v1.7.0 // indirect
 	github.com/bytedance/sonic v1.9.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
