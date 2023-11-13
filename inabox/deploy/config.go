@@ -248,7 +248,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
-		log.Fatal("Could not generate key")
+		log.Fatalf("Could not generate key: %v", err)
 	}
 
 	//String representation of n in base 32
