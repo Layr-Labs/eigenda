@@ -355,8 +355,9 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 
 func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
 	var (
-		blobMetadatas = make([]*disperser.BlobMetadata, 0)
-		batches       = make([]*Batch, 0)
+		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
+		batches         = make([]*Batch, 0)
+		blobKeyPresence = make(map[string]struct{})
 	)
 
 	for skip := 0; len(blobMetadatas) < limit && skip < limit; skip += maxQueryBatchesLimit {
@@ -389,7 +390,13 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 				s.logger.Error("Failed to get blob metadata", "error", err)
 				continue
 			}
-			blobMetadatas = append(blobMetadatas, metadatas...)
+			for _, bm := range metadatas {
+				blobKey := bm.GetBlobKey().String()
+				if _, found := blobKeyPresence[blobKey]; !found {
+					blobKeyPresence[blobKey] = struct{}{}
+					blobMetadatas = append(blobMetadatas, bm)
+				}
+			}
 			batches = append(batches, batch)
 			if len(blobMetadatas) >= limit {
 				break
