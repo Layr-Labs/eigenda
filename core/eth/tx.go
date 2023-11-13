@@ -533,6 +533,13 @@ func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) 
 	return t.EthClient.GetCurrentBlockNumber(ctx)
 }
 
+func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error) {
+	return t.Bindings.StakeRegistry.QuorumCount(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
+}
+
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)
 	if err != nil {
