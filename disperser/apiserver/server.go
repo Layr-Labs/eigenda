@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -26,10 +27,13 @@ const maxBlobSize = 1024 * 512 // 512 KiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
+	mu sync.Mutex
 
 	config disperser.ServerConfig
 
-	blobStore disperser.BlobStore
+	blobStore   disperser.BlobStore
+	tx          core.Transactor
+	quorumCount uint16
 
 	rateConfig  RateConfig
 	ratelimiter common.RateLimiter
@@ -45,6 +49,7 @@ type DispersalServer struct {
 func NewDispersalServer(
 	config disperser.ServerConfig,
 	store disperser.BlobStore,
+	tx core.Transactor,
 	logger common.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
@@ -53,6 +58,8 @@ func NewDispersalServer(
 	return &DispersalServer{
 		config:      config,
 		blobStore:   store,
+		tx:          tx,
+		quorumCount: 0,
 		metrics:     metrics,
 		logger:      logger,
 		ratelimiter: ratelimiter,
@@ -67,11 +74,22 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	defer timer.ObserveDuration()
 
 	securityParams := req.GetSecurityParams()
+	if len(securityParams) == 0 {
+		return nil, fmt.Errorf("invalid request: security_params must not be empty")
+	}
+
 	// The quorum ID must be in range [0, 255]. It'll actually be converted
 	// to uint8, so it cannot be greater than 255.
 	for _, param := range securityParams {
-		if param.GetQuorumId() > 255 {
-			return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, 255], but found %d", param.GetQuorumId())
+		if param.GetQuorumId() >= uint32(s.quorumCount) {
+			err := s.updateQuorumCount(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
+			}
+
+			if param.GetQuorumId() >= uint32(s.quorumCount) {
+				return nil, fmt.Errorf("Invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.GetQuorumId())
+			}
 		}
 	}
 
@@ -198,7 +216,11 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	defer timer.ObserveDuration()
 
 	requestID := req.GetRequestId()
-	s.logger.Info("received a new blob status request", "requestID", requestID)
+	if len(requestID) == 0 {
+		return nil, fmt.Errorf("invalid request: request_id must not be empty")
+	}
+
+	s.logger.Info("received a new blob status request", "requestID", string(requestID))
 	metadataKey, err := disperser.ParseBlobKey(string(requestID))
 	if err != nil {
 		return nil, err
@@ -341,6 +363,23 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 		return fmt.Errorf("could not start GRPC server")
 	}
 
+	return nil
+}
+
+func (s *DispersalServer) updateQuorumCount(ctx context.Context) error {
+	currentBlock, err := s.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+	count, err := s.tx.GetQuorumCount(ctx, currentBlock)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Debug("updating quorum count", "currentBlock", currentBlock, "count", count)
+	s.mu.Lock()
+	s.quorumCount = count
+	s.mu.Unlock()
 	return nil
 }
 

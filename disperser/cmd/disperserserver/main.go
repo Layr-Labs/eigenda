@@ -88,7 +88,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	queue := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
@@ -106,7 +106,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	// TODO: create a separate metrics for batcher
 	metrics := disperser.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-	server := apiserver.NewDispersalServer(config.ServerConfig, queue, logger, metrics, ratelimiter, config.RateConfig)
+	server := apiserver.NewDispersalServer(config.ServerConfig, blobStore, tx, logger, metrics, ratelimiter, config.RateConfig)
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {

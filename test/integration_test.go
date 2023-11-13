@@ -192,7 +192,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	serverConfig := disperser.ServerConfig{
 		GrpcPort: fmt.Sprint(disperserGrpcPort),
 	}
-	server := apiserver.NewDispersalServer(serverConfig, store, logger, disperserMetrics, ratelimiter, rateConfig)
+	tx := &coremock.MockTransactor{}
+	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
+	tx.On("GetQuorumCount").Return(1, nil)
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig)
 
 	return TestDisperser{
 		Batcher:       batcher,
