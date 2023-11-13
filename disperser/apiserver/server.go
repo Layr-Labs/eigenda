@@ -27,7 +27,7 @@ const maxBlobSize = 1024 * 512 // 512 KiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
-	mu sync.Mutex
+	mu *sync.Mutex
 
 	config disperser.ServerConfig
 
@@ -41,8 +41,6 @@ type DispersalServer struct {
 	metrics *disperser.Metrics
 
 	logger common.Logger
-
-	mu *sync.Mutex
 }
 
 // NewServer creates a new Server struct with the provided parameters.
