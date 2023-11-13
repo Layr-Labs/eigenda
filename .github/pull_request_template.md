@@ -2,10 +2,6 @@
 
 <!-- Please give a short summary of the change and the problem this solves. -->
 
-## Related issue number
-
-<!-- For example: "Closes #1234" -->
-
 ## Checks
 
 - [ ] I've made sure the lint is passing in this PR.
