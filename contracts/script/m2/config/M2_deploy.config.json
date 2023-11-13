@@ -1,0 +1,42 @@
+{
+  "chainInfo": {
+    "chainId": 5
+  },
+
+  "permissions" : {
+    "owner": "0x37bAFb55BC02056c5fD891DFa503ee84a97d89bF",
+    "upgrader": "0x37bAFb55BC02056c5fD891DFa503ee84a97d89bF",
+    "churner": "0x0000000000000000000000000000000000000000",
+    "ejector": "0x37bAFb55BC02056c5fD891DFa503ee84a97d89bF"
+  },
+
+  "minimumStakes": [
+    32000000000000000000
+  ],
+
+  "strategyWeights": [
+    [
+      {
+        "0_strategy": "0xB613E78E2068d7489bb66419fB1cfa11275d14da",
+        "1_multiplier": 1070136092289993178
+      },
+      {
+        "0_strategy": "0x879944A8cB437a5f8061361f82A6d4EED59070b5", 
+        "1_multiplier": 1071364636818145808
+      },
+      {
+        "0_strategy": "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0",
+        "1_multiplier": 1000000000000000000
+      }
+    ]
+  ],
+
+  "operatorSetParams": [
+    {
+      "0_maxOperatorCount" : 30,
+      "1_kickBIPsOfOperatorStake" : 11000,
+      "2_kickBIPsOfTotalStake" : 50
+    }
+  ]
+
+}

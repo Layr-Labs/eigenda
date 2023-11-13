@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever";
+package retriever;
+
+// The Retriever is a service for retrieving chunks corresponding to a blob from
+// the EigenDA operator nodes and reconstructing the original blob from the chunks.
+// This is a client-side library that the users are supposed to operationalize.
+//
+// Note: Users generally have two ways to retrieve a blob from EigenDA:
+//   1) Retrieve from the Disperser that the user initially used for dispersal: the API
+//      is Disperser.RetrieveBlob() as defined in api/proto/disperser/disperser.proto
+//   2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
+//
+// The Disperser.RetrieveBlob() (the 1st approach) is generally faster and cheaper as the
+// Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
+// (the 2nd approach here) removes the need to trust the Disperser, with the downside of
+// worse cost and performance.
+service Retriever {
+	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
+	// reconstructed original blob in response.
+	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
+}
+
+message BlobRequest {
+	// The hash of the ReducedBatchHeader defined onchain, see:
+	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+	// This identifies the batch that this blob belongs to.
+	bytes batch_header_hash = 1;
+	// Which blob in the batch this is requesting for (note: a batch is logically an
+	// ordered list of blobs).
+	uint32 blob_index = 2;
+	// The Ethereum block number at which the batch for this blob was constructed.
+	uint32 reference_block_number = 3;
+	// Which quorum of the blob this is requesting for (note a blob can participate in
+	// multiple quorums).
+	uint32 quorum_id = 4;
+}
+
+message BlobReply {
+	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
+	bytes data = 1;
+}

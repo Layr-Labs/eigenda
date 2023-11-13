@@ -1,0 +1,58 @@
+name: 'Go coverage report'
+description: 'This action updates adds an HTML coverage report and SVG badge to your wiki'
+branding:
+  color: blue
+  icon: award
+
+inputs:
+  report:
+    description: Generate an HTML coverage report.
+    default: true
+  chart:
+    description: Generate a coverage over time chart.
+    default: false
+  amend:
+    description: Amend wiki, avoiding spurious commits.
+    default: false
+  go-version:
+    description: The Go version to download (if necessary) and use.
+    default: '1.21'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Checkout wiki
+      uses: actions/checkout@v3
+      with:
+        repository: ${{github.repository}}.wiki
+        token: ${{ github.token }}
+        path: ./.github/wiki/
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{inputs.go-version}}
+
+    - name: Generate coverage report
+      shell: bash
+      env:
+        INPUT_CHART:  ${{inputs.chart}}
+        INPUT_REPORT: ${{inputs.report}}
+      run: |
+        ${{github.action_path}}/coverage.sh ./.github/wiki/
+
+    - name: Push to wiki
+      shell: bash
+      run: |
+        cd ./.github/wiki/
+        git add --all
+        git diff-index --quiet HEAD && exit
+        git config --local user.name  "GitHub Action"
+        git config --local user.email "action@github.com"
+        git remote set-url --push origin https://${{ github.token }}@github.com/Layr-Labs/eigenda.wiki.git
+        test ${{inputs.amend}} == "true" && \
+          git commit --amend --no-edit   && git push --force-with-lease || \
+          git commit -m "Update coverage" && git push https://${{ github.token }}@github.com/Layr-Labs/eigenda.wiki.git

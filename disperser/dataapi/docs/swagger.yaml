@@ -1,0 +1,299 @@
+definitions:
+  core.BlobCommitments:
+    properties:
+      commitment:
+        $ref: '#/definitions/core.Commitment'
+      length:
+        type: integer
+      length_proof:
+        $ref: '#/definitions/core.Commitment'
+    type: object
+  core.Commitment:
+    properties:
+      x:
+        items:
+          type: integer
+        type: array
+    type: object
+  core.SecurityParam:
+    properties:
+      adversary_threshold:
+        description: AdversaryThreshold is the maximum amount of stake that can be
+          controlled by an adversary in the quorum as a percentage of the total stake
+          in the quorum
+        type: integer
+      quorum_id:
+        type: integer
+      quorum_rate:
+        description: |-
+          Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used
+          for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
+          data was posted to the DA node.
+        type: integer
+      quorum_threshold:
+        description: QuorumThreshold is the amount of stake that must sign a message
+          for it to be considered valid as a percentage of the total stake in the
+          quorum
+        type: integer
+    type: object
+  dataapi.BlobMetadataResponse:
+    properties:
+      batch_header_hash:
+        type: string
+      batch_id:
+        type: integer
+      batch_root:
+        type: string
+      blob_commitment:
+        $ref: '#/definitions/core.BlobCommitments'
+      blob_inclusion_proof:
+        type: string
+      blob_index:
+        type: integer
+      blob_key:
+        type: string
+      blob_status:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser.BlobStatus'
+      confirmation_block_number:
+        type: integer
+      fee:
+        type: string
+      reference_block_number:
+        type: integer
+      requested_at:
+        type: integer
+      security_params:
+        items:
+          $ref: '#/definitions/core.SecurityParam'
+        type: array
+      signatory_record_hash:
+        type: string
+    type: object
+  dataapi.BlobsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dataapi.BlobMetadataResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
+    type: object
+  dataapi.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  dataapi.Meta:
+    properties:
+      size:
+        type: integer
+    type: object
+  dataapi.Metric:
+    properties:
+      cost_in_wei:
+        type: integer
+      throughput:
+        type: number
+      total_stake:
+        type: integer
+    type: object
+  dataapi.NonSigner:
+    properties:
+      count:
+        type: integer
+      operatorId:
+        type: string
+    type: object
+  dataapi.Throughput:
+    properties:
+      throughput:
+        type: number
+      timestamp:
+        type: integer
+    type: object
+  github_com_Layr-Labs_eigenda_disperser.BlobStatus:
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+    x-enum-varnames:
+    - Processing
+    - Confirmed
+    - Failed
+    - Finalized
+    - InsufficientSignatures
+info:
+  contact: {}
+  description: This is the EigenDA Data Access API server.
+  title: EigenDA Data Access API
+  version: "1"
+paths:
+  /feed/blobs:
+    get:
+      parameters:
+      - description: 'Limit [default: 10]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.BlobsResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch blobs metadata list
+      tags:
+      - Feed
+  /feed/blobs/{blob_key}:
+    get:
+      parameters:
+      - description: Blob Key
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.BlobMetadataResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch blob metadata by blob key
+      tags:
+      - Feed
+  /metrics:
+    get:
+      parameters:
+      - description: 'Start unix timestamp [default: 1 hour ago]'
+        in: query
+        name: start
+        type: integer
+      - description: 'End unix timestamp [default: unix time now]'
+        in: query
+        name: end
+        type: integer
+      - description: 'Limit [default: 10]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.Metric'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch metrics
+      tags:
+      - Metrics
+  /metrics/non_signers:
+    get:
+      parameters:
+      - description: 'Interval to query for non signers in seconds [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dataapi.NonSigner'
+            type: array
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch non signers
+      tags:
+      - Metrics
+  /metrics/throughput:
+    get:
+      parameters:
+      - description: 'Start unix timestamp [default: 1 hour ago]'
+        in: query
+        name: start
+        type: integer
+      - description: 'End unix timestamp [default: unix time now]'
+        in: query
+        name: end
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dataapi.Throughput'
+            type: array
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch throughput time series
+      tags:
+      - Metrics
+schemes:
+- https
+- http
+swagger: "2.0"

@@ -1,0 +1,8 @@
+inabox/testdata/*
+inabox/anvil.pid
+
+test/testdata/*
+inabox/resources/kzg/SRSTables/*
+
+**/bin/*
+coverage.*

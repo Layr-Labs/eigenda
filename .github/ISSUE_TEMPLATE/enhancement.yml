@@ -1,0 +1,37 @@
+name: "⚡ Enhancement Request"
+description: Something could be better.
+title: "[Enhancement]: <Title>"
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Something could be better?
+        If your request is about a net new feature please use the Feature Request template.
+        Enhancements are tagged `enhancement`.
+  - type: textarea
+    attributes:
+      label: Use case and current behavior
+      description: The context in which the feature is used and what is achieved.
+      placeholder: |
+          Type here.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Enhancement
+      description: Which enhancement is required and what is the new output?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Solution proposal
+      description: Any idea on the how?
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: Any useful additional information?
+    validations:
+      required: false

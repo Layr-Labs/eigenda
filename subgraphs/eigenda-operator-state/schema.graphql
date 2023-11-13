@@ -1,0 +1,104 @@
+## BLSRegistryCoordinatorWithIndices
+
+type ChurnApproverUpdated @entity(immutable: true) {
+  id: Bytes!
+  prevChurnApprover: Bytes! # address
+  newChurnApprover: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorDeregistered @entity(immutable: true) {
+  id: Bytes!
+  operator: Bytes! # address
+  operatorId: Bytes! # bytes32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorRegistered @entity(immutable: true) {
+  id: Bytes!
+  operator: Bytes! # address
+  operatorId: Bytes! # bytes32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorSetParamsUpdated @entity(immutable: true) {
+  id: Bytes!
+  quorumNumber: Int! # uint8
+  operatorSetParams_maxOperatorCount: BigInt! # uint32
+  operatorSetParams_kickBIPsOfOperatorStake: Int! # uint16
+  operatorSetParams_kickBIPsOfTotalStake: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorSocketUpdate @entity(immutable: true) {
+  id: Bytes!
+  operatorId: Operator! # bytes32
+  socket: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+## BLSPubkeyRegistry
+
+type OperatorAddedToQuorum @entity(immutable: true) {
+  id: Bytes!
+  operator: Bytes! # address
+  quorumNumbers: Bytes! # bytes
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorRemovedFromQuorum @entity(immutable: true) {
+  id: Bytes!
+  operator: Bytes! # address
+  quorumNumbers: Bytes! # bytes
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+## BLSPubkeyCompendium
+
+type NewPubkeyRegistration @entity(immutable: true) {
+  id: Bytes!
+  operator: Bytes! # address
+  pubkeyG1_X: BigInt! # uint256
+  pubkeyG1_Y: BigInt! # uint256
+  pubkeyG2_X: [BigInt!]! # uint256[2]
+  pubkeyG2_Y: [BigInt!]! # uint256[2]
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+## Custom
+
+type Operator @entity {
+  id: Bytes!
+  operator: Bytes! # address
+  pubkeyG1_X: BigInt! # uint256
+  pubkeyG1_Y: BigInt! # uint256
+  pubkeyG2_X: [BigInt!]! # uint256[2]
+  pubkeyG2_Y: [BigInt!]! # uint256[2]
+  deregistrationBlockNumber: BigInt!
+  socketUpdates: [OperatorSocketUpdate!]! @derivedFrom(field: "operatorId")
+}
+
+type QuorumApk @entity(immutable: true) {
+  id: Bytes!
+  quorumNumber: Int! # uint8
+  apk_X: BigInt! # uint256
+  apk_Y: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+}

@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node";
+package node;
+
+// The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
+// for better security and separation of concerns.
+
+service Dispersal {
+	// StoreChunks validates that the chunks match what the Node is supposed to receive (
+	// different Nodes are responsible for different chunks, as EigenDA is horizontally
+	// sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
+	// according to the EigenDA protocol. It also stores the chunks along with metadata
+	// for the protocol-defined length of custody. It will return a signature at the
+	// end to attest to the data in this request it has processed.
+	rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
+}
+
+service Retrieval {
+	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
+	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
+	// Similar to RetrieveChunks, this just returns the header of the blob.
+	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
+}
+
+// Requests and replies
+
+message StoreChunksRequest {
+	// Which batch this request is for.
+	BatchHeader batch_header = 1;
+	// The chunks for each blob in the batch to be stored in an EigenDA Node.
+	repeated Blob blobs = 2;
+}
+
+message StoreChunksReply {
+	// The operator's BLS signature signed on the batch header hash.
+	bytes signature = 1;
+}
+
+message RetrieveChunksRequest {
+	// The hash of the ReducedBatchHeader defined onchain, see:
+	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+	// This identifies which batch to retrieve for.
+	bytes batch_header_hash = 1;
+	// Which blob in the batch to retrieve for (note: a batch is logically an ordered
+	// list of blobs).
+	uint32 blob_index = 2;
+	// Which quorum of the blob to retrieve for (note: a blob can have multiple
+	// quorums and the chunks for different quorums at a Node can be different).
+	// The ID must be in range [0, 255].
+	uint32 quorum_id = 3;
+}
+
+message RetrieveChunksReply {
+	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
+	repeated bytes chunks = 1;
+}
+
+
+// See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
+message GetBlobHeaderRequest {
+	bytes batch_header_hash = 1;
+	uint32 blob_index = 2;
+	uint32 quorum_id = 3;
+}
+
+message GetBlobHeaderReply {
+	// The header of the blob requested per GetBlobHeaderRequest.
+	BlobHeader blob_header = 1;
+	// Merkle proof that returned blob header belongs to the batch and is
+	// the batch's MerkleProof.index-th blob.
+	// This can be checked against the batch root on chain.
+	MerkleProof proof = 2;
+}
+
+message MerkleProof {
+	// The proof itself.
+	repeated bytes hashes = 1;
+	// Which index (the leaf of the Merkle tree) this proof is for.
+	uint32 index = 2;
+}
+
+// Types
+
+// In EigenDA, the original blob to disperse is encoded as a polynomial via taking
+// taking different point evaluations (i.e. erasure coding). These points are split
+// into disjoint subsets which are assigned to different operator nodes in the EigenDA
+// network.
+// The data in this message is a subset of these points that are assigned to a
+// single operator node.
+message Blob {
+	// Which (original) blob this is for.
+	BlobHeader header = 1;
+	// Each bundle contains all chunks for a single quorum of the blob.
+	// The number of bundles must be equal to the total number of quorums associated
+	// with the blob, and the ordering must be the same as BlobHeader.quorum_headers.
+	repeated Bundle bundles = 2;
+}
+
+// A Bundle is the collection of chunks associated with a single blob, for a single
+// operator and a single quorum.
+message Bundle {
+	// Each chunk corresponds to a collection of points on the polynomial.
+	// Each chunk has same number of points.
+	repeated bytes chunks = 1;
+}
+
+message BlobHeader {
+	// The KZG commitment to the polynomial representing the blob.
+	bytes commitment = 1;
+	// The low degree proof. It's the KZG commitment to the polynomial shifted to
+	// the largest SRS degree.
+	bytes length_proof = 2;
+	// The length of the original blob in number of symbols (in the field where
+	// the polynomial is defined).
+	uint32 length = 3;
+	// The params of the quorums that this blob participates in.
+	repeated BlobQuorumInfo quorum_headers = 4;
+	// The ID of the user who is dispersing this blob to EigenDA.
+	string account_id = 5;
+}
+
+// See BlobQuorumParam as defined in
+// api/proto/disperser/disperser.proto
+message BlobQuorumInfo {
+	uint32 quorum_id = 1;
+	uint32 adversary_threshold = 2;
+	uint32 quantization_factor = 3;
+	uint32 encoded_blob_length = 4;
+	uint32 quorum_threshold = 5;
+	uint32 ratelimit = 6;
+}
+
+// BatchHeader (see core/data.go#BatchHeader)
+message BatchHeader {
+	// The root of the merkle tree with hashes of blob headers as leaves.
+	bytes batch_root = 1;
+	// The Ethereum block number at which the batch is dispersed.
+	uint32 reference_block_number = 3;
+}

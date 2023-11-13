@@ -1,0 +1,15 @@
+name: "🙋 Question"
+description: Ask a question or request support for using EigenDA
+title: "[Question]: <Title>"
+labels: [question, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The GitHub issue tracker is not for questions.
+        - If you have a question, please try asking it on <TBD>
+        - Our Docs: <TBD>
+  - type: textarea
+    attributes:
+      label: Question.
+      description: Ask your question.

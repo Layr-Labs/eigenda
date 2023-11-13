@@ -1,0 +1,84 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "operator",
+        "type": "address"
+      },
+      {
+        "components": [
+          { "internalType": "uint256", "name": "X", "type": "uint256" },
+          { "internalType": "uint256", "name": "Y", "type": "uint256" }
+        ],
+        "indexed": false,
+        "internalType": "struct BN254.G1Point",
+        "name": "pubkeyG1",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          { "internalType": "uint256[2]", "name": "X", "type": "uint256[2]" },
+          { "internalType": "uint256[2]", "name": "Y", "type": "uint256[2]" }
+        ],
+        "indexed": false,
+        "internalType": "struct BN254.G2Point",
+        "name": "pubkeyG2",
+        "type": "tuple"
+      }
+    ],
+    "name": "NewPubkeyRegistration",
+    "type": "event"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "operatorToPubkeyHash",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "name": "pubkeyHashToOperator",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "X", "type": "uint256" },
+          { "internalType": "uint256", "name": "Y", "type": "uint256" }
+        ],
+        "internalType": "struct BN254.G1Point",
+        "name": "signedMessageHash",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          { "internalType": "uint256", "name": "X", "type": "uint256" },
+          { "internalType": "uint256", "name": "Y", "type": "uint256" }
+        ],
+        "internalType": "struct BN254.G1Point",
+        "name": "pubkeyG1",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          { "internalType": "uint256[2]", "name": "X", "type": "uint256[2]" },
+          { "internalType": "uint256[2]", "name": "Y", "type": "uint256[2]" }
+        ],
+        "internalType": "struct BN254.G2Point",
+        "name": "pubkeyG2",
+        "type": "tuple"
+      }
+    ],
+    "name": "registerBLSPublicKey",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

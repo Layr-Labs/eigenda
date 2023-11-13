@@ -1,0 +1,54 @@
+{
+  "chainInfo": {
+    "chainId": 5
+  },
+
+  "permissions" : {
+    "owner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "upgrader": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "churner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "ejector": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1"
+  },
+
+  "minimumStakes": [
+    0,
+    0
+  ],
+
+  "strategyWeights": [
+    [
+      {
+        "0_strategy": "0xed6DE3f2916d20Cb427fe7255194a05061319FFB",
+        "1_multiplier": 1
+      },
+      {
+        "0_strategy": "0xd421b2a340497545dA68AE53089d99b9Fe0493cD",
+        "1_multiplier": 1
+      },
+      {
+        "0_strategy": "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0",
+        "1_multiplier": 1
+      }
+    ],
+    [
+      {
+        "0_strategy": "0xf35B4f7a47c131b80d0c04707B74D766e6b7D468",
+        "1_multiplier": 1
+      }
+    ]
+  ],
+
+  "operatorSetParams": [
+    {
+      "0_maxOperatorCount" : 200,
+      "1_kickBIPsOfOperatorStake" : 11000,
+      "2_kickBIPsOfTotalStake" : 50
+    },
+    {
+      "0_maxOperatorCount" : 200,
+      "1_kickBIPsOfOperatorStake" : 11000,
+      "2_kickBIPsOfTotalStake" : 50
+    }
+  ]
+
+}

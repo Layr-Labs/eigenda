@@ -1,0 +1,110 @@
+name: integration-tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add LocalStack AWS Credentials
+        run: |
+          mkdir -p ~/.aws
+          touch ~/.aws/credentials
+
+          echo '[default]' >> ~/.aws/credentials
+          echo 'aws_access_key_id=localstack' >> ~/.aws/credentials
+          echo 'aws_secret_access_key=localstack' >> ~/.aws/credentials
+
+      - name: Set Test Profile to default
+        run: |
+          aws configure --profile test-profile set region us-east-1
+          aws configure --profile test-profile set source_profile default
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.21' # The Go version to download (if necessary) and use.
+      - run: go version
+
+      - name: Checkout EigenDA
+        uses: actions/checkout@v3
+
+      - name: Update Submodule Commits
+        run: |
+          git submodule update --init --recursive
+
+      # TODO: add back geth if we need it in tests
+      # - name: Install geth
+      #   run: |
+      #     sudo add-apt-repository -y ppa:ethereum/ethereum
+      #     sudo apt-get update
+      #     sudo apt-get -y install ethereum
+
+      # - name: Get geth version
+      #   run: geth version
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install graph cli
+        run: |
+          yarn global add @graphprotocol/graph-cli@0.51.0
+
+      - name: Get Forge version
+        run: forge --version
+
+      - name: Build contracts
+        run: | 
+          cd contracts && forge build 
+
+      # TODO: add back DA contracts if we will need them in tests.
+      # - name: Compile contracts
+      #   run: |
+      #     make compile-el
+      #     make compile-dl
+
+      - name: Churner 
+        run: go test -v ./churner/tests
+
+      - name: Indexer 
+        run: go test -v ./core/indexer
+
+      - name: Graph Indexer
+        run: make build && go test -v ./core/thegraph
+
+      - name: Inabox E2E
+        run: make build && cd inabox && make run-e2e-nochurner
+
+      - name: Save logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: inabox-logs
+          path: |
+            inabox/testdata/*/logs/
+            inabox/testdata/*/deploy.log
+
+      - name: Send GitHub Action trigger data to Slack workflow
+        if: ${{ failure() }}
+        id: slack
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "workflow": "${{ github.workflow }}",
+              "action_name": "${{ github.action }}",
+              "ref": "${{ github.ref_name }}",
+              "actor": "${{ github.triggering_actor }}",
+              "event_name": "${{ github.event_name }}",
+              "run_id": "https://github.com/Layr-Labs/eigenda/actions/runs/${{ github.run_id }}",
+              "commit_sha": "https://github.com/Layr-Labs/eigenda/commit/${{ github.sha }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,12 @@
+version: '3'
+services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:v1.0.0
+    ports:
+      - 8545:8545
+    networks:
+      - eigenda-demo
+    command: ["anvil --host 0.0.0.0"]
+networks:
+  eigenda-demo:
+    name: eigenda-demo

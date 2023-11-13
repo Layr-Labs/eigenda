@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/churner";
+package churner;
+
+// The Churner is a service that handles churn requests from new operators trying to
+// join the EigenDA network.
+// When the EigenDA network reaches the maximum number of operators, any new operator
+// trying to join will have to make a churn request to this Churner, which acts as the
+// sole decision maker to decide whether this new operator could join, and if so, which
+// existing operator will be churned out (so the max number of operators won't be
+// exceeded).
+// The max number of operators, as well as the rules to make churn decisions, are
+// defined onchain, see details in OperatorSetParam at:
+// https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IBLSRegistryCoordinatorWithIndices.sol#L24.
+service Churner {
+	rpc Churn(ChurnRequest) returns (ChurnReply) {}
+}
+
+message ChurnRequest {
+	// The operator making the churn request.
+	bytes operator_to_register_pubkey_g1 = 1;
+	bytes operator_to_register_pubkey_g2 = 2;
+	// The operator's BLS signature signed on the keccak256 hash of
+	// concat("ChurnRequest", g1, g2, salt).
+	bytes operator_request_signature = 3;
+	// The salt used as part of the message to sign on for operator_request_signature.
+	bytes salt = 4;
+	// The quorums to register for.
+	// Note:
+	//   - If any of the quorum here has already been registered, this entire request
+	//     will fail to proceed.
+	//   - If any of the quorum fails to register, this entire request will fail.
+	// The IDs must be in range [0, 255].
+	repeated uint32 quorum_ids = 5;
+}
+
+message ChurnReply {
+	// The signature signed by the Churner.
+	SignatureWithSaltAndExpiry signature_with_salt_and_expiry = 1;
+	// A list of existing operators that get churned out.
+	// Note: it's possible an operator gets churned out just for one or more quorums
+	// (rather than entirely churned out for all quorums).
+	repeated OperatorToChurn operators_to_churn = 2;
+}
+
+message SignatureWithSaltAndExpiry {
+	// Churner's signature on the Operator's attributes.
+	bytes signature = 1;
+	// Salt is the keccak256 hash of
+	// concat("churn", time.Now(), operatorToChurn's OperatorID, Churner's ECDSA private key)
+	bytes salt = 2;
+	// When this churn decision will expire.
+	int64 expiry = 3;
+}
+
+// This describes an operator to churn out for a quorum.
+message OperatorToChurn {
+	// The ID of the quorum of the operator to churn out.
+	uint32 quorum_id = 1;
+	// The address of the operator.
+	bytes operator = 2;
+	// BLS pubkey (G1 point) of the operator.
+	bytes pubkey = 3;
+}

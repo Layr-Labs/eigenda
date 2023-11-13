@@ -1,0 +1,40 @@
+name: test-coverage
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Add LocalStack AWS Credentials
+      run: |
+        mkdir -p ~/.aws
+        touch ~/.aws/credentials
+
+        echo '[default]' >> ~/.aws/credentials
+        echo 'aws_access_key_id=localstack' >> ~/.aws/credentials
+        echo 'aws_secret_access_key=localstack' >> ~/.aws/credentials
+
+    - name: Set Test Profile to default
+      run: |
+        aws configure --profile test-profile set region us-east-1
+        aws configure --profile test-profile set source_profile default
+
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: '1.21'
+
+    - name: Update coverage badge
+      uses: ./.github/actions/test-coverage
+      with:
+        chart: true
+        amend: true

@@ -1,0 +1,41 @@
+name: unit-tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add LocalStack AWS Credentials
+        run: |
+          mkdir -p ~/.aws
+          touch ~/.aws/credentials
+
+          echo '[default]' >> ~/.aws/credentials
+          echo 'aws_access_key_id=localstack' >> ~/.aws/credentials
+          echo 'aws_secret_access_key=localstack' >> ~/.aws/credentials
+
+      - name: Set Test Profile to default
+        run: |
+          aws configure --profile test-profile set region us-east-1
+          aws configure --profile test-profile set source_profile default
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.21' # The Go version to download (if necessary) and use.
+      - run: go version
+
+      - name: Checkout EigenDA
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: make build
+
+      - name: Test all
+        run: go test -coverprofile=coverage.out -short ./... 

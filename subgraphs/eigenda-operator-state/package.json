@@ -1,0 +1,19 @@
+{
+  "name": "eigenda-operator-state",
+  "license": "UNLICENSED",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --node https://api.thegraph.com/deploy/ Layr-Labs/eigenda-operator-state",
+    "create-local": "graph create --node http://localhost:8020/ Layr-Labs/eigenda-operator-state",
+    "remove-local": "graph remove --node http://localhost:8020/ Layr-Labs/eigenda-operator-state",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 Layr-Labs/eigenda-operator-state",
+    "test": "graph test"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.60.0",
+    "@graphprotocol/graph-ts": "^0.31.0",
+    "matchstick-as": "^0.5.2"
+
+  }
+}

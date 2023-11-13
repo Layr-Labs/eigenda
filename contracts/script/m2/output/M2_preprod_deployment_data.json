@@ -1,0 +1,27 @@
+{
+  "addresses": {
+    "blsOperatorStateRetriever": "0x51Bb6c495259Cb994589C51650C6f9C76197fB4e",
+    "blsPubKeyCompendium": "0x545Fc99D35d27390d0AE984e06af8140eAEc2595",
+    "blsPubkeyRegistry": "0x15353D2437BC73284Cb63164D5e754a7B3FCCbd8",
+    "blsPubkeyRegistryImplementation": "0x53790f2ED668a45d71ad4493cf53fb7dDed8Eb8a",
+    "eigenDAProxyAdmin": "0x271039D887f6556afec0Cb348F108dF6868398eb",
+    "eigenDAServiceManager": "0xa48d5AC73d6C574d115f278F87a3e34e9E81340b",
+    "eigenDAServiceManagerImplementation": "0x8B929F6ef037914cC5283a3A7b033E23d9caDAbe",
+    "indexRegistry": "0x86CA7988b395e8774bd312a37590De3A89C49F08",
+    "indexRegistryImplementation": "0xB92B444E5068731c055F17cf86FA407515594EDe",
+    "registryCoordinator": "0xf451b90a089fA6ebA195Adf6D09c82a14b43E22A",
+    "registryCoordinatorImplementation": "0x02EBa107e3D1D03d99Bd8A829927Ab3c33149E6F",
+    "stakeRegistry": "0x1D2bF1632c12756be979A7e869801DC05bD016ba",
+    "stakeRegistryImplementation": "0x5942CC0933D5529ba10c875A2e40C27D289C17b2"
+  },
+  "chainInfo": {
+    "chainId": 5,
+    "deploymentBlock": 9975097
+  },
+  "permissions": {
+    "eigenDAChurner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "eigenDAEjector": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "eigenDAOwner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "eigenDAUpgrader": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1"
+  }
+}

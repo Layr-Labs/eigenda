@@ -1,0 +1,39 @@
+type Batch @entity(immutable: true) {
+  id: Bytes!
+  batchId: BigInt!
+  batchHeaderHash: Bytes!
+  batchHeader: BatchHeader! @derivedFrom(field: "batch") # only one batch per tx
+  nonSigning: NonSigning! @derivedFrom(field: "batch")
+  gasFees: GasFees!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  txHash: Bytes!
+}
+
+type GasFees @entity(immutable: true) {
+  id: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+  txFee: BigInt!
+}
+
+type BatchHeader @entity(immutable: true) {
+  id: Bytes!
+  blobHeadersRoot: Bytes!
+  quorumNumbers: [BigInt!]!
+  quorumThresholdPercentages: [BigInt!]!
+  referenceBlockNumber: BigInt!
+  batch: Batch!
+}
+
+type NonSigning @entity(immutable: true) {
+  id: Bytes!
+  nonSigners: [Operator!]!
+  batch: Batch!
+}
+
+type Operator @entity {
+  id: Bytes!
+  operatorId: Bytes!
+  nonSignings: [NonSigning!]! @derivedFrom(field: "nonSigners")
+}

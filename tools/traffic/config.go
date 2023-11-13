@@ -1,0 +1,41 @@
+package traffic
+
+import (
+	"time"
+
+	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/tools/traffic/flags"
+	"github.com/urfave/cli"
+)
+
+type Config struct {
+	Hostname               string
+	GrpcPort               string
+	Timeout                time.Duration
+	NumInstances           uint
+	RequestInterval        time.Duration
+	DataSize               uint64
+	QuorumThreshold        uint8
+	AdversarialThreshold   uint8
+	LoggingConfig          logging.Config
+	RandomizeBlobs         bool
+	InstanceLaunchInterval time.Duration
+	UseSecureGrpcFlag      bool
+}
+
+func NewConfig(ctx *cli.Context) *Config {
+	return &Config{
+		Hostname:               ctx.GlobalString(flags.HostnameFlag.Name),
+		GrpcPort:               ctx.GlobalString(flags.GrpcPortFlag.Name),
+		Timeout:                ctx.Duration(flags.TimeoutFlag.Name),
+		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
+		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
+		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
+		QuorumThreshold:        uint8(ctx.GlobalUint(flags.QuorumThresholdFlag.Name)),
+		AdversarialThreshold:   uint8(ctx.GlobalUint(flags.AdversarialThresholdFlag.Name)),
+		LoggingConfig:          logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
+		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
+		UseSecureGrpcFlag:      ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
+	}
+}

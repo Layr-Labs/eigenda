@@ -1,0 +1,53 @@
+version: '3'
+services:
+  geth:
+    image: ethereum/client-go:v1.12.0
+    # pull_policy: always
+    container_name: geth
+    restart: unless-stopped
+    ports:
+      - 30303:30303
+      - 30303:30303/udp
+      - 8545:8545
+      - 8546:8546
+      - 8551:8551
+    volumes:
+      - ${PWD}/geth/data:/root/.ethereum
+      - ${PWD}/geth/secret:/secret
+    stop_signal: SIGINT
+    stop_grace_period: 2m
+    healthcheck:
+      test: [ "CMD-SHELL", "geth attach --exec eth.blockNumber" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - --datadir=/root/.ethereum
+      - --networkid=${GETH_CHAINID}
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.vhosts=*
+      - --http.api=eth,net,web3,txpool,debug,miner
+      - --nodiscover
+      - --netrestrict=127.0.0.1/0
+      - --unlock=${GETH_UNLOCK_ADDRESS}
+      - --mine
+      - --allow-insecure-unlock
+      - --password=/secret/geth-account-password
+      - --rpc.gascap=0
+      - --miner.gasprice=1
+      - --rpc.allow-unprotected-txs
+      - --miner.gaslimit=2922337203600000
+      - --maxpeers=200
+      - --miner.etherbase=${GETH_UNLOCK_ADDRESS}
+    logging:
+      driver: json-file
+      options:
+        max-size: 2m
+        max-file: 10
+
+networks:
+  default:
+    name: eigenda_testbed

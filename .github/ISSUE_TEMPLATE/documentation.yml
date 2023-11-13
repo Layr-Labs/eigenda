@@ -1,0 +1,21 @@
+name: "📃 Documentation Request"
+description: Suggest improvements, additions, or revisions to EigenDA documentation
+title: "[Documentation]: <Title>"
+labels: [docs, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping us improve the EigenDA documentation!
+  - type: textarea
+    attributes:
+      label: Documentation.
+      description: Explain which part of the documents is lacking.
+      placeholder: |
+          Type here.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Additional information.
+      description: Tell us anything else you think we should know.

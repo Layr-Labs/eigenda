@@ -1,0 +1,50 @@
+environment:
+  name: "staging"
+  type: "local"
+
+deployers:
+- name: "default"
+  rpc: http://172.17.0.1:8545
+  verifyContracts: false
+  verifierUrl: http://172.17.0.1:4000/api
+  slow: false
+
+eigenda:
+  deployer: "default"
+
+privateKeys:
+  ecdsaMap:
+    default:
+      privateKey: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    batcher0:
+      privateKey: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+
+# for "configPath", use absolute path
+telemetry:
+  isNeeded: true
+  configPath: "/home/ubuntu/eigenda/inabox/grafana-agent/agent-config.yaml"
+  dockerSd:
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+
+services:
+  counts:
+    dispersers: 1
+    operators: 4
+  stakes:
+    total: 100e18
+    distribution: [1.3, 2, 3, 5]
+  basePort: 32000
+  variables:
+    globals:
+      HOSTNAME: localhost
+      TIMEOUT: 20s
+      CHAIN_RPC: http://172.17.0.1:8545
+      CHAIN_ID: 40525
+      G1_PATH: /data/kzg/g1.point
+      G2_PATH: /data/kzg/g2.point
+      CACHE_PATH: /data/kzg/SRSTables
+      SRS_ORDER: 3000
+      CHALLENGE_ORDER: 3000
+      STD_LOG_LEVEL: "trace"
+      VERBOSE: true

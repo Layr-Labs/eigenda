@@ -1,0 +1,21 @@
+
+{
+    "chain":[
+        {
+            "id":0,
+            "fork":null
+        },
+        {
+            "id":1,
+            "fork":null
+        },
+        {
+            "id":2,
+            "fork":0
+        },
+        {
+            "id":3,
+            "fork":null
+        }
+    ]
+}

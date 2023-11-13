@@ -1,0 +1,220 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "contract IRegistryCoordinator",
+        "name": "_registryCoordinator",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IBLSPublicKeyCompendium",
+        "name": "_pubkeyCompendium",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "operator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "quorumNumbers",
+        "type": "bytes"
+      }
+    ],
+    "name": "OperatorAddedToQuorums",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "operator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "quorumNumbers",
+        "type": "bytes"
+      }
+    ],
+    "name": "OperatorRemovedFromQuorums",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "operator", "type": "address" },
+      { "internalType": "bytes", "name": "quorumNumbers", "type": "bytes" },
+      {
+        "components": [
+          { "internalType": "uint256", "name": "X", "type": "uint256" },
+          { "internalType": "uint256", "name": "Y", "type": "uint256" }
+        ],
+        "internalType": "struct BN254.G1Point",
+        "name": "pubkey",
+        "type": "tuple"
+      }
+    ],
+    "name": "deregisterOperator",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "quorumNumber", "type": "uint8" }
+    ],
+    "name": "getApkForQuorum",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "uint256", "name": "X", "type": "uint256" },
+          { "internalType": "uint256", "name": "Y", "type": "uint256" }
+        ],
+        "internalType": "struct BN254.G1Point",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "quorumNumber", "type": "uint8" },
+      { "internalType": "uint32", "name": "blockNumber", "type": "uint32" },
+      { "internalType": "uint256", "name": "index", "type": "uint256" }
+    ],
+    "name": "getApkHashForQuorumAtBlockNumberFromIndex",
+    "outputs": [{ "internalType": "bytes24", "name": "", "type": "bytes24" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes", "name": "quorumNumbers", "type": "bytes" },
+      { "internalType": "uint256", "name": "blockNumber", "type": "uint256" }
+    ],
+    "name": "getApkIndicesForQuorumsAtBlockNumber",
+    "outputs": [{ "internalType": "uint32[]", "name": "", "type": "uint32[]" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "quorumNumber", "type": "uint8" },
+      { "internalType": "uint256", "name": "index", "type": "uint256" }
+    ],
+    "name": "getApkUpdateForQuorumByIndex",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "bytes24", "name": "apkHash", "type": "bytes24" },
+          {
+            "internalType": "uint32",
+            "name": "updateBlockNumber",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "nextUpdateBlockNumber",
+            "type": "uint32"
+          }
+        ],
+        "internalType": "struct IBLSPubkeyRegistry.ApkUpdate",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "quorumNumber", "type": "uint8" }
+    ],
+    "name": "getQuorumApkHistoryLength",
+    "outputs": [{ "internalType": "uint32", "name": "", "type": "uint32" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pubkeyCompendium",
+    "outputs": [
+      {
+        "internalType": "contract IBLSPublicKeyCompendium",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "", "type": "uint8" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "quorumApkUpdates",
+    "outputs": [
+      { "internalType": "bytes24", "name": "apkHash", "type": "bytes24" },
+      {
+        "internalType": "uint32",
+        "name": "updateBlockNumber",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "nextUpdateBlockNumber",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "operator", "type": "address" },
+      { "internalType": "bytes", "name": "quorumNumbers", "type": "bytes" },
+      {
+        "components": [
+          { "internalType": "uint256", "name": "X", "type": "uint256" },
+          { "internalType": "uint256", "name": "Y", "type": "uint256" }
+        ],
+        "internalType": "struct BN254.G1Point",
+        "name": "pubkey",
+        "type": "tuple"
+      }
+    ],
+    "name": "registerOperator",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "registryCoordinator",
+    "outputs": [
+      {
+        "internalType": "contract IRegistryCoordinator",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

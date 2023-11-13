@@ -1,0 +1,46 @@
+name: "⚡ Feature Request"
+description: Suggest a new feature
+title: "[Feature]: <Title>"
+labels: [feature, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for finding the time to propose a new feature!
+        We really appreciate the community efforts to improve EigenDA.
+        Please search the issue list first as there is a chance that someone else has had the same idea.
+        If you find a similar request, add a thumbs-up to vote for it and optionally add a comment to be part of the conversation.
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: A description of your feature
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Use case
+      description: >
+        Describe the context in which the feature will be used and what is achieved when the feature is used.
+        This will help us understand and prioritize the feature request.
+      placeholder: >
+        Rather than telling us how you might implement this feature, try to take a
+        step back and describe what you are trying to achieve.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Solution proposal
+      description: You have an idea on how to implement the feature? Please share it with us.
+      placeholder: |
+          Type here.
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: Any useful additional info?
+    validations:
+      required: false
