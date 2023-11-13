@@ -32,9 +32,8 @@ type MetricsConfig struct {
 type Metrics struct {
 	registry *prometheus.Registry
 
-	NumRequests       *prometheus.CounterVec
-	NumFailedRequests *prometheus.CounterVec
-	Latency           *prometheus.SummaryVec
+	NumRequests *prometheus.CounterVec
+	Latency     *prometheus.SummaryVec
 
 	httpPort string
 	logger   common.Logger
@@ -52,14 +51,6 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 				Namespace: namespace,
 				Name:      "requests",
 				Help:      "the number of requests",
-			},
-			[]string{"status", "reason", "method"},
-		),
-		NumFailedRequests: promauto.With(reg).NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "failed_requests",
-				Help:      "the number of failed requests",
 			},
 			[]string{"status", "reason", "method"},
 		),
