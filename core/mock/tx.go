@@ -134,6 +134,12 @@ func (t *MockTransactor) GetCurrentBlockNumber(ctx context.Context) (uint32, err
 	return result.(uint32), args.Error(1)
 }
 
+func (t *MockTransactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(uint16), args.Error(1)
+}
+
 func (t *MockTransactor) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)

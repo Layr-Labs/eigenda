@@ -64,15 +64,15 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	transactor, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
-	blockStaleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
+	blockStaleMeasure, err := transactor.GetBlockStaleMeasure(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
 	}
-	storeDurationBlocks, err := tx.GetStoreDurationBlocks(context.Background())
+	storeDurationBlocks, err := transactor.GetStoreDurationBlocks(context.Background())
 	if err != nil || storeDurationBlocks == 0 {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
@@ -90,7 +90,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Creating blob store", "bucket", bucketName)
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	queue := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
@@ -114,7 +114,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	// TODO: create a separate metrics for batcher
 	metrics := disperser.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-	server := apiserver.NewDispersalServer(config.ServerConfig, queue, logger, metrics, ratelimiter, config.RateConfig)
+	server := apiserver.NewDispersalServer(config.ServerConfig, blobStore, transactor, logger, metrics, ratelimiter, config.RateConfig)
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {

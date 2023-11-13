@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -42,11 +43,13 @@ type ChurnResponse struct {
 }
 
 type churner struct {
-	Indexer              thegraph.IndexedChainState
-	Transactor           core.Transactor
-	StakeRegistryAddress gethcommon.Address
-	privateKey           *ecdsa.PrivateKey
-	logger               common.Logger
+	mu          sync.Mutex
+	Indexer     thegraph.IndexedChainState
+	Transactor  core.Transactor
+	QuorumCount uint16
+
+	privateKey *ecdsa.PrivateKey
+	logger     common.Logger
 }
 
 func NewChurner(
@@ -55,22 +58,18 @@ func NewChurner(
 	transactor core.Transactor,
 	logger common.Logger,
 ) (*churner, error) {
-	stakeRegistryAddress, err := transactor.StakeRegistry(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
 	privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
 	if err != nil {
 		return nil, err
 	}
 
 	return &churner{
-		Indexer:              indexer,
-		Transactor:           transactor,
-		StakeRegistryAddress: stakeRegistryAddress,
-		privateKey:           privateKey,
-		logger:               logger,
+		Indexer:     indexer,
+		Transactor:  transactor,
+		QuorumCount: 0,
+
+		privateKey: privateKey,
+		logger:     logger,
 	}, nil
 }
 
@@ -119,6 +118,22 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 	}
 
 	return c.createChurnResponse(ctx, operatorToRegisterId, operatorToRegisterAddress, churnRequest.QuorumIDs)
+}
+
+func (c *churner) UpdateQuorumCount(ctx context.Context) error {
+	currentBlock, err := c.Transactor.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+	count, err := c.Transactor.GetQuorumCount(ctx, currentBlock)
+	if err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	c.QuorumCount = count
+	c.mu.Unlock()
+	return nil
 }
 
 func (c *churner) createChurnResponse(
