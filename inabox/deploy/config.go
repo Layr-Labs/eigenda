@@ -149,6 +149,9 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_STD_LOG_LEVEL:  "debug",
 		CHURNER_FILE_LOG_LEVEL: "trace",
 		CHURNER_LOG_PATH:       logPath,
+
+		CHURNER_ENABLE_METRICS:    "true",
+		CHURNER_METRICS_HTTP_PORT: "9095",
 	}
 
 	env.applyDefaults(&v, "CHURNER", "churner", ind)

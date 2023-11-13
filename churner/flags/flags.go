@@ -57,6 +57,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "PER_PUBLIC_KEY_RATE_LIMIT"),
 		Value:    24 * time.Hour,
 	}
+	EnableMetrics = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
+		Usage:    "start metrics server",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ENABLE_METRICS"),
+	}
+	/* Optional Flags*/
+	MetricsHTTPPort = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
+		Usage:    "the http port which the metrics prometheus server is listening",
+		Required: false,
+		Value:    "9100",
+		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -65,10 +79,12 @@ var requiredFlags = []cli.Flag{
 	GraphUrlFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	EnableMetrics,
 }
 
 var optionalFlags = []cli.Flag{
 	PerPublicKeyRateLimit,
+	MetricsHTTPPort,
 }
 
 // Flags contains the list of configuration options available to the binary.
