@@ -10,18 +10,19 @@
 
 EigenDA is a secure, high-throughput, and decentralized data availability (DA) service built on top of Ethereum using the [EigenLayer](https://github.com/Layr-Labs/eigenlayer-contracts) restaking primitives.
 
-EigenDA is the [first actively validated service (AVS)](https://www.blog.eigenlayer.xyz/twelve-early-projects-building-on-eigenlayer/) built on EigenLayer. The EigenLayer restakers delegate stake to node operators performing validation for EigenDA for service payments, and rollups post data to EigenDA to access low cost, high throughput data availability service with security derived from Ethereum.
-
-- Aligning with Ethereum ecosystem and building toward the Ethereum scaling [endgame](https://vitalik.ca/general/2021/12/06/endgame.html)
-- A standard for high throughput and low cost data availability to enable growth of new on-chain use cases
-- Horizontally scaling both security and throughput with the amount of restake and operators in the network, and meanwhile protecting decentralization (less work needed from each operator as network scaling)
-- Innovative features such as Dual Quorum (two sperate quorums can be required to attest to the availability of data, for example ETH quorum and rollup's native token), customizable safety and liveness.
-
 To understand more how EigenDA works and how it transforms the modern landscape of data availability, continue reading [EigenDA introduction](https://www.blog.eigenlayer.xyz/intro-to-eigenda-hyperscale-data-availability-for-rollups/).
 
 To dive deep into the technical details, continue reading [EigenDA protocol spec](https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/overview.md).
 
 If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA questionnaire](https://docs.google.com/forms/d/e/1FAIpQLSez6PG-BL6C6Mc4QY1M--vbV219OGL_0Euv2zhJ1HmcUiU7cw/viewform).
+
+## Why EigenDA?
+As the [first actively validated service (AVS)](https://www.blog.eigenlayer.xyz/twelve-early-projects-building-on-eigenlayer/) built on EigenLayer, EigenDA transforms the data availability by providing high throughput and low cost serivice with security derived from Ethereum.
+
+- Aligning with Ethereum ecosystem and building toward the Ethereum scaling [endgame](https://vitalik.ca/general/2021/12/06/endgame.html)
+- A standard for high throughput and low cost data availability to enable growth of new on-chain use cases
+- Horizontally scaling both security and throughput with the amount of restake and operators in the network, and therefore protecting decentralization (less work needed from each operator as network scaling)
+- Innovative features such as Dual Quorum (two sperate quorums can be required to attest to the availability of data, for example ETH quorum and rollup's native token), customizable safety and liveness.
 
 ## API Documentation
 
@@ -45,3 +46,4 @@ We welcome all contributions! There are many ways to contribute to the project, 
 - [Open an Issue](https://github.com/Layr-Labs/eigenda/issues/new/choose)
 - [EigenLayer/EigenDA forum](https://forum.eigenlayer.xyz/c/eigenda/9)
 - [Email](mailto:eigenda-support@eigenlabs.org)
+- [Follow us on Twitter](https://twitter.com/eigenlayer)
