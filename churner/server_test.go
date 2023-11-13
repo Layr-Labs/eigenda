@@ -75,6 +75,42 @@ func TestChurn(t *testing.T) {
 		assert.Equal(t, operatorAddr.Bytes(), param.GetOperator())
 		assert.Equal(t, keyPair.PubKey.Serialize(), param.GetPubkey())
 	}
+
+	// retry prior to expiry should fail
+	_, err = s.Churn(ctx, request)
+	assert.ErrorContains(t, err, "previous approval not expired, retry in")
+}
+
+func TestChurnWithInvalidQuorum(t *testing.T) {
+	s := newTestServer(t)
+	ctx := context.Background()
+
+	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
+	request := &pb.ChurnRequest{
+		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
+		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
+		Salt:                       salt,
+		QuorumIds:                  []uint32{0, 1},
+	}
+
+	var requestHash [32]byte
+	requestHashBytes := crypto.Keccak256(
+		[]byte("ChurnRequest"),
+		request.OperatorToRegisterPubkeyG1,
+		request.OperatorToRegisterPubkeyG2,
+		request.Salt,
+	)
+	copy(requestHash[:], requestHashBytes)
+
+	signature := keyPair.SignMessage(requestHash)
+	request.OperatorRequestSignature = signature.Serialize()
+
+	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
+		PubkeyG1: keyPair.PubKey,
+	}, nil)
+
+	_, err := s.Churn(ctx, request)
+	assert.ErrorContains(t, err, "Invalid request: the quorum_id must be in range [0, 0], but found 1")
 }
 
 func setupMockTransactor() {
@@ -82,6 +118,7 @@ func setupMockTransactor() {
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
 	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(2), nil)
 	transactorMock.On("GetCurrentBlockNumber").Return(uint32(2), nil)
+	transactorMock.On("GetQuorumCount").Return(uint16(1), nil)
 	transactorMock.On("GetOperatorStakesForQuorums").Return([][]dacore.OperatorStake{
 		{
 			{

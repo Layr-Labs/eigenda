@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"net"
 
@@ -77,7 +76,7 @@ func (s *Server) serveDispersal() error {
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalDispersalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal("Could not start tcp listener")
+		s.logger.Fatalf("Could not start tcp listener: %w", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 1024) // 1 GiB
@@ -98,11 +97,10 @@ func (s *Server) serveDispersal() error {
 }
 
 func (s *Server) serveRetrieval() error {
-
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalRetrievalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal("Could not start tcp listener")
+		s.logger.Fatalf("Could not start tcp listener: %w", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB

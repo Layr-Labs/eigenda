@@ -11,19 +11,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	// the signature with the lastest expiry
-	latestExpiry = int64(0)
-)
-
 type Server struct {
 	pb.UnimplementedChurnerServer
 
-	config                      *Config
-	churner                     *churner
+	config  *Config
+	churner *churner
+	// the signature with the lastest expiry
+	latestExpiry                int64
 	lastRequestTimeByOperatorID map[core.OperatorID]time.Time
-	logger                      common.Logger
 
+	logger  common.Logger
 	metrics *Metrics
 }
 
@@ -36,6 +33,7 @@ func NewServer(
 	return &Server{
 		config:                      config,
 		churner:                     churner,
+		latestExpiry:                int64(0),
 		lastRequestTimeByOperatorID: make(map[core.OperatorID]time.Time),
 		logger:                      logger,
 		metrics:                     metrics,
@@ -61,15 +59,22 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	now := time.Now()
 	// check that we are after the previous approval's expiry
-	if now.Unix() < latestExpiry {
+	if now.Unix() < s.latestExpiry {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
-		return nil, fmt.Errorf("previous approval not expired, retry in %d", latestExpiry-now.Unix())
+		return nil, fmt.Errorf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix())
 	}
 
 	for quorumID := range req.GetQuorumIds() {
-		if quorumID > 255 {
-			s.metrics.IncrementFailedRequestNum("Churn", FailReasonQuorumIdOutOfRange)
-			return nil, fmt.Errorf("Invalid request: quorum ID must be in range [0, 255], but found %d", quorumID)
+		if quorumID >= int(s.churner.QuorumCount) {
+			err := s.churner.UpdateQuorumCount(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
+			}
+
+			if quorumID >= int(s.churner.QuorumCount) {
+				s.metrics.IncrementFailedRequestNum("Churn", FailReasonQuorumIdOutOfRange)
+				return nil, fmt.Errorf("Invalid request: the quorum_id must be in range [0, %d], but found %d", s.churner.QuorumCount-1, quorumID)
+			}
 		}
 	}
 
@@ -95,7 +100,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	}
 
 	// update the latest expiry
-	latestExpiry = response.SignatureWithSaltAndExpiry.Expiry.Int64()
+	s.latestExpiry = response.SignatureWithSaltAndExpiry.Expiry.Int64()
 
 	operatorsToChurn := convertToOperatorsToChurnGrpc(response.OperatorsToChurn)
 
