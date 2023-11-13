@@ -79,7 +79,7 @@ func (s *Server) serveDispersal() error {
 		s.logger.Fatalf("Could not start tcp listener: %w", err)
 	}
 
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 1024) // 1 GiB
+	opt := grpc.MaxRecvMsgSize(15 * 1024 * 1024 * 1024) // 15 GiB
 	gs := grpc.NewServer(opt)
 
 	// Register reflection service on gRPC server
@@ -103,7 +103,7 @@ func (s *Server) serveRetrieval() error {
 		s.logger.Fatalf("Could not start tcp listener: %w", err)
 	}
 
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	opt := grpc.MaxRecvMsgSize(1024 * 1024) // 1 MiB
 	gs := grpc.NewServer(opt)
 
 	// Register reflection service on gRPC server
