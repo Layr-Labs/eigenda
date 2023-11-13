@@ -195,13 +195,14 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// verify the lowest stake against the registering operator's stake
 		// make sure that: lowestStake * churnBIPsOfOperatorStake < operatorToRegisterStake * bipMultiplier
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
-			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", "Insufficient stake: operator doesn't have enough stake")
+			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
 			return nil, errors.New("registering operator has less than churnBIPsOfOperatorStake")
 		}
 
 		// verify the lowest stake against the total stake
 		// make sure that: lowestStake * bipMultiplier < totalStake * churnBIPsOfTotalStake
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
+			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
 			return nil, errors.New("operator to churn has less than churnBIPSOfTotalStake")
 		}
 

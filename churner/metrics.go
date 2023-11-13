@@ -12,6 +12,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+type FailReason string
+
+const (
+	FailReasonRateLimitExceeded           FailReason = "rate_limit_exceeded"            // Rate limited: per operator rate limiting
+	FailReasonInsufficientStakeToRegister FailReason = "insufficient_stake_to_register" // Operator doesn't have enough stake to be registered
+	FailReasonInsufficientStakeToChurn    FailReason = "insufficient_stake_to_churn"    // Operator doesn't have enough stake to be churned
+	FailReasonQuorumIdOutOfRange          FailReason = "quorum_id_out_of_range"         // Quorum ID out of range: quorum is not in the range of [0, 255]
+	FailReasonPrevApprovalNotExpired      FailReason = "prev_approval_not_expired"      // Expiry: previous approval hasn't expired
+	FailReasonInvalidSignature            FailReason = "invalid_signature"              // Invalid signature: operator's signature is wong
+	FailReasonProcessChurnRequestFailed   FailReason = "failed_process_churn_request"   // Failed to process churn request
+)
+
 type MetricsConfig struct {
 	HTTPPort      string
 	EnableMetrics bool
@@ -82,10 +94,10 @@ func (g *Metrics) IncrementSuccessfulRequestNum(method string) {
 }
 
 // IncrementFailedRequestNum increments the number of failed requests
-func (g *Metrics) IncrementFailedRequestNum(method string, reason string) {
+func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) {
 	g.NumRequests.With(prometheus.Labels{
 		"status": "failed",
-		"reason": reason,
+		"reason": string(reason),
 		"method": method,
 	}).Inc()
 }

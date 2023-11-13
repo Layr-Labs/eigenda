@@ -62,13 +62,13 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	now := time.Now()
 	// check that we are after the previous approval's expiry
 	if now.Unix() < latestExpiry {
-		s.metrics.IncrementFailedRequestNum("Churn", "Expiry: previous approval hasn't expired")
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
 		return nil, fmt.Errorf("previous approval not expired, retry in %d", latestExpiry-now.Unix())
 	}
 
 	for quorumID := range req.GetQuorumIds() {
 		if quorumID > 255 {
-			s.metrics.IncrementFailedRequestNum("Churn", "Invalid request: quorum ID must be in range [0, 255]")
+			s.metrics.IncrementFailedRequestNum("Churn", FailReasonQuorumIdOutOfRange)
 			return nil, fmt.Errorf("Invalid request: quorum ID must be in range [0, 255], but found %d", quorumID)
 		}
 	}
@@ -77,20 +77,20 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", "Invalid signature: operator's signature is wong")
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
 		return nil, fmt.Errorf("failed to verify request signature: %w", err)
 	}
 
 	// check if the request should be rate limited
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", "Rate limited: per operator rate limiting")
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
 		return nil, fmt.Errorf("rate limiter error: %w", err)
 	}
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", "Invalid request: failed to process churn request")
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
 		return nil, fmt.Errorf("failed to process churn request: %w", err)
 	}
 
