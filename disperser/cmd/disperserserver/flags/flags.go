@@ -74,7 +74,7 @@ var (
 	}
 	BucketStoreSize = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "rate-bucket-store-size"),
-		Usage:    "size of the local store to use for rate limiting buckets",
+		Usage:    "size (max number of entries) of the local store to use for rate limiting buckets",
 		Value:    100_000,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RATE_BUCKET_STORE_SIZE"),
 		Required: false,
