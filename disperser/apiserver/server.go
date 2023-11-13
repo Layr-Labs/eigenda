@@ -27,7 +27,7 @@ const maxBlobSize = 1024 * 512 // 512 KiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
-	mu sync.Mutex
+	mu *sync.Mutex
 
 	config disperser.ServerConfig
 
@@ -64,6 +64,7 @@ func NewDispersalServer(
 		logger:      logger,
 		ratelimiter: ratelimiter,
 		rateConfig:  rateConfig,
+		mu:          &sync.Mutex{},
 	}
 }
 
@@ -164,6 +165,11 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 }
 
 func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin string) error {
+
+	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, param := range blob.RequestHeader.SecurityParams {
 
 		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]

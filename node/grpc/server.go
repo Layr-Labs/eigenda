@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"net"
 
@@ -29,6 +30,8 @@ type Server struct {
 	logger common.Logger
 
 	ratelimiter common.RateLimiter
+
+	mu *sync.Mutex
 }
 
 // NewServer creates a new Server instance with the provided parameters.
@@ -41,6 +44,7 @@ func NewServer(config *node.Config, node *node.Node, logger common.Logger, ratel
 		logger:      logger,
 		node:        node,
 		ratelimiter: ratelimiter,
+		mu:          &sync.Mutex{},
 	}
 }
 
@@ -187,7 +191,10 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 
 	encodedBlobSize := core.GetBlobSize(blobHeader.QuorumInfos[in.GetQuorumId()].EncodedBlobLength)
 	rate := blobHeader.QuorumInfos[in.GetQuorumId()].QuorumRate
+
+	s.mu.Lock()
 	allow, err := s.ratelimiter.AllowRequest(ctx, retrieverID, encodedBlobSize, rate)
+	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
