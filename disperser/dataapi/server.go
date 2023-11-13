@@ -358,6 +358,7 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
 		batches         = make([]*Batch, 0)
 		blobKeyPresence = make(map[string]struct{})
+		batchPresence   = make(map[string]struct{})
 	)
 
 	for skip := 0; len(blobMetadatas) < limit && skip < limit; skip += maxQueryBatchesLimit {
@@ -384,6 +385,14 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 				s.logger.Error("Failed to convert batch header hash to hex string", "error", err)
 				continue
 			}
+			batchKey := string(batchHeaderHash[:])
+			if _, found := batchPresence[batchKey]; !found {
+				batchPresence[batchKey] = struct{}{}
+			} else {
+				// The batch has processed, skip it.
+				s.logger.Error("Getting duplicate batch from the graph", "batch header hash", batchKey)
+				continue
+			}
 
 			metadatas, err := s.blobstore.GetAllBlobMetadataByBatch(ctx, batchHeaderHash)
 			if err != nil {
@@ -395,6 +404,8 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 				if _, found := blobKeyPresence[blobKey]; !found {
 					blobKeyPresence[blobKey] = struct{}{}
 					blobMetadatas = append(blobMetadatas, bm)
+				} else {
+					s.logger.Error("Getting duplicate blob key from the blobstore", "blobkey", blobKey)
 				}
 			}
 			batches = append(batches, batch)
