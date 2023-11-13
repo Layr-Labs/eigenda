@@ -69,7 +69,7 @@ var (
 	BucketTableName = cli.StringFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "rate-bucket-table-name"),
 		Usage:  "name of the dynamodb table to store rate limiter buckets. If not provided, a local store will be used",
-		Value:  "BucketStore",
+		Value:  "",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "RATE_BUCKET_TABLE_NAME"),
 	}
 	BucketStoreSize = cli.UintFlag{
