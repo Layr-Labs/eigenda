@@ -22,6 +22,7 @@ type Config struct {
 	RateConfig        apiserver.RateConfig
 	EnableRatelimiter bool
 	BucketTableName   string
+	BucketStoreSize   int
 	EthClientConfig   geth.EthClientConfig
 
 	BLSOperatorStateRetrieverAddr string
@@ -53,6 +54,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		RateConfig:        apiserver.ReadCLIConfig(ctx),
 		EnableRatelimiter: ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
 		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),

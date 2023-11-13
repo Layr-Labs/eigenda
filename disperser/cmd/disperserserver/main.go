@@ -58,17 +58,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	bucketName := config.BlobstoreConfig.BucketName
-	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
-	if err != nil {
-		return err
-	}
-	logger.Info("Initialized S3 client", "bucket", bucketName)
-
-	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
-	if err != nil {
-		return err
-	}
 	client, err := geth.NewClient(config.EthClientConfig, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", err)
@@ -87,6 +76,19 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil || storeDurationBlocks == 0 {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
+
+	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
+	if err != nil {
+		return err
+	}
+
+	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
+	if err != nil {
+		return err
+	}
+
+	bucketName := config.BlobstoreConfig.BucketName
+	logger.Info("Creating blob store", "bucket", bucketName)
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	queue := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
@@ -94,13 +96,19 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if config.EnableRatelimiter {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
 
-		dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
-		if err != nil {
-			return err
+		var bucketStore common.KVStore[common.RateBucketParams]
+		if config.BucketTableName != "" {
+			dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
+			if err != nil {
+				return err
+			}
+			bucketStore = store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, config.BucketTableName)
+		} else {
+			bucketStore, err = store.NewLocalParamStore[common.RateBucketParams](config.BucketStoreSize)
+			if err != nil {
+				return err
+			}
 		}
-		logger.Info("Initialized dynamodb client")
-
-		bucketStore := store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, config.BucketTableName)
 		ratelimiter = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
 	}
 
