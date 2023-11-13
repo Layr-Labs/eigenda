@@ -98,12 +98,13 @@ message SecurityParams {
 	//
 	// Requires:
 	//     1 <= quorum_threshld <= 100
-	//     quorum_threshld > adversary_threshold.
+	//     quorum_threshld > adversary_threshold + 10.
 	//
 	// Note: The adversary_threshold and quorum_threshold will directly influence the
 	// cost of encoding for the blob to be dispersed, roughly by a factor of
 	// 100 / (quorum_threshold - adversary_threshold). See the spec for more details:
 	// https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/protocol-modules/storage/overview.md
+	// Currently it's required that the difference must be at least 10.
 	uint32 quorum_threshold = 3;
 }
 
@@ -198,8 +199,8 @@ message BatchMetadata {
 	BatchHeader batch_header = 1;
 	// The hash of all public keys of the operators that did not sign the batch.
 	bytes signatory_record_hash = 2;
-	// The gas fee of confirming this batch. It's the bytes representation of
-	// a big.Int value.
+	// The fee payment paid by users for dispersing this batch. It's the bytes
+	// representation of a big.Int value.
 	bytes fee = 3;
 	// The Ethereum block number at which the batch is confirmed onchain.
 	uint32 confirmation_block_number = 4;
