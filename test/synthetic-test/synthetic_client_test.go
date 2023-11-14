@@ -13,22 +13,28 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shurcooL/graphql"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	retriever_rpc "github.com/Layr-Labs/eigenda/api/grpc/retriever"
+	"github.com/Layr-Labs/eigenda/clients"
 	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/proto/protogen/encoder"
+	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -51,17 +57,26 @@ type GrpcClient struct {
 	Client   interface{} // This can be a specific client type (disperser_rpc.DisperserClient, retriever_rpc.RetrieverClient, etc.)
 }
 
+type RetrieverClientConfig struct {
+	ChurnerGraphUrl    string
+	RetrieverSrsOrder  string
+	RetrieverG1Path    string
+	RetrieverG2Path    string
+	RetrieverCachePath string
+}
+
 type TestClients struct {
 	Clients map[ClientType]*GrpcClient
 }
 
 // TestSuite Struct.
 type SyntheticTestSuite struct {
-	Clients    *TestClients
-	EthClient  common.EthClient
-	MockRollUp *rollupbindings.ContractMockRollup
-	Logger     *log.Logger
-	TestRunID  string
+	Clients         *TestClients
+	EthClient       common.EthClient
+	MockRollUp      *rollupbindings.ContractMockRollup
+	RetrievalClient *retrievalClient
+	Logger          *log.Logger
+	TestRunID       string
 }
 
 var (
@@ -70,7 +85,7 @@ var (
 	validateOnchainTransaction bool = false
 )
 
-func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string) *SyntheticTestSuite {
+func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
 	testRunID := uuid.New().String()
 	logger := log.New(os.Stdout, "EigenDA SyntheticClient:"+testRunID+" ", log.Ldate|log.Ltime)
 
@@ -115,6 +130,8 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string) *S
 
 	mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
 
+	retrievalClient, err := setupRetrievalClient(ethClient, &deploy.Config{
+
 	// Assign client connections to pointers in TestClients struct
 	return &SyntheticTestSuite{
 		Clients:    clients,
@@ -133,8 +150,17 @@ func TestMain(m *testing.M) {
 	isRetrieverClientDeployed = os.Getenv("RETRIEVER_CLIENT_DEPLOYED") == strings.ToLower("true")
 	validateOnchainTransaction = os.Getenv("VALIDATE_ONCHAIN_TRANSACTION") == strings.ToLower("true")
 
+	// Retriever Config
+	retrieverClientConfig := &RetrieverClientConfig{
+		ChurnerGraphUrl:    os.Getenv("RETRIEVER_CHURNER_GRAPH_URL"),
+		RetrieverSrsOrder:  os.Getenv("RETRIEVER_SRS_ORDER"),
+		RetrieverG1Path:    os.Getenv("RETRIEVER_G1_PATH"),
+		RetrieverG2Path:    os.Getenv("RETRIEVER_G2_PATH"),
+		RetrieverCachePath: os.Getenv("RETRIEVER_CACHE_PATH"),
+	}
+
 	// Initialize Clients
-	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress)
+	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, retrieverClientConfig)
 	logger := testSuite.Logger
 
 	// Check if testSuite is nil
@@ -152,6 +178,41 @@ func TestMain(m *testing.M) {
 	logger.Printf("Exiting Test Client Run with Code:%d", exitCode)
 	// Exit with the test result code
 	os.Exit(exitCode)
+}
+
+func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger *log.Logger) (retrievalClient, error) {
+	// https://github.com/Layr-Labs/eigenda/blob/b8c151436ecefc8046e4aefcdcfee67abf9e8faa/inabox/tests/integration_suite_test.go#L124
+	tx, err := eth.NewTransactor(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	if err != nil {
+		return err
+	}
+
+	cs := eth.NewChainState(tx, client)
+	querier := graphql.NewClient(retrievalClientConfig.CHURNER_GRAPH_URL, nil)
+	indexedChainStateClient := thegraph.NewIndexedChainState(cs, querier, logger)
+	agn := &core.StdAssignmentCoordinator{}
+	nodeClient := clients.NewNodeClient(20 * time.Second)
+	srsOrder, err := strconv.Atoi(retrievalClientConfig.RETRIEVER_SRS_ORDER)
+	if err != nil {
+		return nil, err
+	}
+	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
+		KzgConfig: kzgEncoder.KzgConfig{
+			G1Path:         retrievalClientConfig.RETRIEVER_G1_PATH,
+			G2Path:         retrievalClientConfig.RETRIEVER_G2_PATH,
+			CacheDir:       retrievalClientConfig.RETRIEVER_CACHE_PATH,
+			NumWorker:      1,
+			SRSOrder:       uint64(srsOrder),
+			Verbose:        true,
+			PreloadEncoder: true,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	retrievalClient = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
+	return retrievalClient, nil
 }
 
 // TODO: This file contains some code that can be refactored and shared across some other tests ex:Integration Test.
@@ -252,21 +313,32 @@ loop:
 				}
 
 				// Retrieve Blob from Retriever Client
-				if isRetrieverClientDeployed {
+				if isRetrieverClientEnabled {
 					logger.Printf("Retry Blob using Retrieval Client %v", blobReply)
-					retrieveBlobTime := time.Now()
-					retrieverClientBlobReply, err := retrieverClientBlobRetrieve(blobReply, 0)
-
-					// For now log....later we can define a baseline value for this
-					logger.Printf("Time to RetrieveBlob %v", time.Since(retrieveBlobTime).Seconds())
+					retrieverClientCtx, cancel = context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+					logger.Printf("RetrievalClient:GetBatchHeaderHash()", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash())
+					logger.Printf("RetrievalClient:GetBlobIndex()", blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
+					logger.Printf("RetrievalClient:GetReferenceBlockNumber()", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
+					logger.Printf("RetrievalClient:GetBatchRoot()", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
+					
+					// RetrieverClient RetrieveBlobParams
+					// batchHeaderHash [32]byte,
+					// blobIndex uint32,
+					// referenceBlockNumber uint,
+					// batchRoot [32]byte,
+					// quorumID core.QuorumID
+					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+						0,
+					)
 					assert.Nil(t, err)
-					assert.NotNil(t, retrieverClientBlobReply)
-
-					// Verify RetrieverClientData Matches input data
-					assert.Equal(t, data, retrieverClientBlobReply.Data)
-
-					// Verify Disperser and Retriever Client Blob Reply Data Matches
-					assert.Equal(t, retrieverClientBlobReply.Data, disperserClientBlobReply.Data)
+					assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
+				
+					logger.Printf("Retry Blob using Retrieval Client %v", blobReply)
 				}
 
 				break loop
