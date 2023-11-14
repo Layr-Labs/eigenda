@@ -11,6 +11,7 @@ const (
 	TotalUnauthThroughputFlagName   = "auth.total-unauth-throughput"
 	PerUserUnauthThroughputFlagName = "auth.per-user-unauth-throughput"
 	ClientIPHeaderFlagName          = "auth.client-ip-header"
+	TrustedProxiesFlagname          = "auth.trusted-proxies"
 )
 
 type QuorumRateInfo struct {
@@ -21,6 +22,7 @@ type QuorumRateInfo struct {
 type RateConfig struct {
 	QuorumRateInfos map[core.QuorumID]QuorumRateInfo
 	ClientIPHeader  string
+	TruxtedProxies  map[string]struct{}
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -45,15 +47,26 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:     ClientIPHeaderFlagName,
-			Usage:    "The name of the header used to get the client IP address. If set to empty string, the IP address will be taken from the connection. The rightmost value of the header will be used. For AWS, this should be set to 'x-forwarded-for'.",
+			Usage:    "The name of the header used to get the client IP address. If set to empty string, the IP address will be taken from the connection. The rightmost value of the header will be used, unless a list of trusted proxies is provided. For AWS, this should be set to 'x-forwarded-for'.",
 			Required: false,
 			Value:    "",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CLIENT_IP_HEADER"),
+		},
+		cli.StringSliceFlag{
+			Name:     TrustedProxiesFlagname,
+			Usage:    "The trusted proxies that the request has been forwarded through. If non-empty, the disperser will pull the request IP from the first non-trusted proxy address in the header, reading from right to left.",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "TRUSTED_PROXIES"),
 		},
 	}
 }
 
 func ReadCLIConfig(c *cli.Context) RateConfig {
+
+	trustedProxies := make(map[string]struct{})
+	for _, proxy := range c.StringSlice(TrustedProxiesFlagname) {
+		trustedProxies[proxy] = struct{}{}
+	}
 
 	quorumRateInfos := make(map[core.QuorumID]QuorumRateInfo)
 	for ind, quorumID := range c.IntSlice(RegisteredQuorumFlagName) {
@@ -67,5 +80,6 @@ func ReadCLIConfig(c *cli.Context) RateConfig {
 	return RateConfig{
 		QuorumRateInfos: quorumRateInfos,
 		ClientIPHeader:  c.String(ClientIPHeaderFlagName),
+		TruxtedProxies:  trustedProxies,
 	}
 }
