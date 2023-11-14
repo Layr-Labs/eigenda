@@ -65,3 +65,43 @@ func GetClientAddress(ctx context.Context, header string) (string, error) {
 		return host, nil
 	}
 }
+
+// GetClientAddressWithTrustedProxies is a modified version of GetClientAddress that takes into account the possibility
+// that the request has been proxied through multiple trusted proxies. The function takes in a list of trusted proxies
+// and will pass through the request headers until it finds the first non-trusted proxy. If the request has not been
+// proxied, the function will return the same result as GetClientAddress.
+func GetClientAddressWithTrustedProxies(ctx context.Context, headerName string, trustedProxies map[string]struct{}) (string, error) {
+
+	// If no headerName is specified, return the remote address
+	if headerName == "" {
+		p, ok := peer.FromContext(ctx)
+		if !ok {
+			return "", fmt.Errorf("failed to get peer from request")
+		}
+		addr := p.Addr.String()
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return "", err
+		}
+		return host, nil
+	}
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok || len(md.Get(headerName)) == 0 {
+		return "", fmt.Errorf("failed to get ip from header")
+	}
+
+	ips := md.Get(headerName)
+
+	// Iterate over the IPs from right to left
+	for i := len(ips) - 1; i >= 0; i-- {
+		ip := ips[i]
+
+		// If the IP is not in the trusted proxies list, return it
+		if _, ok := trustedProxies[ip]; !ok {
+			return ip, nil
+		}
+	}
+
+	return "", fmt.Errorf("all IPs in header are trusted proxies")
+}
