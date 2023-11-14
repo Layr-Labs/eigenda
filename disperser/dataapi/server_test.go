@@ -39,8 +39,9 @@ var (
 	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi)
 	config                 = dataapi.Config{ServerMode: "test", SocketAddr: ":8080"}
 
+	mockTx                          = &coremock.MockTransactor{}
 	mockChainState, _               = coremock.NewChainDataMock(core.OperatorIndex(1))
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
@@ -159,6 +160,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
 	mockSubgraphApi.On("QueryOperators").Return(subgraphOperatorRegistereds, nil)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)

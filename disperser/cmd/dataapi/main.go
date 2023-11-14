@@ -97,6 +97,7 @@ func RunDataApi(ctx *cli.Context) error {
 			sharedStorage,
 			promClient,
 			subgraphClient,
+			tx,
 			chainState,
 			logger,
 			metrics,

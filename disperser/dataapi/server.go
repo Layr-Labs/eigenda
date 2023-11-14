@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
 	"github.com/gin-contrib/cors"
@@ -79,6 +80,7 @@ type (
 		blobstore      disperser.BlobStore
 		promClient     PrometheusClient
 		subgraphClient SubgraphClient
+		transactor     core.Transactor
 		chainState     core.ChainState
 
 		metrics *Metrics
@@ -90,6 +92,7 @@ func NewServer(
 	blobstore disperser.BlobStore,
 	promClient PrometheusClient,
 	subgraphClient SubgraphClient,
+	transactor core.Transactor,
 	chainState core.ChainState,
 	logger common.Logger,
 	metrics *Metrics,
@@ -102,6 +105,7 @@ func NewServer(
 		blobstore:      blobstore,
 		promClient:     promClient,
 		subgraphClient: subgraphClient,
+		transactor:     transactor,
 		chainState:     chainState,
 		metrics:        metrics,
 	}
