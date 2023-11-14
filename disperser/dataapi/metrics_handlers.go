@@ -3,10 +3,10 @@ package dataapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/gammazero/workerpool"
 )
 
@@ -22,7 +22,11 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 		return nil, err
 	}
 
-	totalStake, err := s.calculateTotalStake(operators)
+	blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	totalStake, err := s.calculateTotalStake(operators, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -69,17 +73,13 @@ func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*
 	return calculateAverageThroughput(result.Values, avgThroughputWindowSize), nil
 }
 
-func (s *server) calculateTotalStake(operators []*Operator) (int64, error) {
+func (s *server) calculateTotalStake(operators []*Operator, blockNumber uint32) (int64, error) {
 	var (
 		totalStakeByOperatorChan = make(chan *big.Int, len(operators))
 		pool                     = workerpool.New(maxWorkersGetOperatorState)
 	)
 
 	for _, o := range operators {
-		var (
-			operatorId  core.OperatorID
-			blockNumber = uint(o.BlockNumber)
-		)
 		operatorId, err := ConvertHexadecimalToBytes(o.OperatorId)
 		if err != nil {
 			s.logger.Error("Failed to convert operator id to hex string: ", "operatorId", operatorId, "err", err)
@@ -87,7 +87,7 @@ func (s *server) calculateTotalStake(operators []*Operator) (int64, error) {
 		}
 
 		pool.Submit(func() {
-			operatorState, err := s.chainState.GetOperatorStateByOperator(context.Background(), blockNumber, operatorId)
+			operatorState, err := s.chainState.GetOperatorStateByOperator(context.Background(), uint(blockNumber), operatorId)
 			if err != nil {
 				s.logger.Error("Failed to get operator state: ", "operatorId", operatorId, "blockNumber", blockNumber, "err", err)
 				totalStakeByOperatorChan <- big.NewInt(-1)
