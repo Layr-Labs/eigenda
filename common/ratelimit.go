@@ -88,7 +88,7 @@ func GetClientAddressWithTrustedProxies(ctx context.Context, headerName string, 
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok || len(md.Get(headerName)) == 0 {
-		return "", fmt.Errorf("failed to get ip from header")
+		return "", fmt.Errorf("the header %s is not present in the request", headerName)
 	}
 
 	ips := md.Get(headerName)
