@@ -152,12 +152,13 @@ func newTestServer(t *testing.T) *churner.Server {
 
 	setupMockTransactor()
 
-	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger)
+	metrics := churner.NewMetrics("9001", logger)
+	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger, metrics)
 	if err != nil {
 		log.Fatalln("cannot create churner", err)
 	}
 
-	return churner.NewServer(config, cn, logger)
+	return churner.NewServer(config, cn, logger, metrics)
 }
 
 func makeOperatorId(id int) dacore.OperatorID {

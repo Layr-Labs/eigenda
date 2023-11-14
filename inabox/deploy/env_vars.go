@@ -357,6 +357,10 @@ type ChurnerVars struct {
 	CHURNER_LOG_PATH string
 
 	CHURNER_INDEXER_PULL_INTERVAL string
+
+	CHURNER_ENABLE_METRICS string
+
+	CHURNER_METRICS_HTTP_PORT string
 }
 
 func (vars ChurnerVars) getEnvMap() map[string]string {

@@ -26,7 +26,8 @@ func TestProcessChurnRequest(t *testing.T) {
 			PrivateKeyString: churnerPrivateKeyHex,
 		},
 	}
-	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger)
+	metrics := churner.NewMetrics("9001", logger)
+	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger, metrics)
 	assert.NoError(t, err)
 	assert.NotNil(t, cn)
 

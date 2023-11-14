@@ -13,6 +13,7 @@ type Config struct {
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    logging.Config
 	GraphUrl        string
+	MetricsConfig   MetricsConfig
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -28,5 +29,9 @@ func NewConfig(ctx *cli.Context) *Config {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
+		MetricsConfig: MetricsConfig{
+			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
+			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
+		},
 	}
 }

@@ -8,6 +8,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Server struct {
@@ -19,13 +20,15 @@ type Server struct {
 	latestExpiry                int64
 	lastRequestTimeByOperatorID map[core.OperatorID]time.Time
 
-	logger common.Logger
+	logger  common.Logger
+	metrics *Metrics
 }
 
 func NewServer(
 	config *Config,
 	churner *churner,
 	logger common.Logger,
+	metrics *Metrics,
 ) *Server {
 	return &Server{
 		config:                      config,
@@ -33,20 +36,31 @@ func NewServer(
 		latestExpiry:                int64(0),
 		lastRequestTimeByOperatorID: make(map[core.OperatorID]time.Time),
 		logger:                      logger,
+		metrics:                     metrics,
 	}
 }
 
-func (s *Server) Start(ctx context.Context) error {
-	// TODO: Start Metrics
+func (s *Server) Start(metricsConfig MetricsConfig) error {
+	// Enable Metrics Block
+	if metricsConfig.EnableMetrics {
+		httpSocket := fmt.Sprintf(":%s", metricsConfig.HTTPPort)
+		s.metrics.Start(context.Background())
+		s.logger.Info("Enabled metrics for Churner", "socket", httpSocket)
+	}
 	return nil
 }
 
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("Churn", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
 	s.logger.Info("Received request: ", "QuorumIds", req.GetQuorumIds())
 
 	now := time.Now()
 	// check that we are after the previous approval's expiry
 	if now.Unix() < s.latestExpiry {
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
 		return nil, fmt.Errorf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix())
 	}
 
@@ -58,6 +72,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 			}
 
 			if quorumID >= int(s.churner.QuorumCount) {
+				s.metrics.IncrementFailedRequestNum("Churn", FailReasonQuorumIdOutOfRange)
 				return nil, fmt.Errorf("Invalid request: the quorum_id must be in range [0, %d], but found %d", s.churner.QuorumCount-1, quorumID)
 			}
 		}
@@ -67,17 +82,20 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
 		return nil, fmt.Errorf("failed to verify request signature: %w", err)
 	}
 
 	// check if the request should be rate limited
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
 		return nil, fmt.Errorf("rate limiter error: %w", err)
 	}
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
 	if err != nil {
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
 		return nil, fmt.Errorf("failed to process churn request: %w", err)
 	}
 
@@ -86,6 +104,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	operatorsToChurn := convertToOperatorsToChurnGrpc(response.OperatorsToChurn)
 
+	s.metrics.IncrementSuccessfulRequestNum("Churn")
 	return &pb.ChurnReply{
 		SignatureWithSaltAndExpiry: &pb.SignatureWithSaltAndExpiry{
 			Signature: response.SignatureWithSaltAndExpiry.Signature,
