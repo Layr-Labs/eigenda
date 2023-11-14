@@ -55,7 +55,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		cli.StringSliceFlag{
 			Name:     TrustedProxiesFlagname,
 			Usage:    "The trusted proxies that the request has been forwarded through. If non-empty, the disperser will pull the request IP from the first non-trusted proxy address in the header, reading from right to left.",
-			Required: true,
+			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "TRUSTED_PROXIES"),
 		},
 	}
