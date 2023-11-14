@@ -51,6 +51,13 @@ func (s *Server) Start(metricsConfig MetricsConfig) error {
 }
 
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
+
+	err := s.validateChurnRequest(ctx, req)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("Churn", f*1000) // make milliseconds
 	}))
@@ -62,20 +69,6 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	if now.Unix() < s.latestExpiry {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
 		return nil, fmt.Errorf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix())
-	}
-
-	for quorumID := range req.GetQuorumIds() {
-		if quorumID >= int(s.churner.QuorumCount) {
-			err := s.churner.UpdateQuorumCount(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
-			}
-
-			if quorumID >= int(s.churner.QuorumCount) {
-				s.metrics.IncrementFailedRequestNum("Churn", FailReasonQuorumIdOutOfRange)
-				return nil, fmt.Errorf("Invalid request: the quorum_id must be in range [0, %d], but found %d", s.churner.QuorumCount-1, quorumID)
-			}
-		}
 	}
 
 	request := createChurnRequest(req)
@@ -123,6 +116,46 @@ func (s *Server) checkShouldBeRateLimited(now time.Time, request ChurnRequest) e
 	}
 	s.lastRequestTimeByOperatorID[operatorToRegisterId] = now
 	return nil
+}
+
+func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest) error {
+
+	if len(req.OperatorRequestSignature) != 64 {
+		return fmt.Errorf("invalid signature length")
+	}
+
+	if len(req.OperatorToRegisterPubkeyG1) != 64 {
+		return fmt.Errorf("invalid operatorToRegisterPubkeyG1 length")
+	}
+
+	if len(req.OperatorToRegisterPubkeyG2) != 128 {
+		return fmt.Errorf("invalid operatorToRegisterPubkeyG2 length")
+	}
+
+	if len(req.Salt) != 32 {
+		return fmt.Errorf("invalid salt length")
+	}
+
+	// TODO: ensure that all quorumIDs are valid
+	if len(req.QuorumIds) == 0 {
+		return fmt.Errorf("invalid quorumIds length")
+	}
+
+	for quorumID := range req.GetQuorumIds() {
+		if quorumID >= int(s.churner.QuorumCount) {
+			err := s.churner.UpdateQuorumCount(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get onchain quorum count: %w", err)
+			}
+
+			if quorumID >= int(s.churner.QuorumCount) {
+				return fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.churner.QuorumCount-1, quorumID)
+			}
+		}
+	}
+
+	return nil
+
 }
 
 func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
