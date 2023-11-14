@@ -81,7 +81,24 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 			},
 		},
 	})
-	assert.ErrorContains(t, err, "Invalid request: the quorum_id must be in range [0, 1], but found 2")
+	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    90,
+			},
+		},
+	})
+	assert.ErrorContains(t, err, "invalid request: security_params must not contain duplicate quorum_id")
 }
 
 func TestGetBlobStatus(t *testing.T) {

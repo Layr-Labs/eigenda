@@ -78,10 +78,19 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	if len(securityParams) == 0 {
 		return nil, fmt.Errorf("invalid request: security_params must not be empty")
 	}
+	if len(securityParams) > 256 {
+		return nil, fmt.Errorf("invalid request: security_params must not exceed 256")
+	}
 
+	seenQuorums := make(map[uint32]struct{})
 	// The quorum ID must be in range [0, 255]. It'll actually be converted
 	// to uint8, so it cannot be greater than 255.
 	for _, param := range securityParams {
+		if _, ok := seenQuorums[param.QuorumId]; ok {
+			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
+		}
+		seenQuorums[param.QuorumId] = struct{}{}
+
 		if param.GetQuorumId() >= uint32(s.quorumCount) {
 			err := s.updateQuorumCount(ctx)
 			if err != nil {
@@ -89,7 +98,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 			}
 
 			if param.GetQuorumId() >= uint32(s.quorumCount) {
-				return nil, fmt.Errorf("Invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.GetQuorumId())
+				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.GetQuorumId())
 			}
 		}
 	}
