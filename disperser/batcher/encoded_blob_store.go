@@ -97,9 +97,12 @@ func (e *encodedBlobStore) PutEncodingResult(result *EncodingResult) error {
 		return fmt.Errorf("PutEncodedBlob: no such key (%s) in requested set", requestID)
 	}
 
+	if _, ok := e.encoded[requestID]; !ok {
+		e.encodedResultSize += getChunksSize(result)
+	}
 	e.encoded[requestID] = result
 	delete(e.requested, requestID)
-	e.encodedResultSize += getChunksSize(result)
+	e.logger.Trace("[PutEncodingResult]", "referenceBlockNumber", result.ReferenceBlockNumber, "requestID", requestID, "encodedSize", e.encodedResultSize)
 
 	return nil
 }
@@ -132,7 +135,7 @@ func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint)
 			fetched = append(fetched, encodedResult)
 		}
 	}
-	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "blockNumber", blockNumber)
+	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "blockNumber", blockNumber, "encodedSize", e.encodedResultSize)
 
 	return fetched
 }
