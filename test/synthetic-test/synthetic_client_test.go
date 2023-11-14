@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"math/rand"
 	"os"
@@ -32,6 +33,7 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type ClientType string
@@ -75,8 +77,8 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string) *S
 	// Initialize your TestClients and other suite fields here
 	clients, err := newTestClients(map[ClientType]*GrpcClient{
 		Disperser: {
-			Hostname: "disperser.disperser.svc.cluster.local",
-			GrpcPort: "32001",
+			Hostname: "disperser-goerli.eigenda-testnet.eigenops.xyz",
+			GrpcPort: "443",
 			Timeout:  10 * time.Second,
 		},
 		Retriever: {
@@ -181,12 +183,18 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	logger.Printf("Blob Key After Dispersing %s", hex.EncodeToString(key))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
+	if key == nil {
+		logger.Printf("Blob Key Dispersing Error %s", err.Error())
+		t.Fail()
+		return
+	}
+
 	disperseBlobStopTime := time.Since(disperseBlobStartTime)
 	// For now log....later we can define a baseline value for this
 	logger.Printf("Time to Disperse Blob %s", disperseBlobStopTime.String())
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
-	confirmationDeadline := time.Now().Add(60 * time.Second)
+	confirmationDeadline := time.Now().Add(240 * time.Second)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -266,7 +274,7 @@ loop:
 
 			// Check if the confirmation process has exceeded the maximum duration
 			if time.Now().After(confirmationDeadline) {
-				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout of 5 minutes")
+				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout of 4 minutes")
 				logger.Println("Failing the test")
 				t.Fail()
 				return
@@ -428,12 +436,21 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
 	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
+	fmt.Printf("VerificationProof:SignatoryRecordHash: %v\n", sig)
+	fmt.Printf("VerificationProof:ConfirmationBlockNumber: %v\n", batchMetadataProto.GetConfirmationBlockNumber())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
 		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
+
+	fmt.Printf("VerificationProof:BatchId: %v\n", verificationProof.GetBatchId())
+	fmt.Printf("VerificationProof:BlobIndex: %v\n", uint8(verificationProof.GetBlobIndex()))
+	fmt.Printf("VerificationProof:BatchMetadata: %v\n", batchMetadata)
+	fmt.Printf("VerificationProof:InclusionProof: %v\n", verificationProof.GetInclusionProof())
+	fmt.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
+
 	return rollupbindings.EigenDABlobUtilsBlobVerificationProof{
 		BatchId:                verificationProof.GetBatchId(),
 		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
@@ -571,9 +588,27 @@ func createClient(conn *grpc.ClientConn, clientType ClientType) interface{} {
 func newTestClients(clients map[ClientType]*GrpcClient) (*TestClients, error) {
 	grpcClients := make(map[ClientType]*GrpcClient)
 
+	// serverAddress := "disperser-goerli.eigenda-testnet.eigenops.xyz:443"
+	// conn, err := grpc.Dial(serverAddress, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDefaultCallOptions(
+	// 	grpc.MaxCallRecvMsgSize(math.MaxInt32), // Increase frame size limit
+	// ))
+	// if err != nil {
+	// 	log.Fatalf("Error dialing server: %v", err)
+	// }
+	// defer conn.Close()
+
 	for clientType, grpcClient := range clients {
 		addr := fmt.Sprintf("%s:%s", grpcClient.Hostname, grpcClient.GrpcPort)
-		conn, err := grpc.Dial(addr, grpc.WithInsecure()) // Using insecure connection for simplicity, consider using secure connection in production
+		fmt.Println("Address: ", addr, " ClientType: ", clientType)
+		// conn, err := grpc.Dial(addr, grpc.WithInsecure()) // Using insecure connection for simplicity, consider using secure connection in production
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to dial %s server: %v", clientType, err)
+		// }
+
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(math.MaxInt32), // Increase frame size limit
+		))
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial %s server: %v", clientType, err)
 		}
