@@ -180,7 +180,11 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 			return nil, nil
 		}
 
-		if operatorSetParams.MaxOperatorCount != uint32(len(operatorStakes[i])) {
+		if operatorSetParams.MaxOperatorCount == 0 {
+			return nil, errors.New("maxOperatorCount is 0")
+		}
+
+		if uint32(len(operatorStakes[i])) < operatorSetParams.MaxOperatorCount {
 			// quorum is not full, so we can continue
 			continue
 		}

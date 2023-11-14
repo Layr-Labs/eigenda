@@ -110,7 +110,7 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	}, nil)
 
 	_, err := s.Churn(ctx, request)
-	assert.ErrorContains(t, err, "Invalid request: the quorum_id must be in range [0, 0], but found 1")
+	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 0], but found 1")
 }
 
 func setupMockTransactor() {
