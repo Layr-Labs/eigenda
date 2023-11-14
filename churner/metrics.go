@@ -22,6 +22,7 @@ const (
 	FailReasonPrevApprovalNotExpired      FailReason = "prev_approval_not_expired"      // Expiry: previous approval hasn't expired
 	FailReasonInvalidSignature            FailReason = "invalid_signature"              // Invalid signature: operator's signature is wong
 	FailReasonProcessChurnRequestFailed   FailReason = "failed_process_churn_request"   // Failed to process churn request
+	FailReasonInvalidRequest              FailReason = "invalid_request"                // Invalid request: request is malformed
 )
 
 type MetricsConfig struct {
