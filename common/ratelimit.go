@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/metadata"
@@ -52,6 +53,34 @@ func GetClientAddress(ctx context.Context, header string) (string, error) {
 			return "", fmt.Errorf("failed to get ip from header")
 		}
 		return md.Get(header)[len(md.Get(header))-1], nil
+	} else {
+		p, ok := peer.FromContext(ctx)
+		if !ok {
+			return "", fmt.Errorf("failed to get peer from request")
+		}
+		addr := p.Addr.String()
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return "", err
+		}
+		return host, nil
+	}
+}
+
+func GetClientAddressCloudfare(ctx context.Context, header string) (string, error) {
+	if header != "" {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok || len(md.Get(header)) == 0 {
+			return "", fmt.Errorf("failed to get ip from header")
+		}
+		addr := md.Get(header)[len(md.Get(header))-1]
+		// split the address
+		parts := strings.Split(addr, ",")
+		if len(parts) == 2 {
+			return parts[0], nil
+		}
+		return addr, nil
+
 	} else {
 		p, ok := peer.FromContext(ctx)
 		if !ok {
