@@ -64,9 +64,7 @@ func (f *finalizer) Start(ctx context.Context) {
 // block number is less than or equal to the latest finalized block number.
 // If it failes to process some blobs, it will log the error, skip the failed blobs, and will not return an error. The function should be invoked again to retry.
 func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, f.timeout)
-	defer cancel()
-	finalizedHeader, err := f.getLatestFinalizedBlock(ctxWithTimeout)
+	finalizedHeader, err := f.getLatestFinalizedBlock(ctx)
 	if err != nil {
 		return fmt.Errorf("FinalizeBlobs: error getting latest finalized block: %w", err)
 	}
@@ -92,7 +90,7 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 		}
 
 		// confirmation block number may have changed due to reorg
-		confirmationBlockNumber, err := f.getTransactionBlockNumber(ctxWithTimeout, confirmationMetadata.ConfirmationInfo.ConfirmationTxnHash)
+		confirmationBlockNumber, err := f.getTransactionBlockNumber(ctx, confirmationMetadata.ConfirmationInfo.ConfirmationTxnHash)
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error getting transaction block number", "err", err)
 			continue
@@ -115,10 +113,14 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 }
 
 func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.Hash) (uint64, error) {
+	var ctxWithTimeout context.Context
+	var cancel context.CancelFunc
 	var txReceipt *types.Receipt
 	var err error
 	for i := 0; i < maxRetries; i++ {
-		txReceipt, err = f.ethClient.TransactionReceipt(ctx, hash)
+		ctxWithTimeout, cancel = context.WithTimeout(ctx, f.timeout)
+		defer cancel()
+		txReceipt, err = f.ethClient.TransactionReceipt(ctxWithTimeout, hash)
 		if err == nil {
 			break
 		}
@@ -136,10 +138,14 @@ func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.
 }
 
 func (f *finalizer) getLatestFinalizedBlock(ctx context.Context) (*types.Header, error) {
+	var ctxWithTimeout context.Context
+	var cancel context.CancelFunc
 	var header = types.Header{}
 	var err error
 	for i := 0; i < maxRetries; i++ {
-		err := f.rpcClient.CallContext(ctx, &header, "eth_getBlockByNumber", "finalized", false)
+		ctxWithTimeout, cancel = context.WithTimeout(ctx, f.timeout)
+		defer cancel()
+		err := f.rpcClient.CallContext(ctxWithTimeout, &header, "eth_getBlockByNumber", "finalized", false)
 		if err == nil {
 			break
 		}
