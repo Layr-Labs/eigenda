@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wealdtech/go-merkletree"
 )
@@ -173,8 +174,9 @@ func (b *Batcher) Start(ctx context.Context) error {
 }
 
 func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata) error {
-	var err error
+	var result *multierror.Error
 	for _, metadata := range blobMetadatas {
+		var err error
 		if metadata.NumRetries < b.MaxNumRetriesPerBlob {
 			err = b.Queue.IncrementBlobRetryCount(ctx, metadata)
 		} else {
@@ -182,14 +184,16 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 		}
 		if err != nil {
 			b.logger.Error("HandleSingleBatch: error handling blob failure", "err", err)
+			// Append the error
+			result = multierror.Append(result, err)
 		}
 	}
 
 	b.Metrics.UpdateFailedBatchAndBlobs(len(blobMetadatas))
 
-	return err
+	// Return the error(s)
+	return result.ErrorOrNil()
 }
-
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
 	// start a timer
