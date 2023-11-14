@@ -16,6 +16,8 @@ import (
 
 const encodingInterval = 2 * time.Second
 
+const referenceBlockNumberDelay = 1
+
 var errNoEncodedResults = errors.New("no encoded results")
 
 type EncodedSizeNotifier struct {
@@ -191,6 +193,12 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	if referenceBlockNumber == 0 {
 		// Update the reference block number for the next iteration
 		blockNumber, err := e.chainState.GetCurrentBlockNumber()
+		// Backup the reference block number to give indexer time to index the current block. This is important because
+		// the subgraph query currently requests the state at a particular block number and will fail if the block has not
+		// yet been indexed. We can avoid this in the future by more carefully writing the subgraph so that it will store
+		// the block number at which each operator registered (currently it only stores the block number at which the
+		// operator deregistered)
+		blockNumber -= referenceBlockNumberDelay
 		if err != nil {
 			return fmt.Errorf("failed to get current block number, won't request encoding: %w", err)
 		} else {
