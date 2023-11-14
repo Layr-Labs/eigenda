@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -42,11 +43,14 @@ type ChurnResponse struct {
 }
 
 type churner struct {
-	Indexer              thegraph.IndexedChainState
-	Transactor           core.Transactor
-	StakeRegistryAddress gethcommon.Address
-	privateKey           *ecdsa.PrivateKey
-	logger               common.Logger
+	mu          sync.Mutex
+	Indexer     thegraph.IndexedChainState
+	Transactor  core.Transactor
+	QuorumCount uint16
+
+	privateKey *ecdsa.PrivateKey
+	logger     common.Logger
+	metrics    *Metrics
 }
 
 func NewChurner(
@@ -54,23 +58,21 @@ func NewChurner(
 	indexer thegraph.IndexedChainState,
 	transactor core.Transactor,
 	logger common.Logger,
+	metrics *Metrics,
 ) (*churner, error) {
-	stakeRegistryAddress, err := transactor.StakeRegistry(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
 	privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
 	if err != nil {
 		return nil, err
 	}
 
 	return &churner{
-		Indexer:              indexer,
-		Transactor:           transactor,
-		StakeRegistryAddress: stakeRegistryAddress,
-		privateKey:           privateKey,
-		logger:               logger,
+		Indexer:     indexer,
+		Transactor:  transactor,
+		QuorumCount: 0,
+
+		privateKey: privateKey,
+		logger:     logger,
+		metrics:    metrics,
 	}, nil
 }
 
@@ -119,6 +121,22 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 	}
 
 	return c.createChurnResponse(ctx, operatorToRegisterId, operatorToRegisterAddress, churnRequest.QuorumIDs)
+}
+
+func (c *churner) UpdateQuorumCount(ctx context.Context) error {
+	currentBlock, err := c.Transactor.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+	count, err := c.Transactor.GetQuorumCount(ctx, currentBlock)
+	if err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	c.QuorumCount = count
+	c.mu.Unlock()
+	return nil
 }
 
 func (c *churner) createChurnResponse(
@@ -192,12 +210,14 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// verify the lowest stake against the registering operator's stake
 		// make sure that: lowestStake * churnBIPsOfOperatorStake < operatorToRegisterStake * bipMultiplier
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
+			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
 			return nil, errors.New("registering operator has less than churnBIPsOfOperatorStake")
 		}
 
 		// verify the lowest stake against the total stake
 		// make sure that: lowestStake * bipMultiplier < totalStake * churnBIPsOfTotalStake
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
+			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
 			return nil, errors.New("operator to churn has less than churnBIPSOfTotalStake")
 		}
 

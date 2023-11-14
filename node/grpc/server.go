@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log"
+	"sync"
 
 	"net"
 
@@ -30,6 +30,8 @@ type Server struct {
 	logger common.Logger
 
 	ratelimiter common.RateLimiter
+
+	mu *sync.Mutex
 }
 
 // NewServer creates a new Server instance with the provided parameters.
@@ -42,6 +44,7 @@ func NewServer(config *node.Config, node *node.Node, logger common.Logger, ratel
 		logger:      logger,
 		node:        node,
 		ratelimiter: ratelimiter,
+		mu:          &sync.Mutex{},
 	}
 }
 
@@ -77,7 +80,7 @@ func (s *Server) serveDispersal() error {
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalDispersalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal("Could not start tcp listener")
+		s.logger.Fatalf("Could not start tcp listener: %w", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 1024) // 1 GiB
@@ -98,11 +101,10 @@ func (s *Server) serveDispersal() error {
 }
 
 func (s *Server) serveRetrieval() error {
-
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalRetrievalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal("Could not start tcp listener")
+		s.logger.Fatalf("Could not start tcp listener: %w", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
@@ -189,7 +191,10 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 
 	encodedBlobSize := core.GetBlobSize(blobHeader.QuorumInfos[in.GetQuorumId()].EncodedBlobLength)
 	rate := blobHeader.QuorumInfos[in.GetQuorumId()].QuorumRate
+
+	s.mu.Lock()
 	allow, err := s.ratelimiter.AllowRequest(ctx, retrieverID, encodedBlobSize, rate)
+	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}

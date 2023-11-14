@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
 	"github.com/gin-contrib/cors"
@@ -79,6 +80,7 @@ type (
 		blobstore      disperser.BlobStore
 		promClient     PrometheusClient
 		subgraphClient SubgraphClient
+		transactor     core.Transactor
 		chainState     core.ChainState
 
 		metrics *Metrics
@@ -90,6 +92,7 @@ func NewServer(
 	blobstore disperser.BlobStore,
 	promClient PrometheusClient,
 	subgraphClient SubgraphClient,
+	transactor core.Transactor,
 	chainState core.ChainState,
 	logger common.Logger,
 	metrics *Metrics,
@@ -102,6 +105,7 @@ func NewServer(
 		blobstore:      blobstore,
 		promClient:     promClient,
 		subgraphClient: subgraphClient,
+		transactor:     transactor,
 		chainState:     chainState,
 		metrics:        metrics,
 	}
@@ -355,8 +359,10 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 
 func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
 	var (
-		blobMetadatas = make([]*disperser.BlobMetadata, 0)
-		batches       = make([]*Batch, 0)
+		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
+		batches         = make([]*Batch, 0)
+		blobKeyPresence = make(map[string]struct{})
+		batchPresence   = make(map[string]struct{})
 	)
 
 	for skip := 0; len(blobMetadatas) < limit && skip < limit; skip += maxQueryBatchesLimit {
@@ -383,13 +389,29 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 				s.logger.Error("Failed to convert batch header hash to hex string", "error", err)
 				continue
 			}
+			batchKey := string(batchHeaderHash[:])
+			if _, found := batchPresence[batchKey]; !found {
+				batchPresence[batchKey] = struct{}{}
+			} else {
+				// The batch has processed, skip it.
+				s.logger.Error("Getting duplicate batch from the graph", "batch header hash", batchKey)
+				continue
+			}
 
 			metadatas, err := s.blobstore.GetAllBlobMetadataByBatch(ctx, batchHeaderHash)
 			if err != nil {
 				s.logger.Error("Failed to get blob metadata", "error", err)
 				continue
 			}
-			blobMetadatas = append(blobMetadatas, metadatas...)
+			for _, bm := range metadatas {
+				blobKey := bm.GetBlobKey().String()
+				if _, found := blobKeyPresence[blobKey]; !found {
+					blobKeyPresence[blobKey] = struct{}{}
+					blobMetadatas = append(blobMetadatas, bm)
+				} else {
+					s.logger.Error("Getting duplicate blob key from the blobstore", "blobkey", blobKey)
+				}
+			}
 			batches = append(batches, batch)
 			if len(blobMetadatas) >= limit {
 				break

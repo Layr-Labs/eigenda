@@ -154,8 +154,22 @@ func TestBatchTrigger(t *testing.T) {
 	total := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, total, uint(131584))
 
+	// try encode the same blobs again at different block (this happens when the blob is retried)
+	encodingStreamer.ReferenceBlockNumber = 11
+	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	assert.Nil(t, err)
+	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	assert.Nil(t, err)
+
+	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, total, uint(131584))
+
 	// don't notify yet
-	assert.Len(t, encodingStreamer.EncodedSizeNotifier.Notify, 0)
+	select {
+	case <-encodingStreamer.EncodedSizeNotifier.Notify:
+		t.Fatal("expected not to be notified")
+	default:
+	}
 
 	// Request encoding once more
 	_, err = c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
@@ -169,7 +183,11 @@ func TestBatchTrigger(t *testing.T) {
 	assert.Equal(t, total, uint(131584)*2)
 
 	// notify
-	assert.Len(t, encodingStreamer.EncodedSizeNotifier.Notify, 1)
+	select {
+	case <-encodingStreamer.EncodedSizeNotifier.Notify:
+	default:
+		t.Fatal("expected to be notified")
+	}
 }
 
 func TestStreamingEncoding(t *testing.T) {

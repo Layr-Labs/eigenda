@@ -52,8 +52,8 @@ type BlobRequestHeader struct {
 
 func (h *BlobRequestHeader) Validate() error {
 	for _, quorum := range h.SecurityParams {
-		if quorum.AdversaryThreshold >= quorum.QuorumThreshold {
-			return errors.New("invalid request: quorum threshold does not exceed adversary threshold")
+		if quorum.QuorumThreshold < quorum.AdversaryThreshold+10 {
+			return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
 		}
 		if quorum.QuorumThreshold > 100 {
 			return errors.New("invalid request: quorum threshold exceeds 100")

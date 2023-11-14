@@ -186,8 +186,9 @@ func newTestServer(t *testing.T) *churner.Server {
 	)
 	assert.NoError(t, err)
 
-	cn, err := churner.NewChurner(config, mockIndexer, operatorTransactorChurner, logger)
+	metrics := churner.NewMetrics("9001", logger)
+	cn, err := churner.NewChurner(config, mockIndexer, operatorTransactorChurner, logger, metrics)
 	assert.NoError(t, err)
 
-	return churner.NewServer(config, cn, logger)
+	return churner.NewServer(config, cn, logger, metrics)
 }

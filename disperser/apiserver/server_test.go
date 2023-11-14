@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -55,6 +56,49 @@ func TestDisperseBlob(t *testing.T) {
 	status, _, key := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
 	assert.NotNil(t, key)
+}
+
+func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
+	data := make([]byte, 1024)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	p := &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: 51001,
+		},
+	}
+	ctx := peer.NewContext(context.Background(), p)
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           2,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+		},
+	})
+	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    90,
+			},
+		},
+	})
+	assert.ErrorContains(t, err, "invalid request: security_params must not contain duplicate quorum_id")
 }
 
 func TestGetBlobStatus(t *testing.T) {
@@ -289,10 +333,13 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	tx := &mock.MockTransactor{}
+	tx.On("GetCurrentBlockNumber").Return(uint32(100), nil)
+	tx.On("GetQuorumCount").Return(uint16(2), nil)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort: "51001",
-	}, queue, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
+	}, queue, tx, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

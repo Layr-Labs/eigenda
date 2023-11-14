@@ -50,6 +50,20 @@ func TestSharedBlobStore(t *testing.T) {
 	assert.Nil(t, err)
 	assertMetadata(t, blobKey, blobSize, requestedAt, disperser.Processing, metadata1)
 
+	err = sharedStorage.IncrementBlobRetryCount(ctx, metadata1)
+	assert.Nil(t, err)
+	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
+	fmt.Println("Num Retries", metadata1.NumRetries)
+	assert.Nil(t, err)
+	assert.Equal(t, uint(1), metadata1.NumRetries)
+
+	err = sharedStorage.IncrementBlobRetryCount(ctx, metadata1)
+	assert.Nil(t, err)
+	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
+	fmt.Println("Num Retries", metadata1.NumRetries)
+	assert.Nil(t, err)
+	assert.Equal(t, uint(2), metadata1.NumRetries)
+
 	batchHeaderHash := [32]byte{1, 2, 3}
 	blobIndex := uint32(0)
 	confirmationInfo := &disperser.ConfirmationInfo{
