@@ -2,8 +2,9 @@ package traffic
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"sync"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/logging"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type TrafficGenerator struct {
@@ -80,8 +83,22 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 	}
 }
 
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
 func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte, quorumID uint8) error {
-	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
+	header := metadata.New(map[string]string{"x-forwarded-for": randSeq(32)})
+	fmt.Println("sending request with header: ", header)
+	grpc.SendHeader(ctx, header)
+	outgoingCtx := metadata.NewOutgoingContext(ctx, header)
+	ctxTimeout, cancel := context.WithTimeout(outgoingCtx, g.Config.Timeout)
 	defer cancel()
 	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, quorumID, g.Config.QuorumThreshold, g.Config.AdversarialThreshold)
 	if err != nil {
