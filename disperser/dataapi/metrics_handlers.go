@@ -97,7 +97,7 @@ func (s *server) calculateTotalStake(operators []*Operator, blockNumber uint32) 
 			totalStake := big.NewInt(0)
 			s.logger.Debug("Operator state:", "operatorId", operatorId, "num quorums", len(operatorState.Totals))
 			for quorumId, total := range operatorState.Totals {
-				s.logger.Debug("Operator stake:", "operatorId", operatorId, "quorum", quorumId, "stake", total.Stake)
+				s.logger.Debug("Operator stake:", "operatorId", operatorId, "quorum", quorumId, "stake", total.Stake.Uint64())
 				totalStake.Add(totalStake, total.Stake)
 			}
 			totalStakeByOperatorChan <- totalStake
