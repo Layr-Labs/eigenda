@@ -46,7 +46,7 @@ type RateBucketParams struct {
 	LastRequestTime time.Time
 }
 
-// GetClientAddressCloudfare returns the client address from the context. If the header is not empty, it will
+// GetClientAddress returns the client address from the context. If the header is not empty, it will
 // take the ip address located at the `numProxies“ position from the end of the header. If the ip address cannot be
 // found in the header, it will use the connection ip if `alloweDirectionConnection` is true. Otherwise, it will return
 // an error.
