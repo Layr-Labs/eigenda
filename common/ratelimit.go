@@ -52,7 +52,8 @@ func GetClientAddress(ctx context.Context, header string) (string, error) {
 		if !ok || len(md.Get(header)) == 0 {
 			return "", fmt.Errorf("failed to get ip from header")
 		}
-		return md.Get(header)[len(md.Get(header))-1], nil
+		parts := splitHeader(md.Get(header))
+		return parts[len(parts)-1], nil
 	} else {
 		p, ok := peer.FromContext(ctx)
 		if !ok {
@@ -67,21 +68,23 @@ func GetClientAddress(ctx context.Context, header string) (string, error) {
 	}
 }
 
-func GetClientAddressCloudfare(ctx context.Context, header string) (string, error) {
-	if header != "" {
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok || len(md.Get(header)) == 0 {
-			return "", fmt.Errorf("failed to get ip from header")
-		}
-		addr := md.Get(header)[len(md.Get(header))-1]
-		// split the address
-		parts := strings.Split(addr, ",")
-		if len(parts) == 2 {
-			return parts[0], nil
-		}
-		return addr, nil
+// GetClientAddressCloudfare returns the client address from the context. If the header is not empty, it will
+// take the ip address located at the `numProxies“ position from the end of the header. If the ip address cannot be
+// found in the header, it will use the connection ip if `alloweDirectionConnection` is true. Otherwise, it will return
+// an error.
+func GetClientAddressCloudfare(ctx context.Context, header string, numProxies int, allowDirectConnection bool) (string, error) {
 
-	} else {
+	if header != "" && numProxies > 0 {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if ok && len(md.Get(header)) > 0 {
+			parts := splitHeader(md.Get(header))
+			if len(parts) >= numProxies {
+				return parts[len(parts)-numProxies], nil
+			}
+		}
+	}
+
+	if allowDirectConnection {
 		p, ok := peer.FromContext(ctx)
 		if !ok {
 			return "", fmt.Errorf("failed to get peer from request")
@@ -93,4 +96,14 @@ func GetClientAddressCloudfare(ctx context.Context, header string) (string, erro
 		}
 		return host, nil
 	}
+
+	return "", fmt.Errorf("failed to get ip")
+}
+
+func splitHeader(header []string) []string {
+	var result []string
+	for _, h := range header {
+		result = append(result, strings.Split(h, ",")...)
+	}
+	return result
 }
