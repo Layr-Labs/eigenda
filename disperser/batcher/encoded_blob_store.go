@@ -102,7 +102,6 @@ func (e *encodedBlobStore) PutEncodingResult(result *EncodingResult) error {
 	}
 	e.encoded[requestID] = result
 	delete(e.requested, requestID)
-	e.logger.Trace("[PutEncodingResult]", "referenceBlockNumber", result.ReferenceBlockNumber, "requestID", requestID, "encodedSize", e.encodedResultSize)
 
 	return nil
 }

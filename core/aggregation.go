@@ -92,7 +92,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 			socket = op.Socket
 		}
 		if r.Err != nil {
-			a.Logger.Warn("Error returned from messageChan", "operator", operatorIDHex, "socket", socket, "err", r.Err)
+			a.Logger.Warn("[AggregateSignatures] error returned from messageChan", "operator", operatorIDHex, "socket", socket, "err", r.Err)
 			continue
 		}
 
@@ -109,6 +109,8 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 			a.Logger.Error("Signature is not valid", "operator", operatorIDHex, "socket", socket, "pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
 			continue
 		}
+
+		a.Logger.Info("[AggregateSignatures] received signature from operator", "operator", operatorIDHex, "socket", socket)
 
 		for ind, id := range quorumIDs {
 
