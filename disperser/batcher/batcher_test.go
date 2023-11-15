@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/logging"
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
@@ -63,14 +64,15 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 
 func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	// Common Components
-	logger := &cmock.Logger{}
+	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	assert.NoError(t, err)
 
 	// Core Components
 	cst, err := coremock.NewChainDataMock(10)
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 	asgn := &core.StdAssignmentCoordinator{}
-	agg := &core.StdSignatureAggregator{}
+	agg := core.NewStdSignatureAggregator(logger)
 	enc, err := makeTestEncoder()
 	assert.NoError(t, err)
 
