@@ -550,6 +550,7 @@ func (c *InstrumentedEthClient) EstimateGasPriceAndLimitAndSendTx(
 	}
 
 	receipt, err := c.EnsureTransactionEvaled(
+		ctx,
 		tx,
 		tag,
 	)

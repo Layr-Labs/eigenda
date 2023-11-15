@@ -39,5 +39,5 @@ type EthClient interface {
 	TransactionInBlock(ctx context.Context, blockHash common.Hash, index uint) (*types.Transaction, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	EstimateGasPriceAndLimitAndSendTx(ctx context.Context, tx *types.Transaction, tag string, value *big.Int) (*types.Receipt, error)
-	EnsureTransactionEvaled(tx *types.Transaction, tag string) (*types.Receipt, error)
+	EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error)
 }
