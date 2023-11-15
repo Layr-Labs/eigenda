@@ -52,7 +52,7 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 				Name:      "batches_total",
 				Help:      "the number and size of total dispersal batch",
 			},
-			[]string{"state", "data"},
+			[]string{"data"},
 		),
 		BatchProcLatency: promauto.With(reg).NewSummaryVec(
 			prometheus.SummaryOpts{
@@ -85,43 +85,34 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	return metrics
 }
 
-func (g *Metrics) UpdateAttestation(signers, nonSigners int) {
-	g.Attestation.WithLabelValues("signers").Set(float64(signers))
-	g.Attestation.WithLabelValues("non_signers").Set(float64(nonSigners))
+func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int) {
+	g.Attestation.WithLabelValues("signers").Set(float64(operatorCount - nonSignerCount))
+	g.Attestation.WithLabelValues("non_signers").Set(float64(nonSignerCount))
 }
 
-// UpdateFailedBatchAndBlobs updates failed a batch and number of blob within it, it only
-// counts the number of blob and batches
-func (g *Metrics) UpdateFailedBatchAndBlobs(numBlob int) {
-	g.Blob.WithLabelValues("failed", "number").Add(float64(numBlob))
-	g.Batch.WithLabelValues("failed", "number").Inc()
-}
-
-// UpdateCompletedBatchAndBlobs updates whenever there is a completed batch. it updates both the
-// number for batch and blob, and it updates size of data blob. Moreover, it updates the
-// time it takes to process the entire batch from "getting the blobs" to "marking as finished"
-func (g *Metrics) UpdateCompletedBatchAndBlobs(blobsInBatch []*disperser.BlobMetadata, succeeded []bool) {
-	totalBlobSucceeded := 0
-	totalBlobFailed := 0
-	totalBlobSize := 0
-
-	for ind, metadata := range blobsInBatch {
-		if succeeded[ind] {
-			totalBlobSucceeded += 1
-			totalBlobSize += int(metadata.RequestMetadata.BlobSize)
-		} else {
-			totalBlobFailed += 1
-		}
+// UpdateCompletedBlob increments the number and updates size of processed blobs.
+func (g *Metrics) UpdateCompletedBlob(size int, status disperser.BlobStatus) {
+	switch status {
+	case disperser.Confirmed:
+		g.Blob.WithLabelValues("confirmed", "number").Inc()
+		g.Blob.WithLabelValues("confirmed", "size").Add(float64(size))
+	case disperser.Failed:
+		g.Blob.WithLabelValues("failed", "number").Inc()
+		g.Blob.WithLabelValues("failed", "size").Add(float64(size))
+	case disperser.InsufficientSignatures:
+		g.Blob.WithLabelValues("insufficient_signature", "number").Inc()
+		g.Blob.WithLabelValues("insufficient_signature", "size").Add(float64(size))
+	default:
+		return
 	}
 
-	// Failed blob
-	g.UpdateFailedBatchAndBlobs(totalBlobFailed)
+	g.Blob.WithLabelValues("total", "number").Inc()
+	g.Blob.WithLabelValues("total", "size").Add(float64(size))
+}
 
-	// Blob
-	g.Blob.WithLabelValues("completed", "number").Add(float64(totalBlobSucceeded))
-	g.Blob.WithLabelValues("completed", "size").Add(float64(totalBlobSize))
-	// Batch
-	g.Batch.WithLabelValues("completed", "number").Inc()
+func (g *Metrics) IncrementBatchCount(size int) {
+	g.Batch.WithLabelValues("number").Inc()
+	g.Batch.WithLabelValues("size").Add(float64(size))
 }
 
 func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {

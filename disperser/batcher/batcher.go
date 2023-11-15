@@ -187,9 +187,8 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 			// Append the error
 			result = multierror.Append(result, err)
 		}
+		b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
 	}
-
-	b.Metrics.UpdateFailedBatchAndBlobs(len(blobMetadatas))
 
 	// Return the error(s)
 	return result.ErrorOrNil()
@@ -318,8 +317,10 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 		if status == disperser.Confirmed {
 			_, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
+			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
 		} else if status == disperser.InsufficientSignatures {
 			_, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo)
+			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
 		} else {
 			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
 		}
@@ -340,8 +341,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 	log.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
-
-	b.Metrics.UpdateCompletedBatchAndBlobs(batch.BlobMetadata, passed)
+	b.Metrics.IncrementBatchCount(len(batch.BlobMetadata))
 	return nil
 }
 
