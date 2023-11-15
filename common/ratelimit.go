@@ -46,33 +46,11 @@ type RateBucketParams struct {
 	LastRequestTime time.Time
 }
 
-func GetClientAddress(ctx context.Context, header string) (string, error) {
-	if header != "" {
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok || len(md.Get(header)) == 0 {
-			return "", fmt.Errorf("failed to get ip from header")
-		}
-		parts := splitHeader(md.Get(header))
-		return parts[len(parts)-1], nil
-	} else {
-		p, ok := peer.FromContext(ctx)
-		if !ok {
-			return "", fmt.Errorf("failed to get peer from request")
-		}
-		addr := p.Addr.String()
-		host, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			return "", err
-		}
-		return host, nil
-	}
-}
-
 // GetClientAddressCloudfare returns the client address from the context. If the header is not empty, it will
 // take the ip address located at the `numProxies“ position from the end of the header. If the ip address cannot be
 // found in the header, it will use the connection ip if `alloweDirectionConnection` is true. Otherwise, it will return
 // an error.
-func GetClientAddressCloudfare(ctx context.Context, header string, numProxies int, allowDirectConnection bool) (string, error) {
+func GetClientAddress(ctx context.Context, header string, numProxies int, allowDirectConnectionFallback bool) (string, error) {
 
 	if header != "" && numProxies > 0 {
 		md, ok := metadata.FromIncomingContext(ctx)
@@ -84,7 +62,7 @@ func GetClientAddressCloudfare(ctx context.Context, header string, numProxies in
 		}
 	}
 
-	if allowDirectConnection {
+	if header == "" || allowDirectConnectionFallback {
 		p, ok := peer.FromContext(ctx)
 		if !ok {
 			return "", fmt.Errorf("failed to get peer from request")
@@ -103,7 +81,12 @@ func GetClientAddressCloudfare(ctx context.Context, header string, numProxies in
 func splitHeader(header []string) []string {
 	var result []string
 	for _, h := range header {
-		result = append(result, strings.Split(h, ",")...)
+		for _, p := range strings.Split(h, ",") {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
 	}
 	return result
 }
