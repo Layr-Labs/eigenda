@@ -13,24 +13,31 @@ type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
 
 	bucketStore BucketStore
+	allowlist   []string
 
 	logger common.Logger
 }
 
-func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, logger common.Logger) common.RateLimiter {
+func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, allowlist []string, logger common.Logger) common.RateLimiter {
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
+		allowlist:        allowlist,
 		logger:           logger,
 	}
 }
 
 // Checks whether a request from the given requesterID is allowed
 func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
+	for _, id := range d.allowlist {
+		if id == requesterID {
+			// Allow 10x the rate for allowlisted IDs
+			rate = rate * 10
+		}
+	}
 
 	// Retrieve bucket params for the requester ID
 	// This will be from dynamo for Disperser and from local storage for DA node
-
 	bucketParams, err := d.bucketStore.GetItem(ctx, requesterID)
 	if err != nil {
 
