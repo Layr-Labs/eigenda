@@ -57,6 +57,10 @@ func NewChainDataMock(numOperators core.OperatorIndex) (*ChainDataMock, error) {
 }
 
 func (d *ChainDataMock) GetTotalOperatorState(ctx context.Context, blockNumber uint) *PrivateOperatorState {
+	return d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, []core.QuorumID{})
+}
+
+func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, blockNumber uint, quorums []core.QuorumID) *PrivateOperatorState {
 	indexedOperators := make(map[core.OperatorID]*core.IndexedOperatorInfo, d.NumOperators)
 	storedOperators := make(map[core.OperatorID]*core.OperatorInfo)
 	privateOperators := make(map[core.OperatorID]*PrivateOperatorInfo, d.NumOperators)
@@ -66,7 +70,6 @@ func (d *ChainDataMock) GetTotalOperatorState(ctx context.Context, blockNumber u
 	quorumStake := 0
 
 	for ind := core.OperatorIndex(0); ind < d.NumOperators; ind++ {
-
 		if ind == 0 {
 			key := d.KeyPairs[ind].GetPubKeyG1()
 			aggPubKey = key.Deserialize(key.Serialize())
@@ -109,27 +112,21 @@ func (d *ChainDataMock) GetTotalOperatorState(ctx context.Context, blockNumber u
 
 	}
 
-	totals := map[core.QuorumID]*core.OperatorInfo{
-		0: {
+	totals := make(map[core.QuorumID]*core.OperatorInfo)
+	for _, id := range quorums {
+		totals[id] = &core.OperatorInfo{
 			Stake: big.NewInt(int64(quorumStake)),
 			Index: d.NumOperators,
-		},
-		1: {
-			Stake: big.NewInt(int64(quorumStake)),
-			Index: d.NumOperators,
-		},
-		2: {
-			Stake: big.NewInt(int64(quorumStake)),
-			Index: d.NumOperators,
-		},
+		}
+	}
+
+	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
+	for _, id := range quorums {
+		operators[id] = storedOperators
 	}
 
 	operatorState := &core.OperatorState{
-		Operators: map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
-			0: storedOperators,
-			1: storedOperators,
-			2: storedOperators,
-		},
+		Operators:   operators,
 		Totals:      totals,
 		BlockNumber: blockNumber,
 	}
@@ -156,7 +153,7 @@ func (d *ChainDataMock) GetTotalOperatorState(ctx context.Context, blockNumber u
 
 func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
 
-	state := d.GetTotalOperatorState(ctx, blockNumber)
+	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.OperatorState, nil
 
@@ -172,7 +169,7 @@ func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNum
 
 func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
 
-	state := d.GetTotalOperatorState(ctx, blockNumber)
+	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.IndexedOperatorState, nil
 

@@ -185,7 +185,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.Throughput)
 	assert.Equal(t, uint64(85144853442), response.CostInWei)
-	assert.Equal(t, uint64(6), response.TotalStake)
+	assert.Equal(t, uint64(1), response.TotalStake)
 }
 
 func TestFetchMetricsTroughputHandler(t *testing.T) {
