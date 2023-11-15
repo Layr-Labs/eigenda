@@ -180,6 +180,7 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 	}
 
 	receipt, err := c.EnsureTransactionEvaled(
+		ctx,
 		tx,
 		tag,
 	)
@@ -190,8 +191,8 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 	return receipt, err
 }
 
-func (c *EthClient) EnsureTransactionEvaled(tx *types.Transaction, tag string) (*types.Receipt, error) {
-	receipt, err := bind.WaitMined(context.Background(), c.Client, tx)
+func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
+	receipt, err := bind.WaitMined(ctx, c.Client, tx)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
 	}

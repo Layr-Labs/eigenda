@@ -448,7 +448,7 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 	}
 
 	t.Logger.Info("confirming batch onchain")
-	receipt, err := t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "ConfirmBatch", nil)
+	receipt, err := t.EthClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "ConfirmBatch", nil)
 	if err != nil {
 		t.Logger.Error("Failed to estimate gas price and limit", "err", err)
 		return nil, err

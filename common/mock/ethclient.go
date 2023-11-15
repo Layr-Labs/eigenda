@@ -187,7 +187,7 @@ func (mock *MockEthClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Context
 	return result.(*types.Receipt), args.Error(1)
 }
 
-func (mock *MockEthClient) EnsureTransactionEvaled(tx *types.Transaction, tag string) (*types.Receipt, error) {
+func (mock *MockEthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	args := mock.Called()
 	result := args.Get(0)
 	return result.(*types.Receipt), args.Error(1)
