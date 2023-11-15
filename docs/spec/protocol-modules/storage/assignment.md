@@ -53,21 +53,29 @@ The `AssignmentCoordinator` can be used to get the `EncodingParams` struct in th
 
 The standard assignment coordinator implements a very simple logic for determining the number of chunks per node and the chunk length, which we describe here. More background concerning this design can be found in the [Design Document](../../../design/assignment.md)
 
-**Index Assignment**.
-For each operator $i$, let $S_i$ signify the amount of stake held by that operator. The number of chunks assigned to an operator $i$ is given by the equation
-
-$$m_i = \text{ceil}\left(\frac{\rho nS_i}{\sum_j S_j}\right) \tag{1}$$
-
-where $n$ is the total number of operators and $\rho$ is called the quantization factor.
 
 **Chunk Length**.
 To determine the chunk length, we first set the reconstruction threshold at the level of chunks (i.e., the number of chunks from which we wish to be able to reconstruct the original blob) as
 
 $$m = ceil(n\rho\gamma)$$
 
-where  $\gamma = \beta-\alpha$, with $\alpha$ and $\beta$ as defined in the [Storage Overview](./overview.md).
+where where $n$ is the total number of operators and $\rho$ is called the quantization factor, $\gamma = \beta-\alpha$, with $\alpha$ and $\beta$ as defined in the [Storage Overview](./overview.md).
 
-We can then derive the chunk length as $C \ge B/m$, where $B$ is the length of the blob.
+We can then derive the chunk length as $C \ge B/m$, where $B$ is the length of the blob. We have the round the chunk length up to the next power of two. 
+
+**Index Assignment**.
+
+For each operator $i$, let $S_i$ signify the amount of stake held by that operator. We want for the number of chunks assigned to operator $i$ to satisfy
+
+$$
+\frac{\gamma m_i C}{B} \ge \frac{S_i}{\sum_j S_j}
+$$
+
+Let
+
+$$
+m_i = \text{ceil}\left(\frac{B S_i}{C\gamma \sum_j S_j}\right)\tag{1}
+$$
 
 **Correctness**.
 Let's show that any set of operators $U_q \setminus U_a$ will have a complete blob. The amount of data held by these operators is given by
@@ -76,27 +84,13 @@ $$
 \sum_{i \in U_q \setminus U_a} m_i C
 $$
 
-We first notice from (1) and from the definitions of $U_q$ and $U_a$ that
+We have from (1) and from the definitions of $U_q$ and $U_a$ that
 
 $$
-\sum_{i \in U_q \setminus U_a} m_i \ge  n\rho\frac{\sum_{i \in U_q \setminus U_a} S_i}{\sum_jS_j}  = n\rho\frac{\sum_{i \in U_q} S_i - \sum_{i \in U_a} S_i}{\sum_jS_j} \ge n\rho(\beta - \alpha) = n\rho\gamma = ceil(n\rho\gamma) = m.
+\sum_{i \in U_q \setminus U_a} m_i C \ge  =\frac{B}{\gamma}\sum_{i \in U_q \setminus U_a}\frac{S_i}{\sum_j S_j} = \frac{B}{\gamma}\frac{\sum_{i \in U_q} S_i - \sum_{i \in U_a} S_i}{\sum_jS_j} \ge B \frac{\beta-\alpha}{\gamma} = B  \tag{2}
 $$
 
-The second from last equality follows because each $m_i$ is an integer, so the summation must be an integer. Substituting for $C$, we see that
-
-$$
-\sum_{i \in U_q \setminus U_a} m_i C \ge mC \ge B. \tag{2}
-$$
-
-Thus, the reconstruction requirement from the [Encoding](./encoding.md) module is satisfied. Notice that the final inequality of this equation can be written as
-
-`ceil(EncodedBlobLength*(QuorumThreshold-AdversaryThreshold)) >= BlobLength`
-
-with the following mappings:
-- `EncodedBlobLength` = $n\rho C$
-- `QuorumThreshold` = $\beta$
-- `AdversaryThreshold` = $\alpha$
-- `BlobLength` = $B$.
+Thus, the reconstruction requirement from the [Encoding](./encoding.md) module is satisfied. 
 
 ## Validation Actions
 
