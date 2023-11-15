@@ -50,7 +50,7 @@ type (
 
 	Metric struct {
 		Throughput float64 `json:"throughput"`
-		CostInWei  uint64  `json:"cost_in_wei"`
+		CostInGas  float64 `json:"cost_in_gas"`
 		TotalStake uint64  `json:"total_stake"`
 	}
 
