@@ -218,7 +218,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TEST_PRIVATE_BLS"),
 	}
-
 	ClientIPHeaderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "client-ip-header"),
 		Usage:    "The name of the header used to get the client IP address. If set to empty string, the IP address will be taken from the connection. The rightmost value of the header will be used.",
