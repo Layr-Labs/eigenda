@@ -1,19 +1,4 @@
-
-
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-
-setup-geth:
-	cd geth && rm -rf data && ./run.sh setup 10 ../secrets/ecdsa_keys/private_key_hex.txt ./secret/geth-account-password
-
-start-geth:
-	cd geth && docker compose up -d 
-	./wait-for http://0.0.0.0:8545 -- echo "Geth up"
-
-stop-geth:
-	cd geth && docker compose down
-
-
-.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -23,31 +8,32 @@ new-docker-anvil:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-docker.yaml "testdata/$(dt)/config.yaml"
 
-chain:
-	go run ./deploy/cmd -localstack-port 4570 chain
+config: 
+	go run ./gen-env/cmd
 
-localstack:
-	go run ./deploy/cmd -localstack-port 4570 localstack
+devnet-up:
+	$(eval CURRENT_TESTDATA := $(shell ls -1r testdata/ | head -n 1))
+	docker-compose -f testdata/$(CURRENT_TESTDATA)/docker-compose.yml up --detach --build
 
-exp: 
-	go run ./deploy/cmd exp
+devnet-logs:
+	$(eval CURRENT_TESTDATA := $(shell ls -1r testdata/ | head -n 1))
+	docker-compose -f testdata/$(CURRENT_TESTDATA)/docker-compose.yml logs --follow
 
-deploy-all:
-	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
-
-stop-infra:
-	./bin.sh stop-anvil
-	./bin.sh stop-graph
-	docker stop localstack-test
+devnet-down:
+	$(eval CURRENT_TESTDATA := $(shell ls -1r testdata/ | head -n 1))
+	docker-compose -f testdata/$(CURRENT_TESTDATA)/docker-compose.yml down --volumes
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
-run-e2e-nochurner:
-	go test ./tests -v -config=../templates/testconfig-anvil-nochurner.yaml
+# run-e2e-nochurner:
+# 	go test ./tests -v -config=../templates/testconfig-anvil-nochurner.yaml
 
-run-e2e-nograph:
-	go test ./tests -v -config=../templates/testconfig-anvil-nograph.yaml
+# run-e2e-nograph:
+# 	go test ./tests -v -config=../templates/testconfig-anvil-nograph.yaml
 
 clean:
 	rm -rf testdata/*
+
+
+.PHONY: config

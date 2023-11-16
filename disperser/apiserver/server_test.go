@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/inabox/testutils"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
@@ -289,7 +289,7 @@ func setup(m *testing.M) {
 	if deployLocalStack {
 
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		dockertestPool, dockertestResource, err = testutils.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container")
@@ -297,7 +297,7 @@ func setup(m *testing.M) {
 
 	}
 
-	err := deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
+	err := testutils.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
@@ -308,7 +308,7 @@ func setup(m *testing.M) {
 
 func teardown() {
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		testutils.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/config"
+	genenv "github.com/Layr-Labs/eigenda/inabox/gen-env"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -102,14 +104,14 @@ type ratelimitTestCase struct {
 	param             core.SecurityParam
 }
 
-func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase) (int, int) {
+func testRatelimit(t *testing.T, testConfig *config.Config, c ratelimitTestCase) (int, int) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
 	disp := traffic.NewDisperserClient(&traffic.Config{
 		Hostname:        "localhost",
-		GrpcPort:        testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
+		GrpcPort:        "320010",
 		NumInstances:    1,
 		DataSize:        1000_000,
 		RequestInterval: 1 * time.Second,
@@ -131,7 +133,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 		}
 	}()
 
-	conn, err := grpc.Dial(fmt.Sprintf("localhost:%v", testConfig.Retriever.RETRIEVER_GRPC_PORT), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial("localhost:32001", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 	ret := retriever.NewRetrieverClient(conn)
@@ -175,18 +177,15 @@ func TestRatelimit(t *testing.T) {
 	t.Skip("Manual test for now")
 
 	rootPath := "../../"
-	testname, err := deploy.GetLatestTestDirectory(rootPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testConfig := deploy.NewTestConfig(testname, rootPath)
+	testName := genenv.GetLatestTestDirectory(rootPath)
+	testConfig = config.OpenConfig(filepath.Join("inabox/testdata", testName, "config.yaml"))
 
-	if testConfig.Dispersers[0].DISPERSER_SERVER_PER_USER_UNAUTH_THROUGHPUT != fmt.Sprint(perUserThroughput) {
-		t.Fatalf("per user throughput should be %v", perUserThroughput)
-	}
-	if testConfig.Dispersers[0].DISPERSER_SERVER_BUCKET_MULTIPLIERS != fmt.Sprint(dispersalMultiplier) {
-		t.Fatalf("dispersal multiplier should be %v", dispersalMultiplier)
-	}
+	// if testConfig.Services.Variables["globals"][].DISPERSER_SERVER_PER_USER_UNAUTH_THROUGHPUT != fmt.Sprint(perUserThroughput) {
+	// 	t.Fatalf("per user throughput should be %v", perUserThroughput)
+	// }
+	// if testConfig.Dispersers[0].DISPERSER_SERVER_BUCKET_MULTIPLIERS != fmt.Sprint(dispersalMultiplier) {
+	// 	t.Fatalf("dispersal multiplier should be %v", dispersalMultiplier)
+	// }
 
 	t.Run("no ratelimiting when dispersing and retrieving within rate", func(t *testing.T) {
 

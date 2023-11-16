@@ -12,7 +12,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/config"
+	genenv "github.com/Layr-Labs/eigenda/inabox/gen-env"
+	"github.com/Layr-Labs/eigenda/inabox/testutils"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,11 +23,12 @@ var (
 	templateName string
 	testName     string
 	graphUrl     string
-	testConfig   *deploy.Config
+	eigenDA      *testutils.EigenDA
+	lock         *config.ConfigLock
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nochurner.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
@@ -39,38 +42,23 @@ func setup() {
 
 	if testName == "" {
 		var err error
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
+		testName, err = config.CreateNewTestDirectory(templateName, rootPath)
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
-	testConfig.Deployers[0].DeploySubgraphs = true
-
-	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
-
-	fmt.Println("Starting graph node")
-	testConfig.StartGraphNode()
-
-	fmt.Println("Deploying experiment")
-	testConfig.DeployExperiment()
-
-	fmt.Println("Starting binaries")
-	testConfig.StartBinaries()
-
+	fmt.Println("Starting EigenDA")
+	lock = genenv.GenerateConfigLock(rootPath, testName)
+	genenv.GenerateDockerCompose(lock)
+	genenv.CompileDockerCompose(rootPath, testName)
+	eigenDA = testutils.NewEigenDA(rootPath, testName)
+	eigenDA.MustStart()
 }
 
 func teardown() {
-	fmt.Println("Stoping anvil")
-	testConfig.StopAnvil()
-
-	fmt.Println("Stop graph node")
-	testConfig.StopGraphNode()
-
-	fmt.Println("Stop binaries")
-	testConfig.StopBinaries()
+	fmt.Println("Stopping EigenDA")
+	// eigenDA.MustStop()
 }
 
 func TestIndexerIntegration(t *testing.T) {
@@ -86,8 +74,8 @@ func TestIndexerIntegration(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
-	tx, err := eth.NewTransactor(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
+	client := mustMakeTestClient(t, lock, lock.Envs.Batcher.BATCHER_PRIVATE_KEY, logger)
+	tx, err := eth.NewTransactor(logger, client, lock.Config.EigenDA.OperatorStateRetreiver, lock.Config.EigenDA.ServiceManager)
 	assert.NoError(t, err)
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)
@@ -101,15 +89,21 @@ func TestIndexerIntegration(t *testing.T) {
 
 	state, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, len(testConfig.Operators), len(state.IndexedOperators))
+	assert.Equal(t, len(lock.Operators), len(state.IndexedOperators))
 }
 
-func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger common.Logger) common.EthClient {
-	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
+func mustMakeTestClient(t *testing.T, env *config.ConfigLock, privateKey string, logger common.Logger) common.EthClient {
+	deployer, ok := env.Config.GetDeployer(env.Config.EigenDA.Deployer)
+	var rpc string
+	if deployer.LocalAnvil {
+		rpc = "http://localhost:8545"
+	} else {
+		rpc = deployer.RPC
+	}
 	assert.True(t, ok)
 
 	config := geth.EthClientConfig{
-		RPCURL:           deployer.RPC,
+		RPCURL:           rpc,
 		PrivateKeyString: privateKey,
 	}
 

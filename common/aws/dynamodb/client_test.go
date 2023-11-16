@@ -10,7 +10,7 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/logging"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/testutils"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -44,7 +44,7 @@ func setup(m *testing.M) {
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		dockertestPool, dockertestResource, err = testutils.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container")
@@ -72,7 +72,7 @@ func setup(m *testing.M) {
 
 func teardown() {
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		testutils.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
 }
 

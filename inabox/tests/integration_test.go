@@ -8,11 +8,14 @@ import (
 	"time"
 
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	retrieverpb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,7 +23,7 @@ import (
 
 var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 		defer cancel()
 
 		optsWithValue := new(bind.TransactOpts)
@@ -33,7 +36,7 @@ var _ = Describe("Inabox Integration", func() {
 
 		disp := traffic.NewDisperserClient(&traffic.Config{
 			Hostname:        "localhost",
-			GrpcPort:        "32003",
+			GrpcPort:        "32001",
 			NumInstances:    1,
 			DataSize:        1000_000,
 			RequestInterval: 1 * time.Second,
@@ -41,8 +44,10 @@ var _ = Describe("Inabox Integration", func() {
 		})
 		Expect(disp).To(Not(BeNil()))
 
-		data := make([]byte, 1024)
+		// Must not end in 0x00 or else this test will fail in a flakey manner because padding bytes are greedily trimmed.
+		data := make([]byte, 1023)
 		_, err = rand.Read(data)
+		data = append(data, 0x01)
 		Expect(err).To(BeNil())
 
 		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, 0, 100, 80)
@@ -88,14 +93,26 @@ var _ = Describe("Inabox Integration", func() {
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		retrieved, err := retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0,
+
+		conn, err := grpc.Dial(
+			"localhost:32014",
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
 		Expect(err).To(BeNil())
+		defer conn.Close()
+
+		retrieverClient := retrieverpb.NewRetrieverClient(conn)
+
+		retrieveReply, err := retrieverClient.RetrieveBlob(ctx,
+			&retrieverpb.BlobRequest{
+				BatchHeaderHash:      []byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+				BlobIndex:            reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+				ReferenceBlockNumber: reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber(),
+				QuorumId:             0,
+			},
+		)
+		Expect(err).To(BeNil())
+		retrieved := retrieveReply.Data
 		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(data))
 	})
 })

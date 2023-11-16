@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/inabox/config"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/indexer/leveldb"
@@ -18,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexedstate "github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,10 +42,10 @@ func init() {
 		"The header store implementation to be used (inmem, leveldb)")
 }
 
-func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
+func mustRegisterOperators(env *config.ConfigLock, logger common.Logger) {
 
-	for _, op := range env.Operators {
-		tx := mustMakeOperatorTransactor(env, op, logger)
+	for _, op := range env.Envs.Operators {
+		tx := mustMakeOperatorTransactor(&env.Config, op, logger)
 
 		keyPair, err := core.MakeKeyPairFromString(op.NODE_TEST_PRIVATE_BLS)
 		Expect(err).To(BeNil())
@@ -59,14 +60,15 @@ func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
 	}
 }
 
-func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger common.Logger) core.Transactor {
+func mustMakeOperatorTransactor(env *config.Config, op config.OperatorVars, logger common.Logger) core.Transactor {
 
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
 
+	pk, _ := strings.CutPrefix(op.NODE_PRIVATE_KEY, "0x")
 	config := geth.EthClientConfig{
 		RPCURL:           deployer.RPC,
-		PrivateKeyString: op.NODE_PRIVATE_KEY,
+		PrivateKeyString: pk,
 	}
 
 	c, err := geth.NewClient(config, logger)
@@ -78,7 +80,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 
 }
 
-func mustMakeTestClients(env *deploy.Config, privateKey string, logger common.Logger) (common.EthClient, common.RPCEthClient) {
+func mustMakeTestClients(env *config.Config, privateKey string, logger common.Logger) (common.EthClient, common.RPCEthClient) {
 
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
@@ -102,14 +104,14 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger common.Lo
 
 }
 
-func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger common.Logger) *indexedstate.IndexedChainState {
-	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
+func mustMakeChainState(lock *config.ConfigLock, store indexer.HeaderStore, logger common.Logger) *indexedstate.IndexedChainState {
+	client, rpcClient := mustMakeTestClients(&lock.Config, lock.Envs.Batcher.BATCHER_PRIVATE_KEY, logger)
 
-	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
+	tx, err := eth.NewTransactor(logger, client, lock.Config.EigenDA.OperatorStateRetreiver, lock.Config.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
 	cs := eth.NewChainState(tx, client)
 
-	addr := gethcommon.HexToAddress(env.EigenDA.ServiceManager)
+	addr := gethcommon.HexToAddress(lock.Config.EigenDA.ServiceManager)
 
 	indexerConfig := &indexer.Config{
 		PullInterval: 1 * time.Second,
@@ -144,7 +146,7 @@ var _ = Describe("Indexer", func() {
 				store indexer.HeaderStore
 			)
 			if headerStoreType == "leveldb" {
-				dbPath := filepath.Join(testConfig.Path, "db")
+				dbPath := filepath.Join(lock.Path, "db")
 				s, err := leveldb.NewHeaderStore(dbPath)
 				if err == nil {
 					defer s.Close()
@@ -157,13 +159,13 @@ var _ = Describe("Indexer", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 
-			chainState := mustMakeChainState(testConfig, store, logger)
+			chainState := mustMakeChainState(lock, store, logger)
 			err = chainState.Indexer.Index(ctx)
 			Expect(err).ToNot(HaveOccurred())
 
 			time.Sleep(1 * time.Second)
 
-			mustRegisterOperators(testConfig, logger)
+			mustRegisterOperators(lock, logger)
 
 			time.Sleep(1 * time.Second)
 
@@ -173,7 +175,7 @@ var _ = Describe("Indexer", func() {
 
 			pubKeys, ok := obj.(*indexedstate.OperatorPubKeys)
 			Expect(ok).To(BeTrue())
-			Expect(pubKeys.Operators).To(HaveLen(len(testConfig.Operators)))
+			Expect(pubKeys.Operators).To(HaveLen(len(lock.Operators)))
 
 			obj, header, err := chainState.Indexer.HeaderStore.GetLatestObject(chainState.Indexer.Handlers[1].Acc, false)
 			Expect(err).ToNot(HaveOccurred())
@@ -181,12 +183,12 @@ var _ = Describe("Indexer", func() {
 
 			sockets, ok := obj.(indexedstate.OperatorSockets)
 			Expect(ok).To(BeTrue())
-			Expect(sockets).To(HaveLen(len(testConfig.Operators)))
+			Expect(sockets).To(HaveLen(len(lock.Operators)))
 
 			state, err := chainState.GetIndexedOperatorState(ctx, uint(header.Number), quorums)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(state.IndexedOperators).To(HaveLen(len(testConfig.Operators)))
+			Expect(state.IndexedOperators).To(HaveLen(len(lock.Operators)))
 
 			// TODO: add further tests
 

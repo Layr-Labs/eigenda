@@ -34,8 +34,13 @@ jobs:
       - name: Checkout EigenDA
         uses: actions/checkout@v3
 
-      - name: Build
-        run: make build
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Get Forge version
+        run: forge --version
 
       - name: Test all
         run: ./test.sh -coverprofile=coverage.out
