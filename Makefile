@@ -34,7 +34,7 @@ protoc: clean
 
 lint:
 	golint -set_exit_status ./...
-	go tool fix ./..
+	go fix ./...
 	golangci-lint run
 
 build: 
