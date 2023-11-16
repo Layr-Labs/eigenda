@@ -528,6 +528,12 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	}, nil
 }
 
+func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
+	for _, sp := range metadata.RequestMetadata.SecurityParams {
+		e.EncodedBlobstore.DeleteEncodingResult(metadata.GetBlobKey(), sp.QuorumID)
+	}
+}
+
 func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*batchMetadata, error) {
 	quorums := make(map[core.QuorumID]QuorumInfo, 0)
 	for _, metadata := range metadatas {

@@ -169,17 +169,24 @@ func TestBatcherIterations(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 	// Check that the blob was processed
-	meta, err := blobStore.GetBlobMetadata(ctx, blobKey1)
+	meta1, err := blobStore.GetBlobMetadata(ctx, blobKey1)
 	assert.NoError(t, err)
-	assert.Equal(t, blobKey1, meta.GetBlobKey())
-	assert.Equal(t, requestedAt1, meta.RequestMetadata.RequestedAt)
-	assert.Equal(t, disperser.Confirmed, meta.BlobStatus)
-	assert.Equal(t, meta.ConfirmationInfo.BatchID, uint32(3))
+	assert.Equal(t, blobKey1, meta1.GetBlobKey())
+	assert.Equal(t, requestedAt1, meta1.RequestMetadata.RequestedAt)
+	assert.Equal(t, disperser.Confirmed, meta1.BlobStatus)
+	assert.Equal(t, meta1.ConfirmationInfo.BatchID, uint32(3))
 
-	meta, err = blobStore.GetBlobMetadata(ctx, blobKey2)
+	meta2, err := blobStore.GetBlobMetadata(ctx, blobKey2)
 	assert.NoError(t, err)
-	assert.Equal(t, blobKey2, meta.GetBlobKey())
-	assert.Equal(t, disperser.Confirmed, meta.BlobStatus)
+	assert.Equal(t, blobKey2, meta2.GetBlobKey())
+	assert.Equal(t, disperser.Confirmed, meta2.BlobStatus)
+
+	res, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(meta1.GetBlobKey(), 0)
+	assert.ErrorContains(t, err, "no such key")
+	assert.Nil(t, res)
+	res, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(meta2.GetBlobKey(), 1)
+	assert.ErrorContains(t, err, "no such key")
+	assert.Nil(t, res)
 }
 
 func TestBlobFailures(t *testing.T) {

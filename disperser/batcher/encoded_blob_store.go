@@ -118,6 +118,18 @@ func (e *encodedBlobStore) GetEncodingResult(blobKey disperser.BlobKey, quorumID
 	return e.encoded[requestID], nil
 }
 
+func (e *encodedBlobStore) DeleteEncodingResult(blobKey disperser.BlobKey, quorumID core.QuorumID) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	requestID := getRequestID(blobKey, quorumID)
+	if _, ok := e.encoded[requestID]; !ok {
+		return
+	}
+
+	delete(e.encoded, requestID)
+}
+
 // GetNewAndDeleteStaleEncodingResults returns all the fresh encoded results and deletes all the stale results
 func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint) []*EncodingResult {
 	e.mu.Lock()
