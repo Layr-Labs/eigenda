@@ -176,7 +176,7 @@ func (n *Node) Start(ctx context.Context) error {
 			OperatorId: n.Config.ID,
 			QuorumIDs:  n.Config.QuorumIDList,
 		}
-		err := RegisterOperator(ctx, operator, n.Transactor, n.Config.ChurnerUrl, n.Logger)
+		err := RegisterOperator(ctx, operator, n.Transactor, n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
