@@ -67,7 +67,7 @@ func teardown() {
 
 func createTable(t *testing.T, tableName string) {
 	ctx := context.Background()
-	tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	tableDescription, err := test_utils.CreateTableIfNotExists(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String("MetadataKey"),
 			AttributeType: types.ScalarAttributeTypeS,

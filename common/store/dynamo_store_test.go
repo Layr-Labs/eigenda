@@ -59,7 +59,7 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	_, err = test_utils.CreateTable(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
+	_, err = test_utils.CreateTableIfNotExists(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())

@@ -116,12 +116,12 @@ func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, b
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
-	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err := test_utils.CreateTableIfNotExists(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		return err
 	}
 
-	_, err = test_utils.CreateTable(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
+	_, err = test_utils.CreateTableIfNotExists(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
 
 	return err
 

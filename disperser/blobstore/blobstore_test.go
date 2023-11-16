@@ -76,7 +76,7 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	_, err = test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err = test_utils.CreateTableIfNotExists(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())

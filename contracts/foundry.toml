@@ -2,7 +2,7 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
-fs_permissions = [{ access = "read-write", path = "./"}]
+fs_permissions = [{ access = "read-write", path = "./" }]
 
 remappings = [
     "@eigenlayer-middleware/=lib/eigenlayer-middleware/src/",
@@ -10,7 +10,7 @@ remappings = [
     "@eigenlayer-scripts/=lib/eigenlayer-contracts/script/",
     "@openzeppelin/=lib/openzeppelin-contracts/",
     "@openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/",
-    "forge-std/=lib/forge-std/src/"
+    "forge-std/=lib/forge-std/src/",
 ]
 
 gas_reports = ["*"]

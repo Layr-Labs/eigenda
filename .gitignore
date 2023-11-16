@@ -1,8 +1,11 @@
 inabox/testdata/*
 inabox/anvil.pid
+inabox/resources/kzg/SRSTables/*
+
+inabox-docker/testdata/*
+inabox-docker/resources/kzg/SRSTables/*
 
 test/testdata/*
-inabox/resources/kzg/SRSTables/*
 
 **/bin/*
 coverage.*
