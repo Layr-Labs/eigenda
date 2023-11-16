@@ -184,7 +184,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, err
 	}
 
-	retrieverID, err := common.GetClientAddress(ctx, s.config.ClientIPHeader)
+	retrieverID, err := common.GetClientAddress(ctx, s.config.ClientIPHeader, 1, false)
 	if err != nil {
 		return nil, err
 	}
