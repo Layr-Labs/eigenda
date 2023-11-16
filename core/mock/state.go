@@ -112,17 +112,41 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 
 	}
 
-	totals := make(map[core.QuorumID]*core.OperatorInfo)
-	for _, id := range quorums {
-		totals[id] = &core.OperatorInfo{
+	totals := map[core.QuorumID]*core.OperatorInfo{
+		0: {
 			Stake: big.NewInt(int64(quorumStake)),
 			Index: d.NumOperators,
+		},
+		1: {
+			Stake: big.NewInt(int64(quorumStake)),
+			Index: d.NumOperators,
+		},
+		2: {
+			Stake: big.NewInt(int64(quorumStake)),
+			Index: d.NumOperators,
+		},
+	}
+
+	if len(quorums) > 0 {
+		totals = make(map[core.QuorumID]*core.OperatorInfo)
+		for _, id := range quorums {
+			totals[id] = &core.OperatorInfo{
+				Stake: big.NewInt(int64(quorumStake)),
+				Index: d.NumOperators,
+			}
 		}
 	}
 
-	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
-	for _, id := range quorums {
-		operators[id] = storedOperators
+	operators := map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
+		0: storedOperators,
+		1: storedOperators,
+		2: storedOperators,
+	}
+	if len(quorums) > 0 {
+		operators = make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
+		for _, id := range quorums {
+			operators[id] = storedOperators
+		}
 	}
 
 	operatorState := &core.OperatorState{
