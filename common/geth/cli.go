@@ -7,7 +7,7 @@ import (
 
 var (
 	rpcUrlFlagName     = "chain.rpc"
-	privateKeyFlagName = "chain.private-key"
+	PrivateKeyFlagName = "chain.private-key"
 )
 
 type EthClientConfig struct {
@@ -24,9 +24,9 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CHAIN_RPC"),
 		},
 		cli.StringFlag{
-			Name:     privateKeyFlagName,
+			Name:     PrivateKeyFlagName,
 			Usage:    "Ethereum private key for disperser",
-			Required: true,
+			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRIVATE_KEY"),
 		},
 	}
@@ -35,7 +35,11 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg := EthClientConfig{}
 	cfg.RPCURL = ctx.GlobalString(rpcUrlFlagName)
-	cfg.PrivateKeyString = ctx.GlobalString(privateKeyFlagName)
+	pkStr := ctx.GlobalString(PrivateKeyFlagName)
+	if len(pkStr) >= 2 && pkStr[:2] == "0x" {
+		pkStr = pkStr[2:]
+	}
+	cfg.PrivateKeyString = pkStr
 	return cfg
 }
 

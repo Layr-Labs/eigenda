@@ -1,0 +1,138 @@
+version: '3'
+name: eigenda-devnet
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4570:4570"
+    environment:
+      - GATEWAY_LISTEN=0.0.0.0:4570
+      - LOCALSTACK_HOST=localhost.localstack.cloud:4570
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:4570"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - eigenda-demo
+
+  graph-node:
+    image: graphprotocol/graph-node
+    ports:
+      - '8000:8000'
+      - '8001:8001'
+      - '8020:8020'
+      - '8030:8030'
+      - '8040:8040'
+    depends_on:
+      graph-node-ipfs:
+        condition: service_started
+      graph-node-postgres:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      postgres_host: graph-node-postgres
+      postgres_user: graph-node
+      postgres_pass: let-me-in
+      postgres_db: graph-node
+      ipfs: 'graph-node-ipfs:5001'
+      ethereum: 'devnet:http://host.docker.internal:8545'
+      GRAPH_LOG: info
+    networks:
+      - eigenda-demo
+    # note no healthchecks... may be necessary
+
+  graph-node-ipfs:
+    image: ipfs/kubo:v0.14.0
+    ports:
+      - '5001:5001'
+    # volumes:
+    #   - ./data/ipfs:/data/ipfs
+    networks:
+      - eigenda-demo
+
+  graph-node-postgres:
+    image: postgres:14
+    ports:
+      - '5432:5432'
+    command:
+      [
+        "postgres",
+        "-cshared_preload_libraries=pg_stat_statements",
+        "-cmax_connections=200"
+      ]
+    environment:
+      POSTGRES_USER: graph-node
+      POSTGRES_PASSWORD: let-me-in
+      POSTGRES_DB: graph-node
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    # volumes:
+    #   - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d graph-node -U graph-node" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - eigenda-demo
+
+  # geth:
+  #   image: ethereum/client-go:v1.12.0
+  #   # pull_policy: always
+  #   container_name: geth
+  #   restart: unless-stopped
+  #   ports:
+  #     - 30303:30303
+  #     - 30303:30303/udp
+  #     - 8545:8545
+  #     - 8546:8546
+  #     - 8551:8551
+  #   volumes:
+  #     - ${PWD}/geth/data:/root/.ethereum
+  #     - ${PWD}/geth/secret:/secret
+  #   stop_signal: SIGINT
+  #   stop_grace_period: 2m
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "geth attach --exec eth.blockNumber" ]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   command:
+  #     - --datadir=/root/.ethereum
+  #     - --networkid=${GETH_CHAINID}
+  #     - --ws
+  #     - --ws.addr=0.0.0.0
+  #     - --http
+  #     - --http.addr=0.0.0.0
+  #     - --http.vhosts=*
+  #     - --http.api=eth,net,web3,txpool,debug,miner
+  #     - --nodiscover
+  #     - --netrestrict=127.0.0.1/0
+  #     - --unlock=${GETH_UNLOCK_ADDRESS}
+  #     - --mine
+  #     - --allow-insecure-unlock
+  #     - --password=/secret/geth-account-password
+  #     - --rpc.gascap=0
+  #     - --miner.gasprice=1
+  #     - --rpc.allow-unprotected-txs
+  #     - --miner.gaslimit=2922337203600000
+  #     - --maxpeers=200
+  #     - --miner.etherbase=${GETH_UNLOCK_ADDRESS}
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: 2m
+  #       max-file: 10
+
+volumes:
+  go-build-cache:
+    name: go-build-cache
+  go-root-cache:
+    name: go-root-cache
+networks:
+  eigenda-demo:
+    name: eigenda-demo

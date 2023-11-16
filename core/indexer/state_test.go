@@ -18,7 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexedstate "github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/strategies/processes/deploy"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

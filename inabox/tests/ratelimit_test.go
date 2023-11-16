@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/strategies/processes/deploy"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
