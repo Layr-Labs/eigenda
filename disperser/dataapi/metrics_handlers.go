@@ -79,7 +79,7 @@ func (s *server) calculateTotalStake(operators []*Operator, blockNumber uint32) 
 		pool                     = workerpool.New(maxWorkersGetOperatorState)
 	)
 
-	s.logger.Debug("Number of operators to calculate stake:", len(operators))
+	s.logger.Debug("Number of operators to calculate stake:", "numOperators", len(operators), "blockNumber", blockNumber)
 	for _, o := range operators {
 		operatorId, err := ConvertHexadecimalToBytes(o.OperatorId)
 		if err != nil {
