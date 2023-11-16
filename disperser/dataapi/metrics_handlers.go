@@ -128,7 +128,7 @@ func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error)
 
 	var (
 		totalBlobSize  uint
-		totalCostInWei float64
+		totalGasUsed float64
 		batch          = batches[0]
 	)
 
@@ -153,9 +153,9 @@ func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error)
 	}
 
 	if uint64(totalBlobSize) > 0 {
-		totalCostInWei = float64(batch.GasFees.GasUsed) / float64(totalBlobSize)
+		totalGasUsed = float64(batch.GasFees.GasUsed) / float64(totalBlobSize)
 	}
-	return totalCostInWei, nil
+	return totalGasUsed, nil
 }
 
 func calculateAverageThroughput(values []*PrometheusResultValues, windowSize int64) []*Throughput {
