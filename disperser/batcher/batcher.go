@@ -264,7 +264,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	batchID, err := b.getBatchID(ctx, txnReceipt)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata)
-		return fmt.Errorf("HandleSingleBatch: error confirming batch: %w", err)
+		return fmt.Errorf("HandleSingleBatch: error fetching batch ID: %w", err)
 	}
 
 	// Mark the blobs as complete
@@ -316,11 +316,17 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		}
 
 		if status == disperser.Confirmed {
-			_, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
-			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
+			if _, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
+				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
+				// remove encoded blob from storage so we don't disperse it again
+				b.EncodingStreamer.RemoveEncodedBlob(metadata)
+			}
 		} else if status == disperser.InsufficientSignatures {
-			_, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo)
-			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
+			if _, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
+				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
+				// remove encoded blob from storage so we don't disperse it again
+				b.EncodingStreamer.RemoveEncodedBlob(metadata)
+			}
 		} else {
 			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
 		}
