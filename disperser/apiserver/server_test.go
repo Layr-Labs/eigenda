@@ -287,8 +287,6 @@ func setup(m *testing.M) {
 
 	if deployLocalstack {
 
-		panic(fmt.Sprintf("this should be off, DEPLOY_LOCALSTACK=%v", os.Getenv("DEPLOY_LOCALSTACK")))
-
 		var err error
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
