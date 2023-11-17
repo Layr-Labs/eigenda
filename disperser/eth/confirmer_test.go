@@ -39,7 +39,7 @@ func TestConfirmerTimeout(t *testing.T) {
 	tx := coremock.MockTransactor{}
 	confirmer, err := eth.NewBatchConfirmer(&tx, 100*time.Millisecond)
 	assert.Nil(t, err)
-	tx.On("ConfirmBatch").Return(nil, context.DeadlineExceeded)
+	tx.On("ConfirmBatch").Return(nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", "123", context.DeadlineExceeded)).Once()
 	_, err = confirmer.ConfirmBatch(context.Background(), &core.BatchHeader{
 		ReferenceBlockNumber: 100,
 		BatchRoot:            [32]byte{},

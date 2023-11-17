@@ -40,6 +40,14 @@ func (s *server) convertBlobMetadatasToBlobMetadataResponse(ctx context.Context,
 		err               error
 		responseMetadatas = make([]*BlobMetadataResponse, len(metadatas))
 	)
+
+	sort.SliceStable(metadatas, func(i, j int) bool {
+		if metadatas[i].ConfirmationInfo.BatchID != metadatas[j].ConfirmationInfo.BatchID {
+			return metadatas[i].ConfirmationInfo.BatchID < metadatas[j].ConfirmationInfo.BatchID
+		}
+		return metadatas[i].ConfirmationInfo.BlobIndex < metadatas[j].ConfirmationInfo.BlobIndex
+	})
+
 	for i := range metadatas {
 		responseMetadatas[i], err = convertMetadataToBlobMetadataResponse(metadatas[i])
 		if err != nil {
@@ -47,13 +55,6 @@ func (s *server) convertBlobMetadatasToBlobMetadataResponse(ctx context.Context,
 		}
 	}
 
-	sort.SliceStable(responseMetadatas, func(i, j int) bool {
-		if responseMetadatas[i].ConfirmationBlockNumber !=
-			responseMetadatas[j].ConfirmationBlockNumber {
-			return responseMetadatas[i].ConfirmationBlockNumber < responseMetadatas[j].ConfirmationBlockNumber
-		}
-		return responseMetadatas[i].RequestAt < responseMetadatas[j].RequestAt
-	})
 	return responseMetadatas, nil
 }
 

@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	gweiMultiplier             = 1_000_000_000
 	avgThroughputWindowSize    = 120 // The time window (in seconds) to calculate the data throughput.
 	maxWorkersGetOperatorState = 10  // The maximum number of workers to use when querying operator state.
 )
@@ -50,14 +49,14 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 		troughput = totalBytes / timeDuration
 	}
 
-	costInWei, err := s.calculateTotalCostGasUsedInWei(ctx)
+	costInGas, err := s.calculateTotalCostGasUsed(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Metric{
 		Throughput: troughput,
-		CostInWei:  costInWei,
+		CostInGas:  costInGas,
 		TotalStake: totalStake.Uint64(),
 	}, nil
 }
@@ -75,7 +74,7 @@ func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*
 	return calculateAverageThroughput(result.Values, avgThroughputWindowSize), nil
 }
 
-func (s *server) calculateTotalCostGasUsedInWei(ctx context.Context) (uint64, error) {
+func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error) {
 	batches, err := s.subgraphClient.QueryBatchesWithLimit(ctx, 1, 0)
 	if err != nil {
 		return 0, err
@@ -86,9 +85,9 @@ func (s *server) calculateTotalCostGasUsedInWei(ctx context.Context) (uint64, er
 	}
 
 	var (
-		totalBlobSize  uint
-		totalCostInWei uint64
-		batch          = batches[0]
+		totalBlobSize uint
+		totalGasUsed  float64
+		batch         = batches[0]
 	)
 
 	if batch == nil {
@@ -112,10 +111,9 @@ func (s *server) calculateTotalCostGasUsedInWei(ctx context.Context) (uint64, er
 	}
 
 	if uint64(totalBlobSize) > 0 {
-		cost := float64(batch.GasFees.GasUsed) / float64(totalBlobSize)
-		totalCostInWei = uint64(cost * gweiMultiplier)
+		totalGasUsed = float64(batch.GasFees.GasUsed) / float64(totalBlobSize)
 	}
-	return totalCostInWei, nil
+	return totalGasUsed, nil
 }
 
 func calculateAverageThroughput(values []*PrometheusResultValues, windowSize int64) []*Throughput {

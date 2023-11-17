@@ -89,12 +89,13 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 
-	request, err := GetStoreChunksRequest(blobs, header)
+	request, totalSize, err := GetStoreChunksRequest(blobs, header)
 	if err != nil {
 		return nil, err
 	}
 
 	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 1024)
+	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize)
 	reply, err := gc.StoreChunks(ctx, request, opt)
 
 	if err != nil {
@@ -106,15 +107,16 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	return sig, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchHeader) (*node.StoreChunksRequest, error) {
-
+func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchHeader) (*node.StoreChunksRequest, int, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
+	totalSize := 0
 	for i, blob := range blobMessages {
 		var err error
 		blobs[i], err = getBlobMessage(blob)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
+		totalSize += blob.BlobHeader.EncodedSizeAllQuorums()
 	}
 
 	request := &node.StoreChunksRequest{
@@ -122,7 +124,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchH
 		Blobs:       blobs,
 	}
 
-	return request, nil
+	return request, totalSize, nil
 }
 
 func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
