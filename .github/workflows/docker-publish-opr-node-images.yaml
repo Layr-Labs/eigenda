@@ -59,7 +59,7 @@ jobs:
       with:
         file: ./node/cmd/Dockerfile
         push: true
-        tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-node:${{ github.event.inputs.commit_sha }}
+        tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-node:${{ steps.set_tag.outputs.tag }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new
       if: ${{ success() }}
@@ -70,7 +70,7 @@ jobs:
         context: .
         file: ./node/plugin/Dockerfile
         push: true
-        tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-nodeplugin:${{ github.event.inputs.commit_sha }}
+        tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-nodeplugin:${{ steps.set_tag.outputs.tag }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new
       if: ${{ success() }}
@@ -79,6 +79,6 @@ jobs:
       uses: actions/cache@v2
       with:
         path: /tmp/.buildx-cache-new
-        key: ${{ runner.os }}-buildx-${{ github.event.inputs.commit_sha }}
+        key: ${{ runner.os }}-buildx-${{ steps.set_tag.outputs.tag }}
         restore-keys: |
           ${{ runner.os }}-buildx-
