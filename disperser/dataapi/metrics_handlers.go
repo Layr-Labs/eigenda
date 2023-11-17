@@ -3,7 +3,11 @@ package dataapi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/big"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 const (
@@ -12,19 +16,21 @@ const (
 )
 
 func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, limit int) (*Metric, error) {
-	// operators, err := s.subgraphClient.QueryOperatorsWithLimit(ctx, limit)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to get current block number: %w", err)
-	// }
-	// totalStake, err := s.calculateTotalStake(operators, blockNumber)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	operatorState, err := s.chainState.GetOperatorState(ctx, uint(blockNumber), []core.QuorumID{core.QuorumID(0)})
+	if err != nil {
+		return nil, err
+	}
+	if len(operatorState.Operators) != 1 {
+		return nil, fmt.Errorf("Requesting for one quorum (quorumID=0), but got %v", operatorState.Operators)
+	}
+	totalStake := big.NewInt(0)
+	for _, op := range operatorState.Operators[0] {
+		totalStake.Add(totalStake, op.Stake)
+	}
 
 	result, err := s.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
 	if err != nil {
@@ -51,7 +57,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	return &Metric{
 		Throughput: troughput,
 		CostInGas:  costInGas,
-		TotalStake: 0,
+		TotalStake: totalStake.Uint64(),
 	}, nil
 }
 
@@ -67,50 +73,6 @@ func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*
 
 	return calculateAverageThroughput(result.Values, avgThroughputWindowSize), nil
 }
-
-// func (s *server) calculateTotalStake(operators []*Operator, blockNumber uint32) (int64, error) {
-// 	var (
-// 		totalStakeByOperatorChan = make(chan *big.Int, len(operators))
-// 		pool                     = workerpool.New(maxWorkersGetOperatorState)
-// 	)
-//
-// 	s.logger.Debug("Number of operators to calculate stake:", "numOperators", len(operators), "blockNumber", blockNumber)
-// 	for _, o := range operators {
-// 		operatorId, err := ConvertHexadecimalToBytes(o.OperatorId)
-// 		if err != nil {
-// 			s.logger.Error("Failed to convert operator id to hex string: ", "operatorId", operatorId, "err", err)
-// 			return 0, err
-// 		}
-//
-// 		pool.Submit(func() {
-// 			operatorState, err := s.chainState.GetOperatorStateByOperator(context.Background(), uint(blockNumber), operatorId)
-// 			if err != nil {
-// 				s.logger.Error("Failed to get operator state: ", "operatorId", operatorId, "blockNumber", blockNumber, "err", err)
-// 				totalStakeByOperatorChan <- big.NewInt(-1)
-// 				return
-// 			}
-// 			totalStake := big.NewInt(0)
-// 			s.logger.Debug("Operator state:", "operatorId", operatorId, "num quorums", len(operatorState.Totals))
-// 			for quorumId, total := range operatorState.Totals {
-// 				s.logger.Debug("Operator stake:", "operatorId", operatorId, "quorum", quorumId, "stake", (*total.Stake).Int64())
-// 				totalStake.Add(totalStake, total.Stake)
-// 			}
-// 			totalStakeByOperatorChan <- totalStake
-// 		})
-// 	}
-//
-// 	pool.StopWait()
-// 	close(totalStakeByOperatorChan)
-//
-// 	totalStake := big.NewInt(0)
-// 	for total := range totalStakeByOperatorChan {
-// 		if total.Int64() == -1 {
-// 			return 0, errors.New("error getting operator state")
-// 		}
-// 		totalStake.Add(totalStake, total)
-// 	}
-// 	return totalStake.Int64(), nil
-// }
 
 func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error) {
 	batches, err := s.subgraphClient.QueryBatchesWithLimit(ctx, 1, 0)
