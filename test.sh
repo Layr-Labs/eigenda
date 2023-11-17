@@ -7,7 +7,7 @@ function tearDown {
 }
 trap tearDown EXIT
 
-go run ./inabox/deploy/cmd -root-path=./ -localstack-port=4570 -deploy-resources=false localstack
+go run ./inabox/deploy/cmd -localstack-port=4570 -deploy-resources=false localstack
 go clean -testcache 
 # expand all arguments to script at the end of this line
 LOCALSTACK_PORT=4570 DEPLOY_LOCALSTACK=false go test -short ./... "$@"

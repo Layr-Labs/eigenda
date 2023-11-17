@@ -83,26 +83,25 @@ func getRunner(command string) func(ctx *cli.Context) error {
 
 	return func(ctx *cli.Context) error {
 
-		rootPath, err := filepath.Abs(ctx.String(rootPathFlagName))
-		if err != nil {
-			return err
-		}
-
-		testname := ctx.String(testNameFlagName)
-
-		if testname == "" {
-			testname, err = deploy.GetLatestTestDirectory(rootPath)
+		var config *deploy.Config
+		if command != localstackCmdName {
+			rootPath, err := filepath.Abs(ctx.String(rootPathFlagName))
 			if err != nil {
 				return err
 			}
+			testname := ctx.String(testNameFlagName)
+			if testname == "" {
+				testname, err = deploy.GetLatestTestDirectory(rootPath)
+				if err != nil {
+					return err
+				}
+			}
+			config = deploy.NewTestConfig(testname, rootPath)
 		}
-
-		config := deploy.NewTestConfig(testname, rootPath)
 
 		switch command {
 		case chainCmdName:
-			err = chainInfra(ctx, config)
-			return err
+			return chainInfra(ctx, config)
 		case localstackCmdName:
 			return localstack(ctx)
 		case expCmdName:
