@@ -38,4 +38,23 @@ jobs:
         run: make build
 
       - name: Test all
-        run: go test -coverprofile=coverage.out -short ./... 
+        run: ./test.sh -coverprofile=coverage.out
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage
+          path: coverage.out
+
+  coverage-report: 
+    name: Coverage Report
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+          
+      - name: Update coverage badge
+        uses: ./.github/actions/test-coverage
+        with:
+          chart: true
+          amend: true

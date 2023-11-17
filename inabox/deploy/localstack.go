@@ -36,6 +36,7 @@ func StartDockertestWithLocalstackContainer(localStackPort string) (*dockertest.
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository:   "localstack/localstack",
 		Tag:          "latest",
+		Name:         "localstack-test",
 		ExposedPorts: []string{localStackPort},
 		PortBindings: map[docker.Port][]docker.PortBinding{
 			docker.Port(localStackPort): {

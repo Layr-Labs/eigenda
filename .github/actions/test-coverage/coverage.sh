@@ -52,10 +52,12 @@ set -euo pipefail
 SCRIPT_DIR="$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")"
 
 OUT_DIR="${1-$SCRIPT_DIR}"
-OUT_FILE="$(mktemp)"
 
-# Get coverage for all packages in the current directory; store next to script.
-go test -short ./...  -coverprofile "$OUT_FILE"
+# OUT_FILE="$(mktemp)"
+# # Get coverage for all packages in the current directory; store next to script.
+# go test -short ./...  -coverprofile "$OUT_FILE"
+
+OUT_FILE="coverage.out"
 
 if [[ "${INPUT_REPORT-true}" == "true" ]]; then
 	# Create an HTML report; store next to script.
