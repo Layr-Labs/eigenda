@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/blobstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
@@ -36,9 +37,11 @@ var (
 	dispersalServer    *apiserver.DispersalServer
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
-	localStackPort     string
-	metadataTableName  = "test-BlobMetadata"
-	bucketTableName    = "test-BucketStore"
+	UUID               = uuid.New()
+	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
+
+	localStackPort = "4568"
 )
 
 func TestMain(m *testing.M) {
@@ -276,16 +279,26 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 }
 
 func setup(m *testing.M) {
-	localStackPort = "4568"
-	pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-	dockertestPool = pool
-	dockertestResource = resource
-	if err != nil {
-		teardown()
-		panic("failed to start localstack container")
+
+	deployLocalstack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalstack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
-	err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName)
+	if deployLocalstack {
+
+		panic(fmt.Sprintf("this should be off, DEPLOY_LOCALSTACK=%v", os.Getenv("DEPLOY_LOCALSTACK")))
+
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			teardown()
+			panic("failed to start localstack container")
+		}
+
+	}
+
+	err := deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")

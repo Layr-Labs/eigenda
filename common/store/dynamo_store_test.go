@@ -23,7 +23,7 @@ var (
 
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
-	localStackPort     string
+	localStackPort     = "4566"
 
 	dynamoClient     *dynamodb.Client
 	dynamoParamStore common.KVStore[common.RateBucketParams]
@@ -38,13 +38,19 @@ func TestMain(m *testing.M) {
 }
 
 func setup(m *testing.M) {
-	localStackPort = "4569"
-	pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-	dockertestPool = pool
-	dockertestResource = resource
-	if err != nil {
-		teardown()
-		panic("failed to start localstack container")
+
+	deployLocalstack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalstack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+
+	if deployLocalstack {
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			teardown()
+			panic("failed to start localstack container")
+		}
 	}
 
 	cfg := aws.ClientConfig{
@@ -53,16 +59,17 @@ func setup(m *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
+
+	_, err := test_utils.CreateTable(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
+	if err != nil {
+		teardown()
+		panic("failed to create dynamodb table: " + err.Error())
+	}
+
 	dynamoClient, err = dynamodb.NewClient(cfg, logger)
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb client: " + err.Error())
-	}
-
-	_, err = test_utils.CreateTable(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
-	if err != nil {
-		teardown()
-		panic("failed to create dynamodb table: " + err.Error())
 	}
 
 	dynamoParamStore = store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, bucketTableName)

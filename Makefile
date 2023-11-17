@@ -1,4 +1,4 @@
-.PHONY: compile-el compile-dl clean protoc lint
+.PHONY: compile-el compile-dl clean protoc lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer
 
 PROTOS := ./api/proto
 PROTOS_DISPERSER := ./disperser/proto
@@ -45,7 +45,7 @@ build:
 	cd tools/traffic && make build
 
 unit-tests:
-	go clean -testcache && go test -short ./... -p 2 -race
+	./test.sh
 
 integration-tests-churner:
 	go test -v ./churner/tests

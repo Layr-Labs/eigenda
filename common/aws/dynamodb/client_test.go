@@ -23,6 +23,8 @@ var (
 	dockertestResource *dockertest.Resource
 	dynamoClient       *commondynamodb.Client
 	clientConfig       commonaws.ClientConfig
+
+	localStackPort = "4567"
 )
 
 func TestMain(m *testing.M) {
@@ -33,13 +35,19 @@ func TestMain(m *testing.M) {
 }
 
 func setup(m *testing.M) {
-	localStackPort := "4567"
-	pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-	dockertestPool = pool
-	dockertestResource = resource
-	if err != nil {
-		teardown()
-		panic("failed to start localstack container")
+
+	deployLocalstack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalstack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+
+	if deployLocalstack {
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			teardown()
+			panic("failed to start localstack container")
+		}
 	}
 
 	logger, err := logging.GetLogger(logging.DefaultCLIConfig())

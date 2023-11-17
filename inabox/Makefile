@@ -13,7 +13,7 @@ stop-geth:
 	cd geth && docker compose down
 
 
-.PHONY: new-anvil new-docker-anvil infra resources exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
+.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -23,11 +23,11 @@ new-docker-anvil:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-docker.yaml "testdata/$(dt)/config.yaml"
 
-infra:
-	go run ./deploy/cmd -localstack-port 4570 infra
+chain:
+	go run ./deploy/cmd -localstack-port 4570 chain
 
-resources:
-	go run ./deploy/cmd -localstack-port 4570 resources
+localstack:
+	go run ./deploy/cmd -localstack-port 4570 localstack
 
 exp: 
 	go run ./deploy/cmd exp
@@ -38,7 +38,7 @@ deploy-all:
 stop-infra:
 	./bin.sh stop-anvil
 	./bin.sh stop-graph
-	docker stop $(shell docker container ls --all --filter=ancestor=localstack/localstack:latest --format "{{.ID}}")
+	docker stop localstack-test
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
