@@ -59,7 +59,7 @@ jobs:
             path: .
             
         - name: Update coverage badge
-              uses: ./.github/actions/test-coverage
-              with:
-                chart: true
-                amend: true
+          uses: ./.github/actions/test-coverage
+          with:
+            chart: true
+            amend: true
