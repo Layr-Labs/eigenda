@@ -36,7 +36,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
-	"github.com/Layr-Labs/eigenda/disperser/inmem"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dispersermock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
