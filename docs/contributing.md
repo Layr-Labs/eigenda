@@ -6,7 +6,7 @@ The EigenDA repo is organized as a monorepo, with each project adhering to the "
 
 The same pattern is used for intra-project and inter-project dependencies. For instance, the folder `indexer/indexer` contains implementations of the interfaces in `core` which depend on the `indexer` project. 
 
-In general, the `core` project contains implementation all of the important business logic responsible for the security guarantees of the EigenDA protocol, while the other projects add the networking layers needed to run the distributed system. 
+In general, the `core` project contains implementation of all the important business logic responsible for the security guarantees of the EigenDA protocol, while the other projects add the networking layers needed to run the distributed system. 
 
 
 # Directory structure
@@ -17,7 +17,7 @@ In general, the `core` project contains implementation all of the important busi
 ┌── <a href="./core">core</a>: Core logic of the EigenDA protocol
 ├── <a href="./disperser">disperser</a>: Disperser service
 ├── <a href="./docs">docs</a>: Documentation and specification
-── <a href="./indexer">indexer</a>: A simple indexer for efficently tracking chain state and maintaining accumulators
+── <a href="./indexer">indexer</a>: A simple indexer for efficiently tracking chain state and maintaining accumulators
 ├── <a href="./node">node</a>: DA node service
 ├── <a href="./pkg">pkg</a>
 |   ├── <a href="./pkg/encoding">encoding</a>: Core encoding/decoding functionality and multiproof generation
