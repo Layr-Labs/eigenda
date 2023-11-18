@@ -12,7 +12,7 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/inmem"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
