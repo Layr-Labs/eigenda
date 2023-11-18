@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/dispatcher"
+	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/stretchr/testify/assert"
 )
 
