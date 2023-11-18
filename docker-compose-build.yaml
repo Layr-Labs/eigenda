@@ -3,22 +3,22 @@ services:
   batcher:
     build:
       context: .
-      dockerfile: disperser/batcher.Dockerfile
+      dockerfile: disperser/cmd/batcher/Dockerfile
     image: ghcr.io/layr-labs/eigenda/batcher:${BUILD_TAG:-latest}
   disperser:
     build:
       context: .
-      dockerfile: disperser/disperser.Dockerfile
+      dockerfile: disperser/cmd/disperserserver/Dockerfile
     image: ghcr.io/layr-labs/eigenda/disperser:${BUILD_TAG:-latest}
   encoder:
     build:
       context: .
-      dockerfile: disperser/encoder.Dockerfile
+      dockerfile: disperser/cmd/encoder/Dockerfile
     image: ghcr.io/layr-labs/eigenda/encoder:${BUILD_TAG:-latest}
   retriever:
     build:
       context: .
-      dockerfile: retriever/Dockerfile
+      dockerfile: retriever/cmd/Dockerfile
     image: ghcr.io/layr-labs/eigenda/retriever:${BUILD_TAG:-latest}
   node:
     build:
@@ -28,10 +28,10 @@ services:
   churner:
     build:
       context: .
-      dockerfile: churner/Dockerfile
+      dockerfile: churner/cmd/Dockerfile
     image: ghcr.io/layr-labs/eigenda/churner:${BUILD_TAG:-latest}
   nodeplugin:
     build:
       context: .
-      dockerfile: node/plugin/Dockerfile
+      dockerfile: node/plugin/cmd/Dockerfile
     image: ghcr.io/layr-labs/eigenda/nodeplugin:${BUILD_TAG:-latest}
