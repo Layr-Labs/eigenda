@@ -13,6 +13,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  CACHE-FROM: /tmp/.buildx-cache
+  CACHE-TO: /tmp/.buildx-cache-new
 
 jobs:
   build-and-push:
@@ -71,14 +73,14 @@ jobs:
         file: ./node/plugin/Dockerfile
         push: true
         tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-nodeplugin:${{ steps.set_tag.outputs.tag }}
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,dest=/tmp/.buildx-cache-new
+        cache-from: type=local,src=${{ env.CACHE-FROM }}
+        cache-to: type=local,dest=${{ env.CACHE-TO }}
       if: ${{ success() }}
 
     - name: Update cache
       uses: actions/cache@v2
       with:
-        path: /tmp/.buildx-cache-new
+        path: ${{ env.CACHE-TO }}
         key: ${{ runner.os }}-buildx-${{ steps.set_tag.outputs.tag }}
         restore-keys: |
           ${{ runner.os }}-buildx-
