@@ -51,7 +51,7 @@ jobs:
 
     - name: Set Tag Name
       id: set_tag
-      run: echo "::set-output name=tag::${{ github.event.inputs.release_tag || github.event.inputs.commit_sha }}"
+      run: echo "tag=${{ github.event.inputs.release_tag || github.event.inputs.commit_sha }}" >> $GITHUB_OUTPUT
       if: ${{ success() }}
 
     - name: Build and Push Opr Node Image
