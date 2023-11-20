@@ -163,7 +163,6 @@ func (n *Node) Start(ctx context.Context) error {
 
 	// Build the socket based on the hostname/IP provided in the CLI
 	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
-	n.Logger.Info("Registering node with socket", "socket", socket)
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Debug("Registering node on chain with the following parameters:", "operatorId",
 			n.Config.ID, "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
@@ -193,8 +192,9 @@ func (n *Node) Start(ctx context.Context) error {
 }
 
 // The expireLoop is a loop that is run once per configured second(s) while the node
-// is running. It scans for expirated batches and remove them from the local database.
+// is running. It scans for expired batches and removes them from the local database.
 func (n *Node) expireLoop() {
+	n.Logger.Info("Start expireLoop goroutine in background to periodically remove expired batches on the node")
 	ticker := time.NewTicker(time.Duration(n.Config.ExpirationPollIntervalSec) * time.Second)
 	defer ticker.Stop()
 
@@ -207,12 +207,12 @@ func (n *Node) expireLoop() {
 		// least have 1 second.
 		timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
 		numBatchesDeleted, err := n.Store.DeleteExpiredEntries(time.Now().Unix(), timeLimitSec)
-		n.Logger.Info("GC cycle deleted", "num batches", numBatchesDeleted)
+		n.Logger.Info("Complete an expiration cycle to remove expired batches", "num expired batches found and removed", numBatchesDeleted)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				n.Logger.Error("GC cycle ContextDeadlineExceeded", "time limit (sec)", timeLimitSec)
+				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired batches need to be removed, which will continue in next cycle", "time limit (sec)", timeLimitSec)
 			} else {
-				n.Logger.Error("GC cycle had failed to delete some expired entries", "err", err)
+				n.Logger.Error("Expiration cycle encountered error when removing expired batches, which will be retried in next cycle", "err", err)
 			}
 		}
 	}
@@ -358,6 +358,8 @@ func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
 }
 
 func (n *Node) checkRegisteredNodeIpOnChain(ctx context.Context) {
+	n.Logger.Info("Start checkRegisteredNodeIpOnChain goroutine in background to subscribe the operator socket change events onchain")
+
 	socketChan, err := n.OperatorSocketsFilterer.WatchOperatorSocketUpdate(ctx, n.Config.ID)
 	if err != nil {
 		return
@@ -379,6 +381,8 @@ func (n *Node) checkRegisteredNodeIpOnChain(ctx context.Context) {
 }
 
 func (n *Node) checkCurrentNodeIp(ctx context.Context) {
+	n.Logger.Info("Start checkCurrentNodeIp goroutine in background to detect the current public IP of the operator node")
+
 	t := time.NewTimer(n.Config.PubIPCheckInterval)
 	for {
 		select {
