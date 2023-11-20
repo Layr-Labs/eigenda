@@ -46,14 +46,15 @@ jobs:
           name: coverage
           path: coverage.out
 
-  coverage-report: 
+  coverage-report:
     name: Coverage Report
     needs: unit-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-          
+
       - name: Update coverage badge
+        if: github.ref == 'refs/heads/master'
         uses: ./.github/actions/test-coverage
         with:
           chart: true

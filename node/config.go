@@ -93,7 +93,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	expirationPollIntervalSec := ctx.GlobalUint64(flags.ExpirationPollIntervalSecFlag.Name)
 	if expirationPollIntervalSec <= minExpirationPollIntervalSec {
-		return nil, errors.New("The expiration-poll-interval flag must be greater than 3 seconds")
+		return nil, errors.New("the expiration-poll-interval flag must be greater than 3 seconds")
 	}
 
 	testMode := ctx.GlobalBool(flags.EnableTestModeFlag.Name)

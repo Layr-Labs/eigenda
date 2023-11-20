@@ -75,7 +75,7 @@ func EncodeBatchExpirationKey(expirationTime int64) []byte {
 // Returns the expiration timestamp encoded in the key.
 func DecodeBatchExpirationKey(key []byte) (int64, error) {
 	if len(key) != len(batchExpirationPrefix)+8 {
-		return 0, errors.New("The expiration key is invalid")
+		return 0, errors.New("the expiration key is invalid")
 	}
 	ts := int64(binary.BigEndian.Uint64(key[len(key)-8:]))
 	return ts, nil
