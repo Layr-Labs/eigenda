@@ -192,7 +192,7 @@ func (n *Node) Start(ctx context.Context) error {
 }
 
 // The expireLoop is a loop that is run once per configured second(s) while the node
-// is running. It scans for expired batches and remove them from the local database.
+// is running. It scans for expired batches and removes them from the local database.
 func (n *Node) expireLoop() {
 	n.Logger.Info("Start expireLoop goroutine in background to periodically remove expired batches on the node")
 	ticker := time.NewTicker(time.Duration(n.Config.ExpirationPollIntervalSec) * time.Second)
