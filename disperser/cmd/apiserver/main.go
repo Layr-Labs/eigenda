@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	"github.com/Layr-Labs/eigenda/disperser/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/cmd/disperserserver/flags"
+	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/urfave/cli"
 )
 

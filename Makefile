@@ -1,9 +1,9 @@
 .PHONY: compile-el compile-dl clean protoc lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer
 
 PROTOS := ./api/proto
-PROTOS_DISPERSER := ./disperser/proto
+PROTOS_DISPERSER := ./disperser/api/proto
 PROTO_GEN := ./api/grpc
-PROTO_GEN_DISPERSER_PATH = ./disperser/proto/protogen
+PROTO_GEN_DISPERSER_PATH = ./disperser/api/grpc
 
 compile-el:
 	cd contracts && ./compile.sh compile-el

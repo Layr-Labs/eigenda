@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	"github.com/Layr-Labs/eigenda/disperser/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 
