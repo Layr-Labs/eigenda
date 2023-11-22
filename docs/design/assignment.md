@@ -33,7 +33,7 @@ and any $U_a \subseteq U_q$ such
 $$ \sum_{i \in U_a} S_i \le \alpha \sum_{i \in O}S_i$$
 
 
-we need to be able to reconstuct from $U_q \setminus U_a$. But we can see that the total stake held by this group will satisfy
+we need to be able to reconstruct from $U_q \setminus U_a$. But we can see that the total stake held by this group will satisfy
 
 $$
 \sum_{i \in U_q \setminus U_a} S_i = \sum_{i \in U_q}S_i - \sum_{i \in U_a}S_i \ge (\beta-\alpha)\sum_{i \in O}S_i  = \gamma \sum_{i \in O}S_i.
@@ -55,7 +55,7 @@ $$\max_{\{S_j:j\in O\}} \gamma\frac{B_i - \tilde{B}_i}{B} \le 1/n.$$
 
 ### 3. Minimizes encoding complexity
 
-The system should minimize coding and verification computational complexity for both the disperser and operators. The computational complexity roughly scales with the number of chunks (or more specifcally, inversely with the chunk size) [clarification required]. Thus, the system should minimize the number of chunks, subject to requirements 1 and 2. 
+The system should minimize coding and verification computational complexity for both the disperser and operators. The computational complexity roughly scales with the number of chunks (or more specifically, inversely with the chunk size) [clarification required]. Thus, the system should minimize the number of chunks, subject to requirements 1 and 2. 
 
 ## Proposed solution
 
@@ -122,6 +122,6 @@ Moreover, the optimization routing described for finding $m$ will serve only to 
 
 ## FAQs
 
-Q1. Can increasing the number of parity symbols increase the total degree of the polynomial, resulting in greator coding complexity. 
+Q1. Can increasing the number of parity symbols increase the total degree of the polynomial, resulting in greater coding complexity. 
 
 A1. This seems like a possibility. In general, interactions with constraints of the proving system are not covered here. However, if this is a concern it should be possible to adjust block size constraints accordingly to avoid pushing over some limit. 

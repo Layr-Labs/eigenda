@@ -39,7 +39,7 @@ The disperser returns to each requester the KZG commitment to the `overallPoly` 
 
 ### Encoding
 
-The disperser encodes the `overallPoly` for each quorum among all of the `BlobStoreRequests`. The disperser generates its encoding parameters for each quroum relative to the highest `AdversaryThresholdBPs` and highest `QuorumThresholdBPs` for each quorum among all of the `BlobStoreRequests`.
+The disperser encodes the `overallPoly` for each quorum among all of the `BlobStoreRequests`. The disperser generates its encoding parameters for each quorum relative to the highest `AdversaryThresholdBPs` and highest `QuorumThresholdBPs` for each quorum among all of the `BlobStoreRequests`.
 
 [TODO: @bxue-l2]
 

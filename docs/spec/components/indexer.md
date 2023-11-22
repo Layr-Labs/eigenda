@@ -13,9 +13,9 @@ An accumulator can optionally define a custom method for initializing the accumu
 
 The indexer is one of the only stateful components of the operator. To avoid reindexing on restarts, the state of the indexer is stored in a database. We will use a schemaless db to avoid migrations.
 
-The indexer must also support reorg resistence. We can achieve simple reorg resilience in the following way:
+The indexer must also support reorg resistance. We can achieve simple reorg resilience in the following way:
 - For every accumulator, we make sure to store history long enough that we always have access to a finalized state. 
-- In the event reorg is detected, we can revert to most recent finalized state, and then reindex to head. 
+- In the event reorg is detected, we can revert to the most recent finalized state, and then reindex to head. 
 
 The indexer needs to accommodate upgrades to the smart contract interfaces. Contract upgrades can have the following effects on interfaces:
 - Addition, removal, modification of events
