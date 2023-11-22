@@ -180,7 +180,7 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
-		n.Logger.Info("The node is started, but it's not opt-in in EigenDA yet (it's not receiving and validating data in EigenDA). To register, please follow the guide in https://docs.eigenlayer.xyz/operator-guides/avs-installation-and-registration/eigenda-operator-guide/eigenda-avs-installation-and-registration")
+		n.Logger.Info("The node has successfully started. Note it's not opt-in to EigenDA yet (it's not receiving and validating data in EigenDA). To register, please follow the guide in https://github.com/Layr-Labs/eigenda-operator-setup")
 	}
 
 	n.CurrentSocket = socket
