@@ -180,7 +180,7 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
-		n.Logger.Info("The node has successfully started. Note it's not opt-in to EigenDA yet (it's not receiving and validating data in EigenDA). To register, please follow the guide in https://github.com/Layr-Labs/eigenda-operator-setup")
+		n.Logger.Info("The node has successfully started. Note it's not opt-in to EigenDA yet (it's not receiving or validating data in EigenDA). To register, please follow the EigenDA operator guide section in docs.eigenlayer.xyz")
 	}
 
 	n.CurrentSocket = socket
