@@ -7,7 +7,7 @@ build_batcher:
 	go build -o ./bin/batcher ./cmd/batcher
 
 build_server:
-	go build -o ./bin/server ./cmd/disperserserver
+	go build -o ./bin/server ./cmd/apiserver
 
 build_encoder:
 	go build -o ./bin/encoder ./cmd/encoder
