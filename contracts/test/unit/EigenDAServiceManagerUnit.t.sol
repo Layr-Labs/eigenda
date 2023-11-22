@@ -6,7 +6,9 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;

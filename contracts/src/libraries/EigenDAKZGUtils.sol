@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.9;
 
-import {BN254} from "../../src/core/EigenDAServiceManager.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 /**
  * @title Library for verifying KZG commitments.
- * @author Layr Labs, Inc.
+ * @author Layr Labs, Inc.b
 */
 library EigenDAKZGUtils {
     using BN254 for BN254.G1Point;

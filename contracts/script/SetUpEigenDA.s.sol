@@ -1,26 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
-
-import "@eigenlayer-core/contracts/permissions/PauserRegistry.sol";
-import "@eigenlayer-core/test/mocks/EmptyContract.sol";
-
-import "@eigenlayer-middleware/BLSPublicKeyCompendium.sol";
-import "@eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
-import "@eigenlayer-middleware/BLSPubkeyRegistry.sol";
-import "@eigenlayer-middleware/IndexRegistry.sol";
-import "@eigenlayer-middleware/StakeRegistry.sol";
-
-
+import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
+import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
+import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
+import {BLSPublicKeyCompendium} from "eigenlayer-middleware/BLSPublicKeyCompendium.sol";
+import {BLSRegistryCoordinatorWithIndices} from "eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
+import {BLSPubkeyRegistry} from "eigenlayer-middleware/BLSPubkeyRegistry.sol";
+import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
+import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
+import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
-import "../src/libraries/EigenDAHasher.sol";
-
-import "./EigenDADeployer.s.sol";
-import "./EigenLayerUtils.s.sol";
+import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
+import {EigenDADeployer} from "./EigenDADeployer.s.sol";
+import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
 import "forge-std/Test.sol";
-
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 

@@ -5,11 +5,12 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BLSMockAVSDeployer} from "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {MockRollup, BN254} from "./mocks/MockRollup.sol";
+import {MockRollup} from "./mocks/MockRollup.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
 import {EigenDABlobUtils} from "../src/libraries/EigenDABlobUtils.sol";
-//import {BN254} from "../lib/eigenlayer-middleware/src/libraries/BN254.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 import "forge-std/StdStorage.sol";
 

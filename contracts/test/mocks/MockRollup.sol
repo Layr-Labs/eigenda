@@ -4,9 +4,9 @@ pragma solidity ^0.8.9;
 
 import {EigenDAKZGUtils} from "../../src/libraries/EigenDAKZGUtils.sol";
 import {EigenDABlobUtils} from "../../src/libraries/EigenDABlobUtils.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager, BN254} from "../../src/core/EigenDAServiceManager.sol";
-//import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
-
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 struct Commitment {
     address validator; // validator who posted the commitment

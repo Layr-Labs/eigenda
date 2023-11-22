@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
-import "@eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
+import {BytesLib} from "eigenlayer-core/contracts/libraries/BytesLib.sol";
+import {Merkle} from "eigenlayer-core/contracts/libraries/Merkle.sol";
+import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
+import {IStrategyManager} from "eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
+import {ISlasher} from "eigenlayer-core/contracts/interfaces/ISlasher.sol";
+import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
+import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
+import {IBLSRegistryCoordinatorWithIndices} from "eigenlayer-middleware/interfaces/IBLSRegistryCoordinatorWithIndices.sol";
+import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
+import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
+import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
 
-import "@eigenlayer-core/contracts/libraries/BytesLib.sol";
-import "@eigenlayer-core/contracts/libraries/Merkle.sol";
-import "@eigenlayer-core/contracts/permissions/Pausable.sol";
-
-import "../libraries/EigenDAHasher.sol";
-
-import "./EigenDAServiceManagerStorage.sol";
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.

@@ -9,7 +9,9 @@ import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDABlobUtils} from "../../src/libraries/EigenDABlobUtils.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDABlobUtilsHarness} from "../harnesses/EigenDABlobUtilsHarness.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+
 
 import "forge-std/StdStorage.sol";
 

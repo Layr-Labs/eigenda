@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.9;
 
-import "@eigenlayer-core/contracts/libraries/Merkle.sol";
+import "eigenlayer-core/contracts/libraries/Merkle.sol";
 import "./EigenDAHasher.sol";
 import "../interfaces/IEigenDAServiceManager.sol";
 

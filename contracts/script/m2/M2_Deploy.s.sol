@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
 
-import "@eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
+import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
 
-import "@eigenlayer-middleware/BLSPublicKeyCompendium.sol";
-import "@eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
-import "@eigenlayer-middleware/BLSPubkeyRegistry.sol";
-import "@eigenlayer-middleware/IndexRegistry.sol";
-import "@eigenlayer-middleware/StakeRegistry.sol";
-import "@eigenlayer-middleware/BLSOperatorStateRetriever.sol";
+import "eigenlayer-middleware/BLSPublicKeyCompendium.sol";
+import "eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
+import "eigenlayer-middleware/BLSPubkeyRegistry.sol";
+import "eigenlayer-middleware/IndexRegistry.sol";
+import "eigenlayer-middleware/StakeRegistry.sol";
+import "eigenlayer-middleware/BLSOperatorStateRetriever.sol";
 
-import "@eigenlayer-core/contracts/permissions/PauserRegistry.sol";
+import "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
 
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 
