@@ -35,7 +35,7 @@ type components struct {
 	encoderClient *disperser.LocalEncoderClient
 }
 
-func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
+func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint64, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
 	logger := &cmock.Logger{}
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.NewChainDataMock(numOperators)
@@ -46,7 +46,8 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), batchThreshold)
 	workerpool := workerpool.New(5)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = initialBlockNumber
 
@@ -67,7 +68,8 @@ func TestEncodingQueueLimit(t *testing.T) {
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 100000)
 	pool := &cmock.MockWorkerpool{}
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, pool, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, pool, metrics.EncodingStreamerMetrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 
@@ -145,8 +147,9 @@ func TestBatchTrigger(t *testing.T) {
 	assert.Nil(t, err)
 	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
 	assert.Nil(t, err)
-	total := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(131584))
+	count, size := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 1)
+	assert.Equal(t, size, uint64(131584))
 
 	// try encode the same blobs again at different block (this happens when the blob is retried)
 	encodingStreamer.ReferenceBlockNumber = 11
@@ -155,8 +158,9 @@ func TestBatchTrigger(t *testing.T) {
 	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
 	assert.Nil(t, err)
 
-	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(131584))
+	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 1)
+	assert.Equal(t, size, uint64(131584))
 
 	// don't notify yet
 	select {
@@ -173,8 +177,9 @@ func TestBatchTrigger(t *testing.T) {
 	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
 	assert.Nil(t, err)
 
-	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(131584)*2)
+	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 2)
+	assert.Equal(t, size, uint64(131584)*2)
 
 	// notify
 	select {
@@ -206,8 +211,9 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.Nil(t, err)
 	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
-	total := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(0))
+	count, size := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 0)
+	assert.Equal(t, size, uint64(0))
 
 	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
 	assert.Nil(t, err)
@@ -233,8 +239,9 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.Len(t, encodedResult.Chunks, 16)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
-	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(131584))
+	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 1)
+	assert.Equal(t, size, uint64(131584))
 
 	// Cancel previous blob so it doesn't get reencoded.
 	err = c.blobStore.MarkBlobFailed(ctx, metadataKey)
@@ -262,8 +269,9 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.NotNil(t, encodedResult)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 11)
 	assert.True(t, isRequested)
-	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(131584))
+	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 1)
+	assert.Equal(t, size, uint64(131584))
 
 	// Request the same blob, which should be dedupped
 	_, err = c.blobStore.StoreBlob(ctx, &blob, requestedAt)
@@ -272,8 +280,9 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, len(out), 0)
 	// It should not have been added to the encoded blob store
-	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
-	assert.Equal(t, total, uint(131584))
+	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, count, 1)
+	assert.Equal(t, size, uint64(131584))
 }
 
 func TestEncodingFailure(t *testing.T) {
@@ -285,7 +294,13 @@ func TestEncodingFailure(t *testing.T) {
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 1e12)
 	workerpool := workerpool.New(5)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, logger)
+	streamerConfig := batcher.StreamerConfig{
+		SRSOrder:               300000,
+		EncodingRequestTimeout: 5 * time.Second,
+		EncodingQueueLimit:     100,
+	}
+	metrics := batcher.NewMetrics("9100", logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 

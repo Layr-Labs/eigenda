@@ -17,7 +17,7 @@ type encodedBlobStore struct {
 	requested map[requestID]struct{}
 	encoded   map[requestID]*EncodingResult
 	// encodedResultSize is the total size of all the chunks in the encoded results in bytes
-	encodedResultSize uint
+	encodedResultSize uint64
 
 	logger common.Logger
 }
@@ -152,22 +152,22 @@ func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint)
 }
 
 // GetEncodedResultSize returns the total size of all the chunks in the encoded results in bytes
-func (e *encodedBlobStore) GetEncodedResultSize() uint {
+func (e *encodedBlobStore) GetEncodedResultSize() (int, uint64) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return e.encodedResultSize
+	return len(e.encoded), e.encodedResultSize
 }
 
 func getRequestID(key disperser.BlobKey, quorumID core.QuorumID) requestID {
 	return requestID(fmt.Sprintf("%s-%d", key.String(), quorumID))
 }
 
-func getChunksSize(result *EncodingResult) uint {
-	size := 0
+func getChunksSize(result *EncodingResult) uint64 {
+	var size uint64
 
 	for _, chunk := range result.Chunks {
-		size += len(chunk.Coeffs) * 256 // 256 bytes per symbol
+		size += uint64(len(chunk.Coeffs) * 256) // 256 bytes per symbol
 	}
-	return uint(size + 256*2) // + 256 * 2 bytes for proof
+	return size + 256*2 // + 256 * 2 bytes for proof
 }
