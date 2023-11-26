@@ -34,7 +34,7 @@ func TestRedisStore(t *testing.T) {
 		EndpointURL: "localhost",
 		Port:        "6379",
 	}
-	redisClient, err := elasticcache.NewClient(clientConfig) // Assuming logger can be nil
+	redisClient, err := elasticcache.NewClient(clientConfig, nil) // Assuming logger can be nil
 	if err != nil {
 		t.Fatalf("Failed to create Redis client: %v", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	elasticCache "github.com/Layr-Labs/eigenda/common/aws/elasticcache"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,9 +15,8 @@ func TestRedisClient(t *testing.T) {
 		EndpointURL: "localhost",
 		Port:        "6379", // Assuming Redis is running on the default port
 	}
-	logger := common.Logger{} // Replace with actual logger initialization
 
-	client, err := elasticCache.NewClient(cfg, logger)
+	client, err := elasticCache.NewClient(cfg, nil)
 	if err != nil {
 		t.Fatalf("Failed to create Redis client: %v", err)
 	}
