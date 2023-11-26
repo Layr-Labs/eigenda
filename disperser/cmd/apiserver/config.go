@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/aws/elasticcache"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
@@ -27,6 +28,8 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	RateLimiterRedisClient        bool
+	RedisClientConfig             elasticcache.RedisClientConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -59,6 +62,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+
+		// TODO Define a new config for RedisClientConfig
+		RedisClientConfig: elasticcache.RedisClientConfig{
+			EndpointURL: ctx.GlobalString("redis-endpoint-url"),
+			Port:        ctx.GlobalString("redis-port"),
+		},
 	}
 	return config, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/aws/elasticcache"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
@@ -97,16 +98,30 @@ func RunDisperserServer(ctx *cli.Context) error {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
 
 		var bucketStore common.KVStore[common.RateBucketParams]
-		if config.BucketTableName != "" {
-			dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
+
+		// Can be defined as a Factory of Stores used by RateLimiter
+		if config.RateLimiterRedisClient {
+			redisClient, err := elasticcache.NewClient(config.RedisClientConfig, logger)
 			if err != nil {
 				return err
 			}
-			bucketStore = store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, config.BucketTableName)
+
+			bucketStore = store.NewRedisStore[common.RateBucketParams](redisClient)
+
 		} else {
-			bucketStore, err = store.NewLocalParamStore[common.RateBucketParams](config.BucketStoreSize)
-			if err != nil {
-				return err
+			if config.BucketTableName != "" {
+				dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
+				if err != nil {
+					return err
+				}
+				bucketStore = store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, config.BucketTableName)
+			}
+
+			if bucketStore == nil {
+				bucketStore, err = store.NewLocalParamStore[common.RateBucketParams](config.BucketStoreSize)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		ratelimiter = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
