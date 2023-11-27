@@ -39,7 +39,7 @@ func TestRedisStore(t *testing.T) {
 		t.Fatalf("Failed to create Redis client: %v", err)
 	}
 
-	redisStore := store.NewRedisStore[common.RateBucketParams](redisClient)
+	redisStore := store.NewRedisStore[common.RateBucketParams](redisClient, "testKey", "testValue")
 
 	// Run your tests here
 	// Example: Test Set and Get
