@@ -5,15 +5,20 @@ import (
 	"encoding/json"
 
 	"github.com/Layr-Labs/eigenda/common"
-	commoncache "github.com/Layr-Labs/eigenda/common/aws/elasticcache"
+	elasticCache "github.com/Layr-Labs/eigenda/common/aws/elasticcache"
 )
 
 type RedisStore[T any] struct {
-	client *commoncache.RedisClient
+	client    *elasticCache.RedisClient
+	lockKey   string
+	lockValue string // Unique value for the lock, e.g., UUID or server identifier
 }
 
-func NewRedisStore[T any](client *commoncache.RedisClient) common.KVStore[T] {
-	return &RedisStore[T]{client: client}
+func NewRedisStore[T any](client *elasticCache.RedisClient, lockKey string, lockValue string) common.KVStore[T] {
+	return &RedisStore[T]{client: client,
+		lockKey:   lockKey,
+		lockValue: lockValue,
+	}
 }
 
 func (s *RedisStore[T]) GetItem(ctx context.Context, key string) (*T, error) {
@@ -37,5 +42,6 @@ func (s *RedisStore[T]) UpdateItem(ctx context.Context, key string, value *T) er
 		return err
 	}
 
-	return s.client.Set(ctx, key, jsonData, 0).Err() // 0 means no expiration
+	_, err = s.client.Set(ctx, key, jsonData, s.lockKey, s.lockValue, 0) // 0 means no expiration
+	return err
 }

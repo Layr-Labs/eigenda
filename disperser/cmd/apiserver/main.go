@@ -106,7 +106,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 				return err
 			}
 
-			bucketStore = store.NewRedisStore[common.RateBucketParams](redisClient)
+			// TODO: Pass in the correct lock and UUID as config
+			// Set UUID as a flag when multiple Dispersers are running
+			bucketStore = store.NewRedisStore[common.RateBucketParams](redisClient, "disperser_lock", "disperser_UUID")
 
 		} else {
 			if config.BucketTableName != "" {
