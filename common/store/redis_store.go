@@ -15,7 +15,12 @@ type RedisStore[T any] struct {
 }
 
 func NewRedisStore[T any](client *elasticCache.RedisClient, lockValue string) common.LockableKVStore[T] {
-	return &RedisStore[T]{client: client, lockValue: lockValue}
+
+	// LockValue is an identifier for the application initializing this store
+	return &RedisStore[T]{
+		client:    client,
+		lockValue: lockValue,
+	}
 }
 
 func (s *RedisStore[T]) GetItem(ctx context.Context, key string) (*T, error) {

@@ -29,6 +29,8 @@ func NewLocalParamStore[T any](size int, lockValue string) (common.LockableKVSto
 		return nil, err
 	}
 
+	// LockValues is an identifier for the application initializing this store
+	// This value is not used for LocalParamStore but is used for RedisStore
 	return &localParamStore[T]{
 		cache:     cache,
 		lockValue: lockValue,
