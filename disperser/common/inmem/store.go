@@ -181,6 +181,14 @@ func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobK
 	return nil, disperser.ErrBlobNotFound
 }
 
+func (q *BlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) error {
+	if metadata.NumRetries < maxRetry {
+		return q.IncrementBlobRetryCount(ctx, metadata)
+	} else {
+		return q.MarkBlobFailed(ctx, metadata.GetBlobKey())
+	}
+}
+
 // getNewBlobHash generates a new blob key
 func (q *BlobStore) getNewBlobHash() (disperser.BlobHash, error) {
 	var key disperser.BlobHash
