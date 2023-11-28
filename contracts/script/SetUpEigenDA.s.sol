@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: UNLICENSED 
+/*
 pragma solidity ^0.8.9;
 
 import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
@@ -184,3 +185,4 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.writeJson(finalJson, "./script/output/eigenda_deploy_output.json");        
     }
 }
+*/

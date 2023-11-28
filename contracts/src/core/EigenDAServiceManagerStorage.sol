@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
-import "eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
-
-import "../interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.

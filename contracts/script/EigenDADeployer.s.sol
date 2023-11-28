@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: UNLICENSED 
+/*
 pragma solidity ^0.8.9;
 
 import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
@@ -6,15 +7,12 @@ import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegist
 import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
 import {BLSPublicKeyCompendium} from "eigenlayer-middleware/BLSPublicKeyCompendium.sol";
 import {BLSRegistryCoordinatorWithIndices, IBLSRegistryCoordinatorWithIndices} from "eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
-import {BLSPubkeyRegistry} from "eigenlayer-middleware/BLSPubkeyRegistry.sol";
-import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
-import {StakeRegistry, IStakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
+import {BLSPubkeyRegistry, IBLSPubkeyRegistry} from "eigenlayer-middleware/BLSPubkeyRegistry.sol";
+import {IndexRegistry, IIndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
+import {StakeRegistry, IStakeRegistry, IServiceManager} from "eigenlayer-middleware/StakeRegistry.sol";
 import {BLSOperatorStateRetriever} from "eigenlayer-middleware/BLSOperatorStateRetriever.sol";
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
-import {IBLSPubkeyRegistry} from "eigenlayer-middleware/interfaces/IBLSPubkeyRegistry.sol";
-import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
-import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
@@ -95,7 +93,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         */
+         *//*
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -217,3 +215,4 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         blsOperatorStateRetriever = new BLSOperatorStateRetriever();
     }
 }
+*/

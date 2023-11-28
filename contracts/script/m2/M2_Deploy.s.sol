@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
+/*
 pragma solidity =0.8.12;
 
 import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
@@ -336,5 +337,5 @@ contract Deployer_M2 is ExistingDeploymentParser {
         string memory finalJson = vm.serializeString(parent_object, permissions, permissions_output);
         vm.writeJson(finalJson, outputPath);
     } 
-
 }
+*/

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
 import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
 import {BytesLib} from "eigenlayer-core/contracts/libraries/BytesLib.sol";
@@ -11,8 +11,7 @@ import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
 import {IStrategyManager} from "eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
 import {ISlasher} from "eigenlayer-core/contracts/interfaces/ISlasher.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
-import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
-import {IBLSRegistryCoordinatorWithIndices} from "eigenlayer-middleware/interfaces/IBLSRegistryCoordinatorWithIndices.sol";
+import {BLSSignatureChecker, IBLSRegistryCoordinatorWithIndices} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
