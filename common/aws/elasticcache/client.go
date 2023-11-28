@@ -2,7 +2,6 @@ package elasticcache
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -42,18 +41,12 @@ func (c *RedisClient) Get(ctx context.Context, key string) *redis.StringCmd {
 }
 
 // Set sets a value in Redis
-func (c *RedisClient) Set(ctx context.Context, key string, value interface{}, lockKey string, lockValue string, expiration time.Duration) (*redis.StatusCmd, error) {
-
-	// TODO: Make RedisLock Expiration a Configurable parameter
-	if !c.acquireLock(lockKey, lockValue, time.Second*30) {
-		return nil, errors.New("unable to acquire lock")
-	}
-	defer c.releaseLock(lockKey, lockValue)
+func (c *RedisClient) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) (*redis.StatusCmd, error) {
 
 	return c.redisClient.Set(ctx, key, value, expiration), nil
 }
 
-func (c *RedisClient) acquireLock(lockKey string, lockValue string, expiration time.Duration) bool {
+func (c *RedisClient) AcquireLock(lockKey string, lockValue string, expiration time.Duration) bool {
 	result, err := c.redisClient.SetNX(context.Background(), lockKey, lockValue, expiration).Result()
 	if err != nil {
 		// Handle error
@@ -62,7 +55,7 @@ func (c *RedisClient) acquireLock(lockKey string, lockValue string, expiration t
 	return result
 }
 
-func (c *RedisClient) releaseLock(lockKey string, lockValue string) {
+func (c *RedisClient) ReleaseLock(lockKey string, lockValue string) error {
 	script := `
     if redis.call("get",KEYS[1]) == ARGV[1] then
         return redis.call("del",KEYS[1])
@@ -72,6 +65,8 @@ func (c *RedisClient) releaseLock(lockKey string, lockValue string) {
     `
 	_, err := c.redisClient.Eval(context.Background(), script, []string{lockKey}, lockValue).Result()
 	if err != nil {
-		// Handle error
+		return err
 	}
+
+	return nil
 }

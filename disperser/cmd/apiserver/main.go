@@ -97,7 +97,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if config.EnableRatelimiter {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
 
-		var bucketStore common.KVStore[common.RateBucketParams]
+		var bucketStore common.LockableKVStore[common.RateBucketParams]
 
 		// Can be defined as a Factory of Stores used by RateLimiter
 		if config.RateLimiterRedisClient {
@@ -108,22 +108,12 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 			// TODO: Pass in the correct lock and UUID as config
 			// Set UUID as a flag when multiple Dispersers are running
-			bucketStore = store.NewRedisStore[common.RateBucketParams](redisClient, "disperser_lock", "disperser_UUID")
+			bucketStore = store.NewRedisStore[common.RateBucketParams](redisClient, "disperser_lock")
 
 		} else {
-			if config.BucketTableName != "" {
-				dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
-				if err != nil {
-					return err
-				}
-				bucketStore = store.NewDynamoParamStore[common.RateBucketParams](dynamoClient, config.BucketTableName)
-			}
-
-			if bucketStore == nil {
-				bucketStore, err = store.NewLocalParamStore[common.RateBucketParams](config.BucketStoreSize)
-				if err != nil {
-					return err
-				}
+			bucketStore, err = store.NewLocalParamStore[common.RateBucketParams](config.BucketStoreSize, "disperser_lock")
+			if err != nil {
+				return err
 			}
 		}
 		ratelimiter = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)

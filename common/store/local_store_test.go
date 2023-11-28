@@ -16,7 +16,7 @@ var (
 
 func TestLocalStore(t *testing.T) {
 
-	localStore, err := store.NewLocalParamStore[common.RateBucketParams](inmemBucketStoreSize)
+	localStore, err := store.NewLocalParamStore[common.RateBucketParams](inmemBucketStoreSize, "disperser_lock")
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -38,4 +38,16 @@ func TestLocalStore(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, p, p2)
 
+}
+
+func TestLockingMechanism(t *testing.T) {
+	localStore, err := store.NewLocalParamStore[common.RateBucketParams](inmemBucketStoreSize, "disperser_lock")
+	assert.NoError(t, err)
+	key := "lockKey"
+	if localStore.AcquireLock(key, time.Second*5) {
+		err := localStore.ReleaseLock(key)
+		assert.NoError(t, err)
+	} else {
+		t.Error("Failed to acquire lock")
+	}
 }
