@@ -41,8 +41,7 @@ func TestRedisStore(t *testing.T) {
 
 	redisStore := store.NewRedisStore[common.RateBucketParams](redisClient)
 
-	// Run your tests here
-	// Example: Test Set and Get
+	// Test Update and Get Item
 	ctx := context.Background()
 	testKey := "testKey"
 	testValue := common.RateBucketParams{
