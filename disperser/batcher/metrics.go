@@ -42,7 +42,7 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and encoded size of total dispersal blobs",
+				Help:      "the number and unencoded size of total dispersal blobs",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
