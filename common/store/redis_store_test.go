@@ -2,31 +2,51 @@ package store_test
 
 import (
 	"context"
-	"os"
+	"log"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/elasticcache"
+	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/ory/dockertest/v3"
+	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRedisStore(t *testing.T) {
-
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
-	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	// Start Docker pool
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		t.Fatalf("Could not connect to Docker: %v", err)
 	}
 
-	if deployLocalStack {
-		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
-		if err != nil {
-			teardown()
-			panic("failed to start localstack container")
+	// Start Redis container
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
+		Repository: "redis",
+		Tag:        "latest",
+		PortBindings: map[docker.Port][]docker.PortBinding{
+			"6379/tcp": {{HostIP: "", HostPort: "6379"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Could not start Redis container: %v", err)
+	}
+
+	// Delay cleanup until after all tests have run
+	t.Cleanup(func() {
+		if err := pool.Purge(resource); err != nil {
+			t.Fatalf("Could not purge Redis container: %v", err)
 		}
+	})
+
+	// Wait for Redis to be ready
+	if err := pool.Retry(func() error {
+		// Perform a health check...
+		return nil // return nil if healthy
+	}); err != nil {
+		log.Fatalf("Could not connect to Redis: %v", err)
 	}
 
 	// Set up the Redis client to point to your local Redis server
@@ -34,7 +54,8 @@ func TestRedisStore(t *testing.T) {
 		EndpointURL: "localhost",
 		Port:        "6379",
 	}
-	redisClient, err := elasticcache.NewClient(clientConfig, nil) // Assuming logger can be nil
+
+	redisClient, err := elasticcache.NewClient(clientConfig, &cmock.Logger{}) // Assuming logger can be nil
 	if err != nil {
 		t.Fatalf("Failed to create Redis client: %v", err)
 	}
