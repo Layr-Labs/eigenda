@@ -75,7 +75,7 @@ func NodeMain(ctx *cli.Context) error {
 		CountFailed: true,
 	}
 
-	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](bucketStoreSize)
+	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](bucketStoreSize, "node_lock")
 	if err != nil {
 		return err
 	}

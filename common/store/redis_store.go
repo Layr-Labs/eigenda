@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	elasticCache "github.com/Layr-Labs/eigenda/common/aws/elasticcache"
@@ -10,13 +11,14 @@ import (
 
 type RedisStore[T any] struct {
 	client    *elasticCache.RedisClient
-	lockKey   string
-	lockValue string // Unique value for the lock, e.g., UUID or server identifier
+	lockValue string // global lock value
 }
 
-func NewRedisStore[T any](client *elasticCache.RedisClient, lockKey string, lockValue string) common.KVStore[T] {
-	return &RedisStore[T]{client: client,
-		lockKey:   lockKey,
+func NewRedisStore[T any](client *elasticCache.RedisClient, lockValue string) common.LockableKVStore[T] {
+
+	// LockValue is an identifier for the application initializing this store
+	return &RedisStore[T]{
+		client:    client,
 		lockValue: lockValue,
 	}
 }
@@ -42,6 +44,16 @@ func (s *RedisStore[T]) UpdateItem(ctx context.Context, key string, value *T) er
 		return err
 	}
 
-	_, err = s.client.Set(ctx, key, jsonData, s.lockKey, s.lockValue, 0) // 0 means no expiration
+	_, err = s.client.Set(ctx, key, jsonData, 0) // 0 means no expiration
 	return err
+}
+
+// AcquireLock implementation for RedisStore
+func (s *RedisStore[T]) AcquireLock(key string, expiration time.Duration) bool {
+	return s.client.AcquireLock(key, s.lockValue, expiration)
+}
+
+// ReleaseLock implementation for RedisStore
+func (s *RedisStore[T]) ReleaseLock(key string) error {
+	return s.client.ReleaseLock(key, s.lockValue)
 }

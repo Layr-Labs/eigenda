@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -60,7 +61,7 @@ func TestRedisStore(t *testing.T) {
 		t.Fatalf("Failed to create Redis client: %v", err)
 	}
 
-	redisStore := store.NewRedisStore[common.RateBucketParams](redisClient, "testKey", "testValue")
+	redisStore := store.NewRedisStore[common.RateBucketParams](redisClient, "testKey")
 
 	// Test Update and Get Item
 	ctx := context.Background()
@@ -76,4 +77,20 @@ func TestRedisStore(t *testing.T) {
 	result, err := redisStore.GetItem(ctx, testKey)
 	assert.NoError(t, err, "GetItem should not return an error")
 	assert.Equal(t, testValue, *result, "GetItem should return the value that was set")
+
+	// Acquire and Release Lock Test
+	testlock := "testlock"
+	locked := redisStore.AcquireLock(testlock, 0)
+	fmt.Println(locked)
+	assert.True(t, locked)
+
+	err = redisStore.UpdateItem(ctx, testlock, &testValue)
+	assert.NoError(t, err, "UpdateItem should not return an error")
+
+	result, err = redisStore.GetItem(ctx, testlock)
+	assert.NoError(t, err, "GetItem should not return an error")
+	assert.Equal(t, testValue, *result, "GetItem should return the value that was set")
+
+	err = redisStore.ReleaseLock(testlock)
+	assert.NoError(t, err, "Release should not return an error")
 }

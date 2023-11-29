@@ -20,7 +20,7 @@ func makeTestRatelimiter() (common.RateLimiter, error) {
 	}
 	bucketStoreSize := 1000
 
-	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](bucketStoreSize)
+	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](bucketStoreSize, "test_lock")
 	if err != nil {
 		return nil, err
 	}

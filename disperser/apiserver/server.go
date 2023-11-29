@@ -175,10 +175,6 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin string) error {
 
-	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for _, param := range blob.RequestHeader.SecurityParams {
 
 		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]

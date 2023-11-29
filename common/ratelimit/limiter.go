@@ -2,12 +2,14 @@ package ratelimit
 
 import (
 	"context"
+	"errors"
+	"log"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 )
 
-type BucketStore = common.KVStore[common.RateBucketParams]
+type BucketStore = common.LockableKVStore[common.RateBucketParams]
 
 type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
@@ -29,8 +31,18 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore,
 func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
 
 	// Retrieve bucket params for the requester ID
-	// This will be from dynamo for Disperser and from local storage for DA node
+	if !d.bucketStore.AcquireLock(requesterID, time.Second) {
+		return false, errors.New("unable to acquire lock")
+	}
 
+	defer func() {
+		if err := d.bucketStore.ReleaseLock(requesterID); err != nil {
+			// Handle the error, e.g., log it
+			log.Printf("Failed to release lock: %v", err)
+		}
+	}()
+
+	// This will be from Redis for Disperser and from local storage for DA node
 	bucketParams, err := d.bucketStore.GetItem(ctx, requesterID)
 	if err != nil {
 
