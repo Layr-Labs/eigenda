@@ -348,7 +348,11 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 	log.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.IncrementBatchCount(len(batch.BlobMetadata))
+	batchSize := int64(0)
+	for _, blobMeta := range batch.BlobMetadata {
+		batchSize += int64(blobMeta.RequestMetadata.BlobSize)
+	}
+	b.Metrics.IncrementBatchCount(batchSize)
 	return nil
 }
 

@@ -85,10 +85,10 @@ type BlobHeader struct {
 }
 
 // Returns the total encoded size in bytes of the blob across all quorums.
-func (b *BlobHeader) EncodedSizeAllQuorums() int {
-	size := 0
+func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
+	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
-		size += int(quorum.EncodedBlobLength * bn254.BYTES_PER_COEFFICIENT)
+		size += int64(quorum.EncodedBlobLength) * int64(bn254.BYTES_PER_COEFFICIENT)
 	}
 	return size
 }

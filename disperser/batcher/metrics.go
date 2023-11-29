@@ -42,7 +42,7 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and size of total dispersal blob",
+				Help:      "the number and unencoded size of total dispersal blobs",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
@@ -50,7 +50,7 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "batches_total",
-				Help:      "the number and size of total dispersal batch",
+				Help:      "the number and unencoded size of total dispersal batches",
 			},
 			[]string{"data"},
 		),
@@ -110,7 +110,7 @@ func (g *Metrics) UpdateCompletedBlob(size int, status disperser.BlobStatus) {
 	g.Blob.WithLabelValues("total", "size").Add(float64(size))
 }
 
-func (g *Metrics) IncrementBatchCount(size int) {
+func (g *Metrics) IncrementBatchCount(size int64) {
 	g.Batch.WithLabelValues("number").Inc()
 	g.Batch.WithLabelValues("size").Add(float64(size))
 }

@@ -118,7 +118,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 	}
 
 	// Calculate the num of bytes (for chunks) that will be purged from the database.
-	size := 0
+	size := int64(0)
 	// Scan for the batch header, blob headers and chunks of each expired batch.
 	for _, hash := range expiredBatches {
 		var batchHeaderHash [32]byte
@@ -138,7 +138,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		blobIter := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
 		for blobIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
-			size += len(blobIter.Value())
+			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
 	}
@@ -216,7 +216,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	values = append(values, batchHeaderHash[:])
 
 	// Generate key/value pairs for all blob headers and blob chunks .
-	size := 0
+	size := int64(0)
 	for idx, blob := range blobs {
 		// blob header
 		blobHeaderKey, err := EncodeBlobHeaderKey(batchHeaderHash, idx)
@@ -253,7 +253,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 			if err != nil {
 				return nil, err
 			}
-			size += len(chunkBytes)
+			size += int64(len(chunkBytes))
 
 			keys = append(keys, key)
 			values = append(values, chunkBytes)

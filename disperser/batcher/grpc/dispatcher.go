@@ -107,9 +107,9 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	return sig, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchHeader) (*node.StoreChunksRequest, int, error) {
+func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchHeader) (*node.StoreChunksRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
-	totalSize := 0
+	totalSize := int64(0)
 	for i, blob := range blobMessages {
 		var err error
 		blobs[i], err = getBlobMessage(blob)
