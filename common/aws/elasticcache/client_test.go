@@ -3,7 +3,6 @@ package elasticcache_test
 import (
 	"context"
 	"log"
-	"os"
 	"testing"
 	"time"
 
@@ -14,17 +13,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var pool *dockertest.Pool
-var resource *dockertest.Resource
-
-func TestMain(m *testing.M) {
-	var err error
-	pool, err = dockertest.NewPool("")
+func TestRedisClient(t *testing.T) {
+	// Start Docker pool
+	pool, err := dockertest.NewPool("")
 	if err != nil {
-		log.Fatalf("Could not connect to Docker: %v", err)
+		t.Fatalf("Could not connect to Docker: %v", err)
 	}
 
-	resource, err = pool.RunWithOptions(&dockertest.RunOptions{
+	// Start Redis container
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "redis",
 		Tag:        "latest",
 		PortBindings: map[docker.Port][]docker.PortBinding{
@@ -32,8 +29,15 @@ func TestMain(m *testing.M) {
 		},
 	})
 	if err != nil {
-		log.Fatalf("Could not start Redis container: %v", err)
+		t.Fatalf("Could not start Redis container: %v", err)
 	}
+
+	// Delay cleanup until after all tests have run
+	t.Cleanup(func() {
+		if err := pool.Purge(resource); err != nil {
+			t.Fatalf("Could not purge Redis container: %v", err)
+		}
+	})
 
 	// Wait for Redis to be ready
 	if err := pool.Retry(func() error {
@@ -43,22 +47,10 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Could not connect to Redis: %v", err)
 	}
 
-	// Run tests
-	code := m.Run()
-
-	// Teardown: Stop and remove the Redis container
-	if err := pool.Purge(resource); err != nil {
-		log.Fatalf("Could not purge Redis container: %v", err)
-	}
-
-	os.Exit(code)
-}
-
-func TestRedisClient(t *testing.T) {
-	// Set up the Redis client
+	// Set up Redis client
 	cfg := elasticCache.RedisClientConfig{
 		EndpointURL: "localhost",
-		Port:        "6379", // Assuming Redis is running on the default port
+		Port:        "6379",
 	}
 
 	logger := &cmock.Logger{}
