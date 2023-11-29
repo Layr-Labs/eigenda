@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -120,9 +121,11 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case response := <-encoderChan:
 				err := e.ProcessEncodedBlobs(ctx, response)
 				if err != nil {
-					if !errors.Is(err, context.Canceled) {
-						e.logger.Error("error processing encoded blobs", "err", err)
+					if strings.Contains(err.Error(), context.Canceled.Error()) {
+						// ignore canceled errors because canceled encoding requests are normal
+						continue
 					}
+					e.logger.Error("error processing encoded blobs", "err", err)
 				}
 			}
 		}
@@ -140,7 +143,7 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case <-ticker.C:
 				err := e.RequestEncoding(ctx, encoderChan)
 				if err != nil {
-					e.logger.Error("error requesting encoding", "err", err)
+					e.logger.Warn("error requesting encoding", "err", err)
 				}
 			}
 		}
