@@ -127,7 +127,7 @@ func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, b
 	// Create Redis Cluster
 	if err := pool.Retry(func() error {
 		fmt.Println("Creating Redis Cluster")
-		return execCmd("./create-redis-cluster.sh", []string{}, []string{fmt.Sprintf("AWS_URL=http://0.0.0.0:%s", localStackPort)})
+		return execCmd("./create-redis-cluster.sh", []string{}, nil)
 	}); err != nil {
 		fmt.Println("Could not connect to docker to create Redis cluster:", err)
 		return err
