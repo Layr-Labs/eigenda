@@ -236,7 +236,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	// Measure num batches received and its size in bytes
 	batchSize := int64(0)
 	for _, blob := range blobs {
-		batchSize += blob.BlobHeader.EncodedSizeAllQuorums()
+		batchSize += blob.Bundles.Size()
 	}
 	n.Metrics.AcceptBatches("received", batchSize)
 

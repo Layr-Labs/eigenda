@@ -160,3 +160,14 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 	}
 	return data, nil
 }
+
+// Returns the size of the bundles in bytes.
+func (cb Bundles) Size() int {
+	size := 0
+	for _, bundle := range cb {
+		for _, chunk := range bundle {
+			size += chunk.Size()
+		}
+	}
+	return size
+}
