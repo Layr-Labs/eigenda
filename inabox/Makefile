@@ -33,7 +33,7 @@ exp:
 	go run ./deploy/cmd exp
 
 deploy-all:
-	go run ./deploy/cmd -localstack-port 4570 all
+	go run ./deploy/cmd -deploy-resources -localstack-port 4570 -deploy-resources true all 
 
 stop-infra:
 	./bin.sh stop-anvil
