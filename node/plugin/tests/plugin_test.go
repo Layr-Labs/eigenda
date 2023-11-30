@@ -10,9 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
-	commock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
-	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
@@ -27,11 +25,9 @@ func init() {
 }
 
 var (
-	keyPair      *dacore.KeyPair
 	testConfig   *deploy.Config
 	templateName string
 	testName     string
-	logger       = &commock.Logger{}
 )
 
 func TestMain(m *testing.M) {
