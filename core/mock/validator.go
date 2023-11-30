@@ -23,6 +23,11 @@ func NewMockChunkValidator() *MockChunkValidator {
 	return &MockChunkValidator{}
 }
 
+func (v *MockChunkValidator) ValidateBatch(blobs []*core.BlobMessage, operatorState *core.OperatorState) error {
+	args := v.Called(blobs, operatorState)
+	return args.Error(0)
+}
+
 func (v *MockChunkValidator) ValidateBlob(blob *core.BlobMessage, operatorState *core.OperatorState) error {
 	args := v.Called(blob, operatorState)
 	return args.Error(0)
