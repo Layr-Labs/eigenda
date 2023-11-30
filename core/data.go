@@ -171,3 +171,10 @@ func (cb Bundles) Size() int64 {
 	}
 	return size
 }
+
+type Sample struct {
+	Commitment *Commitment
+	Chunk      *Chunk // contain proof and coeffs
+	EvalIndex  ChunkNumber
+	BlobIndex  int
+}

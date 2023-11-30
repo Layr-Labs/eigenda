@@ -25,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/gammazero/workerpool"
 )
 
 const (
@@ -322,24 +321,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 		return err
 	}
 
-	pool := workerpool.New(n.Config.NumBatchValidators)
-	out := make(chan error, len(blobs))
-	for _, blob := range blobs {
-		blob := blob
-		pool.Submit(func() {
-			n.validateBlob(ctx, blob, operatorState, out)
-		})
-	}
-
-	for i := 0; i < len(blobs); i++ {
-		err := <-out
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-
+	return n.Validator.ValidateBatch(blobs, operatorState)
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
