@@ -160,3 +160,10 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 	}
 	return data, nil
 }
+
+type Sample struct {
+	Commitment *Commitment
+	Chunk      *Chunk // contain proof and coeffs
+	EvalIndex  ChunkNumber
+	BlobIndex  int
+}
