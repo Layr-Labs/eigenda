@@ -161,9 +161,16 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 	return data, nil
 }
 
+// Sample is a chunk with associated metadata used by the Universal Batch Verifier
 type Sample struct {
 	Commitment *Commitment
-	Chunk      *Chunk // contain proof and coeffs
+	Chunk      *Chunk
 	EvalIndex  ChunkNumber
 	BlobIndex  int
+}
+
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+type SubBatch struct {
+	Samples  []Sample
+	NumBlobs int
 }
