@@ -662,22 +662,9 @@ func createClient(conn *grpc.ClientConn, clientType ClientType) interface{} {
 func newTestClients(clients map[ClientType]*GrpcClient) (*TestClients, error) {
 	grpcClients := make(map[ClientType]*GrpcClient)
 
-	// serverAddress := "disperser-goerli.eigenda-testnet.eigenops.xyz:443"
-	// conn, err := grpc.Dial(serverAddress, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDefaultCallOptions(
-	// 	grpc.MaxCallRecvMsgSize(math.MaxInt32), // Increase frame size limit
-	// ))
-	// if err != nil {
-	// 	log.Fatalf("Error dialing server: %v", err)
-	// }
-	// defer conn.Close()
-
 	for clientType, grpcClient := range clients {
 		addr := fmt.Sprintf("%s:%s", grpcClient.Hostname, grpcClient.GrpcPort)
 		fmt.Println("Address: ", addr, " ClientType: ", clientType)
-		// conn, err := grpc.Dial(addr, grpc.WithInsecure()) // Using insecure connection for simplicity, consider using secure connection in production
-		// if err != nil {
-		// 	return nil, fmt.Errorf("failed to dial %s server: %v", clientType, err)
-		// }
 
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32), // Increase frame size limit
