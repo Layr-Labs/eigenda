@@ -55,10 +55,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	D := params.ChunkLen
 
 	n := len(samples)
-
-	//rInt := uint64(22894)
-	//var r bls.Fr
-	//bls.AsFr(&r, rInt)
+	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
 
 	r, err := GenRandomness(params, samples, m)
 	if err != nil {
@@ -66,10 +63,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	}
 
 	randomsFr := make([]bls.Fr, n)
-	//bls.AsFr(&randomsFr[0], rInt)
 	bls.CopyFr(&randomsFr[0], &r)
-
-	fmt.Println("random", r.String())
 
 	// lhs
 	var tmp bls.Fr
@@ -85,7 +79,6 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		bls.CopyG1(&proofs[i], &samples[i].Proof)
 	}
 
-	fmt.Printf("len proof %v len ran %v\n", len(proofs), len(randomsFr))
 	// lhs g1
 	lhsG1 := bls.LinCombG1(proofs, randomsFr)
 
@@ -98,9 +91,6 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	// rhs g1
 	// get commitments
 	commits := make([]bls.G1Point, m)
-	//for k := 0 ; k < n ; k++ {
-	// commits[k] = samples[k].Commitment
-	//}
 	// get coeffs
 	ftCoeffs := make([]bls.Fr, m)
 	for k := 0; k < n; k++ {
@@ -109,7 +99,6 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		bls.AddModFr(&ftCoeffs[row], &ftCoeffs[row], &randomsFr[k])
 		bls.CopyG1(&commits[row], &s.Commitment)
 	}
-	fmt.Printf("len commit %v len coeff %v\n", len(commits), len(ftCoeffs))
 
 	ftG1 := bls.LinCombG1(commits, ftCoeffs)
 
@@ -169,30 +158,3 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		return errors.New("Universal Verify Incorrect paring")
 	}
 }
-
-//func SingleVerify(ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, coeffs []bls.Fr, proof bls.G1Point) bool {
-//	var xPow bls.Fr
-//	bls.CopyFr(&xPow, &bls.ONE)
-
-//	var tmp bls.Fr
-//	for i := 0; i < len(coeffs); i++ {
-//		bls.MulModFr(&tmp, &xPow, x)
-//		bls.CopyFr(&xPow, &tmp)
-//	}
-
-// [x^n]_2
-//	var xn2 bls.G2Point
-//	bls.MulG2(&xn2, &bls.GenG2, &xPow)
-
-// [s^n - x^n]_2
-//	var xnMinusYn bls.G2Point
-//	bls.SubG2(&xnMinusYn, &ks.Srs.G2[len(coeffs)], &xn2)
-
-// [interpolation_polynomial(s)]_1
-//	is1 := bls.LinCombG1(ks.Srs.G1[:len(coeffs)], coeffs)
-// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
-//	var commitMinusInterpolation bls.G1Point
-//	bls.SubG1(&commitMinusInterpolation, commitment, is1)
-
-//	return bls.PairingsVerify(&commitMinusInterpolation, &bls.GenG2, &proof, &xnMinusYn)
-//}
