@@ -50,6 +50,14 @@ func AsFr(dst *Fr, i uint64) {
 	(*fr.Element)(dst).SetUint64(i)
 }
 
+func HashToSingleField(dst *Fr, msg []byte) error {
+	DST := []byte("-")
+	randomFr, err := fr.Hash(msg, DST, 1)
+	randomFrBytes := (randomFr[0]).Bytes()
+	FrSetBytes(dst, randomFrBytes[:])
+	return err
+}
+
 func FrStr(b *Fr) string {
 	if b == nil {
 		return "<nil>"

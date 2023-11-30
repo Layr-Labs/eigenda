@@ -1,11 +1,12 @@
 package kzgEncoder
 
 import (
+	"bytes"
+	"encoding/gob"
+	"errors"
 	"fmt"
-	"log"
 
 	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -17,49 +18,58 @@ type Sample struct {
 	X          uint // X is int , at which index is evaluated
 }
 
+// generate a random value using Fiat Shamir transform
+func GenRandomness(params rs.EncodingParams, samples []Sample, m int) (bls.Fr, error) {
+
+	var buffer bytes.Buffer
+	enc := gob.NewEncoder(&buffer)
+	err := enc.Encode(samples)
+	if err != nil {
+		return bls.ZERO, err
+	}
+
+	err = enc.Encode(params)
+	if err != nil {
+		return bls.ZERO, err
+	}
+
+	err = enc.Encode(m)
+	if err != nil {
+		return bls.ZERO, err
+	}
+
+	var randomFr bls.Fr
+
+	err = bls.HashToSingleField(&randomFr, buffer.Bytes())
+	if err != nil {
+		return bls.ZERO, err
+	}
+	return randomFr, nil
+}
+
 // m is number of blob
-func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) bool {
+func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
 	verifier, _ := group.GetKzgVerifier(params)
 	ks := verifier.Ks
 
-	for ind, s := range samples {
-		q, err := rs.GetLeadingCosetIndex(
-			uint64(s.X),
-			params.NumChunks,
-		)
-		if err != nil {
-			return false
-		}
-
-		lc := ks.FFTSettings.ExpandedRootsOfUnity[uint64(q)]
-
-		ok := SingleVerify(ks, &s.Commitment, &lc, s.Coeffs, s.Proof)
-		if !ok {
-			fmt.Println("proof", s.Proof.String())
-			fmt.Println("commitment", s.Commitment.String())
-
-			for i := 0; i < len(s.Coeffs); i++ {
-				fmt.Printf("%v ", s.Coeffs[i].String())
-			}
-			fmt.Println("q", q, lc.String())
-
-			log.Fatalf("Proof %v failed\n", ind)
-		} else {
-
-			fmt.Println("&&&&&&&&&&&&&&&&&&tested frame and pass", ind)
-		}
-	}
-
-	D := len(samples[0].Coeffs) // chunkLen
+	D := params.ChunkLen
 
 	n := len(samples)
 
-	rInt := uint64(22894)
-	var r bls.Fr
-	bls.AsFr(&r, rInt)
+	//rInt := uint64(22894)
+	//var r bls.Fr
+	//bls.AsFr(&r, rInt)
+
+	r, err := GenRandomness(params, samples, m)
+	if err != nil {
+		return err
+	}
 
 	randomsFr := make([]bls.Fr, n)
-	bls.AsFr(&randomsFr[0], rInt)
+	//bls.AsFr(&randomsFr[0], rInt)
+	bls.CopyFr(&randomsFr[0], &r)
+
+	fmt.Println("random", r.String())
 
 	// lhs
 	var tmp bls.Fr
@@ -109,7 +119,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		coeffs := samples[k].Coeffs
 
 		rk := randomsFr[k]
-		for j := 0; j < D; j++ {
+		for j := uint64(0); j < D; j++ {
 			bls.MulModFr(&tmp, &coeffs[j], &rk)
 			bls.AddModFr(&stCoeffs[j], &stCoeffs[j], &tmp)
 		}
@@ -128,14 +138,14 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 			params.NumChunks,
 		)
 		if err != nil {
-			return false
+			return err
 		}
 
 		h := ks.ExpandedRootsOfUnity[x]
 		var hPow bls.Fr
 		bls.CopyFr(&hPow, &bls.ONE)
 
-		for j := 0; j < D; j++ {
+		for j := uint64(0); j < D; j++ {
 			bls.MulModFr(&tmp, &hPow, &h)
 			bls.CopyFr(&hPow, &tmp)
 		}
@@ -153,39 +163,36 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	bls.SubG1(&rhsG1, ftG1, stG1)
 	bls.AddG1(&rhsG1, &rhsG1, ttG1)
 
-	return bls.PairingsVerify(lhsG1, lhsG2, &rhsG1, rhsG2)
-}
-
-func SingleVerify(ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, coeffs []bls.Fr, proof bls.G1Point) bool {
-	var xPow bls.Fr
-	bls.CopyFr(&xPow, &bls.ONE)
-
-	var tmp bls.Fr
-	for i := 0; i < len(coeffs); i++ {
-		bls.MulModFr(&tmp, &xPow, x)
-		bls.CopyFr(&xPow, &tmp)
+	if bls.PairingsVerify(lhsG1, lhsG2, &rhsG1, rhsG2) {
+		return nil
+	} else {
+		return errors.New("Universal Verify Incorrect paring")
 	}
-
-	// [x^n]_2
-	var xn2 bls.G2Point
-	bls.MulG2(&xn2, &bls.GenG2, &xPow)
-
-	// [s^n - x^n]_2
-	var xnMinusYn bls.G2Point
-	bls.SubG2(&xnMinusYn, &ks.Srs.G2[len(coeffs)], &xn2)
-
-	// [interpolation_polynomial(s)]_1
-	is1 := bls.LinCombG1(ks.Srs.G1[:len(coeffs)], coeffs)
-	// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
-	var commitMinusInterpolation bls.G1Point
-	bls.SubG1(&commitMinusInterpolation, commitment, is1)
-
-	// Verify the pairing equation
-	//
-	// e([commitment - interpolation_polynomial(s)], [1]) = e([proof],  [s^n - x^n])
-	//    equivalent to
-	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
-	//
-
-	return bls.PairingsVerify(&commitMinusInterpolation, &bls.GenG2, &proof, &xnMinusYn)
 }
+
+//func SingleVerify(ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, coeffs []bls.Fr, proof bls.G1Point) bool {
+//	var xPow bls.Fr
+//	bls.CopyFr(&xPow, &bls.ONE)
+
+//	var tmp bls.Fr
+//	for i := 0; i < len(coeffs); i++ {
+//		bls.MulModFr(&tmp, &xPow, x)
+//		bls.CopyFr(&xPow, &tmp)
+//	}
+
+// [x^n]_2
+//	var xn2 bls.G2Point
+//	bls.MulG2(&xn2, &bls.GenG2, &xPow)
+
+// [s^n - x^n]_2
+//	var xnMinusYn bls.G2Point
+//	bls.SubG2(&xnMinusYn, &ks.Srs.G2[len(coeffs)], &xn2)
+
+// [interpolation_polynomial(s)]_1
+//	is1 := bls.LinCombG1(ks.Srs.G1[:len(coeffs)], coeffs)
+// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
+//	var commitMinusInterpolation bls.G1Point
+//	bls.SubG1(&commitMinusInterpolation, commitment, is1)
+
+//	return bls.PairingsVerify(&commitMinusInterpolation, &bls.GenG2, &proof, &xnMinusYn)
+//}

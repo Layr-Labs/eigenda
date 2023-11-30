@@ -161,6 +161,7 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 	return data, nil
 }
 
+<<<<<<< HEAD
 // Returns the size of the bundles in bytes.
 func (cb Bundles) Size() int64 {
 	size := int64(0)
@@ -172,9 +173,18 @@ func (cb Bundles) Size() int64 {
 	return size
 }
 
+=======
+// Sample is a chunk with associated metadata used by the Universal Batch Verifier
+>>>>>>> organize data struct and add fiat shamir
 type Sample struct {
 	Commitment *Commitment
-	Chunk      *Chunk // contain proof and coeffs
+	Chunk      *Chunk
 	EvalIndex  ChunkNumber
 	BlobIndex  int
+}
+
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+type SubBatch struct {
+	Samples  []Sample
+	NumBlobs int
 }

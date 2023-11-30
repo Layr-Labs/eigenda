@@ -2,9 +2,7 @@ package encoding
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
-	"log"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
@@ -82,24 +80,6 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 			Coeffs: frame.Coeffs,
 			Proof:  frame.Proof,
 		}
-
-		q, _ := encoder.GetLeadingCosetIndex(uint64(ind), uint64(len(chunks)))
-		lc := enc.Fs.ExpandedRootsOfUnity[uint64(q)]
-		ok := frame.Verify(enc.Ks, commit, &lc)
-		if !ok {
-			log.Fatalf("Proof %v failed\n", ind)
-		} else {
-
-			fmt.Println("proof", frame.Proof.String())
-			fmt.Println("commitment", commit.String())
-			for i := 0; i < len(frame.Coeffs); i++ {
-				fmt.Printf("%v ", frame.Coeffs[i].String())
-			}
-			fmt.Println("q", q, lc.String())
-
-			fmt.Println("***************tested frame and pass")
-		}
-
 	}
 
 	length := uint(len(encoder.ToFrArray(data)))
@@ -170,11 +150,7 @@ func (e *Encoder) UniversalVerifyChunks(params core.EncodingParams, samplesCore 
 		samples[i] = sample
 	}
 
-	if e.EncoderGroup.UniversalVerify(encParams, samples, numBlobs) {
-		return nil
-	} else {
-		return errors.New("Universal Verify wrong")
-	}
+	return e.EncoderGroup.UniversalVerify(encParams, samples, numBlobs)
 }
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob

@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"fmt"
 )
 
 var (
@@ -119,8 +118,7 @@ func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
 
 func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState) error {
 
-	batchGroup := make(map[EncodingParams][]Sample)
-	numBlobMap := make(map[EncodingParams]int)
+	subBatchMap := make(map[EncodingParams]SubBatch)
 
 	for i, blob := range blobs {
 		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
@@ -180,18 +178,8 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 			// Get Encoding Params
 			params := EncodingParams{ChunkLength: chunkLength, NumChunks: info.TotalChunks}
 
-			// ToDo add a struct
-			_, ok := batchGroup[params]
-			if !ok {
-				batchGroup[params] = make([]Sample, 0)
-				numBlobMap[params] = 1
-			} else {
-				numBlobMap[params] += 1
-			}
-
 			// Check the received chunks against the commitment
 			indices := assignment.GetIndices()
-			fmt.Println("indices", indices)
 			samples := make([]Sample, 0)
 			for ind := range chunks {
 				sample := Sample{
@@ -202,15 +190,22 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 				}
 				samples = append(samples, sample)
 			}
-			batchGroup[params] = append(batchGroup[params], samples...)
+
+			// Sort into subBatch
+			subBatch, ok := subBatchMap[params]
+			if !ok {
+				subBatch.Samples = samples
+				subBatch.NumBlobs = 1
+			} else {
+				subBatch.Samples = append(subBatch.Samples, samples...)
+				subBatch.NumBlobs += 1
+			}
 		}
 	}
 
-	// ToDo parallelize
-	fmt.Println("num batchGroup", len(batchGroup))
-	for params, samples := range batchGroup {
-		numBlobs, _ := numBlobMap[params]
-		err := v.encoder.UniversalVerifyChunks(params, samples, numBlobs)
+	// ToDo add parallelization for verification for each subBatch
+	for params, subBatch := range subBatchMap {
+		err := v.encoder.UniversalVerifyChunks(params, subBatch.Samples, subBatch.NumBlobs)
 		if err != nil {
 			return err
 		}
