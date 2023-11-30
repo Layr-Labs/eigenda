@@ -324,12 +324,6 @@ loop:
 					logger.Printf("RetrievalClient:GetReferenceBlockNumber()", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
 					logger.Printf("RetrievalClient:GetBatchRoot()", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
 					
-					// RetrieverClient RetrieveBlobParams
-					// batchHeaderHash [32]byte,
-					// blobIndex uint32,
-					// referenceBlockNumber uint,
-					// batchRoot [32]byte,
-					// quorumID core.QuorumID
 					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
 						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
@@ -497,6 +491,7 @@ func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IE
 }
 
 func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerificationProof) rollupbindings.EigenDABlobUtilsBlobVerificationProof {
+	logger := testSuite.Logger
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
@@ -510,8 +505,8 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
 	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
-	fmt.Printf("VerificationProof:SignatoryRecordHash: %v\n", sig)
-	fmt.Printf("VerificationProof:ConfirmationBlockNumber: %v\n", batchMetadataProto.GetConfirmationBlockNumber())
+	logger.Printf("VerificationProof:SignatoryRecordHash: %v\n", sig)
+	logger.Printf("VerificationProof:ConfirmationBlockNumber: %v\n", batchMetadataProto.GetConfirmationBlockNumber())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
@@ -519,11 +514,11 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
 
-	fmt.Printf("VerificationProof:BatchId: %v\n", verificationProof.GetBatchId())
-	fmt.Printf("VerificationProof:BlobIndex: %v\n", uint8(verificationProof.GetBlobIndex()))
-	fmt.Printf("VerificationProof:BatchMetadata: %v\n", batchMetadata)
-	fmt.Printf("VerificationProof:InclusionProof: %v\n", verificationProof.GetInclusionProof())
-	fmt.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
+	logger.Printf("VerificationProof:BatchId: %v\n", verificationProof.GetBatchId())
+	logger.Printf("VerificationProof:BlobIndex: %v\n", uint8(verificationProof.GetBlobIndex()))
+	logger.Printf("VerificationProof:BatchMetadata: %v\n", batchMetadata)
+	logger.Printf("VerificationProof:InclusionProof: %v\n", verificationProof.GetInclusionProof())
+	logger.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
 
 	return rollupbindings.EigenDABlobUtilsBlobVerificationProof{
 		BatchId:                verificationProof.GetBatchId(),
