@@ -1,4 +1,4 @@
-name: Push Docker images to GHCR with Caching
+name: Push Public Docker images to GHCR with Caching
 
 on:
   workflow_dispatch:
@@ -70,7 +70,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: .
-        file: ./node/plugin/Dockerfile
+        file: ./node/plugin/cmd/Dockerfile
         push: true
         tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-nodeplugin:${{ steps.set_tag.outputs.tag }}
         cache-from: type=local,src=${{ env.CACHE-FROM }}

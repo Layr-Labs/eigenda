@@ -164,7 +164,7 @@ func (n *Node) Start(ctx context.Context) error {
 	// Build the socket based on the hostname/IP provided in the CLI
 	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
 	if n.Config.RegisterNodeAtStart {
-		n.Logger.Debug("Registering node on chain with the following parameters:", "operatorId",
+		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
 			n.Config.ID, "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
 			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", n.Config.QuorumIDList)
 		socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
@@ -179,6 +179,8 @@ func (n *Node) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
+	} else {
+		n.Logger.Info("The node has successfully started. Note it's not opt-in to EigenDA yet (it's not receiving or validating data in EigenDA). To register, please follow the EigenDA operator guide section in docs.eigenlayer.xyz")
 	}
 
 	n.CurrentSocket = socket
@@ -232,9 +234,9 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	log := n.Logger
 
 	// Measure num batches received and its size in bytes
-	batchSize := 0
+	batchSize := int64(0)
 	for _, blob := range blobs {
-		batchSize += blob.BlobHeader.EncodedSizeAllQuorums()
+		batchSize += blob.Bundles.Size()
 	}
 	n.Metrics.AcceptBatches("received", batchSize)
 

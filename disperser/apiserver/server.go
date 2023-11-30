@@ -114,7 +114,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	blob := getBlobFromRequest(req)
 
-	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 1, true)
+	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(uint8(param.GetQuorumId()))

@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wealdtech/go-merkletree"
@@ -97,9 +98,9 @@ func NewBatcher(
 		SRSOrder:               config.SRSOrder,
 		EncodingRequestTimeout: config.PullInterval,
 		EncodingQueueLimit:     config.EncodingRequestQueueSize,
-		PoolSize:               config.NumConnections,
 	}
-	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, logger)
+	encodingWorkerPool := workerpool.New(config.NumConnections)
+	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +348,11 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 	log.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.IncrementBatchCount(len(batch.BlobMetadata))
+	batchSize := int64(0)
+	for _, blobMeta := range batch.BlobMetadata {
+		batchSize += int64(blobMeta.RequestMetadata.BlobSize)
+	}
+	b.Metrics.IncrementBatchCount(batchSize)
 	return nil
 }
 
