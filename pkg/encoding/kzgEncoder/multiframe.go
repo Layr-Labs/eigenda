@@ -10,12 +10,14 @@ import (
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
+// Sample is the basic unit for a verification
+// A blob may contain multiple Samples
 type Sample struct {
 	Commitment bls.G1Point
 	Proof      bls.G1Point
-	Row        int
+	Row        int // corresponds to a row in the verification matrix
 	Coeffs     []bls.Fr
-	X          uint // X is int , at which index is evaluated
+	X          uint // X is assignment
 }
 
 // generate a random value using Fiat Shamir transform
@@ -47,7 +49,12 @@ func GenRandomness(params rs.EncodingParams, samples []Sample, m int) (bls.Fr, e
 	return randomFr, nil
 }
 
-// m is number of blob
+// UniversalVerify implements batch verification on a set of chunks given the same chunk dimension (chunkLen, numChunk).
+// The details is given in Ethereum Research post whose authors are George Kadianakis, George Kadianakis, George Kadianakis
+// https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
+//
+// m is number of blob, samples is a list of chunks
+// Inside the code, ft stands for first term; st for the second term; tt for the third term
 func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
 	verifier, _ := group.GetKzgVerifier(params)
 	ks := verifier.Ks
@@ -122,6 +129,8 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	leadingDs := make([]bls.Fr, n)
 
 	for k := 0; k < n; k++ {
+		// It is important to obtain the leading coset here
+		// As the params from the eigenda Core might not have NumChunks be the power of 2
 		x, err := rs.GetLeadingCosetIndex(
 			uint64(samples[k].X),
 			params.NumChunks,
@@ -141,7 +150,6 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		bls.CopyFr(&leadingDs[k], &hPow)
 	}
 
-	//
 	for k := 0; k < n; k++ {
 		rk := randomsFr[k]
 		bls.MulModFr(&ttCoeffs[k], &rk, &leadingDs[k])
