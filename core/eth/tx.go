@@ -448,7 +448,7 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 	}
 
 	t.Logger.Info("confirming batch onchain")
-	receipt, err := t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "ConfirmBatch", nil)
+	receipt, err := t.EthClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "ConfirmBatch", nil)
 	if err != nil {
 		t.Logger.Error("Failed to estimate gas price and limit", "err", err)
 		return nil, err
@@ -531,6 +531,13 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 
 func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
 	return t.EthClient.GetCurrentBlockNumber(ctx)
+}
+
+func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error) {
+	return t.Bindings.StakeRegistry.QuorumCount(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {

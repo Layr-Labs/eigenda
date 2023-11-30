@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/metadata"
@@ -45,14 +46,23 @@ type RateBucketParams struct {
 	LastRequestTime time.Time
 }
 
-func GetClientAddress(ctx context.Context, header string) (string, error) {
-	if header != "" {
+// GetClientAddress returns the client address from the context. If the header is not empty, it will
+// take the ip address located at the `numProxies“ position from the end of the header. If the ip address cannot be
+// found in the header, it will use the connection ip if `allowDirectConnectionFallback` is true. Otherwise, it will return
+// an error.
+func GetClientAddress(ctx context.Context, header string, numProxies int, allowDirectConnectionFallback bool) (string, error) {
+
+	if header != "" && numProxies > 0 {
 		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok || len(md.Get(header)) == 0 {
-			return "", fmt.Errorf("failed to get ip from header")
+		if ok && len(md.Get(header)) > 0 {
+			parts := splitHeader(md.Get(header))
+			if len(parts) >= numProxies {
+				return parts[len(parts)-numProxies], nil
+			}
 		}
-		return md.Get(header)[len(md.Get(header))-1], nil
-	} else {
+	}
+
+	if header == "" || allowDirectConnectionFallback {
 		p, ok := peer.FromContext(ctx)
 		if !ok {
 			return "", fmt.Errorf("failed to get peer from request")
@@ -64,4 +74,19 @@ func GetClientAddress(ctx context.Context, header string) (string, error) {
 		}
 		return host, nil
 	}
+
+	return "", fmt.Errorf("failed to get ip")
+}
+
+func splitHeader(header []string) []string {
+	var result []string
+	for _, h := range header {
+		for _, p := range strings.Split(h, ",") {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+	}
+	return result
 }

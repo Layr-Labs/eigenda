@@ -97,9 +97,11 @@ func (e *encodedBlobStore) PutEncodingResult(result *EncodingResult) error {
 		return fmt.Errorf("PutEncodedBlob: no such key (%s) in requested set", requestID)
 	}
 
+	if _, ok := e.encoded[requestID]; !ok {
+		e.encodedResultSize += getChunksSize(result)
+	}
 	e.encoded[requestID] = result
 	delete(e.requested, requestID)
-	e.encodedResultSize += getChunksSize(result)
 
 	return nil
 }
@@ -114,6 +116,18 @@ func (e *encodedBlobStore) GetEncodingResult(blobKey disperser.BlobKey, quorumID
 	}
 
 	return e.encoded[requestID], nil
+}
+
+func (e *encodedBlobStore) DeleteEncodingResult(blobKey disperser.BlobKey, quorumID core.QuorumID) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	requestID := getRequestID(blobKey, quorumID)
+	if _, ok := e.encoded[requestID]; !ok {
+		return
+	}
+
+	delete(e.encoded, requestID)
 }
 
 // GetNewAndDeleteStaleEncodingResults returns all the fresh encoded results and deletes all the stale results
@@ -132,7 +146,7 @@ func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint)
 			fetched = append(fetched, encodedResult)
 		}
 	}
-	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "blockNumber", blockNumber)
+	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "blockNumber", blockNumber, "encodedSize", e.encodedResultSize)
 
 	return fetched
 }

@@ -12,8 +12,9 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/inmem"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
 )
@@ -23,7 +24,6 @@ var (
 		SRSOrder:               300000,
 		EncodingRequestTimeout: 5 * time.Second,
 		EncodingQueueLimit:     100,
-		PoolSize:               5,
 	}
 )
 
@@ -45,8 +45,8 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 	encoderClient := disperser.NewLocalEncoderClient(enc)
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), batchThreshold)
-
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, logger)
+	workerpool := workerpool.New(5)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = initialBlockNumber
 
@@ -63,12 +63,11 @@ func TestEncodingQueueLimit(t *testing.T) {
 	cst, err := coremock.NewChainDataMock(numOperators)
 	assert.Nil(t, err)
 	encoderClient := mock.NewMockEncoderClient()
-	wait := make(chan time.Time)
-	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).WaitUntil(wait).Return(nil, nil, nil)
+	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, nil)
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 100000)
-
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, logger)
+	pool := &cmock.MockWorkerpool{}
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, pool, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 
@@ -77,59 +76,54 @@ func TestEncodingQueueLimit(t *testing.T) {
 		AdversaryThreshold: 80,
 		QuorumThreshold:    100,
 	}}
-	blob1Data := []byte{1, 2, 3, 4, 5}
-	blob1 := core.Blob{
+	blobData := []byte{1, 2, 3, 4, 5}
+	blob := core.Blob{
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: blob1Data,
+		Data: blobData,
 	}
+
+	pool.On("Submit", tmock.Anything).Run(func(args tmock.Arguments) {
+		args.Get(0).(func())()
+	})
+
+	// assume that encoding queue is already full
+	pool.On("WaitingQueueSize").Return(streamerConfig.EncodingQueueLimit).Once()
 
 	ctx := context.Background()
-	key1, err := blobStore.StoreBlob(ctx, &blob1, uint64(time.Now().UnixNano()))
+	key, err := blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
-	out := make(chan batcher.EncodingResultOrStatus)
+	out := make(chan batcher.EncodingResultOrStatus, 1)
+	// This should return without making a request since encoding queue was already full
 	err = encodingStreamer.RequestEncoding(context.Background(), out)
 	assert.Nil(t, err)
 
-	blob2Data := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	blob2 := core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			SecurityParams: securityParams,
-		},
-		Data: blob2Data,
+	encoderClient.AssertNotCalled(t, "EncodeBlob")
+	select {
+	case <-out:
+		t.Fatal("did not expect any encoding results")
+	default:
 	}
-	key2, err := blobStore.StoreBlob(ctx, &blob2, uint64(time.Now().UnixNano()))
-	assert.Nil(t, err)
-	// EncodeBlob still running, so this should return without making a request
-	err = encodingStreamer.RequestEncoding(context.Background(), out)
-	assert.Nil(t, err)
-
-	// EncodeBlob call returns
-	wait <- time.Now()
-	// second blob should not have been encoded
-	encoderClient.AssertNumberOfCalls(t, "EncodeBlob", 1)
-	encoderClient.AssertCalled(t, "EncodeBlob", tmock.Anything, blob1Data, tmock.Anything)
-	encoderClient.AssertNotCalled(t, "EncodeBlob", tmock.Anything, blob2Data, tmock.Anything)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
-	assert.Nil(t, err)
-	res, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(key1, 0)
-	assert.Nil(t, err)
-	assert.NotNil(t, res)
-	res, err = encodingStreamer.EncodedBlobstore.GetEncodingResult(key2, 0)
-	assert.NotNil(t, err)
-	assert.Nil(t, res)
+	// assume that encoding queue opens up
+	pool.On("WaitingQueueSize").Return(0).Once()
 
 	// retry
 	err = encodingStreamer.RequestEncoding(context.Background(), out)
 	assert.Nil(t, err)
-	wait <- time.Now()
 
-	encoderClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
-	encoderClient.AssertCalled(t, "EncodeBlob", tmock.Anything, blob2Data, tmock.Anything)
-	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	encoderClient.AssertNumberOfCalls(t, "EncodeBlob", 1)
+	encoderClient.AssertCalled(t, "EncodeBlob", tmock.Anything, blobData, tmock.Anything)
+	var encodingResult batcher.EncodingResultOrStatus
+	select {
+	case encodingResult = <-out:
+	default:
+		t.Fatal("did not expect any encoding results")
+	}
+
+	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), encodingResult)
 	assert.Nil(t, err)
-	res, err = encodingStreamer.EncodedBlobstore.GetEncodingResult(key2, 0)
+	res, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(key, 0)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
 }
@@ -154,8 +148,22 @@ func TestBatchTrigger(t *testing.T) {
 	total := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, total, uint(131584))
 
+	// try encode the same blobs again at different block (this happens when the blob is retried)
+	encodingStreamer.ReferenceBlockNumber = 11
+	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	assert.Nil(t, err)
+	err = encodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	assert.Nil(t, err)
+
+	total = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, total, uint(131584))
+
 	// don't notify yet
-	assert.Len(t, encodingStreamer.EncodedSizeNotifier.Notify, 0)
+	select {
+	case <-encodingStreamer.EncodedSizeNotifier.Notify:
+		t.Fatal("expected not to be notified")
+	default:
+	}
 
 	// Request encoding once more
 	_, err = c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
@@ -169,7 +177,11 @@ func TestBatchTrigger(t *testing.T) {
 	assert.Equal(t, total, uint(131584)*2)
 
 	// notify
-	assert.Len(t, encodingStreamer.EncodedSizeNotifier.Notify, 1)
+	select {
+	case <-encodingStreamer.EncodedSizeNotifier.Notify:
+	default:
+		t.Fatal("expected to be notified")
+	}
 }
 
 func TestStreamingEncoding(t *testing.T) {
@@ -272,14 +284,8 @@ func TestEncodingFailure(t *testing.T) {
 	encoderClient := mock.NewMockEncoderClient()
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 1e12)
-	streamerConfig := batcher.StreamerConfig{
-		SRSOrder:               300000,
-		EncodingRequestTimeout: 5 * time.Second,
-		EncodingQueueLimit:     100,
-		PoolSize:               5,
-	}
-
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, logger)
+	workerpool := workerpool.New(5)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 
@@ -456,7 +462,6 @@ func TestIncorrectParameters(t *testing.T) {
 		SRSOrder:               3000,
 		EncodingRequestTimeout: 5 * time.Second,
 		EncodingQueueLimit:     100,
-		PoolSize:               5,
 	}
 
 	encodingStreamer, c := createEncodingStreamer(t, 0, 1e12, streamerConfig)

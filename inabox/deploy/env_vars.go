@@ -21,6 +21,8 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_ENABLE_RATELIMITER string
 
+	DISPERSER_SERVER_RATE_BUCKET_STORE_SIZE string
+
 	DISPERSER_SERVER_CHAIN_RPC string
 
 	DISPERSER_SERVER_PRIVATE_KEY string
@@ -355,6 +357,10 @@ type ChurnerVars struct {
 	CHURNER_LOG_PATH string
 
 	CHURNER_INDEXER_PULL_INTERVAL string
+
+	CHURNER_ENABLE_METRICS string
+
+	CHURNER_METRICS_HTTP_PORT string
 }
 
 func (vars ChurnerVars) getEnvMap() map[string]string {

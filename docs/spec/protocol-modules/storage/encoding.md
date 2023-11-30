@@ -55,7 +55,7 @@ EigenDA uses a combination of Reed-Solomon (RS) erasure coding and KZG polynomia
 Basic RS encoding is used to achieve the first requirement of tolerance to adversarial node behavior. This looks like the following:
 
 1. The blob data is represented as a string of symbols, where each symbol is elements in a certain finite field. The number of symbols is called the `BlobLength`
-2. These symbols are interpreted as the the coefficients of a `BlobLength`-1 degree polynomial.
+2. These symbols are interpreted as the coefficients of a `BlobLength`-1 degree polynomial.
 3. This polynomial is evaluated at `NumChunks`*`ChunkLength` distinct indices.
 4. Chunks are constructed, where each chunk consists of the polynomial evaluations at `ChunkLength` distinct indices.
 
@@ -63,13 +63,13 @@ Notice that given any number of chunks $M$ such that $M$*`ChunkLength` > `BlobLe
 
 ### Validation via KZG
 
-Without modification, RS encoding has the following important problem: Suppose that a user asks an untrusted disperser to encode data and send it to the nodes. Even if the user is satisfied that each node has received some chunk of data, there is know way to know how the disperser when about constructing those chunks. [KZG polynomial commitments](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html) provide a solution to this problem.
+Without modification, RS encoding has the following important problem: Suppose that a user asks an untrusted disperser to encode data and send it to the nodes. Even if the user is satisfied that each node has received some chunk of data, there is no way to know how the disperser went about constructing those chunks. [KZG polynomial commitments](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html) provide a solution to this problem.
 
 #### Encoded Chunk Verification
 KZG commitments provide three important primitives, for a polynomial $p(X) = \sum_{i}c_iX^i$:
 - `commit(p(X))` returns a `Commitment` which is used to identify the polynomial.
 - `prove(p(X),indices)` returns a `Proof` which can be used to verify that a set of evaluations lies on the polynomial.
-- `verify(Commitment,Proof,evals,indices)` returns a `bool` indicating whether the committed polynomial evalutates to `evals` and the provided `indices`.
+- `verify(Commitment,Proof,evals,indices)` returns a `bool` indicating whether the committed polynomial evaluates to `evals` and the provided `indices`.
 
 #### Blob Size Verification
 KZG commitments also can be used to verify the degree of the original polynomial, which in turn corresponds to the size of the encoded blob.
@@ -86,7 +86,7 @@ A design for an efficient encoding backend that makes use of amortized kzg multi
 
 ## Validation Actions
 
-When the a DA node receives a `StoreChunks` request, it performs the following validation actions relative to each blob header:
+When a DA node receives a `StoreChunks` request, it performs the following validation actions relative to each blob header:
 - It uses `GetOperatorAssignment` of the `AssignmentCoordinator` interface to calculate the chunk indices for which it is responsible and the total number of chunks, `TotalChunks`.
 - It instantiates an encoder using the `ChunkLength` from the `BlobHeader` and the `TotalChunks`, and uses `VerifyChunks` to verify that the data contained within the chunks lies on the committed polynomial at the correct indices.
 - The `VerifyChunks` method also verifies that the `Length` contained in the `BlobCommitments` struct is valid based on the `LengthProof`.

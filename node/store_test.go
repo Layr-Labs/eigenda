@@ -52,7 +52,7 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	}
 	chunk1 := &core.Chunk{
 		Proof:  commitment,
-		Coeffs: []core.Symbol{},
+		Coeffs: []core.Symbol{bn254.ONE},
 	}
 
 	blobMessage := []*core.BlobMessage{

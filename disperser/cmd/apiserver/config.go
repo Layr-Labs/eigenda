@@ -7,8 +7,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	"github.com/Layr-Labs/eigenda/disperser/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/cmd/disperserserver/flags"
+	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/urfave/cli"
 )
 
@@ -22,6 +22,7 @@ type Config struct {
 	RateConfig        apiserver.RateConfig
 	EnableRatelimiter bool
 	BucketTableName   string
+	BucketStoreSize   int
 	EthClientConfig   geth.EthClientConfig
 
 	BLSOperatorStateRetrieverAddr string
@@ -53,6 +54,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		RateConfig:        apiserver.ReadCLIConfig(ctx),
 		EnableRatelimiter: ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
 		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),

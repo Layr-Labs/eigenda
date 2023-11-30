@@ -28,7 +28,7 @@ When the `StoreChunks` method is called, the node performs the following checks:
 1. Check that all payments are correct (See [Payment Constraints](./node-payments.md)).
 2. Check that its own chunks are correct (See [Blob Encoding Constraints](./node-encoding.md))
 
-Provided that both checks are successful, the node will sign the concatentation of the paymentRoot and blobRoot using the BLS key registered with the `BLSRegistry` and then return the signature. 
+Provided that both checks are successful, the node will sign the concatenation of the paymentRoot and blobRoot using the BLS key registered with the `BLSRegistry` and then return the signature. 
 
 
 

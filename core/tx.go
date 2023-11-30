@@ -64,30 +64,30 @@ type Transactor interface {
 	// specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
 	ConfirmBatch(ctx context.Context, batchHeader BatchHeader, quorums map[QuorumID]*QuorumResult, signatureAggregation SignatureAggregation) (*types.Receipt, error)
 
-	// Returns the BLOCK_STALE_MEASURE defined onchain.
+	// GetBlockStaleMeasure returns the BLOCK_STALE_MEASURE defined onchain.
 	GetBlockStaleMeasure(ctx context.Context) (uint32, error)
-	// Returns the STORE_DURATION_BLOCKS defined onchain.
+	// GetStoreDurationBlocks returns the STORE_DURATION_BLOCKS defined onchain.
 	GetStoreDurationBlocks(ctx context.Context) (uint32, error)
 
-	// Returns the address of the stake registry contract.
+	// StakeRegistry returns the address of the stake registry contract.
 	StakeRegistry(ctx context.Context) (gethcommon.Address, error)
 
-	// Returns the address of the operator from the operator id.
+	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)
 
-	// Returns the current quorum bitmap for the operator.
+	// GetCurrentQuorumBitmapByOperatorId returns the current quorum bitmap for the operator.
 	GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId OperatorID) (*big.Int, error)
 
-	// Returns operator set params for the quorum.
+	// GetOperatorSetParams returns operator set params for the quorum.
 	GetOperatorSetParams(ctx context.Context, quorumID QuorumID) (*OperatorSetParam, error)
 
-	// Returns the number of registered operators for the quorum.
+	// GetNumberOfRegisteredOperatorForQuorum returns the number of registered operators for the quorum.
 	GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID QuorumID) (uint32, error)
 
-	// Returns the weight of the operator for the quorum view.
+	// WeightOfOperatorForQuorum returns the weight of the operator for the quorum view.
 	WeightOfOperatorForQuorum(ctx context.Context, quorumID QuorumID, operator gethcommon.Address) (*big.Int, error)
 
-	// Returns calculated operator churn approval digest hash.
+	// CalculateOperatorChurnApprovalDigestHash returns calculated operator churn approval digest hash.
 	CalculateOperatorChurnApprovalDigestHash(
 		ctx context.Context,
 		operatorId OperatorID,
@@ -96,6 +96,9 @@ type Transactor interface {
 		expiry *big.Int,
 	) ([32]byte, error)
 
-	// Returns the current block number.
+	// GetCurrentBlockNumber returns the current block number.
 	GetCurrentBlockNumber(ctx context.Context) (uint32, error)
+
+	// GetQuorumCount returns the number of quorums registered at given block number.
+	GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error)
 }

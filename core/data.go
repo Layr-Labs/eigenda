@@ -52,7 +52,7 @@ type BlobRequestHeader struct {
 
 func (h *BlobRequestHeader) Validate() error {
 	for _, quorum := range h.SecurityParams {
-		if quorum.AdversaryThreshold+10 >= quorum.QuorumThreshold {
+		if quorum.QuorumThreshold < quorum.AdversaryThreshold+10 {
 			return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
 		}
 		if quorum.QuorumThreshold > 100 {
@@ -85,10 +85,10 @@ type BlobHeader struct {
 }
 
 // Returns the total encoded size in bytes of the blob across all quorums.
-func (b *BlobHeader) EncodedSizeAllQuorums() int {
-	size := 0
+func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
+	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
-		size += int(quorum.EncodedBlobLength * bn254.BYTES_PER_COEFFICIENT)
+		size += int64(quorum.EncodedBlobLength) * int64(bn254.BYTES_PER_COEFFICIENT)
 	}
 	return size
 }
@@ -159,4 +159,15 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 		}
 	}
 	return data, nil
+}
+
+// Returns the size of the bundles in bytes.
+func (cb Bundles) Size() int64 {
+	size := int64(0)
+	for _, bundle := range cb {
+		for _, chunk := range bundle {
+			size += int64(chunk.Size())
+		}
+	}
+	return size
 }

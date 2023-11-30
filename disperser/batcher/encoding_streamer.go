@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 )
 
@@ -38,9 +38,6 @@ type StreamerConfig struct {
 
 	// EncodingQueueLimit is the maximum number of encoding requests that can be queued
 	EncodingQueueLimit int
-
-	// PoolSize is the number of workers in the worker pool
-	PoolSize int
 }
 
 type EncodingStreamer struct {
@@ -50,7 +47,7 @@ type EncodingStreamer struct {
 
 	EncodedBlobstore     *encodedBlobStore
 	ReferenceBlockNumber uint
-	Pool                 *workerpool.WorkerPool
+	Pool                 common.WorkerPool
 	EncodedSizeNotifier  *EncodedSizeNotifier
 
 	blobStore             disperser.BlobStore
@@ -92,6 +89,7 @@ func NewEncodingStreamer(
 	encoderClient disperser.EncoderClient,
 	assignmentCoordinator core.AssignmentCoordinator,
 	encodedSizeNotifier *EncodedSizeNotifier,
+	workerPool common.WorkerPool,
 	logger common.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
@@ -100,7 +98,7 @@ func NewEncodingStreamer(
 		StreamerConfig:         config,
 		EncodedBlobstore:       newEncodedBlobStore(logger),
 		ReferenceBlockNumber:   uint(0),
-		Pool:                   workerpool.New(config.PoolSize),
+		Pool:                   workerPool,
 		EncodedSizeNotifier:    encodedSizeNotifier,
 		blobStore:              blobStore,
 		chainState:             chainState,
@@ -123,9 +121,11 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case response := <-encoderChan:
 				err := e.ProcessEncodedBlobs(ctx, response)
 				if err != nil {
-					if !errors.Is(err, context.Canceled) {
-						e.logger.Error("error processing encoded blobs", "err", err)
+					if strings.Contains(err.Error(), context.Canceled.Error()) {
+						// ignore canceled errors because canceled encoding requests are normal
+						continue
 					}
+					e.logger.Error("error processing encoded blobs", "err", err)
 				}
 			}
 		}
@@ -143,7 +143,7 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case <-ticker.C:
 				err := e.RequestEncoding(ctx, encoderChan)
 				if err != nil {
-					e.logger.Error("error requesting encoding", "err", err)
+					e.logger.Warn("error requesting encoding", "err", err)
 				}
 			}
 		}
@@ -526,6 +526,12 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		BatchMetadata: batchMetadata,
 		MerkleTree:    tree,
 	}, nil
+}
+
+func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
+	for _, sp := range metadata.RequestMetadata.SecurityParams {
+		e.EncodedBlobstore.DeleteEncodingResult(metadata.GetBlobKey(), sp.QuorumID)
+	}
 }
 
 func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*batchMetadata, error) {

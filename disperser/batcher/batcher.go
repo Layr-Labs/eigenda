@@ -13,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/gammazero/workerpool"
+	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wealdtech/go-merkletree"
 )
@@ -96,9 +98,9 @@ func NewBatcher(
 		SRSOrder:               config.SRSOrder,
 		EncodingRequestTimeout: config.PullInterval,
 		EncodingQueueLimit:     config.EncodingRequestQueueSize,
-		PoolSize:               config.NumConnections,
 	}
-	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, logger)
+	encodingWorkerPool := workerpool.New(config.NumConnections)
+	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -173,8 +175,9 @@ func (b *Batcher) Start(ctx context.Context) error {
 }
 
 func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata) error {
-	var err error
+	var result *multierror.Error
 	for _, metadata := range blobMetadatas {
+		var err error
 		if metadata.NumRetries < b.MaxNumRetriesPerBlob {
 			err = b.Queue.IncrementBlobRetryCount(ctx, metadata)
 		} else {
@@ -182,14 +185,15 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 		}
 		if err != nil {
 			b.logger.Error("HandleSingleBatch: error handling blob failure", "err", err)
+			// Append the error
+			result = multierror.Append(result, err)
 		}
+		b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
 	}
 
-	b.Metrics.UpdateFailedBatchAndBlobs(len(blobMetadatas))
-
-	return err
+	// Return the error(s)
+	return result.ErrorOrNil()
 }
-
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
 	// start a timer
@@ -261,7 +265,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	batchID, err := b.getBatchID(ctx, txnReceipt)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata)
-		return fmt.Errorf("HandleSingleBatch: error confirming batch: %w", err)
+		return fmt.Errorf("HandleSingleBatch: error fetching batch ID: %w", err)
 	}
 
 	// Mark the blobs as complete
@@ -313,9 +317,17 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		}
 
 		if status == disperser.Confirmed {
-			_, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
+			if _, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
+				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
+				// remove encoded blob from storage so we don't disperse it again
+				b.EncodingStreamer.RemoveEncodedBlob(metadata)
+			}
 		} else if status == disperser.InsufficientSignatures {
-			_, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo)
+			if _, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
+				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
+				// remove encoded blob from storage so we don't disperse it again
+				b.EncodingStreamer.RemoveEncodedBlob(metadata)
+			}
 		} else {
 			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
 		}
@@ -336,8 +348,11 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 	log.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
-
-	b.Metrics.UpdateCompletedBatchAndBlobs(batch.BlobMetadata, passed)
+	batchSize := int64(0)
+	for _, blobMeta := range batch.BlobMetadata {
+		batchSize += int64(blobMeta.RequestMetadata.BlobSize)
+	}
+	b.Metrics.IncrementBatchCount(batchSize)
 	return nil
 }
 

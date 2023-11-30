@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	"github.com/Layr-Labs/eigenda/disperser/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
@@ -20,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -35,9 +37,12 @@ var (
 	dispersalServer    *apiserver.DispersalServer
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
-	localStackPort     string
-	metadataTableName  = "test-BlobMetadata"
-	bucketTableName    = "test-BucketStore"
+	UUID               = uuid.New()
+	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
+
+	deployLocalStack bool
+	localStackPort   = "4568"
 )
 
 func TestMain(m *testing.M) {
@@ -55,6 +60,49 @@ func TestDisperseBlob(t *testing.T) {
 	status, _, key := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
 	assert.NotNil(t, key)
+}
+
+func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
+	data := make([]byte, 1024)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	p := &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: 51001,
+		},
+	}
+	ctx := peer.NewContext(context.Background(), p)
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           2,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+		},
+	})
+	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    90,
+			},
+		},
+	})
+	assert.ErrorContains(t, err, "invalid request: security_params must not contain duplicate quorum_id")
 }
 
 func TestGetBlobStatus(t *testing.T) {
@@ -232,16 +280,24 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 }
 
 func setup(m *testing.M) {
-	localStackPort = "4568"
-	pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-	dockertestPool = pool
-	dockertestResource = resource
-	if err != nil {
-		teardown()
-		panic("failed to start localstack container")
+
+	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalStack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
-	err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName)
+	if deployLocalStack {
+
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			teardown()
+			panic("failed to start localstack container")
+		}
+
+	}
+
+	err := deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
@@ -251,7 +307,9 @@ func setup(m *testing.M) {
 }
 
 func teardown() {
-	deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	if deployLocalStack {
+		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	}
 }
 
 func newTestServer(m *testing.M) *apiserver.DispersalServer {
@@ -289,10 +347,13 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	tx := &mock.MockTransactor{}
+	tx.On("GetCurrentBlockNumber").Return(uint32(100), nil)
+	tx.On("GetQuorumCount").Return(uint16(2), nil)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort: "51001",
-	}, queue, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
+	}, queue, tx, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

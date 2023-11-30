@@ -53,54 +53,54 @@
   },
   "preprod-goerli": {
     "BLSRegistryCoordinatorWithIndices": {
-      "address": "0x93249C534edB2c80A3F9b8EC296c85329cbFc408",
-      "startBlock": 9999752
+      "address": "0x376B46C69bf1eD9e6EF32115c644650517F1265B",
+      "startBlock": 10015410
     },
     "BLSPubkeyRegistry": {
-      "address": "0x93CeF99595572b67d44a3bE927b4d403a2C1b724",
-      "startBlock": 9999752
+      "address": "0xB64F362EA5216c17cffE5964710c7C9E824af8aD",
+      "startBlock": 10015410
     },
     "BLSPubkeyCompendium": {
-      "address": "0x0A7727404Ef6B6CC45B445B323b67Fb67A414010",
-      "startBlock": 9999752
+      "address": "0xE0de168E81C8f31A3b91cDC1C8eE033f6f1cC012",
+      "startBlock": 10015410
     },
     "BLSPubkeyCompendium_Operator": {
-      "address": "0x0A7727404Ef6B6CC45B445B323b67Fb67A414010",
-      "startBlock": 9999752
+      "address": "0xE0de168E81C8f31A3b91cDC1C8eE033f6f1cC012",
+      "startBlock": 10015410
     },
     "BLSRegistryCoordinatorWithIndices_Operator": {
-      "address": "0x93249C534edB2c80A3F9b8EC296c85329cbFc408",
-      "startBlock": 9999752
+      "address": "0x376B46C69bf1eD9e6EF32115c644650517F1265B",
+      "startBlock": 10015410
     },
     "BLSPubkeyRegistry_QuorumApkUpdates": {
-      "address": "0x93CeF99595572b67d44a3bE927b4d403a2C1b724",
-      "startBlock": 9999752
+      "address": "0xB64F362EA5216c17cffE5964710c7C9E824af8aD",
+      "startBlock": 10015410
     }
   },
   "goerli": {
     "BLSRegistryCoordinatorWithIndices": {
-      "address": "0x376B46C69bf1eD9e6EF32115c644650517F1265B",
-      "startBlock": 10015410
+      "address": "0x0b30a3427765f136754368a4500bAca8d2a54C0B",
+      "startBlock": 10043972
     },
     "BLSPubkeyRegistry": {
-      "address": "0xB64F362EA5216c17cffE5964710c7C9E824af8aD",
-      "startBlock": 10015410
+      "address": "0xD8fCD5c9103962DE37E375EF9dB62cCf39D5BEcA",
+      "startBlock": 10043972
     },
     "BLSPubkeyCompendium": {
-      "address": "0xE0de168E81C8f31A3b91cDC1C8eE033f6f1cC012",
-      "startBlock": 10015410
+      "address": "0xc81d3963087Fe09316cd1E032457989C7aC91b19",
+      "startBlock": 10043972
     },
     "BLSPubkeyCompendium_Operator": {
-      "address": "0xE0de168E81C8f31A3b91cDC1C8eE033f6f1cC012",
-      "startBlock": 10015410
+      "address": "0xc81d3963087Fe09316cd1E032457989C7aC91b19",
+      "startBlock": 10043972
     },
     "BLSRegistryCoordinatorWithIndices_Operator": {
-      "address": "0x376B46C69bf1eD9e6EF32115c644650517F1265B",
-      "startBlock": 10015410
+      "address": "0x0b30a3427765f136754368a4500bAca8d2a54C0B",
+      "startBlock": 10043972
     },
     "BLSPubkeyRegistry_QuorumApkUpdates": {
-      "address": "0xB64F362EA5216c17cffE5964710c7C9E824af8aD",
-      "startBlock": 10015410
+      "address": "0xD8fCD5c9103962DE37E375EF9dB62cCf39D5BEcA",
+      "startBlock": 10043972
     }
   }
 }

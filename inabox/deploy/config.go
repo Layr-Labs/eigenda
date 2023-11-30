@@ -149,6 +149,9 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_STD_LOG_LEVEL:  "debug",
 		CHURNER_FILE_LOG_LEVEL: "trace",
 		CHURNER_LOG_PATH:       logPath,
+
+		CHURNER_ENABLE_METRICS:    "true",
+		CHURNER_METRICS_HTTP_PORT: "9095",
 	}
 
 	env.applyDefaults(&v, "CHURNER", "churner", ind)
@@ -161,7 +164,8 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 	v := DisperserVars{
 		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
 		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata",
-		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "test-BucketStore",
+		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "",
+		DISPERSER_SERVER_RATE_BUCKET_STORE_SIZE: "100000",
 		DISPERSER_SERVER_GRPC_PORT:              grpcPort,
 		DISPERSER_SERVER_ENABLE_METRICS:         "true",
 		DISPERSER_SERVER_METRICS_HTTP_PORT:      "9093",

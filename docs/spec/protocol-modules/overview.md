@@ -1,7 +1,7 @@
 
-# The "Modules" of Data Availablility
+# The "Modules" of Data Availability
 
-The overall security guarantee provided by EigenDA is actually a composite of many smaller guarantees, each with its own intricacies. For the purpose of exposition, in this section we break down the EigenDA protocol into a set of three modules, which divide roughly along the lines of the guarantees which for which the modules are responsible. 
+The overall security guarantee provided by EigenDA is actually a composite of many smaller guarantees, each with its own intricacies. For the purpose of exposition, in this section we break down the EigenDA protocol into a set of three modules, which divide roughly along the lines of the guarantees for which the modules are responsible. 
 
 ## Attestation
 The main guarantee supported by the attestation module concerns the on-chain conditions under which a batch is able to be confirmed by the EigenDA smart contracts. In particular, the attestation module is responsible for upholding the following guarantee:

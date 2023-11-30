@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/logging"
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
@@ -17,7 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
-	"github.com/Layr-Labs/eigenda/disperser/inmem"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -63,14 +64,15 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 
 func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	// Common Components
-	logger := &cmock.Logger{}
+	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	assert.NoError(t, err)
 
 	// Core Components
 	cst, err := coremock.NewChainDataMock(10)
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 	asgn := &core.StdAssignmentCoordinator{}
-	agg := &core.StdSignatureAggregator{}
+	agg := core.NewStdSignatureAggregator(logger)
 	enc, err := makeTestEncoder()
 	assert.NoError(t, err)
 
@@ -167,17 +169,24 @@ func TestBatcherIterations(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 	// Check that the blob was processed
-	meta, err := blobStore.GetBlobMetadata(ctx, blobKey1)
+	meta1, err := blobStore.GetBlobMetadata(ctx, blobKey1)
 	assert.NoError(t, err)
-	assert.Equal(t, blobKey1, meta.GetBlobKey())
-	assert.Equal(t, requestedAt1, meta.RequestMetadata.RequestedAt)
-	assert.Equal(t, disperser.Confirmed, meta.BlobStatus)
-	assert.Equal(t, meta.ConfirmationInfo.BatchID, uint32(3))
+	assert.Equal(t, blobKey1, meta1.GetBlobKey())
+	assert.Equal(t, requestedAt1, meta1.RequestMetadata.RequestedAt)
+	assert.Equal(t, disperser.Confirmed, meta1.BlobStatus)
+	assert.Equal(t, meta1.ConfirmationInfo.BatchID, uint32(3))
 
-	meta, err = blobStore.GetBlobMetadata(ctx, blobKey2)
+	meta2, err := blobStore.GetBlobMetadata(ctx, blobKey2)
 	assert.NoError(t, err)
-	assert.Equal(t, blobKey2, meta.GetBlobKey())
-	assert.Equal(t, disperser.Confirmed, meta.BlobStatus)
+	assert.Equal(t, blobKey2, meta2.GetBlobKey())
+	assert.Equal(t, disperser.Confirmed, meta2.BlobStatus)
+
+	res, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(meta1.GetBlobKey(), 0)
+	assert.ErrorContains(t, err, "no such key")
+	assert.Nil(t, res)
+	res, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(meta2.GetBlobKey(), 1)
+	assert.ErrorContains(t, err, "no such key")
+	assert.Nil(t, res)
 }
 
 func TestBlobFailures(t *testing.T) {

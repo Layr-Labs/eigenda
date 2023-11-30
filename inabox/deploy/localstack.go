@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/disperser/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 
@@ -36,6 +36,7 @@ func StartDockertestWithLocalstackContainer(localStackPort string) (*dockertest.
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository:   "localstack/localstack",
 		Tag:          "latest",
+		Name:         "localstack-test",
 		ExposedPorts: []string{localStackPort},
 		PortBindings: map[docker.Port][]docker.PortBinding{
 			docker.Port(localStackPort): {

@@ -255,6 +255,11 @@ func (ics *indexedChainState) getAllOperatorsRegisteredAtBlockNumberWithPaginati
 }
 
 func convertIndexedOperatorInfoGqlToIndexedOperatorInfo(operator *IndexedOperatorInfoGql) (*core.IndexedOperatorInfo, error) {
+
+	if len(operator.SocketUpdates) == 0 {
+		return nil, errors.New("no socket found for operator")
+	}
+
 	pubkeyG1 := new(bn254.G1Affine)
 	_, err := pubkeyG1.X.SetString(string(operator.PubkeyG1_X))
 	if err != nil {

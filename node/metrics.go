@@ -121,22 +121,22 @@ func (g *Metrics) ObserveLatency(method, stage string, latencyMs float64) {
 	g.RequestLatency.WithLabelValues(method, stage).Observe(latencyMs)
 }
 
-func (g *Metrics) AddCurrentBatch(batchSize int) {
+func (g *Metrics) AddCurrentBatch(batchSize int64) {
 	g.CurrBatches.WithLabelValues("number").Inc()
 	g.CurrBatches.WithLabelValues("size").Add(float64(batchSize))
 }
 
-func (g *Metrics) RemoveCurrentBatch(batchSize int) {
+func (g *Metrics) RemoveCurrentBatch(batchSize int64) {
 	g.CurrBatches.WithLabelValues("number").Dec()
 	g.CurrBatches.WithLabelValues("size").Sub(float64(batchSize))
 }
 
-func (g *Metrics) RemoveNCurrentBatch(numBatches, totalBatchSize int) {
+func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 	g.CurrBatches.WithLabelValues("number").Sub(float64(numBatches))
 	g.CurrBatches.WithLabelValues("size").Sub(float64(totalBatchSize))
 }
 
-func (g *Metrics) AcceptBatches(status string, batchSize int) {
+func (g *Metrics) AcceptBatches(status string, batchSize int64) {
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
 }

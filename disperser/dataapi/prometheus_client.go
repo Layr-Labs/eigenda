@@ -39,7 +39,7 @@ func NewPrometheusClient(api prometheus.Api, cluster string) *prometheusClient {
 }
 
 func (pc *prometheusClient) QueryDisperserBlobSizeBytesPerSecond(ctx context.Context, start time.Time, end time.Time) (*PrometheusResult, error) {
-	query := fmt.Sprintf("eigenda_batcher_blobs_total{state=\"completed\",data=\"size\",cluster=\"%s\"}", pc.cluster)
+	query := fmt.Sprintf("eigenda_batcher_blobs_total{state=\"confirmed\",data=\"size\",cluster=\"%s\"}", pc.cluster)
 	numSecondsInTimeRange := end.Sub(start).Seconds()
 	step := uint64(numSecondsInTimeRange / maxNumOfDataPoints)
 	if step < 1 {

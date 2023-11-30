@@ -33,7 +33,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/proto/protogen/encoder"
+	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -191,6 +191,8 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	querier := graphql.NewClient(retrievalClientConfig.CHURNER_GRAPH_URL, nil)
 	indexedChainStateClient := thegraph.NewIndexedChainState(cs, querier, logger)
 	agn := &core.StdAssignmentCoordinator{}
+
+	// TODO: What should be the value here?
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(retrievalClientConfig.RETRIEVER_SRS_ORDER)
 	if err != nil {

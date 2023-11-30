@@ -7,22 +7,22 @@ import (
 	"path/filepath"
 
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/ory/dockertest/v3"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	testNameFlagName   = "testname"
-	rootPathFlagName   = "root-path"
-	localstackFlagName = "localstack-port"
+	testNameFlagName        = "testname"
+	rootPathFlagName        = "root-path"
+	localstackFlagName      = "localstack-port"
+	deployResourcesFlagName = "deploy-resources"
 
 	metadataTableName = "test-BlobMetadata"
 	bucketTableName   = "test-BucketStore"
 
-	infraCmdName     = "infra"
-	resourcesCmdName = "resources"
-	expCmdName       = "exp"
-	allCmdName       = "all"
+	chainCmdName      = "chain"
+	localstackCmdName = "localstack"
+	expCmdName        = "exp"
+	allCmdName        = "all"
 )
 
 func main() {
@@ -44,17 +44,22 @@ func main() {
 				Value: "",
 				Usage: "path to the config file",
 			},
+			&cli.StringFlag{
+				Name:  deployResourcesFlagName,
+				Value: "",
+				Usage: "whether to deploy localstack resources",
+			},
 		},
 		Commands: []*cli.Command{
 			{
-				Name:   infraCmdName,
-				Usage:  "deploy the infrastructure (anvil, graph, localstack) for the inabox test",
-				Action: getRunner(infraCmdName),
+				Name:   chainCmdName,
+				Usage:  "deploy the chain infrastructure (anvil, graph) for the inabox test",
+				Action: getRunner(chainCmdName),
 			},
 			{
-				Name:   resourcesCmdName,
-				Usage:  "deploy the AWS resources needed for the inabox test",
-				Action: getRunner(resourcesCmdName),
+				Name:   localstackCmdName,
+				Usage:  "deploy localstack and create the AWS resources needed for the inabox test",
+				Action: getRunner(localstackCmdName),
 			},
 			{
 				Name:   expCmdName,
@@ -78,28 +83,27 @@ func getRunner(command string) func(ctx *cli.Context) error {
 
 	return func(ctx *cli.Context) error {
 
-		rootPath, err := filepath.Abs(ctx.String(rootPathFlagName))
-		if err != nil {
-			return err
-		}
-
-		testname := ctx.String(testNameFlagName)
-
-		if testname == "" {
-			testname, err = deploy.GetLatestTestDirectory(rootPath)
+		var config *deploy.Config
+		if command != localstackCmdName {
+			rootPath, err := filepath.Abs(ctx.String(rootPathFlagName))
 			if err != nil {
 				return err
 			}
+			testname := ctx.String(testNameFlagName)
+			if testname == "" {
+				testname, err = deploy.GetLatestTestDirectory(rootPath)
+				if err != nil {
+					return err
+				}
+			}
+			config = deploy.NewTestConfig(testname, rootPath)
 		}
 
-		config := deploy.NewTestConfig(testname, rootPath)
-
 		switch command {
-		case infraCmdName:
-			_, _, err = infra(ctx, config)
-			return err
-		case resourcesCmdName:
-			return resources(ctx)
+		case chainCmdName:
+			return chainInfra(ctx, config)
+		case localstackCmdName:
+			return localstack(ctx)
 		case expCmdName:
 			config.DeployExperiment()
 		case allCmdName:
@@ -112,9 +116,8 @@ func getRunner(command string) func(ctx *cli.Context) error {
 
 }
 
-func infra(ctx *cli.Context, config *deploy.Config) (*dockertest.Pool, *dockertest.Resource, error) {
+func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 
-	pool, resources, err := deploy.StartDockertestWithLocalstackContainer(ctx.String(localstackFlagName))
 	config.StartAnvil()
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
@@ -122,22 +125,32 @@ func infra(ctx *cli.Context, config *deploy.Config) (*dockertest.Pool, *dockerte
 		config.StartGraphNode()
 	}
 
-	return pool, resources, err
+	return nil
 
 }
 
-func resources(ctx *cli.Context) error {
-	return deploy.DeployResources(nil, ctx.String(localstackFlagName), metadataTableName, bucketTableName)
-}
+func localstack(ctx *cli.Context) error {
 
-func all(ctx *cli.Context, config *deploy.Config) error {
-
-	pool, _, err := infra(ctx, config)
+	pool, _, err := deploy.StartDockertestWithLocalstackContainer(ctx.String(localstackFlagName))
 	if err != nil {
 		return err
 	}
 
-	err = deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName)
+	if ctx.Bool(deployResourcesFlagName) {
+		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName)
+	}
+
+	return nil
+}
+
+func all(ctx *cli.Context, config *deploy.Config) error {
+
+	err := chainInfra(ctx, config)
+	if err != nil {
+		return err
+	}
+
+	err = localstack(ctx)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net"
@@ -81,14 +80,15 @@ func run(ctx *cli.Context) error {
 
 	querier := graphql.NewClient(config.GraphUrl, nil)
 	indexer := thegraph.NewIndexedChainState(cs, querier, logger)
+	metrics := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
-	cn, err := churner.NewChurner(config, indexer, tx, logger)
+	cn, err := churner.NewChurner(config, indexer, tx, logger, metrics)
 	if err != nil {
 		log.Fatalln("cannot create churner", err)
 	}
 
-	churnerServer := churner.NewServer(config, cn, logger)
-	if err = churnerServer.Start(context.Background()); err != nil {
+	churnerServer := churner.NewServer(config, cn, logger, metrics)
+	if err = churnerServer.Start(config.MetricsConfig); err != nil {
 		log.Fatalln("failed to start churner server", err)
 	}
 

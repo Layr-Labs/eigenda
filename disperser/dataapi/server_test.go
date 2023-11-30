@@ -14,10 +14,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
-	"github.com/Layr-Labs/eigenda/disperser/inmem"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
@@ -39,8 +39,9 @@ var (
 	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi)
 	config                 = dataapi.Config{ServerMode: "test", SocketAddr: ":8080"}
 
+	mockTx                          = &coremock.MockTransactor{}
 	mockChainState, _               = coremock.NewChainDataMock(core.OperatorIndex(1))
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
@@ -159,6 +160,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
 	mockSubgraphApi.On("QueryOperators").Return(subgraphOperatorRegistereds, nil)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
@@ -182,8 +184,8 @@ func TestFetchMetricsHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.Throughput)
-	assert.Equal(t, uint64(85144853442), response.CostInWei)
-	assert.Equal(t, uint64(6), response.TotalStake)
+	assert.Equal(t, float64(85.14485344239945), response.CostInGas)
+	assert.Equal(t, uint64(1), response.TotalStake)
 }
 
 func TestFetchMetricsTroughputHandler(t *testing.T) {
