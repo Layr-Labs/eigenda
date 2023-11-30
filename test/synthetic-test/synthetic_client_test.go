@@ -92,7 +92,7 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 	// Initialize your TestClients and other suite fields here
 	clients, err := newTestClients(map[ClientType]*GrpcClient{
 		Disperser: {
-			Hostname: "disperser-goerli.eigenda-testnet.eigenops.xyz",
+			Hostname: "disperser.disperser.svc.cluster.local",
 			GrpcPort: "443",
 			Timeout:  10 * time.Second,
 		},
