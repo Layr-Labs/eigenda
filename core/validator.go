@@ -128,7 +128,6 @@ func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
 }
 
 func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState) error {
-
 	subBatchMap := make(map[EncodingParams]SubBatch)
 
 	for i, blob := range blobs {
@@ -155,18 +154,19 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 				samples := make([]Sample, len(chunks))
 				for ind := range chunks {
 					samples[ind] = Sample{
-						Commitment: blob.BlobHeader.BlobCommitments.Commitment,
-						Chunk:      chunks[ind],
-						EvalIndex:  uint(indices[ind]),
-						BlobIndex:  i,
+						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
+						Chunk:           chunks[ind],
+						AssignmentIndex: uint(indices[ind]),
+						BlobIndex:       i,
 					}
 				}
-
 				// Add into subBatch
 				subBatch, ok := subBatchMap[*params]
 				if !ok {
-					subBatch.Samples = samples
-					subBatch.NumBlobs = 1
+					subBatchMap[*params] = SubBatch{
+						Samples:  samples,
+						NumBlobs: 1,
+					}
 				} else {
 					subBatch.Samples = append(subBatch.Samples, samples...)
 					subBatch.NumBlobs += 1
@@ -175,14 +175,31 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		}
 	}
 
-	// ToDo add parallelization for verification for each subBatch
+	numSubBatch := len(subBatchMap)
+	out := make(chan error, numSubBatch)
 	for params, subBatch := range subBatchMap {
-		err := v.encoder.UniversalVerifyChunks(params, subBatch.Samples, subBatch.NumBlobs)
+		params := params
+		subBatch := subBatch
+		go v.UniversalVerifyWorker(params, &subBatch, out)
+	}
+
+	for i := 0; i < numSubBatch; i++ {
+		err := <-out
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
 
+func (v *chunkValidator) UniversalVerifyWorker(params EncodingParams, subBatch *SubBatch, out chan error) {
+
+	err := v.encoder.UniversalVerifyChunks(params, subBatch.Samples, subBatch.NumBlobs)
+	if err != nil {
+		out <- err
+		return
+	}
+
+	out <- nil
 }

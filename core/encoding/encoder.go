@@ -2,7 +2,6 @@ package encoding
 
 import (
 	"crypto/sha256"
-	"fmt"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
@@ -61,7 +60,6 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 		}
 	}
 	encParams := toEncParams(params)
-	fmt.Println("encParams", encParams)
 
 	enc, err := e.EncoderGroup.GetKzgEncoder(encParams)
 	if err != nil {
@@ -136,7 +134,6 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 // convert struct understandable by the crypto library
 func (e *Encoder) UniversalVerifyChunks(params core.EncodingParams, samplesCore []core.Sample, numBlobs int) error {
 	encParams := toEncParams(params)
-
 	samples := make([]kzgEncoder.Sample, len(samplesCore))
 
 	for i, sc := range samplesCore {
@@ -145,7 +142,7 @@ func (e *Encoder) UniversalVerifyChunks(params core.EncodingParams, samplesCore 
 			Proof:      sc.Chunk.Proof,
 			Row:        sc.BlobIndex,
 			Coeffs:     sc.Chunk.Coeffs,
-			X:          sc.EvalIndex,
+			X:          sc.AssignmentIndex,
 		}
 		samples[i] = sample
 	}

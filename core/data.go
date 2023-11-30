@@ -177,10 +177,10 @@ func (cb Bundles) Size() int64 {
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier
 >>>>>>> organize data struct and add fiat shamir
 type Sample struct {
-	Commitment *Commitment
-	Chunk      *Chunk
-	EvalIndex  ChunkNumber
-	BlobIndex  int
+	Commitment      *Commitment
+	Chunk           *Chunk
+	AssignmentIndex ChunkNumber
+	BlobIndex       int
 }
 
 // SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
