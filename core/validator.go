@@ -33,6 +33,7 @@ func NewChunkValidator(enc Encoder, asgn AssignmentCoordinator, cst ChainState, 
 	}
 }
 
+// preprocessBlob for each Quorum
 func (v *chunkValidator) preprocessBlob(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*Chunk, *Assignment, *EncodingParams, error) {
 	if quorumHeader.AdversaryThreshold >= quorumHeader.QuorumThreshold {
 		return nil, nil, nil, errors.New("invalid header: quorum threshold does not exceed adversary threshold")
@@ -175,12 +176,13 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		}
 	}
 
+	// Parallelize the universal verification for each subBatch
 	numSubBatch := len(subBatchMap)
 	out := make(chan error, numSubBatch)
 	for params, subBatch := range subBatchMap {
 		params := params
 		subBatch := subBatch
-		go v.UniversalVerifyWorker(params, &subBatch, out)
+		go v.universalVerifyWorker(params, &subBatch, out)
 	}
 
 	for i := 0; i < numSubBatch; i++ {
@@ -193,7 +195,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 	return nil
 }
 
-func (v *chunkValidator) UniversalVerifyWorker(params EncodingParams, subBatch *SubBatch, out chan error) {
+func (v *chunkValidator) universalVerifyWorker(params EncodingParams, subBatch *SubBatch, out chan error) {
 
 	err := v.encoder.UniversalVerifyChunks(params, subBatch.Samples, subBatch.NumBlobs)
 	if err != nil {
