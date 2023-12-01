@@ -1,3 +1,6 @@
+//go:build k8s_func_test
+// +build k8s_func_test
+
 package k8s_test
 
 import (
