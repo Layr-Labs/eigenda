@@ -123,11 +123,13 @@ func (e *encodedBlobStore) DeleteEncodingResult(blobKey disperser.BlobKey, quoru
 	defer e.mu.Unlock()
 
 	requestID := getRequestID(blobKey, quorumID)
-	if _, ok := e.encoded[requestID]; !ok {
+	encodedResult, ok := e.encoded[requestID]
+	if !ok {
 		return
 	}
 
 	delete(e.encoded, requestID)
+	e.encodedResultSize -= getChunksSize(encodedResult)
 }
 
 // GetNewAndDeleteStaleEncodingResults returns all the fresh encoded results and deletes all the stale results
