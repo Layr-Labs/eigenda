@@ -177,12 +177,7 @@ func (b *Batcher) Start(ctx context.Context) error {
 func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata) error {
 	var result *multierror.Error
 	for _, metadata := range blobMetadatas {
-		var err error
-		if metadata.NumRetries < b.MaxNumRetriesPerBlob {
-			err = b.Queue.IncrementBlobRetryCount(ctx, metadata)
-		} else {
-			err = b.Queue.MarkBlobFailed(ctx, metadata.GetBlobKey())
-		}
+		err := b.Queue.HandleBlobFailure(ctx, metadata, b.MaxNumRetriesPerBlob)
 		if err != nil {
 			b.logger.Error("HandleSingleBatch: error handling blob failure", "err", err)
 			// Append the error
