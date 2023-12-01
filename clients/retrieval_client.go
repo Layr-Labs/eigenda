@@ -31,6 +31,11 @@ type retrievalClient struct {
 	numConnections        int
 }
 
+type operatorFetchChunkStatusInfo struct {
+	Success             bool
+	IndexedOperatorInfo *core.IndexedOperatorInfo
+}
+
 var _ RetrievalClient = (*retrievalClient)(nil)
 
 func NewRetrievalClient(
@@ -67,6 +72,10 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
 
+	// Track the number of operators that we successfully get chunks from
+	var availableOperatorsCount int
+	operatorFetchChunkStatus := make(map[core.OperatorID]operatorFetchChunkStatusInfo)
+
 	// Get blob header from any operator
 	var blobHeader *core.BlobHeader
 	var proof *merkletree.Proof
@@ -80,11 +89,15 @@ func (r *retrievalClient) RetrieveBlob(
 			continue
 		}
 
+		// Increment Available Operator Count
+		availableOperatorsCount++
+
 		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
 		if err != nil {
 			r.logger.Warn("got invalid blob header, trying different operator", "operator", opInfo.Socket, "err", err)
 			continue
 		}
+
 		proofVerified, err = merkletree.VerifyProofUsing(blobHeaderHash[:], false, proof, [][]byte{batchRoot[:]}, keccak256.New())
 		if err != nil {
 			r.logger.Warn("got invalid blob header proof, trying different operator", "operator", opInfo.Socket, "err", err)
@@ -118,6 +131,9 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, fmt.Errorf("failed to get assignments")
 	}
 
+	// Log Count of Available Operators
+	r.logger.Info("Available Operators", availableOperatorsCount, "from Total Opeartors", len(operators))
+
 	// Fetch chunks from all operators
 	chunksChan := make(chan RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
@@ -136,8 +152,14 @@ func (r *retrievalClient) RetrieveBlob(
 	for i := 0; i < len(operators); i++ {
 		reply := <-chunksChan
 		if reply.Err != nil {
+			// Set Operator Fetch Chunk Status to false
+			operatorFetchChunkStatus[reply.OperatorID] = operatorFetchChunkStatusInfo{
+				Success:             false,
+				IndexedOperatorInfo: indexedOperatorState.IndexedOperators[reply.OperatorID],
+			}
 			continue
 		}
+
 		assignment, ok := assignements[reply.OperatorID]
 		if !ok {
 			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
@@ -155,6 +177,13 @@ func (r *retrievalClient) RetrieveBlob(
 	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
 	if err != nil {
 		return nil, err
+	}
+
+	// Log Operator Fetch Chunk Status
+	for _, statusInfo := range operatorFetchChunkStatus {
+		if !statusInfo.Success {
+			r.logger.Warn("Failed to receive chunks from operator", statusInfo.IndexedOperatorInfo)
+		}
 	}
 
 	return r.encoder.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
