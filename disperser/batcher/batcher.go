@@ -92,7 +92,7 @@ func NewBatcher(
 ) (*Batcher, error) {
 	batchTrigger := NewEncodedSizeNotifier(
 		make(chan struct{}, 1),
-		config.BatchSizeMBLimit*1024*1024, // convert to bytes
+		uint64(config.BatchSizeMBLimit)*1024*1024, // convert to bytes
 	)
 	streamerConfig := StreamerConfig{
 		SRSOrder:               config.SRSOrder,
@@ -100,7 +100,7 @@ func NewBatcher(
 		EncodingQueueLimit:     config.EncodingRequestQueueSize,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
-	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, logger)
+	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
 	if err != nil {
 		return nil, err
 	}
