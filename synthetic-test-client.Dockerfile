@@ -7,7 +7,10 @@ COPY ./test/synthetic-test /app
 COPY go.mod /app
 COPY go.sum /app
 COPY api /app/api
+COPY clients /app/clients
+COPY node /app/node
 COPY common /app/common
+COPY churner /app/churner
 COPY core /app/core
 COPY indexer /app/indexer
 COPY contracts /app/contracts
