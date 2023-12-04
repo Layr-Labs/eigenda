@@ -98,19 +98,8 @@ func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
 	return opts, nil
 }
 
-// UpdateGas returns an otherwise identical txn to the one provided but with updated
-// gas prices sampled from the existing network conditions and an accurate gasLimit.
-// Note that this method does not publish the transaction.
-//
-// Note: tx must be a to a contract, not an EOA
-//
-// Slightly modified from: https://github.com/ethereum-optimism/optimism/blob/ec266098641820c50c39c31048aa4e953bece464/batch-submitter/drivers/sequencer/driver.go#L314
-func (c *EthClient) UpdateGas(
-	ctx context.Context,
-	tx *types.Transaction,
-	value *big.Int,
-) (*types.Transaction, error) {
-	gasTipCap, err := c.SuggestGasTipCap(ctx)
+func (c *EthClient) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
+	gasTipCap, err = c.SuggestGasTipCap(ctx)
 	if err != nil {
 		// If the transaction failed because the backend does not support
 		// eth_maxPriorityFeePerGas, fallback to using the default constant.
@@ -132,14 +121,13 @@ func (c *EthClient) UpdateGas(
 
 	header, err := c.HeaderByNumber(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	gasFeeCap := getGasFeeCap(gasTipCap, header.BaseFee)
+	gasFeeCap = getGasFeeCap(gasTipCap, header.BaseFee)
+	return
+}
 
-	// The estimated gas limits performed by RawTransact fail semi-regularly
-	// with out of gas exceptions. To remedy this we extract the internal calls
-	// to perform gas price/gas limit estimation here and add a buffer to
-	// account for any network variability.
+func (c *EthClient) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
 	gasLimit, err := c.Client.EstimateGas(ctx, ethereum.CallMsg{
 		From:      c.AccountAddress,
 		To:        tx.To(),
@@ -172,13 +160,10 @@ func (c *EthClient) UpdateGas(
 		// cache the contract for later use
 		c.Contracts[*tx.To()] = contract
 	}
-
 	return contract.RawTransact(opts, tx.Data())
 }
 
-// EstimateGasPriceAndLimitAndSendTx sends and returns an otherwise identical txn
-// to the one provided but with updated gas prices sampled from the existing network
-// conditions and an accurate gasLimit
+// EstimateGasPriceAndLimitAndSendTx sends and returns a transaction receipt.
 //
 // Note: tx must be a to a contract, not an EOA
 func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
@@ -187,10 +172,16 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 	tag string,
 	value *big.Int,
 ) (*types.Receipt, error) {
-	tx, err := c.UpdateGas(ctx, tx, value)
+	gasTipCap, gasFeeCap, err := c.GetLatestGasCaps(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("EstimateGasPriceAndLimitAndSendTx: failed to get gas price for txn (%s): %w", tag, err)
+	}
+
+	tx, err = c.UpdateGas(ctx, tx, value, gasTipCap, gasFeeCap)
 	if err != nil {
 		return nil, fmt.Errorf("EstimateGasPriceAndLimitAndSendTx: failed to update gas for txn (%s): %w", tag, err)
 	}
+
 	err = c.SendTransaction(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("EstimateGasPriceAndLimitAndSendTx: failed to send txn (%s): %w", tag, err)
