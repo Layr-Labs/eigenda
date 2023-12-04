@@ -408,9 +408,10 @@ func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []
 	return state, nil
 }
 
-// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
+// BuildConfirmBatchTxn builds a transaction to confirm a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
 // specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
-func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation core.SignatureAggregation) (*types.Receipt, error) {
+// Note that this function returns a transaction without publishing it to the blockchain. The caller is responsible for publishing the transaction.
+func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation core.SignatureAggregation) (*types.Transaction, error) {
 	quorumNumbers := quorumParamsToQuorumNumbers(quorums)
 	nonSignerOperatorIds := make([][32]byte, len(signatureAggregation.NonSigners))
 	for i := range signatureAggregation.NonSigners {
@@ -470,9 +471,15 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 		t.Logger.Error("Failed to generate transact opts", "err", err)
 		return nil, err
 	}
-	tx, err := t.Bindings.EigenDAServiceManager.ConfirmBatch(opts, batchH, signatureChecker)
+	return t.Bindings.EigenDAServiceManager.ConfirmBatch(opts, batchH, signatureChecker)
+}
+
+// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
+// specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
+func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation core.SignatureAggregation) (*types.Receipt, error) {
+	tx, err := t.BuildConfirmBatchTxn(ctx, batchHeader, quorums, signatureAggregation)
 	if err != nil {
-		t.Logger.Error("Failed to confirm batch", "err", err)
+		t.Logger.Error("Failed to build a ConfirmBatch txn", "err", err)
 		return nil, err
 	}
 

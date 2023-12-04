@@ -17,6 +17,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func mineAnvilBlocks(numBlocks int) {
+	for i := 0; i < numBlocks; i++ {
+		err := rpcClient.CallContext(context.Background(), nil, "evm_mine")
+		Expect(err).To(BeNil())
+	}
+}
+
 var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
@@ -27,7 +34,12 @@ var _ = Describe("Inabox Integration", func() {
 		optsWithValue.Value = big.NewInt(1e18)
 		tx, err := mockRollup.RegisterValidator(optsWithValue)
 		Expect(err).To(BeNil())
-		_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "RegisterValidator", big.NewInt(1e18))
+		tx, err = ethClient.UpdateGas(ctx, tx, optsWithValue.Value)
+		Expect(err).To(BeNil())
+		err = ethClient.SendTransaction(ctx, tx)
+		Expect(err).To(BeNil())
+		mineAnvilBlocks(numConfirmations + 1)
+		_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "RegisterValidator")
 		Expect(err).To(BeNil())
 
 		disp := traffic.NewDisperserClient(&traffic.Config{
@@ -79,9 +91,16 @@ var _ = Describe("Inabox Integration", func() {
 					Expect(err).To(BeNil())
 					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
 					Expect(err).To(BeNil())
-					_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "PostCommitment", nil)
+					tx, err = ethClient.UpdateGas(ctx, tx, nil)
+					Expect(err).To(BeNil())
+					err = ethClient.SendTransaction(ctx, tx)
+					Expect(err).To(BeNil())
+					mineAnvilBlocks(numConfirmations + 1)
+					_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
 					Expect(err).To(BeNil())
 					break loop
+				} else {
+					mineAnvilBlocks(numConfirmations + 1)
 				}
 			}
 		}
@@ -97,7 +116,7 @@ var _ = Describe("Inabox Integration", func() {
 			0,
 		)
 		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(data))
+		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 	})
 })
 

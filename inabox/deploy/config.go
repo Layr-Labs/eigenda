@@ -171,6 +171,7 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 		DISPERSER_SERVER_METRICS_HTTP_PORT:      "9093",
 		DISPERSER_SERVER_CHAIN_RPC:              "",
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
+		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
 
 		DISPERSER_SERVER_REGISTERED_QUORUM_ID:       "0",
 		DISPERSER_SERVER_TOTAL_UNAUTH_THROUGHPUT:    "10000000",
@@ -217,6 +218,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_AWS_ENDPOINT_URL:            "",
 		BATCHER_FINALIZER_INTERVAL:          "6m",
 		BATCHER_ENCODING_REQUEST_QUEUE_SIZE: "500",
+		BATCHER_NUM_CONFIRMATIONS:           "0",
 	}
 
 	env.applyDefaults(&v, "BATCHER", "batcher", ind)
@@ -301,6 +303,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_NUM_BATCH_VALIDATORS:        "128",
 		NODE_PUBLIC_IP_PROVIDER:          "mockip",
 		NODE_PUBLIC_IP_CHECK_INTERVAL:    "10s",
+		NODE_NUM_CONFIRMATIONS:           "0",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
