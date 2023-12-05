@@ -27,7 +27,7 @@ we need to be able to reconstruct from $U_q \setminus U_a$.
 The guarantee is upheld by two smaller modules of encoding and assignment.
 
 #### Encoding
-Encoding is used to take a data blob and transform it into an extended representation consisting of a collection of chunks, such that the original blob can be reconstructed from any sufficiently large group of chunks. This must be done in a verifiable manner so that the agent performing the encoding does need not to be a trusted actor. See [Encoding](./encoding.md) for details and validation actions.
+Encoding is used to take a data blob and transform it into an extended representation consisting of a collection of chunks, such that the original blob can be reconstructed from any sufficiently large group of chunks. This must be done in a verifiable manner so that the agent performing the encoding does not need to be a trusted actor. See [Encoding](./encoding.md) for details and validation actions.
 
 #### Assignment
 The acceptance guarantee is only satisfied when chunks are properly assigned to DA nodes in proportion to the amount of stake held by the DA nodes within the required quorums. See [Assignment](./assignment.md) for details and validation actions.
