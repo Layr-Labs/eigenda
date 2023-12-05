@@ -21,7 +21,7 @@ When making state claims, validators of the optimistic rollup should resubmit th
 
 ### Revealing Data Onchain during Fraud Proofs (Optimistic rollups)
 
-To keep the interface between EIP-4844 and EigenDA the same, optimistic rollups need to reveal data onchain against the commitment to their own data instead of the concatenated data of all of the `BlobStoreRequests` in the batch. To prove the rollups own data commitment against the batched (concatenated) commitment the was posted onchain in the dataStore header, rollups generate the following proof.
+To keep the interface between EIP-4844 and EigenDA the same, optimistic rollups need to reveal data onchain against the commitment to their own data instead of the concatenated data of all of the `BlobStoreRequests` in the batch. To prove the rollups own data commitment against the batched (concatenated) commitment that was posted onchain in the dataStore header, rollups generate the following proof.
 
 A challenger retrieves the data corresponding to the KZG commitment pointed to by validators of their rollup and parses their rollup's data from the claimed start and end degree. They then prove to a smart contract the commitment to the rollups data, along with their fraud proof, via the [subcommitment proofs](#subcommitment-proof). Note that the rollup's smart contract will implement the verifier described in the proof.
 

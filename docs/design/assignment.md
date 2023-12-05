@@ -116,7 +116,7 @@ We can therefore satisfy requirement 2 by letting $\rho=1$.
 
 ### Assessment of coding complexity
 
-It turns out that to meet the desired requirements, we do not need to increase the encoding complexity (i.e. decrease chunk size) compared to the default case. Increase in the total number of chunks due to the `ceil()` function can be handled by increasing the number of parity symbols. 
+It turns out that to meet the desired requirements, we do not need to increase the encoding complexity (i.e. decrease chunk size) compared to the default case. An increase in the total number of chunks due to the `ceil()` function can be handled by increasing the number of parity symbols. 
 
 Moreover, the optimization routing described for finding $m$ will serve only to improve beyond the baseline (lower bound), which already achieves desired performance. 
 

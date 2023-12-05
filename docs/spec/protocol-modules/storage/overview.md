@@ -7,7 +7,7 @@ Within the modular structure of the EigenDA protocol, when we consider "storage,
 >> When the minimal adversarial threshold assumptions of a blob are met for any quorum, then on-chain acceptance of a blob implies a full blob is held by honest DA nodes of that quorum for the designated period.
 
 We can further break this guarantee into two parts:
-1. Acceptance guarantee: When sufficient portion of stake is held by honest DA nodes of a given quorum, then off-chain acceptance implies that a full blob was transferred to the honest DA nodes of that quorum.
+1. Acceptance guarantee: When a sufficient portion of stake is held by honest DA nodes of a given quorum, then off-chain acceptance implies that a full blob was transferred to the honest DA nodes of that quorum.
 2. Storage guarantee: When honest nodes receive data that is accepted on-chain, they will store it for the designated period.
 
 ## Acceptance Guarantee
@@ -27,7 +27,7 @@ we need to be able to reconstruct from $U_q \setminus U_a$.
 The guarantee is upheld by two smaller modules of encoding and assignment.
 
 #### Encoding
-Encoding is used to take a data blob and transform it into an extended representation consisting of a collection of chunks, such that the original blob can be reconstructed from any sufficiently large group of chunks. This must be done in a verifiable manner so that the agent performing the encoding need not be a trusted actor. See [Encoding](./encoding.md) for details and validation actions.
+Encoding is used to take a data blob and transform it into an extended representation consisting of a collection of chunks, such that the original blob can be reconstructed from any sufficiently large group of chunks. This must be done in a verifiable manner so that the agent performing the encoding does not need to be a trusted actor. See [Encoding](./encoding.md) for details and validation actions.
 
 #### Assignment
 The acceptance guarantee is only satisfied when chunks are properly assigned to DA nodes in proportion to the amount of stake held by the DA nodes within the required quorums. See [Assignment](./assignment.md) for details and validation actions.
