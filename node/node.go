@@ -429,13 +429,3 @@ func buildSdkClients(config *Config, logger common.Logger) (*constructor.Clients
 	sdkClients.PrometheusRegistry.MustRegister(economicMetricsCollector)
 	return sdkClients, nil
 }
-
-//func (n *Node) validateBlob(ctx context.Context, blob *core.BlobMessage, operatorState *core.OperatorState, out chan error) {
-//	err := n.Validator.ValidateBlob(blob, operatorState)
-//	if err != nil {
-//		out <- err
-//		return
-//	}
-
-//	out <- nil
-//}
