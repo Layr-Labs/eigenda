@@ -39,6 +39,3 @@ We welcome all contributions! There are many ways to contribute to the project, 
 - [EigenLayer/EigenDA forum](https://forum.eigenlayer.xyz/c/eigenda/9)
 - [Email](mailto:eigenda-support@eigenlabs.org)
 - [Follow us on Twitter](https://twitter.com/eigenlayer)
-
-## Acknowledgement
-Cryptographic library inside pkg/kzg are copied from https://github.com/protolambda/go-kzg. All functions will be replaced by our own implementation in the future.

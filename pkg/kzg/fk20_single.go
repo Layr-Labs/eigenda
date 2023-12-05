@@ -1,3 +1,5 @@
+// This code is sourced from the go-kzg Repository by protolambda.
+// Original code: https://github.com/protolambda/go-kzg
 // MIT License
 //
 // Copyright (c) 2020 @protolambda
