@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -23,8 +22,8 @@ var _ = Describe("Inabox Integration", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 		defer cancel()
 
-		optsWithValue := new(bind.TransactOpts)
-		*optsWithValue = *ethClient.GetNoSendTransactOpts()
+		optsWithValue, err := ethClient.GetNoSendTransactOpts()
+		Expect(err).To(BeNil())
 		optsWithValue.Value = big.NewInt(1e18)
 		tx, err := mockRollup.RegisterValidator(optsWithValue)
 		Expect(err).To(BeNil())
@@ -76,7 +75,9 @@ var _ = Describe("Inabox Integration", func() {
 				if *blobStatus == disperser.Confirmed {
 					blobHeader := blobHeaderFromProto(reply.GetInfo().GetBlobHeader())
 					verificationProof := blobVerificationProofFromProto(reply.GetInfo().GetBlobVerificationProof())
-					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof)
+					opts, err := ethClient.GetNoSendTransactOpts()
+					Expect(err).To(BeNil())
+					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
 					Expect(err).To(BeNil())
 					_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "PostCommitment", nil)
 					Expect(err).To(BeNil())

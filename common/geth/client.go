@@ -25,12 +25,12 @@ var (
 
 type EthClient struct {
 	*ethclient.Client
-	RPCURL             string
-	privateKey         *ecdsa.PrivateKey
-	AccountAddress     gethcommon.Address
-	NoSendTransactOpts *bind.TransactOpts
-	Contracts          map[gethcommon.Address]*bind.BoundContract
-	Logger             common.Logger
+	RPCURL         string
+	privateKey     *ecdsa.PrivateKey
+	chainID        *big.Int
+	AccountAddress gethcommon.Address
+	Contracts      map[gethcommon.Address]*bind.BoundContract
+	Logger         common.Logger
 }
 
 var _ common.EthClient = (*EthClient)(nil)
@@ -42,7 +42,6 @@ func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error)
 	}
 	var accountAddress gethcommon.Address
 	var privateKey *ecdsa.PrivateKey
-	var opts *bind.TransactOpts
 
 	if len(config.PrivateKeyString) != 0 {
 		privateKey, err = crypto.HexToECDSA(config.PrivateKeyString)
@@ -57,30 +56,22 @@ func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error)
 			return nil, ErrCannotGetECDSAPubKey
 		}
 		accountAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+	}
 
-		chainIDBigInt, err := chainClient.ChainID(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("NewClient: cannot get chainId: %w", err)
-		}
-
-		// generate and memoize NoSendTransactOpts
-		opts, err = bind.NewKeyedTransactorWithChainID(privateKey, chainIDBigInt)
-		if err != nil {
-			return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
-		}
-		opts.NoSend = true
+	chainIDBigInt, err := chainClient.ChainID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("NewClient: cannot get chainId: %w", err)
 	}
 
 	c := &EthClient{
 		RPCURL:         config.RPCURL,
 		privateKey:     privateKey,
+		chainID:        chainIDBigInt,
 		AccountAddress: accountAddress,
 		Client:         chainClient,
 		Contracts:      make(map[gethcommon.Address]*bind.BoundContract),
 		Logger:         logger,
 	}
-
-	c.NoSendTransactOpts = opts
 
 	return c, err
 }
@@ -94,8 +85,14 @@ func (c *EthClient) GetAccountAddress() gethcommon.Address {
 	return c.AccountAddress
 }
 
-func (c *EthClient) GetNoSendTransactOpts() *bind.TransactOpts {
-	return c.NoSendTransactOpts
+func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
+	opts, err := bind.NewKeyedTransactorWithChainID(c.privateKey, c.chainID)
+	if err != nil {
+		return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
+	}
+	opts.NoSend = true
+
+	return opts, nil
 }
 
 // UpdateGas returns an otherwise identical txn to the one provided but with updated
@@ -153,8 +150,10 @@ func (c *EthClient) UpdateGas(
 		return nil, err
 	}
 
-	opts := new(bind.TransactOpts)
-	*opts = *c.NoSendTransactOpts
+	opts, err := c.GetNoSendTransactOpts()
+	if err != nil {
+		return nil, err
+	}
 	opts.Context = ctx
 	opts.Nonce = new(big.Int).SetUint64(tx.Nonce())
 	opts.GasTipCap = gasTipCap
