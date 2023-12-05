@@ -129,9 +129,9 @@ func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
 }
 
 func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState) error {
-	subBatchMap := make(map[EncodingParams]SubBatch)
+	subBatchMap := make(map[EncodingParams]*SubBatch)
 
-	for i, blob := range blobs {
+	for _, blob := range blobs {
 		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
 			return errors.New("number of bundles does not match number of quorums")
 		}
@@ -151,6 +151,12 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 				return err
 			} else {
 				// Check the received chunks against the commitment
+				blobIndex := 0
+				subBatch, ok := subBatchMap[*params]
+				if ok {
+					blobIndex = subBatch.NumBlobs
+				}
+
 				indices := assignment.GetIndices()
 				samples := make([]Sample, len(chunks))
 				for ind := range chunks {
@@ -158,13 +164,13 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 						Chunk:           chunks[ind],
 						AssignmentIndex: uint(indices[ind]),
-						BlobIndex:       i,
+						BlobIndex:       blobIndex,
 					}
 				}
-				// Add into subBatch
-				subBatch, ok := subBatchMap[*params]
+
+				// update subBatch
 				if !ok {
-					subBatchMap[*params] = SubBatch{
+					subBatchMap[*params] = &SubBatch{
 						Samples:  samples,
 						NumBlobs: 1,
 					}
@@ -182,7 +188,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 	for params, subBatch := range subBatchMap {
 		params := params
 		subBatch := subBatch
-		go v.universalVerifyWorker(params, &subBatch, out)
+		go v.universalVerifyWorker(params, subBatch, out)
 	}
 
 	for i := 0; i < numSubBatch; i++ {

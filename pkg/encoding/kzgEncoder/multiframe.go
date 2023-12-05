@@ -56,6 +56,14 @@ func GenRandomness(params rs.EncodingParams, samples []Sample, m int) (bls.Fr, e
 // m is number of blob, samples is a list of chunks
 // Inside the code, ft stands for first term; st for the second term; tt for the third term
 func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
+	// precheck
+	for i, s := range samples {
+		if s.Row >= m {
+			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.Row, m)
+			return errors.New("sample.Row and numBlob is inconsistend")
+		}
+	}
+
 	verifier, _ := group.GetKzgVerifier(params)
 	ks := verifier.Ks
 
