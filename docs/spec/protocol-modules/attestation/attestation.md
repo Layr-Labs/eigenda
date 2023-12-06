@@ -21,7 +21,7 @@ This document discusses how these properties are achieved by the attestation pro
 
 ### Sufficient stake checking
 
-The [BLSRegistry.sol](../contracts-registry.md) maintains the `pubkeyToStakeHistory` and `pubKeyToIndexHistory` storage variables, which allow for the the current stake and index of each operator to be retrieved for an arbitrary block number. These variables are updated whenever DA nodes register or deregister.
+The [BLSRegistry.sol](../contracts-registry.md) maintains the `pubkeyToStakeHistory` and `pubKeyToIndexHistory` storage variables, which allow for the current stake and index of each operator to be retrieved for an arbitrary block number. These variables are updated whenever DA nodes register or deregister.
 
 TODO: Describe quorum storage variables.
 
