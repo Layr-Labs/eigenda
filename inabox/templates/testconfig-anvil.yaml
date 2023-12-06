@@ -35,11 +35,11 @@ services:
       TIMEOUT: 20s
       CHAIN_RPC: http://localhost:8547
       CHAIN_ID: 40525
-      G1_PATH: resources/kzg/g1.point
-      G2_PATH: resources/kzg/g2.point
+      G1_PATH: resources/kzg/g1.point.300000
+      G2_PATH: resources/kzg/g2.point.300000
       CACHE_PATH: resources/kzg/SRSTables
-      SRS_ORDER: 3000
-      CHALLENGE_ORDER: 3000
+      SRS_ORDER: 300000
+      CHALLENGE_ORDER: 300000
       STD_LOG_LEVEL: "trace"
       FILE_LOG_LEVEL: "trace"
       VERBOSE: true
