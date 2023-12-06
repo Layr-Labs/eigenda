@@ -193,7 +193,7 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 func TestCoreLibrary(t *testing.T) {
 
 	numBlob := 1 // must be greater than 0
-	blobLengths := []int{1, 100, 1000}
+	blobLengths := []int{1, 64, 1000}
 	quantizationFactors := []uint{1, 10}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
