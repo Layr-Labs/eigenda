@@ -49,6 +49,16 @@ function start_trap {
         pid="$!"
         pids="$pids $pid"
     done
+
+    for FILE in $(ls $testpath/envs/ret*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../retriever/bin/server &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
     
     files=($(ls $testpath/envs/opr*.env))
     last_index=$(( ${#files[@]} - 1 ))
