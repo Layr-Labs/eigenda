@@ -67,6 +67,9 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
 
+	// Track the number of operators that we successfully get chunks from
+	availableOperators := make(map[core.OperatorID]bool)
+
 	// Get blob header from any operator
 	var blobHeader *core.BlobHeader
 	var proof *merkletree.Proof
@@ -79,6 +82,8 @@ func (r *retrievalClient) RetrieveBlob(
 			r.logger.Warn("failed to dial operator while fetching BlobHeader, trying different operator", "operator", opInfo.Socket, "err", err)
 			continue
 		}
+		// Set Operator as available
+		availableOperators[opID] = true
 
 		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
 		if err != nil {
@@ -123,6 +128,7 @@ func (r *retrievalClient) RetrieveBlob(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments")
 	}
+	r.logger.Info("Available Operators", len(availableOperators), "from Total Opeartors", len(operators))
 
 	// Fetch chunks from all operators
 	chunksChan := make(chan RetrievedChunks, len(operators))
@@ -161,6 +167,7 @@ func (r *retrievalClient) RetrieveBlob(
 		reply := <-chunksChan
 		if reply.Err != nil {
 			r.logger.Error("failed to get chunks from operator", "operator", reply.OperatorID, "err", reply.Err)
+			availableOperators[reply.OperatorID] = false
 			continue
 		}
 		assignment, ok := assignements[reply.OperatorID]
@@ -178,6 +185,13 @@ func (r *retrievalClient) RetrieveBlob(
 
 		chunks = append(chunks, reply.Chunks...)
 		indices = append(indices, assignment.GetIndices()...)
+	}
+
+	// Log the operators that we failed to get chunks from AvailableOperators
+	for opID, status := range availableOperators {
+		if !status {
+			r.logger.Warn("Failed To Retrieve Chunk from one of the available Operators", "operatorId", opID)
+		}
 	}
 
 	return r.encoder.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
