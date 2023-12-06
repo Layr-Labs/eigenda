@@ -138,9 +138,10 @@ func setup(t *testing.T) {
 		SecurityParam: core.SecurityParam{
 			QuorumID:           quorumID,
 			AdversaryThreshold: adversaryThreshold,
+			QuorumThreshold:    quorumThreshold,
 		},
 		QuantizationFactor: quantizationFactor,
-		EncodedBlobLength:  quantizationFactor * chunkLength * numOperators,
+		EncodedBlobLength:  quantizationFactor * params.ChunkLength * numOperators,
 	}
 
 	blobHeader = &core.BlobHeader{

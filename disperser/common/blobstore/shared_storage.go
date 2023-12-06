@@ -216,6 +216,14 @@ func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey dispe
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
 }
 
+func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) error {
+	if metadata.NumRetries < maxRetry {
+		return s.IncrementBlobRetryCount(ctx, metadata)
+	} else {
+		return s.MarkBlobFailed(ctx, metadata.GetBlobKey())
+	}
+}
+
 func getMetadataHash(requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {
 	var str string
 	str = fmt.Sprintf("%d/", requestedAt)

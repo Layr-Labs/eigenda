@@ -144,8 +144,6 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	}
 
 	cs := eth.NewChainState(tx, client)
-	// querier := graphql.NewClient(testConfig.Churner.CHURNER_GRAPH_URL, nil)
-	// ics := thegraph.NewIndexedChainState(cs, querier, logger)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
@@ -166,12 +164,6 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-
-	// cs := eth.NewChainState(tx, gethClient)
-	// rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURL)
-	// if err != nil {
-	// 	log.Fatalln("could not start tcp listener", err)
-	// }
 
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 
