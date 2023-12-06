@@ -21,31 +21,26 @@ type Sample struct {
 }
 
 // generate a random value using Fiat Shamir transform
+// we can also pseudo randomness generated locally, but we have to ensure no adv can manipulate it
+// Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
 func GenRandomness(params rs.EncodingParams, samples []Sample, m int) (bls.Fr, error) {
-
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(samples)
-	if err != nil {
-		return bls.ZERO, err
-	}
 
-	err = enc.Encode(params)
-	if err != nil {
-		return bls.ZERO, err
-	}
-
-	err = enc.Encode(m)
-	if err != nil {
-		return bls.ZERO, err
+	for _, sample := range samples {
+		err := enc.Encode(sample.Commitment)
+		if err != nil {
+			return bls.ZERO, err
+		}
 	}
 
 	var randomFr bls.Fr
 
-	err = bls.HashToSingleField(&randomFr, buffer.Bytes())
+	err := bls.HashToSingleField(&randomFr, buffer.Bytes())
 	if err != nil {
 		return bls.ZERO, err
 	}
+
 	return randomFr, nil
 }
 

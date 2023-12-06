@@ -77,7 +77,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			aggPubKey.Add(d.KeyPairs[ind].GetPubKeyG1())
 		}
 
-		stake := ind + 1
+		stake := ind*ind*6 + 32
 		host := "0.0.0.0"
 		dispersalPort := fmt.Sprintf("3%03v", int(2*ind))
 		retrievalPort := fmt.Sprintf("3%03v", int(2*ind+1))

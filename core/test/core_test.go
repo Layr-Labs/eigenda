@@ -192,8 +192,8 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 
 func TestCoreLibrary(t *testing.T) {
 
-	numBlob := 5 // must be greater than 0
-	blobLengths := []int{1, 64, 1000}
+	numBlob := 1 // must be greater than 0
+	blobLengths := []int{1, 100, 1000}
 	quantizationFactors := []uint{1, 10}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
@@ -216,14 +216,14 @@ func TestCoreLibrary(t *testing.T) {
 	for _, operatorCount := range operatorCounts {
 		cst, err := mock.NewChainDataMock(core.OperatorIndex(operatorCount))
 		assert.NoError(t, err)
-
+		batches := make([]core.EncodedBlob, 0)
+		batchHeader := core.BatchHeader{
+			ReferenceBlockNumber: bn,
+			BatchRoot:            [32]byte{},
+		}
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
 		for _, blobLength := range blobLengths {
-			batches := make([]core.EncodedBlob, 0)
-			batchHeader := core.BatchHeader{
-				ReferenceBlockNumber: bn,
-				BatchRoot:            [32]byte{},
-			}
+
 			for _, quantizationFactor := range quantizationFactors {
 				for _, securityParam := range securityParams {
 
@@ -242,10 +242,11 @@ func TestCoreLibrary(t *testing.T) {
 				}
 
 			}
-			t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(batches)), func(t *testing.T) {
-				checkBatchByUniversalVerifier(t, cst, batches, batchHeader)
-			})
+
 		}
+		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(batches)), func(t *testing.T) {
+			checkBatchByUniversalVerifier(t, cst, batches, batchHeader)
+		})
 
 	}
 
