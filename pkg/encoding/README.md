@@ -5,4 +5,4 @@
 
 - is built upon crypto primitive from https://pkg.go.dev/github.com/protolambda/go-kzg
 
-- accepts arbitrary number of systematic nodes, parity nodes and data size, free of restricton on power of 2
+- accepts arbitrary number of systematic nodes, parity nodes and data size, free of restriction on power of 2
