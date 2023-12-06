@@ -7,7 +7,7 @@ The overall security guarantee provided by EigenDA is actually a composite of ma
 The main guarantee supported by the attestation module concerns the on-chain conditions under which a batch is able to be confirmed by the EigenDA smart contracts. In particular, the attestation module is responsible for upholding the following guarantee:
 - Sufficient stake checking: A blob is only accepted on-chain when signatures from operators having sufficient stake on each quorum are presented. 
 
-The Attestation module is largely implemented by the EigenDA smart contracts via bookkeeping of stake and associated checks performed at the batch confirmation phase of the [Disperal Flow](../flows/dispersal.md). For more details, see the [Attestation module documentation](./attestation/attestation.md.md)
+The Attestation module is largely implemented by the EigenDA smart contracts via bookkeeping of stake and associated checks performed at the batch confirmation phase of the [Disperal Flow](../flows/dispersal.md). For more details, see the [Attestation module documentation](./attestation/attestation.md)
 
 ## Storage
 The main guarantee supported by the storage module concerns the off-chain conditions which mirror the on-chain conditions of the storage module. In particular, the storage module is responsible for upholding the following guarantee:
@@ -20,4 +20,4 @@ The Storage module is largely implemented by the DA nodes, with an untrusted sup
 The main guarantee supported by the retrieval module concerns the retrievability of stored blob data by honest consumers of that data. In particular, the retrieval module is responsible for upholding the following guarantee:
 - TODO: Articulate the retrieval guarantee that we support. 
 
-For more details, see the [Retrieval module documentation](.retrieval/retrieval.md)
+For more details, see the [Retrieval module documentation](./retrieval/retrieval.md)
