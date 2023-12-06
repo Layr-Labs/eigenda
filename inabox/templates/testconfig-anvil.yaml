@@ -4,7 +4,7 @@ environment:
 
 deployers:
 - name: "default"
-  rpc: http://localhost:8545
+  rpc: http://localhost:8547
   verifyContracts: false
   verifierUrl: http://localhost:4000/api
   deploySubgraphs: true
@@ -33,7 +33,7 @@ services:
     globals:
       HOSTNAME: localhost
       TIMEOUT: 20s
-      CHAIN_RPC: http://localhost:8545
+      CHAIN_RPC: http://localhost:8547
       CHAIN_ID: 40525
       G1_PATH: resources/kzg/g1.point
       G2_PATH: resources/kzg/g2.point

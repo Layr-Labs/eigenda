@@ -197,12 +197,11 @@ function stop_detached {
 function start_anvil {
 
     echo "Starting anvil server ....."
-    anvil --host 0.0.0.0 > /dev/null & 
+    anvil --host 0.0.0.0 --port 8547 > /dev/null &
     anvil_pid=$! 
-    echo "Anvil server started ....."
+    ./wait-for localhost:8547 -- echo "Anvil up"
 
     echo $anvil_pid > ./anvil.pid
-
 }
 
 function stop_anvil {

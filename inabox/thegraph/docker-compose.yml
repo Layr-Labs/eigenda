@@ -20,7 +20,7 @@ services:
       postgres_pass: let-me-in
       postgres_db: graph-node
       ipfs: 'ipfs:5001'
-      ethereum: 'devnet:http://host.docker.internal:8545'
+      ethereum: 'devnet:http://host.docker.internal:8547'
       GRAPH_LOG: info
 
   ipfs:
