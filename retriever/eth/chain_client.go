@@ -3,6 +3,7 @@ package eth
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -43,7 +44,7 @@ func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddres
 		return nil, err
 	}
 	if len(logs) == 0 {
-		return nil, fmt.Errorf("could not find confirmBatch events for batch header %s", string(batchHeaderHash))
+		return nil, fmt.Errorf("could not find confirmBatch events for batch header %s", hex.EncodeToString(batchHeaderHash))
 	}
 
 	if len(logs) > 1 {

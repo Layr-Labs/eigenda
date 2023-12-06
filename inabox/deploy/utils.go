@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -103,17 +104,12 @@ func execYarnCmd(command string) {
 
 	cmd := exec.Command("yarn", command)
 
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
 		log.Panicf("Failed to execute yarn command (%s). Err: %s", command, err)
-	} else {
-		log.Print(out.String())
 	}
 
 	log.Print("yarn command ran succesfully")
@@ -154,17 +150,12 @@ func execForgeScript(script, privateKey string, deployer *ContractDeployer, extr
 		cmd = exec.Command("forge", args...)
 	}
 
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stdin
 
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
 		log.Panicf("Failed to execute forge script. Err: %s", err)
-	} else {
-		log.Print(out.String())
 	}
 
 	log.Print("Forge script ran succesfully!")
@@ -301,16 +292,19 @@ func execCmd(name string, args []string, envVars []string) error {
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, envVars...)
 	}
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	// TODO: When these are uncommented, the deployer sometimes fails to start anvil
-	// cmd.Stdout = &out
-	// cmd.Stderr = &stderr
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("%s: %s", err.Error(), stderr.String())
+		return err
 	}
-	fmt.Print(out.String())
 	return nil
+}
+
+func removeANSIColorCodes(input []byte) []byte {
+	// Regular expression to match ANSI escape codes
+	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	return re.ReplaceAllLiteral(input, []byte(""))
 }
