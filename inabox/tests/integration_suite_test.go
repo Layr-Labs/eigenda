@@ -3,6 +3,7 @@ package integration_test
 import (
 	"flag"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,14 +17,18 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/indexer"
+	indexereth "github.com/Layr-Labs/eigenda/indexer/eth"
+	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/ory/dockertest/v3"
-	"github.com/shurcooL/graphql"
 )
 
 var (
@@ -129,14 +134,18 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
+	rpcClient, err := ethrpc.Dial(testConfig.Deployers[0].RPC)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
 	tx, err := eth.NewTransactor(logger, client, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
 
 	cs := eth.NewChainState(tx, client)
-	querier := graphql.NewClient(testConfig.Churner.CHURNER_GRAPH_URL, nil)
-	ics := thegraph.NewIndexedChainState(cs, querier, logger)
+	// querier := graphql.NewClient(testConfig.Churner.CHURNER_GRAPH_URL, nil)
+	// ics := thegraph.NewIndexedChainState(cs, querier, logger)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
@@ -158,7 +167,57 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	retrievalClient = clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, 10)
+	// cs := eth.NewChainState(tx, gethClient)
+	// rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURL)
+	// if err != nil {
+	// 	log.Fatalln("could not start tcp listener", err)
+	// }
+
+	eigenDAServiceManagerAddr := gethcommon.HexToAddress(testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+
+	pubKeyFilterer, err := coreindexer.NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr, client)
+	if err != nil {
+		return fmt.Errorf("failed to create new operator pubkeys filter: %w", err)
+	}
+
+	socketsFilterer, err := coreindexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
+	if err != nil {
+		return fmt.Errorf("failed to create new operator sockets filter: %w", err)
+	}
+
+	handlers := []indexer.AccumulatorHandler{
+		{
+			Acc:      coreindexer.NewOperatorPubKeysAccumulator(logger),
+			Filterer: pubKeyFilterer,
+			Status:   indexer.Good,
+		},
+		{
+			Acc:      coreindexer.NewOperatorSocketsAccumulator(logger),
+			Filterer: socketsFilterer,
+			Status:   indexer.Good,
+		},
+	}
+
+	var (
+		upgrader    = &coreindexer.Upgrader{}
+		headerStore = inmemstore.NewHeaderStore()
+		headerSrvc  = indexereth.NewHeaderService(logger, rpcClient)
+		indexer     = indexer.New(
+			&indexer.Config{
+				PullInterval: 100 * time.Millisecond,
+			},
+			handlers,
+			headerSrvc,
+			headerStore,
+			upgrader,
+			logger,
+		)
+	)
+
+	retrievalClient, err = clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, 10)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -15,8 +15,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/indexer/inmem"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/indexer"
+	indexereth "github.com/Layr-Labs/eigenda/indexer/eth"
+	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
@@ -89,7 +91,6 @@ func RetrieverMain(ctx *cli.Context) error {
 	// if err != nil {
 	// 	return err
 	// }
-	store := inmem.NewHeaderStore()
 
 	tx, err := eth.NewTransactor(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
@@ -100,13 +101,56 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	indexedState, err := indexer.NewIndexedChainState(&config.IndexerConfig, common.HexToAddress(config.EigenDAServiceManagerAddr), cs, store, gethClient, rpcClient, logger)
+
+	eigenDAServiceManagerAddr := common.HexToAddress(config.EigenDAServiceManagerAddr)
+
+	pubKeyFilterer, err := coreindexer.NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr, gethClient)
+	if err != nil {
+		return fmt.Errorf("failed to create new operator pubkeys filter: %w", err)
+	}
+
+	socketsFilterer, err := coreindexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, gethClient)
+	if err != nil {
+		return fmt.Errorf("failed to create new operator sockets filter: %w", err)
+	}
+
+	handlers := []indexer.AccumulatorHandler{
+		{
+			Acc:      coreindexer.NewOperatorPubKeysAccumulator(logger),
+			Filterer: pubKeyFilterer,
+			Status:   indexer.Good,
+		},
+		{
+			Acc:      coreindexer.NewOperatorSocketsAccumulator(logger),
+			Filterer: socketsFilterer,
+			Status:   indexer.Good,
+		},
+	}
+
+	var (
+		upgrader    = &coreindexer.Upgrader{}
+		headerStore = inmemstore.NewHeaderStore()
+		headerSrvc  = indexereth.NewHeaderService(logger, rpcClient)
+		indexer     = indexer.New(
+			&config.IndexerConfig,
+			handlers,
+			headerSrvc,
+			headerStore,
+			upgrader,
+			logger,
+		)
+	)
+
+	agn := &core.StdAssignmentCoordinator{}
+	retrievalClient, err := clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, config.NumConnections)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient := clients.NewRetrievalClient(logger, indexedState, agn, nodeClient, encoder, config.NumConnections)
+	indexedState, err := coreindexer.NewIndexedChainState(cs, indexer)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
 	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, indexedState, chainClient)
