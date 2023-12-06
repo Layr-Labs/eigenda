@@ -67,6 +67,10 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
 
+	// Track the number of operators that we successfully get chunks from
+	var availableOperatorsCount int
+	operatorFetchChunkStatus := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+
 	// Get blob header from any operator
 	var blobHeader *core.BlobHeader
 	var proof *merkletree.Proof
@@ -79,6 +83,8 @@ func (r *retrievalClient) RetrieveBlob(
 			r.logger.Warn("failed to dial operator while fetching BlobHeader, trying different operator", "operator", opInfo.Socket, "err", err)
 			continue
 		}
+		// Increment Available Operator Count
+		availableOperatorsCount++
 
 		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
 		if err != nil {
@@ -113,16 +119,12 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, fmt.Errorf("no quorum header for quorum %d", quorumID)
 	}
 
-	// Validate the blob length
-	err = r.encoder.VerifyBlobLength(blobHeader.BlobCommitments)
-	if err != nil {
-		return nil, err
-	}
-
 	assignements, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, quorumID, uint(quorumHeader.QuantizationFactor))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments")
 	}
+
+	r.logger.Info("Available Operators", availableOperatorsCount, "from Total Opeartors", len(operators))
 
 	// Fetch chunks from all operators
 	chunksChan := make(chan RetrievedChunks, len(operators))
@@ -132,26 +134,8 @@ func (r *retrievalClient) RetrieveBlob(
 		opInfo := indexedOperatorState.IndexedOperators[opID]
 		pool.Submit(func() {
 			r.nodeClient.GetChunks(ctx, opID, opInfo, batchHeaderHash, blobIndex, quorumID, chunksChan)
+			// TODO(ian-shim): validate chunks received from nodes
 		})
-	}
-
-	chunkLength, err := r.assignmentCoordinator.GetChunkLengthFromHeader(indexedOperatorState.OperatorState, quorumHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	minChunkLength, err := r.assignmentCoordinator.GetMinimumChunkLength(uint(len(operators)), blobHeader.BlobCommitments.Length, quorumHeader.QuantizationFactor, quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
-	if err != nil {
-		return nil, err
-	}
-
-	encodingParams, err := core.GetEncodingParams(minChunkLength, info.TotalChunks)
-	if err != nil {
-		return nil, err
-	}
-
-	if chunkLength != encodingParams.ChunkLength {
-		return nil, fmt.Errorf("chunk length mismatch: %d != %d", chunkLength, encodingParams.ChunkLength)
 	}
 
 	var chunks []*core.Chunk
@@ -160,7 +144,7 @@ func (r *retrievalClient) RetrieveBlob(
 	for i := 0; i < len(operators); i++ {
 		reply := <-chunksChan
 		if reply.Err != nil {
-			r.logger.Error("failed to get chunks from operator", "operator", reply.OperatorID, "err", reply.Err)
+			operatorFetchChunkStatus[reply.OperatorID] = indexedOperatorState.IndexedOperators[reply.OperatorID]
 			continue
 		}
 		assignment, ok := assignements[reply.OperatorID]
@@ -168,16 +152,23 @@ func (r *retrievalClient) RetrieveBlob(
 			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
 		}
 
-		err = r.encoder.VerifyChunks(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
-		if err != nil {
-			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID, "err", err)
-			continue
-		} else {
-			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID)
-		}
-
 		chunks = append(chunks, reply.Chunks...)
 		indices = append(indices, assignment.GetIndices()...)
+	}
+
+	chunkLength, err := r.assignmentCoordinator.GetChunkLengthFromHeader(indexedOperatorState.OperatorState, quorumHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log Operator Info For Which We Failed To Receive Chunks
+	for _, oprInfo := range operatorFetchChunkStatus {
+		r.logger.Warn("Failed to receive chunks from operator", "operatorInfo", oprInfo)
 	}
 
 	return r.encoder.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
