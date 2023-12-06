@@ -32,7 +32,7 @@ make run-e2e
 
 ## Manually deploy the experiment and interact with the services
 
-### Preliminiary setup steps
+### Preliminary setup steps
 
 Ensure that all submodules (e.g. EigenLayer smart contracts) are checked out to the correct branch, and then build the binaries.
 ```
@@ -130,9 +130,9 @@ Run the binaries:
 cd inabox
 ./bin.sh start
 ```
-This will print all logs from the EigenDA services to the screen; `Crtl+C` will stop all services. Inspect the logs to make sure all binaries started without any errors. 
+This will print all logs from the EigenDA services to the screen; `Ctrl+C` will stop all services. Inspect the logs to make sure all binaries started without any errors. 
 
-Alternatively, you can start and stop the EigenDA services in detacbed mode by running `./bin.sh start-detached` and `./bin.sh stop-detached`, respectively. In this case, the logs are saved to `inabox/testdata/DATETIME/logs`.
+Alternatively, you can start and stop the EigenDA services in detached mode by running `./bin.sh start-detached` and `./bin.sh stop-detached`, respectively. In this case, the logs are saved to `inabox/testdata/DATETIME/logs`.
 
 Disperse a blob:
 ```
