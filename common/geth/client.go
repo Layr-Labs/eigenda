@@ -45,6 +45,7 @@ func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error)
 	var opts *bind.TransactOpts
 
 	if len(config.PrivateKeyString) != 0 {
+		fmt.Println(config.PrivateKeyString)
 		privateKey, err = crypto.HexToECDSA(config.PrivateKeyString)
 		if err != nil {
 			return nil, fmt.Errorf("NewClient: cannot parse private key: %w", err)
@@ -215,7 +216,10 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
 		return nil, ErrTransactionFailed
 	}
-	c.Logger.Trace("successfully submitted transaction", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
+	hashHex := tx.Hash().Hex()
+	gasUsed := receipt.GasUsed
+	logger := c.Logger
+	logger.Trace("successfully submitted transaction", "txHash", hashHex, "tag", tag, "gasUsed", gasUsed)
 	return receipt, nil
 }
 

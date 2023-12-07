@@ -17,6 +17,10 @@ clean:
 	find $(PROTO_GEN_DISPERSER_PATH) -name "*.pb.go" -type f | xargs rm -rf
 	mkdir -p $(PROTO_GEN_DISPERSER_PATH)
 
+foundryup:
+	rustup update
+	foundryup -C $(shell cat .foundryrc)
+
 protoc: clean
 	protoc -I $(PROTOS) \
 	--go_out=$(PROTO_GEN) \

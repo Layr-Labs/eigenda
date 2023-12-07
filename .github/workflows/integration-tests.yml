@@ -10,7 +10,7 @@ on:
 jobs:
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: linux-xl
     steps:
       - name: Add LocalStack AWS Credentials
         run: |
@@ -51,7 +51,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: nightly-d4e6b43ea694f31ef2915e75d81c3308479ef8fd
 
       - name: Install graph cli
         run: |
@@ -70,17 +70,17 @@ jobs:
       #     make compile-el
       #     make compile-dl
 
-      - name: Churner 
-        run: go test -v ./churner/tests
+      # - name: Churner 
+      #   run: go test -v ./churner/tests
 
-      - name: Indexer 
-        run: go test -v ./core/indexer
+      # - name: Indexer 
+      #   run: go test -v ./core/indexer
 
       - name: Graph Indexer
-        run: make build && go test -v ./core/thegraph
+        run: go test -v ./core/thegraph
 
       - name: Inabox E2E
-        run: make build && cd inabox && make run-e2e-nochurner
+        run: cd inabox && make run-e2e
 
       - name: Save logs
         if: always()

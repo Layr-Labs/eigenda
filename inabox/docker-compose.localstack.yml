@@ -1,0 +1,22 @@
+version: '3'
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4570:4570"
+    environment:
+      - GATEWAY_LISTEN=0.0.0.0:4570
+      - LOCALSTACK_HOST=localhost.localstack.cloud:4570
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:4570"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+    networks:
+      - eigenda-demo
+
+networks:
+  eigenda-demo:
+    name: eigenda-demo

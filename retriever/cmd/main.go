@@ -50,9 +50,8 @@ func main() {
 
 func RetrieverMain(ctx *cli.Context) error {
 	log.Println("Initializing Retriever")
-	hostname := ctx.String(flags.HostnameFlag.Name)
 	port := ctx.String(flags.GrpcPortFlag.Name)
-	addr := fmt.Sprintf("%s:%s", hostname, port)
+	addr := fmt.Sprintf("0.0.0.0:%s", port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)

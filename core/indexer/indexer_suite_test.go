@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/config"
+	genenv "github.com/Layr-Labs/eigenda/inabox/gen-env"
+	"github.com/Layr-Labs/eigenda/inabox/testutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -14,11 +16,12 @@ var (
 	templateName string
 	testName     string
 
-	testConfig *deploy.Config
+	lock  *config.ConfigLock
+	anvil *testutils.AnvilContainer
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nochurner.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil-local.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 }
 
@@ -35,21 +38,21 @@ var _ = BeforeSuite(func() {
 
 		if testName == "" {
 			var err error
-			testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
+			testName, err = config.CreateNewTestDirectory(templateName, rootPath)
 			if err != nil {
 				Expect(err).To(BeNil())
 			}
 		}
 
-		testConfig = deploy.NewTestConfig(testName, rootPath)
-		testConfig.Deployers[0].DeploySubgraphs = false
+		genenv.GenerateConfigLock(rootPath, testName)
+		lock = config.OpenConfigLock(rootPath, testName)
+		lock.Config.Deployers[0].DeploySubgraphs = false
 
-		if testConfig.Environment.IsLocal() {
+		if lock.Config.Environment.IsLocal() {
 			fmt.Println("Starting anvil")
-			testConfig.StartAnvil()
 
-			fmt.Println("Deploying experiment")
-			testConfig.DeployExperiment()
+			anvil = testutils.NewAnvilContainer(lock)
+			anvil.MustStart()
 		}
 	}
 
@@ -57,9 +60,9 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 
-	if !testing.Short() && testConfig.Environment.IsLocal() {
+	if !testing.Short() && lock.Config.Environment.IsLocal() {
 		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
+		anvil.MustStop()
 	}
 
 })

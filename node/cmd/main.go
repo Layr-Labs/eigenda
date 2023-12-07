@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 
 	"github.com/urfave/cli"
@@ -43,8 +45,55 @@ func main() {
 	select {}
 }
 
+func ExtraFlagsValidation(ctx *cli.Context) error {
+	testMode := ctx.GlobalBool(flags.EnableTestModeFlag.Name)
+
+	blsKeyFile := ctx.GlobalString(flags.BlsKeyFileFlag.Name)
+	blsKeyPassword := ctx.GlobalString(flags.BlsKeyPasswordFlag.Name)
+	blsKey := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
+
+	if !testMode && blsKey != "" {
+		_ = cli.ShowAppHelp(ctx)
+		return errors.New("may not pass BLS private key in plaintext in production mode")
+	}
+
+	if blsKey == "" && (blsKeyFile == "" || blsKeyPassword == "") {
+		_ = cli.ShowAppHelp(ctx)
+		if testMode {
+			return errors.New("in test mode, must pass either a BLS private key OR a BLS encrypted private key file and the password to that file")
+		} else {
+			return errors.New("in prod mode, must pass a BLS encrypted private key file and the password to that file")
+		}
+	}
+
+	ecdsaKeyFile := ctx.GlobalString(flags.EcdsaKeyFileFlag.Name)
+	ecdsaKeyPassword := ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name)
+	ecdsaKey := ctx.GlobalString(geth.PrivateKeyFlagName)
+
+	if !testMode && ecdsaKey != "" {
+		_ = cli.ShowAppHelp(ctx)
+		return errors.New("may not pass ECDSA private key in plaintext in production mode")
+	}
+
+	if ecdsaKey == "" && (ecdsaKeyFile == "" || ecdsaKeyPassword == "") {
+		_ = cli.ShowAppHelp(ctx)
+		if testMode {
+			return errors.New("in test mode, must pass either a ECDSA private key OR a ECDSA encrypted private key file and the password to that file")
+		} else {
+			return errors.New("in prod mode, must pass a ECDSA encrypted private key file and the password to that file")
+		}
+	}
+
+	return nil
+}
+
 func NodeMain(ctx *cli.Context) error {
 	log.Println("Initializing Node")
+	err := ExtraFlagsValidation(ctx)
+	if err != nil {
+		return err
+	}
+
 	config, err := node.NewConfig(ctx)
 	if err != nil {
 		return err

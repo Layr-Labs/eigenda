@@ -2,6 +2,7 @@ package test_utils
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -36,6 +37,54 @@ func CreateTable(ctx context.Context, cfg commonaws.ClientConfig, name string, i
 	}
 
 	return table.TableDescription, nil
+}
+
+func CreateTableIfNotExists(ctx context.Context, cfg commonaws.ClientConfig, name string, input *dynamodb.CreateTableInput) (*types.TableDescription, error) {
+	c, err := getClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the table already exists
+	_, err = c.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(name),
+	})
+
+	// If the table does not exist, create it
+	if err != nil {
+		var aerr *types.ResourceNotFoundException
+		if errors.As(err, &aerr) {
+			// Table does not exist, so create it
+			table, err := c.CreateTable(ctx, input)
+			if err != nil {
+				return nil, err
+			}
+
+			// Wait for the table to be created
+			waiter := dynamodb.NewTableExistsWaiter(c)
+			err = waiter.Wait(ctx, &dynamodb.DescribeTableInput{
+				TableName: aws.String(name),
+			}, waiterDuration)
+			if err != nil {
+				return nil, err
+			}
+
+			return table.TableDescription, nil
+		} else {
+			// Some other error occurred
+			return nil, err
+		}
+	}
+
+	// If the table exists, return its description
+	tableDescription, err := c.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(name),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tableDescription.Table, nil
 }
 
 func getClient(clientConfig commonaws.ClientConfig) (*dynamodb.Client, error) {

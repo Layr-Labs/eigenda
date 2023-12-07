@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -18,7 +19,9 @@ import (
 	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/thegraph/mock"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/inabox/config"
+	genenv "github.com/Layr-Labs/eigenda/inabox/gen-env"
+	"github.com/Layr-Labs/eigenda/inabox/testutils"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -31,9 +34,10 @@ func init() {
 
 var (
 	keyPair                        *dacore.KeyPair
-	testConfig                     *deploy.Config
+	testConfig                     *config.ConfigLock
 	templateName                   string
 	testName                       string
+	anvil                          *testutils.AnvilContainer
 	logger                         = &commock.Logger{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
@@ -56,14 +60,14 @@ func setup(m *testing.M) {
 
 	if testName == "" {
 		var err error
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
+		testName, err = config.CreateNewTestDirectory(templateName, rootPath)
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
-	testConfig.Deployers[0].DeploySubgraphs = false
+	testConfig = genenv.GenerateConfigLock(rootPath, testName)
+	testConfig = config.OpenConfigLock(rootPath, testName)
 
 	if testing.Short() {
 		fmt.Println("Skipping churner test in short mode")
@@ -72,17 +76,14 @@ func setup(m *testing.M) {
 	}
 
 	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
-
-	fmt.Println("Deploying experiment")
-	testConfig.DeployExperiment()
+	anvil = testutils.NewAnvilContainer(testConfig)
+	anvil.MustStart()
 }
 
 func teardown() {
-	if testConfig != nil {
+	if anvil != nil {
 		fmt.Println("Stoping anvil")
-		testConfig.StopAnvil()
-		testConfig.StopGraphNode()
+		anvil.MustStop()
 	}
 }
 
@@ -93,8 +94,8 @@ func TestChurner(t *testing.T) {
 	op := testConfig.Operators[0]
 	operatorTransactor, err := createTransactorFromScratch(
 		op.NODE_PRIVATE_KEY,
-		testConfig.EigenDA.OperatorStateRetreiver,
-		testConfig.EigenDA.ServiceManager,
+		testConfig.Config.EigenDA.OperatorStateRetreiver,
+		testConfig.Config.EigenDA.ServiceManager,
 		logger,
 	)
 	assert.NoError(t, err)
@@ -147,9 +148,10 @@ func TestChurner(t *testing.T) {
 }
 
 func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger common.Logger) (*eth.Transactor, error) {
+	pk, _ := strings.CutPrefix(privateKey, "0x")
 	ethClientCfg := geth.EthClientConfig{
 		RPCURL:           rpcURL,
-		PrivateKeyString: privateKey,
+		PrivateKeyString: pk,
 	}
 
 	gethClient, err := geth.NewClient(ethClientCfg, logger)
@@ -174,14 +176,14 @@ func newTestServer(t *testing.T) *churner.Server {
 			PrivateKeyString: churnerPrivateKeyHex,
 		},
 		LoggerConfig:                  logging.DefaultCLIConfig(),
-		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetreiver,
-		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
+		BLSOperatorStateRetrieverAddr: testConfig.Config.EigenDA.OperatorStateRetreiver,
+		EigenDAServiceManagerAddr:     testConfig.Config.EigenDA.ServiceManager,
 	}
 
 	operatorTransactorChurner, err := createTransactorFromScratch(
 		churnerPrivateKeyHex,
-		testConfig.EigenDA.OperatorStateRetreiver,
-		testConfig.EigenDA.ServiceManager,
+		testConfig.Config.EigenDA.OperatorStateRetreiver,
+		testConfig.Config.EigenDA.ServiceManager,
 		logger,
 	)
 	assert.NoError(t, err)
