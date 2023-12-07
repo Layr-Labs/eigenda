@@ -45,11 +45,14 @@ func NewRetrievalClient(
 	encoder core.Encoder,
 	numConnections int,
 ) (*retrievalClient, error) {
-
 	indexedState, err := coreindexer.NewIndexedChainState(
 		chainState,
 		indexer,
 	)
+	if err != nil {
+		return nil, err
+	}
+	err = indexedState.Start(context.Background())
 	if err != nil {
 		return nil, err
 	}
