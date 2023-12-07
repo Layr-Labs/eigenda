@@ -138,7 +138,7 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, logger)
+	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, logger)
 	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, confirmer, ics, asgn, encoderClient, agg, client, finalizer, logger, metrics)
 	if err != nil {
 		return err

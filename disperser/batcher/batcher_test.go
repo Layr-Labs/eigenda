@@ -165,6 +165,9 @@ func TestBatcherIterations(t *testing.T) {
 	assert.NoError(t, err)
 	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.NoError(t, err)
+	count, size := components.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, 2, count)
+	assert.Equal(t, uint64(197632), size)
 
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
@@ -187,6 +190,9 @@ func TestBatcherIterations(t *testing.T) {
 	res, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(meta2.GetBlobKey(), 1)
 	assert.ErrorContains(t, err, "no such key")
 	assert.Nil(t, res)
+	count, size = components.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
+	assert.Equal(t, 0, count)
+	assert.Equal(t, uint64(0), size)
 }
 
 func TestBlobFailures(t *testing.T) {

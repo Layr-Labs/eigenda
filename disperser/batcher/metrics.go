@@ -18,7 +18,13 @@ type MetricsConfig struct {
 	EnableMetrics bool
 }
 
+type EncodingStreamerMetrics struct {
+	EncodedBlobs *prometheus.GaugeVec
+}
+
 type Metrics struct {
+	*EncodingStreamerMetrics
+
 	registry *prometheus.Registry
 
 	Blob             *prometheus.CounterVec
@@ -37,7 +43,19 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
+	encodingStreamerMetrics := EncodingStreamerMetrics{
+		EncodedBlobs: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "encoded_blobs",
+				Help:      "number and size of all encoded blobs",
+			},
+			[]string{"type"},
+		),
+	}
+
 	metrics := &Metrics{
+		EncodingStreamerMetrics: &encodingStreamerMetrics,
 		Blob: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -132,4 +150,9 @@ func (g *Metrics) Start(ctx context.Context) {
 		err := http.ListenAndServe(addr, mux)
 		log.Error("prometheus server failed", "err", err)
 	}()
+}
+
+func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
+	e.EncodedBlobs.WithLabelValues("size").Set(float64(size))
+	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
 }

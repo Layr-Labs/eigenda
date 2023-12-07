@@ -177,18 +177,36 @@ func (mock *MockEthClient) TransactionInBlock(ctx context.Context, blockHash com
 
 func (mock *MockEthClient) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	args := mock.Called()
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
+}
+
+func (mock *MockEthClient) UpdateGas(ctx context.Context, tx *types.Transaction, value *big.Int) (*types.Transaction, error) {
+	args := mock.Called()
 	result := args.Get(0)
-	return result.(*types.Receipt), args.Error(1)
+	return result.(*types.Transaction), args.Error(1)
 }
 
 func (mock *MockEthClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Context, tx *types.Transaction, tag string, value *big.Int) (*types.Receipt, error) {
 	args := mock.Called()
-	result := args.Get(0)
-	return result.(*types.Receipt), args.Error(1)
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
 }
 
 func (mock *MockEthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	args := mock.Called()
-	result := args.Get(0)
-	return result.(*types.Receipt), args.Error(1)
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
 }
