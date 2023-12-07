@@ -128,7 +128,7 @@ func (r *retrievalClient) RetrieveBlob(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments")
 	}
-	r.logger.Info("Available Operators", len(availableOperators), "from Total Opeartors", len(operators))
+	r.logger.Info("Available Operators", "numAvailable", len(availableOperators), "from Total Opeartors", len(operators))
 
 	// Fetch chunks from all operators
 	chunksChan := make(chan RetrievedChunks, len(operators))
