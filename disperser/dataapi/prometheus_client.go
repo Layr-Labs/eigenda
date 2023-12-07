@@ -9,10 +9,10 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// maxNumOfDataPoints is the maximum number of data points that can be queried from Prometheus based on latency that this API can provide
 const (
-	maxNumOfDataPoints = 3500
-	minWindowSizeInSec = 60
+	// maxNumOfDataPoints is the maximum number of data points that can be queried from Prometheus based on latency that this API can provide
+	maxNumOfDataPoints        = 3500
+	throughputRateWindowInSec = 60
 )
 
 type (
@@ -48,8 +48,8 @@ func (pc *prometheusClient) QueryDisperserBlobSizeBytesPerSecond(ctx context.Con
 }
 
 func (pc *prometheusClient) QueryDisperserAvgThroughputBlobSizeBytes(ctx context.Context, start time.Time, end time.Time, windowSizeInSec uint8) (*PrometheusResult, error) {
-	if windowSizeInSec < minWindowSizeInSec {
-		windowSizeInSec = minWindowSizeInSec
+	if windowSizeInSec < throughputRateWindowInSec {
+		windowSizeInSec = throughputRateWindowInSec
 	}
 
 	query := fmt.Sprintf("sum by (job) (rate(eigenda_batcher_blobs_total{state=\"confirmed\",data=\"size\",cluster=\"%s\"}[%ds]))", pc.cluster, windowSizeInSec)
