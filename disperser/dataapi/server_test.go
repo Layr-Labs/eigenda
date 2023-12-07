@@ -92,6 +92,7 @@ func TestFetchBlobHandler(t *testing.T) {
 	assert.Equal(t, expectedBlobCommitment, response.BlobCommitment)
 	assert.Equal(t, expectedBatchId, uint32(response.BatchId))
 	assert.Equal(t, expectedConfirmationBlockNumber, uint32(response.ConfirmationBlockNumber))
+	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000123", response.ConfirmationTxnHash)
 	assert.Equal(t, hex.EncodeToString(expectedFee), response.Fee)
 	assert.Equal(t, blob.RequestHeader.SecurityParams, response.SecurityParams)
 	assert.Equal(t, uint64(5567830000), response.RequestAt)

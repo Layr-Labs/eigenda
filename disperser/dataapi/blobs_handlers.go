@@ -84,6 +84,7 @@ func convertMetadataToBlobMetadataResponse(metadata *disperser.BlobMetadata) (*B
 		BlobCommitment:          metadata.ConfirmationInfo.BlobCommitment,
 		BatchId:                 metadata.ConfirmationInfo.BatchID,
 		ConfirmationBlockNumber: metadata.ConfirmationInfo.ConfirmationBlockNumber,
+		ConfirmationTxnHash:     metadata.ConfirmationInfo.ConfirmationTxnHash.String(),
 		Fee:                     hex.EncodeToString(metadata.ConfirmationInfo.Fee),
 		SecurityParams:          metadata.RequestMetadata.SecurityParams,
 		RequestAt:               ConvertNanosecondToSecond(metadata.RequestMetadata.RequestedAt),
