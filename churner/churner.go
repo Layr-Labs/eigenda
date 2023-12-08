@@ -217,6 +217,8 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// This means the registering operator needs to have greater than
 		// churnBIPsOfOperatorStake/10000 times the stake of lowest stake in order to
 		// churn the lowest-stake operator out.
+		// For example, when churnBIPsOfOperatorStake=11000, the operator trying to
+		// register needs to have 1.1 times the stake of the lowest-stake operator.
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
 			return nil, fmt.Errorf("registering operator must have more than %f times of the stake of the lowest-stake operator", float64(operatorSetParams.ChurnBIPsOfOperatorStake)/10000.0)
@@ -226,6 +228,9 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// make sure that: lowestStake * bipMultiplier < totalStake * churnBIPsOfTotalStake
 		// This for the lowest-stake operator to be churned out, it must have less than
 		// churnBIPsOfTotalStake/10000 of the total stake.
+		// For example, when churnBIPsOfTotalStake=1001, the operator to be churned out
+		// (i.e. the lowest-stake operator) needs to have less than 10.01% of the total
+		// stake.
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
 			return nil, fmt.Errorf("operator to churn out must have less than %f percentage of the total stake", float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0)
