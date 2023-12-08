@@ -13,9 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -196,7 +195,7 @@ func TestPluginInvalidOperation(t *testing.T) {
 }
 
 func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
-	_, privateKey, err := getECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
+	_, privateKey, err := plugin.GetECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
 	assert.NoError(t, err)
 	assert.NotNil(t, privateKey)
 
@@ -252,18 +251,4 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	assert.NotNil(t, transactor)
 
 	return transactor
-}
-
-// Returns the decrypted ECDSA private key from the given file.
-func getECDSAPrivateKey(keyFile string, password string) (*keystore.Key, *string, error) {
-	keyContents, err := os.ReadFile(keyFile)
-	if err != nil {
-		return nil, nil, err
-	}
-	sk, err := keystore.DecryptKey(keyContents, password)
-	if err != nil {
-		return nil, nil, err
-	}
-	privateKey := fmt.Sprintf("%x", crypto.FromECDSA(sk.PrivateKey))
-	return sk, &privateKey, nil
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -14,24 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/urfave/cli"
 )
-
-// Returns the decrypted ECDSA private key from the given file.
-func getECDSAPrivateKey(keyFile string, password string) (*keystore.Key, *string, error) {
-	keyContents, err := os.ReadFile(keyFile)
-	if err != nil {
-		return nil, nil, err
-	}
-	sk, err := keystore.DecryptKey(keyContents, password)
-	if err != nil {
-		return nil, nil, err
-	}
-	privateKey := fmt.Sprintf("%x", crypto.FromECDSA(sk.PrivateKey))
-	return sk, &privateKey, nil
-}
 
 func main() {
 	app := cli.NewApp()
@@ -82,7 +65,7 @@ func pluginOps(ctx *cli.Context) {
 
 	operatorID := keyPair.GetPubKeyG1().GetOperatorID()
 
-	sk, privateKey, err := getECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
+	sk, privateKey, err := plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
 	if err != nil {
 		log.Printf("Error: failed to read or decrypt the ECDSA private key: %v", err)
 		return
