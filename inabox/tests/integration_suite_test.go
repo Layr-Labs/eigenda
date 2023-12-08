@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -20,11 +21,8 @@ import (
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/indexer"
-	indexereth "github.com/Layr-Labs/eigenda/indexer/eth"
-	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -165,52 +163,25 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
-
-	pubKeyFilterer, err := coreindexer.NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr, client)
-	if err != nil {
-		return fmt.Errorf("failed to create new operator pubkeys filter: %w", err)
-	}
-
-	socketsFilterer, err := coreindexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
-	if err != nil {
-		return fmt.Errorf("failed to create new operator sockets filter: %w", err)
-	}
-
-	handlers := []indexer.AccumulatorHandler{
-		{
-			Acc:      coreindexer.NewOperatorPubKeysAccumulator(logger),
-			Filterer: pubKeyFilterer,
-			Status:   indexer.Good,
+	indexer, err := coreindexer.SetupNewIndexer(
+		&indexer.Config{
+			PullInterval: 100 * time.Millisecond,
 		},
-		{
-			Acc:      coreindexer.NewOperatorSocketsAccumulator(logger),
-			Filterer: socketsFilterer,
-			Status:   indexer.Good,
-		},
-	}
-
-	var (
-		upgrader    = &coreindexer.Upgrader{}
-		headerStore = inmemstore.NewHeaderStore()
-		headerSrvc  = indexereth.NewHeaderService(logger, rpcClient)
-		indexer     = indexer.New(
-			&indexer.Config{
-				PullInterval: 100 * time.Millisecond,
-			},
-			handlers,
-			headerSrvc,
-			headerStore,
-			upgrader,
-			logger,
-		)
+		client,
+		rpcClient,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER,
+		logger,
 	)
+	if err != nil {
+		return err
+	}
 
 	retrievalClient, err = clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, 10)
 	if err != nil {
 		return err
 	}
-	return nil
+
+	return indexer.Index(context.Background())
 }
 
 var _ = AfterSuite(func() {

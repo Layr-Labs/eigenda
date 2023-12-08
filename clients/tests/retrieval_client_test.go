@@ -88,6 +88,10 @@ func setup(t *testing.T) {
 	if err != nil {
 		panic("failed to create a new retrieval client")
 	}
+	err = indexer.Index(context.Background())
+	if err != nil {
+		panic("failed to start indexing")
+	}
 
 	var (
 		quorumID           core.QuorumID = 0

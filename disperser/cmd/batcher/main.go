@@ -11,11 +11,6 @@ import (
 
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/indexer"
-	indexereth "github.com/Layr-Labs/eigenda/indexer/eth"
-
-	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -123,45 +118,16 @@ func RunBatcher(ctx *cli.Context) error {
 	} else {
 		logger.Info("Using built-in indexer")
 
-		eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
-
-		pubKeyFilterer, err := coreindexer.NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr, client)
-		if err != nil {
-			return fmt.Errorf("failed to create new operator pubkeys filter: %w", err)
-		}
-
-		socketsFilterer, err := coreindexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
-		if err != nil {
-			return fmt.Errorf("failed to create new operator sockets filter: %w", err)
-		}
-
-		handlers := []indexer.AccumulatorHandler{
-			{
-				Acc:      coreindexer.NewOperatorPubKeysAccumulator(logger),
-				Filterer: pubKeyFilterer,
-				Status:   indexer.Good,
-			},
-			{
-				Acc:      coreindexer.NewOperatorSocketsAccumulator(logger),
-				Filterer: socketsFilterer,
-				Status:   indexer.Good,
-			},
-		}
-
-		var (
-			upgrader    = &coreindexer.Upgrader{}
-			headerStore = inmemstore.NewHeaderStore()
-			headerSrvc  = indexereth.NewHeaderService(logger, rpcClient)
-			indexer     = indexer.New(
-				&config.IndexerConfig,
-				handlers,
-				headerSrvc,
-				headerStore,
-				upgrader,
-				logger,
-			)
+		indexer, err := coreindexer.SetupNewIndexer(
+			&config.IndexerConfig,
+			client,
+			rpcClient,
+			config.EigenDAServiceManagerAddr,
+			logger,
 		)
-
+		if err != nil {
+			return err
+		}
 		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
 		if err != nil {
 			return err

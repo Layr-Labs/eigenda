@@ -16,13 +16,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/indexer"
-	indexereth "github.com/Layr-Labs/eigenda/indexer/eth"
-	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -102,44 +98,16 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	eigenDAServiceManagerAddr := common.HexToAddress(config.EigenDAServiceManagerAddr)
-
-	pubKeyFilterer, err := coreindexer.NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr, gethClient)
-	if err != nil {
-		return fmt.Errorf("failed to create new operator pubkeys filter: %w", err)
-	}
-
-	socketsFilterer, err := coreindexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, gethClient)
-	if err != nil {
-		return fmt.Errorf("failed to create new operator sockets filter: %w", err)
-	}
-
-	handlers := []indexer.AccumulatorHandler{
-		{
-			Acc:      coreindexer.NewOperatorPubKeysAccumulator(logger),
-			Filterer: pubKeyFilterer,
-			Status:   indexer.Good,
-		},
-		{
-			Acc:      coreindexer.NewOperatorSocketsAccumulator(logger),
-			Filterer: socketsFilterer,
-			Status:   indexer.Good,
-		},
-	}
-
-	var (
-		upgrader    = &coreindexer.Upgrader{}
-		headerStore = inmemstore.NewHeaderStore()
-		headerSrvc  = indexereth.NewHeaderService(logger, rpcClient)
-		indexer     = indexer.New(
-			&config.IndexerConfig,
-			handlers,
-			headerSrvc,
-			headerStore,
-			upgrader,
-			logger,
-		)
+	indexer, err := coreindexer.SetupNewIndexer(
+		&config.IndexerConfig,
+		gethClient,
+		rpcClient,
+		config.EigenDAServiceManagerAddr,
+		logger,
 	)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
 
 	agn := &core.StdAssignmentCoordinator{}
 	retrievalClient, err := clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, config.NumConnections)

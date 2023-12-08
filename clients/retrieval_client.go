@@ -52,10 +52,6 @@ func NewRetrievalClient(
 	if err != nil {
 		return nil, err
 	}
-	err = indexedState.Start(context.Background())
-	if err != nil {
-		return nil, err
-	}
 	return &retrievalClient{
 		logger:                logger,
 		indexedChainState:     indexedState,

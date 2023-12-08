@@ -18,6 +18,11 @@ func NewRetrievalClient() *MockRetrievalClient {
 	return &MockRetrievalClient{}
 }
 
+func (c *MockRetrievalClient) StartIndexingChainState(ctx context.Context) error {
+	args := c.Called()
+	return args.Error(0)
+}
+
 func (c *MockRetrievalClient) RetrieveBlob(
 	ctx context.Context,
 	batchHeaderHash [32]byte,
