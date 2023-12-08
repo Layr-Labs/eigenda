@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -213,16 +214,21 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 
 		// verify the lowest stake against the registering operator's stake
 		// make sure that: lowestStake * churnBIPsOfOperatorStake < operatorToRegisterStake * bipMultiplier
+		// This means the registering operator needs to have greater than
+		// churnBIPsOfOperatorStake/10000 times the stake of lowest stake in order to
+		// churn the lowest-stake operator out.
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
-			return nil, errors.New("registering operator has less than churnBIPsOfOperatorStake")
+			return nil, fmt.Errorf("registering operator must have more than %f times of the stake of the lowest-stake operator", float64(operatorSetParams.ChurnBIPsOfOperatorStake)/10000.0)
 		}
 
 		// verify the lowest stake against the total stake
 		// make sure that: lowestStake * bipMultiplier < totalStake * churnBIPsOfTotalStake
+		// This for the lowest-stake operator to be churned out, it must have less than
+		// churnBIPsOfTotalStake/10000 of the total stake.
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
-			return nil, errors.New("operator to churn has less than churnBIPSOfTotalStake")
+			return nil, fmt.Errorf("operator to churn out must have less than %f percentage of the total stake", float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0)
 		}
 
 		operatorToChurnAddress, err := c.Transactor.OperatorIDToAddress(ctx, lowestStakeOperatorId)
