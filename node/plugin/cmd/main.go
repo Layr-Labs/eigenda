@@ -139,7 +139,7 @@ func pluginOps(ctx *cli.Context) {
 		log.Printf("Info: Operator with Operator Address: %x is updating its quorums: %v", sk.Address, config.QuorumIDList)
 		err = node.UpdateOperatorQuorums(context.Background(), operator, tx, config.ChurnerUrl, true, logger)
 		if err != nil {
-			log.Printf("Error: failed to update quorums for operator ID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
+			log.Printf("Error: failed to update quorums for operator ID: %x, operator address: %x, quorums: %v, error: %v", operatorID, sk.Address, config.QuorumIDList, err)
 			return
 		}
 		log.Printf("Info: successfully updated quorums, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
