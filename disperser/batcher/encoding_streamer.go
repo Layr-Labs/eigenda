@@ -23,7 +23,7 @@ type EncodedSizeNotifier struct {
 
 	Notify chan struct{}
 	// threshold is the size of the total encoded blob results in bytes that triggers the notifier
-	threshold uint
+	threshold uint64
 	// active is set to false after the notifier is triggered to prevent it from triggering again for the same batch
 	// This is reset when CreateBatch is called and the encoded results have been consumed
 	active bool
@@ -57,7 +57,8 @@ type EncodingStreamer struct {
 
 	encodingCtxCancelFuncs []context.CancelFunc
 
-	logger common.Logger
+	metrics *EncodingStreamerMetrics
+	logger  common.Logger
 }
 
 type batchMetadata struct {
@@ -74,7 +75,7 @@ type batch struct {
 	MerkleTree    *merkletree.MerkleTree
 }
 
-func NewEncodedSizeNotifier(notify chan struct{}, threshold uint) *EncodedSizeNotifier {
+func NewEncodedSizeNotifier(notify chan struct{}, threshold uint64) *EncodedSizeNotifier {
 	return &EncodedSizeNotifier{
 		Notify:    notify,
 		threshold: threshold,
@@ -90,6 +91,7 @@ func NewEncodingStreamer(
 	assignmentCoordinator core.AssignmentCoordinator,
 	encodedSizeNotifier *EncodedSizeNotifier,
 	workerPool common.WorkerPool,
+	metrics *EncodingStreamerMetrics,
 	logger common.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
@@ -105,6 +107,7 @@ func NewEncodingStreamer(
 		encoderClient:          encoderClient,
 		assignmentCoordinator:  assignmentCoordinator,
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
+		metrics:                metrics,
 		logger:                 logger,
 	}, nil
 }
@@ -370,7 +373,8 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 		return fmt.Errorf("failed to putEncodedBlob: %w", err)
 	}
 
-	encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
+	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
+	e.metrics.UpdateEncodedBlobs(count, encodedSize)
 	if e.EncodedSizeNotifier.threshold > 0 && encodedSize >= e.EncodedSizeNotifier.threshold {
 		e.EncodedSizeNotifier.mu.Lock()
 

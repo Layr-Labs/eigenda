@@ -2,12 +2,14 @@ package batcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -23,22 +25,24 @@ type Finalizer interface {
 }
 
 type finalizer struct {
-	timeout      time.Duration
-	loopInterval time.Duration
-	blobStore    disperser.BlobStore
-	ethClient    common.EthClient
-	rpcClient    common.RPCEthClient
-	logger       common.Logger
+	timeout              time.Duration
+	loopInterval         time.Duration
+	blobStore            disperser.BlobStore
+	ethClient            common.EthClient
+	rpcClient            common.RPCEthClient
+	maxNumRetriesPerBlob uint
+	logger               common.Logger
 }
 
-func NewFinalizer(timeout time.Duration, loopInterval time.Duration, blobStore disperser.BlobStore, ethClient common.EthClient, rpcClient common.RPCEthClient, logger common.Logger) Finalizer {
+func NewFinalizer(timeout time.Duration, loopInterval time.Duration, blobStore disperser.BlobStore, ethClient common.EthClient, rpcClient common.RPCEthClient, maxNumRetriesPerBlob uint, logger common.Logger) Finalizer {
 	return &finalizer{
-		timeout:      timeout,
-		loopInterval: loopInterval,
-		blobStore:    blobStore,
-		ethClient:    ethClient,
-		rpcClient:    rpcClient,
-		logger:       logger,
+		timeout:              timeout,
+		loopInterval:         loopInterval,
+		blobStore:            blobStore,
+		ethClient:            ethClient,
+		rpcClient:            rpcClient,
+		maxNumRetriesPerBlob: maxNumRetriesPerBlob,
+		logger:               logger,
 	}
 }
 
@@ -91,6 +95,14 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 
 		// confirmation block number may have changed due to reorg
 		confirmationBlockNumber, err := f.getTransactionBlockNumber(ctx, confirmationMetadata.ConfirmationInfo.ConfirmationTxnHash)
+		if errors.Is(err, ethereum.NotFound) {
+			// The confirmed block is finalized, but the transaction is not found. It means the transaction should be considered forked/invalid and the blob should be considered as failed.
+			err := f.blobStore.HandleBlobFailure(ctx, m, f.maxNumRetriesPerBlob)
+			if err != nil {
+				f.logger.Error("FinalizeBlobs: error marking blob as failed", "blobKey", blobKey.String(), "err", err)
+			}
+			continue
+		}
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error getting transaction block number", "err", err)
 			continue
@@ -123,6 +135,10 @@ func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.
 		txReceipt, err = f.ethClient.TransactionReceipt(ctxWithTimeout, hash)
 		if err == nil {
 			break
+		}
+		if errors.Is(err, ethereum.NotFound) {
+			// If the transaction is not found, it means the transaction has been reorged out of the chain.
+			return 0, err
 		}
 
 		retrySec := math.Pow(2, float64(i))

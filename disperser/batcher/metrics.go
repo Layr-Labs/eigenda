@@ -13,12 +13,29 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+type FailReason string
+
+const (
+	FailBatchHeaderHash        FailReason = "batch_header_hash"
+	FailAggregateSignatures    FailReason = "aggregate_signatures"
+	FailNoSignatures           FailReason = "no_signatures"
+	FailConfirmBatch           FailReason = "confirm_batch"
+	FailGetBatchID             FailReason = "get_batch_id"
+	FailUpdateConfirmationInfo FailReason = "update_confirmation_info"
+)
+
 type MetricsConfig struct {
 	HTTPPort      string
 	EnableMetrics bool
 }
 
+type EncodingStreamerMetrics struct {
+	EncodedBlobs *prometheus.GaugeVec
+}
+
 type Metrics struct {
+	*EncodingStreamerMetrics
+
 	registry *prometheus.Registry
 
 	Blob             *prometheus.CounterVec
@@ -26,6 +43,7 @@ type Metrics struct {
 	BatchProcLatency *prometheus.SummaryVec
 	GasUsed          prometheus.Gauge
 	Attestation      *prometheus.GaugeVec
+	BatchError       *prometheus.CounterVec
 
 	httpPort string
 	logger   common.Logger
@@ -37,7 +55,19 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
+	encodingStreamerMetrics := EncodingStreamerMetrics{
+		EncodedBlobs: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "encoded_blobs",
+				Help:      "number and size of all encoded blobs",
+			},
+			[]string{"type"},
+		),
+	}
+
 	metrics := &Metrics{
+		EncodingStreamerMetrics: &encodingStreamerMetrics,
 		Blob: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -78,6 +108,14 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 			},
 			[]string{"type"},
 		),
+		BatchError: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "batch_error",
+				Help:      "number of batch errors",
+			},
+			[]string{"type"},
+		),
 		registry: reg,
 		httpPort: httpPort,
 		logger:   logger,
@@ -115,6 +153,10 @@ func (g *Metrics) IncrementBatchCount(size int64) {
 	g.Batch.WithLabelValues("size").Add(float64(size))
 }
 
+func (g *Metrics) UpdateBatchError(errType FailReason, numBlobs int) {
+	g.BatchError.WithLabelValues(string(errType)).Add(float64(numBlobs))
+}
+
 func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 	g.BatchProcLatency.WithLabelValues(stage).Observe(latencyMs)
 }
@@ -132,4 +174,9 @@ func (g *Metrics) Start(ctx context.Context) {
 		err := http.ListenAndServe(addr, mux)
 		log.Error("prometheus server failed", "err", err)
 	}()
+}
+
+func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
+	e.EncodedBlobs.WithLabelValues("size").Set(float64(size))
+	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
 }

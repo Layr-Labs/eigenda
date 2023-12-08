@@ -3,7 +3,7 @@
 ### Quorum Information
 
 ```go
-// QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
+// QuorumID is a unique identifier for a quorum; initially EigenDA will support up to 256 quorums
 type QuorumID = uint8
 
 // SecurityParam contains the quorum ID and the adversary threshold for the quorum;
@@ -24,11 +24,11 @@ type QuorumResult struct {
 ### Blob Requests
 
 ```go
-// BlobHeader contains the orignal data size of a blob and the security requi
+// BlobHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// BlobSize is the size of the original data in bytes
 	BlobSize uint32
-	// For a blob to be accepted by EigenDA, it satisfy the AdversaryThreshold of each quorum contained in SecurityParams
+	// For a blob to be accepted by EigenDA, it satisfies the AdversaryThreshold of each quorum contained in SecurityParams
 	SecurityParams []SecurityParam
 }
 ```
@@ -79,7 +79,7 @@ type EncodedBatch struct {
 // Chunk is the smallest unit that is distributed to DA nodes, including both data and the associated polynomial opening proofs.
 // A chunk corresponds to a set of evaluations of the global polynomial whose coefficients are used to construct the blob Commitment.
 type Chunk struct {
-	// The Coeffs field contains the coefficients of the polynomial which interolates these evaluations. This is the same as the
+	// The Coeffs field contains the coefficients of the polynomial which interpolates these evaluations. This is the same as the
 	// interpolating polynomial, I(X), used in the KZG multi-reveal (https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html#multiproofs)
 	Coeffs []Symbol
 	Proof  Proof
@@ -113,7 +113,7 @@ type OperatorInfo struct {
 
 // OperatorState contains information about the current state of operators which is stored in the blockchain state
 type OperatorState struct {
-	// Operators is a map from quorum ID to a map from the operators in that quourm to their StoredOperatorInfo. Membership
+	// Operators is a map from quorum ID to a map from the operators in that quorum to their StoredOperatorInfo. Membership
 	// in the map implies membership in the quorum.
 	Operators map[QuorumID]map[OperatorID]*OperatorInfo
 	// Totals is a map from quorum ID to the total stake (Stake) and total count (Index) of all operators in that quorum

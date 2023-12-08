@@ -66,7 +66,7 @@ func (i Indexer) Index(){
     myLatestHeader := i.HeaderService.GetLatestHeader(true)
 
     // TODO: Also if there are no headers synced
-    // Fast forward it it's too many blocks to catch up
+    // Fast forward if it's too many blocks to catch up
     if syncFromBlock - myLatestHeader.Number > maxSyncBlocks {
 
         // This probably just wipes the HeaderStore clean

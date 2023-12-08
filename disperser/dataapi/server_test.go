@@ -30,6 +30,8 @@ import (
 var (
 	//go:embed testdata/prometheus-response-sample.json
 	mockPrometheusResponse string
+	//go:embed testdata/prometheus-resp-avg-throughput.json
+	mockPrometheusRespAvgThroughput string
 
 	expectedBlobCommitment *core.BlobCommitments
 	blobstore              = inmem.NewBlobStore()
@@ -90,6 +92,7 @@ func TestFetchBlobHandler(t *testing.T) {
 	assert.Equal(t, expectedBlobCommitment, response.BlobCommitment)
 	assert.Equal(t, expectedBatchId, uint32(response.BatchId))
 	assert.Equal(t, expectedConfirmationBlockNumber, uint32(response.ConfirmationBlockNumber))
+	assert.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000123", response.ConfirmationTxnHash)
 	assert.Equal(t, hex.EncodeToString(expectedFee), response.Fee)
 	assert.Equal(t, blob.RequestHeader.SecurityParams, response.SecurityParams)
 	assert.Equal(t, uint64(5567830000), response.RequestAt)
@@ -163,7 +166,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
 	mockSubgraphApi.On("QueryOperators").Return(subgraphOperatorRegistereds, nil)
-	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
 	r.GET("/v1/metrics", testDataApiServer.FetchMetricsHandler)
 
@@ -192,12 +195,12 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
-	err := s.UnmarshalJSON([]byte(mockPrometheusResponse))
+	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
 	assert.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
-	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
 	r.GET("/v1/metrics/throughput", testDataApiServer.FetchMetricsTroughputHandler)
 
@@ -223,9 +226,9 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 3481, len(response))
-	assert.Equal(t, float64(15000), response[0].Throughput)
-	assert.Equal(t, uint64(1699435890), response[0].Timestamp)
-	assert.Equal(t, float64(5.761665289256135e+07), totalThroughput)
+	assert.Equal(t, float64(11666.666666666666), response[0].Throughput)
+	assert.Equal(t, uint64(1701292800), response[0].Timestamp)
+	assert.Equal(t, float64(3.599722666666646e+07), totalThroughput)
 }
 
 func setUpRouter() *gin.Engine {

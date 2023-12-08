@@ -51,7 +51,7 @@ BatchHeader (see core/data.go#BatchHeader)
 
 ### Blob
 In EigenDA, the original blob to disperse is encoded as a polynomial via taking
-taking different point evaluations (i.e. erasure coding). These points are split
+different point evaluations (i.e. erasure coding). These points are split
 into disjoint subsets which are assigned to different operator nodes in the EigenDA
 network.
 The data in this message is a subset of these points that are assigned to a
