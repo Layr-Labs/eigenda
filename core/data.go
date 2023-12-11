@@ -181,6 +181,7 @@ type Sample struct {
 }
 
 // SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+// Blobs with the same encoding parameters are collected in a single subBatch
 type SubBatch struct {
 	Samples  []Sample
 	NumBlobs int

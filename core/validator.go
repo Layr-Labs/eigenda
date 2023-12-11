@@ -130,17 +130,21 @@ func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
 
 func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState) error {
 	subBatchMap := make(map[EncodingParams]*SubBatch)
+	blobCommitments := make([]BlobCommitments, len(blobs))
 
-	for _, blob := range blobs {
+	for k, blob := range blobs {
 		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
 			return errors.New("number of bundles does not match number of quorums")
 		}
 
 		// Validate the blob length
-		err := v.encoder.VerifyBlobLength(blob.BlobHeader.BlobCommitments)
-		if err != nil {
-			return err
-		}
+		// err := v.encoder.VerifyBlobLength(blob.BlobHeader.BlobCommitments)
+		//if err != nil {
+		//	return err
+		//}
+
+		blobCommitments[k] = blob.BlobHeader.BlobCommitments
+
 		// for each quorum
 		for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
 			// Check if the operator is a member of the quorum
@@ -191,6 +195,8 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		go v.universalVerifyWorker(params, subBatch, out)
 	}
 
+	
+
 	for i := 0; i < numSubBatch; i++ {
 		err := <-out
 		if err != nil {
@@ -203,7 +209,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 
 func (v *chunkValidator) universalVerifyWorker(params EncodingParams, subBatch *SubBatch, out chan error) {
 
-	err := v.encoder.UniversalVerifyChunks(params, subBatch.Samples, subBatch.NumBlobs)
+	err := v.encoder.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
 	if err != nil {
 		out <- err
 		return

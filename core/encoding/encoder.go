@@ -132,7 +132,7 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 }
 
 // convert struct understandable by the crypto library
-func (e *Encoder) UniversalVerifyChunks(params core.EncodingParams, samplesCore []core.Sample, numBlobs int) error {
+func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCore []core.Sample, numBlobs int) error {
 	encParams := toEncParams(params)
 	samples := make([]kzgEncoder.Sample, len(samplesCore))
 

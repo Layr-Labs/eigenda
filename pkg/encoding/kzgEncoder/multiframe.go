@@ -23,7 +23,7 @@ type Sample struct {
 // generate a random value using Fiat Shamir transform
 // we can also pseudo randomness generated locally, but we have to ensure no adv can manipulate it
 // Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
-func GenRandomness(params rs.EncodingParams, samples []Sample, m int) (bls.Fr, error) {
+func GenRandomness(samples []Sample) (bls.Fr, error) {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 
@@ -45,7 +45,7 @@ func GenRandomness(params rs.EncodingParams, samples []Sample, m int) (bls.Fr, e
 }
 
 // UniversalVerify implements batch verification on a set of chunks given the same chunk dimension (chunkLen, numChunk).
-// The details is given in Ethereum Research post whose authors are George Kadianakis, George Kadianakis, George Kadianakis
+// The details is given in Ethereum Research post whose authors are George Kadianakis, Ansgar Dietrichs, Dankrad Feist
 // https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
 //
 // m is number of blob, samples is a list of chunks
@@ -55,7 +55,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	for i, s := range samples {
 		if s.Row >= m {
 			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.Row, m)
-			return errors.New("sample.Row and numBlob is inconsistend")
+			return errors.New("sample.Row and numBlob is inconsistent")
 		}
 	}
 
@@ -67,7 +67,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	n := len(samples)
 	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
 
-	r, err := GenRandomness(params, samples, m)
+	r, err := GenRandomness(samples)
 	if err != nil {
 		return err
 	}
