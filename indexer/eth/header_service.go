@@ -28,7 +28,7 @@ func (h *HeaderService) PullNewHeaders(lastHeader *head.Header) (head.Headers, b
 	ctx := context.Background()
 	latestHeader, err := h.getHeaderByNumber(ctx, nil)
 	if err != nil {
-		h.logger.Error("Error. Cannot get latest header:", err)
+		h.logger.Error("Error. Cannot get latest header:", "err", err)
 		return nil, false, err
 	}
 
@@ -44,7 +44,7 @@ func (h *HeaderService) PullNewHeaders(lastHeader *head.Header) (head.Headers, b
 
 	newHeaders, err := h.headersByRange(ctx, starting, int(count))
 	if err != nil {
-		h.logger.Error("Error. Cannot get latest header: ", err)
+		h.logger.Error("Error. Cannot get latest header: ", "err", err)
 		return nil, false, err
 	}
 
@@ -71,7 +71,7 @@ func (h *HeaderService) PullLatestHeader(finalized bool) (*head.Header, error) {
 
 	header, err := h.getHeaderByNumber(ctx, nil)
 	if err != nil {
-		h.logger.Error("Error. Cannot get latest header", err)
+		h.logger.Error("Error. Cannot get latest header", "err", err)
 		return nil, err
 	}
 
@@ -79,7 +79,7 @@ func (h *HeaderService) PullLatestHeader(finalized bool) (*head.Header, error) {
 	if finalized && diff >= DistanceFromHead {
 		latestFinalized, err := h.getHeaderByNumber(ctx, big.NewInt(diff))
 		if err != nil {
-			h.logger.Error("Error. Cannot get finalized header", err)
+			h.logger.Error("Error. Cannot get finalized header", "err", err)
 			return nil, err
 		}
 		return &head.Header{

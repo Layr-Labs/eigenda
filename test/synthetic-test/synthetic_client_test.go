@@ -236,7 +236,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	}
 
 	retrievalClient = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
-	return nil
+	return indexer.Index(context.Background())
 }
 
 // TODO: This file contains some code that can be refactored and shared across some other tests ex:Integration Test.

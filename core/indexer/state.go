@@ -4,66 +4,22 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
-	"github.com/Layr-Labs/eigenda/indexer/eth"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type IndexedChainState struct {
 	core.ChainState
 
-	Indexer *indexer.Indexer
+	Indexer indexer.Indexer
 }
 
 var _ core.IndexedChainState = (*IndexedChainState)(nil)
 
-// TODO: Pass in dependencies instead of creating them here
-
 func NewIndexedChainState(
-	config *indexer.Config,
-	eigenDAServiceManagerAddr gethcommon.Address,
 	chainState core.ChainState,
-	headerStore indexer.HeaderStore,
-	client common.EthClient,
-	rpcClient common.RPCEthClient,
-	logger common.Logger,
+	indexer indexer.Indexer,
 ) (*IndexedChainState, error) {
-
-	pubKeyFilterer, err := NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr, client)
-	if err != nil {
-		return nil, err
-	}
-
-	socketsFilterer, err := NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
-	if err != nil {
-		return nil, err
-	}
-
-	handlers := []indexer.AccumulatorHandler{
-		{
-			Acc:      NewOperatorPubKeysAccumulator(logger),
-			Filterer: pubKeyFilterer,
-			Status:   indexer.Good,
-		},
-		{
-			Acc:      NewOperatorSocketsAccumulator(logger),
-			Filterer: socketsFilterer,
-			Status:   indexer.Good,
-		},
-	}
-
-	headerSrvc := eth.NewHeaderService(logger, rpcClient)
-	upgrader := &Upgrader{}
-	indexer := indexer.NewIndexer(
-		config,
-		handlers,
-		headerSrvc,
-		headerStore,
-		upgrader,
-		logger,
-	)
 
 	return &IndexedChainState{
 		ChainState: chainState,
@@ -121,7 +77,7 @@ func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, block
 }
 
 func (ics *IndexedChainState) GetCurrentBlockNumber() (uint, error) {
-	header, err := ics.Indexer.HeaderStore.GetLatestHeader(false)
+	header, err := ics.Indexer.GetLatestHeader(false)
 	if err != nil {
 		return 0, err
 	}
@@ -134,7 +90,7 @@ func (ics *IndexedChainState) getObjects(blockNumber uint) (*OperatorPubKeys, Op
 		Number: uint64(blockNumber),
 	}
 
-	obj, _, err := ics.Indexer.HeaderStore.GetObject(queryHeader, ics.Indexer.Handlers[0].Acc)
+	obj, err := ics.Indexer.GetObject(queryHeader, 0)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -144,7 +100,7 @@ func (ics *IndexedChainState) getObjects(blockNumber uint) (*OperatorPubKeys, Op
 		return nil, nil, ErrWrongObjectFromIndexer
 	}
 
-	obj, _, err = ics.Indexer.HeaderStore.GetObject(queryHeader, ics.Indexer.Handlers[1].Acc)
+	obj, err = ics.Indexer.GetObject(queryHeader, 1)
 	if err != nil {
 		return nil, nil, err
 	}

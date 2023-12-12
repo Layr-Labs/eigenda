@@ -15,12 +15,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/indexer/inmem"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -89,7 +87,6 @@ func RetrieverMain(ctx *cli.Context) error {
 	// if err != nil {
 	// 	return err
 	// }
-	store := inmem.NewHeaderStore()
 
 	tx, err := eth.NewTransactor(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
@@ -100,13 +97,28 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	indexedState, err := indexer.NewIndexedChainState(&config.IndexerConfig, common.HexToAddress(config.EigenDAServiceManagerAddr), cs, store, gethClient, rpcClient, logger)
+
+	indexer, err := coreindexer.CreateNewIndexer(
+		&config.IndexerConfig,
+		gethClient,
+		rpcClient,
+		config.EigenDAServiceManagerAddr,
+		logger,
+	)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
 	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient := clients.NewRetrievalClient(logger, indexedState, agn, nodeClient, encoder, config.NumConnections)
+	retrievalClient, err := clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, config.NumConnections)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
+
+	indexedState, err := coreindexer.NewIndexedChainState(cs, indexer)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
 	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, indexedState, chainClient)
