@@ -201,9 +201,21 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("system ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
+			s.logger.Warn("system data ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
 			return errSystemRateLimit
 		}
+
+		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, systemQuorumKey, blobRateMultiplier, rates.TotalUnauthBlobRate)
+		if err != nil {
+			return fmt.Errorf("ratelimiter error: %v", err)
+		}
+		if !allowed {
+			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
+			return errSystemRateLimit
+		}
+
+		// Check Account Ratelimit
 
 		blob.RequestHeader.AccountID = "ip:" + origin
 
@@ -213,7 +225,17 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
+			s.logger.Warn("account data ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
+			return errAccountRateLimit
+		}
+
+		userQuorumKey = fmt.Sprintf("%s:%d-blobrate", blob.RequestHeader.AccountID, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, blobRateMultiplier, rates.PerUserUnauthBlobRate)
+		if err != nil {
+			return fmt.Errorf("ratelimiter error: %v", err)
+		}
+		if !allowed {
+			s.logger.Warn("account blob ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", float32(rates.PerUserUnauthBlobRate)/blobRateMultiplier)
 			return errAccountRateLimit
 		}
 

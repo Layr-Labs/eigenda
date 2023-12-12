@@ -36,6 +36,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
+	rateConfig, err := apiserver.ReadCLIConfig(ctx)
+	if err != nil {
+		return Config{}, err
+	}
+
 	config := Config{
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
@@ -51,7 +56,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
 		RatelimiterConfig: ratelimiterConfig,
-		RateConfig:        apiserver.ReadCLIConfig(ctx),
+		RateConfig:        rateConfig,
 		EnableRatelimiter: ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
 		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
