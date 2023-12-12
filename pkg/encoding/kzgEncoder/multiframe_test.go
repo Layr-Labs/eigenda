@@ -39,7 +39,7 @@ func TestUniversalVerify(t *testing.T) {
 			sample := kzgRs.Sample{
 				Commitment: *commit,
 				Proof:      f.Proof,
-				Row:        z,
+				RowIndex:   z,
 				Coeffs:     f.Coeffs,
 				X:          uint(i),
 			}
