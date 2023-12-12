@@ -140,10 +140,6 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		}
 
 		// Validate the blob length
-		// err := v.encoder.VerifyBlobLength(blob.BlobHeader.BlobCommitments)
-		//if err != nil {
-		//	return err
-		//}
 
 		blobCommitmentList[k] = blob.BlobHeader.BlobCommitments
 

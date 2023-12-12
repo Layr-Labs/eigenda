@@ -140,7 +140,7 @@ func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCor
 		sample := kzgEncoder.Sample{
 			Commitment: *sc.Commitment.G1Point,
 			Proof:      sc.Chunk.Proof,
-			Row:        sc.BlobIndex,
+			RowIndex:   sc.BlobIndex,
 			Coeffs:     sc.Chunk.Coeffs,
 			X:          sc.AssignmentIndex,
 		}
