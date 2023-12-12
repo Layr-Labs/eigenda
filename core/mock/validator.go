@@ -3,6 +3,7 @@ package mock
 import (
 	"errors"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/mock"
 )
@@ -23,8 +24,8 @@ func NewMockChunkValidator() *MockChunkValidator {
 	return &MockChunkValidator{}
 }
 
-func (v *MockChunkValidator) ValidateBatch(blobs []*core.BlobMessage, operatorState *core.OperatorState) error {
-	args := v.Called(blobs, operatorState)
+func (v *MockChunkValidator) ValidateBatch(blobs []*core.BlobMessage, operatorState *core.OperatorState, pool common.WorkerPool) error {
+	args := v.Called(blobs, operatorState, pool)
 	return args.Error(0)
 }
 

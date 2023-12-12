@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/gammazero/workerpool"
 )
 
 const (
@@ -44,6 +45,7 @@ type Node struct {
 	Transactor              core.Transactor
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
+	Pool                    common.WorkerPool
 
 	mu            sync.Mutex
 	CurrentSocket string
@@ -66,6 +68,8 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	}
 
 	config.ID = keyPair.GetPubKeyG1().GetOperatorID()
+
+	pool := workerpool.New(config.NumBatchValidators)
 
 	// Make sure config folder exists.
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
@@ -143,6 +147,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 		Validator:               validator,
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
+		Pool:                    pool,
 	}, nil
 }
 
@@ -321,7 +326,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 		return err
 	}
 
-	return n.Validator.ValidateBatch(blobs, operatorState)
+	return n.Validator.ValidateBatch(blobs, operatorState, n.Pool)
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {

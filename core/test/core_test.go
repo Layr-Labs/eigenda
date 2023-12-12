@@ -8,9 +8,11 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
@@ -171,7 +173,7 @@ func checkBatch(t *testing.T, cst core.IndexedChainState, encodedBlob core.Encod
 
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
-func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader) {
+func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader, pool common.WorkerPool) {
 	val := core.NewChunkValidator(enc, asn, cst, [32]byte{})
 
 	quorums := []core.QuorumID{0}
@@ -184,7 +186,8 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 		for z, encodedBlob := range encodedBlobs {
 			blobMessages[z] = encodedBlob[id]
 		}
-		err := val.ValidateBatch(blobMessages, state.OperatorState)
+
+		err := val.ValidateBatch(blobMessages, state.OperatorState, pool)
 		assert.NoError(t, err)
 	}
 
@@ -212,6 +215,8 @@ func TestCoreLibrary(t *testing.T) {
 
 	quorumIndex := uint(0)
 	bn := uint(0)
+
+	pool := workerpool.New(1)
 
 	for _, operatorCount := range operatorCounts {
 		cst, err := mock.NewChainDataMock(core.OperatorIndex(operatorCount))
@@ -245,7 +250,7 @@ func TestCoreLibrary(t *testing.T) {
 
 		}
 		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(batches)), func(t *testing.T) {
-			checkBatchByUniversalVerifier(t, cst, batches, batchHeader)
+			checkBatchByUniversalVerifier(t, cst, batches, batchHeader, pool)
 		})
 
 	}

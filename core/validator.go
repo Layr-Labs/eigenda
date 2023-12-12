@@ -2,6 +2,8 @@ package core
 
 import (
 	"errors"
+
+	"github.com/Layr-Labs/eigenda/common"
 )
 
 var (
@@ -11,7 +13,7 @@ var (
 )
 
 type ChunkValidator interface {
-	ValidateBatch([]*BlobMessage, *OperatorState) error
+	ValidateBatch([]*BlobMessage, *OperatorState, common.WorkerPool) error
 	ValidateBlob(*BlobMessage, *OperatorState) error
 	UpdateOperatorID(OperatorID)
 }
@@ -128,9 +130,9 @@ func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
 	v.operatorID = operatorID
 }
 
-func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState) error {
+func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
 	subBatchMap := make(map[EncodingParams]*SubBatch)
-	blobCommitments := make([]BlobCommitments, len(blobs))
+	blobCommitmentList := make([]BlobCommitments, len(blobs))
 
 	for k, blob := range blobs {
 		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
@@ -143,7 +145,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		//	return err
 		//}
 
-		blobCommitments[k] = blob.BlobHeader.BlobCommitments
+		blobCommitmentList[k] = blob.BlobHeader.BlobCommitments
 
 		// for each quorum
 		for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
@@ -188,16 +190,28 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 
 	// Parallelize the universal verification for each subBatch
 	numSubBatch := len(subBatchMap)
-	out := make(chan error, numSubBatch)
+	numResult := numSubBatch + len(blobCommitmentList)
+	// create a channel to accept results, we don't use stop
+	out := make(chan error, numResult)
+
+	// parallelize subBatch verification
 	for params, subBatch := range subBatchMap {
 		params := params
 		subBatch := subBatch
-		go v.universalVerifyWorker(params, subBatch, out)
+		pool.Submit(func() {
+			v.universalVerifyWorker(params, subBatch, out)
+		})
 	}
 
-	
+	// parallelize length proof verification
+	for _, blobCommitments := range blobCommitmentList {
+		blobCommitments := blobCommitments
+		pool.Submit(func() {
+			v.VerifyBlobLengthWorker(blobCommitments, out)
+		})
+	}
 
-	for i := 0; i < numSubBatch; i++ {
+	for i := 0; i < numResult; i++ {
 		err := <-out
 		if err != nil {
 			return err
@@ -210,6 +224,16 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 func (v *chunkValidator) universalVerifyWorker(params EncodingParams, subBatch *SubBatch, out chan error) {
 
 	err := v.encoder.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
+	if err != nil {
+		out <- err
+		return
+	}
+
+	out <- nil
+}
+
+func (v *chunkValidator) VerifyBlobLengthWorker(blobCommitments BlobCommitments, out chan error) {
+	err := v.encoder.VerifyBlobLength(blobCommitments)
 	if err != nil {
 		out <- err
 		return
