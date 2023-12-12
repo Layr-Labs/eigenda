@@ -163,7 +163,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	indexer, err := coreindexer.SetupNewIndexer(
+	indexer, err := coreindexer.CreateNewIndexer(
 		&indexer.Config{
 			PullInterval: 100 * time.Millisecond,
 		},

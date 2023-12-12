@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func SetupNewIndexer(
+func CreateNewIndexer(
 	config *indexer.Config,
 	gethClient dacommon.EthClient,
 	rpcClient dacommon.RPCEthClient,

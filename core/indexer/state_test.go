@@ -115,7 +115,7 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger co
 		}
 	)
 
-	indexer, err := coreindexer.SetupNewIndexer(
+	indexer, err := coreindexer.CreateNewIndexer(
 		&indexerConfig,
 		client,
 		rpcClient,

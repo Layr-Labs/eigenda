@@ -118,7 +118,7 @@ func RunBatcher(ctx *cli.Context) error {
 	} else {
 		logger.Info("Using built-in indexer")
 
-		indexer, err := coreindexer.SetupNewIndexer(
+		indexer, err := coreindexer.CreateNewIndexer(
 			&config.IndexerConfig,
 			client,
 			rpcClient,

@@ -98,7 +98,7 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	indexer, err := coreindexer.SetupNewIndexer(
+	indexer, err := coreindexer.CreateNewIndexer(
 		&config.IndexerConfig,
 		gethClient,
 		rpcClient,
