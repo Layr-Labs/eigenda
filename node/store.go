@@ -267,7 +267,6 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
 	}
-	s.metrics.AddCurrentBatch(size)
 
 	return &keys, nil
 }
