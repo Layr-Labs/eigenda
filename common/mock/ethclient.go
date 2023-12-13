@@ -31,10 +31,10 @@ func (mock *MockEthClient) GetAccountAddress() common.Address {
 	return result.(common.Address)
 }
 
-func (mock *MockEthClient) GetNoSendTransactOpts() *bind.TransactOpts {
+func (mock *MockEthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
 	args := mock.Called()
 	result := args.Get(0)
-	return result.(*bind.TransactOpts)
+	return result.(*bind.TransactOpts), args.Error(1)
 }
 
 func (mock *MockEthClient) ChainID(ctx context.Context) (*big.Int, error) {

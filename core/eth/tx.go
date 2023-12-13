@@ -123,7 +123,12 @@ func (t *Transactor) RegisterBLSPublicKey(ctx context.Context, keypair *core.Key
 		}
 
 		// assemble tx
-		tx, err := t.Bindings.PubkeyCompendium.RegisterBLSPublicKey(t.EthClient.GetNoSendTransactOpts(), signedMessageHashParam, pubkeyG1Param, pubkeyG2Param)
+		opts, err := t.EthClient.GetNoSendTransactOpts()
+		if err != nil {
+			t.Logger.Error("Failed to generate transact opts", "err", err)
+			return err
+		}
+		tx, err := t.Bindings.PubkeyCompendium.RegisterBLSPublicKey(opts, signedMessageHashParam, pubkeyG1Param, pubkeyG2Param)
 		if err != nil {
 			t.Logger.Error("Error assembling RegisterBLSPublicKey tx")
 			return err
@@ -173,8 +178,12 @@ func (t *Transactor) RegisterOperator(ctx context.Context, pubkeyG1 *core.G1Poin
 		Y: pubkey.Y,
 	}
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
-
-	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator1(t.EthClient.GetNoSendTransactOpts(), quorumNumbers, g1Point, socket)
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
+	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator1(opts, quorumNumbers, g1Point, socket)
 
 	if err != nil {
 		t.Logger.Error("Failed to register operator", "err", err)
@@ -221,8 +230,13 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *co
 		Expiry:    new(big.Int).SetInt64(churnReply.SignatureWithSaltAndExpiry.Expiry),
 	}
 
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
 	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator(
-		t.EthClient.GetNoSendTransactOpts(),
+		opts,
 		quorumNumbers,
 		operatorToRegisterPubkey,
 		socket,
@@ -270,8 +284,13 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 		Y: pubkey.Y,
 	}
 
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
 	tx, err := t.Bindings.BLSRegCoordWithIndices.DeregisterOperatorWithCoordinator(
-		t.EthClient.GetNoSendTransactOpts(),
+		opts,
 		quorumNumbers,
 		g1Point,
 	)
@@ -290,7 +309,12 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 
 // UpdateOperatorSocket updates the socket of the operator in all the quorums that it is
 func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) error {
-	tx, err := t.Bindings.BLSRegCoordWithIndices.UpdateSocket(t.EthClient.GetNoSendTransactOpts(), socket)
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
+	tx, err := t.Bindings.BLSRegCoordWithIndices.UpdateSocket(opts, socket)
 	if err != nil {
 		t.Logger.Error("Failed to update operator socket", "err", err)
 		return err
@@ -441,7 +465,12 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 		NonSignerStakeIndices:        checkSignaturesIndices.NonSignerStakeIndices,
 	}
 
-	tx, err := t.Bindings.EigenDAServiceManager.ConfirmBatch(t.EthClient.GetNoSendTransactOpts(), batchH, signatureChecker)
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return nil, err
+	}
+	tx, err := t.Bindings.EigenDAServiceManager.ConfirmBatch(opts, batchH, signatureChecker)
 	if err != nil {
 		t.Logger.Error("Failed to confirm batch", "err", err)
 		return nil, err

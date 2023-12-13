@@ -328,7 +328,9 @@ loop:
 					ethClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 					defer cancel()
 
-					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof)
+					opts, err := ethClient.GetNoSendTransactOpts()
+					assert.Nil(t, err)
+					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
 					assert.Nil(t, err)
 					assert.NotNil(t, tx)
 					logger.Printf("PostCommitment Tx %v", tx)
