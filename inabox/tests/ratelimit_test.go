@@ -31,7 +31,7 @@ type result struct {
 	err  error
 }
 
-func dispserse(t *testing.T, ctx context.Context, client traffic.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
+func disperse(t *testing.T, ctx context.Context, client traffic.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
 
 	blobStatus, key, err := client.DisperseBlob(ctx, data, param.QuorumID, param.QuorumThreshold, param.AdversaryThreshold)
 	if err != nil {
@@ -127,7 +127,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	go func() {
 		for i := 0; i < c.numDispersal; i++ {
 			<-dispersalTicker.C
-			go dispserse(t, ctx, disp, resultChan, data, c.param)
+			go disperse(t, ctx, disp, resultChan, data, c.param)
 		}
 	}()
 
@@ -172,7 +172,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 
 func TestRatelimit(t *testing.T) {
 
-	t.Skip("Manual test for now")
+	// t.Skip("Manual test for now")
 
 	rootPath := "../../"
 	testname, err := deploy.GetLatestTestDirectory(rootPath)
@@ -190,7 +190,7 @@ func TestRatelimit(t *testing.T) {
 
 	t.Run("no ratelimiting when dispersing and retrieving within rate", func(t *testing.T) {
 
-		t.Skip("Manual test for now")
+		// t.Skip("Manual test for now")
 
 		testCase := ratelimitTestCase{
 			numDispersal:      10,

@@ -62,7 +62,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:     PerUserUnauthBlobRateFlagName,
 			Usage:    "Per-user blob interval for unauthenticated requests (Blobs/sec)",
 			Required: true,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "PER_USER_UNAUTH_BLOB_INTERVAL"),
+			EnvVar:   common.PrefixEnvVar(envPrefix, "PER_USER_UNAUTH_BLOB_RATE"),
 		},
 		cli.StringFlag{
 			Name:     ClientIPHeaderFlagName,

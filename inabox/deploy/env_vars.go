@@ -55,6 +55,10 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_PER_USER_UNAUTH_THROUGHPUT string
 
+	DISPERSER_SERVER_TOTAL_UNAUTH_BLOB_RATE string
+
+	DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE string
+
 	DISPERSER_SERVER_CLIENT_IP_HEADER string
 }
 
@@ -344,7 +348,11 @@ type ChurnerVars struct {
 
 	CHURNER_EIGENDA_SERVICE_MANAGER string
 
+	CHURNER_ENABLE_METRICS string
+
 	CHURNER_PER_PUBLIC_KEY_RATE_LIMIT string
+
+	CHURNER_METRICS_HTTP_PORT string
 
 	CHURNER_CHAIN_RPC string
 
@@ -357,10 +365,6 @@ type ChurnerVars struct {
 	CHURNER_LOG_PATH string
 
 	CHURNER_INDEXER_PULL_INTERVAL string
-
-	CHURNER_ENABLE_METRICS string
-
-	CHURNER_METRICS_HTTP_PORT string
 }
 
 func (vars ChurnerVars) getEnvMap() map[string]string {
