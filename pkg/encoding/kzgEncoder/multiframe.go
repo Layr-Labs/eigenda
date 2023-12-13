@@ -18,11 +18,11 @@ type Sample struct {
 	Proof      bls.G1Point
 	RowIndex   int // corresponds to a row in the verification matrix
 	Coeffs     []bls.Fr
-	X          uint // X is the same assignment index of chunk in EigenDa
+	X          uint // X is the evaluating index which corresponds to the leading coset
 }
 
 // generate a random value using Fiat Shamir transform
-// we can also pseudo randomness generated locally, but we have to ensure no adv can manipulate it
+// we can also pseudo randomness generated locally, but we have to ensure no adversary can manipulate it
 // Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
 func GenRandomness(samples []Sample) (bls.Fr, error) {
 	var buffer bytes.Buffer
@@ -117,18 +117,9 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 	leadingDs := make([]bls.Fr, n)
 
 	for k := 0; k < n; k++ {
-		// It is important to obtain the leading coset index here
-		// As the params from the eigenda Core might not have NumChunks be the power of 2
-		x, err := rs.GetLeadingCosetIndex(
-			uint64(samples[k].X),
-			params.NumChunks,
-		)
-		if err != nil {
-			return nil, err
-		}
 
 		// got the leading coset field element
-		h := ks.ExpandedRootsOfUnity[x]
+		h := ks.ExpandedRootsOfUnity[samples[k].X]
 		var hPow bls.Fr
 		bls.CopyFr(&hPow, &bls.ONE)
 
@@ -167,7 +158,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	for i, s := range samples {
 		if s.RowIndex >= m {
 			fmt.Printf("sample %v has %v Row, but there are only %v blobs\n", i, s.RowIndex, m)
-			return errors.New("sample.Row and numBlob is inconsistent")
+			return errors.New("sample.RowIndex and numBlob are inconsistent")
 		}
 	}
 

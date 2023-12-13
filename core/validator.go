@@ -35,8 +35,7 @@ func NewChunkValidator(enc Encoder, asgn AssignmentCoordinator, cst ChainState, 
 	}
 }
 
-// preprocessBlob for each Quorum
-func (v *chunkValidator) preprocessBlob(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*Chunk, *Assignment, *EncodingParams, error) {
+func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*Chunk, *Assignment, *EncodingParams, error) {
 	if quorumHeader.AdversaryThreshold >= quorumHeader.QuorumThreshold {
 		return nil, nil, nil, errors.New("invalid header: quorum threshold does not exceed adversary threshold")
 	}
@@ -109,7 +108,7 @@ func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *Operator
 
 	for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
 		// preprocess validation info
-		chunks, assignment, params, err := v.preprocessBlob(quorumHeader, blob, operatorState)
+		chunks, assignment, params, err := v.validateBlobQuorum(quorumHeader, blob, operatorState)
 		if err == ErrBlobQuorumSkip {
 			continue
 		} else if err != nil {
@@ -139,14 +138,12 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 			return errors.New("number of bundles does not match number of quorums")
 		}
 
-		// Validate the blob length
-
+		// Saved for the blob length validation
 		blobCommitmentList[k] = blob.BlobHeader.BlobCommitments
 
 		// for each quorum
 		for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
-			// Check if the operator is a member of the quorum
-			chunks, assignment, params, err := v.preprocessBlob(quorumHeader, blob, operatorState)
+			chunks, assignment, params, err := v.validateBlobQuorum(quorumHeader, blob, operatorState)
 			if err == ErrBlobQuorumSkip {
 				continue
 			} else if err != nil {
@@ -185,8 +182,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 	}
 
 	// Parallelize the universal verification for each subBatch
-	numSubBatch := len(subBatchMap)
-	numResult := numSubBatch + len(blobCommitmentList)
+	numResult := len(subBatchMap) + len(blobCommitmentList)
 	// create a channel to accept results, we don't use stop
 	out := make(chan error, numResult)
 

@@ -137,12 +137,20 @@ func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCor
 	samples := make([]kzgEncoder.Sample, len(samplesCore))
 
 	for i, sc := range samplesCore {
+		x, err := encoder.GetLeadingCosetIndex(
+			uint64(sc.AssignmentIndex),
+			encParams.NumChunks,
+		)
+		if err != nil {
+			return err
+		}
+
 		sample := kzgEncoder.Sample{
 			Commitment: *sc.Commitment.G1Point,
 			Proof:      sc.Chunk.Proof,
 			RowIndex:   sc.BlobIndex,
 			Coeffs:     sc.Chunk.Coeffs,
-			X:          sc.AssignmentIndex,
+			X:          uint(x),
 		}
 		samples[i] = sample
 	}

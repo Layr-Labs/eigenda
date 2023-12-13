@@ -41,7 +41,7 @@ func TestUniversalVerify(t *testing.T) {
 				Proof:      f.Proof,
 				RowIndex:   z,
 				Coeffs:     f.Coeffs,
-				X:          uint(i),
+				X:          uint(q),
 			}
 			samples = append(samples, sample)
 		}
