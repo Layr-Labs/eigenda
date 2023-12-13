@@ -25,6 +25,9 @@ type Metrics struct {
 	// The latency (in ms) to process the request.
 	RequestLatency *prometheus.SummaryVec
 	// Accumulated number and size of batches processed by their statuses.
+	// TODO: this metrics should be removed in future release.
+	AccuBatchesDeprecated *prometheus.CounterVec
+	// Accumulated number and size of batches processed by their statuses.
 	AccuBatches *prometheus.CounterVec
 	// Accumulated number and size of batches that have been removed from the Node.
 	AccuRemovedBatches *prometheus.CounterVec
@@ -58,7 +61,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			prometheus.CounterOpts{
 				Namespace: Namespace,
 				Name:      "eigenda_rpc_requests_total",
-				Help:      "the total number of requests handled by the DA node",
+				Help:      "the total number of requests processed by the DA node",
 			},
 			[]string{"method", "status"},
 		),
@@ -71,13 +74,21 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 			[]string{"method", "stage"},
 		),
+		AccuBatchesDeprecated: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: Namespace,
+				Name:      "eigenda_batches_total",
+				Help:      "the total number and size of batches processed by the DA node",
+			},
+			[]string{"type", "status"},
+		),
 		// The "status" label has values: received, validated, stored, signed.
 		// These are the lifecycle of a batch at the DA Node.
 		AccuBatches: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: Namespace,
-				Name:      "eigenda_batches_total",
-				Help:      "the total number and size of batches handled by the DA node",
+				Name:      "eigenda_processed_batches_total",
+				Help:      "the total number and size of batches processed by the DA node",
 			},
 			[]string{"type", "status"},
 		),
@@ -129,6 +140,8 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 }
 
 func (g *Metrics) AcceptBatches(status string, batchSize int64) {
+	g.AccuBatchesDeprecated.WithLabelValues("number", status).Inc()
+	g.AccuBatchesDeprecated.WithLabelValues("size", status).Add(float64(batchSize))
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
 }
