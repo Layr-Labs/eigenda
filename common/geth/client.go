@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/ethereum/go-ethereum"
@@ -25,12 +26,13 @@ var (
 
 type EthClient struct {
 	*ethclient.Client
-	RPCURL         string
-	privateKey     *ecdsa.PrivateKey
-	chainID        *big.Int
-	AccountAddress gethcommon.Address
-	Contracts      map[gethcommon.Address]*bind.BoundContract
-	Logger         common.Logger
+	RPCURL           string
+	privateKey       *ecdsa.PrivateKey
+	chainID          *big.Int
+	AccountAddress   gethcommon.Address
+	Contracts        map[gethcommon.Address]*bind.BoundContract
+	Logger           common.Logger
+	numConfirmations int
 }
 
 var _ common.EthClient = (*EthClient)(nil)
@@ -64,13 +66,14 @@ func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error)
 	}
 
 	c := &EthClient{
-		RPCURL:         config.RPCURL,
-		privateKey:     privateKey,
-		chainID:        chainIDBigInt,
-		AccountAddress: accountAddress,
-		Client:         chainClient,
-		Contracts:      make(map[gethcommon.Address]*bind.BoundContract),
-		Logger:         logger,
+		RPCURL:           config.RPCURL,
+		privateKey:       privateKey,
+		chainID:          chainIDBigInt,
+		AccountAddress:   accountAddress,
+		Client:           chainClient,
+		Contracts:        make(map[gethcommon.Address]*bind.BoundContract),
+		Logger:           logger,
+		numConfirmations: config.NumConfirmations,
 	}
 
 	return c, err
@@ -206,7 +209,7 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 }
 
 func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
-	receipt, err := bind.WaitMined(ctx, c.Client, tx)
+	receipt, err := c.waitMined(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
 	}
@@ -216,6 +219,43 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 	}
 	c.Logger.Trace("successfully submitted transaction", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
 	return receipt, nil
+}
+
+// waitMined waits for tx to be mined on the blockchain.
+// Taken from https://github.com/ethereum/go-ethereum/blob/master/accounts/abi/bind/util.go#L32,
+// but added a check for number of confirmations.
+func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
+	queryTicker := time.NewTicker(3 * time.Second)
+	defer queryTicker.Stop()
+
+	for {
+		receipt, err := c.TransactionReceipt(ctx, tx.Hash())
+		if err == nil {
+			chainTip, err := c.BlockNumber(ctx)
+			if err == nil {
+				if receipt.BlockNumber.Uint64()+uint64(c.numConfirmations) > chainTip {
+					c.Logger.Trace("EnsureTransactionEvaled: transaction has been mined but don't have enough confirmations at current chain tip", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
+				} else {
+					return receipt, nil
+				}
+			} else {
+				c.Logger.Trace("EnsureTransactionEvaled: failed to get chain tip while waiting for transaction to mine", "err", err)
+			}
+		}
+
+		if errors.Is(err, ethereum.NotFound) {
+			c.Logger.Trace("Transaction not yet mined")
+		} else {
+			c.Logger.Trace("Receipt retrieval failed", "err", err)
+		}
+
+		// Wait for the next round.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-queryTicker.C:
+		}
+	}
 }
 
 // getGasFeeCap returns the gas fee cap for a transaction, calculated as:

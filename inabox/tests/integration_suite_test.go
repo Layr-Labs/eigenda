@@ -43,8 +43,10 @@ var (
 	bucketTableName   = "test-BucketStore"
 	logger            common.Logger
 	ethClient         common.EthClient
+	rpcClient         common.RPCEthClient
 	mockRollup        *rollupbindings.ContractMockRollup
 	retrievalClient   clients.RetrievalClient
+	numConfirmations  int = 3
 )
 
 func init() {
@@ -115,7 +117,10 @@ var _ = BeforeSuite(func() {
 	ethClient, err = geth.NewClient(geth.EthClientConfig{
 		RPCURL:           testConfig.Deployers[0].RPC,
 		PrivateKeyString: pk,
+		NumConfirmations: numConfirmations,
 	}, logger)
+	Expect(err).To(BeNil())
+	rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 	Expect(err).To(BeNil())
 	mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
 	Expect(err).To(BeNil())
@@ -127,6 +132,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
 		RPCURL:           testConfig.Deployers[0].RPC,
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
+		NumConfirmations: numConfirmations,
 	}
 	client, err := geth.NewClient(ethClientConfig, logger)
 	if err != nil {

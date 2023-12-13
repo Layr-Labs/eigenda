@@ -67,6 +67,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	config := geth.EthClientConfig{
 		RPCURL:           deployer.RPC,
 		PrivateKeyString: op.NODE_PRIVATE_KEY,
+		NumConfirmations: 0,
 	}
 
 	c, err := geth.NewClient(config, logger)
@@ -86,6 +87,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger common.Lo
 	config := geth.EthClientConfig{
 		RPCURL:           deployer.RPC,
 		PrivateKeyString: privateKey,
+		NumConfirmations: 0,
 	}
 
 	client, err := geth.NewClient(config, logger)
