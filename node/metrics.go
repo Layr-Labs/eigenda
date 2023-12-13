@@ -25,6 +25,7 @@ type Metrics struct {
 	// The latency (in ms) to process the request.
 	RequestLatency *prometheus.SummaryVec
 	// Accumulated number and size of batches processed by their statuses.
+	// TODO: this metrics should be removed in future release.
 	AccuBatchesDeprecated *prometheus.CounterVec
 	// Accumulated number and size of batches processed by their statuses.
 	AccuBatches *prometheus.CounterVec
@@ -60,7 +61,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			prometheus.CounterOpts{
 				Namespace: Namespace,
 				Name:      "eigenda_rpc_requests_total",
-				Help:      "the total number of requests handled by the DA node",
+				Help:      "the total number of requests processed by the DA node",
 			},
 			[]string{"method", "status"},
 		),
@@ -77,7 +78,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			prometheus.CounterOpts{
 				Namespace: Namespace,
 				Name:      "eigenda_batches_total",
-				Help:      "the total number and size of batches handled by the DA node",
+				Help:      "the total number and size of batches processed by the DA node",
 			},
 			[]string{"type", "status"},
 		),
@@ -86,8 +87,8 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 		AccuBatches: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: Namespace,
-				Name:      "eigenda_accumulated_batches_total",
-				Help:      "the total number and size of batches handled by the DA node",
+				Name:      "eigenda_processed_batches_total",
+				Help:      "the total number and size of batches processed by the DA node",
 			},
 			[]string{"type", "status"},
 		),
