@@ -165,6 +165,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ChurnerUrl:                    ctx.GlobalString(flags.ChurnerUrlFlag.Name),
 		NumBatchValidators:            ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
 		ClientIPHeader:                ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
-		UseSecureGrpc:                 !testMode,
+		UseSecureGrpc:                 ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 	}, nil
 }

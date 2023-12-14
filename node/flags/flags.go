@@ -136,6 +136,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_URL"),
 	}
+	ChurnerUseSecureGRPC = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "churner-use-secure-grpc"),
+		Usage:    "Whether to use secure GRPC connection to Churner",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
+	}
 	PubIPProviderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
 		Usage:    "The ip provider service used to obtain a node's public IP [seeip (default), ipify)",
@@ -260,6 +266,7 @@ var optionalFlags = []cli.Flag{
 	InternalDispersalPortFlag,
 	InternalRetrievalPortFlag,
 	ClientIPHeaderFlag,
+	ChurnerUseSecureGRPC,
 }
 
 func init() {
