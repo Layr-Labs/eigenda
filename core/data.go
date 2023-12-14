@@ -72,6 +72,8 @@ type BlobQuorumInfo struct {
 	QuantizationFactor uint
 	// EncodedBlobLength is the nominal endcoded length of the blob in symbols; EncodedBlobLength = QuantizationFactor * NumOperatorsForQuorum * ChunkLength
 	EncodedBlobLength uint
+	// ChunkLength is the number of symbols in a chunk
+	ChunkLength uint
 }
 
 // BlobHeader contains all metadata related to a blob including commitments and parameters for encoding

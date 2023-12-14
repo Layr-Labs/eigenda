@@ -37,7 +37,7 @@ func (c *Assignment) GetIndices() []ChunkNumber {
 // given  QuorumResults and determining or validating system parameters that will satisfy these security requirements given the
 // OperatorStates. There are two classes of parameters that must be determined or validate: 1) the chunk indices that will be
 // assigned to each DA node, and 2) the size of each chunk.
-type AssignmentCoordinator interface {
+type AssignmentCoordinatorOld interface {
 
 	// GetAssignments calculates the full set of node assignments. The assignment of indices to nodes depends only on the OperatorState
 	// for a given quorum and the quantizationFactor. In particular, it does not depend on the security parameters.
@@ -61,12 +61,12 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-type StdAssignmentCoordinator struct {
+type StdAssignmentCoordinatorOld struct {
 }
 
-var _ AssignmentCoordinator = (*StdAssignmentCoordinator)(nil)
+var _ AssignmentCoordinatorOld = (*StdAssignmentCoordinatorOld)(nil)
 
-func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, quorum QuorumID, quantizationFactor uint) (map[OperatorID]Assignment, AssignmentInfo, error) {
+func (c *StdAssignmentCoordinatorOld) GetAssignments(state *OperatorState, quorum QuorumID, quantizationFactor uint) (map[OperatorID]Assignment, AssignmentInfo, error) {
 
 	numOperators := len(state.Operators[quorum])
 	numOperatorsBig := new(big.Int).SetUint64(uint64(numOperators))
@@ -134,7 +134,7 @@ func getOperatorAtIndex(headerHash [32]byte, index, numOperators int) int {
 	return int(operatorIndex.Uint64())
 }
 
-func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, quorum QuorumID, quantizationFactor uint, id OperatorID) (Assignment, AssignmentInfo, error) {
+func (c *StdAssignmentCoordinatorOld) GetOperatorAssignment(state *OperatorState, quorum QuorumID, quantizationFactor uint, id OperatorID) (Assignment, AssignmentInfo, error) {
 
 	assignments, info, err := c.GetAssignments(state, quorum, quantizationFactor)
 	if err != nil {
@@ -149,7 +149,7 @@ func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, q
 	return assignment, info, nil
 }
 
-func (c *StdAssignmentCoordinator) GetMinimumChunkLength(numOperators, blobLength, quantizationFactor uint, quorumThreshold, adversaryThreshold uint8) (uint, error) {
+func (c *StdAssignmentCoordinatorOld) GetMinimumChunkLength(numOperators, blobLength, quantizationFactor uint, quorumThreshold, adversaryThreshold uint8) (uint, error) {
 
 	if adversaryThreshold >= quorumThreshold {
 		return 0, errors.New("invalid header: quorum threshold does not exceed adversary threshold")
@@ -161,7 +161,7 @@ func (c *StdAssignmentCoordinator) GetMinimumChunkLength(numOperators, blobLengt
 
 }
 
-func (c *StdAssignmentCoordinator) GetChunkLengthFromHeader(state *OperatorState, header *BlobQuorumInfo) (uint, error) {
+func (c *StdAssignmentCoordinatorOld) GetChunkLengthFromHeader(state *OperatorState, header *BlobQuorumInfo) (uint, error) {
 
 	// Validate the chunk length
 	numOperators := uint(len(state.Operators[header.QuorumID]))

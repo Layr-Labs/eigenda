@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
@@ -54,7 +55,7 @@ func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *Operator
 		}
 
 		// Get the assignments for the quorum
-		assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, quorumHeader.QuorumID, quorumHeader.QuantizationFactor, v.operatorID)
+		assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, blob.BlobHeader, quorumHeader.QuorumID, v.operatorID)
 		if err != nil {
 			return err
 		}
@@ -67,40 +68,25 @@ func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *Operator
 			return errors.New("number of chunks does not match assignment")
 		}
 
-		chunkLength, err := v.assignment.GetChunkLengthFromHeader(operatorState, quorumHeader)
-		if err != nil {
-			return err
-		}
-
 		// Validate the chunkLength against the quorum and adversary threshold parameters
-		numOperators := uint(len(operatorState.Operators[quorumHeader.QuorumID]))
-		minChunkLength, err := v.assignment.GetMinimumChunkLength(numOperators, blob.BlobHeader.BlobCommitments.Length, quorumHeader.QuantizationFactor, quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
-		if err != nil {
-			return err
-		}
-		params, err := GetEncodingParams(minChunkLength, info.TotalChunks)
-		if err != nil {
-			return err
-		}
-
-		if params.ChunkLength != chunkLength {
-			return errors.New("number of chunks does not match assignment")
+		ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobHeader, quorumHeader.QuorumID)
+		if err != nil || !ok {
+			return fmt.Errorf("invalid chunk length: %w", err)
 		}
 
 		// Get the chunk length
 		chunks := blob.Bundles[quorumHeader.QuorumID]
 		for _, chunk := range chunks {
-			if uint(chunk.Length()) != chunkLength {
+			if uint(chunk.Length()) != quorumHeader.ChunkLength {
 				return ErrChunkLengthMismatch
 			}
 		}
 
-		// Validate the chunk length
-		if chunkLength*quorumHeader.QuantizationFactor*numOperators != quorumHeader.EncodedBlobLength {
-			return ErrInvalidHeader
-		}
-
 		// Check the received chunks against the commitment
+		params, err := GetEncodingParams(quorumHeader.ChunkLength, info.TotalChunks)
+		if err != nil {
+			return err
+		}
 		err = v.encoder.VerifyChunks(chunks, assignment.GetIndices(), blob.BlobHeader.BlobCommitments, params)
 		if err != nil {
 			return err

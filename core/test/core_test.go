@@ -79,19 +79,24 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blob core.Blob, quor
 		t.Fatal(err)
 	}
 
-	assignments, info, err := asn.GetAssignments(state, quorumID, quantizationFactor)
+	blobSize := uint(len(blob.Data))
+	blobLength := core.GetBlobLength(blobSize)
+
+	chunkLength, err := asn.CalculateChunkLength(state, blobLength, blob.RequestHeader.SecurityParams[quorumIndex])
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blobSize := uint(len(blob.Data))
-	blobLength := core.GetBlobLength(blobSize)
-	adversaryThreshold := blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold
-	quorumThreshold := blob.RequestHeader.SecurityParams[quorumIndex].QuorumThreshold
+	quorumHeader := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           quorumID,
+			AdversaryThreshold: blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold,
+			QuorumThreshold:    blob.RequestHeader.SecurityParams[quorumIndex].QuorumThreshold,
+		},
+		ChunkLength: chunkLength,
+	}
 
-	numOperators := uint(len(state.Operators[quorumID]))
-
-	chunkLength, err := asn.GetMinimumChunkLength(numOperators, blobLength, quantizationFactor, quorumThreshold, adversaryThreshold)
+	assignments, info, err := asn.GetAssignments(state, blobLength, quorumHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,16 +109,6 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blob core.Blob, quor
 	commitments, chunks, err := enc.Encode(blob.Data, params)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	quorumHeader := &core.BlobQuorumInfo{
-		SecurityParam: core.SecurityParam{
-			QuorumID:           quorumID,
-			AdversaryThreshold: adversaryThreshold,
-			QuorumThreshold:    quorumThreshold,
-		},
-		QuantizationFactor: quantizationFactor,
-		EncodedBlobLength:  params.ChunkLength * quantizationFactor * numOperators,
 	}
 
 	blobHeader := &core.BlobHeader{

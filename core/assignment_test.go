@@ -21,7 +21,18 @@ func TestOperatorAssignments(t *testing.T) {
 	operatorState := state.OperatorState
 	coordinator := &core.StdAssignmentCoordinator{}
 
-	assignments, info, err := coordinator.GetAssignments(operatorState, 0, uint(2))
+	quorumInfo := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: 50,
+			QuorumThreshold:    100,
+		},
+		ChunkLength: 10,
+	}
+
+	blobLength := uint(1000)
+
+	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
 	assert.NoError(t, err)
 	expectedAssignments := map[core.OperatorID]core.Assignment{
 		makeOperatorId(0): {
@@ -74,7 +85,14 @@ func TestOperatorAssignments(t *testing.T) {
 	for operatorID, assignment := range assignments {
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
-		assignment, info, err := coordinator.GetOperatorAssignment(operatorState, 0, uint(2), operatorID)
+		header := &core.BlobHeader{
+			BlobCommitments: core.BlobCommitments{
+				Length: blobLength,
+			},
+			QuorumInfos: []*core.BlobQuorumInfo{quorumInfo},
+		}
+
+		assignment, info, err := coordinator.GetOperatorAssignment(operatorState, header, 0, operatorID)
 		assert.NoError(t, err)
 
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
