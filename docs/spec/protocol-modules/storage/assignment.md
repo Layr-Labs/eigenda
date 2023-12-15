@@ -17,18 +17,17 @@ The AssignmentCoordinator must implement the following interface, which facilita
 ```go
 type AssignmentCoordinator interface {
 
-	// GetAssignments calculates the full set of node assignments. The assignment of indices to nodes depends only on the OperatorState
-	// for a given quorum and the quantizationFactor. In particular, it does not depend on the security parameters.
-	GetAssignments(state *OperatorState, quorumID QuorumID, quantizationFactor uint) (map[OperatorID]Assignment, AssignmentInfo, error)
+	// GetAssignments calculates the full set of node assignments.
+	GetAssignments(state *OperatorState, blobLength uint, info *BlobQuorumInfo) (map[OperatorID]Assignment, AssignmentInfo, error)
 
 	// GetOperatorAssignment calculates the assignment for a specific DA node
-	GetOperatorAssignment(state *OperatorState, quorum QuorumID, quantizationFactor uint, id OperatorID) (Assignment, AssignmentInfo, error)
+	GetOperatorAssignment(state *OperatorState, header *BlobHeader, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error)
 
-	// GetMinimumChunkLength calculates the minimum chunkLength that is sufficient for a given blob for each quorum
-	GetMinimumChunkLength(numOperators, blobLength, quantizationFactor uint, quorumThreshold, adversaryThreshold uint8) uint
+	// ValidateChunkLength validates that the chunk length for the given quorum satisfies all protocol requirements
+	ValidateChunkLength(state *OperatorState, header *BlobHeader, quorum QuorumID) (bool, error)
 
-	// GetChunkLengthFromHeader calculates the chunk length from the blob header
-	GetChunkLengthFromHeader(state *OperatorState, header *BlobQuorumInfo) (uint, error)
+	// CalculateChunkLength calculates the chunk length for the given quorum that satisfies all protocol requirements
+	CalculateChunkLength(state *OperatorState, blobLength uint, param *SecurityParam) (uint, error)
 }
 ```
 
@@ -55,13 +54,21 @@ The standard assignment coordinator implements a very simple logic for determini
 
 
 **Chunk Length**.
-To determine the chunk length, we first set the reconstruction threshold at the level of chunks (i.e., the number of chunks from which we wish to be able to reconstruct the original blob) as
 
-$$m = ceil(n\rho\gamma)$$
+The protocol requires that chunk lengths are sufficiently small that operators with a small proportion of stake are able to receive a quantity of data commensurate with their stake share. For each operator $i$, let $S_i$ signify the amount of stake held by that operator. 
 
-where where $n$ is the total number of operators and $\rho$ is called the quantization factor, $\gamma = \beta-\alpha$, with $\alpha$ and $\beta$ as defined in the [Storage Overview](./overview.md).
+We require that the chunk size $C$ satisfy
 
-We can then derive the chunk length as $C \ge B/m$, where $B$ is the length of the blob. We have the round the chunk length up to the next power of two. 
+$$
+C \le \text{NextPowerOf2}\left(\frac{B}{\gamma}\max\left(\frac{\min_jS_j}{\sum_jS_j}, \alpha \right) \right)
+$$
+
+
+where $\gamma = \beta-\alpha$, with $\alpha$ and $\beta$ as defined in the [Storage Overview](./overview.md) and $\alpha = 1/8192$ is a system parameter.
+
+This means that as long as an operator has a stake share of at least $\alpha$ the proportion of encoded data that they will receive will be within a factor of 2 of their share of stake. Operators with less than an $\alpha$ fraction of stake will receive no more than a fraction $\alpha$ of the encoded data. 
+
+In the future, additional constraints on chunk length may be added; for instance, the chunk length may be set in order to maintain a fixed number of chunks per blob across all system states. 
 
 **Index Assignment**.
 
