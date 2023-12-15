@@ -102,7 +102,6 @@ func (env *Config) deployEigenDAContracts() {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				QuantizationFactor: 1,
 			},
 		},
 	}

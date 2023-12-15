@@ -228,14 +228,14 @@ func TestStreamingEncoding(t *testing.T) {
 			AdversaryThreshold: 80,
 			QuorumThreshold:    100,
 		},
-		ChunkLength: 10,
+		ChunkLength: 8,
 	})
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
 	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
-	assert.Len(t, encodedResult.Chunks, 16)
+	assert.Len(t, encodedResult.Chunks, 64)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
@@ -448,7 +448,7 @@ func TestPartialBlob(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			ChunkLength: 10,
+			ChunkLength: 4,
 		}})
 
 		assert.Contains(t, batch.BlobHeaders, blobMessage.BlobHeader)
@@ -620,7 +620,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				ChunkLength: 10,
+				ChunkLength: 8,
 			},
 			{
 				SecurityParam: core.SecurityParam{
@@ -628,7 +628,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 70,
 					QuorumThreshold:    95,
 				},
-				ChunkLength: 10,
+				ChunkLength: 4,
 			},
 		})
 
@@ -653,7 +653,7 @@ func TestGetBatch(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			ChunkLength: 10,
+			ChunkLength: 4,
 		}})
 
 		assert.Len(t, blobMessage.Bundles, 1)

@@ -189,7 +189,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, err
 	}
 
-	encodedBlobSize := core.GetBlobSize(blobHeader.QuorumInfos[in.GetQuorumId()].EncodedBlobLength)
+	encodedBlobSize := core.GetBlobLength(core.GetEncodedBlobLength(blobHeader.Length, blobHeader.QuorumInfos[in.GetQuorumId()].QuorumThreshold, blobHeader.QuorumInfos[in.GetQuorumId()].AdversaryThreshold))
 	rate := blobHeader.QuorumInfos[in.GetQuorumId()].QuorumRate
 
 	s.mu.Lock()
