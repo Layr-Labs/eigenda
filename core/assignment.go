@@ -177,10 +177,8 @@ var (
 func roundUpDivideBig(a, b *big.Int) *big.Int {
 
 	one := new(big.Int).SetUint64(1)
-	res := new(big.Int)
-	a.Add(a, b)
-	a.Sub(a, one)
-	res.Div(a, b)
+
+	res := new(big.Int).Div(new(big.Int).Sub(new(big.Int).Add(a, b), one), b)
 	return res
 
 }
