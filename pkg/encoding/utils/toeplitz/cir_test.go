@@ -68,7 +68,7 @@ func TestMultiplyCircular_InvalidDimensions(t *testing.T) {
 	x[2] = bls.ToFr("3")
 	x[3] = bls.ToFr("4")
 	_, err := c.Multiply(x)
-	assert.EqualError(t, err, "Dimension inconsistent")
+	assert.EqualError(t, err, "dimension inconsistent")
 }
 
 func TestMultiplyPointsCircular(t *testing.T) {
@@ -109,7 +109,7 @@ func TestMultiplyPointsCircular_InvalidDimension(t *testing.T) {
 	x[3] = bls.GenG1
 
 	_, err := c.MultiplyPoints(x, false, true)
-	assert.EqualError(t, err, "Dimension inconsistent. Input != vector")
+	assert.EqualError(t, err, "dimension inconsistent. Input != vector")
 }
 
 func TestHadamard_InvalidDimension(t *testing.T) {
@@ -122,7 +122,7 @@ func TestHadamard_InvalidDimension(t *testing.T) {
 
 	c := make([]bls.Fr, 3)
 	err := toeplitz.Hadamard(a, b, c)
-	assert.EqualError(t, err, "Dimension inconsistent. Cannot do Hadamard Product on Fr")
+	assert.EqualError(t, err, "dimension inconsistent. Cannot do Hadamard Product on Fr")
 
 	// TODO: This causes a panic because there are no checks on the size of c
 	// b = make([]bls.Fr, 2)
@@ -145,7 +145,7 @@ func TestHadamardPoint_InvalidDimension(t *testing.T) {
 
 	c := make([]bls.G1Point, 3)
 	err := toeplitz.HadamardPoints(a, b, c)
-	assert.EqualError(t, err, "Dimension inconsistent. Cannot do Hadamard Product on Points")
+	assert.EqualError(t, err, "dimension inconsistent. Cannot do Hadamard Product on Points")
 
 	// TODO: This causes a panic because there are no checks on the size of c
 	// b = make([]bls.Fr, 2)

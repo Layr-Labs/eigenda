@@ -12,7 +12,7 @@ import (
 
 type EthClient interface {
 	GetAccountAddress() common.Address
-	GetNoSendTransactOpts() *bind.TransactOpts
+	GetNoSendTransactOpts() (*bind.TransactOpts, error)
 	ChainID(ctx context.Context) (*big.Int, error)
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
@@ -39,5 +39,6 @@ type EthClient interface {
 	TransactionInBlock(ctx context.Context, blockHash common.Hash, index uint) (*types.Transaction, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	EstimateGasPriceAndLimitAndSendTx(ctx context.Context, tx *types.Transaction, tag string, value *big.Int) (*types.Receipt, error)
-	EnsureTransactionEvaled(tx *types.Transaction, tag string) (*types.Receipt, error)
+	UpdateGas(ctx context.Context, tx *types.Transaction, value *big.Int) (*types.Transaction, error)
+	EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error)
 }

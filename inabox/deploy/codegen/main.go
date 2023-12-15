@@ -8,8 +8,8 @@ import (
 	"text/template"
 
 	churner "github.com/Layr-Labs/eigenda/churner/flags"
+	dis "github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	bat "github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
-	dis "github.com/Layr-Labs/eigenda/disperser/cmd/disperserserver/flags"
 	enc "github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	opr "github.com/Layr-Labs/eigenda/node/flags"
 	retriever "github.com/Layr-Labs/eigenda/retriever/flags"

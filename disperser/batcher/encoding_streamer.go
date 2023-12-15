@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 )
 
@@ -23,7 +23,7 @@ type EncodedSizeNotifier struct {
 
 	Notify chan struct{}
 	// threshold is the size of the total encoded blob results in bytes that triggers the notifier
-	threshold uint
+	threshold uint64
 	// active is set to false after the notifier is triggered to prevent it from triggering again for the same batch
 	// This is reset when CreateBatch is called and the encoded results have been consumed
 	active bool
@@ -38,9 +38,6 @@ type StreamerConfig struct {
 
 	// EncodingQueueLimit is the maximum number of encoding requests that can be queued
 	EncodingQueueLimit int
-
-	// PoolSize is the number of workers in the worker pool
-	PoolSize int
 }
 
 type EncodingStreamer struct {
@@ -50,7 +47,7 @@ type EncodingStreamer struct {
 
 	EncodedBlobstore     *encodedBlobStore
 	ReferenceBlockNumber uint
-	Pool                 *workerpool.WorkerPool
+	Pool                 common.WorkerPool
 	EncodedSizeNotifier  *EncodedSizeNotifier
 
 	blobStore             disperser.BlobStore
@@ -60,7 +57,8 @@ type EncodingStreamer struct {
 
 	encodingCtxCancelFuncs []context.CancelFunc
 
-	logger common.Logger
+	metrics *EncodingStreamerMetrics
+	logger  common.Logger
 }
 
 type batchMetadata struct {
@@ -77,7 +75,7 @@ type batch struct {
 	MerkleTree    *merkletree.MerkleTree
 }
 
-func NewEncodedSizeNotifier(notify chan struct{}, threshold uint) *EncodedSizeNotifier {
+func NewEncodedSizeNotifier(notify chan struct{}, threshold uint64) *EncodedSizeNotifier {
 	return &EncodedSizeNotifier{
 		Notify:    notify,
 		threshold: threshold,
@@ -92,6 +90,8 @@ func NewEncodingStreamer(
 	encoderClient disperser.EncoderClient,
 	assignmentCoordinator core.AssignmentCoordinator,
 	encodedSizeNotifier *EncodedSizeNotifier,
+	workerPool common.WorkerPool,
+	metrics *EncodingStreamerMetrics,
 	logger common.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
@@ -100,13 +100,14 @@ func NewEncodingStreamer(
 		StreamerConfig:         config,
 		EncodedBlobstore:       newEncodedBlobStore(logger),
 		ReferenceBlockNumber:   uint(0),
-		Pool:                   workerpool.New(config.PoolSize),
+		Pool:                   workerPool,
 		EncodedSizeNotifier:    encodedSizeNotifier,
 		blobStore:              blobStore,
 		chainState:             chainState,
 		encoderClient:          encoderClient,
 		assignmentCoordinator:  assignmentCoordinator,
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
+		metrics:                metrics,
 		logger:                 logger,
 	}, nil
 }
@@ -123,9 +124,11 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case response := <-encoderChan:
 				err := e.ProcessEncodedBlobs(ctx, response)
 				if err != nil {
-					if !errors.Is(err, context.Canceled) {
-						e.logger.Error("error processing encoded blobs", "err", err)
+					if strings.Contains(err.Error(), context.Canceled.Error()) {
+						// ignore canceled errors because canceled encoding requests are normal
+						continue
 					}
+					e.logger.Error("error processing encoded blobs", "err", err)
 				}
 			}
 		}
@@ -143,7 +146,7 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case <-ticker.C:
 				err := e.RequestEncoding(ctx, encoderChan)
 				if err != nil {
-					e.logger.Error("error requesting encoding", "err", err)
+					e.logger.Warn("error requesting encoding", "err", err)
 				}
 			}
 		}
@@ -370,7 +373,8 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 		return fmt.Errorf("failed to putEncodedBlob: %w", err)
 	}
 
-	encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
+	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
+	e.metrics.UpdateEncodedBlobs(count, encodedSize)
 	if e.EncodedSizeNotifier.threshold > 0 && encodedSize >= e.EncodedSizeNotifier.threshold {
 		e.EncodedSizeNotifier.mu.Lock()
 
@@ -526,6 +530,12 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		BatchMetadata: batchMetadata,
 		MerkleTree:    tree,
 	}, nil
+}
+
+func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
+	for _, sp := range metadata.RequestMetadata.SecurityParams {
+		e.EncodedBlobstore.DeleteEncodingResult(metadata.GetBlobKey(), sp.QuorumID)
+	}
 }
 
 func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*batchMetadata, error) {

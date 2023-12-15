@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/disperser/eth"
+	"github.com/Layr-Labs/eigenda/disperser/batcher/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +39,7 @@ func TestConfirmerTimeout(t *testing.T) {
 	tx := coremock.MockTransactor{}
 	confirmer, err := eth.NewBatchConfirmer(&tx, 100*time.Millisecond)
 	assert.Nil(t, err)
-	tx.On("ConfirmBatch").Return(nil, context.DeadlineExceeded)
+	tx.On("ConfirmBatch").Return(nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", "123", context.DeadlineExceeded)).Once()
 	_, err = confirmer.ConfirmBatch(context.Background(), &core.BatchHeader{
 		ReferenceBlockNumber: 100,
 		BatchRoot:            [32]byte{},

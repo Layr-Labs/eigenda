@@ -92,7 +92,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 			socket = op.Socket
 		}
 		if r.Err != nil {
-			a.Logger.Warn("Error returned from messageChan", "operator", operatorIDHex, "socket", socket, "err", r.Err)
+			a.Logger.Warn("[AggregateSignatures] error returned from messageChan", "operator", operatorIDHex, "socket", socket, "err", r.Err)
 			continue
 		}
 
@@ -109,6 +109,8 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 			a.Logger.Error("Signature is not valid", "operator", operatorIDHex, "socket", socket, "pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
 			continue
 		}
+
+		a.Logger.Info("[AggregateSignatures] received signature from operator", "operator", operatorIDHex, "socket", socket)
 
 		for ind, id := range quorumIDs {
 
@@ -144,8 +146,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 
 	for id, op := range state.IndexedOperators {
 		_, found := signerMap[id]
+		a.Logger.Trace("[state.IndexedOperators]", "operator", hexutil.Encode(id[:]), "G1X", op.PubkeyG1.X.Text(16), "G1Y", op.PubkeyG1.Y.Text(16))
 		if !found {
 			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			a.Logger.Trace("[state.IndexedOperators] Non signer found", "operator", hexutil.Encode(id[:]), "G1X", op.PubkeyG1.X.Text(16), "G1Y", op.PubkeyG1.Y.Text(16))
 			nonSignerOperatorIds = append(nonSignerOperatorIds, id)
 		}
 	}

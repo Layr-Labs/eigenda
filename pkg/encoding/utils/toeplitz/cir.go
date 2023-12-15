@@ -22,7 +22,7 @@ func NewCircular(v []bls.Fr, fs *kzg.FFTSettings) *Circular {
 // Matrix multiplication between a circular matrix and a vector using FFT
 func (c *Circular) Multiply(x []bls.Fr) ([]bls.Fr, error) {
 	if len(x) != len(c.V) {
-		return nil, errors.New("Dimension inconsistent")
+		return nil, errors.New("dimension inconsistent")
 	}
 	n := len(x)
 
@@ -58,7 +58,7 @@ func (c *Circular) Multiply(x []bls.Fr) ([]bls.Fr, error) {
 // function allows for using precomputed FFT as its input.
 func (c *Circular) MultiplyPoints(x []bls.G1Point, inv bool, usePrecompute bool) ([]bls.G1Point, error) {
 	if len(x) != len(c.V) {
-		return nil, errors.New("Dimension inconsistent. Input != vector")
+		return nil, errors.New("dimension inconsistent. Input != vector")
 	}
 	n := len(x)
 
@@ -109,7 +109,7 @@ func (c *Circular) GetFFTCoeff() ([]bls.Fr, error) {
 // Hadamard product between 2 vectors, one contains G1 points, the other contains Fr element
 func HadamardPoints(a []bls.G1Point, b []bls.Fr, u []bls.G1Point) error {
 	if len(a) != len(b) {
-		return errors.New("Dimension inconsistent. Cannot do Hadamard Product on Points")
+		return errors.New("dimension inconsistent. Cannot do Hadamard Product on Points")
 	}
 
 	for i := 0; i < len(a); i++ {
@@ -121,7 +121,7 @@ func HadamardPoints(a []bls.G1Point, b []bls.Fr, u []bls.G1Point) error {
 // Hadamard product between 2 vectors containing Fr elements
 func Hadamard(a, b, u []bls.Fr) error {
 	if len(a) != len(b) {
-		return errors.New("Dimension inconsistent. Cannot do Hadamard Product on Fr")
+		return errors.New("dimension inconsistent. Cannot do Hadamard Product on Fr")
 	}
 
 	for i := 0; i < len(a); i++ {

@@ -131,6 +131,33 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 
 }
 
+// convert struct understandable by the crypto library
+func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCore []core.Sample, numBlobs int) error {
+	encParams := toEncParams(params)
+	samples := make([]kzgEncoder.Sample, len(samplesCore))
+
+	for i, sc := range samplesCore {
+		x, err := encoder.GetLeadingCosetIndex(
+			uint64(sc.AssignmentIndex),
+			encParams.NumChunks,
+		)
+		if err != nil {
+			return err
+		}
+
+		sample := kzgEncoder.Sample{
+			Commitment: *sc.Commitment.G1Point,
+			Proof:      sc.Chunk.Proof,
+			RowIndex:   sc.BlobIndex,
+			Coeffs:     sc.Chunk.Coeffs,
+			X:          uint(x),
+		}
+		samples[i] = sample
+	}
+
+	return e.EncoderGroup.UniversalVerify(encParams, samples, numBlobs)
+}
+
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
 func (e *Encoder) Decode(chunks []*core.Chunk, indices []core.ChunkNumber, params core.EncodingParams, maxInputSize uint64) ([]byte, error) {

@@ -26,8 +26,8 @@ const (
 	//bit5
 )
 
-var ErrRBOInvalidLength = errors.New("Length must be power of 2 for RBO")
-var ErrFrRBOListTooLarge = errors.New("Fr RBO list length too large")
+var ErrRBOInvalidLength = errors.New("length must be power of 2 for RBO")
+var ErrFrRBOListTooLarge = errors.New("Fr RBO list length too large") //lint:ignore ST1005 ignore noun
 var ErrG1RBOListTooLarge = errors.New("G1 RBO list length too large")
 
 // bitmagic: binary search through a uint32 to find the index (least bit being 0) of the first set bit.

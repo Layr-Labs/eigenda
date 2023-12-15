@@ -32,14 +32,14 @@ func BlobStoreRequestsToPoly(blobStoreRequests []BlobStoreRequest) ([]fr.Element
         blobDataStartDegrees = append(blobDataStartDegrees, len(overallPoly))
         overallPoly = append(overallPoly, poly...)
     }
-    return overallPoly, bobIDs, blobDataStartDegrees
+    return overallPoly, blobIDs, blobDataStartDegrees
 }
 ```
-The disperser returns to each requester the KZG commitment to the `overallPoly` that their data was included in, its start and end degrees, and the the corresponding [DataStoreHeader](../spec/types/node-types.md#datastoreheader) that the blob was included in.
+The disperser returns to each requester the KZG commitment to the `overallPoly` that their data was included in, its start and end degrees, and the corresponding [DataStoreHeader](../spec/types/node-types.md#datastoreheader) that the blob was included in.
 
 ### Encoding
 
-The disperser encodes the `overallPoly` for each quorum among all of the `BlobStoreRequests`. The disperser generates its encoding parameters for each quroum relative to the highest `AdversaryThresholdBPs` and highest `QuorumThresholdBPs` for each quorum among all of the `BlobStoreRequests`.
+The disperser encodes the `overallPoly` for each quorum among all of the `BlobStoreRequests`. The disperser generates its encoding parameters for each quorum relative to the highest `AdversaryThresholdBPs` and highest `QuorumThresholdBPs` for each quorum among all of the `BlobStoreRequests`.
 
 [TODO: @bxue-l2]
 

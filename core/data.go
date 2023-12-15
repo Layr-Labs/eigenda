@@ -85,10 +85,10 @@ type BlobHeader struct {
 }
 
 // Returns the total encoded size in bytes of the blob across all quorums.
-func (b *BlobHeader) EncodedSizeAllQuorums() int {
-	size := 0
+func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
+	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
-		size += int(quorum.EncodedBlobLength * bn254.BYTES_PER_COEFFICIENT)
+		size += int64(quorum.EncodedBlobLength) * int64(bn254.BYTES_PER_COEFFICIENT)
 	}
 	return size
 }
@@ -159,4 +159,30 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 		}
 	}
 	return data, nil
+}
+
+// Returns the size of the bundles in bytes.
+func (cb Bundles) Size() int64 {
+	size := int64(0)
+	for _, bundle := range cb {
+		for _, chunk := range bundle {
+			size += int64(chunk.Size())
+		}
+	}
+	return size
+}
+
+// Sample is a chunk with associated metadata used by the Universal Batch Verifier
+type Sample struct {
+	Commitment      *Commitment
+	Chunk           *Chunk
+	AssignmentIndex ChunkNumber
+	BlobIndex       int
+}
+
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+// Blobs with the same encoding parameters are collected in a single subBatch
+type SubBatch struct {
+	Samples  []Sample
+	NumBlobs int
 }

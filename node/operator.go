@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -24,7 +26,7 @@ type Operator struct {
 }
 
 // Register operator registers the operator with the given public key for the given quorum IDs.
-func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerUrl string, logger common.Logger) error {
+func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerUrl string, useSecureGrpc bool, logger common.Logger) error {
 	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, operator.OperatorId)
 	if err != nil {
 		return fmt.Errorf("failed to get registered quorum ids for an operator: %w", err)
@@ -72,7 +74,7 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 
 	// if we should call the churner, call it
 	if shouldCallChurner {
-		churnReply, err := requestChurnApproval(ctx, operator, churnerUrl, logger)
+		churnReply, err := requestChurnApproval(ctx, operator, churnerUrl, useSecureGrpc, logger)
 		if err != nil {
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
@@ -93,12 +95,18 @@ func DeregisterOperator(ctx context.Context, KeyPair *core.KeyPair, transactor c
 	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber)
 }
 
-func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, logger common.Logger) (*grpcchurner.ChurnReply, error) {
+func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger common.Logger) (*grpcchurner.ChurnReply, error) {
 	logger.Info("churner url", "url", churnerUrl)
+
+	credential := insecure.NewCredentials()
+	if useSecureGrpc {
+		config := &tls.Config{}
+		credential = credentials.NewTLS(config)
+	}
 
 	conn, err := grpc.Dial(
 		churnerUrl,
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // TODO: still need this?
+		grpc.WithTransportCredentials(credential),
 	)
 	if err != nil {
 		logger.Error("Node cannot connect to churner", "err", err)

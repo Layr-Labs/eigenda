@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -13,20 +14,29 @@ type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
 
 	bucketStore BucketStore
+	allowlist   []string
 
 	logger common.Logger
 }
 
-func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, logger common.Logger) common.RateLimiter {
+func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, allowlist []string, logger common.Logger) common.RateLimiter {
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
+		allowlist:        allowlist,
 		logger:           logger,
 	}
 }
 
 // Checks whether a request from the given requesterID is allowed
 func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
+	// TODO: temporary allowlist that unconditionally allows request
+	// for testing purposes only
+	for _, id := range d.allowlist {
+		if strings.Contains(requesterID, id) {
+			return true, nil
+		}
+	}
 
 	// Retrieve bucket params for the requester ID
 	// This will be from dynamo for Disperser and from local storage for DA node

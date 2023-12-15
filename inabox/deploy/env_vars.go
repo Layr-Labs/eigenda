@@ -27,6 +27,8 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_PRIVATE_KEY string
 
+	DISPERSER_SERVER_NUM_CONFIRMATIONS string
+
 	DISPERSER_SERVER_STD_LOG_LEVEL string
 
 	DISPERSER_SERVER_FILE_LOG_LEVEL string
@@ -113,6 +115,8 @@ type BatcherVars struct {
 	BATCHER_CHAIN_RPC string
 
 	BATCHER_PRIVATE_KEY string
+
+	BATCHER_NUM_CONFIRMATIONS string
 
 	BATCHER_STD_LOG_LEVEL string
 
@@ -242,6 +246,8 @@ type OperatorVars struct {
 
 	NODE_CLIENT_IP_HEADER string
 
+	NODE_CHURNER_USE_SECURE_GRPC string
+
 	NODE_G1_PATH string
 
 	NODE_G2_PATH string
@@ -261,6 +267,8 @@ type OperatorVars struct {
 	NODE_CHAIN_RPC string
 
 	NODE_PRIVATE_KEY string
+
+	NODE_NUM_CONFIRMATIONS string
 
 	NODE_STD_LOG_LEVEL string
 
@@ -315,6 +323,8 @@ type RetrieverVars struct {
 
 	RETRIEVER_PRIVATE_KEY string
 
+	RETRIEVER_NUM_CONFIRMATIONS string
+
 	RETRIEVER_STD_LOG_LEVEL string
 
 	RETRIEVER_FILE_LOG_LEVEL string
@@ -344,11 +354,17 @@ type ChurnerVars struct {
 
 	CHURNER_EIGENDA_SERVICE_MANAGER string
 
+	CHURNER_ENABLE_METRICS string
+
 	CHURNER_PER_PUBLIC_KEY_RATE_LIMIT string
+
+	CHURNER_METRICS_HTTP_PORT string
 
 	CHURNER_CHAIN_RPC string
 
 	CHURNER_PRIVATE_KEY string
+
+	CHURNER_NUM_CONFIRMATIONS string
 
 	CHURNER_STD_LOG_LEVEL string
 
@@ -357,10 +373,6 @@ type ChurnerVars struct {
 	CHURNER_LOG_PATH string
 
 	CHURNER_INDEXER_PULL_INTERVAL string
-
-	CHURNER_ENABLE_METRICS string
-
-	CHURNER_METRICS_HTTP_PORT string
 }
 
 func (vars ChurnerVars) getEnvMap() map[string]string {

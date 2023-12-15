@@ -4,9 +4,9 @@
 The assignment functionality within EigenDA is carried out by the `AssignmentCoordinator` which is responsible for taking the current OperatorState and the security requirements represented by a given QuorumParams and determining or validating system parameters that will satisfy these security requirements given the OperatorStates. There are two classes of parameters that must be determined or validated:
 
 1) the chunk indices that will be assigned to each DA node.
-2) the length of each chunk (measured in number of symbols). In keeping with the constraint imposed by the Encoding module, all chunks must have the same length, so this is paramter is a scalar.
+2) the length of each chunk (measured in number of symbols). In keeping with the constraint imposed by the Encoding module, all chunks must have the same length, so this parameter is a scalar.
 
-As illustrated in the interface that follows, the assignment of indices does not depends on the security parameters such as quorum threshold and adversary threshold. As these parameters change, the only effect on the resulting assignments will be that the chunk length changes.
+As illustrated in the interface that follows, the assignment of indices does not depend on the security parameters such as quorum threshold and adversary threshold. As these parameters change, the only effect on the resulting assignments will be that the chunk length changes.
 
 The `AssignmentCoordinator` is used by the disperser to determine or validate the `EncodingParams` struct used to encode a data blob, consisting of the total number of chunks (i.e., the total number of indices) and the length of the chunk. We illustrate this in the next section.
 
@@ -98,8 +98,8 @@ Validation with respect to assignments is performed at different layers of the p
 
 ### DA Nodes
 
-When the a DA node receives a `StoreChunks` request, it performs the following validation actions relative to each blob header:
-- It uses `GetOperatorAssignment` to calculate the chunk indices for which it is responsible, and verifies that each of the chunks that it has recieved lies on the polynomial at these indices (see [Encoding validation actions](./encoding.md#validation-actions))
+When the DA node receives a `StoreChunks` request, it performs the following validation actions relative to each blob header:
+- It uses `GetOperatorAssignment` to calculate the chunk indices for which it is responsible, and verifies that each of the chunks that it has received lies on the polynomial at these indices (see [Encoding validation actions](./encoding.md#validation-actions))
 - It validates that the `Length` contained in the `BlobHeader` is valid. (see [Encoding validation actions](./encoding.md#validation-actions))
 - It determines the `ChunkLength` of the received chunks.
 - It validates that the `EncodedBlobLength` of the `BlobHeader` satisfies `BlobHeader.EncodedBlobLength = ChunkLength*BlobHeader.QuantizationFactor*State.NumOperators`

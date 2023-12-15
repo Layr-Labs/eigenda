@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/indexer/leveldb"
@@ -23,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -67,6 +67,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	config := geth.EthClientConfig{
 		RPCURL:           deployer.RPC,
 		PrivateKeyString: op.NODE_PRIVATE_KEY,
+		NumConfirmations: 0,
 	}
 
 	c, err := geth.NewClient(config, logger)
@@ -86,6 +87,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger common.Lo
 	config := geth.EthClientConfig{
 		RPCURL:           deployer.RPC,
 		PrivateKeyString: privateKey,
+		NumConfirmations: 0,
 	}
 
 	client, err := geth.NewClient(config, logger)
@@ -107,14 +109,24 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger co
 
 	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
-	cs := eth.NewChainState(tx, client)
 
-	addr := gethcommon.HexToAddress(env.EigenDA.ServiceManager)
+	var (
+		cs            = eth.NewChainState(tx, client)
+		indexerConfig = indexer.Config{
+			PullInterval: 1 * time.Second,
+		}
+	)
 
-	indexerConfig := &indexer.Config{
-		PullInterval: 1 * time.Second,
-	}
-	chainState, err := indexedstate.NewIndexedChainState(indexerConfig, addr, cs, store, client, rpcClient, logger)
+	indexer, err := coreindexer.CreateNewIndexer(
+		&indexerConfig,
+		client,
+		rpcClient,
+		env.EigenDA.ServiceManager,
+		logger,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	chainState, err := indexedstate.NewIndexedChainState(cs, indexer)
 	if err != nil {
 		panic(err)
 	}
@@ -166,8 +178,9 @@ var _ = Describe("Indexer", func() {
 			mustRegisterOperators(testConfig, logger)
 
 			time.Sleep(1 * time.Second)
-
-			obj, _, err := chainState.Indexer.HeaderStore.GetLatestObject(chainState.Indexer.Handlers[0].Acc, false)
+			lastHeader, err := chainState.Indexer.GetLatestHeader(false)
+			Expect(err).ToNot(HaveOccurred())
+			obj, err := chainState.Indexer.GetObject(lastHeader, 0)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(obj).NotTo(BeNil())
 
@@ -175,7 +188,7 @@ var _ = Describe("Indexer", func() {
 			Expect(ok).To(BeTrue())
 			Expect(pubKeys.Operators).To(HaveLen(len(testConfig.Operators)))
 
-			obj, header, err := chainState.Indexer.HeaderStore.GetLatestObject(chainState.Indexer.Handlers[1].Acc, false)
+			obj, err = chainState.Indexer.GetObject(lastHeader, 1)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(obj).NotTo(BeNil())
 
@@ -183,6 +196,8 @@ var _ = Describe("Indexer", func() {
 			Expect(ok).To(BeTrue())
 			Expect(sockets).To(HaveLen(len(testConfig.Operators)))
 
+			header, err := chainState.Indexer.GetLatestHeader(false)
+			Expect(err).ToNot(HaveOccurred())
 			state, err := chainState.GetIndexedOperatorState(ctx, uint(header.Number), quorums)
 			Expect(err).ToNot(HaveOccurred())
 

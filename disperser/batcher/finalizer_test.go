@@ -11,7 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/inmem"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +39,7 @@ func TestFinalizedBlob(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1_000_000),
 	}, nil)
 
-	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, logger)
+	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, logger)
 
 	requestedAt := uint64(time.Now().UnixNano())
 	blob := makeTestBlob([]*core.SecurityParam{{
@@ -116,7 +117,7 @@ func TestUnfinalizedBlob(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1_000_100),
 	}, nil)
 
-	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, logger)
+	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, logger)
 
 	requestedAt := uint64(time.Now().UnixNano())
 	blob := makeTestBlob([]*core.SecurityParam{{
@@ -169,4 +170,96 @@ func TestUnfinalizedBlob(t *testing.T) {
 	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Finalized)
 	assert.NoError(t, err)
 	assert.Len(t, metadatas, 0)
+}
+
+func TestNoReceipt(t *testing.T) {
+	ctx := context.Background()
+	queue := inmem.NewBlobStore()
+	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	assert.NoError(t, err)
+	ethClient := &mock.MockEthClient{}
+	rpcClient := &mock.MockRPCEthClient{}
+
+	latestFinalBlock := int64(1_000_010)
+	rpcClient.On("CallContext", m.Anything, m.Anything, "eth_getBlockByNumber", "finalized", false).
+		Run(func(args m.Arguments) {
+			args[1].(*types.Header).Number = big.NewInt(latestFinalBlock)
+		}).Return(nil)
+	ethClient.On("TransactionReceipt", m.Anything, m.Anything).Return(nil, ethereum.NotFound)
+
+	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, logger)
+
+	requestedAt := uint64(time.Now().UnixNano())
+	blob := makeTestBlob([]*core.SecurityParam{{
+		QuorumID:           0,
+		AdversaryThreshold: 80,
+	}})
+	metadataKey, err := queue.StoreBlob(ctx, &blob, requestedAt)
+	assert.NoError(t, err)
+	batchHeaderHash := [32]byte{1, 2, 3}
+	blobIndex := uint32(10)
+	sigRecordHash := [32]byte{0}
+	inclusionProof := []byte{1, 2, 3, 4, 5}
+	confirmationInfo := &disperser.ConfirmationInfo{
+		BatchHeaderHash:         batchHeaderHash,
+		BlobIndex:               blobIndex,
+		SignatoryRecordHash:     sigRecordHash,
+		ReferenceBlockNumber:    132,
+		BatchRoot:               []byte("hello"),
+		BlobInclusionProof:      inclusionProof,
+		BlobCommitment:          &core.BlobCommitments{},
+		BatchID:                 99,
+		ConfirmationTxnHash:     common.HexToHash("0x123"),
+		ConfirmationBlockNumber: uint32(150),
+		Fee:                     []byte{0},
+	}
+	metadata := &disperser.BlobMetadata{
+		BlobHash:     metadataKey.BlobHash,
+		MetadataHash: metadataKey.MetadataHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: core.BlobRequestHeader{
+				SecurityParams: blob.RequestHeader.SecurityParams,
+			},
+			BlobSize:    uint(len(blob.Data)),
+			RequestedAt: requestedAt,
+		},
+	}
+	m, err := queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Confirmed, m.BlobStatus)
+	err = finalizer.FinalizeBlobs(context.Background())
+	assert.NoError(t, err)
+
+	// status should be kept at confirmed
+	metadatas, err := queue.GetBlobMetadataByStatus(ctx, disperser.Finalized)
+	assert.NoError(t, err)
+	assert.Len(t, metadatas, 0)
+	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Failed)
+	assert.NoError(t, err)
+	assert.Len(t, metadatas, 0)
+	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
+	assert.NoError(t, err)
+	assert.Len(t, metadatas, 1)
+	// num retries should be incremented
+	assert.Equal(t, metadatas[0].NumRetries, uint(1))
+
+	// try again
+	err = finalizer.FinalizeBlobs(context.Background())
+	assert.NoError(t, err)
+
+	// status should be transitioned to failed
+	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Finalized)
+	assert.NoError(t, err)
+	assert.Len(t, metadatas, 0)
+	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
+	assert.NoError(t, err)
+	assert.Len(t, metadatas, 0)
+	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Failed)
+	assert.NoError(t, err)
+	assert.Len(t, metadatas, 1)
+	// num retries should be the same
+	assert.Equal(t, metadatas[0].NumRetries, uint(1))
 }

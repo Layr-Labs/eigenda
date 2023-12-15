@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/dispatcher"
+	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,8 +93,9 @@ func TestStoreChunks(t *testing.T) {
 		numTotalChunks += len(blobMessagesByOp[opID][i].Bundles[0])
 	}
 	t.Logf("Batch numTotalChunks: %d", numTotalChunks)
-	req, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader)
+	req, totalSize, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader)
 	assert.NoError(t, err)
+	assert.Equal(t, 50790400, totalSize)
 
 	timer := time.Now()
 	reply, err := server.StoreChunks(context.Background(), req)

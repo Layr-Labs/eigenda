@@ -76,6 +76,6 @@ func GetLeadingCosetIndex(i uint64, numChunks uint64) (uint32, error) {
 		j := rb.ReverseBitsLimited(uint32(numChunks), uint32(i))
 		return j, nil
 	} else {
-		return 0, errors.New("Cannot create number of frame higher than possible")
+		return 0, errors.New("cannot create number of frame higher than possible")
 	}
 }

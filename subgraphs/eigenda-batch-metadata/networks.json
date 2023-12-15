@@ -13,8 +13,8 @@
   },
   "preprod-goerli": {
     "EigenDAServiceManager": {
-      "address": "0x50A65b4ffAC1D3094F1b8a7f8c65460e98CDD18a",
-      "startBlock": 9999752
+      "address": "0x25425d315Ae31897a8e7F47B1077Bf5ED3894Ca1",
+      "startBlock": 10015410
     }
   },
   "goerli": {

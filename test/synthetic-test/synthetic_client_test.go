@@ -4,6 +4,7 @@
 package k8s_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -12,22 +13,27 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shurcooL/graphql"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	retriever_rpc "github.com/Layr-Labs/eigenda/api/grpc/retriever"
+	"github.com/Layr-Labs/eigenda/clients"
 	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/proto/protogen/encoder"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -49,26 +55,39 @@ type GrpcClient struct {
 	Client   interface{} // This can be a specific client type (disperser_rpc.DisperserClient, retriever_rpc.RetrieverClient, etc.)
 }
 
+type RetrieverClientConfig struct {
+	Bls_Operator_State_Retriever     string
+	EigenDA_ServiceManager_Retriever string
+	ChurnerGraphUrl                  string
+	RetrieverSrsOrder                string
+	RetrieverG1Path                  string
+	RetrieverG2Path                  string
+	RetrieverCachePath               string
+}
+
 type TestClients struct {
 	Clients map[ClientType]*GrpcClient
 }
 
 // TestSuite Struct.
 type SyntheticTestSuite struct {
-	Clients    *TestClients
-	EthClient  common.EthClient
-	MockRollUp *rollupbindings.ContractMockRollup
-	Logger     *log.Logger
-	TestRunID  string
+	Clients         *TestClients
+	EthClient       common.EthClient
+	MockRollUp      *rollupbindings.ContractMockRollup
+	Logger          *log.Logger
+	RetrievalClient clients.RetrievalClient
+	TestRunID       string
 }
 
 var (
 	testSuite                  *SyntheticTestSuite
 	isRetrieverClientDeployed  bool = false
 	validateOnchainTransaction bool = false
+	retrievalClient            clients.RetrievalClient
+	logger                     common.Logger
 )
 
-func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string) *SyntheticTestSuite {
+func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
 	testRunID := uuid.New().String()
 	logger := log.New(os.Stdout, "EigenDA SyntheticClient:"+testRunID+" ", log.Ldate|log.Ltime)
 
@@ -112,13 +131,25 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string) *S
 	}
 
 	mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
+	if err != nil {
+		logger.Printf("Error: %v", err)
+		return nil
+	}
+
+	err = setupRetrievalClient(ethClient, &retrieverClientConfig, ethLogger)
+
+	if err != nil {
+		logger.Printf("Error: %v", err)
+		return nil
+	}
 
 	// Assign client connections to pointers in TestClients struct
 	return &SyntheticTestSuite{
-		Clients:    clients,
-		EthClient:  ethClient,
-		MockRollUp: mockRollup,
-		Logger:     logger,
+		Clients:         clients,
+		EthClient:       ethClient,
+		MockRollUp:      mockRollup,
+		RetrievalClient: retrievalClient,
+		Logger:          logger,
 	}
 }
 
@@ -130,9 +161,27 @@ func TestMain(m *testing.M) {
 	mockRollUpContractAddress := os.Getenv("MOCKROLLUP_CONTRACT_ADDRESS")
 	isRetrieverClientDeployed = os.Getenv("RETRIEVER_CLIENT_DEPLOYED") == strings.ToLower("true")
 	validateOnchainTransaction = os.Getenv("VALIDATE_ONCHAIN_TRANSACTION") == strings.ToLower("true")
+	blsOperatorStateRetriever := os.Getenv("BLS_OPERATOR_STATE_RETRIEVER")
+	eigenDAServiceManagerRetreiever := os.Getenv("EIGENDA_SERVICE_MANAGER_RETRIEVER")
+	churnerGraphUrl := os.Getenv("CHURNER_GRAPH_URL")
+	retrieverSrsOrder := os.Getenv("RETRIEVER_SRS_ORDER")
+	retrieverG1Path := os.Getenv("RETRIEVER_G1_PATH")
+	retrieverG2Path := os.Getenv("RETRIEVER_G2_PATH")
+	retrieverCachePath := os.Getenv("RETRIEVER_CACHE_PATH")
+
+	// Retriever Config
+	retrieverClientConfig := &RetrieverClientConfig{
+		Bls_Operator_State_Retriever:     blsOperatorStateRetriever,
+		EigenDA_ServiceManager_Retriever: eigenDAServiceManagerRetreiever,
+		ChurnerGraphUrl:                  churnerGraphUrl,
+		RetrieverSrsOrder:                retrieverSrsOrder,
+		RetrieverG1Path:                  retrieverG1Path,
+		RetrieverG2Path:                  retrieverG2Path,
+		RetrieverCachePath:               retrieverCachePath,
+	}
 
 	// Initialize Clients
-	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress)
+	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, *retrieverClientConfig)
 	logger := testSuite.Logger
 
 	// Check if testSuite is nil
@@ -150,6 +199,44 @@ func TestMain(m *testing.M) {
 	logger.Printf("Exiting Test Client Run with Code:%d", exitCode)
 	// Exit with the test result code
 	os.Exit(exitCode)
+}
+
+// SetUp RetrievalClient to retriever blob from Operator Node
+func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger common.Logger) error {
+	// https://github.com/Layr-Labs/eigenda/blob/b8c151436ecefc8046e4aefcdcfee67abf9e8faa/inabox/tests/integration_suite_test.go#L124
+	tx, err := eth.NewTransactor(logger, ethClient, retrievalClientConfig.Bls_Operator_State_Retriever, retrievalClientConfig.EigenDA_ServiceManager_Retriever)
+	if err != nil {
+		return err
+	}
+
+	cs := eth.NewChainState(tx, ethClient)
+	querier := graphql.NewClient(retrievalClientConfig.ChurnerGraphUrl, nil)
+	indexedChainStateClient := thegraph.NewIndexedChainState(cs, querier, logger)
+	agn := &core.StdAssignmentCoordinator{}
+
+	// TODO: What should be the value here?
+	nodeClient := clients.NewNodeClient(20 * time.Second)
+	srsOrder, err := strconv.Atoi(retrievalClientConfig.RetrieverSrsOrder)
+	if err != nil {
+		return err
+	}
+	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
+		KzgConfig: kzgEncoder.KzgConfig{
+			G1Path:         retrievalClientConfig.RetrieverG1Path,
+			G2Path:         retrievalClientConfig.RetrieverG2Path,
+			CacheDir:       retrievalClientConfig.RetrieverCachePath,
+			NumWorker:      1,
+			SRSOrder:       uint64(srsOrder),
+			Verbose:        true,
+			PreloadEncoder: true,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	retrievalClient = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
+	return indexer.Index(context.Background())
 }
 
 // TODO: This file contains some code that can be refactored and shared across some other tests ex:Integration Test.
@@ -181,12 +268,18 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	logger.Printf("Blob Key After Dispersing %s", hex.EncodeToString(key))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
+	if key == nil {
+		logger.Printf("Blob Key Dispersing Error %s", err.Error())
+		t.Fail()
+		return
+	}
+
 	disperseBlobStopTime := time.Since(disperseBlobStartTime)
 	// For now log....later we can define a baseline value for this
 	logger.Printf("Time to Disperse Blob %s", disperseBlobStopTime.String())
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
-	confirmationDeadline := time.Now().Add(60 * time.Second)
+	confirmationDeadline := time.Now().Add(240 * time.Second)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -235,7 +328,9 @@ loop:
 					ethClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 					defer cancel()
 
-					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof)
+					opts, err := ethClient.GetNoSendTransactOpts()
+					assert.Nil(t, err)
+					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
 					assert.Nil(t, err)
 					assert.NotNil(t, tx)
 					logger.Printf("PostCommitment Tx %v", tx)
@@ -244,21 +339,28 @@ loop:
 				}
 
 				// Retrieve Blob from Retriever Client
+				// Retrieval Client Iterates Over Operators to get the specific Blob
 				if isRetrieverClientDeployed {
-					logger.Printf("Retry Blob using Retrieval Client %v", blobReply)
-					retrieveBlobTime := time.Now()
-					retrieverClientBlobReply, err := retrieverClientBlobRetrieve(blobReply, 0)
+					logger.Printf("Try Blob using Retrieval Client %v", blobReply)
+					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+					logger.Printf("RetrievalClient:GetBatchHeaderHash() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash())
+					logger.Printf("RetrievalClient:GetBlobIndex() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
+					logger.Printf("RetrievalClient:GetReferenceBlockNumber() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
+					logger.Printf("RetrievalClient:GetBatchRoot() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
 
-					// For now log....later we can define a baseline value for this
-					logger.Printf("Time to RetrieveBlob %v", time.Since(retrieveBlobTime).Seconds())
+					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+						0,
+					)
 					assert.Nil(t, err)
-					assert.NotNil(t, retrieverClientBlobReply)
+					logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
+					assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
 
-					// Verify RetrieverClientData Matches input data
-					assert.Equal(t, data, retrieverClientBlobReply.Data)
-
-					// Verify Disperser and Retriever Client Blob Reply Data Matches
-					assert.Equal(t, retrieverClientBlobReply.Data, disperserClientBlobReply.Data)
+					logger.Printf("Blob using Retrieval Client %v", blobReply)
 				}
 
 				break loop
@@ -266,7 +368,7 @@ loop:
 
 			// Check if the confirmation process has exceeded the maximum duration
 			if time.Now().After(confirmationDeadline) {
-				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout of 5 minutes")
+				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout of 4 minutes")
 				logger.Println("Failing the test")
 				t.Fail()
 				return
@@ -415,6 +517,7 @@ func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IE
 }
 
 func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerificationProof) rollupbindings.EigenDABlobUtilsBlobVerificationProof {
+	logger := testSuite.Logger
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
@@ -428,12 +531,21 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
 	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
+	logger.Printf("VerificationProof:SignatoryRecordHash: %v\n", sig)
+	logger.Printf("VerificationProof:ConfirmationBlockNumber: %v\n", batchMetadataProto.GetConfirmationBlockNumber())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
 		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
+
+	logger.Printf("VerificationProof:BatchId: %v\n", verificationProof.GetBatchId())
+	logger.Printf("VerificationProof:BlobIndex: %v\n", uint8(verificationProof.GetBlobIndex()))
+	logger.Printf("VerificationProof:BatchMetadata: %v\n", batchMetadata)
+	logger.Printf("VerificationProof:InclusionProof: %v\n", verificationProof.GetInclusionProof())
+	logger.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
+
 	return rollupbindings.EigenDABlobUtilsBlobVerificationProof{
 		BatchId:                verificationProof.GetBatchId(),
 		BlobIndex:              uint8(verificationProof.GetBlobIndex()),

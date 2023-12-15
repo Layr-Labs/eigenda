@@ -36,6 +36,12 @@ runs:
       with:
         go-version: ${{inputs.go-version}}
 
+    - name: Download coverage artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: coverage
+        path: .
+
     - name: Generate coverage report
       shell: bash
       env:

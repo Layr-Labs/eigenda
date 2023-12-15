@@ -10,8 +10,8 @@ The `confirmBatch` interface upholds the following system properties:
 2. Reorg behavior: On chain confirmations behave properly under chain reorgs or forks.
 3. Confirmer permissioning: Only permissioned dispersers can confirm blobs.
 
-**Operator registration gaurds**
-The `register` and `deregister` interfaces uphold the folloiwng system properties:
+**Operator registration guards**
+The `register` and `deregister` interfaces uphold the following system properties:
 1. DA nodes cannot register if their delegated stake is insufficient.
 2. DA nodes cannot deregister if they are still responsible for storing data.
 
@@ -21,7 +21,7 @@ This document discusses how these properties are achieved by the attestation pro
 
 ### Sufficient stake checking
 
-The [BLSRegistry.sol](../contracts-registry.md) maintains the `pubkeyToStakeHistory` and `pubKeyToIndexHistory` storage variables, which allow for the the current stake and index of each operator to be retrieved for an arbitrary block number. These variables are updated whenever DA nodes register or deregister.
+The [BLSRegistry.sol](../contracts-registry.md) maintains the `pubkeyToStakeHistory` and `pubKeyToIndexHistory` storage variables, which allow for the current stake and index of each operator to be retrieved for an arbitrary block number. These variables are updated whenever DA nodes register or deregister.
 
 TODO: Describe quorum storage variables.
 
@@ -51,6 +51,6 @@ Whenever the `confirmBatch` method of the [ServiceMananger.sol](../contracts-ser
 TODO: Specify how confirmer is permissioned
 
 
-## Operator registration gaurds
+## Operator registration guards
 
 TODO: Describe these guards

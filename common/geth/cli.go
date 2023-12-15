@@ -6,13 +6,15 @@ import (
 )
 
 var (
-	rpcUrlFlagName     = "chain.rpc"
-	privateKeyFlagName = "chain.private-key"
+	rpcUrlFlagName           = "chain.rpc"
+	privateKeyFlagName       = "chain.private-key"
+	numConfirmationsFlagName = "chain.num-confirmations"
 )
 
 type EthClientConfig struct {
 	RPCURL           string
 	PrivateKeyString string
+	NumConfirmations int
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
@@ -29,6 +31,13 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRIVATE_KEY"),
 		},
+		cli.IntFlag{
+			Name:     numConfirmationsFlagName,
+			Usage:    "Number of confirmations to wait for",
+			Required: false,
+			Value:    0,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_CONFIRMATIONS"),
+		},
 	}
 }
 
@@ -36,6 +45,7 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg := EthClientConfig{}
 	cfg.RPCURL = ctx.GlobalString(rpcUrlFlagName)
 	cfg.PrivateKeyString = ctx.GlobalString(privateKeyFlagName)
+	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	return cfg
 }
 
@@ -44,5 +54,6 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg := EthClientConfig{}
 	cfg.RPCURL = ctx.GlobalString(rpcUrlFlagName)
+	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	return cfg
 }
