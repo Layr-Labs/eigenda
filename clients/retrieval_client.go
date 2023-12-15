@@ -10,9 +10,6 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
-
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/indexer"
 )
 
 type RetrievalClient interface {
@@ -38,23 +35,16 @@ var _ RetrievalClient = (*retrievalClient)(nil)
 
 func NewRetrievalClient(
 	logger common.Logger,
-	chainState core.ChainState,
-	indexer indexer.Indexer,
+	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	encoder core.Encoder,
 	numConnections int,
 ) (*retrievalClient, error) {
-	indexedState, err := coreindexer.NewIndexedChainState(
-		chainState,
-		indexer,
-	)
-	if err != nil {
-		return nil, err
-	}
+
 	return &retrievalClient{
 		logger:                logger,
-		indexedChainState:     indexedState,
+		indexedChainState:     chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
 		encoder:               encoder,
