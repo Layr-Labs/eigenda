@@ -418,6 +418,10 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 	for i := range signatureAggregation.NonSigners {
 		nonSignerOperatorIds[i] = hashPubKeyG1(signatureAggregation.NonSigners[i])
 	}
+	sigAgg, err := json.Marshal(signatureAggregation)
+	if err == nil {
+		t.Logger.Trace("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
+	}
 
 	t.Logger.Trace("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
 	for _, ns := range nonSignerOperatorIds {
