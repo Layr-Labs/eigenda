@@ -208,7 +208,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// Dispatch encoded batch
 	log.Trace("[batcher] Dispatching encoded batch...")
 	stageTimer = time.Now()
-	update := b.Dispatcher.DisperseBatch(ctx, batch.BatchMetadata.State, batch.EncodedBlobs, batch.BatchHeader)
+	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Trace("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
 
 	// Get the batch header hash
@@ -223,20 +223,21 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log.Trace("[batcher] Aggregating signatures...")
 
 	// construct quorumParams
-	quorumIDs := make([]core.QuorumID, 0, len(batch.BatchMetadata.QuorumInfos))
-	for quorumID := range batch.BatchMetadata.QuorumInfos {
+	quorumIDs := make([]core.QuorumID, 0, len(batch.State.AggKeys))
+	for quorumID := range batch.State.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
 	}
+	fmt.Println("quorumIDs", quorumIDs)
 
 	stageTimer = time.Now()
-	aggSig, err := b.Aggregator.AggregateSignatures(batch.BatchMetadata.State, quorumIDs, headerHash, update)
+	aggSig, err := b.Aggregator.AggregateSignatures(batch.State, quorumIDs, headerHash, update)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
 	}
 	log.Trace("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.UpdateAttestation(len(batch.BatchMetadata.State.IndexedOperators), len(aggSig.NonSigners))
+	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners))
 
 	passed, numPassed := getBlobQuorumPassStatus(aggSig.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes

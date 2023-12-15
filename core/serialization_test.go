@@ -83,7 +83,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				QuantizationFactor: 20,
+				ChunkLength: 10,
 			},
 		},
 	}
@@ -160,8 +160,7 @@ func TestQuorumParamsHash(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				QuantizationFactor: 1,
-				EncodedBlobLength:  48,
+				ChunkLength: 10,
 			},
 		},
 	}

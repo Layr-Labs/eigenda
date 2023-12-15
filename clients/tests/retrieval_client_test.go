@@ -95,13 +95,13 @@ func setup(t *testing.T) {
 
 	var (
 		quorumID           core.QuorumID = 0
-		quantizationFactor uint          = 2
 		adversaryThreshold uint8         = 80
 		quorumThreshold    uint8         = 90
 	)
 	securityParams := []*core.SecurityParam{
 		{
 			QuorumID:           quorumID,
+			QuorumThreshold:    quorumThreshold,
 			AdversaryThreshold: adversaryThreshold,
 		},
 	}
@@ -116,15 +116,24 @@ func setup(t *testing.T) {
 		t.Fatalf("failed to get operator state: %s", err)
 	}
 
-	assignments, info, err := coordinator.GetAssignments(operatorState, quorumID, quantizationFactor)
+	blobSize := uint(len(blob.Data))
+	blobLength := core.GetBlobLength(uint(blobSize))
+
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, securityParams[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blobSize := uint(len(blob.Data))
-	blobLength := core.GetBlobLength(uint(blobSize))
-	numOperators := uint(len(operatorState.Operators[quorumID]))
-	chunkLength, err := coordinator.GetMinimumChunkLength(numOperators, blobLength, quantizationFactor, quorumThreshold, adversaryThreshold)
+	quorumHeader := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           quorumID,
+			AdversaryThreshold: adversaryThreshold,
+			QuorumThreshold:    quorumThreshold,
+		},
+		ChunkLength: chunkLength,
+	}
+
+	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,16 +146,6 @@ func setup(t *testing.T) {
 	commitments, chunks, err := encoder.Encode(blob.Data, params)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	quorumHeader := &core.BlobQuorumInfo{
-		SecurityParam: core.SecurityParam{
-			QuorumID:           quorumID,
-			AdversaryThreshold: adversaryThreshold,
-			QuorumThreshold:    quorumThreshold,
-		},
-		QuantizationFactor: quantizationFactor,
-		EncodedBlobLength:  quantizationFactor * params.ChunkLength * numOperators,
 	}
 
 	blobHeader = &core.BlobHeader{

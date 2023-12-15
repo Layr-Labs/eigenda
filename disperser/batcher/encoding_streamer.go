@@ -67,12 +67,12 @@ type batchMetadata struct {
 }
 
 type batch struct {
-	EncodedBlobs  []core.EncodedBlob
-	BlobMetadata  []*disperser.BlobMetadata
-	BlobHeaders   []*core.BlobHeader
-	BatchHeader   *core.BatchHeader
-	BatchMetadata *batchMetadata
-	MerkleTree    *merkletree.MerkleTree
+	EncodedBlobs []core.EncodedBlob
+	BlobMetadata []*disperser.BlobMetadata
+	BlobHeaders  []*core.BlobHeader
+	BatchHeader  *core.BatchHeader
+	State        *core.IndexedOperatorState
+	MerkleTree   *merkletree.MerkleTree
 }
 
 func NewEncodedSizeNotifier(notify chan struct{}, threshold uint64) *EncodedSizeNotifier {
@@ -227,9 +227,15 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 
 	e.logger.Trace("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
-	batchMetadata, err := e.getBatchMetadata(ctx, metadatas, referenceBlockNumber)
+	// batchMetadata, err := e.getBatchMetadata(ctx, metadatas, referenceBlockNumber)
+	// if err != nil {
+	// 	return fmt.Errorf("error getting quorum infos: %w", err)
+	// }
+
+	// Get the operator state
+	state, err := e.getOperatorStateForBlobs(ctx, metadatas, referenceBlockNumber)
 	if err != nil {
-		return fmt.Errorf("error getting quorum infos: %w", err)
+		return fmt.Errorf("error getting operator state: %w", err)
 	}
 
 	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata, 0)
@@ -249,7 +255,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	for i := range metadatas {
 		metadata := metadatas[i]
 
-		e.RequestEncodingForBlob(ctx, metadata, blobs[metadata.GetBlobKey()], batchMetadata, referenceBlockNumber, encoderChan)
+		e.RequestEncodingForBlob(ctx, metadata, blobs[metadata.GetBlobKey()], state, referenceBlockNumber, encoderChan)
 	}
 
 	return nil
@@ -258,9 +264,10 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 type pendingRequestInfo struct {
 	BlobQuorumInfo *core.BlobQuorumInfo
 	EncodingParams core.EncodingParams
+	Assignments    map[core.OperatorID]core.Assignment
 }
 
-func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata *disperser.BlobMetadata, blob *core.Blob, batchMetadata *batchMetadata, referenceBlockNumber uint, encoderChan chan EncodingResultOrStatus) {
+func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata *disperser.BlobMetadata, blob *core.Blob, state *core.IndexedOperatorState, referenceBlockNumber uint, encoderChan chan EncodingResultOrStatus) {
 
 	// Validate the encoding parameters for each quorum
 
@@ -271,21 +278,37 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 	for ind := range metadata.RequestMetadata.SecurityParams {
 
 		quorum := metadata.RequestMetadata.SecurityParams[ind]
+
 		// Check if the blob has already been encoded for this quorum
 		if e.EncodedBlobstore.HasEncodingRequested(blobKey, quorum.QuorumID, referenceBlockNumber) {
 			continue
 		}
 
-		quorumInfo := batchMetadata.QuorumInfos[quorum.QuorumID]
 		blobLength := core.GetBlobLength(metadata.RequestMetadata.BlobSize)
-		numOperators := uint(len(quorumInfo.Assignments))
-		chunkLength, err := e.assignmentCoordinator.GetMinimumChunkLength(numOperators, blobLength, quorumInfo.QuantizationFactor, quorum.QuorumThreshold, quorum.AdversaryThreshold)
+
+		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, quorum)
 		if err != nil {
-			// This error shouldn't happen because we check blob headers before adding them blob store
-			e.logger.Error("[RequestEncodingForBlob] invalid request parameters", "err", err)
+			e.logger.Error("[RequestEncodingForBlob] error calculating chunk length", "err", err)
 			continue
 		}
-		params, err := core.GetEncodingParams(chunkLength, quorumInfo.Info.TotalChunks)
+
+		blobQuorumInfo := &core.BlobQuorumInfo{
+			SecurityParam: core.SecurityParam{
+				QuorumID:           quorum.QuorumID,
+				AdversaryThreshold: quorum.AdversaryThreshold,
+				QuorumThreshold:    quorum.QuorumThreshold,
+				QuorumRate:         quorum.QuorumRate,
+			},
+			ChunkLength: chunkLength,
+		}
+
+		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, blobLength, blobQuorumInfo)
+		if err != nil {
+			e.logger.Error("[RequestEncodingForBlob] error getting assignments", "err", err)
+			continue
+		}
+
+		params, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
 		if err != nil {
 			e.logger.Error("[RequestEncodingForBlob] error getting encoding params", "err", err)
 			continue
@@ -302,20 +325,10 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			return
 		}
 
-		blobQuorumInfo := &core.BlobQuorumInfo{
-			SecurityParam: core.SecurityParam{
-				QuorumID:           quorum.QuorumID,
-				AdversaryThreshold: quorum.AdversaryThreshold,
-				QuorumThreshold:    quorum.QuorumThreshold,
-				QuorumRate:         quorum.QuorumRate,
-			},
-			QuantizationFactor: quorumInfo.QuantizationFactor,
-			EncodedBlobLength:  params.ChunkLength * quorumInfo.QuantizationFactor * numOperators,
-		}
-
 		pending = append(pending, pendingRequestInfo{
 			BlobQuorumInfo: blobQuorumInfo,
 			EncodingParams: params,
+			Assignments:    assignments,
 		})
 	}
 
@@ -351,7 +364,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					BlobQuorumInfo:       res.BlobQuorumInfo,
 					Commitment:           commits,
 					Chunks:               chunks,
-					Assignments:          batchMetadata.QuorumInfos[res.BlobQuorumInfo.QuorumID].Assignments,
+					Assignments:          res.Assignments,
 				},
 				Err: nil,
 			}
@@ -504,10 +517,14 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		i++
 	}
 
-	batchMetadata, err := e.getBatchMetadata(context.Background(), metadatas, e.ReferenceBlockNumber)
+	state, err := e.getOperatorStateForBlobs(context.Background(), metadatas, e.ReferenceBlockNumber)
 	if err != nil {
 		return nil, err
 	}
+	// batchMetadata, err := e.getBatchMetadata(context.Background(), metadatas, e.ReferenceBlockNumber)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// Populate the batch header
 	batchHeader := &core.BatchHeader{
@@ -523,12 +540,12 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	e.ReferenceBlockNumber = 0
 
 	return &batch{
-		EncodedBlobs:  encodedBlobs,
-		BatchHeader:   batchHeader,
-		BlobHeaders:   blobHeaders,
-		BlobMetadata:  metadatas,
-		BatchMetadata: batchMetadata,
-		MerkleTree:    tree,
+		EncodedBlobs: encodedBlobs,
+		BatchHeader:  batchHeader,
+		BlobHeaders:  blobHeaders,
+		BlobMetadata: metadatas,
+		State:        state,
+		MerkleTree:   tree,
 	}, nil
 }
 
@@ -538,7 +555,8 @@ func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
 	}
 }
 
-func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*batchMetadata, error) {
+func (e *EncodingStreamer) getOperatorStateForBlobs(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*core.IndexedOperatorState, error) {
+
 	quorums := make(map[core.QuorumID]QuorumInfo, 0)
 	for _, metadata := range metadatas {
 		for _, quorum := range metadata.RequestMetadata.SecurityParams {
@@ -559,20 +577,45 @@ func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*di
 		return nil, fmt.Errorf("error getting operator state at block number %d: %w", blockNumber, err)
 	}
 
-	for quorumID := range quorums {
-		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, quorumID, QuantizationFactor)
-		if err != nil {
-			return nil, err
-		}
-		quorums[quorumID] = QuorumInfo{
-			Assignments:        assignments,
-			Info:               info,
-			QuantizationFactor: QuantizationFactor,
-		}
-	}
+	return state, nil
 
-	return &batchMetadata{
-		QuorumInfos: quorums,
-		State:       state,
-	}, nil
 }
+
+// func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*batchMetadata, error) {
+// 	quorums := make(map[core.QuorumID]QuorumInfo, 0)
+// 	for _, metadata := range metadatas {
+// 		for _, quorum := range metadata.RequestMetadata.SecurityParams {
+// 			quorums[quorum.QuorumID] = QuorumInfo{}
+// 		}
+// 	}
+
+// 	quorumIds := make([]core.QuorumID, len(quorums))
+// 	i := 0
+// 	for id := range quorums {
+// 		quorumIds[i] = id
+// 		i++
+// 	}
+
+// 	// Get the operator state
+// 	state, err := e.chainState.GetIndexedOperatorState(ctx, blockNumber, quorumIds)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error getting operator state at block number %d: %w", blockNumber, err)
+// 	}
+
+// 	for quorumID := range quorums {
+// 		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, quorumID, QuantizationFactor)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		quorums[quorumID] = QuorumInfo{
+// 			Assignments:        assignments,
+// 			Info:               info,
+// 			QuantizationFactor: QuantizationFactor,
+// 		}
+// 	}
+
+// 	return &batchMetadata{
+// 		QuorumInfos: quorums,
+// 		State:       state,
+// 	}, nil
+// }

@@ -460,7 +460,20 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	assert.NoError(t, err)
-	assignments, info, err := asn.GetAssignments(operatorState, 0, batcher.QuantizationFactor)
+
+	blobLength := core.GetBlobLength(uint(len(blob.Data)))
+	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, blob.RequestHeader.SecurityParams[0])
+
+	blobQuorumInfo := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: q0AdversaryThreshold,
+			QuorumThreshold:    q0QuorumThreshold,
+		},
+		ChunkLength: chunkLength,
+	}
+
+	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
 	assert.NoError(t, err)
 
 	var indices []core.ChunkNumber
@@ -513,8 +526,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	chunkLength, err := asn.GetChunkLengthFromHeader(operatorState, blobHeader.QuorumInfos[0])
-	assert.NoError(t, err)
 	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
 	recovered, err := enc.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)

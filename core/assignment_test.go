@@ -30,7 +30,7 @@ func TestOperatorAssignments(t *testing.T) {
 		ChunkLength: 10,
 	}
 
-	blobLength := uint(1000)
+	blobLength := uint(100)
 
 	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
 	assert.NoError(t, err)

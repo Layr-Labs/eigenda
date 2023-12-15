@@ -69,9 +69,9 @@ func (h *BlobRequestHeader) Validate() error {
 type BlobQuorumInfo struct {
 	SecurityParam
 	// QuantizationFactor determines the nominal number of chunks
-	QuantizationFactor uint
-	// EncodedBlobLength is the nominal endcoded length of the blob in symbols; EncodedBlobLength = QuantizationFactor * NumOperatorsForQuorum * ChunkLength
-	EncodedBlobLength uint
+	// QuantizationFactor uint
+	// // EncodedBlobLength is the nominal endcoded length of the blob in symbols; EncodedBlobLength = QuantizationFactor * NumOperatorsForQuorum * ChunkLength
+	// EncodedBlobLength uint
 	// ChunkLength is the number of symbols in a chunk
 	ChunkLength uint
 }
@@ -90,7 +90,8 @@ type BlobHeader struct {
 func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
-		size += int64(quorum.EncodedBlobLength) * int64(bn254.BYTES_PER_COEFFICIENT)
+
+		size += int64(roundUpDivide(b.Length*PercentMultiplier*bn254.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }

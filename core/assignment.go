@@ -61,118 +61,118 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-type StdAssignmentCoordinatorOld struct {
-}
+// type StdAssignmentCoordinatorOld struct {
+// }
 
-var _ AssignmentCoordinatorOld = (*StdAssignmentCoordinatorOld)(nil)
+// var _ AssignmentCoordinatorOld = (*StdAssignmentCoordinatorOld)(nil)
 
-func (c *StdAssignmentCoordinatorOld) GetAssignments(state *OperatorState, quorum QuorumID, quantizationFactor uint) (map[OperatorID]Assignment, AssignmentInfo, error) {
+// func (c *StdAssignmentCoordinatorOld) GetAssignments(state *OperatorState, quorum QuorumID, quantizationFactor uint) (map[OperatorID]Assignment, AssignmentInfo, error) {
 
-	numOperators := len(state.Operators[quorum])
-	numOperatorsBig := new(big.Int).SetUint64(uint64(numOperators))
+// 	numOperators := len(state.Operators[quorum])
+// 	numOperatorsBig := new(big.Int).SetUint64(uint64(numOperators))
 
-	quantizationFactorBig := new(big.Int).SetUint64(uint64(quantizationFactor))
+// 	quantizationFactorBig := new(big.Int).SetUint64(uint64(quantizationFactor))
 
-	chunksByOperator := make([]uint, numOperators)
+// 	chunksByOperator := make([]uint, numOperators)
 
-	// Get NumPar
-	numChunks := uint(0)
-	totalStakes := state.Totals[quorum].Stake
-	for _, r := range state.Operators[quorum] {
+// 	// Get NumPar
+// 	numChunks := uint(0)
+// 	totalStakes := state.Totals[quorum].Stake
+// 	for _, r := range state.Operators[quorum] {
 
-		m := new(big.Int).Mul(numOperatorsBig, r.Stake)
-		m = m.Mul(m, quantizationFactorBig)
-		m = roundUpDivideBig(m, totalStakes)
+// 		m := new(big.Int).Mul(numOperatorsBig, r.Stake)
+// 		m = m.Mul(m, quantizationFactorBig)
+// 		m = roundUpDivideBig(m, totalStakes)
 
-		numChunks += uint(m.Uint64())
-		chunksByOperator[r.Index] = uint(m.Uint64())
-	}
+// 		numChunks += uint(m.Uint64())
+// 		chunksByOperator[r.Index] = uint(m.Uint64())
+// 	}
 
-	currentIndex := uint(0)
-	assignments := make([]Assignment, numOperators)
+// 	currentIndex := uint(0)
+// 	assignments := make([]Assignment, numOperators)
 
-	headerHash := [32]byte{}
+// 	headerHash := [32]byte{}
 
-	for orderedInd := range chunksByOperator {
+// 	for orderedInd := range chunksByOperator {
 
-		// Find the operator that should be at index currentIndex
-		operatorInd := getOperatorAtIndex(headerHash, orderedInd, numOperators)
-		m := chunksByOperator[operatorInd]
+// 		// Find the operator that should be at index currentIndex
+// 		operatorInd := getOperatorAtIndex(headerHash, orderedInd, numOperators)
+// 		m := chunksByOperator[operatorInd]
 
-		assignments[operatorInd] = Assignment{
-			StartIndex: currentIndex,
-			NumChunks:  m,
-		}
-		currentIndex += m
-	}
+// 		assignments[operatorInd] = Assignment{
+// 			StartIndex: currentIndex,
+// 			NumChunks:  m,
+// 		}
+// 		currentIndex += m
+// 	}
 
-	assignmentMap := make(map[OperatorID]Assignment)
+// 	assignmentMap := make(map[OperatorID]Assignment)
 
-	for id, opInfo := range state.Operators[quorum] {
-		assignment := assignments[opInfo.Index]
-		assignmentMap[id] = assignment
-	}
+// 	for id, opInfo := range state.Operators[quorum] {
+// 		assignment := assignments[opInfo.Index]
+// 		assignmentMap[id] = assignment
+// 	}
 
-	return assignmentMap, AssignmentInfo{
-		TotalChunks: numChunks,
-	}, nil
+// 	return assignmentMap, AssignmentInfo{
+// 		TotalChunks: numChunks,
+// 	}, nil
 
-}
+// }
 
-// getOperatorAtIndex returns the operator at a given index within the reordered sequence.
-// We reorder the sequence by letting the reordered_index = operator_index + headerHash.
-// Thus, get get the operator at a given reordered_index, we simply reverse:
-// operator_index = reordered_index - headerHash
-func getOperatorAtIndex(headerHash [32]byte, index, numOperators int) int {
-	indexBig := new(big.Int).SetUint64(uint64(index))
-	offset := new(big.Int).SetBytes(headerHash[:])
+// // getOperatorAtIndex returns the operator at a given index within the reordered sequence.
+// // We reorder the sequence by letting the reordered_index = operator_index + headerHash.
+// // Thus, get get the operator at a given reordered_index, we simply reverse:
+// // operator_index = reordered_index - headerHash
+// func getOperatorAtIndex(headerHash [32]byte, index, numOperators int) int {
+// 	indexBig := new(big.Int).SetUint64(uint64(index))
+// 	offset := new(big.Int).SetBytes(headerHash[:])
 
-	operatorIndex := new(big.Int).Sub(indexBig, offset)
+// 	operatorIndex := new(big.Int).Sub(indexBig, offset)
 
-	operatorIndex.Mod(operatorIndex, new(big.Int).SetUint64(uint64(numOperators)))
+// 	operatorIndex.Mod(operatorIndex, new(big.Int).SetUint64(uint64(numOperators)))
 
-	return int(operatorIndex.Uint64())
-}
+// 	return int(operatorIndex.Uint64())
+// }
 
-func (c *StdAssignmentCoordinatorOld) GetOperatorAssignment(state *OperatorState, quorum QuorumID, quantizationFactor uint, id OperatorID) (Assignment, AssignmentInfo, error) {
+// func (c *StdAssignmentCoordinatorOld) GetOperatorAssignment(state *OperatorState, quorum QuorumID, quantizationFactor uint, id OperatorID) (Assignment, AssignmentInfo, error) {
 
-	assignments, info, err := c.GetAssignments(state, quorum, quantizationFactor)
-	if err != nil {
-		return Assignment{}, AssignmentInfo{}, err
-	}
+// 	assignments, info, err := c.GetAssignments(state, quorum, quantizationFactor)
+// 	if err != nil {
+// 		return Assignment{}, AssignmentInfo{}, err
+// 	}
 
-	assignment, ok := assignments[id]
-	if !ok {
-		return Assignment{}, AssignmentInfo{}, ErrNotFound
-	}
+// 	assignment, ok := assignments[id]
+// 	if !ok {
+// 		return Assignment{}, AssignmentInfo{}, ErrNotFound
+// 	}
 
-	return assignment, info, nil
-}
+// 	return assignment, info, nil
+// }
 
-func (c *StdAssignmentCoordinatorOld) GetMinimumChunkLength(numOperators, blobLength, quantizationFactor uint, quorumThreshold, adversaryThreshold uint8) (uint, error) {
+// func (c *StdAssignmentCoordinatorOld) GetMinimumChunkLength(numOperators, blobLength, quantizationFactor uint, quorumThreshold, adversaryThreshold uint8) (uint, error) {
 
-	if adversaryThreshold >= quorumThreshold {
-		return 0, errors.New("invalid header: quorum threshold does not exceed adversary threshold")
-	}
+// 	if adversaryThreshold >= quorumThreshold {
+// 		return 0, errors.New("invalid header: quorum threshold does not exceed adversary threshold")
+// 	}
 
-	numSys := roundUpDivide(uint(quorumThreshold-adversaryThreshold)*numOperators*quantizationFactor, PercentMultiplier)
-	chunkLength := roundUpDivide(blobLength, numSys)
-	return chunkLength, nil
+// 	numSys := roundUpDivide(uint(quorumThreshold-adversaryThreshold)*numOperators*quantizationFactor, PercentMultiplier)
+// 	chunkLength := roundUpDivide(blobLength, numSys)
+// 	return chunkLength, nil
 
-}
+// }
 
-func (c *StdAssignmentCoordinatorOld) GetChunkLengthFromHeader(state *OperatorState, header *BlobQuorumInfo) (uint, error) {
+// func (c *StdAssignmentCoordinatorOld) GetChunkLengthFromHeader(state *OperatorState, header *BlobQuorumInfo) (uint, error) {
 
-	// Validate the chunk length
-	numOperators := uint(len(state.Operators[header.QuorumID]))
-	chunkLength := header.EncodedBlobLength / (header.QuantizationFactor * numOperators)
+// 	// Validate the chunk length
+// 	numOperators := uint(len(state.Operators[header.QuorumID]))
+// 	chunkLength := header.EncodedBlobLength / (header.QuantizationFactor * numOperators)
 
-	if chunkLength*header.QuantizationFactor*numOperators != header.EncodedBlobLength {
-		return 0, errors.New("invalid header")
-	}
+// 	if chunkLength*header.QuantizationFactor*numOperators != header.EncodedBlobLength {
+// 		return 0, errors.New("invalid header")
+// 	}
 
-	return chunkLength, nil
-}
+// 	return chunkLength, nil
+// }
 
 func roundUpDivideBig(a, b *big.Int) *big.Int {
 

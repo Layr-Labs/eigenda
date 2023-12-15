@@ -271,8 +271,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 				QuorumNumber:                 uint32(quorumInfo.QuorumID),
 				AdversaryThresholdPercentage: uint32(quorumInfo.AdversaryThreshold),
 				QuorumThresholdPercentage:    uint32(quorumInfo.QuorumThreshold),
-				QuantizationParam:            uint32(quorumInfo.QuantizationFactor),
-				EncodedLength:                uint64(quorumInfo.EncodedBlobLength),
+				ChunkLength:                  uint32(quorumInfo.ChunkLength),
 			}
 			quorumNumbers[i] = quorumInfo.QuorumID
 			quorumPercentSigned[i] = confirmationInfo.QuorumResults[quorumInfo.QuorumID].PercentSigned

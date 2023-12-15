@@ -228,8 +228,7 @@ func TestStreamingEncoding(t *testing.T) {
 			AdversaryThreshold: 80,
 			QuorumThreshold:    100,
 		},
-		QuantizationFactor: batcher.QuantizationFactor,
-		EncodedBlobLength:  320,
+		ChunkLength: 10,
 	})
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
@@ -425,12 +424,7 @@ func TestPartialBlob(t *testing.T) {
 	assert.Equal(t, batch.BatchHeader.ReferenceBlockNumber, uint(10))
 
 	// Check BatchMetadata
-	assert.NotNil(t, batch.BatchMetadata)
-	assert.Len(t, batch.BatchMetadata.QuorumInfos, 1)
-	assert.Len(t, batch.BatchMetadata.QuorumInfos[0].Assignments, numOperators)
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[0].QuantizationFactor, batcher.QuantizationFactor)
-
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[0].Info.TotalChunks, uint(15))
+	assert.NotNil(t, batch.State)
 	assert.ElementsMatch(t, batch.BlobMetadata[0].RequestMetadata.SecurityParams, blob1.RequestHeader.SecurityParams)
 
 	// Check EncodedBlobs
@@ -454,8 +448,7 @@ func TestPartialBlob(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			QuantizationFactor: batcher.QuantizationFactor,
-			EncodedBlobLength:  160,
+			ChunkLength: 10,
 		}})
 
 		assert.Contains(t, batch.BlobHeaders, blobMessage.BlobHeader)
@@ -590,16 +583,8 @@ func TestGetBatch(t *testing.T) {
 	assert.Greater(t, len(batch.BatchHeader.BatchRoot), 0)
 	assert.Equal(t, batch.BatchHeader.ReferenceBlockNumber, uint(10))
 
-	// Check BatchMetadata
-	assert.NotNil(t, batch.BatchMetadata)
-	assert.Len(t, batch.BatchMetadata.QuorumInfos, 3)
-	for quorumID := uint8(0); quorumID < 3; quorumID++ {
-		assert.Len(t, batch.BatchMetadata.QuorumInfos[quorumID].Assignments, numOperators)
-		assert.Equal(t, batch.BatchMetadata.QuorumInfos[quorumID].QuantizationFactor, batcher.QuantizationFactor)
-	}
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[0].Info.TotalChunks, uint(15))
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[1].Info.TotalChunks, uint(15))
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[2].Info.TotalChunks, uint(15))
+	// Check State
+	assert.NotNil(t, batch.State)
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
@@ -635,8 +620,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				QuantizationFactor: batcher.QuantizationFactor,
-				EncodedBlobLength:  320,
+				ChunkLength: 10,
 			},
 			{
 				SecurityParam: core.SecurityParam{
@@ -644,8 +628,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 70,
 					QuorumThreshold:    95,
 				},
-				QuantizationFactor: batcher.QuantizationFactor,
-				EncodedBlobLength:  160,
+				ChunkLength: 10,
 			},
 		})
 
@@ -670,8 +653,7 @@ func TestGetBatch(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			QuantizationFactor: batcher.QuantizationFactor,
-			EncodedBlobLength:  160,
+			ChunkLength: 10,
 		}})
 
 		assert.Len(t, blobMessage.Bundles, 1)

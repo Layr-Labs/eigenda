@@ -69,7 +69,7 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 
 // prepareBatch takes in a single blob, encodes it, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBatch(t *testing.T, cst core.IndexedChainState, blob core.Blob, quorumIndex uint, quantizationFactor uint, bn uint) (core.EncodedBlob, core.BatchHeader) {
+func prepareBatch(t *testing.T, cst core.IndexedChainState, blob core.Blob, quorumIndex uint, bn uint) (core.EncodedBlob, core.BatchHeader) {
 
 	quorumID := blob.RequestHeader.SecurityParams[quorumIndex].QuorumID
 	quorums := []core.QuorumID{quorumID}
@@ -163,7 +163,6 @@ func checkBatch(t *testing.T, cst core.IndexedChainState, encodedBlob core.Encod
 func TestCoreLibrary(t *testing.T) {
 
 	blobLengths := []int{1, 64, 1000}
-	quantizationFactors := []uint{1, 10}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
 	securityParams := []*core.SecurityParam{
@@ -180,25 +179,23 @@ func TestCoreLibrary(t *testing.T) {
 	}
 
 	for _, blobLength := range blobLengths {
-		for _, quantizationFactor := range quantizationFactors {
-			for _, operatorCount := range operatorCounts {
-				for _, securityParam := range securityParams {
+		for _, operatorCount := range operatorCounts {
+			for _, securityParam := range securityParams {
 
-					t.Run(fmt.Sprintf("blobLength=%v, quantizationFactor=%v, operatorCount=%v, securityParams=%v", blobLength, quantizationFactor, operatorCount, securityParam), func(t *testing.T) {
+				t.Run(fmt.Sprintf("blobLength=%v, operatorCount=%v, securityParams=%v", blobLength, operatorCount, securityParam), func(t *testing.T) {
 
-						blob := makeTestBlob(t, blobLength, []*core.SecurityParam{securityParam})
+					blob := makeTestBlob(t, blobLength, []*core.SecurityParam{securityParam})
 
-						cst, err := mock.NewChainDataMock(core.OperatorIndex(operatorCount))
-						assert.NoError(t, err)
+					cst, err := mock.NewChainDataMock(core.OperatorIndex(operatorCount))
+					assert.NoError(t, err)
 
-						quorumIndex := uint(0)
-						bn := uint(0)
+					quorumIndex := uint(0)
+					bn := uint(0)
 
-						batch, header := prepareBatch(t, cst, blob, quorumIndex, quantizationFactor, bn)
+					batch, header := prepareBatch(t, cst, blob, quorumIndex, bn)
 
-						checkBatch(t, cst, batch, header)
-					})
-				}
+					checkBatch(t, cst, batch, header)
+				})
 			}
 		}
 	}
