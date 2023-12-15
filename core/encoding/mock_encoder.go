@@ -27,6 +27,12 @@ func (e *MockEncoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNum
 	return args.Error(0)
 }
 
+func (e *MockEncoder) UniversalVerifySubBatch(params core.EncodingParams, samples []core.Sample, numBlobs int) error {
+	args := e.Called(params, samples, numBlobs)
+	time.Sleep(e.Delay)
+	return args.Error(0)
+}
+
 func (e *MockEncoder) VerifyBlobLength(commitments core.BlobCommitments) error {
 
 	args := e.Called(commitments)

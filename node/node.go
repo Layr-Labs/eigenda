@@ -323,23 +323,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 
 	pool := workerpool.New(n.Config.NumBatchValidators)
-	out := make(chan error, len(blobs))
-	for _, blob := range blobs {
-		blob := blob
-		pool.Submit(func() {
-			n.validateBlob(ctx, blob, operatorState, out)
-		})
-	}
-
-	for i := 0; i < len(blobs); i++ {
-		err := <-out
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-
+	return n.Validator.ValidateBatch(blobs, operatorState, pool)
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
@@ -446,14 +430,4 @@ func buildSdkClients(config *Config, logger common.Logger) (*constructor.Clients
 	economicMetricsCollector := economic.NewCollector(sdkClients.ElChainReader, sdkClients.AvsRegistryChainReader, AppName, logger, client.AccountAddress, QuorumNames)
 	sdkClients.PrometheusRegistry.MustRegister(economicMetricsCollector)
 	return sdkClients, nil
-}
-
-func (n *Node) validateBlob(ctx context.Context, blob *core.BlobMessage, operatorState *core.OperatorState, out chan error) {
-	err := n.Validator.ValidateBlob(blob, operatorState)
-	if err != nil {
-		out <- err
-		return
-	}
-
-	out <- nil
 }
