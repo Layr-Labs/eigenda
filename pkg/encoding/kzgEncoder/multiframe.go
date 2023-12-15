@@ -79,11 +79,20 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 	// note the coeff is affected by how many chunks are validated per blob
 	// if x chunks are sampled from one blob, we need to compute the sum of all x random field element corresponding to each sample
 	aggCommitCoeffs := make([]bls.Fr, m)
+	setCommit := make([]bool, m)
 	for k := 0; k < n; k++ {
 		s := samples[k]
 		row := s.RowIndex
 		bls.AddModFr(&aggCommitCoeffs[row], &aggCommitCoeffs[row], &randomsFr[k])
-		bls.CopyG1(&commits[row], &s.Commitment)
+
+		if !setCommit[row] {
+			bls.CopyG1(&commits[row], &s.Commitment)
+			setCommit[row] = true
+		} else {
+			if !bls.EqualG1(&commits[row], &s.Commitment) {
+				return nil, errors.New("Samples of the same row has different commitments")
+			}
+		}
 	}
 
 	aggCommit := bls.LinCombG1(commits, aggCommitCoeffs)
