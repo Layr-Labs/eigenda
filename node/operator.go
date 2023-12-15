@@ -98,7 +98,7 @@ func DeregisterOperator(ctx context.Context, KeyPair *core.KeyPair, transactor c
 func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger common.Logger) (*grpcchurner.ChurnReply, error) {
 	logger.Info("churner url", "url", churnerUrl)
 
-	var credential = insecure.NewCredentials()
+	credential := insecure.NewCredentials()
 	if useSecureGrpc {
 		config := &tls.Config{}
 		credential = credentials.NewTLS(config)
