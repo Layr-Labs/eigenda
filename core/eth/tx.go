@@ -262,7 +262,7 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *co
 // registered with at the supplied block number. To fully deregister an operator, this function should be called
 // with the current block number.
 func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32) error {
-	operatorId := hashPubKeyG1(pubkeyG1)
+	operatorId := HashPubKeyG1(pubkeyG1)
 	quorumBitmap, opStates, err := t.Bindings.BLSOpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operatorId, blockNumber)
@@ -416,7 +416,8 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 	quorumNumbers := quorumParamsToQuorumNumbers(quorums)
 	nonSignerOperatorIds := make([][32]byte, len(signatureAggregation.NonSigners))
 	for i := range signatureAggregation.NonSigners {
-		nonSignerOperatorIds[i] = hashPubKeyG1(signatureAggregation.NonSigners[i])
+		// TODO: instead of recalculating the operator id, we should just pass it in from the caller
+		nonSignerOperatorIds[i] = HashPubKeyG1(signatureAggregation.NonSigners[i])
 	}
 	sigAgg, err := json.Marshal(signatureAggregation)
 	if err == nil {
@@ -725,9 +726,13 @@ func quorumParamsToThresholdPercentages(quorumParams map[core.QuorumID]*core.Quo
 	return thresholdPercentages
 }
 
-func hashPubKeyG1(pk *core.G1Point) [32]byte {
+func HashPubKeyG1(pk *core.G1Point) [32]byte {
 	gp := pubKeyG1ToBN254G1Point(pk)
-	return crypto.Keccak256Hash(append(gp.X.Bytes(), gp.Y.Bytes()...))
+	xBytes := make([]byte, 32)
+	yBytes := make([]byte, 32)
+	gp.X.FillBytes(xBytes)
+	gp.Y.FillBytes(yBytes)
+	return crypto.Keccak256Hash(append(xBytes, yBytes...))
 }
 
 func BitmapToQuorumIds(bitmap *big.Int) []core.QuorumID {
