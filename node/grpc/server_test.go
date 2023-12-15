@@ -94,6 +94,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 	if mockValidator {
 		mockVal := core_mock.NewMockChunkValidator()
 		mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
+		mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		val = mockVal
 	} else {
 

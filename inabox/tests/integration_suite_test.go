@@ -182,7 +182,12 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, 10)
+	ics, err := coreindexer.NewIndexedChainState(cs, indexer)
+	if err != nil {
+		return err
+	}
+
+	retrievalClient, err = clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, 10)
 	if err != nil {
 		return err
 	}

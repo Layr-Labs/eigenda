@@ -246,6 +246,8 @@ type OperatorVars struct {
 
 	NODE_CLIENT_IP_HEADER string
 
+	NODE_CHURNER_USE_SECURE_GRPC string
+
 	NODE_G1_PATH string
 
 	NODE_G2_PATH string

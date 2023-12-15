@@ -174,3 +174,18 @@ func (cb Bundles) Size() int64 {
 	}
 	return size
 }
+
+// Sample is a chunk with associated metadata used by the Universal Batch Verifier
+type Sample struct {
+	Commitment      *Commitment
+	Chunk           *Chunk
+	AssignmentIndex ChunkNumber
+	BlobIndex       int
+}
+
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+// Blobs with the same encoding parameters are collected in a single subBatch
+type SubBatch struct {
+	Samples  []Sample
+	NumBlobs int
+}

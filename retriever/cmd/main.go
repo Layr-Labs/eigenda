@@ -16,10 +16,12 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -98,30 +100,39 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	indexer, err := coreindexer.CreateNewIndexer(
-		&config.IndexerConfig,
-		gethClient,
-		rpcClient,
-		config.EigenDAServiceManagerAddr,
-		logger,
-	)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+	var ics core.IndexedChainState
+	if config.UseGraph {
+		logger.Info("Using graph node")
+		querier := graphql.NewClient(config.GraphUrl, nil)
+		logger.Info("Connecting to subgraph", "url", config.GraphUrl)
+		ics = thegraph.NewIndexedChainState(cs, querier, logger)
+	} else {
+		logger.Info("Using built-in indexer")
+
+		indexer, err := coreindexer.CreateNewIndexer(
+			&config.IndexerConfig,
+			gethClient,
+			rpcClient,
+			config.EigenDAServiceManagerAddr,
+			logger,
+		)
+		if err != nil {
+			return err
+		}
+		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
+		if err != nil {
+			return err
+		}
 	}
 
 	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient, err := clients.NewRetrievalClient(logger, cs, indexer, agn, nodeClient, encoder, config.NumConnections)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
-	}
-
-	indexedState, err := coreindexer.NewIndexedChainState(cs, indexer)
+	retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, config.NumConnections)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
-	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, indexedState, chainClient)
+	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, ics, chainClient)
 	if err = retrieverServiceServer.Start(context.Background()); err != nil {
 		log.Fatalln("failed to start retriever service server", err)
 	}
