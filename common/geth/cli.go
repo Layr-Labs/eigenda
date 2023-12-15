@@ -35,7 +35,7 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Name:     numConfirmationsFlagName,
 			Usage:    "Number of confirmations to wait for",
 			Required: false,
-			Value:    3,
+			Value:    0,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_CONFIRMATIONS"),
 		},
 	}
