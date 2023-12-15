@@ -2,23 +2,28 @@ package subgraph
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/shurcooL/graphql"
 )
 
 var (
-	once                   sync.Once
-	instance               *api
-	MAX_ENTITIES_PER_QUERY = 1000
+	once               sync.Once
+	instance           *api
+	maxEntriesPerQuery = 1000
 )
 
 type (
 	Api interface {
 		QueryBatches(ctx context.Context, descending bool, orderByField string, first, skip int) ([]*Batches, error)
-		QueryOperators(ctx context.Context, first int) ([]*OperatorRegistered, error)
+		QueryOperators(ctx context.Context, first int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningOperatorIds, error)
+		QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
+		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
 	}
 
 	api struct {
@@ -61,7 +66,7 @@ func (a *api) QueryBatches(ctx context.Context, descending bool, orderByField st
 	return result.Batches, nil
 }
 
-func (a *api) QueryOperators(ctx context.Context, first int) ([]*OperatorRegistered, error) {
+func (a *api) QueryOperators(ctx context.Context, first int) ([]*Operator, error) {
 	variables := map[string]any{
 		"first": graphql.Int(first),
 	}
@@ -84,7 +89,7 @@ func (a *api) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, int
 	result := new(queryBatchNonSigningOperatorIdsInInterval)
 	batchNonSigningOperatorIds := make([]*BatchNonSigningOperatorIds, 0)
 	for {
-		variables["first"] = graphql.Int(MAX_ENTITIES_PER_QUERY)
+		variables["first"] = graphql.Int(maxEntriesPerQuery)
 		variables["skip"] = graphql.Int(skip)
 
 		err := a.uiMonitoringGgl.Query(ctx, &result, variables)
@@ -97,9 +102,49 @@ func (a *api) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, int
 		}
 		batchNonSigningOperatorIds = append(batchNonSigningOperatorIds, result.BatchNonSigningOperatorIds...)
 
-		skip += MAX_ENTITIES_PER_QUERY
+		skip += maxEntriesPerQuery
 	}
 
 	result.BatchNonSigningOperatorIds = batchNonSigningOperatorIds
 	return result.BatchNonSigningOperatorIds, nil
+}
+
+func (a *api) QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx context.Context, blockTimestamp uint64) ([]*Operator, error) {
+	variables := map[string]any{
+		"blockTimestamp_gt": graphql.Int(blockTimestamp),
+	}
+	skip := 0
+	result := new(queryOperatorDeregistereds)
+	operators := make([]*Operator, 0)
+	for {
+		variables["first"] = graphql.Int(maxEntriesPerQuery)
+		variables["skip"] = graphql.Int(skip)
+
+		err := a.operatorStateGql.Query(ctx, &result, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(result.OperatorDeregistereds) == 0 {
+			break
+		}
+		operators = append(operators, result.OperatorDeregistereds...)
+		skip += maxEntriesPerQuery
+	}
+	return operators, nil
+}
+
+func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error) {
+	var (
+		query     queryOperatorById
+		variables = map[string]any{
+			"id": graphql.String(fmt.Sprintf("0x%s", hex.EncodeToString(operatorId[:]))),
+		}
+	)
+	err := a.operatorStateGql.Query(context.Background(), &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return &query.Operator, nil
 }

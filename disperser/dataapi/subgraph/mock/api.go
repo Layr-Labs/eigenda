@@ -5,6 +5,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	"github.com/stretchr/testify/mock"
 )
@@ -41,12 +42,12 @@ func (m *MockSubgraphApi) QueryBatches(ctx context.Context, descending bool, ord
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperators(ctx context.Context, first int) ([]*subgraph.OperatorRegistered, error) {
+func (m *MockSubgraphApi) QueryOperators(ctx context.Context, first int) ([]*subgraph.Operator, error) {
 	args := m.Called()
 
-	var value []*subgraph.OperatorRegistered
+	var value []*subgraph.Operator
 	if args.Get(0) != nil {
-		value = args.Get(0).([]*subgraph.OperatorRegistered)
+		value = args.Get(0).([]*subgraph.Operator)
 
 		if len(value) > first {
 			value = value[:first]
@@ -66,6 +67,28 @@ func (m *MockSubgraphApi) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 		if len(value) > int(first) {
 			value = value[:first]
 		}
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx context.Context, blockTimestamp uint64) ([]*subgraph.Operator, error) {
+	args := m.Called()
+
+	var value []*subgraph.Operator
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.Operator)
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*subgraph.IndexedOperatorInfo, error) {
+	args := m.Called()
+
+	var value *subgraph.IndexedOperatorInfo
+	if args.Get(0) != nil {
+		value = args.Get(0).(*subgraph.IndexedOperatorInfo)
 	}
 
 	return value, args.Error(1)
