@@ -61,11 +61,6 @@ type EncodingStreamer struct {
 	logger  common.Logger
 }
 
-type batchMetadata struct {
-	QuorumInfos map[core.QuorumID]QuorumInfo
-	State       *core.IndexedOperatorState
-}
-
 type batch struct {
 	EncodedBlobs []core.EncodedBlob
 	BlobMetadata []*disperser.BlobMetadata
