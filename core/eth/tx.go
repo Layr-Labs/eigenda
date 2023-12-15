@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -418,6 +419,10 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 		nonSignerOperatorIds[i] = hashPubKeyG1(signatureAggregation.NonSigners[i])
 	}
 
+	t.Logger.Trace("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
+	for _, ns := range nonSignerOperatorIds {
+		t.Logger.Trace("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
+	}
 	checkSignaturesIndices, err := t.Bindings.BLSOpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
 			Context: ctx,
@@ -428,7 +433,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 		nonSignerOperatorIds,
 	)
 	if err != nil {
-		t.Logger.Error("Failed to fetch checkSignaturesIndices", err)
+		t.Logger.Error("Failed to fetch checkSignaturesIndices", "err", err)
 		return nil, err
 	}
 
@@ -445,6 +450,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 		QuorumThresholdPercentages: quorumThresholdPercentages,
 		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
 	}
+	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -464,6 +470,10 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 		QuorumApkIndices:             checkSignaturesIndices.QuorumApkIndices,
 		TotalStakeIndices:            checkSignaturesIndices.TotalStakeIndices,
 		NonSignerStakeIndices:        checkSignaturesIndices.NonSignerStakeIndices,
+	}
+	sigChecker, err := json.Marshal(signatureChecker)
+	if err == nil {
+		t.Logger.Trace("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
