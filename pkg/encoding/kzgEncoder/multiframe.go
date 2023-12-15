@@ -24,7 +24,7 @@ type Sample struct {
 // generate a random value using Fiat Shamir transform
 // we can also pseudo randomness generated locally, but we have to ensure no adversary can manipulate it
 // Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
-func GenRandomness(samples []Sample) (bls.Fr, error) {
+func GenRandomFactor(samples []Sample) (bls.Fr, error) {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 
@@ -49,7 +49,7 @@ func GenRandomness(samples []Sample) (bls.Fr, error) {
 // Randomnesss for each sample is computed by repeatedly raising the power of the root randomness
 func GenRandomnessVector(samples []Sample) ([]bls.Fr, error) {
 	// root randomness
-	r, err := GenRandomness(samples)
+	r, err := GenRandomFactor(samples)
 	if err != nil {
 		return nil, err
 	}
