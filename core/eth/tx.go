@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -445,6 +446,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 		QuorumThresholdPercentages: quorumThresholdPercentages,
 		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
 	}
+	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), gethcommon.Bytes2Hex(batchH.QuorumNumbers), gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -464,6 +466,10 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader core.
 		QuorumApkIndices:             checkSignaturesIndices.QuorumApkIndices,
 		TotalStakeIndices:            checkSignaturesIndices.TotalStakeIndices,
 		NonSignerStakeIndices:        checkSignaturesIndices.NonSignerStakeIndices,
+	}
+	sigChecker, err := json.Marshal(signatureChecker)
+	if err == nil {
+		t.Logger.Trace("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
