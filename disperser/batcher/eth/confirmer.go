@@ -44,7 +44,7 @@ func (c *BatchConfirmer) ConfirmBatch(ctx context.Context, header *core.BatchHea
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	for i := 0; i < maxRetries; i++ {
-		txReceipt, err = c.Transactor.ConfirmBatch(ctxWithTimeout, *header, quorums, *sigAgg)
+		txReceipt, err = c.Transactor.ConfirmBatch(ctxWithTimeout, header, quorums, sigAgg)
 		if err == nil {
 			break
 		}

@@ -19,48 +19,71 @@ var (
 	hundred                      = big.NewInt(100)
 )
 
-type TxnRequest struct {
-	Tx    *types.Transaction
-	Tag   string
-	Value *big.Int
-}
-
-// ReceiptOrErr is a wrapper for a transaction receipt or an error.
-// Receipt should be nil if there is an error, and non-nil if there is no error.
-type ReceiptOrErr struct {
-	Receipt *types.Receipt
-	Err     error
-}
-
 // TxnManager receives transactions from the caller, sends them to the chain, and monitors their status.
 // It also handles the case where a transaction is not mined within a certain time. In this case, it will
 // resend the transaction with a higher gas price. It is assumed that all transactions originate from the
 // same account.
-type TxnManager struct {
-	mu sync.Mutex
+type TxnManager interface {
+	Start(ctx context.Context)
+	ProcessTransaction(ctx context.Context, req *TxnRequest) error
+	ReceiptChan() chan *ReceiptOrErr
+}
 
-	ReceiptChan chan *ReceiptOrErr
+type TxnRequest struct {
+	Tx       *types.Transaction
+	Tag      string
+	Value    *big.Int
+	Metadata interface{}
+
+	requestedAt time.Time
+}
+
+// ReceiptOrErr is a wrapper for a transaction receipt or an error.
+// Receipt should be nil if there is an error, and non-nil if there is no error.
+// Metadata is the metadata passed in with the transaction request.
+type ReceiptOrErr struct {
+	Receipt  *types.Receipt
+	Metadata interface{}
+	Err      error
+}
+
+type txnManager struct {
+	mu sync.Mutex
 
 	ethClient   common.EthClient
 	requestChan chan *TxnRequest
 	logger      common.Logger
 
+	receiptChan        chan *ReceiptOrErr
 	queueSize          int
 	txnRefreshInterval time.Duration
 }
 
-func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger common.Logger) *TxnManager {
-	return &TxnManager{
-		ReceiptChan:        make(chan *ReceiptOrErr, queueSize),
+var _ TxnManager = (*txnManager)(nil)
+
+func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger common.Logger) TxnManager {
+	return &txnManager{
 		ethClient:          ethClient,
 		requestChan:        make(chan *TxnRequest, queueSize),
 		logger:             logger,
+		receiptChan:        make(chan *ReceiptOrErr, queueSize),
 		queueSize:          queueSize,
 		txnRefreshInterval: txnRefreshInterval,
 	}
 }
 
-func (t *TxnManager) Start(ctx context.Context) {
+func NewTxnRequest(tx *types.Transaction, tag string, value *big.Int, metadata interface{}) *TxnRequest {
+	return &TxnRequest{
+		Tx:       tx,
+		Tag:      tag,
+		Value:    value,
+		Metadata: metadata,
+
+		requestedAt: time.Now(),
+	}
+}
+
+func (t *txnManager) Start(ctx context.Context) {
 	go func() {
 		for {
 			select {
@@ -69,14 +92,16 @@ func (t *TxnManager) Start(ctx context.Context) {
 			case req := <-t.requestChan:
 				receipt, err := t.monitorTransaction(ctx, req)
 				if err != nil {
-					t.ReceiptChan <- &ReceiptOrErr{
-						Receipt: nil,
-						Err:     err,
+					t.receiptChan <- &ReceiptOrErr{
+						Receipt:  nil,
+						Metadata: req.Metadata,
+						Err:      err,
 					}
 				} else {
-					t.ReceiptChan <- &ReceiptOrErr{
-						Receipt: receipt,
-						Err:     nil,
+					t.receiptChan <- &ReceiptOrErr{
+						Receipt:  receipt,
+						Metadata: req.Metadata,
+						Err:      nil,
 					}
 				}
 			}
@@ -88,7 +113,7 @@ func (t *TxnManager) Start(ctx context.Context) {
 // ProcessTransaction sends the transaction and queues the transaction for monitoring.
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
 // TxnManager monitors the transaction and resends it with a higher gas price if it is not mined without a timeout.
-func (t *TxnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) error {
+func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.logger.Debug("[ProcessTransaction] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
@@ -105,18 +130,24 @@ func (t *TxnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 	if err != nil {
 		return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
 	}
+	req.Tx = txn
 
 	t.requestChan <- req
 	return nil
 }
 
+func (t *txnManager) ReceiptChan() chan *ReceiptOrErr {
+	return t.receiptChan
+}
+
 // monitorTransaction monitors the transaction and resends it with a higher gas price if it is not mined without a timeout.
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
-func (t *TxnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
+func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
 	for {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
 
+		t.logger.Debug("[monitorTransaction] monitoring transaction", "tag", req.Tag, "nonce", req.Tx.Nonce())
 		receipt, err := t.ethClient.EnsureTransactionEvaled(
 			ctxWithTimeout,
 			req.Tx,
@@ -151,7 +182,7 @@ func (t *TxnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 
 // speedUpTxn increases the gas price of the existing transaction by specified percentage.
 // It makes sure the new gas price is not lower than the current gas price.
-func (t *TxnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag string) (*types.Transaction, error) {
+func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag string) (*types.Transaction, error) {
 	prevGasTipCap := tx.GasTipCap()
 	prevGasFeeCap := tx.GasFeeCap()
 	// get the gas tip cap and gas fee cap based on current network condition
