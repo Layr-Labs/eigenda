@@ -242,7 +242,7 @@ func (ics *indexedChainState) getAllOperatorsRegisteredAtBlockNumberWithPaginati
 		)
 		err := ics.querier.Query(ctx, &query, variables)
 		if err != nil {
-			ics.logger.Error("Error reqesting for operators", "err", err)
+			ics.logger.Error("Error requesting for operators", "err", err)
 			return nil, err
 		}
 

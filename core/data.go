@@ -40,7 +40,7 @@ type Blob struct {
 	Data          []byte
 }
 
-// BlobRequestHeader contains the orignal data size of a blob and the security required
+// BlobRequestHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// Commitments
 	BlobCommitments `json:"commitments"`
