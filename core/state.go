@@ -43,7 +43,7 @@ type OperatorState struct {
 // IndexedOperatorInfo contains information about an operator which is contained in events from the EigenDA smart contracts. Note that
 // this information does not depend on the quorum.
 type IndexedOperatorInfo struct {
-	// PubKeyG1 and PubKeyG2 are the public keys of the operator, which are retreived from the EigenDAPubKeyCompendium smart contract
+	// PubKeyG1 and PubKeyG2 are the public keys of the operator, which are retrieved from the EigenDAPubKeyCompendium smart contract
 	PubkeyG1 *G1Point
 	PubkeyG2 *G2Point
 	// Socket is the socket address of the operator, in the form "host:port"
