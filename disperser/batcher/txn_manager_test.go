@@ -29,27 +29,39 @@ func TestProcessTransaction(t *testing.T) {
 	ethClient.On("SendTransaction").Return(nil)
 	ethClient.On("EnsureTransactionEvaled").Return(&types.Receipt{
 		BlockNumber: new(big.Int).SetUint64(1),
-	}, nil)
+	}, nil).Once()
 
-	successful := false
 	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
-		HandleSuccess: func(ctx context.Context, receipt *types.Receipt) {
-			fmt.Println("success function called", successful)
-			successful = true
-		},
-		HandleFailure: func(ctx context.Context, err error) {
-			assert.Fail(t, "should not be called")
-		},
 	})
-	<-ctx.Done()
 	assert.NoError(t, err)
-	assert.True(t, successful)
+	receiptOrErr := <-txnManager.ReceiptChan
+	assert.NoError(t, receiptOrErr.Err)
+	assert.Equal(t, uint64(1), receiptOrErr.Receipt.BlockNumber.Uint64())
 	ethClient.AssertNumberOfCalls(t, "GetLatestGasCaps", 1)
 	ethClient.AssertNumberOfCalls(t, "UpdateGas", 1)
 	ethClient.AssertNumberOfCalls(t, "SendTransaction", 1)
+	ethClient.AssertNumberOfCalls(t, "EnsureTransactionEvaled", 1)
+
+	// now test the case where the transaction fails
+	randomErr := fmt.Errorf("random error")
+	ethClient.On("EnsureTransactionEvaled").Return(nil, randomErr)
+	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+		Tx:    txn,
+		Tag:   "test transaction",
+		Value: nil,
+	})
+	<-ctx.Done()
+	assert.NoError(t, err)
+	receiptOrErr = <-txnManager.ReceiptChan
+	assert.Error(t, receiptOrErr.Err, randomErr)
+	assert.Nil(t, receiptOrErr.Receipt)
+	ethClient.AssertNumberOfCalls(t, "GetLatestGasCaps", 2)
+	ethClient.AssertNumberOfCalls(t, "UpdateGas", 2)
+	ethClient.AssertNumberOfCalls(t, "SendTransaction", 2)
+	ethClient.AssertNumberOfCalls(t, "EnsureTransactionEvaled", 2)
 }
 
 func TestReplaceGasFee(t *testing.T) {
@@ -70,23 +82,15 @@ func TestReplaceGasFee(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	successful := false
 	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
-		HandleSuccess: func(ctx context.Context, receipt *types.Receipt) {
-			fmt.Println("success function called", successful)
-			successful = true
-		},
-		HandleFailure: func(ctx context.Context, err error) {
-			assert.Fail(t, "should not be called")
-		},
 	})
 	<-ctx.Done()
 	assert.NoError(t, err)
-	assert.True(t, successful)
 	ethClient.AssertNumberOfCalls(t, "GetLatestGasCaps", 2)
 	ethClient.AssertNumberOfCalls(t, "UpdateGas", 2)
 	ethClient.AssertNumberOfCalls(t, "SendTransaction", 2)
+	ethClient.AssertNumberOfCalls(t, "EnsureTransactionEvaled", 2)
 }

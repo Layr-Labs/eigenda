@@ -14,14 +14,22 @@ import (
 
 // percentage multiplier for gas price. It needs to be >= 10 to properly replace existing transaction
 // e.g. 10 means 10% increase
-var gasPricePercentageMultiplier = big.NewInt(10)
+var (
+	gasPricePercentageMultiplier = big.NewInt(10)
+	hundred                      = big.NewInt(100)
+)
 
 type TxnRequest struct {
-	Tx            *types.Transaction
-	Tag           string
-	Value         *big.Int
-	HandleSuccess func(ctx context.Context, receipt *types.Receipt)
-	HandleFailure func(ctx context.Context, err error)
+	Tx    *types.Transaction
+	Tag   string
+	Value *big.Int
+}
+
+// ReceiptOrErr is a wrapper for a transaction receipt or an error.
+// Receipt should be nil if there is an error, and non-nil if there is no error.
+type ReceiptOrErr struct {
+	Receipt *types.Receipt
+	Err     error
 }
 
 // TxnManager receives transactions from the caller, sends them to the chain, and monitors their status.
@@ -30,6 +38,8 @@ type TxnRequest struct {
 // same account.
 type TxnManager struct {
 	mu sync.Mutex
+
+	ReceiptChan chan *ReceiptOrErr
 
 	ethClient   common.EthClient
 	requestChan chan *TxnRequest
@@ -41,6 +51,7 @@ type TxnManager struct {
 
 func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger common.Logger) *TxnManager {
 	return &TxnManager{
+		ReceiptChan:        make(chan *ReceiptOrErr, queueSize),
 		ethClient:          ethClient,
 		requestChan:        make(chan *TxnRequest, queueSize),
 		logger:             logger,
@@ -58,9 +69,15 @@ func (t *TxnManager) Start(ctx context.Context) {
 			case req := <-t.requestChan:
 				receipt, err := t.monitorTransaction(ctx, req)
 				if err != nil {
-					req.HandleFailure(ctx, err)
+					t.ReceiptChan <- &ReceiptOrErr{
+						Receipt: nil,
+						Err:     err,
+					}
 				} else {
-					req.HandleSuccess(ctx, receipt)
+					t.ReceiptChan <- &ReceiptOrErr{
+						Receipt: receipt,
+						Err:     nil,
+					}
 				}
 			}
 		}
@@ -74,6 +91,7 @@ func (t *TxnManager) Start(ctx context.Context) {
 func (t *TxnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.logger.Debug("[ProcessTransaction] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
 	gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest gas caps: %w", err)
@@ -109,16 +127,20 @@ func (t *TxnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 		}
 
 		if errors.Is(err, context.DeadlineExceeded) {
-			t.logger.Warn("transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex())
-			txn, err := t.speedUpTxn(ctxWithTimeout, req.Tx, req.Tag)
+			if receipt != nil {
+				t.logger.Warn("transaction has been mined, but hasn't accumulated the required number of confirmations", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
+				continue
+			}
+			t.logger.Warn("transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
+			req.Tx, err = t.speedUpTxn(ctx, req.Tx, req.Tag)
 			if err != nil {
 				t.logger.Error("failed to speed up transaction", "err", err)
-				return nil, err
+				continue
 			}
-			err = t.ethClient.SendTransaction(ctx, txn)
+			err = t.ethClient.SendTransaction(ctx, req.Tx)
 			if err != nil {
 				t.logger.Error("failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
-				return nil, err
+				continue
 			}
 		} else {
 			t.logger.Error("transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
@@ -152,9 +174,14 @@ func (t *TxnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag 
 		newGasFeeCap = increasedGasFeeCap
 	}
 
+	t.logger.Debug("[speedUpTxn] increasing gas price", "tag", tag, "txHash", tx.Hash().Hex(), "nonce", tx.Nonce(), "prevGasTipCap", prevGasTipCap, "prevGasFeeCap", prevGasFeeCap, "newGasTipCap", newGasTipCap, "newGasFeeCap", newGasFeeCap)
 	return t.ethClient.UpdateGas(ctx, tx, tx.Value(), newGasTipCap, newGasFeeCap)
 }
 
+// increaseGasPrice increases the gas price by specified percentage.
+// i.e. gasPrice + (gasPrice * gasPricePercentageMultiplier / 100)
 func increaseGasPrice(gasPrice *big.Int) *big.Int {
-	return new(big.Int).Add(gasPrice, new(big.Int).Div(gasPrice, gasPricePercentageMultiplier))
+	bump := new(big.Int).Mul(gasPrice, gasPricePercentageMultiplier)
+	bump.Div(bump, hundred)
+	return new(big.Int).Add(gasPrice, bump)
 }

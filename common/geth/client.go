@@ -199,10 +199,12 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 	return receipt, err
 }
 
+// EnsureTransactionEvaled waits for tx to be mined on the blockchain and returns the receipt.
+// If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
 func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	receipt, err := c.waitMined(ctx, tx)
 	if err != nil {
-		return nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
+		return receipt, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
 	}
 	if receipt.Status != 1 {
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
@@ -212,15 +214,17 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 	return receipt, nil
 }
 
-// waitMined waits for tx to be mined on the blockchain.
+// waitMined waits for tx to be mined on the blockchain and returns the receipt.
+// If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
 // Taken from https://github.com/ethereum/go-ethereum/blob/master/accounts/abi/bind/util.go#L32,
 // but added a check for number of confirmations.
 func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
 	queryTicker := time.NewTicker(3 * time.Second)
 	defer queryTicker.Stop()
-
+	var receipt *types.Receipt
+	var err error
 	for {
-		receipt, err := c.TransactionReceipt(ctx, tx.Hash())
+		receipt, err = c.TransactionReceipt(ctx, tx.Hash())
 		if err == nil {
 			chainTip, err := c.BlockNumber(ctx)
 			if err == nil {
@@ -236,14 +240,14 @@ func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*type
 
 		if errors.Is(err, ethereum.NotFound) {
 			c.Logger.Trace("Transaction not yet mined")
-		} else {
+		} else if err != nil {
 			c.Logger.Trace("Receipt retrieval failed", "err", err)
 		}
 
 		// Wait for the next round.
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return receipt, ctx.Err()
 		case <-queryTicker.C:
 		}
 	}
