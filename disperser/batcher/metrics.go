@@ -22,6 +22,7 @@ const (
 	FailConfirmBatch           FailReason = "confirm_batch"
 	FailGetBatchID             FailReason = "get_batch_id"
 	FailUpdateConfirmationInfo FailReason = "update_confirmation_info"
+	FailNoAggregatedSignature  FailReason = "no_aggregated_signature"
 )
 
 type MetricsConfig struct {

@@ -62,9 +62,12 @@ type Transactor interface {
 	// The indices of the operators within each quorum are also returned.
 	GetOperatorStakesForQuorums(ctx context.Context, quorums []QuorumID, blockNumber uint32) (OperatorStakes, error)
 
+	// BuildConfirmBatchTxn builds a transaction to confirm a batch header and signature aggregation.
+	BuildConfirmBatchTxn(ctx context.Context, batchHeader *BatchHeader, quorums map[QuorumID]*QuorumResult, signatureAggregation *SignatureAggregation) (*types.Transaction, error)
+
 	// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
 	// specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
-	ConfirmBatch(ctx context.Context, batchHeader BatchHeader, quorums map[QuorumID]*QuorumResult, signatureAggregation SignatureAggregation) (*types.Receipt, error)
+	ConfirmBatch(ctx context.Context, batchHeader *BatchHeader, quorums map[QuorumID]*QuorumResult, signatureAggregation *SignatureAggregation) (*types.Receipt, error)
 
 	// GetBlockStaleMeasure returns the BLOCK_STALE_MEASURE defined onchain.
 	GetBlockStaleMeasure(ctx context.Context) (uint32, error)
