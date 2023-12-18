@@ -222,11 +222,6 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 
 	e.logger.Trace("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
-	// batchMetadata, err := e.getBatchMetadata(ctx, metadatas, referenceBlockNumber)
-	// if err != nil {
-	// 	return fmt.Errorf("error getting quorum infos: %w", err)
-	// }
-
 	// Get the operator state
 	state, err := e.getOperatorStateForBlobs(ctx, metadatas, referenceBlockNumber)
 	if err != nil {
@@ -516,10 +511,6 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	if err != nil {
 		return nil, err
 	}
-	// batchMetadata, err := e.getBatchMetadata(context.Background(), metadatas, e.ReferenceBlockNumber)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	// Populate the batch header
 	batchHeader := &core.BatchHeader{

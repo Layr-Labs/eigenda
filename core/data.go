@@ -68,10 +68,6 @@ func (h *BlobRequestHeader) Validate() error {
 // BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
 type BlobQuorumInfo struct {
 	SecurityParam
-	// QuantizationFactor determines the nominal number of chunks
-	// QuantizationFactor uint
-	// // EncodedBlobLength is the nominal endcoded length of the blob in symbols; EncodedBlobLength = QuantizationFactor * NumOperatorsForQuorum * ChunkLength
-	// EncodedBlobLength uint
 	// ChunkLength is the number of symbols in a chunk
 	ChunkLength uint
 }

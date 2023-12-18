@@ -52,20 +52,20 @@ func (c *Assignment) GetIndices() []ChunkNumber {
 
 // AssignmentCoordinator is responsible for taking the current OperatorState and the security requirements represented by a
 // given  QuorumResults and determining or validating system parameters that will satisfy these security requirements given the
-// OperatorStates. There are two classes of parameters that must be determined or validate: 1) the chunk indices that will be
+// OperatorStates. There are two classes of parameters that must be determined or validated: 1) the chunk indices that will be
 // assigned to each DA node, and 2) the size of each chunk.
 type AssignmentCoordinator interface {
 
-	// GetAssignments calculates the full set of node assignments. The assignment of indices to nodes depends only on the OperatorState
-	// for a given quorum and the quantizationFactor. In particular, it does not depend on the security parameters.
+	// GetAssignments calculates the full set of node assignments.
 	GetAssignments(state *OperatorState, blobLength uint, info *BlobQuorumInfo) (map[OperatorID]Assignment, AssignmentInfo, error)
 
 	// GetOperatorAssignment calculates the assignment for a specific DA node
 	GetOperatorAssignment(state *OperatorState, header *BlobHeader, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error)
 
-	// GetMinimumChunkLength calculates the minimum chunkSize that is sufficient for a given blob for each quorum
+	// ValidateChunkLength validates that the chunk length for the given quorum satisfies all protocol requirements
 	ValidateChunkLength(state *OperatorState, header *BlobHeader, quorum QuorumID) (bool, error)
 
+	// CalculateChunkLength calculates the chunk length for the given quorum that satisfies all protocol requirements
 	CalculateChunkLength(state *OperatorState, blobLength uint, param *SecurityParam) (uint, error)
 }
 
