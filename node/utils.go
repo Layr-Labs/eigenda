@@ -2,9 +2,12 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
@@ -79,4 +82,13 @@ func DecodeBatchExpirationKey(key []byte) (int64, error) {
 	}
 	ts := int64(binary.BigEndian.Uint64(key[len(key)-8:]))
 	return ts, nil
+}
+
+func SocketAddress(ctx context.Context, provider pubip.Provider, dispersalPort string, retrievalPort string) (string, error) {
+	ip, err := provider.PublicIPAddress(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get public ip address from IP provider: %w", err)
+	}
+	socket := core.MakeOperatorSocket(ip, dispersalPort, retrievalPort)
+	return socket.String(), nil
 }

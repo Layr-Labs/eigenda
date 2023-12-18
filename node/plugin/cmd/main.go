@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node"
@@ -114,8 +116,19 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
+	pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
+
+	socket := string(core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort))
+	if isLocalhost(socket) {
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, config.DispersalPort, config.RetrievalPort)
+		if err != nil {
+			log.Printf("Error: failed to create EigenDA transactor: %v", err)
+			return
+		}
+	}
+
 	operator := &node.Operator{
-		Socket:     config.Socket,
+		Socket:     socket,
 		Timeout:    10 * time.Second,
 		KeyPair:    keyPair,
 		OperatorId: keyPair.GetPubKeyG1().GetOperatorID(),
@@ -140,4 +153,8 @@ func pluginOps(ctx *cli.Context) {
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
+}
+
+func isLocalhost(socket string) bool {
+	return strings.Contains(socket, "localhost") || strings.Contains(socket, "127.0.0.1") || strings.Contains(socket, "0.0.0.0")
 }
