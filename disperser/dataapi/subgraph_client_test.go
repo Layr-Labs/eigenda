@@ -161,7 +161,7 @@ func TestQueryOperators(t *testing.T) {
 
 func TestQueryIndexedDeregisteredOperatorsInTheLast14Days(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
-	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfos, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi)
 	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedDeregisteredOperatorsInTheLast14Days(context.Background())

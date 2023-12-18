@@ -43,6 +43,7 @@ type (
 	}
 	DeregisteredOperatorInfo struct {
 		*core.IndexedOperatorInfo
+		// BlockNumber is the block number at which the operator was deregistered.
 		BlockNumber uint
 	}
 	IndexedDeregisteredOperatorState struct {
@@ -107,7 +108,7 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 
 func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error) {
 	last14Days := uint64(time.Now().Add(-_14Days).Unix())
-	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx, last14Days)
+	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, last14Days)
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ type (
 		QueryBatches(ctx context.Context, descending bool, orderByField string, first, skip int) ([]*Batches, error)
 		QueryOperators(ctx context.Context, first int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningOperatorIds, error)
-		QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
+		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
 	}
 
@@ -109,29 +109,16 @@ func (a *api) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, int
 	return result.BatchNonSigningOperatorIds, nil
 }
 
-func (a *api) QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx context.Context, blockTimestamp uint64) ([]*Operator, error) {
+func (a *api) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error) {
 	variables := map[string]any{
 		"blockTimestamp_gt": graphql.Int(blockTimestamp),
 	}
-	skip := 0
-	result := new(queryOperatorDeregistereds)
-	operators := make([]*Operator, 0)
-	for {
-		variables["first"] = graphql.Int(maxEntriesPerQuery)
-		variables["skip"] = graphql.Int(skip)
-
-		err := a.operatorStateGql.Query(ctx, &result, variables)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(result.OperatorDeregistereds) == 0 {
-			break
-		}
-		operators = append(operators, result.OperatorDeregistereds...)
-		skip += maxEntriesPerQuery
+	query := new(queryOperatorDeregistereds)
+	err := a.operatorStateGql.Query(ctx, &query, variables)
+	if err != nil {
+		return nil, err
 	}
-	return operators, nil
+	return query.OperatorDeregistereds, nil
 }
 
 func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error) {

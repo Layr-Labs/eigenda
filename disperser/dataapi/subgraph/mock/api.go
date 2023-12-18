@@ -72,7 +72,7 @@ func (m *MockSubgraphApi) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryDeregisteredOperatorsGreaterThanBlockTimestampWithPagination(ctx context.Context, blockTimestamp uint64) ([]*subgraph.Operator, error) {
+func (m *MockSubgraphApi) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*subgraph.Operator, error) {
 	args := m.Called()
 
 	var value []*subgraph.Operator
