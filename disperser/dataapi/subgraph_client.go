@@ -36,12 +36,12 @@ type (
 		BlockNumber     uint64
 		TransactionHash []byte
 	}
-	subgraphClient struct {
-		api subgraph.Api
-	}
 	NonSigner struct {
 		OperatorId string
 		Count      int
+	}
+	subgraphClient struct {
+		api subgraph.Api
 	}
 )
 

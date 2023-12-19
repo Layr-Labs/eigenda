@@ -56,6 +56,8 @@ definitions:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser.BlobStatus'
       confirmation_block_number:
         type: integer
+      confirmation_txn_hash:
+        type: string
       fee:
         type: string
       reference_block_number:
@@ -90,8 +92,8 @@ definitions:
     type: object
   dataapi.Metric:
     properties:
-      cost_in_wei:
-        type: integer
+      cost_in_gas:
+        type: number
       throughput:
         type: number
       total_stake:
@@ -109,6 +111,15 @@ definitions:
       throughput:
         type: number
       timestamp:
+        type: integer
+    type: object
+  dataapi.UnsignedBatches:
+    properties:
+      percentage:
+        type: number
+      total_batches:
+        type: integer
+      total_non_signers:
         type: integer
     type: object
   github_com_Layr-Labs_eigenda_disperser.BlobStatus:
@@ -291,6 +302,35 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch throughput time series
+      tags:
+      - Metrics
+  /metrics/unsigned_batches:
+    get:
+      parameters:
+      - description: 'Interval to query for non signers in seconds [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.UnsignedBatches'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch unsigned batches
       tags:
       - Metrics
 schemes:

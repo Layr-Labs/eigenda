@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	commock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
@@ -17,12 +18,14 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
+	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 )
@@ -229,6 +232,63 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 	assert.Equal(t, float64(11666.666666666666), response[0].Throughput)
 	assert.Equal(t, uint64(1701292800), response[0].Timestamp)
 	assert.Equal(t, float64(3.599722666666646e+07), totalThroughput)
+}
+
+func TestFetchUnsignedBatchesHandler(t *testing.T) {
+	r := setUpRouter()
+
+	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
+
+	nonSigning := struct {
+		NonSigners []struct {
+			OperatorId graphql.String `graphql:"operatorId"`
+		} `graphql:"nonSigners"`
+	}{
+		NonSigners: []struct {
+			OperatorId graphql.String `graphql:"operatorId"`
+		}{
+			{OperatorId: "0x0000000000000"},
+			{OperatorId: "0x0000000000001"},
+			{OperatorId: "0x0000000000002"},
+			{OperatorId: "0x0000000000003"},
+			{OperatorId: "0x0000000000004"},
+			{OperatorId: "0x0000000000005"},
+			{OperatorId: "0x0000000000006"},
+		},
+	}
+	batchNonSigningOperatorIds := []*subgraph.BatchNonSigningOperatorIds{
+		{
+			NonSigning: nonSigning,
+		},
+	}
+
+	mockSubgraphApi.On("QueryBatchNonSigningOperatorIdsInInterval").Return(batchNonSigningOperatorIds, nil).Once()
+
+	r.GET("/v1/metrics/unsigned_batches", testDataApiServer.FetchUnsignedBatchesHandler)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/unsigned_batches", nil)
+	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 1*time.Millisecond)
+	defer cancel()
+
+	req = req.WithContext(ctxWithDeadline)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.UnsignedBatches
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 7, response.TotalNonSigners)
+	assert.True(t, response.TotalBatches > 20)
+	assert.True(t, response.Percentage > 0.01)
 }
 
 func setUpRouter() *gin.Engine {

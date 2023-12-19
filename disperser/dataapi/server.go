@@ -69,6 +69,12 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
+	UnsignedBatches struct {
+		TotalNonSigners int     `json:"total_non_signers"`
+		TotalBatches    int     `json:"total_batches"`
+		Percentage      float64 `json:"percentage"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -355,6 +361,38 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchNonSigners")
+	c.JSON(http.StatusOK, metric)
+}
+
+// FetchUnsignedBatches godoc
+//
+//	@Summary	Fetch unsigned batches
+//	@Tags		Metrics
+//	@Produce	json
+//	@Param		interval	query		int	false	"Interval to query for non signers in seconds [default: 3600]"
+//	@Success	200			{object}	UnsignedBatches
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/unsigned_batches  [get]
+func (s *server) FetchUnsignedBatchesHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchUnsignedBatches", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 3600
+	}
+	metric, err := s.getUnsignedBatches(c.Request.Context(), interval)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchUnsignedBatches")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchUnsignedBatches")
 	c.JSON(http.StatusOK, metric)
 }
 

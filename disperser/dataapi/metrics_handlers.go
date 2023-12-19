@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -141,4 +142,54 @@ func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]N
 	}
 
 	return &nonSignersObj, nil
+}
+
+func (s *server) getUnsignedBatches(ctx context.Context, intervalSeconds int64) (*UnsignedBatches, error) {
+	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		limit          = 1000
+		skip           = 0
+		totalOfBatches = 0
+	)
+
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break loop
+		default:
+			batches, err := s.subgraphClient.QueryBatchesWithLimit(ctx, limit, skip)
+			if err != nil {
+				s.logger.Error("Failed to query batches", "error", err)
+				return nil, err
+			}
+			totalOfBatches += len(batches)
+			if len(batches) == 0 {
+				break
+			}
+			skip += limit
+		}
+	}
+
+	if totalOfBatches < 1 {
+		return &UnsignedBatches{
+			TotalNonSigners: len(nonSigners),
+			TotalBatches:    totalOfBatches,
+			Percentage:      0,
+		}, nil
+	}
+	percentageS := fmt.Sprintf("%.2f", float64(len(nonSigners))/float64(totalOfBatches))
+	percentage, err := strconv.ParseFloat(percentageS, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &UnsignedBatches{
+		TotalNonSigners: len(nonSigners),
+		TotalBatches:    totalOfBatches,
+		Percentage:      percentage,
+	}, nil
 }
