@@ -14,24 +14,6 @@ import (
 var (
 	/* Required Flags */
 
-	HostnameFlag = cli.StringFlag{
-		Name:     "hostname",
-		Usage:    "Hostname at which node is available",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "HOSTNAME"),
-	}
-	DispersalPortFlag = cli.StringFlag{
-		Name:     "dispersal-port",
-		Usage:    "Port at which node registers to listen for dispersal calls",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "DISPERSAL_PORT"),
-	}
-	RetrievalPortFlag = cli.StringFlag{
-		Name:     "retrieval-port",
-		Usage:    "Port at which node registers to listen for retrieval calls",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "RETRIEVAL_PORT"),
-	}
 	PubIPProviderFlag = cli.StringFlag{
 		Name:     "public-ip-provider",
 		Usage:    "The ip provider service used to obtain a operator's public IP [seeip (default), ipify)",
@@ -124,9 +106,6 @@ var (
 )
 
 type Config struct {
-	Hostname                      string
-	RetrievalPort                 string
-	DispersalPort                 string
 	PubIPProvider                 string
 	Operation                     string
 	EcdsaKeyFile                  string
@@ -159,9 +138,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
-		Hostname:                      ctx.GlobalString(HostnameFlag.Name),
-		DispersalPort:                 ctx.GlobalString(DispersalPortFlag.Name),
-		RetrievalPort:                 ctx.GlobalString(RetrievalPortFlag.Name),
 		PubIPProvider:                 ctx.GlobalString(PubIPProviderFlag.Name),
 		Operation:                     op,
 		EcdsaKeyPassword:              ctx.GlobalString(EcdsaKeyPasswordFlag.Name),

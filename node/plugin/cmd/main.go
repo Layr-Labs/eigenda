@@ -116,11 +116,25 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
+	s := strings.Split(config.Socket, ":")
+	if len(s) != 2 {
+		log.Printf("Error: invalid socket address format: %s", config.Socket)
+		return
+	}
+	hostname := s[0]
+	dispersalPort := s[1]
 
-	socket := string(core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort))
+	s = strings.Split(config.Socket, ";")
+	if len(s) != 2 {
+		log.Printf("Error: invalid socket address format, missing retrieval port: %s", config.Socket)
+		return
+	}
+	retrievalPort := s[1]
+
+	socket := string(core.MakeOperatorSocket(hostname, dispersalPort, retrievalPort))
 	if isLocalhost(socket) {
-		socket, err = node.SocketAddress(context.Background(), pubIPProvider, config.DispersalPort, config.RetrievalPort)
+		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
 		if err != nil {
 			log.Printf("Error: failed to create EigenDA transactor: %v", err)
 			return
