@@ -136,7 +136,7 @@ func pluginOps(ctx *cli.Context) {
 		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
 		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
 		if err != nil {
-			log.Printf("Error: failed to create EigenDA transactor: %v", err)
+			log.Printf("Error: failed to get socket address from ip provider: %v", err)
 			return
 		}
 	}
