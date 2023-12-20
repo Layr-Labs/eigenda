@@ -35,20 +35,21 @@ var _ RetrievalClient = (*retrievalClient)(nil)
 
 func NewRetrievalClient(
 	logger common.Logger,
-	indexedChainState core.IndexedChainState,
+	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	encoder core.Encoder,
 	numConnections int,
-) *retrievalClient {
+) (*retrievalClient, error) {
+
 	return &retrievalClient{
 		logger:                logger,
-		indexedChainState:     indexedChainState,
+		indexedChainState:     chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
 		encoder:               encoder,
 		numConnections:        numConnections,
-	}
+	}, nil
 }
 
 func (r *retrievalClient) RetrieveBlob(

@@ -89,6 +89,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "CHURNER_URL"),
 	}
+	NumConfirmationsFlag = cli.IntFlag{
+		Name:     "num-confirmations",
+		Usage:    "Number of confirmations to wait for",
+		Required: false,
+		Value:    3,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "NUM_CONFIRMATIONS"),
+	}
 )
 
 type Config struct {
@@ -103,6 +110,7 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	ChurnerUrl                    string
+	NumConfirmations              int
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -133,5 +141,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
 		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
+		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
 	}, nil
 }

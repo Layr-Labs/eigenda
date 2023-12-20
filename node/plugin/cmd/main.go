@@ -47,6 +47,7 @@ func main() {
 		plugin.BlsOperatorStateRetrieverFlag,
 		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
+		plugin.NumConfirmationsFlag,
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
@@ -98,6 +99,7 @@ func pluginOps(ctx *cli.Context) {
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           config.ChainRpcUrl,
 		PrivateKeyString: *privateKey,
+		NumConfirmations: config.NumConfirmations,
 	}
 	client, err := geth.NewClient(ethConfig, logger)
 	if err != nil {

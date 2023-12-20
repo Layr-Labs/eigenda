@@ -12,7 +12,7 @@ import (
 
 type EthClient interface {
 	GetAccountAddress() common.Address
-	GetNoSendTransactOpts() *bind.TransactOpts
+	GetNoSendTransactOpts() (*bind.TransactOpts, error)
 	ChainID(ctx context.Context) (*big.Int, error)
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)

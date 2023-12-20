@@ -7,6 +7,7 @@ import (
 
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	kzgbn254 "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -169,4 +170,19 @@ func TestQuorumParamsHash(t *testing.T) {
 	assert.NoError(t, err)
 	expected := "90a8cc415c00b8bc3dcc3b21f240277e93ef712327e0001094b045ec60dff65c"
 	assert.Equal(t, common.Bytes2Hex(hash[:]), expected)
+}
+
+func TestHashPubKeyG1(t *testing.T) {
+	x, ok := new(big.Int).SetString("166951537990155304646296676950704619272379920143528795571830693741626950865", 10)
+	assert.True(t, ok)
+	y, ok := new(big.Int).SetString("1787567470127357668828096785064424339221076501074969235378695359686742067296", 10)
+	assert.True(t, ok)
+	pk := &core.G1Point{
+		G1Affine: &bn254.G1Affine{
+			X: *new(fp.Element).SetBigInt(x),
+			Y: *new(fp.Element).SetBigInt(y),
+		},
+	}
+	hash := eth.HashPubKeyG1(pk)
+	assert.Equal(t, common.Bytes2Hex(hash[:]), "426d1a0363fbdcd0c8d33b643252164057193ca022958fa0da99d9e70c980dd7")
 }

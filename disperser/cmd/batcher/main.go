@@ -9,11 +9,8 @@ import (
 
 	"github.com/shurcooL/graphql"
 
-	"github.com/Layr-Labs/eigenda/core/indexer"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-
-	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -121,9 +118,17 @@ func RunBatcher(ctx *cli.Context) error {
 	} else {
 		logger.Info("Using built-in indexer")
 
-		store := inmemstore.NewHeaderStore()
-
-		ics, err = indexer.NewIndexedChainState(&config.IndexerConfig, gethcommon.HexToAddress(config.EigenDAServiceManagerAddr), cs, store, client, rpcClient, logger)
+		indexer, err := coreindexer.CreateNewIndexer(
+			&config.IndexerConfig,
+			client,
+			rpcClient,
+			config.EigenDAServiceManagerAddr,
+			logger,
+		)
+		if err != nil {
+			return err
+		}
+		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
 		if err != nil {
 			return err
 		}

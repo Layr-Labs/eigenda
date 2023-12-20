@@ -9,12 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 )
 
-type AccumulatorHandler struct {
-	Acc      Accumulator
-	Filterer Filterer
-	Status   Status
-}
-
 type Status uint
 
 const (
@@ -27,7 +21,20 @@ const (
 	maxSyncBlocks        = 10
 )
 
-type Indexer struct {
+type Indexer interface {
+	Index(ctx context.Context) error
+	HandleAccumulator(acc Accumulator, f Filterer, headers Headers) error
+	GetLatestHeader(finalized bool) (*Header, error)
+	GetObject(header *Header, handlerIndex int) (AccumulatorObject, error)
+}
+
+type AccumulatorHandler struct {
+	Acc      Accumulator
+	Filterer Filterer
+	Status   Status
+}
+
+type indexer struct {
 	Logger common.Logger
 
 	Handlers           []AccumulatorHandler
@@ -38,20 +45,22 @@ type Indexer struct {
 	PullInterval time.Duration
 }
 
-func NewIndexer(
+var _ Indexer = (*indexer)(nil)
+
+func New(
 	config *Config,
 	handlers []AccumulatorHandler,
 	headerSrvc HeaderService,
 	headerStore HeaderStore,
 	upgradeForkWatcher UpgradeForkWatcher,
 	logger common.Logger,
-) *Indexer {
+) *indexer {
 
 	for _, h := range handlers {
 		h.Status = Good
 	}
 
-	return &Indexer{
+	return &indexer{
 		Handlers:           handlers,
 		HeaderService:      headerSrvc,
 		HeaderStore:        headerStore,
@@ -61,7 +70,7 @@ func NewIndexer(
 	}
 }
 
-func (i Indexer) Index(ctx context.Context) error {
+func (i *indexer) Index(ctx context.Context) error {
 
 	// Check if any of the accumulators are uninitialized
 	initialized := true
@@ -175,7 +184,7 @@ func (i Indexer) Index(ctx context.Context) error {
 	return nil
 }
 
-func (i Indexer) HandleAccumulator(acc Accumulator, f Filterer, headers Headers) error {
+func (i *indexer) HandleAccumulator(acc Accumulator, f Filterer, headers Headers) error {
 
 	// Handle fast mode
 	initHeader, remainingHeaders, err := f.FilterFastMode(headers)
@@ -233,5 +242,20 @@ func (i Indexer) HandleAccumulator(acc Accumulator, f Filterer, headers Headers)
 	}
 
 	return nil
+}
 
+func (i *indexer) GetLatestHeader(finalized bool) (*Header, error) {
+	return i.HeaderStore.GetLatestHeader(false)
+}
+
+func (i *indexer) GetObject(header *Header, handlerIndex int) (AccumulatorObject, error) {
+	if len(i.Handlers) <= handlerIndex {
+		return nil, errors.New("handler index out of bounds")
+	}
+
+	obj, _, err := i.HeaderStore.GetObject(header, i.Handlers[handlerIndex].Acc)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
 }
