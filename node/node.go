@@ -32,8 +32,12 @@ import (
 const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
+)
 
-	goerliChainID = "5"
+var (
+	eigenDAUIMap = map[string]string{
+		"5": "https://goerli.eigenlayer.xyz/avs/eigenda",
+	}
 )
 
 type Node struct {
@@ -190,11 +194,13 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
-		eigenDAUrl := "unsupported chain"
-		if n.ChainID.String() == goerliChainID {
-			eigenDAUrl = "https://goerli.eigenlayer.xyz/avs/eigenda"
+		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
+		if ok {
+			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
+		} else {
+			n.Logger.Info("The node has started but the network is not supported yet")
 		}
-		n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
+
 	}
 
 	n.CurrentSocket = socket
