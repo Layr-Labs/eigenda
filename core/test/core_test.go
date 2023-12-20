@@ -1,4 +1,4 @@
-package integration
+package core_test
 
 import (
 	"context"
@@ -213,7 +213,7 @@ func TestCoreLibrary(t *testing.T) {
 	pool := workerpool.New(1)
 
 	for _, operatorCount := range operatorCounts {
-		cst, err := mock.NewChainDataMock(core.OperatorIndex(operatorCount))
+		cst, err := mock.MakeChainDataMock(core.OperatorIndex(operatorCount))
 		assert.NoError(t, err)
 		batches := make([]core.EncodedBlob, 0)
 		batchHeader := core.BatchHeader{

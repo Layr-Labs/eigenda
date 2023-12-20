@@ -360,7 +360,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	cst, err := coremock.NewChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.NoError(t, err)
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)

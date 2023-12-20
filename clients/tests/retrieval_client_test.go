@@ -61,12 +61,12 @@ var (
 func setup(t *testing.T) {
 
 	var err error
-	chainState, err = coremock.NewChainDataMock(core.OperatorIndex(numOperators))
+	chainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
 	if err != nil {
 		t.Fatalf("failed to create new mocked chain data: %s", err)
 	}
 
-	indexedChainState, err = coremock.NewChainDataMock(core.OperatorIndex(numOperators))
+	indexedChainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
 	if err != nil {
 		t.Fatalf("failed to create new mocked indexed chain data: %s", err)
 	}

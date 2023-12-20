@@ -22,7 +22,7 @@ var (
 
 func init() {
 	var err error
-	dat, err = mock.NewChainDataMock(10)
+	dat, err = mock.MakeChainDataMock(10)
 	if err != nil {
 		log.Fatal(err)
 	}
