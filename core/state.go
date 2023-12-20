@@ -19,13 +19,13 @@ func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSoc
 	return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
 }
 
-func ParseOperatorSocket(operatorSocket string) (socket string, dispersalPort string, retrievalPort string, err error) {
+func ParseOperatorSocket(operatorSocket string) (host string, dispersalPort string, retrievalPort string, err error) {
 	s := strings.Split(operatorSocket, ":")
 	if len(s) != 2 {
 		err = fmt.Errorf("invalid socket address format: %s", operatorSocket)
 		return
 	}
-	hostname := s[0]
+	host = s[0]
 	dispersalPort = s[1]
 
 	s = strings.Split(operatorSocket, ";")
@@ -35,7 +35,6 @@ func ParseOperatorSocket(operatorSocket string) (socket string, dispersalPort st
 	}
 	retrievalPort = s[1]
 
-	socket = string(MakeOperatorSocket(hostname, dispersalPort, retrievalPort))
 	return
 }
 

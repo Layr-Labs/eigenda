@@ -116,12 +116,13 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	socket, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	host, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
 	}
 
+	socket := string(core.MakeOperatorSocket(host, dispersalPort, retrievalPort))
 	if isLocalhost(socket) {
 		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
 		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
