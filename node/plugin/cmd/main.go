@@ -116,22 +116,12 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	s := strings.Split(config.Socket, ":")
-	if len(s) != 2 {
-		log.Printf("Error: invalid socket address format: %s", config.Socket)
+	socket, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	if err != nil {
+		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
 	}
-	hostname := s[0]
-	dispersalPort := s[1]
 
-	s = strings.Split(config.Socket, ";")
-	if len(s) != 2 {
-		log.Printf("Error: invalid socket address format, missing retrieval port: %s", config.Socket)
-		return
-	}
-	retrievalPort := s[1]
-
-	socket := string(core.MakeOperatorSocket(hostname, dispersalPort, retrievalPort))
 	if isLocalhost(socket) {
 		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
 		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)

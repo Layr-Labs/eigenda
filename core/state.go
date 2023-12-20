@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 // Operators
@@ -16,6 +17,26 @@ func (s OperatorSocket) String() string {
 
 func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSocket {
 	return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
+}
+
+func ParseOperatorSocket(operatorSocket string) (socket string, dispersalPort string, retrievalPort string, err error) {
+	s := strings.Split(operatorSocket, ":")
+	if len(s) != 2 {
+		err = fmt.Errorf("invalid socket address format: %s", operatorSocket)
+		return
+	}
+	hostname := s[0]
+	dispersalPort = s[1]
+
+	s = strings.Split(operatorSocket, ";")
+	if len(s) != 2 {
+		err = fmt.Errorf("invalid socket address format, missing retrieval port: %s", operatorSocket)
+		return
+	}
+	retrievalPort = s[1]
+
+	socket = string(MakeOperatorSocket(hostname, dispersalPort, retrievalPort))
+	return
 }
 
 type StakeAmount *big.Int
