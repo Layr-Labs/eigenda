@@ -71,7 +71,7 @@ type AssignmentCoordinator interface {
 	ValidateChunkLength(state *OperatorState, header *BlobHeader, quorum QuorumID) (bool, error)
 
 	// CalculateChunkLength calculates the chunk length for the given quorum that satisfies all protocol requirements
-	CalculateChunkLength(state *OperatorState, blobLength uint, param *SecurityParam) (uint, error)
+	CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error)
 }
 
 type StdAssignmentCoordinator struct {
@@ -185,28 +185,43 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, hea
 
 }
 
-func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength uint, param *SecurityParam) (uint, error) {
+func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error) {
 
 	quorum := param.QuorumID
 	numOperators := len(state.Operators[quorum])
 
-	// Get minimum stake amont
-	minStake := state.Totals[quorum].Stake
-	for _, r := range state.Operators[quorum] {
-		if r.Stake.Cmp(minStake) < 0 {
-			minStake = r.Stake
+	var numChunks uint
+	if targetNumChunks != 0 {
+		// If targetNumChunks is specified, then we use that value
+
+		numChunks = targetNumChunks - uint(numOperators)
+
+	} else {
+		// Otherwise, we calculate the number of chunks based on the ratio of the total stake to the minimum stake
+
+		// Get minimum stake amount
+		minStake := state.Totals[quorum].Stake
+		for _, r := range state.Operators[quorum] {
+			if r.Stake.Cmp(minStake) < 0 {
+				minStake = r.Stake
+			}
 		}
+
+		// Cap the number of chunks to maxRequiredNumChunks - numOperators
+		numChunks = maxRequiredNumChunks - uint(numOperators)
+
+		if minStake.Cmp(big.NewInt(0)) > 0 {
+			totalStake := state.Totals[quorum].Stake
+			numChunksByStake := uint(roundUpDivideBig(totalStake, minStake).Uint64())
+
+			if numChunksByStake < numChunks {
+				numChunks = numChunksByStake
+			}
+		}
+
 	}
 
-	totalStake := state.Totals[quorum].Stake
-
-	numChunks := int(roundUpDivideBig(totalStake, minStake).Uint64())
-
-	if numChunks > maxRequiredNumChunks-numOperators {
-		numChunks = maxRequiredNumChunks - numOperators
-	}
-
-	chunkLength := roundUpDivide(blobLength*percentMultiplier, uint(numChunks)*uint(param.QuorumThreshold-param.AdversaryThreshold))
+	chunkLength := roundUpDivide(blobLength*percentMultiplier, numChunks*uint(param.QuorumThreshold-param.AdversaryThreshold))
 
 	if chunkLength < minChunkLength {
 		chunkLength = minChunkLength

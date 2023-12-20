@@ -125,7 +125,7 @@ func setup(t *testing.T) {
 	blobSize := uint(len(blob.Data))
 	blobLength := core.GetBlobLength(uint(blobSize))
 
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, securityParams[0])
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
 		t.Fatal(err)
 	}

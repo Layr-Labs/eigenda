@@ -81,7 +81,7 @@ func getTestData() (core.Blob, core.EncodingParams) {
 	blobSize := uint(len(testBlob.Data))
 	blobLength := core.GetBlobLength(uint(blobSize))
 
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, securityParams[0])
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
 		log.Fatal(err)
 	}

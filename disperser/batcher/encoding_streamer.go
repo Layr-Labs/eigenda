@@ -276,7 +276,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		blobLength := core.GetBlobLength(metadata.RequestMetadata.BlobSize)
 
-		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, quorum)
+		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, 0, quorum)
 		if err != nil {
 			e.logger.Error("[RequestEncodingForBlob] error calculating chunk length", "err", err)
 			continue

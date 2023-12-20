@@ -93,7 +93,7 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 		blobSize := uint(len(blob.Data))
 		blobLength := core.GetBlobLength(blobSize)
 
-		chunkLength, err := asn.CalculateChunkLength(state, blobLength, blob.RequestHeader.SecurityParams[quorumIndex])
+		chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, blob.RequestHeader.SecurityParams[quorumIndex])
 		if err != nil {
 			t.Fatal(err)
 		}

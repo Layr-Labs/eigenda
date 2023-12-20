@@ -462,7 +462,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	assert.NoError(t, err)
 
 	blobLength := core.GetBlobLength(uint(len(blob.Data)))
-	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, blob.RequestHeader.SecurityParams[0])
+	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
 	assert.NoError(t, err)
 
 	blobQuorumInfo := &core.BlobQuorumInfo{
