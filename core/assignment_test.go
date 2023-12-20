@@ -3,9 +3,11 @@ package core_test
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,5 +101,93 @@ func TestOperatorAssignments(t *testing.T) {
 		assert.Equal(t, expectedInfo, info)
 
 	}
+
+}
+
+func FuzzOperatorAssignments(f *testing.F) {
+
+	// Add distributions to fuzz
+	asn := &core.StdAssignmentCoordinator{}
+
+	for i := 1; i < 100; i++ {
+		f.Add(i, true)
+	}
+
+	for i := 1; i < 100; i++ {
+		f.Add(i, false)
+	}
+
+	for i := 0; i < 100; i++ {
+		f.Add(rand.Intn(1000), rand.Intn(2) == 0)
+	}
+
+	f.Fuzz(func(t *testing.T, numOperators int, useTargetNumChunks bool) {
+
+		// Generate a random slice of integers of length n
+
+		stakes := make([]int, numOperators)
+		for i := range stakes {
+			stakes[i] = rand.Intn(100)
+		}
+
+		advThreshold := rand.Intn(99)
+		quorumThreshold := rand.Intn(100-advThreshold) + advThreshold + 1
+
+		param := &core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: uint8(advThreshold),
+			QuorumThreshold:    uint8(quorumThreshold),
+		}
+
+		dat, err := mock.NewChainDataMock(stakes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state := dat.GetTotalOperatorState(context.Background(), 0)
+
+		blobLength := uint(rand.Intn(100000))
+
+		targetNumChunks := uint(0)
+		if useTargetNumChunks {
+			targetNumChunks = uint(rand.Intn(1000))
+		}
+
+		chunkLength, err := asn.CalculateChunkLength(state.OperatorState, blobLength, targetNumChunks, param)
+		assert.NoError(t, err)
+
+		quorumInfo := core.BlobQuorumInfo{
+			SecurityParam: *param,
+			ChunkLength:   chunkLength,
+		}
+
+		header := &core.BlobHeader{
+			BlobCommitments: core.BlobCommitments{
+				Length: blobLength,
+			},
+			QuorumInfos: []*core.BlobQuorumInfo{&quorumInfo},
+		}
+
+		ok, err := asn.ValidateChunkLength(state.OperatorState, header, 0)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+
+		assignments, _, err := asn.GetAssignments(state.OperatorState, blobLength, &quorumInfo)
+		assert.NoError(t, err)
+
+		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "chunkLength", chunkLength, "blobLength", blobLength)
+
+		// Check that each operator's assignment satisfies the security requirement
+		for operatorID, assignment := range assignments {
+
+			totalStake := state.Totals[0].Stake
+			myStake := state.Operators[0][operatorID].Stake
+
+			valid := assignment.NumChunks*uint((quorumThreshold-advThreshold))*chunkLength*uint(totalStake.Uint64()) >= blobLength*uint(myStake.Uint64())
+			assert.True(t, valid)
+
+		}
+
+	})
 
 }
