@@ -130,7 +130,7 @@ func (env *Config) deployEigenDAContracts() {
 
 // Deploys a EigenDA experiment
 func (env *Config) DeployExperiment() {
-
+	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 	defer env.SaveTestConfig()
 
 	log.Print("Deploying experiment...")
@@ -206,7 +206,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 
 	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT))
 
-	err := execCmd("./node-plugin.sh", []string{}, []string{
+	envVars := []string{
 		"NODE_OPERATION=" + operation,
 		"NODE_ECDSA_KEY_FILE=" + operator.NODE_ECDSA_KEY_FILE,
 		"NODE_BLS_KEY_FILE=" + operator.NODE_BLS_KEY_FILE,
@@ -218,7 +218,10 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
 		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
-	})
+		"NODE_NUM_CONFIRMATIONS=0",
+	}
+	
+	err := execCmd("./node-plugin.sh", []string{}, envVars)
 
 	if err != nil {
 		log.Panicf("Failed to run node plugin. Err: %s", err)
