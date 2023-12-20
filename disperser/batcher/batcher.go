@@ -53,6 +53,8 @@ type Config struct {
 	// BatchSizeMBLimit is the maximum size of a batch in MB
 	BatchSizeMBLimit     uint
 	MaxNumRetriesPerBlob uint
+
+	TargetNumChunks uint
 }
 
 type Batcher struct {
@@ -98,6 +100,7 @@ func NewBatcher(
 		SRSOrder:               config.SRSOrder,
 		EncodingRequestTimeout: config.PullInterval,
 		EncodingQueueLimit:     config.EncodingRequestQueueSize,
+		TargetNumChunks:        config.TargetNumChunks,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
 	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)

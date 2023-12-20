@@ -38,6 +38,9 @@ type StreamerConfig struct {
 
 	// EncodingQueueLimit is the maximum number of encoding requests that can be queued
 	EncodingQueueLimit int
+
+	// TargetNumChunks is the target number of chunks per encoded blob
+	TargetNumChunks uint
 }
 
 type EncodingStreamer struct {
@@ -276,7 +279,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		blobLength := core.GetBlobLength(metadata.RequestMetadata.BlobSize)
 
-		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, 0, quorum)
+		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, e.StreamerConfig.TargetNumChunks, quorum)
 		if err != nil {
 			e.logger.Error("[RequestEncodingForBlob] error calculating chunk length", "err", err)
 			continue

@@ -154,6 +154,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_RETRIES_PER_BLOB"),
 		Value:    2,
 	}
+	TargetNumChunksFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "target-num-chunks"),
+		Usage:    "Target number of chunks per blob. If set to zero, the number of chunks will be calculated based on the ratio of the total stake to the minimum stake",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TARGET_NUM_CHUNKS"),
+		Value:    0,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -181,6 +188,7 @@ var optionalFlags = []cli.Flag{
 	FinalizerIntervalFlag,
 	EncodingRequestQueueSizeFlag,
 	MaxNumRetriesPerBlobFlag,
+	TargetNumChunksFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
