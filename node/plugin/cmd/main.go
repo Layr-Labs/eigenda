@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -16,24 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/urfave/cli"
 )
-
-// Returns the decrypted ECDSA private key from the given file.
-func getECDSAPrivateKey(keyFile string, password string) (*keystore.Key, *string, error) {
-	keyContents, err := os.ReadFile(keyFile)
-	if err != nil {
-		return nil, nil, err
-	}
-	sk, err := keystore.DecryptKey(keyContents, password)
-	if err != nil {
-		return nil, nil, err
-	}
-	privateKey := fmt.Sprintf("%x", crypto.FromECDSA(sk.PrivateKey))
-	return sk, &privateKey, nil
-}
 
 func main() {
 	app := cli.NewApp()
@@ -85,7 +68,7 @@ func pluginOps(ctx *cli.Context) {
 
 	operatorID := keyPair.GetPubKeyG1().GetOperatorID()
 
-	sk, privateKey, err := getECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
+	sk, privateKey, err := plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
 	if err != nil {
 		log.Printf("Error: failed to read or decrypt the ECDSA private key: %v", err)
 		return
@@ -155,6 +138,14 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully opt-out the EigenDA, for operator ID: %x, operator address: %x", operatorID, sk.Address)
+	} else if config.Operation == "update-quorums" {
+		log.Printf("Info: Operator with Operator Address: %x is updating its quorums: %v", sk.Address, config.QuorumIDList)
+		err = node.UpdateOperatorQuorums(context.Background(), operator, tx, config.ChurnerUrl, true, logger)
+		if err != nil {
+			log.Printf("Error: failed to update quorums for operator ID: %x, operator address: %x, quorums: %v, error: %v", operatorID, sk.Address, config.QuorumIDList, err)
+			return
+		}
+		log.Printf("Info: successfully updated quorums, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
