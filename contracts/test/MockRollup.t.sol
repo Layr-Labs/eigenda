@@ -95,10 +95,17 @@ contract MockRollupTest is BLSMockAVSDeployer {
         //get commitment with illegal value
         (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
+        IEigenDAServiceManager.QuorumBlobParam[] memory quorumBlobParamsCopy = new IEigenDAServiceManager.QuorumBlobParam[](2);
+        for (uint i = 0; i < blobHeader.quorumBlobParams.length; i++) {
+            quorumBlobParamsCopy[i].quorumNumber = blobHeader.quorumBlobParams[i].quorumNumber;
+            quorumBlobParamsCopy[i].adversaryThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage;
+            quorumBlobParamsCopy[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].quorumThresholdPercentage;
+        }
+        
         stdstore
             .target(address(mockRollup))
             .sig("quorumBlobParamsHash()")
-            .checked_write(keccak256(abi.encode(blobHeader.quorumBlobParams)));
+            .checked_write(keccak256(abi.encode(quorumBlobParamsCopy)));
 
         //post commitment
         vm.prank(alice);

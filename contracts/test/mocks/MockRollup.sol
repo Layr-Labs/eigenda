@@ -66,7 +66,10 @@ contract MockRollup {
         EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
 
         // zero out the chunkLengths (this a temporary hack)
-        blobHeader.quorumBlobParams[0].chunkLength = 0;
+        for (uint256 i = 0; i < blobHeader.quorumBlobParams.length; i++)
+        {
+            blobHeader.quorumBlobParams[i].chunkLength = 0;
+        }
 
         // verify that the blob header contains the correct quorumBlobParams
         require(keccak256(abi.encode(blobHeader.quorumBlobParams)) == quorumBlobParamsHash, "MockRollup.postCommitment: QuorumBlobParams do not match quorumBlobParamsHash");
