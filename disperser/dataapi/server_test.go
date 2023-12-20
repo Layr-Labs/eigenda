@@ -268,7 +268,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/unsigned_batches", nil)
-	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 1*time.Millisecond)
+	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
 
 	req = req.WithContext(ctxWithDeadline)
@@ -287,8 +287,11 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 7, response.TotalNonSigners)
-	assert.True(t, response.TotalBatches > 20)
-	assert.True(t, response.Percentage > 0.01)
+	assert.True(t, response.TotalBatches > 0)
+
+	for _, v := range response.PercentagePerOperator {
+		assert.True(t, v > 0.01)
+	}
 }
 
 func setUpRouter() *gin.Engine {

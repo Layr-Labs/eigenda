@@ -175,21 +175,23 @@ loop:
 		}
 	}
 
-	if totalOfBatches < 1 {
-		return &UnsignedBatches{
-			TotalNonSigners: len(nonSigners),
-			TotalBatches:    totalOfBatches,
-			Percentage:      0,
-		}, nil
+	percentage := make(map[string]float64, 0)
+	for operatorId, totalUnsignedBatches := range nonSigners {
+		if totalOfBatches < 1 {
+			percentage[operatorId] = 0
+			continue
+		}
+		ps := fmt.Sprintf("%.2f", float64(totalUnsignedBatches)/float64(totalOfBatches))
+		pf, err := strconv.ParseFloat(ps, 64)
+		if err != nil {
+			return nil, err
+		}
+		percentage[operatorId] = pf
 	}
-	percentageS := fmt.Sprintf("%.2f", float64(len(nonSigners))/float64(totalOfBatches))
-	percentage, err := strconv.ParseFloat(percentageS, 64)
-	if err != nil {
-		return nil, err
-	}
+
 	return &UnsignedBatches{
-		TotalNonSigners: len(nonSigners),
-		TotalBatches:    totalOfBatches,
-		Percentage:      percentage,
+		TotalNonSigners:       len(nonSigners),
+		TotalBatches:          totalOfBatches,
+		PercentagePerOperator: percentage,
 	}, nil
 }

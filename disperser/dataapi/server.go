@@ -70,9 +70,9 @@ type (
 	}
 
 	UnsignedBatches struct {
-		TotalNonSigners int     `json:"total_non_signers"`
-		TotalBatches    int     `json:"total_batches"`
-		Percentage      float64 `json:"percentage"`
+		TotalNonSigners       int                `json:"total_non_signers"`
+		TotalBatches          int                `json:"total_batches"`
+		PercentagePerOperator map[string]float64 `json:"percentage_per_operator"`
 	}
 
 	ErrorResponse struct {
