@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -31,6 +32,8 @@ import (
 const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
+
+	goerliChainID = "5"
 )
 
 type Node struct {
@@ -45,6 +48,7 @@ type Node struct {
 	Transactor              core.Transactor
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
+	ChainID                 *big.Int
 
 	mu            sync.Mutex
 	CurrentSocket string
@@ -77,6 +81,11 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create chain.Client: %w", err)
+	}
+
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
 	// Create Transactor
@@ -144,6 +153,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 		Validator:               validator,
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
+		ChainID:                 chainID,
 	}, nil
 }
 
@@ -180,7 +190,11 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
-		n.Logger.Info("The node has successfully started. Note: if it's not opted in on https://goerli.eigenlayer.xyz/avs/eigenda (for goerli), then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register")
+		eigenDAUrl := "unsupported chain"
+		if n.ChainID.String() == goerliChainID {
+			eigenDAUrl = "https://goerli.eigenlayer.xyz/avs/eigenda"
+		}
+		n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
 	}
 
 	n.CurrentSocket = socket
