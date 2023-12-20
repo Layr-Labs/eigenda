@@ -190,7 +190,7 @@ func TestRatelimit(t *testing.T) {
 
 	t.Run("no ratelimiting when dispersing and retrieving within rate", func(t *testing.T) {
 
-		// t.Skip("Manual test for now")
+		t.Skip("Manual test for now")
 
 		testCase := ratelimitTestCase{
 			numDispersal:      10,
@@ -278,6 +278,33 @@ func TestRatelimit(t *testing.T) {
 		fmt.Println("Retrieval Ratelimited: ", retrievalErrors)
 		assert.Equal(t, 0, dispersalErrors)
 		assert.Greater(t, retrievalErrors, 0)
+
+	})
+
+	t.Run("ratelimiting when dispersing greater than blob rate", func(t *testing.T) {
+
+		t.Skip("Manual test for now")
+
+		testCase := ratelimitTestCase{
+			numDispersal:      200,
+			numRetrieval:      0,
+			dispersalInterval: 450 * time.Millisecond,
+			retrievalInterval: 500 * time.Millisecond,
+			pause:             0,
+			blobSize:          5,
+			param: core.SecurityParam{
+				QuorumID:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    100,
+			},
+		}
+
+		dispersalErrors, retrievalErrors := testRatelimit(t, testConfig, testCase)
+
+		fmt.Println("Dispersal Ratelimited: ", dispersalErrors)
+
+		assert.Greater(t, dispersalErrors, 0)
+		assert.Equal(t, 0, retrievalErrors)
 
 	})
 
