@@ -288,10 +288,8 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 7, response.TotalNonSigners)
 	assert.True(t, response.TotalBatches > 0)
-
-	for _, v := range response.PercentagePerOperator {
-		assert.True(t, v > 0.01)
-	}
+	assert.NotNil(t, response.PercentagePerOperator)
+	assert.Equal(t, 7, len(response.PercentagePerOperator))
 }
 
 func setUpRouter() *gin.Engine {
