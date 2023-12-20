@@ -58,7 +58,7 @@ func (c *Assignment) GetIndices() []ChunkNumber {
 // AssignmentCoordinator is responsible for taking the current OperatorState and the security requirements represented by a
 // given QuorumResults and determining or validating system parameters that will satisfy these security requirements given the
 // OperatorStates. There are two classes of parameters that must be determined or validated: 1) the chunk indices that will be
-// assigned to each DA node, and 2) the size of each chunk.
+// assigned to each DA node, and 2) the length of each chunk.
 type AssignmentCoordinator interface {
 
 	// GetAssignments calculates the full set of node assignments.
