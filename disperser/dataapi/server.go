@@ -364,9 +364,9 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 	c.JSON(http.StatusOK, metric)
 }
 
-// FetchUnsignedBatches godoc
+// FetchOperatorNonsigningPercentageHandler godoc
 //
-//	@Summary	Fetch unsigned batches
+//	@Summary	Fetch operator non signing percentage
 //	@Tags		Metrics
 //	@Produce	json
 //	@Param		interval	query		int	false	"Interval to query for non signers in seconds [default: 3600]"
@@ -374,8 +374,8 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/unsigned_batches  [get]
-func (s *server) FetchUnsignedBatchesHandler(c *gin.Context) {
+//	@Router		/metrics/operator_nonsigning_percentage  [get]
+func (s *server) FetchOperatorNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchUnsignedBatches", f*1000) // make milliseconds
 	}))

@@ -264,10 +264,10 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 
 	mockSubgraphApi.On("QueryBatchNonSigningOperatorIdsInInterval").Return(batchNonSigningOperatorIds, nil).Once()
 
-	r.GET("/v1/metrics/unsigned_batches", testDataApiServer.FetchUnsignedBatchesHandler)
+	r.GET("/v1/metrics/operator_nonsigning_percentage", testDataApiServer.FetchOperatorNonsigningPercentageHandler)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/unsigned_batches", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/operator_nonsigning_percentage", nil)
 	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
 

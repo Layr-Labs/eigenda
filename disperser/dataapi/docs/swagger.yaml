@@ -115,8 +115,10 @@ definitions:
     type: object
   dataapi.UnsignedBatches:
     properties:
-      percentage:
-        type: number
+      percentage_per_operator:
+        additionalProperties:
+          type: number
+        type: object
       total_batches:
         type: integer
       total_non_signers:
@@ -269,6 +271,35 @@ paths:
       summary: Fetch non signers
       tags:
       - Metrics
+  /metrics/operator_nonsigning_percentage:
+    get:
+      parameters:
+      - description: 'Interval to query for non signers in seconds [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.UnsignedBatches'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch operator non signing percentage
+      tags:
+      - Metrics
   /metrics/throughput:
     get:
       parameters:
@@ -302,35 +333,6 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch throughput time series
-      tags:
-      - Metrics
-  /metrics/unsigned_batches:
-    get:
-      parameters:
-      - description: 'Interval to query for non signers in seconds [default: 3600]'
-        in: query
-        name: interval
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.UnsignedBatches'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch unsigned batches
       tags:
       - Metrics
 schemes:

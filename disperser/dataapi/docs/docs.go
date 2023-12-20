@@ -212,6 +212,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/metrics/operator_nonsigning_percentage": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch operator non signing percentage",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Interval to query for non signers in seconds [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.UnsignedBatches"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/throughput": {
             "get": {
                 "produces": [
@@ -243,51 +288,6 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/dataapi.Throughput"
                             }
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/metrics/unsigned_batches": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Metrics"
-                ],
-                "summary": "Fetch unsigned batches",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Interval to query for non signers in seconds [default: 3600]",
-                        "name": "interval",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.UnsignedBatches"
                         }
                     },
                     "400": {
@@ -480,8 +480,11 @@ const docTemplate = `{
         "dataapi.UnsignedBatches": {
             "type": "object",
             "properties": {
-                "percentage": {
-                    "type": "number"
+                "percentage_per_operator": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
                 },
                 "total_batches": {
                     "type": "integer"
