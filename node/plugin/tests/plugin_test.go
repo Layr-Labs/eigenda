@@ -68,7 +68,6 @@ func teardown() {
 	if testConfig != nil {
 		fmt.Println("Stoping anvil")
 		testConfig.StopAnvil()
-		testConfig.StopGraphNode()
 	}
 }
 
@@ -240,6 +239,7 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           operator.NODE_CHAIN_RPC,
 		PrivateKeyString: hexPk,
+		NumConfirmations: 0,
 	}
 
 	client, err := geth.NewClient(ethConfig, logger)
