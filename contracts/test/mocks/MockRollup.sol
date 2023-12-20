@@ -62,11 +62,15 @@ contract MockRollup {
         require(validators[msg.sender], "MockRollup.postCommitment: Validator not registered");
         require(commitments[block.timestamp].validator == address(0), "MockRollup.postCommitment: Commitment already posted");
 
+        // verify that the blob was included in the batch
+        EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
+
+        // zero out the chunkLengths (this a temporary hack)
+        blobHeader.quorumBlobParams[0].chunkLength = 0;
+
         // verify that the blob header contains the correct quorumBlobParams
         require(keccak256(abi.encode(blobHeader.quorumBlobParams)) == quorumBlobParamsHash, "MockRollup.postCommitment: QuorumBlobParams do not match quorumBlobParamsHash");
 
-        // verify that the blob was included in the batch
-        EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
 
         commitments[block.timestamp] = Commitment(msg.sender, blobHeader.dataLength, blobHeader.commitment);
     }

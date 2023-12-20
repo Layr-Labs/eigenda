@@ -130,7 +130,7 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
 			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			QuantizationParameter:        0,
+			ChunkLength:                  quorum.ChunkLength,
 		}
 	}
 
