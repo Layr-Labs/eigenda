@@ -95,6 +95,22 @@ func DeregisterOperator(ctx context.Context, KeyPair *core.KeyPair, transactor c
 	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber)
 }
 
+// UpdateOperatorQuorums updates the quorums for the given operator
+func UpdateOperatorQuorums(
+	ctx context.Context,
+	operator *Operator,
+	transactor core.Transactor,
+	churnerUrl string,
+	useSecureGrpc bool,
+	logger common.Logger,
+) error {
+	err := DeregisterOperator(ctx, operator.KeyPair, transactor)
+	if err != nil {
+		return fmt.Errorf("failed to deregister operator: %w", err)
+	}
+	return RegisterOperator(ctx, operator, transactor, churnerUrl, useSecureGrpc, logger)
+}
+
 func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger common.Logger) (*grpcchurner.ChurnReply, error) {
 	logger.Info("churner url", "url", churnerUrl)
 
