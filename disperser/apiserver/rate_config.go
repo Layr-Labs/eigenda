@@ -11,12 +11,14 @@ import (
 
 const (
 	RegisteredQuorumFlagName        = "auth.registered-quorum"
-	TotalUnauthThroughputFlagName   = "auth.total-unauth-throughput"
-	PerUserUnauthThroughputFlagName = "auth.per-user-unauth-throughput"
+	TotalUnauthThroughputFlagName   = "auth.total-unauth-byte-rate"
+	PerUserUnauthThroughputFlagName = "auth.per-user-unauth-byte-rate"
 	TotalUnauthBlobRateFlagName     = "auth.total-unauth-blob-rate"
 	PerUserUnauthBlobRateFlagName   = "auth.per-user-unauth-blob-rate"
 	ClientIPHeaderFlagName          = "auth.client-ip-header"
 
+	// We allow the user to specify the blob rate in blobs/sec, but internally we use blobs/sec * 1e6 (i.e. blobs/microsec).
+	// This is because the rate limiter takes an integer rate.
 	blobRateMultiplier = 1e6
 )
 
@@ -44,13 +46,13 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:     TotalUnauthThroughputFlagName,
 			Usage:    "Total encoded throughput for unauthenticated requests (Bytes/sec)",
 			Required: true,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "TOTAL_UNAUTH_THROUGHPUT"),
+			EnvVar:   common.PrefixEnvVar(envPrefix, "TOTAL_UNAUTH_BYTE_RATE"),
 		},
 		cli.IntSliceFlag{
 			Name:     PerUserUnauthThroughputFlagName,
 			Usage:    "Per-user encoded throughput for unauthenticated requests (Bytes/sec)",
 			Required: true,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "PER_USER_UNAUTH_THROUGHPUT"),
+			EnvVar:   common.PrefixEnvVar(envPrefix, "PER_USER_UNAUTH_BYTE_RATE"),
 		},
 		cli.StringSliceFlag{
 			Name:     TotalUnauthBlobRateFlagName,

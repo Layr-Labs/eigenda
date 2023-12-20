@@ -181,7 +181,7 @@ func TestRatelimit(t *testing.T) {
 	}
 	testConfig := deploy.NewTestConfig(testname, rootPath)
 
-	if testConfig.Dispersers[0].DISPERSER_SERVER_PER_USER_UNAUTH_THROUGHPUT != fmt.Sprint(perUserThroughput) {
+	if testConfig.Dispersers[0].DISPERSER_SERVER_PER_USER_UNAUTH_BYTE_RATE != fmt.Sprint(perUserThroughput) {
 		t.Fatalf("per user throughput should be %v", perUserThroughput)
 	}
 	if testConfig.Dispersers[0].DISPERSER_SERVER_BUCKET_MULTIPLIERS != fmt.Sprint(dispersalMultiplier) {

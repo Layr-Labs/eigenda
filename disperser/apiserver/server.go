@@ -201,7 +201,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("system data ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
+			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
 			return errSystemRateLimit
 		}
 
@@ -225,7 +225,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account data ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
+			s.logger.Warn("account byte ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
 			return errAccountRateLimit
 		}
 
