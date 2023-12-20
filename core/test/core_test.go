@@ -256,3 +256,12 @@ func TestCoreLibrary(t *testing.T) {
 	}
 
 }
+
+func TestParseOperatorSocket(t *testing.T) {
+	operatorSocket := "localhost:1234;5678"
+	host, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(operatorSocket)
+	assert.NoError(t, err)
+	assert.Equal(t, "localhost", host)
+	assert.Equal(t, "1234", dispersalPort)
+	assert.Equal(t, "5678", retrievalPort)
+}

@@ -20,20 +20,20 @@ func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSoc
 }
 
 func ParseOperatorSocket(operatorSocket string) (host string, dispersalPort string, retrievalPort string, err error) {
-	s := strings.Split(operatorSocket, ":")
+	s := strings.Split(operatorSocket, ";")
+	if len(s) != 2 {
+		err = fmt.Errorf("invalid socket address format, missing retrieval port: %s", operatorSocket)
+		return
+	}
+	retrievalPort = s[1]
+
+	s = strings.Split(s[0], ":")
 	if len(s) != 2 {
 		err = fmt.Errorf("invalid socket address format: %s", operatorSocket)
 		return
 	}
 	host = s[0]
 	dispersalPort = s[1]
-
-	s = strings.Split(operatorSocket, ";")
-	if len(s) != 2 {
-		err = fmt.Errorf("invalid socket address format, missing retrieval port: %s", operatorSocket)
-		return
-	}
-	retrievalPort = s[1]
 
 	return
 }
