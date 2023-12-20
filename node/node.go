@@ -198,7 +198,7 @@ func (n *Node) Start(ctx context.Context) error {
 		if ok {
 			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
 		} else {
-			n.Logger.Info("The node has started but the network is not supported yet")
+			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet", n.ChainID.String())
 		}
 
 	}
