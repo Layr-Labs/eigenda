@@ -2,19 +2,24 @@ package core
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"math/big"
 )
 
 const (
-	percentMultiplier    = 100
-	minChunkLength       = 1
+	percentMultiplier = 100
+
+	// minChunkLength is the minimum chunk length supported. Generally speaking, it doesn't make sense for a chunk to be
+	// smaller than the proof overhead, which is equal to one G1 point.
+	minChunkLength = 1
+
+	// maxRequiredNumChunks is the maximum number of chunks that can be required for a single quorum. Encoding costs scale
+	// as N*log(N), with N being the number of chunks. The value of 8192 was chosen to ensure that the encoding costs for
+	// a single quorum are reasonable, while still allowing for a single operator to have O(0.01%) of the total data.
 	maxRequiredNumChunks = 8192
 )
 
 var (
-	ErrInvalidChunkLength  = errors.New("invalid chunk length")
 	ErrChunkLengthTooSmall = errors.New("chunk length too small")
 	ErrChunkLengthTooLarge = errors.New("chunk length too large")
 	ErrNotFound            = errors.New("not found")
@@ -51,7 +56,7 @@ func (c *Assignment) GetIndices() []ChunkNumber {
 // Implementation
 
 // AssignmentCoordinator is responsible for taking the current OperatorState and the security requirements represented by a
-// given  QuorumResults and determining or validating system parameters that will satisfy these security requirements given the
+// given QuorumResults and determining or validating system parameters that will satisfy these security requirements given the
 // OperatorStates. There are two classes of parameters that must be determined or validated: 1) the chunk indices that will be
 // assigned to each DA node, and 2) the size of each chunk.
 type AssignmentCoordinator interface {
@@ -171,7 +176,6 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, hea
 		maxChunkLength = uint(nextPowerOf2(uint64(maxChunkLength)))
 
 		if info.ChunkLength > maxChunkLength {
-			fmt.Println("maxChunkLength", maxChunkLength, "info.ChunkLength", info.ChunkLength)
 			return false, ErrChunkLengthTooLarge
 		}
 
@@ -217,8 +221,8 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 func roundUpDivideBig(a, b *big.Int) *big.Int {
 
 	one := new(big.Int).SetUint64(1)
-
-	res := new(big.Int).Div(new(big.Int).Sub(new(big.Int).Add(a, b), one), b)
+	num := new(big.Int).Sub(new(big.Int).Add(a, b), one) // a + b - 1
+	res := new(big.Int).Div(num, b)                      // (a + b - 1) / b
 	return res
 
 }

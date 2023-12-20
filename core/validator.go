@@ -80,6 +80,10 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 		return nil, nil, nil, err
 	}
 
+	if params.ChunkLength != quorumHeader.ChunkLength {
+		return nil, nil, nil, errors.New("invalid chunk length")
+	}
+
 	return chunks, &assignment, &params, nil
 }
 
