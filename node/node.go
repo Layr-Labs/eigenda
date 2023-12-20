@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -33,6 +34,13 @@ const (
 	gcPercentageTime = 0.1
 )
 
+var (
+	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
+	eigenDAUIMap = map[string]string{
+		"5": "https://goerli.eigenlayer.xyz/avs/eigenda",
+	}
+)
+
 type Node struct {
 	Config                  *Config
 	Logger                  common.Logger
@@ -45,6 +53,7 @@ type Node struct {
 	Transactor              core.Transactor
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
+	ChainID                 *big.Int
 
 	mu            sync.Mutex
 	CurrentSocket string
@@ -77,6 +86,11 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create chain.Client: %w", err)
+	}
+
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
 	// Create Transactor
@@ -144,6 +158,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 		Validator:               validator,
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
+		ChainID:                 chainID,
 	}, nil
 }
 
@@ -180,7 +195,13 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
-		n.Logger.Info("The node has successfully started. Note it's not opt-in to EigenDA yet (it's not receiving or validating data in EigenDA). To register, please follow the EigenDA operator guide section in docs.eigenlayer.xyz")
+		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
+		if ok {
+			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
+		} else {
+			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet", n.ChainID.String())
+		}
+
 	}
 
 	n.CurrentSocket = socket
