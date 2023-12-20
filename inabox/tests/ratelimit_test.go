@@ -172,7 +172,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 
 func TestRatelimit(t *testing.T) {
 
-	// t.Skip("Manual test for now")
+	t.Skip("Manual test for now")
 
 	rootPath := "../../"
 	testname, err := deploy.GetLatestTestDirectory(rootPath)
