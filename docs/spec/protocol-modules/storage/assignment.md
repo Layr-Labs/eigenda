@@ -46,7 +46,7 @@ $$
 
 where $\gamma = \beta-\alpha$, with $\alpha$ and $\beta$ as defined in the [Storage Overview](./overview.md).
 
-This means that as long as an operator has a stake share of at least $1/M_\text{max}$ of encoded data that they will receive will be within a factor of 2 of their share of stake. Operators with less than $1/M_\text{max}$ of stake will receive no more than a $1/M_\text{max}$ of the encoded data. $M_\text{max}$ represents the maximum number of chunks that the disperser can be required to encode per blob. This limit is included because proving costs scale somewhat super-linearly with the number of chunks. 
+This means that as long as an operator has a stake share of at least $1/M_\text{max}$, then the encoded data that they will receive will be within a factor of 2 of their share of stake. Operators with less than $1/M_\text{max}$ of stake will receive no more than a $1/M_\text{max}$ of the encoded data. $M_\text{max}$ represents the maximum number of chunks that the disperser can be required to encode per blob. This limit is included because proving costs scale somewhat super-linearly with the number of chunks. 
 
 In the future, additional constraints on chunk length may be added; for instance, the chunk length may be set in order to maintain a fixed number of chunks per blob across all system states. Currently, the protocol does not mandate a specific value for the chunk length, but will accept the range satisfying the above constraint. The `CalculateChunkLength` function is provided as a convenience function which can be used to find a chunk length satisfying the protocol requirements. 
 
