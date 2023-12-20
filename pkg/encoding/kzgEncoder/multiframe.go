@@ -177,7 +177,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	D := params.ChunkLen
 
 	n := len(samples)
-	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
+	// fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
 
 	// generate random field elements to aggregate equality check
 	randomsFr, err := GenRandomnessVector(samples)
