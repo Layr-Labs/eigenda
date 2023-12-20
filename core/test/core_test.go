@@ -264,4 +264,12 @@ func TestParseOperatorSocket(t *testing.T) {
 	assert.Equal(t, "localhost", host)
 	assert.Equal(t, "1234", dispersalPort)
 	assert.Equal(t, "5678", retrievalPort)
+
+	_, _, _, err = core.ParseOperatorSocket("localhost:12345678")
+	assert.NotNil(t, err)
+	assert.Equal(t, "invalid socket address format, missing retrieval port: localhost:12345678", err.Error())
+
+	_, _, _, err = core.ParseOperatorSocket("localhost1234;5678")
+	assert.NotNil(t, err)
+	assert.Equal(t, "invalid socket address format: localhost1234;5678", err.Error())
 }
