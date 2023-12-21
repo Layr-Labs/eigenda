@@ -4,10 +4,12 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node"
@@ -97,8 +99,24 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
+	_, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	if err != nil {
+		log.Printf("Error: failed to parse operator socket: %v", err)
+		return
+	}
+
+	socket := config.Socket
+	if isLocalhost(socket) {
+		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
+		if err != nil {
+			log.Printf("Error: failed to get socket address from ip provider: %v", err)
+			return
+		}
+	}
+
 	operator := &node.Operator{
-		Socket:     config.Socket,
+		Socket:     socket,
 		Timeout:    10 * time.Second,
 		KeyPair:    keyPair,
 		OperatorId: keyPair.GetPubKeyG1().GetOperatorID(),
@@ -131,4 +149,8 @@ func pluginOps(ctx *cli.Context) {
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
+}
+
+func isLocalhost(socket string) bool {
+	return strings.Contains(socket, "localhost") || strings.Contains(socket, "127.0.0.1") || strings.Contains(socket, "0.0.0.0")
 }

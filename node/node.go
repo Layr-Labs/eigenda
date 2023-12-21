@@ -396,7 +396,7 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			newSocketAddr, err := n.socketAddress(ctx)
+			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort)
 			if err != nil {
 				n.Logger.Error("failed to get socket address", "err", err)
 				continue
@@ -404,15 +404,6 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 			n.updateSocketAddress(ctx, newSocketAddr)
 		}
 	}
-}
-
-func (n *Node) socketAddress(ctx context.Context) (string, error) {
-	ip, err := n.PubIPProvider.PublicIPAddress(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get public ip address from IP provider: %w", err)
-	}
-	socket := core.MakeOperatorSocket(ip, n.Config.DispersalPort, n.Config.RetrievalPort)
-	return socket.String(), nil
 }
 
 // we only need to build the sdk clients for eigenmetrics right now,
