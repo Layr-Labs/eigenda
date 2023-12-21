@@ -42,7 +42,7 @@ var (
 	config                 = dataapi.Config{ServerMode: "test", SocketAddr: ":8080"}
 
 	mockTx                          = &coremock.MockTransactor{}
-	mockChainState, _               = coremock.NewChainDataMock(core.OperatorIndex(1))
+	mockChainState, _               = coremock.MakeChainDataMock(core.OperatorIndex(1))
 	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)

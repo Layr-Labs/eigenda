@@ -54,12 +54,12 @@ var testEncoder, testServerConfig = makeTestEncoder()
 
 func getTestData() (core.Blob, core.EncodingParams) {
 	var quorumID core.QuorumID = 0
-	var quantizationFactor uint = 2
 	var adversaryThreshold uint8 = 80
 	var quorumThreshold uint8 = 90
 	securityParams := []*core.SecurityParam{
 		{
 			QuorumID:           quorumID,
+			QuorumThreshold:    quorumThreshold,
 			AdversaryThreshold: adversaryThreshold,
 		},
 	}
@@ -71,22 +71,27 @@ func getTestData() (core.Blob, core.EncodingParams) {
 		Data: gettysburgAddressBytes,
 	}
 
-	indexedChainState, _ := coremock.NewChainDataMock(core.OperatorIndex(10))
+	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
 	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
 	if err != nil {
 		log.Fatalf("failed to get operator state: %s", err)
 	}
 	coordinator := &core.StdAssignmentCoordinator{}
-	_, info, err := coordinator.GetAssignments(operatorState, quorumID, quantizationFactor)
+
+	blobSize := uint(len(testBlob.Data))
+	blobLength := core.GetBlobLength(uint(blobSize))
+
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	blobSize := uint(len(testBlob.Data))
+	blobQuorumInfo := &core.BlobQuorumInfo{
+		SecurityParam: *securityParams[0],
+		ChunkLength:   chunkLength,
+	}
 
-	blobLength := core.GetBlobLength(uint(blobSize))
-	numOperators := uint(len(operatorState.Operators[quorumID]))
-	chunkLength, err := coordinator.GetMinimumChunkLength(numOperators, blobLength, quantizationFactor, quorumThreshold, adversaryThreshold)
+	_, info, err := coordinator.GetAssignments(operatorState, blobLength, blobQuorumInfo)
 	if err != nil {
 		log.Fatal(err)
 	}

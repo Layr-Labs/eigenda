@@ -19,6 +19,8 @@ func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSoc
 	return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
 }
 
+type StakeAmount = *big.Int
+
 func ParseOperatorSocket(socket string) (host string, dispersalPort string, retrievalPort string, err error) {
 	s := strings.Split(socket, ";")
 	if len(s) != 2 {
@@ -37,8 +39,6 @@ func ParseOperatorSocket(socket string) (host string, dispersalPort string, retr
 
 	return
 }
-
-type StakeAmount *big.Int
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum

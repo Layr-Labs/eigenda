@@ -233,14 +233,14 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
 	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
-	stakeThreshold = roundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(PercentMultiplier))
+	stakeThreshold = roundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
 
 	return stakeThreshold
 }
 
 func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
 
-	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(PercentMultiplier))
+	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
 	quorumThresholdBig := stakeAmount.Div(stakeAmount, state.Totals[quorum].Stake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())

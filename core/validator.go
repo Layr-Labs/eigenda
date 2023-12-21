@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
 )
@@ -46,7 +47,7 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	// Get the assignments for the quorum
-	assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, quorumHeader.QuorumID, quorumHeader.QuantizationFactor, v.operatorID)
+	assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, blob.BlobHeader, quorumHeader.QuorumID, v.operatorID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -59,37 +60,28 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 		return nil, nil, nil, errors.New("number of chunks does not match assignment")
 	}
 
-	chunkLength, err := v.assignment.GetChunkLengthFromHeader(operatorState, quorumHeader)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	// Validate the chunkLength against the quorum and adversary threshold parameters
-	numOperators := uint(len(operatorState.Operators[quorumHeader.QuorumID]))
-	minChunkLength, err := v.assignment.GetMinimumChunkLength(numOperators, blob.BlobHeader.BlobCommitments.Length, quorumHeader.QuantizationFactor, quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	params, err := GetEncodingParams(minChunkLength, info.TotalChunks)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	if params.ChunkLength != chunkLength {
-		return nil, nil, nil, errors.New("number of chunks does not match assignment")
+	ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobHeader.Length, quorumHeader)
+	if err != nil || !ok {
+		return nil, nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
 
 	// Get the chunk length
 	chunks := blob.Bundles[quorumHeader.QuorumID]
 	for _, chunk := range chunks {
-		if uint(chunk.Length()) != chunkLength {
+		if uint(chunk.Length()) != quorumHeader.ChunkLength {
 			return nil, nil, nil, ErrChunkLengthMismatch
 		}
 	}
 
-	// Validate the chunk length
-	if chunkLength*quorumHeader.QuantizationFactor*numOperators != quorumHeader.EncodedBlobLength {
-		return nil, nil, nil, ErrInvalidHeader
+	// Check the received chunks against the commitment
+	params, err := GetEncodingParams(quorumHeader.ChunkLength, info.TotalChunks)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if params.ChunkLength != quorumHeader.ChunkLength {
+		return nil, nil, nil, errors.New("invalid chunk length")
 	}
 
 	return chunks, &assignment, &params, nil

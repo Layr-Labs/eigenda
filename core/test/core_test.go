@@ -1,4 +1,4 @@
-package integration
+package core_test
 
 import (
 	"context"
@@ -71,7 +71,7 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 
 // prepareBatch takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, quorumIndex uint, quantizationFactor uint, bn uint) ([]core.EncodedBlob, core.BatchHeader) {
+func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, quorumIndex uint, bn uint) ([]core.EncodedBlob, core.BatchHeader) {
 
 	batchHeader := core.BatchHeader{
 		ReferenceBlockNumber: bn,
@@ -90,19 +90,24 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 			t.Fatal(err)
 		}
 
-		assignments, info, err := asn.GetAssignments(state, quorumID, quantizationFactor)
+		blobSize := uint(len(blob.Data))
+		blobLength := core.GetBlobLength(blobSize)
+
+		chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, blob.RequestHeader.SecurityParams[quorumIndex])
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		blobSize := uint(len(blob.Data))
-		blobLength := core.GetBlobLength(blobSize)
-		adversaryThreshold := blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold
-		quorumThreshold := blob.RequestHeader.SecurityParams[quorumIndex].QuorumThreshold
+		quorumHeader := &core.BlobQuorumInfo{
+			SecurityParam: core.SecurityParam{
+				QuorumID:           quorumID,
+				AdversaryThreshold: blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold,
+				QuorumThreshold:    blob.RequestHeader.SecurityParams[quorumIndex].QuorumThreshold,
+			},
+			ChunkLength: chunkLength,
+		}
 
-		numOperators := uint(len(state.Operators[quorumID]))
-
-		chunkLength, err := asn.GetMinimumChunkLength(numOperators, blobLength, quantizationFactor, quorumThreshold, adversaryThreshold)
+		assignments, info, err := asn.GetAssignments(state, blobLength, quorumHeader)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,16 +120,6 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 		commitments, chunks, err := enc.Encode(blob.Data, params)
 		if err != nil {
 			t.Fatal(err)
-		}
-
-		quorumHeader := &core.BlobQuorumInfo{
-			SecurityParam: core.SecurityParam{
-				QuorumID:           quorumID,
-				AdversaryThreshold: adversaryThreshold,
-				QuorumThreshold:    quorumThreshold,
-			},
-			QuantizationFactor: quantizationFactor,
-			EncodedBlobLength:  params.ChunkLength * quantizationFactor * numOperators,
 		}
 
 		blobHeader := &core.BlobHeader{
@@ -197,7 +192,6 @@ func TestCoreLibrary(t *testing.T) {
 
 	numBlob := 1 // must be greater than 0
 	blobLengths := []int{1, 64, 1000}
-	quantizationFactors := []uint{1, 10}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
 	securityParams := []*core.SecurityParam{
@@ -219,7 +213,7 @@ func TestCoreLibrary(t *testing.T) {
 	pool := workerpool.New(1)
 
 	for _, operatorCount := range operatorCounts {
-		cst, err := mock.NewChainDataMock(core.OperatorIndex(operatorCount))
+		cst, err := mock.MakeChainDataMock(core.OperatorIndex(operatorCount))
 		assert.NoError(t, err)
 		batches := make([]core.EncodedBlob, 0)
 		batchHeader := core.BatchHeader{
@@ -229,23 +223,20 @@ func TestCoreLibrary(t *testing.T) {
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
 		for _, blobLength := range blobLengths {
 
-			for _, quantizationFactor := range quantizationFactors {
-				for _, securityParam := range securityParams {
+			for _, securityParam := range securityParams {
 
-					t.Run(fmt.Sprintf("blobLength=%v, quantizationFactor=%v, operatorCount=%v, securityParams=%v", blobLength, quantizationFactor, operatorCount, securityParam), func(t *testing.T) {
+				t.Run(fmt.Sprintf("blobLength=%v, operatorCount=%v, securityParams=%v", blobLength, operatorCount, securityParam), func(t *testing.T) {
 
-						blobs := make([]core.Blob, numBlob)
-						for i := 0; i < numBlob; i++ {
-							blobs[i] = makeTestBlob(t, blobLength, []*core.SecurityParam{securityParam})
-						}
+					blobs := make([]core.Blob, numBlob)
+					for i := 0; i < numBlob; i++ {
+						blobs[i] = makeTestBlob(t, blobLength, []*core.SecurityParam{securityParam})
+					}
 
-						batch, header := prepareBatch(t, cst, blobs, quorumIndex, quantizationFactor, bn)
-						batches = append(batches, batch...)
+					batch, header := prepareBatch(t, cst, blobs, quorumIndex, bn)
+					batches = append(batches, batch...)
 
-						checkBatch(t, cst, batch[0], header)
-					})
-				}
-
+					checkBatch(t, cst, batch[0], header)
+				})
 			}
 
 		}
