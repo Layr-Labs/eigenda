@@ -220,22 +220,22 @@ func TestStreamingEncoding(t *testing.T) {
 	encodedResult, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey, core.QuorumID(0))
 	assert.Nil(t, err)
 	assert.NotNil(t, encodedResult)
-	assert.Equal(t, encodedResult.BlobMetadata, metadata)
-	assert.Equal(t, encodedResult.ReferenceBlockNumber, uint(10))
-	assert.Equal(t, encodedResult.BlobQuorumInfo, &core.BlobQuorumInfo{
+	assert.Equal(t, metadata, encodedResult.BlobMetadata)
+	assert.Equal(t, uint(10), encodedResult.ReferenceBlockNumber)
+	assert.Equal(t, &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
 			QuorumID:           0,
 			AdversaryThreshold: 80,
 			QuorumThreshold:    100,
 		},
-		ChunkLength: 8,
-	})
+		ChunkLength: 16,
+	}, encodedResult.BlobQuorumInfo)
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
 	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
-	assert.Len(t, encodedResult.Chunks, 64)
+	assert.Len(t, encodedResult.Chunks, 32)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
@@ -448,7 +448,7 @@ func TestPartialBlob(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			ChunkLength: 4,
+			ChunkLength: 8,
 		}})
 
 		assert.Contains(t, batch.BlobHeaders, blobMessage.BlobHeader)
@@ -620,7 +620,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				ChunkLength: 8,
+				ChunkLength: 16,
 			},
 			{
 				SecurityParam: core.SecurityParam{
@@ -628,7 +628,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 70,
 					QuorumThreshold:    95,
 				},
-				ChunkLength: 4,
+				ChunkLength: 8,
 			},
 		})
 
@@ -653,7 +653,7 @@ func TestGetBatch(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			ChunkLength: 4,
+			ChunkLength: 8,
 		}})
 
 		assert.Len(t, blobMessage.Bundles, 1)

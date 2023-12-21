@@ -82,6 +82,15 @@ type BlobHeader struct {
 	AccountID AccountID `json:"account_id"`
 }
 
+func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
+	for _, quorumInfo := range b.QuorumInfos {
+		if quorumInfo.QuorumID == quorum {
+			return quorumInfo
+		}
+	}
+	return nil
+}
+
 // Returns the total encoded size in bytes of the blob across all quorums.
 func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)

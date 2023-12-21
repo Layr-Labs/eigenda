@@ -156,31 +156,24 @@ func FuzzOperatorAssignments(f *testing.F) {
 		chunkLength, err := asn.CalculateChunkLength(state.OperatorState, blobLength, targetNumChunks, param)
 		assert.NoError(t, err)
 
-		quorumInfo := core.BlobQuorumInfo{
+		quorumInfo := &core.BlobQuorumInfo{
 			SecurityParam: *param,
 			ChunkLength:   chunkLength,
 		}
 
-		header := &core.BlobHeader{
-			BlobCommitments: core.BlobCommitments{
-				Length: blobLength,
-			},
-			QuorumInfos: []*core.BlobQuorumInfo{&quorumInfo},
-		}
-
-		ok, err := asn.ValidateChunkLength(state.OperatorState, header, 0)
+		ok, err := asn.ValidateChunkLength(state.OperatorState, blobLength, quorumInfo)
 		assert.NoError(t, err)
 		assert.True(t, ok)
 
-		assignments, info, err := asn.GetAssignments(state.OperatorState, blobLength, &quorumInfo)
+		assignments, info, err := asn.GetAssignments(state.OperatorState, blobLength, quorumInfo)
 		assert.NoError(t, err)
 
 		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "chunkLength", chunkLength, "blobLength", blobLength)
 
 		if useTargetNumChunks {
 
-			header.QuorumInfos[0].ChunkLength = chunkLength * 2
-			ok, err := asn.ValidateChunkLength(state.OperatorState, header, 0)
+			quorumInfo.ChunkLength = chunkLength * 2
+			ok, err := asn.ValidateChunkLength(state.OperatorState, blobLength, quorumInfo)
 
 			// If it's possible to make the chunk larger, then the number of chunks should fall within the target
 			if ok && err == nil {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 )
@@ -68,7 +69,7 @@ type AssignmentCoordinator interface {
 	GetOperatorAssignment(state *OperatorState, header *BlobHeader, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error)
 
 	// ValidateChunkLength validates that the chunk length for the given quorum satisfies all protocol requirements
-	ValidateChunkLength(state *OperatorState, header *BlobHeader, quorum QuorumID) (bool, error)
+	ValidateChunkLength(state *OperatorState, blobLength uint, info *BlobQuorumInfo) (bool, error)
 
 	// CalculateChunkLength calculates the chunk length for the given quorum that satisfies all protocol requirements
 	CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error)
@@ -130,7 +131,12 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 
 func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, header *BlobHeader, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error) {
 
-	assignments, info, err := c.GetAssignments(state, header.Length, header.QuorumInfos[quorum])
+	quorumInfo := header.GetQuorumInfo(quorum)
+	if quorumInfo == nil {
+		return Assignment{}, AssignmentInfo{}, fmt.Errorf("invalid request: quorum ID %d not found in blob header", quorum)
+	}
+
+	assignments, info, err := c.GetAssignments(state, header.Length, quorumInfo)
 	if err != nil {
 		return Assignment{}, AssignmentInfo{}, err
 	}
@@ -143,10 +149,7 @@ func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, h
 	return assignment, info, nil
 }
 
-func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, header *BlobHeader, quorum QuorumID) (bool, error) {
-
-	// TODO: We need to find the quorum info with the right quorumID
-	info := header.QuorumInfos[quorum]
+func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blobLength uint, info *BlobQuorumInfo) (bool, error) {
 
 	// Check that the chunk length meets the minimum requirement
 	if info.ChunkLength < MinChunkLength {
@@ -154,21 +157,21 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, hea
 	}
 
 	// Get minimum stake amont
-	minStake := state.Totals[quorum].Stake
-	for _, r := range state.Operators[quorum] {
+	minStake := state.Totals[info.QuorumID].Stake
+	for _, r := range state.Operators[info.QuorumID] {
 		if r.Stake.Cmp(minStake) < 0 {
 			minStake = r.Stake
 		}
 	}
 
-	totalStake := state.Totals[quorum].Stake
+	totalStake := state.Totals[info.QuorumID].Stake
 	if info.ChunkLength != MinChunkLength {
 
-		num := new(big.Int).Mul(big.NewInt(2*int64(header.Length*percentMultiplier)), minStake)
+		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*percentMultiplier)), minStake)
 		denom := new(big.Int).Mul(big.NewInt(int64(info.QuorumThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := roundUpDivide(2*header.Length*percentMultiplier, MaxRequiredNumChunks*uint(info.QuorumThreshold-info.AdversaryThreshold))
+		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.QuorumThreshold-info.AdversaryThreshold))
 
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2
@@ -201,14 +204,7 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 			ChunkLength:   chunkLength,
 		}
 
-		blobHeader := &BlobHeader{
-			BlobCommitments: BlobCommitments{
-				Length: blobLength,
-			},
-			QuorumInfos: []*BlobQuorumInfo{quorumInfo},
-		}
-
-		ok, err := c.ValidateChunkLength(state, blobHeader, 0)
+		ok, err := c.ValidateChunkLength(state, blobLength, quorumInfo)
 		if err != nil || !ok {
 			return chunkLength / 2, nil
 		}
