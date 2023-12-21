@@ -53,6 +53,9 @@ integration-tests-churner:
 integration-tests-indexer:
 	go test -v ./core/indexer
 
+integration-tests-node-plugin:
+	go test -v ./node/plugin/tests
+
 integration-tests-inabox:
 	make build 
 	cd inabox && make run-e2e

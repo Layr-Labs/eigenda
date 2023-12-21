@@ -3,15 +3,20 @@ package dataapi
 import (
 	"context"
 	"strconv"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 )
+
+const _14Days = 14 * 24 * time.Hour
 
 type (
 	SubgraphClient interface {
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
+		QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -35,6 +40,14 @@ type (
 		BlockTimestamp  uint64
 		BlockNumber     uint64
 		TransactionHash []byte
+	}
+	DeregisteredOperatorInfo struct {
+		*core.IndexedOperatorInfo
+		// BlockNumber is the block number at which the operator was deregistered.
+		BlockNumber uint
+	}
+	IndexedDeregisteredOperatorState struct {
+		Operators map[core.OperatorID]*DeregisteredOperatorInfo
 	}
 	subgraphClient struct {
 		api subgraph.Api
@@ -93,6 +106,44 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return batchNonSigningOperatorIds, nil
 }
 
+func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error) {
+	last14Days := uint64(time.Now().Add(-_14Days).Unix())
+	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, last14Days)
+	if err != nil {
+		return nil, err
+	}
+
+	operators := make(map[core.OperatorID]*DeregisteredOperatorInfo, len(deregisteredOperators))
+	for i := range deregisteredOperators {
+		deregisteredOperator := deregisteredOperators[i]
+		operator, err := convertOperator(deregisteredOperator)
+		if err != nil {
+			return nil, err
+		}
+
+		var operatorId [32]byte
+		copy(operatorId[:], operator.OperatorId)
+
+		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
+		if err != nil {
+			return nil, err
+		}
+		indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
+		if err != nil {
+			return nil, err
+		}
+
+		operators[operatorId] = &DeregisteredOperatorInfo{
+			IndexedOperatorInfo: indexedOperatorInfo,
+			BlockNumber:         uint(operator.BlockNumber),
+		}
+	}
+
+	return &IndexedDeregisteredOperatorState{
+		Operators: operators,
+	}, nil
+}
+
 func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
 	batches := make([]*Batch, len(subgraphBatches))
 	for i, batch := range subgraphBatches {
@@ -147,7 +198,7 @@ func convertGasFees(gasFees subgraph.GasFees) (*GasFees, error) {
 	}, nil
 }
 
-func convertOperator(operator *subgraph.OperatorRegistered) (*Operator, error) {
+func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
 	if err != nil {
 		return nil, err

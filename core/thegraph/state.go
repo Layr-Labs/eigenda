@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	defaultInterval       = time.Second
-	maxInterval           = 5 * time.Minute
-	MAX_ENTRIES_PER_QUERY = 1000
-	startRetriesInterval  = time.Second * 5
-	startMaxRetries       = 6
+	defaultInterval      = time.Second
+	maxInterval          = 5 * time.Minute
+	maxEntriesPerQuery   = 1000
+	startRetriesInterval = time.Second * 5
+	startMaxRetries      = 6
 )
 
 type (
@@ -235,7 +235,7 @@ func (ics *indexedChainState) getAllOperatorsRegisteredAtBlockNumberWithPaginati
 		var (
 			query     QueryOperatorsGql
 			variables = map[string]any{
-				"first":       graphql.Int(MAX_ENTRIES_PER_QUERY),
+				"first":       graphql.Int(maxEntriesPerQuery),
 				"skip":        graphql.Int(len(operators)), // skip is the number of operators already retrieved
 				"blockNumber": graphql.Int(blockNumber),
 			}
