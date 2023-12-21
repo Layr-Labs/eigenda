@@ -186,12 +186,12 @@ loop:
 	}
 
 	for operatorId, totalUnsignedBatches := range nonSigners {
-		ps := fmt.Sprintf("%.2f", float64(totalUnsignedBatches)/float64(totalBatches))
-		pf, err := strconv.ParseFloat(ps, 64)
-		if err != nil {
-			return nil, err
-		}
-		if pf > 0 {
+		if totalUnsignedBatches > 0 {
+			ps := fmt.Sprintf("%.2f", float64(totalUnsignedBatches)/float64(totalBatches))
+			pf, err := strconv.ParseFloat(ps, 64)
+			if err != nil {
+				return nil, err
+			}
 			percentage[operatorId] = pf
 		}
 	}
