@@ -172,10 +172,22 @@ func FuzzOperatorAssignments(f *testing.F) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 
-		assignments, _, err := asn.GetAssignments(state.OperatorState, blobLength, &quorumInfo)
+		assignments, info, err := asn.GetAssignments(state.OperatorState, blobLength, &quorumInfo)
 		assert.NoError(t, err)
 
 		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "chunkLength", chunkLength, "blobLength", blobLength)
+
+		if useTargetNumChunks {
+
+			header.QuorumInfos[0].ChunkLength = chunkLength * 2
+			ok, err := asn.ValidateChunkLength(state.OperatorState, header, 0)
+
+			// If it's possible to make the chunk larger, then the number of chunks should fall within the target
+			if ok && err == nil {
+				assert.GreaterOrEqual(t, targetNumChunks, info.TotalChunks)
+				assert.Greater(t, info.TotalChunks, targetNumChunks/2)
+			}
+		}
 
 		// Check that each operator's assignment satisfies the security requirement
 		for operatorID, assignment := range assignments {

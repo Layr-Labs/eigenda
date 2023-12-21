@@ -11,12 +11,12 @@ const (
 
 	// minChunkLength is the minimum chunk length supported. Generally speaking, it doesn't make sense for a chunk to be
 	// smaller than the proof overhead, which is equal to one G1 point.
-	minChunkLength = 1
+	MinChunkLength = 1
 
 	// maxRequiredNumChunks is the maximum number of chunks that can be required for a single quorum. Encoding costs scale
 	// as N*log(N), with N being the number of chunks. The value of 8192 was chosen to ensure that the encoding costs for
 	// a single quorum are reasonable, while still allowing for a single operator to have O(0.01%) of the total data.
-	maxRequiredNumChunks = 8192
+	MaxRequiredNumChunks = 8192
 )
 
 var (
@@ -149,7 +149,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, hea
 	info := header.QuorumInfos[quorum]
 
 	// Check that the chunk length meets the minimum requirement
-	if info.ChunkLength < minChunkLength {
+	if info.ChunkLength < MinChunkLength {
 		return false, ErrChunkLengthTooSmall
 	}
 
@@ -162,13 +162,13 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, hea
 	}
 
 	totalStake := state.Totals[quorum].Stake
-	if info.ChunkLength != minChunkLength {
+	if info.ChunkLength != MinChunkLength {
 
 		num := new(big.Int).Mul(big.NewInt(2*int64(header.Length*percentMultiplier)), minStake)
 		denom := new(big.Int).Mul(big.NewInt(int64(info.QuorumThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := roundUpDivide(2*header.Length*percentMultiplier, maxRequiredNumChunks*uint(info.QuorumThreshold-info.AdversaryThreshold))
+		maxChunkLength2 := roundUpDivide(2*header.Length*percentMultiplier, MaxRequiredNumChunks*uint(info.QuorumThreshold-info.AdversaryThreshold))
 
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2
@@ -188,10 +188,13 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, hea
 
 func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error) {
 
-	chunkLength := uint(minChunkLength) * 2
+	chunkLength := uint(MinChunkLength) * 2
 
 	for {
 		// Increase the chunk length until it is too large or we are beneath the targetNumChunks
+		// This will always give the largest acceptable chunk length
+		// The loop will always stop because the chunk length will eventually be too large for the
+		// constraint in ValidateChunkLength
 
 		quorumInfo := &BlobQuorumInfo{
 			SecurityParam: *param,
