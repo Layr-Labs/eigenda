@@ -280,7 +280,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.UnsignedBatches
+	var response dataapi.OperatorNonsigningPercentage
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

@@ -233,7 +233,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.UnsignedBatches"
+                            "$ref": "#/definitions/dataapi.OperatorNonsigningPercentage"
                         }
                     },
                     "400": {
@@ -466,18 +466,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dataapi.Throughput": {
-            "type": "object",
-            "properties": {
-                "throughput": {
-                    "type": "number"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dataapi.UnsignedBatches": {
+        "dataapi.OperatorNonsigningPercentage": {
             "type": "object",
             "properties": {
                 "percentage_per_operator": {
@@ -490,6 +479,17 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "total_non_signers": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dataapi.Throughput": {
+            "type": "object",
+            "properties": {
+                "throughput": {
+                    "type": "number"
+                },
+                "timestamp": {
                     "type": "integer"
                 }
             }

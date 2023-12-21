@@ -106,14 +106,7 @@ definitions:
       operatorId:
         type: string
     type: object
-  dataapi.Throughput:
-    properties:
-      throughput:
-        type: number
-      timestamp:
-        type: integer
-    type: object
-  dataapi.UnsignedBatches:
+  dataapi.OperatorNonsigningPercentage:
     properties:
       percentage_per_operator:
         additionalProperties:
@@ -122,6 +115,13 @@ definitions:
       total_batches:
         type: integer
       total_non_signers:
+        type: integer
+    type: object
+  dataapi.Throughput:
+    properties:
+      throughput:
+        type: number
+      timestamp:
         type: integer
     type: object
   github_com_Layr-Labs_eigenda_disperser.BlobStatus:
@@ -284,7 +284,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.UnsignedBatches'
+            $ref: '#/definitions/dataapi.OperatorNonsigningPercentage'
         "400":
           description: 'error: Bad request'
           schema:

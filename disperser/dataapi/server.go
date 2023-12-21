@@ -69,7 +69,7 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
-	UnsignedBatches struct {
+	OperatorNonsigningPercentage struct {
 		TotalNonSigners       int                `json:"total_non_signers"`
 		TotalBatches          int                `json:"total_batches"`
 		PercentagePerOperator map[string]float64 `json:"percentage_per_operator"`
@@ -370,14 +370,14 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Tags		Metrics
 //	@Produce	json
 //	@Param		interval	query		int	false	"Interval to query for non signers in seconds [default: 3600]"
-//	@Success	200			{object}	UnsignedBatches
+//	@Success	200			{object}	OperatorNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/operator_nonsigning_percentage  [get]
 func (s *server) FetchOperatorNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchUnsignedBatches", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("FetchOperatorNonsigningPercentageHandler", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
@@ -387,12 +387,12 @@ func (s *server) FetchOperatorNonsigningPercentageHandler(c *gin.Context) {
 	}
 	metric, err := s.getUnsignedBatches(c.Request.Context(), interval)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchUnsignedBatches")
+		s.metrics.IncrementFailedRequestNum("FetchOperatorNonsigningPercentageHandler")
 		errorResponse(c, err)
 		return
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchUnsignedBatches")
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorNonsigningPercentageHandler")
 	c.JSON(http.StatusOK, metric)
 }
 
