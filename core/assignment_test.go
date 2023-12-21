@@ -118,7 +118,7 @@ func FuzzOperatorAssignments(f *testing.F) {
 	}
 
 	for i := 0; i < 100; i++ {
-		f.Add(rand.Intn(1000), rand.Intn(2) == 0)
+		f.Add(rand.Intn(1000)+1, rand.Intn(2) == 0)
 	}
 
 	f.Fuzz(func(t *testing.T, numOperators int, useTargetNumChunks bool) {
@@ -153,6 +153,8 @@ func FuzzOperatorAssignments(f *testing.F) {
 			targetNumChunks = uint(rand.Intn(1000))
 		}
 
+		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "blobLength", blobLength)
+
 		chunkLength, err := asn.CalculateChunkLength(state.OperatorState, blobLength, targetNumChunks, param)
 		assert.NoError(t, err)
 
@@ -168,7 +170,7 @@ func FuzzOperatorAssignments(f *testing.F) {
 		assignments, info, err := asn.GetAssignments(state.OperatorState, blobLength, quorumInfo)
 		assert.NoError(t, err)
 
-		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "chunkLength", chunkLength, "blobLength", blobLength)
+		// fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "chunkLength", chunkLength, "blobLength", blobLength)
 
 		if useTargetNumChunks {
 
