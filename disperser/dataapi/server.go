@@ -369,7 +369,7 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Summary	Fetch operator non signing percentage
 //	@Tags		Metrics
 //	@Produce	json
-//	@Param		interval	query		int	false	"Interval to query for non signers in seconds [default: 3600]"
+//	@Param		interval	query		int	false	"Interval to query for operator nonsigning percentage [default: 3600]"
 //	@Success	200			{object}	OperatorNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -385,7 +385,7 @@ func (s *server) FetchOperatorNonsigningPercentageHandler(c *gin.Context) {
 	if err != nil || interval == 0 {
 		interval = 3600
 	}
-	metric, err := s.getUnsignedBatches(c.Request.Context(), interval)
+	metric, err := s.getOperatorNonsigningPercentage(c.Request.Context(), interval)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorNonsigningPercentageHandler")
 		errorResponse(c, err)

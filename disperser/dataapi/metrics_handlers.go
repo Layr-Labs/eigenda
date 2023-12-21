@@ -144,7 +144,7 @@ func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]N
 	return &nonSignersObj, nil
 }
 
-func (s *server) getUnsignedBatches(ctx context.Context, intervalSeconds int64) (*OperatorNonsigningPercentage, error) {
+func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSeconds int64) (*OperatorNonsigningPercentage, error) {
 	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
 	if err != nil {
 		return nil, err

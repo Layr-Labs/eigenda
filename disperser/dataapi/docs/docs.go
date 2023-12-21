@@ -224,7 +224,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Interval to query for non signers in seconds [default: 3600]",
+                        "description": "Interval to query for operator nonsigning percentage [default: 3600]",
                         "name": "interval",
                         "in": "query"
                     }

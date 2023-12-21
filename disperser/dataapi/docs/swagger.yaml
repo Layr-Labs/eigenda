@@ -274,7 +274,8 @@ paths:
   /metrics/operator_nonsigning_percentage:
     get:
       parameters:
-      - description: 'Interval to query for non signers in seconds [default: 3600]'
+      - description: 'Interval to query for operator nonsigning percentage [default:
+          3600]'
         in: query
         name: interval
         type: integer
