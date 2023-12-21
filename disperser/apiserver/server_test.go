@@ -23,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -154,8 +153,7 @@ func TestGetBlobStatus(t *testing.T) {
 			QuorumNumber:                 uint32(sp.QuorumID),
 			AdversaryThresholdPercentage: uint32(sp.AdversaryThreshold),
 			QuorumThresholdPercentage:    uint32(sp.QuorumThreshold),
-			QuantizationParam:            uint32(batcher.QuantizationFactor),
-			EncodedLength:                uint64(confirmedMetadata.ConfirmationInfo.BlobQuorumInfos[i].EncodedBlobLength),
+			ChunkLength:                  10,
 		}
 		quorumNumbers[i] = sp.QuorumID
 		quorumPercentSigned[i] = confirmedMetadata.ConfirmationInfo.QuorumResults[sp.QuorumID].PercentSigned
@@ -438,7 +436,6 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	sigRecordHash := [32]byte{0}
 	fee := []byte{0}
 	inclusionProof := []byte{1, 2, 3, 4, 5}
-	encodedBlobLength := 32
 	quorumResults := make(map[core.QuorumID]*core.QuorumResult, len(securityParams))
 	quorumInfos := make([]*core.BlobQuorumInfo, len(securityParams))
 	for i, sp := range securityParams {
@@ -447,9 +444,8 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 			PercentSigned: 100,
 		}
 		quorumInfos[i] = &core.BlobQuorumInfo{
-			SecurityParam:      *sp,
-			QuantizationFactor: batcher.QuantizationFactor,
-			EncodedBlobLength:  uint(encodedBlobLength),
+			SecurityParam: *sp,
+			ChunkLength:   10,
 		}
 	}
 

@@ -162,7 +162,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 			NumWorker:      1,
 			SRSOrder:       uint64(srsOrder),
 			Verbose:        true,
-			PreloadEncoder: true,
+			PreloadEncoder: false,
 		},
 	})
 	if err != nil {

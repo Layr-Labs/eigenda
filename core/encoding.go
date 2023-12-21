@@ -77,7 +77,7 @@ func GetEncodingParams(minChunkLength, minNumChunks uint) (EncodingParams, error
 func ValidateEncodingParams(params EncodingParams, blobLength, SRSOrder int) error {
 
 	if int(params.ChunkLength*params.NumChunks) >= SRSOrder {
-		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS")
+		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, SRSOrder)
 	}
 
 	if int(params.ChunkLength*params.NumChunks) < blobLength {

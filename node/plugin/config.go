@@ -14,6 +14,13 @@ import (
 var (
 	/* Required Flags */
 
+	PubIPProviderFlag = cli.StringFlag{
+		Name:     "public-ip-provider",
+		Usage:    "The ip provider service used to obtain a operator's public IP [seeip (default), ipify)",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "PUBLIC_IP_PROVIDER"),
+	}
+
 	// The operation to run.
 	OperationFlag = cli.StringFlag{
 		Name:     "operation",
@@ -99,6 +106,7 @@ var (
 )
 
 type Config struct {
+	PubIPProvider                 string
 	Operation                     string
 	EcdsaKeyFile                  string
 	BlsKeyFile                    string
@@ -130,6 +138,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
+		PubIPProvider:                 ctx.GlobalString(PubIPProviderFlag.Name),
 		Operation:                     op,
 		EcdsaKeyPassword:              ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
 		BlsKeyPassword:                ctx.GlobalString(BlsKeyPasswordFlag.Name),
