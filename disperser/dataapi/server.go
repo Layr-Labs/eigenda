@@ -69,10 +69,15 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
-	OperatorNonsigningPercentage struct {
-		TotalNonSigners       int                `json:"total_non_signers"`
-		TotalBatches          int                `json:"total_batches"`
-		PercentagePerOperator map[string]float64 `json:"percentage_per_operator"`
+	OperatorNonsigningPercentageMetrics struct {
+		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
+		TotalBatches         int     `json:"total_batches"`
+		Percentage           float64 `json:"percentage"`
+	}
+
+	OperatorsNonsigningPercentage struct {
+		TotalNonSigners int                                            `json:"total_non_signers"`
+		Operators       map[string]OperatorNonsigningPercentageMetrics `json:"operators"`
 	}
 
 	ErrorResponse struct {
@@ -141,6 +146,7 @@ func (s *server) Start() error {
 			metrics.GET("/", s.FetchMetricsHandler)
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
 			metrics.GET("/non_signers", s.FetchNonSigners)
+			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -364,20 +370,20 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 	c.JSON(http.StatusOK, metric)
 }
 
-// FetchOperatorNonsigningPercentageHandler godoc
+// FetchOperatorsNonsigningPercentageHandler godoc
 //
-//	@Summary	Fetch operator non signing percentage
+//	@Summary	Fetch operators non signing percentage
 //	@Tags		Metrics
 //	@Produce	json
-//	@Param		interval	query		int	false	"Interval to query for operator nonsigning percentage [default: 3600]"
-//	@Success	200			{object}	OperatorNonsigningPercentage
+//	@Param		interval	query		int	false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Success	200			{object}	OperatorsNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/operator_nonsigning_percentage  [get]
-func (s *server) FetchOperatorNonsigningPercentageHandler(c *gin.Context) {
+func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorNonsigningPercentageHandler", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
@@ -387,12 +393,12 @@ func (s *server) FetchOperatorNonsigningPercentageHandler(c *gin.Context) {
 	}
 	metric, err := s.getOperatorNonsigningPercentage(c.Request.Context(), interval)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchOperatorNonsigningPercentageHandler")
+		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)
 		return
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorNonsigningPercentageHandler")
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
 	c.JSON(http.StatusOK, metric)
 }
 

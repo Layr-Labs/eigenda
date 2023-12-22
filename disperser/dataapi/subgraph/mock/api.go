@@ -42,6 +42,16 @@ func (m *MockSubgraphApi) QueryBatches(ctx context.Context, descending bool, ord
 	return value, args.Error(1)
 }
 
+func (m *MockSubgraphApi) QueryBatchesByBlockTimestampRange(ctx context.Context, start, end uint64) ([]*subgraph.Batches, error) {
+	args := m.Called()
+	var value []*subgraph.Batches
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.Batches)
+	}
+
+	return value, args.Error(1)
+}
+
 func (m *MockSubgraphApi) QueryOperators(ctx context.Context, first int) ([]*subgraph.Operator, error) {
 	args := m.Called()
 
@@ -67,6 +77,17 @@ func (m *MockSubgraphApi) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 		if len(value) > int(first) {
 			value = value[:first]
 		}
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*subgraph.Operator, error) {
+	args := m.Called()
+
+	var value []*subgraph.Operator
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.Operator)
 	}
 
 	return value, args.Error(1)

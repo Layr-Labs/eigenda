@@ -144,61 +144,50 @@ func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]N
 	return &nonSignersObj, nil
 }
 
-func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSeconds int64) (*OperatorNonsigningPercentage, error) {
+func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSeconds int64) (*OperatorsNonsigningPercentage, error) {
 	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
 	if err != nil {
 		return nil, err
 	}
 
-	var (
-		limit        = 1000
-		skip         = 0
-		totalBatches = 0
-	)
-
-loop:
-	for {
-		select {
-		case <-ctx.Done():
-			break loop
-		default:
-			batches, err := s.subgraphClient.QueryBatchesWithLimit(ctx, limit, skip)
-			if err != nil {
-				s.logger.Error("Failed to query batches", "error", err)
-				return nil, err
-			}
-			totalBatches += len(batches)
-			if len(batches) == 0 {
-				break
-			}
-			skip += limit
-		}
+	if len(nonSigners) == 0 {
+		return &OperatorsNonsigningPercentage{}, nil
 	}
 
-	percentage := make(map[string]float64, 0)
-
-	if totalBatches < 1 {
-		return &OperatorNonsigningPercentage{
-			TotalNonSigners:       len(nonSigners),
-			TotalBatches:          totalBatches,
-			PercentagePerOperator: percentage,
-		}, nil
+	pastBlockTimestamp := uint64(time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix())
+	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp)
+	if err != nil {
+		return nil, err
 	}
+
+	if len(numBatchesByOperators) == 0 {
+		return &OperatorsNonsigningPercentage{}, nil
+	}
+
+	operators := make(map[string]OperatorNonsigningPercentageMetrics, 0)
 
 	for operatorId, totalUnsignedBatches := range nonSigners {
 		if totalUnsignedBatches > 0 {
-			ps := fmt.Sprintf("%.2f", float64(totalUnsignedBatches)/float64(totalBatches))
+			numBatches := numBatchesByOperators[operatorId]
+			if numBatches == 0 {
+				continue
+			}
+			ps := fmt.Sprintf("%.2f", (float64(totalUnsignedBatches)/float64(numBatches))*100)
 			pf, err := strconv.ParseFloat(ps, 64)
 			if err != nil {
 				return nil, err
 			}
-			percentage[operatorId] = pf
+
+			operators[operatorId] = OperatorNonsigningPercentageMetrics{
+				TotalUnsignedBatches: totalUnsignedBatches,
+				TotalBatches:         numBatches,
+				Percentage:           pf,
+			}
 		}
 	}
 
-	return &OperatorNonsigningPercentage{
-		TotalNonSigners:       len(nonSigners),
-		TotalBatches:          totalBatches,
-		PercentagePerOperator: percentage,
+	return &OperatorsNonsigningPercentage{
+		TotalNonSigners: len(operators),
+		Operators:       operators,
 	}, nil
 }

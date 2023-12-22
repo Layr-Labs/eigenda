@@ -37,16 +37,17 @@ var (
 	mockPrometheusRespAvgThroughput string
 
 	expectedBlobCommitment *core.BlobCommitments
+	mockLogger             = &commock.Logger{}
 	blobstore              = inmem.NewBlobStore()
 	mockPrometheusApi      = &prommock.MockPrometheusApi{}
 	prometheusClient       = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
-	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi)
+	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
 	config                 = dataapi.Config{ServerMode: "test", SocketAddr: ":8080"}
 
 	mockTx                          = &coremock.MockTransactor{}
 	mockChainState, _               = coremock.MakeChainDataMock(core.OperatorIndex(1))
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics("9001", mockLogger))
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
@@ -247,13 +248,8 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 		NonSigners: []struct {
 			OperatorId graphql.String `graphql:"operatorId"`
 		}{
-			{OperatorId: "0x0000000000000"},
-			{OperatorId: "0x0000000000001"},
-			{OperatorId: "0x0000000000002"},
-			{OperatorId: "0x0000000000003"},
-			{OperatorId: "0x0000000000004"},
-			{OperatorId: "0x0000000000005"},
-			{OperatorId: "0x0000000000006"},
+			{OperatorId: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"},
+			{OperatorId: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568312"},
 		},
 	}
 	batchNonSigningOperatorIds := []*subgraph.BatchNonSigningOperatorIds{
@@ -263,11 +259,14 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	}
 
 	mockSubgraphApi.On("QueryBatchNonSigningOperatorIdsInInterval").Return(batchNonSigningOperatorIds, nil).Once()
+	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistereds, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryBatchesByBlockTimestampRange").Return(subgraphBatches, nil)
 
-	r.GET("/v1/metrics/operator_nonsigning_percentage", testDataApiServer.FetchOperatorNonsigningPercentageHandler)
+	r.GET("/v1/metrics/operators_nonsigning_percentage", testDataApiServer.FetchOperatorsNonsigningPercentageHandler)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/operator_nonsigning_percentage", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/operators_nonsigning_percentage", nil)
 	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
 
@@ -280,16 +279,18 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.OperatorNonsigningPercentage
+	var response dataapi.OperatorsNonsigningPercentage
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
+	operator := response.Operators["0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"]
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, 7, response.TotalNonSigners)
-	assert.True(t, response.TotalBatches > 0)
-	assert.NotNil(t, response.PercentagePerOperator)
-	assert.Equal(t, 7, len(response.PercentagePerOperator))
+	assert.Equal(t, 1, response.TotalNonSigners)
+	assert.Equal(t, 3, operator.TotalBatches)
+	assert.Equal(t, 1, operator.TotalUnsignedBatches)
+	assert.Equal(t, float64(33.33), operator.Percentage)
+	assert.Equal(t, 1, len(response.Operators))
 }
 
 func setUpRouter() *gin.Engine {
