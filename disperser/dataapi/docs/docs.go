@@ -220,11 +220,11 @@ const docTemplate = `{
                 "tags": [
                     "Metrics"
                 ],
-                "summary": "Fetch operator non signing percentage",
+                "summary": "Fetch operators non signing percentage",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Interval to query for operator nonsigning percentage [default: 3600]",
+                        "description": "Interval to query for operators nonsigning percentage [default: 3600]",
                         "name": "interval",
                         "in": "query"
                     }
@@ -233,7 +233,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorNonsigningPercentage"
+                            "$ref": "#/definitions/dataapi.OperatorsNonsigningPercentage"
                         }
                     },
                     "400": {
@@ -466,17 +466,28 @@ const docTemplate = `{
                 }
             }
         },
-        "dataapi.OperatorNonsigningPercentage": {
+        "dataapi.OperatorNonsigningPercentageMetrics": {
             "type": "object",
             "properties": {
-                "percentage_per_operator": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
-                    }
+                "percentage": {
+                    "type": "number"
                 },
                 "total_batches": {
                     "type": "integer"
+                },
+                "total_unsigned_batches": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dataapi.OperatorsNonsigningPercentage": {
+            "type": "object",
+            "properties": {
+                "operators": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
+                    }
                 },
                 "total_non_signers": {
                     "type": "integer"

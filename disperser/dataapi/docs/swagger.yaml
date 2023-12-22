@@ -106,14 +106,21 @@ definitions:
       operatorId:
         type: string
     type: object
-  dataapi.OperatorNonsigningPercentage:
+  dataapi.OperatorNonsigningPercentageMetrics:
     properties:
-      percentage_per_operator:
-        additionalProperties:
-          type: number
-        type: object
+      percentage:
+        type: number
       total_batches:
         type: integer
+      total_unsigned_batches:
+        type: integer
+    type: object
+  dataapi.OperatorsNonsigningPercentage:
+    properties:
+      operators:
+        additionalProperties:
+          $ref: '#/definitions/dataapi.OperatorNonsigningPercentageMetrics'
+        type: object
       total_non_signers:
         type: integer
     type: object
@@ -274,7 +281,7 @@ paths:
   /metrics/operator_nonsigning_percentage:
     get:
       parameters:
-      - description: 'Interval to query for operator nonsigning percentage [default:
+      - description: 'Interval to query for operators nonsigning percentage [default:
           3600]'
         in: query
         name: interval
@@ -285,7 +292,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.OperatorNonsigningPercentage'
+            $ref: '#/definitions/dataapi.OperatorsNonsigningPercentage'
         "400":
           description: 'error: Bad request'
           schema:
@@ -298,7 +305,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch operator non signing percentage
+      summary: Fetch operators non signing percentage
       tags:
       - Metrics
   /metrics/throughput:
