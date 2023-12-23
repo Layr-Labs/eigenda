@@ -42,6 +42,11 @@ func (s *server) convertBlobMetadatasToBlobMetadataResponse(ctx context.Context,
 	)
 
 	sort.SliceStable(metadatas, func(i, j int) bool {
+		// We may have unconfirmed blobs to fetch, which will not have the ConfirmationInfo.
+		// In such case, we order them by request timestamp.
+		if metadatas[i].ConfirmationInfo == nil || metadatas[j].ConfirmationInfo == nil {
+			return metadatas[i].RequestMetadata.RequestedAt < metadatas[j].RequestMetadata.RequestedAt
+		}
 		if metadatas[i].ConfirmationInfo.BatchID != metadatas[j].ConfirmationInfo.BatchID {
 			return metadatas[i].ConfirmationInfo.BatchID < metadatas[j].ConfirmationInfo.BatchID
 		}

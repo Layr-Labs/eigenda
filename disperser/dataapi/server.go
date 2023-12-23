@@ -407,15 +407,6 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 			for _, bm := range metadatas {
 				blobKey := bm.GetBlobKey().String()
 				if _, found := blobKeyPresence[blobKey]; !found {
-					// We only interest in confirmed blobs.
-					isConfirmed, confirmErr := bm.IsConfirmed()
-					if confirmErr != nil {
-						return nil, nil, err
-					}
-					if !isConfirmed {
-						s.logger.Info("Skipping unconfirmed blob", "blobkey", blobKey)
-						continue
-					}
 					blobKeyPresence[blobKey] = struct{}{}
 					blobMetadatas = append(blobMetadatas, bm)
 				} else {
