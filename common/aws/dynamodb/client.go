@@ -158,6 +158,10 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
+// UpsertItemWithExpressionBuilder, updates an item with optimistic locking
+// Puts an item if it does not exist
+// 2 retries are performed if the conditional check fails
+// Returns the updated item if successful
 func (c *Client) UpsertItemWithExpression(ctx context.Context, tableName string, key Key, item Item, customUpdateExpr *expression.UpdateBuilder) (Item, error) {
 	var resp *dynamodb.UpdateItemOutput
 	var err error
@@ -232,7 +236,10 @@ func (c *Client) UpsertItemWithExpression(ctx context.Context, tableName string,
 	return resp.Attributes, nil
 }
 
-// UpdateItemWithVersion updates an item with optimistic locking
+// UpsertItemWithVersion updates an item with optimistic locking
+// Puts an item if it does not exist
+// 2 retries are performed if the conditional check fails
+// Returns the updated item if successful
 func (c *Client) UpsertItemWithVersion(ctx context.Context, tableName string, key Key, item Item, expectedVersion int) (Item, error) {
 	var resp *dynamodb.UpdateItemOutput
 	var err error
@@ -309,7 +316,7 @@ func (c *Client) UpsertItemWithVersion(ctx context.Context, tableName string, ke
 		})
 
 		if err != nil {
-			fmt.Println("Conditional check failed for key %v, error:", key, err)
+			fmt.Println("Conditional check failed for key, error:", key, err)
 			continue
 		}
 
