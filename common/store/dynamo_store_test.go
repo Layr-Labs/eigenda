@@ -28,7 +28,7 @@ var (
 	localStackPort   = "4566"
 
 	dynamoClient     *dynamodb.Client
-	dynamoParamStore common.KVStore[common.RateBucketParams]
+	dynamoParamStore common.KVStoreVersioned[common.RateBucketParams]
 	bucketTableName  = "BucketStore"
 )
 
@@ -83,7 +83,7 @@ func teardown() {
 	}
 }
 
-func TestDynamoBucketStore(t *testing.T) {
+func TestDynamoBucketStoreVersioned(t *testing.T) {
 	ctx := context.Background()
 
 	p := &common.RateBucketParams{
@@ -91,15 +91,17 @@ func TestDynamoBucketStore(t *testing.T) {
 		LastRequestTime: time.Now().UTC(),
 	}
 
-	p2, err := dynamoParamStore.GetItem(ctx, "testRetriever")
+	p2, version, err := dynamoParamStore.GetItemWithVersion(ctx, "testRetriever")
 	assert.Error(t, err)
 	assert.Nil(t, p2)
+	assert.Equal(t, 0, version)
 
-	err = dynamoParamStore.UpdateItem(ctx, "testRetriever", p)
+	err = dynamoParamStore.UpdateItemWithVersion(ctx, "testRetriever", p, version)
 	assert.NoError(t, err)
 
-	p2, err = dynamoParamStore.GetItem(ctx, "testRetriever")
+	p2, version, err = dynamoParamStore.GetItemWithVersion(ctx, "testRetriever")
 
 	assert.NoError(t, err)
 	assert.Equal(t, p, p2)
+	assert.Equal(t, 1, version)
 }

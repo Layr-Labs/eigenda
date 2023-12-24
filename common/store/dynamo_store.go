@@ -17,7 +17,7 @@ type dynamodbBucketStore[T any] struct {
 	tableName string
 }
 
-func NewDynamoParamStore[T any](client *commondynamodb.Client, tableName string) common.KVStore[T] {
+func NewDynamoParamStore[T any](client *commondynamodb.Client, tableName string) common.KVStoreVersioned[T] {
 	return &dynamodbBucketStore[T]{
 		client:    client,
 		tableName: tableName,
@@ -49,6 +49,31 @@ func (s *dynamodbBucketStore[T]) GetItem(ctx context.Context, requesterID string
 	return params, nil
 }
 
+func (s *dynamodbBucketStore[T]) GetItemWithVersion(ctx context.Context, requesterID string) (*T, int, error) {
+
+	key := map[string]types.AttributeValue{
+		"RequesterID": &types.AttributeValueMemberS{
+			Value: requesterID,
+		},
+	}
+
+	item, version, err := s.client.GetItemWithVersion(ctx, s.tableName, key)
+	if err != nil {
+		return nil, 0, err
+	}
+	if item == nil {
+		return nil, 0, fmt.Errorf("item not found")
+	}
+
+	params := new(T)
+	err = attributevalue.UnmarshalMap(item, params)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return params, version, nil
+}
+
 func (s *dynamodbBucketStore[T]) UpdateItem(ctx context.Context, requesterID string, params *T) error {
 
 	fields, err := attributevalue.MarshalMap(params)
@@ -61,6 +86,33 @@ func (s *dynamodbBucketStore[T]) UpdateItem(ctx context.Context, requesterID str
 	}
 
 	return s.client.PutItem(ctx, s.tableName, fields)
+}
+
+func (s *dynamodbBucketStore[T]) UpdateItemWithVersion(ctx context.Context, requesterID string, params *T, expectedVersion int) error {
+
+	fields, err := attributevalue.MarshalMap(params)
+	if err != nil {
+		return err
+	}
+
+	fields["RequesterID"] = &types.AttributeValueMemberS{
+		Value: requesterID,
+	}
+
+	key := map[string]types.AttributeValue{
+		"RequesterID": &types.AttributeValueMemberS{
+			Value: requesterID,
+		},
+	}
+
+	_, err = s.client.UpsertItemWithVersion(ctx, s.tableName, key, fields, expectedVersion)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	return nil
 }
 
 func GenerateTableSchema(readCapacityUnits int64, writeCapacityUnits int64, tableName string) *dynamodb.CreateTableInput {

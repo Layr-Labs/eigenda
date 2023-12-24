@@ -109,7 +109,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 				return err
 			}
 		}
-		ratelimiter = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+		ratelimiter, err = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
 	}
 
 	// TODO: create a separate metrics for batcher
