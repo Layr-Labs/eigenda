@@ -23,7 +23,7 @@ var errAccountRateLimit = fmt.Errorf("request ratelimited: account limit")
 
 const systemAccountKey = "system"
 
-const maxBlobSize = 1024 * 512 // 512 KiB
+const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
@@ -106,7 +106,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	blobSize := len(req.GetData())
 	// The blob size in bytes must be in range [1, maxBlobSize].
 	if blobSize > maxBlobSize {
-		return nil, fmt.Errorf("blob size cannot exceed 512 KiB")
+		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
 	}
 	if blobSize == 0 {
 		return nil, fmt.Errorf("blob size must be greater than 0")
