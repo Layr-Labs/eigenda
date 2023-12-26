@@ -5,11 +5,10 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BLSMockAVSDeployer} from "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {MockRollup, BN254} from "./mocks/MockRollup.sol";
+import {MockRollup, BN254} from "../src/rollupmock/MockRollup.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IEigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDABlobUtils} from "../src/libraries/EigenDABlobUtils.sol";
-//import {BN254} from "../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 import "forge-std/StdStorage.sol";
 
@@ -76,7 +75,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             )
         );
 
-        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, quorumBlobParamsHash, defaultStakeRequired);
+        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, defaultStakeRequired);
 
         //hardcode g2 proof
         illegalProof.X[1] = 11151623676041303181597631684634074376466382703418354161831688442589830350329;
@@ -102,7 +101,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
         //post commitment
         vm.prank(alice);
-        mockRollup.postCommitment(blobHeader, blobVerificationProof);
+        mockRollup.postCommitment(blobHeader, blobVerificationProof, quorumBlobParamsHash);
 
         //challenge commitment
         vm.prank(bob);
