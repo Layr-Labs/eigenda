@@ -392,7 +392,8 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	pb.RegisterDisperserServer(gs, s)
 
 	// Register Server for Health Checks
-	healthcheck.RegisterHealthServer(gs)
+	name := pb.Disperser_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
 
 	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
