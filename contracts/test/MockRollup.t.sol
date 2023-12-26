@@ -5,7 +5,7 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BLSMockAVSDeployer} from "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {MockRollup, BN254} from "../src/rollupmock/MockRollup.sol";
+import {MockRollup, BN254} from "../src/rollup/MockRollup.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IEigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDABlobUtils} from "../src/libraries/EigenDABlobUtils.sol";
