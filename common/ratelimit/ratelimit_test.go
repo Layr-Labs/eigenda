@@ -135,8 +135,7 @@ func TestRatelimit(t *testing.T) {
 	assert.Equal(t, false, allow)
 }
 
-func TestRatelimitAllowList(t *testing.T) {
-
+func TestRatelimitAllowlist(t *testing.T) {
 	ratelimiter, err := makeTestRatelimiter()
 	assert.NoError(t, err)
 
@@ -144,7 +143,8 @@ func TestRatelimitAllowList(t *testing.T) {
 
 	retreiverID := "testRetriever2"
 
-	for i := 0; i < 10; i++ {
+	// 10x more requests allowed for allowlisted IDs
+	for i := 0; i < 100; i++ {
 		allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
 		assert.NoError(t, err)
 		assert.Equal(t, true, allow)
