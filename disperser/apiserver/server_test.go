@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDisperseBlob(t *testing.T) {
-	data := make([]byte, 1024)
+	data := make([]byte, 1024*1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -247,7 +247,7 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 }
 
 func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
-	data := make([]byte, 1024*512+10)
+	data := make([]byte, 2*1024*1024+10)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -274,7 +274,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "blob size cannot exceed 512 KiB")
+	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
 }
 
 func setup(m *testing.M) {
