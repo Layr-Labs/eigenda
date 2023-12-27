@@ -69,6 +69,11 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
+	DeRegisteredOperatorsResponse struct {
+		Meta Meta                        `json:"meta"`
+		Data []*DeregisteredOperatorInfo `json:"data"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -129,6 +134,10 @@ func (s *server) Start() error {
 		{
 			feed.GET("/blobs", s.FetchBlobsHandler)
 			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
+		}
+		operatorsInfo := v1.Group("/operatorsInfo")
+		{
+			operatorsInfo.GET("/deRegisteredLast14days", s.FetchBlobsHandler)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -356,6 +365,38 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchNonSigners")
 	c.JSON(http.StatusOK, metric)
+}
+
+// FetchDeRegisteredOperators godoc
+//
+//	@Summary	Fetch list of DeregisteredOperators Last 14 days
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200		{object}	BlobsResponse
+//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404		{object}	ErrorResponse	"error: Not found"
+//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Router		/operatorsInfo/deRegisteredLast14days [get]
+func (s *server) FetchDeRegisteredOperators(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchDeRegisteredOperatorsLast14days", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	metadatas, err := s.getDeregisterdOperatorsLast14days(c.Request.Context())
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchDeRegisteredOperatorsLast14days")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchDeRegisteredOperatorsLast14days")
+	c.JSON(http.StatusOK, DeRegisteredOperatorsResponse{
+		Meta: Meta{
+			Size: len(metadatas),
+		},
+		Data: metadatas,
+	})
 }
 
 func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
