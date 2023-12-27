@@ -38,7 +38,7 @@ type components struct {
 func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint64, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
 	logger := &cmock.Logger{}
 	blobStore := inmem.NewBlobStore()
-	cst, err := coremock.NewChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
 	enc, err := makeTestEncoder()
 	assert.Nil(t, err)
@@ -61,7 +61,7 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 func TestEncodingQueueLimit(t *testing.T) {
 	logger := &cmock.Logger{}
 	blobStore := inmem.NewBlobStore()
-	cst, err := coremock.NewChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
 	encoderClient := mock.NewMockEncoderClient()
 	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, nil)
@@ -220,23 +220,22 @@ func TestStreamingEncoding(t *testing.T) {
 	encodedResult, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey, core.QuorumID(0))
 	assert.Nil(t, err)
 	assert.NotNil(t, encodedResult)
-	assert.Equal(t, encodedResult.BlobMetadata, metadata)
-	assert.Equal(t, encodedResult.ReferenceBlockNumber, uint(10))
-	assert.Equal(t, encodedResult.BlobQuorumInfo, &core.BlobQuorumInfo{
+	assert.Equal(t, metadata, encodedResult.BlobMetadata)
+	assert.Equal(t, uint(10), encodedResult.ReferenceBlockNumber)
+	assert.Equal(t, &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
 			QuorumID:           0,
 			AdversaryThreshold: 80,
 			QuorumThreshold:    100,
 		},
-		QuantizationFactor: batcher.QuantizationFactor,
-		EncodedBlobLength:  320,
-	})
+		ChunkLength: 16,
+	}, encodedResult.BlobQuorumInfo)
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
 	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
-	assert.Len(t, encodedResult.Chunks, 16)
+	assert.Len(t, encodedResult.Chunks, 32)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
@@ -288,7 +287,7 @@ func TestStreamingEncoding(t *testing.T) {
 func TestEncodingFailure(t *testing.T) {
 	logger := &cmock.Logger{}
 	blobStore := inmem.NewBlobStore()
-	cst, err := coremock.NewChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
 	encoderClient := mock.NewMockEncoderClient()
 	asgn := &core.StdAssignmentCoordinator{}
@@ -425,12 +424,7 @@ func TestPartialBlob(t *testing.T) {
 	assert.Equal(t, batch.BatchHeader.ReferenceBlockNumber, uint(10))
 
 	// Check BatchMetadata
-	assert.NotNil(t, batch.BatchMetadata)
-	assert.Len(t, batch.BatchMetadata.QuorumInfos, 1)
-	assert.Len(t, batch.BatchMetadata.QuorumInfos[0].Assignments, numOperators)
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[0].QuantizationFactor, batcher.QuantizationFactor)
-
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[0].Info.TotalChunks, uint(15))
+	assert.NotNil(t, batch.State)
 	assert.ElementsMatch(t, batch.BlobMetadata[0].RequestMetadata.SecurityParams, blob1.RequestHeader.SecurityParams)
 
 	// Check EncodedBlobs
@@ -454,8 +448,7 @@ func TestPartialBlob(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			QuantizationFactor: batcher.QuantizationFactor,
-			EncodedBlobLength:  160,
+			ChunkLength: 8,
 		}})
 
 		assert.Contains(t, batch.BlobHeaders, blobMessage.BlobHeader)
@@ -590,16 +583,8 @@ func TestGetBatch(t *testing.T) {
 	assert.Greater(t, len(batch.BatchHeader.BatchRoot), 0)
 	assert.Equal(t, batch.BatchHeader.ReferenceBlockNumber, uint(10))
 
-	// Check BatchMetadata
-	assert.NotNil(t, batch.BatchMetadata)
-	assert.Len(t, batch.BatchMetadata.QuorumInfos, 3)
-	for quorumID := uint8(0); quorumID < 3; quorumID++ {
-		assert.Len(t, batch.BatchMetadata.QuorumInfos[quorumID].Assignments, numOperators)
-		assert.Equal(t, batch.BatchMetadata.QuorumInfos[quorumID].QuantizationFactor, batcher.QuantizationFactor)
-	}
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[0].Info.TotalChunks, uint(15))
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[1].Info.TotalChunks, uint(15))
-	assert.Equal(t, batch.BatchMetadata.QuorumInfos[2].Info.TotalChunks, uint(15))
+	// Check State
+	assert.NotNil(t, batch.State)
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
@@ -635,8 +620,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				QuantizationFactor: batcher.QuantizationFactor,
-				EncodedBlobLength:  320,
+				ChunkLength: 16,
 			},
 			{
 				SecurityParam: core.SecurityParam{
@@ -644,8 +628,7 @@ func TestGetBatch(t *testing.T) {
 					AdversaryThreshold: 70,
 					QuorumThreshold:    95,
 				},
-				QuantizationFactor: batcher.QuantizationFactor,
-				EncodedBlobLength:  160,
+				ChunkLength: 8,
 			},
 		})
 
@@ -670,8 +653,7 @@ func TestGetBatch(t *testing.T) {
 				AdversaryThreshold: 75,
 				QuorumThreshold:    100,
 			},
-			QuantizationFactor: batcher.QuantizationFactor,
-			EncodedBlobLength:  160,
+			ChunkLength: 8,
 		}})
 
 		assert.Len(t, blobMessage.Bundles, 1)

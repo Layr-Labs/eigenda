@@ -5,6 +5,10 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 func ConvertHexadecimalToBytes(byteHash []byte) ([32]byte, error) {
@@ -30,4 +34,45 @@ func ConvertHexadecimalToBytes(byteHash []byte) ([32]byte, error) {
 
 func ConvertNanosecondToSecond(timestamp uint64) uint64 {
 	return timestamp / uint64(time.Second)
+}
+
+func ConvertOperatorInfoGqlToIndexedOperatorInfo(operator *subgraph.IndexedOperatorInfo) (*core.IndexedOperatorInfo, error) {
+
+	if len(operator.SocketUpdates) == 0 {
+		return nil, errors.New("no socket found for operator")
+	}
+
+	pubkeyG1 := new(bn254.G1Affine)
+	_, err := pubkeyG1.X.SetString(string(operator.PubkeyG1_X))
+	if err != nil {
+		return nil, err
+	}
+	_, err = pubkeyG1.Y.SetString(string(operator.PubkeyG1_Y))
+	if err != nil {
+		return nil, err
+	}
+
+	pubkeyG2 := new(bn254.G2Affine)
+	_, err = pubkeyG2.X.A1.SetString(string(operator.PubkeyG2_X[0]))
+	if err != nil {
+		return nil, err
+	}
+	_, err = pubkeyG2.X.A0.SetString(string(operator.PubkeyG2_X[1]))
+	if err != nil {
+		return nil, err
+	}
+	_, err = pubkeyG2.Y.A1.SetString(string(operator.PubkeyG2_Y[0]))
+	if err != nil {
+		return nil, err
+	}
+	_, err = pubkeyG2.Y.A0.SetString(string(operator.PubkeyG2_Y[1]))
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.IndexedOperatorInfo{
+		PubkeyG1: &core.G1Point{G1Affine: pubkeyG1},
+		PubkeyG2: &core.G2Point{G2Affine: pubkeyG2},
+		Socket:   string(operator.SocketUpdates[0].Socket),
+	}, nil
 }

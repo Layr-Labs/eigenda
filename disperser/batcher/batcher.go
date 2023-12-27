@@ -53,6 +53,8 @@ type Config struct {
 	// BatchSizeMBLimit is the maximum size of a batch in MB
 	BatchSizeMBLimit     uint
 	MaxNumRetriesPerBlob uint
+
+	TargetNumChunks uint
 }
 
 type Batcher struct {
@@ -98,6 +100,7 @@ func NewBatcher(
 		SRSOrder:               config.SRSOrder,
 		EncodingRequestTimeout: config.PullInterval,
 		EncodingQueueLimit:     config.EncodingRequestQueueSize,
+		TargetNumChunks:        config.TargetNumChunks,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
 	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
@@ -174,7 +177,7 @@ func (b *Batcher) Start(ctx context.Context) error {
 	return nil
 }
 
-func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata) error {
+func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata, reason FailReason) error {
 	var result *multierror.Error
 	for _, metadata := range blobMetadatas {
 		err := b.Queue.HandleBlobFailure(ctx, metadata, b.MaxNumRetriesPerBlob)
@@ -185,6 +188,7 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 		}
 		b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
 	}
+	b.Metrics.UpdateBatchError(reason, len(blobMetadatas))
 
 	// Return the error(s)
 	return result.ErrorOrNil()
@@ -207,14 +211,14 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// Dispatch encoded batch
 	log.Trace("[batcher] Dispatching encoded batch...")
 	stageTimer = time.Now()
-	update := b.Dispatcher.DisperseBatch(ctx, batch.BatchMetadata.State, batch.EncodedBlobs, batch.BatchHeader)
+	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Trace("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
 
 	// Get the batch header hash
 	log.Trace("[batcher] Getting batch header hash...")
 	headerHash, err := batch.BatchHeader.GetBatchHeaderHash()
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.BlobMetadata)
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailBatchHeaderHash)
 		return fmt.Errorf("HandleSingleBatch: error getting batch header hash: %w", err)
 	}
 
@@ -222,25 +226,26 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log.Trace("[batcher] Aggregating signatures...")
 
 	// construct quorumParams
-	quorumIDs := make([]core.QuorumID, 0, len(batch.BatchMetadata.QuorumInfos))
-	for quorumID := range batch.BatchMetadata.QuorumInfos {
+	quorumIDs := make([]core.QuorumID, 0, len(batch.State.AggKeys))
+	for quorumID := range batch.State.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
 	}
+	fmt.Println("quorumIDs", quorumIDs)
 
 	stageTimer = time.Now()
-	aggSig, err := b.Aggregator.AggregateSignatures(batch.BatchMetadata.State, quorumIDs, headerHash, update)
+	aggSig, err := b.Aggregator.AggregateSignatures(batch.State, quorumIDs, headerHash, update)
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.BlobMetadata)
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
 	}
 	log.Trace("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.UpdateAttestation(len(batch.BatchMetadata.State.IndexedOperators), len(aggSig.NonSigners))
+	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners))
 
 	passed, numPassed := getBlobQuorumPassStatus(aggSig.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
-		_ = b.handleFailure(ctx, batch.BlobMetadata)
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailNoSignatures)
 		return fmt.Errorf("HandleSingleBatch: no blobs received sufficient signatures")
 	}
 
@@ -249,7 +254,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	stageTimer = time.Now()
 	txnReceipt, err := b.Confirmer.ConfirmBatch(ctx, batch.BatchHeader, aggSig.QuorumResults, aggSig)
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.BlobMetadata)
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("HandleSingleBatch: error confirming batch: %w", err)
 	}
 	log.Trace("[batcher] ConfirmBatch took", "duration", time.Since(stageTimer))
@@ -259,7 +264,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 	batchID, err := b.getBatchID(ctx, txnReceipt)
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.BlobMetadata)
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailGetBatchID)
 		return fmt.Errorf("HandleSingleBatch: error fetching batch ID: %w", err)
 	}
 
@@ -335,7 +340,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	if len(blobsToRetry) > 0 {
-		_ = b.handleFailure(ctx, blobsToRetry)
+		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
 		if len(blobsToRetry) == len(batch.BlobMetadata) {
 			return fmt.Errorf("HandleSingleBatch: failed to update blob confirmed metadata for all blobs in batch: %w", updateConfirmationInfoErr)
 		}

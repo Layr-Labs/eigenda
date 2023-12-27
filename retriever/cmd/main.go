@@ -15,13 +15,13 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/indexer/inmem"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -89,7 +89,6 @@ func RetrieverMain(ctx *cli.Context) error {
 	// if err != nil {
 	// 	return err
 	// }
-	store := inmem.NewHeaderStore()
 
 	tx, err := eth.NewTransactor(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
@@ -100,16 +99,40 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	indexedState, err := indexer.NewIndexedChainState(&config.IndexerConfig, common.HexToAddress(config.EigenDAServiceManagerAddr), cs, store, gethClient, rpcClient, logger)
+
+	var ics core.IndexedChainState
+	if config.UseGraph {
+		logger.Info("Using graph node")
+		querier := graphql.NewClient(config.GraphUrl, nil)
+		logger.Info("Connecting to subgraph", "url", config.GraphUrl)
+		ics = thegraph.NewIndexedChainState(cs, querier, logger)
+	} else {
+		logger.Info("Using built-in indexer")
+
+		indexer, err := coreindexer.CreateNewIndexer(
+			&config.IndexerConfig,
+			gethClient,
+			rpcClient,
+			config.EigenDAServiceManagerAddr,
+			logger,
+		)
+		if err != nil {
+			return err
+		}
+		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
+		if err != nil {
+			return err
+		}
+	}
+
+	agn := &core.StdAssignmentCoordinator{}
+	retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, config.NumConnections)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient := clients.NewRetrievalClient(logger, indexedState, agn, nodeClient, encoder, config.NumConnections)
-
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
-	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, indexedState, chainClient)
+	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, ics, chainClient)
 	if err = retrieverServiceServer.Start(context.Background()); err != nil {
 		log.Fatalln("failed to start retriever service server", err)
 	}
@@ -121,7 +144,8 @@ func RetrieverMain(ctx *cli.Context) error {
 	pb.RegisterRetrieverServer(gs, retrieverServiceServer)
 
 	// Register Server for Health Checks
-	healthcheck.RegisterHealthServer(gs)
+	name := pb.Retriever_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
 
 	log.Printf("server listening at %s", addr)
 	return gs.Serve(listener)

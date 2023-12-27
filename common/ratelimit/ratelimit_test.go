@@ -47,7 +47,7 @@ func makeTestRatelimiter() (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, &mock.Logger{})
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, []string{"testRetriever2"}, &mock.Logger{})
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func makeTestRatelimiterDynamodB() (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, &mock.Logger{})
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, []string{}, &mock.Logger{})
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +133,26 @@ func TestRatelimit(t *testing.T) {
 	allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
 	assert.NoError(t, err)
 	assert.Equal(t, false, allow)
+}
+
+func TestRatelimitAllowList(t *testing.T) {
+
+	ratelimiter, err := makeTestRatelimiter()
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	retreiverID := "testRetriever2"
+
+	for i := 0; i < 10; i++ {
+		allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
+		assert.NoError(t, err)
+		assert.Equal(t, true, allow)
+	}
+
+	allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
+	assert.NoError(t, err)
+	assert.Equal(t, true, allow)
 }
 
 func TestRatelimitDynamodBStore(t *testing.T) {

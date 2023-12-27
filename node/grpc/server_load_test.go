@@ -26,20 +26,35 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		_, err := rand.Read(data)
 		assert.NoError(t, err)
 
-		// encode data
 		operatorState, err := chainState.GetOperatorState(context.Background(), 0, []core.QuorumID{0})
 		assert.NoError(t, err)
-		assignments, info, err := asn.GetAssignments(operatorState, 0, batcher.QuantizationFactor)
+
+		chunkLength, err := asn.CalculateChunkLength(operatorState, core.GetBlobLength(uint(blobSize)), 0, &core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: uint8(advThreshold),
+			QuorumThreshold:    uint8(quorumThreshold),
+		})
+		assert.NoError(t, err)
+
+		blobQuorumInfo := &core.BlobQuorumInfo{
+			SecurityParam: core.SecurityParam{
+				QuorumID:           0,
+				AdversaryThreshold: uint8(advThreshold),
+				QuorumThreshold:    uint8(quorumThreshold),
+			},
+			ChunkLength: chunkLength,
+		}
+
+		// encode data
+
+		assignments, info, err := asn.GetAssignments(operatorState, core.GetBlobLength(uint(blobSize)), blobQuorumInfo)
 		assert.NoError(t, err)
 		quorumInfo := batcher.QuorumInfo{
 			Assignments:        assignments,
 			Info:               info,
 			QuantizationFactor: batcher.QuantizationFactor,
 		}
-		blobLength := core.GetBlobLength(uint(blobSize))
-		numOperators := uint(len(quorumInfo.Assignments))
-		chunkLength, err := asn.GetMinimumChunkLength(numOperators, blobLength, quorumInfo.QuantizationFactor, uint8(quorumThreshold), uint8(advThreshold))
-		assert.NoError(t, err)
+
 		params, err := core.GetEncodingParams(chunkLength, quorumInfo.Info.TotalChunks)
 		assert.NoError(t, err)
 		t.Logf("Encoding params: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
@@ -50,17 +65,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		// populate blob header
 		blobHeaders[i] = &core.BlobHeader{
 			BlobCommitments: commits,
-			QuorumInfos: []*core.BlobQuorumInfo{
-				{
-					SecurityParam: core.SecurityParam{
-						QuorumID:           0,
-						AdversaryThreshold: uint8(advThreshold),
-						QuorumThreshold:    uint8(quorumThreshold),
-					},
-					QuantizationFactor: quorumInfo.QuantizationFactor,
-					EncodedBlobLength:  params.ChunkLength * quorumInfo.QuantizationFactor * numOperators,
-				},
-			},
+			QuorumInfos:     []*core.BlobQuorumInfo{blobQuorumInfo},
 		}
 
 		// populate blob messages

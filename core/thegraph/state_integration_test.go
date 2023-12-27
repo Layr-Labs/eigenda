@@ -111,6 +111,7 @@ func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, log
 	config := geth.EthClientConfig{
 		RPCURL:           deployer.RPC,
 		PrivateKeyString: privateKey,
+		NumConfirmations: 0,
 	}
 
 	client, err := geth.NewClient(config, logger)

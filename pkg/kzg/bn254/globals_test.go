@@ -1,4 +1,3 @@
-
 package bn254
 
 import (

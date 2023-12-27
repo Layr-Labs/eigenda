@@ -80,7 +80,10 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, []string{}, logger)
+	if err != nil {
+		return err
+	}
 
 	// Creates the GRPC server.
 	server := grpc.NewServer(config, node, logger, ratelimiter)

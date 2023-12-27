@@ -360,7 +360,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	cst, err := coremock.NewChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.NoError(t, err)
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
@@ -460,7 +460,21 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	assert.NoError(t, err)
-	assignments, info, err := asn.GetAssignments(operatorState, 0, batcher.QuantizationFactor)
+
+	blobLength := core.GetBlobLength(uint(len(blob.Data)))
+	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
+	assert.NoError(t, err)
+
+	blobQuorumInfo := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: q0AdversaryThreshold,
+			QuorumThreshold:    q0QuorumThreshold,
+		},
+		ChunkLength: chunkLength,
+	}
+
+	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
 	assert.NoError(t, err)
 
 	var indices []core.ChunkNumber
@@ -486,8 +500,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.Equal(t, uint32(0), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumId())
 		assert.Equal(t, uint32(q0QuorumThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumThreshold())
 		assert.Equal(t, uint32(q0AdversaryThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetAdversaryThreshold())
-		assert.Equal(t, uint32(batcher.QuantizationFactor), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuantizationFactor())
-		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetEncodedBlobLength(), uint32(0))
+		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {
 			blobHeader, err = nodegrpc.GetBlobHeaderFromProto(headerReply.GetBlobHeader())
@@ -513,8 +526,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	chunkLength, err := asn.GetChunkLengthFromHeader(operatorState, blobHeader.QuorumInfos[0])
-	assert.NoError(t, err)
 	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
 	recovered, err := enc.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)

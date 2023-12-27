@@ -236,7 +236,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	}
 
 	retrievalClient = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
-	return nil
+	return indexer.Index(context.Background())
 }
 
 // TODO: This file contains some code that can be refactored and shared across some other tests ex:Integration Test.
@@ -328,7 +328,9 @@ loop:
 					ethClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 					defer cancel()
 
-					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof)
+					opts, err := ethClient.GetNoSendTransactOpts()
+					assert.Nil(t, err)
+					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
 					assert.Nil(t, err)
 					assert.NotNil(t, tx)
 					logger.Printf("PostCommitment Tx %v", tx)

@@ -60,7 +60,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	client, err := geth.NewClient(config.EthClientConfig, logger)
 	if err != nil {
-		logger.Error("Cannot create chain.Client", err)
+		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
 
@@ -109,7 +109,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 				return err
 			}
 		}
-		ratelimiter, err = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+		ratelimiter, err = ratelimit.NewRateLimiter(globalParams, bucketStore, config.RatelimiterConfig.Allowlist, logger)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	// TODO: create a separate metrics for batcher

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 // Operators
@@ -18,7 +19,26 @@ func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSoc
 	return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
 }
 
-type StakeAmount *big.Int
+type StakeAmount = *big.Int
+
+func ParseOperatorSocket(socket string) (host string, dispersalPort string, retrievalPort string, err error) {
+	s := strings.Split(socket, ";")
+	if len(s) != 2 {
+		err = fmt.Errorf("invalid socket address format, missing retrieval port: %s", socket)
+		return
+	}
+	retrievalPort = s[1]
+
+	s = strings.Split(s[0], ":")
+	if len(s) != 2 {
+		err = fmt.Errorf("invalid socket address format: %s", socket)
+		return
+	}
+	host = s[0]
+	dispersalPort = s[1]
+
+	return
+}
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum

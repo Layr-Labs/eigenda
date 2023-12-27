@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -14,11 +15,13 @@ type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
 
 	bucketStore interface{}
+	allowlist   []string
 
 	logger common.Logger
 }
 
-func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{}, logger common.Logger) (common.RateLimiter, error) {
+// Note: This could instead be a factor of RateLimiter with different bucket types
+func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{}, allowlist []string, logger common.Logger) (common.RateLimiter, error) {
 
 	if _, isKVStore := bucketStore.(common.KVStore[common.RateBucketParams]); !isKVStore {
 		if _, isKVStoreVersioned := bucketStore.(common.KVStoreVersioned[common.RateBucketParams]); !isKVStoreVersioned {
@@ -29,11 +32,20 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{},
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
+		allowlist:        allowlist,
 		logger:           logger,
 	}, nil
 }
 
 func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
+	// TODO: temporary allowlist that unconditionally allows request
+	// for testing purposes only
+	for _, id := range d.allowlist {
+		if strings.Contains(requesterID, id) {
+			return true, nil
+		}
+	}
+
 	// Retrieve bucket params for the requester ID
 	var bucketParams *common.RateBucketParams
 	var err error

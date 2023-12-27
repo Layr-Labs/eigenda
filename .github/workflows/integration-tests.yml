@@ -76,6 +76,9 @@ jobs:
       - name: Indexer 
         run: go test -v ./core/indexer
 
+      - name: Node Plugin 
+        run: go test -v ./node/plugin/tests
+
       - name: Graph Indexer
         run: make build && go test -v ./core/thegraph
 

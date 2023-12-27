@@ -13,6 +13,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+type FailReason string
+
+const (
+	FailBatchHeaderHash        FailReason = "batch_header_hash"
+	FailAggregateSignatures    FailReason = "aggregate_signatures"
+	FailNoSignatures           FailReason = "no_signatures"
+	FailConfirmBatch           FailReason = "confirm_batch"
+	FailGetBatchID             FailReason = "get_batch_id"
+	FailUpdateConfirmationInfo FailReason = "update_confirmation_info"
+)
+
 type MetricsConfig struct {
 	HTTPPort      string
 	EnableMetrics bool
@@ -32,6 +43,7 @@ type Metrics struct {
 	BatchProcLatency *prometheus.SummaryVec
 	GasUsed          prometheus.Gauge
 	Attestation      *prometheus.GaugeVec
+	BatchError       *prometheus.CounterVec
 
 	httpPort string
 	logger   common.Logger
@@ -96,6 +108,14 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 			},
 			[]string{"type"},
 		),
+		BatchError: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "batch_error",
+				Help:      "number of batch errors",
+			},
+			[]string{"type"},
+		),
 		registry: reg,
 		httpPort: httpPort,
 		logger:   logger,
@@ -131,6 +151,10 @@ func (g *Metrics) UpdateCompletedBlob(size int, status disperser.BlobStatus) {
 func (g *Metrics) IncrementBatchCount(size int64) {
 	g.Batch.WithLabelValues("number").Inc()
 	g.Batch.WithLabelValues("size").Add(float64(size))
+}
+
+func (g *Metrics) UpdateBatchError(errType FailReason, numBlobs int) {
+	g.BatchError.WithLabelValues(string(errType)).Add(float64(numBlobs))
 }
 
 func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {

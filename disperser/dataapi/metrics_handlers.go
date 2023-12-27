@@ -45,7 +45,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	)
 	if valuesSize > 1 {
 		totalBytes = result.Values[valuesSize-1].Value - result.Values[0].Value
-		timeDuration = result.Values[len(result.Values)-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
+		timeDuration = result.Values[valuesSize-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
 		troughput = totalBytes / timeDuration
 	}
 
@@ -62,7 +62,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 }
 
 func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*Throughput, error) {
-	result, err := s.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(start, 0), time.Unix(end, 0))
+	result, err := s.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(start, 0), time.Unix(end, 0), avgThroughputWindowSize)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,16 @@ func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*
 		return []*Throughput{}, nil
 	}
 
-	return calculateAverageThroughput(result.Values, avgThroughputWindowSize), nil
+	throughputs := make([]*Throughput, 0)
+	for i := avgThroughputWindowSize; i < len(result.Values); i++ {
+		v := result.Values[i]
+		throughputs = append(throughputs, &Throughput{
+			Timestamp:  uint64(v.Timestamp.Unix()),
+			Throughput: v.Value,
+		})
+	}
+
+	return throughputs, nil
 }
 
 func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error) {
@@ -114,29 +123,6 @@ func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error)
 		totalGasUsed = float64(batch.GasFees.GasUsed) / float64(totalBlobSize)
 	}
 	return totalGasUsed, nil
-}
-
-func calculateAverageThroughput(values []*PrometheusResultValues, windowSize int64) []*Throughput {
-	throughputs := make([]*Throughput, 0)
-	totalBytesTransferred := float64(0)
-	start := 0
-	for i := avgThroughputWindowSize; i < len(values); i++ {
-		currentTime := values[i].Timestamp.Unix()
-
-		// The total number of iterations for this loop will be O(N) in aggregate after
-		// the outer loop completes, so the amortized cost here is just O(1).
-		for start < i && currentTime-values[start+1].Timestamp.Unix() > windowSize {
-			start++
-		}
-		duration := currentTime - values[start].Timestamp.Unix()
-		totalBytesTransferred = values[i].Value - values[start].Value
-		averageThroughput := totalBytesTransferred / float64(duration)
-		throughputs = append(throughputs, &Throughput{
-			Timestamp:  uint64(currentTime),
-			Throughput: averageThroughput,
-		})
-	}
-	return throughputs
 }
 
 func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]NonSigner, error) {

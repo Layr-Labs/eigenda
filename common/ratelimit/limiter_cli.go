@@ -15,12 +15,14 @@ const (
 	BucketMultipliersFlagName = "bucket-multipliers"
 	CountFailedFlagName       = "count-failed"
 	BucketStoreSizeFlagName   = "bucket-store-size"
+	AllowlistFlagName         = "allowlist"
 )
 
 type Config struct {
 	common.GlobalRateParams
 	BucketStoreSize  int
 	UniformRateParam common.RateParam
+	Allowlist        []string
 }
 
 func RatelimiterCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -51,6 +53,13 @@ func RatelimiterCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Value:    1000,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "BUCKET_STORE_SIZE"),
 			Required: false,
+		},
+		cli.StringSliceFlag{
+			Name:     common.PrefixFlag(flagPrefix, AllowlistFlagName),
+			Usage:    "Allowlist of IPs to bypass rate limiting",
+			EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST"),
+			Required: false,
+			Value:    &cli.StringSlice{},
 		},
 	}
 }
@@ -97,6 +106,7 @@ func ReadCLIConfig(ctx *cli.Context, flagPrefix string) (Config, error) {
 	cfg.Multipliers = multipliers
 	cfg.GlobalRateParams.CountFailed = ctx.Bool(common.PrefixFlag(flagPrefix, CountFailedFlagName))
 	cfg.BucketStoreSize = ctx.Int(common.PrefixFlag(flagPrefix, BucketStoreSizeFlagName))
+	cfg.Allowlist = ctx.StringSlice(common.PrefixFlag(flagPrefix, AllowlistFlagName))
 
 	err := validateConfig(cfg)
 	if err != nil {
