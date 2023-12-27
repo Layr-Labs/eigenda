@@ -183,6 +183,9 @@ func TestQueryIndexedDeregisteredOperatorsInTheLast14Days(t *testing.T) {
 	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG2, operator.PubkeyG2)
 	assert.Equal(t, "localhost:32006;32007", operator.Socket)
 	assert.Equal(t, uint64(22), uint64(operator.BlockNumber))
+	assert.Equal(t, []byte("0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311"), operator.Metadata.OperatorId)
+	assert.Equal(t, []byte("0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211"), operator.Metadata.TransactionHash)
+	assert.Equal(t, uint64(22), uint64(operator.Metadata.BlockNumber))
 }
 
 func assertGasFees(t *testing.T, gasFees *dataapi.GasFees) {

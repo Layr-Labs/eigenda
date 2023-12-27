@@ -45,6 +45,7 @@ type (
 		*core.IndexedOperatorInfo
 		// BlockNumber is the block number at which the operator was deregistered.
 		BlockNumber uint
+		Metadata    *Operator
 	}
 	IndexedDeregisteredOperatorState struct {
 		Operators map[core.OperatorID]*DeregisteredOperatorInfo
@@ -136,6 +137,7 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx c
 		operators[operatorId] = &DeregisteredOperatorInfo{
 			IndexedOperatorInfo: indexedOperatorInfo,
 			BlockNumber:         uint(operator.BlockNumber),
+			Metadata:            operator,
 		}
 	}
 

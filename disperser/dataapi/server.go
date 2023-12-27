@@ -137,7 +137,7 @@ func (s *server) Start() error {
 		}
 		operatorsInfo := v1.Group("/operatorsInfo")
 		{
-			operatorsInfo.GET("/deRegisteredLast14days", s.FetchBlobsHandler)
+			operatorsInfo.GET("/deRegisteredLast14days", s.FetchDeRegisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
