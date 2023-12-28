@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"golang.org/x/crypto/sha3"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -74,9 +75,14 @@ var _ = Describe("Inabox Integration", func() {
 				blobStatus, err = disperser.FromBlobStatusProto(reply.GetStatus())
 				Expect(err).To(BeNil())
 				if *blobStatus == disperser.Confirmed {
-					blobHeader := blobHeaderFromProto(reply.GetInfo().GetBlobHeader())
+					blobHeader, hash := blobHeaderFromProto(reply.GetInfo().GetBlobHeader())
 					verificationProof := blobVerificationProofFromProto(reply.GetInfo().GetBlobVerificationProof())
-					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof)
+					var byteArr [32]byte
+					Expect(len(hash)).To(Equal(32))
+					// Copy hash into byte array
+					copy(byteArr[:], hash)
+
+					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof, byteArr)
 					Expect(err).To(BeNil())
 					_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "PostCommitment", nil)
 					Expect(err).To(BeNil())
@@ -100,7 +106,21 @@ var _ = Describe("Inabox Integration", func() {
 	})
 })
 
-func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEigenDAServiceManagerBlobHeader {
+func computeKeccak256Hash(quorums []rollupbindings.IEigenDAServiceManagerQuorumBlobParam) []byte {
+	hasher := sha3.NewLegacyKeccak256()
+
+	for _, quorum := range quorums {
+		// Convert each field to bytes and write to hasher
+		hasher.Write([]byte{quorum.QuorumNumber})
+		hasher.Write([]byte{quorum.AdversaryThresholdPercentage})
+		hasher.Write([]byte{quorum.QuorumThresholdPercentage})
+		hasher.Write([]byte{quorum.QuantizationParameter})
+	}
+
+	return hasher.Sum(nil)
+}
+
+func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) (rollupbindings.IEigenDAServiceManagerBlobHeader, []byte) {
 	commitmentBytes := blobHeader.GetCommitment()
 	commitment, err := new(core.Commitment).Deserialize(commitmentBytes)
 	Expect(err).To(BeNil())
@@ -114,6 +134,8 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 		}
 	}
 
+	hash := computeKeccak256Hash(quorums)
+
 	return rollupbindings.IEigenDAServiceManagerBlobHeader{
 		Commitment: rollupbindings.BN254G1Point{
 			X: commitment.X.BigInt(new(big.Int)),
@@ -121,7 +143,7 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 		},
 		DataLength:       blobHeader.GetDataLength(),
 		QuorumBlobParams: quorums,
-	}
+	}, hash
 }
 
 func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDABlobUtilsBlobVerificationProof {
