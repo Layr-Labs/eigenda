@@ -35,20 +35,21 @@ var _ RetrievalClient = (*retrievalClient)(nil)
 
 func NewRetrievalClient(
 	logger common.Logger,
-	indexedChainState core.IndexedChainState,
+	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	encoder core.Encoder,
 	numConnections int,
-) *retrievalClient {
+) (*retrievalClient, error) {
+
 	return &retrievalClient{
 		logger:                logger,
-		indexedChainState:     indexedChainState,
+		indexedChainState:     chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
 		encoder:               encoder,
 		numConnections:        numConnections,
-	}
+	}, nil
 }
 
 func (r *retrievalClient) RetrieveBlob(
@@ -119,7 +120,7 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, err
 	}
 
-	assignements, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, quorumID, uint(quorumHeader.QuantizationFactor))
+	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments")
 	}
@@ -135,23 +136,9 @@ func (r *retrievalClient) RetrieveBlob(
 		})
 	}
 
-	chunkLength, err := r.assignmentCoordinator.GetChunkLengthFromHeader(indexedOperatorState.OperatorState, quorumHeader)
+	encodingParams, err := core.GetEncodingParams(quorumHeader.ChunkLength, info.TotalChunks)
 	if err != nil {
 		return nil, err
-	}
-
-	minChunkLength, err := r.assignmentCoordinator.GetMinimumChunkLength(uint(len(operators)), blobHeader.BlobCommitments.Length, quorumHeader.QuantizationFactor, quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
-	if err != nil {
-		return nil, err
-	}
-
-	encodingParams, err := core.GetEncodingParams(minChunkLength, info.TotalChunks)
-	if err != nil {
-		return nil, err
-	}
-
-	if chunkLength != encodingParams.ChunkLength {
-		return nil, fmt.Errorf("chunk length mismatch: %d != %d", chunkLength, encodingParams.ChunkLength)
 	}
 
 	var chunks []*core.Chunk
@@ -163,7 +150,7 @@ func (r *retrievalClient) RetrieveBlob(
 			r.logger.Error("failed to get chunks from operator", "operator", reply.OperatorID, "err", reply.Err)
 			continue
 		}
-		assignment, ok := assignements[reply.OperatorID]
+		assignment, ok := assignments[reply.OperatorID]
 		if !ok {
 			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
 		}

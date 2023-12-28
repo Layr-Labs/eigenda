@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/ethereum/go-ethereum"
@@ -25,12 +26,13 @@ var (
 
 type EthClient struct {
 	*ethclient.Client
-	RPCURL             string
-	privateKey         *ecdsa.PrivateKey
-	AccountAddress     gethcommon.Address
-	NoSendTransactOpts *bind.TransactOpts
-	Contracts          map[gethcommon.Address]*bind.BoundContract
-	Logger             common.Logger
+	RPCURL           string
+	privateKey       *ecdsa.PrivateKey
+	chainID          *big.Int
+	AccountAddress   gethcommon.Address
+	Contracts        map[gethcommon.Address]*bind.BoundContract
+	Logger           common.Logger
+	numConfirmations int
 }
 
 var _ common.EthClient = (*EthClient)(nil)
@@ -42,7 +44,6 @@ func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error)
 	}
 	var accountAddress gethcommon.Address
 	var privateKey *ecdsa.PrivateKey
-	var opts *bind.TransactOpts
 
 	if len(config.PrivateKeyString) != 0 {
 		privateKey, err = crypto.HexToECDSA(config.PrivateKeyString)
@@ -57,30 +58,23 @@ func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error)
 			return nil, ErrCannotGetECDSAPubKey
 		}
 		accountAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+	}
 
-		chainIDBigInt, err := chainClient.ChainID(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("NewClient: cannot get chainId: %w", err)
-		}
-
-		// generate and memoize NoSendTransactOpts
-		opts, err = bind.NewKeyedTransactorWithChainID(privateKey, chainIDBigInt)
-		if err != nil {
-			return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
-		}
-		opts.NoSend = true
+	chainIDBigInt, err := chainClient.ChainID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("NewClient: cannot get chainId: %w", err)
 	}
 
 	c := &EthClient{
-		RPCURL:         config.RPCURL,
-		privateKey:     privateKey,
-		AccountAddress: accountAddress,
-		Client:         chainClient,
-		Contracts:      make(map[gethcommon.Address]*bind.BoundContract),
-		Logger:         logger,
+		RPCURL:           config.RPCURL,
+		privateKey:       privateKey,
+		chainID:          chainIDBigInt,
+		AccountAddress:   accountAddress,
+		Client:           chainClient,
+		Contracts:        make(map[gethcommon.Address]*bind.BoundContract),
+		Logger:           logger,
+		numConfirmations: config.NumConfirmations,
 	}
-
-	c.NoSendTransactOpts = opts
 
 	return c, err
 }
@@ -94,8 +88,14 @@ func (c *EthClient) GetAccountAddress() gethcommon.Address {
 	return c.AccountAddress
 }
 
-func (c *EthClient) GetNoSendTransactOpts() *bind.TransactOpts {
-	return c.NoSendTransactOpts
+func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
+	opts, err := bind.NewKeyedTransactorWithChainID(c.privateKey, c.chainID)
+	if err != nil {
+		return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
+	}
+	opts.NoSend = true
+
+	return opts, nil
 }
 
 // UpdateGas returns an otherwise identical txn to the one provided but with updated
@@ -153,8 +153,10 @@ func (c *EthClient) UpdateGas(
 		return nil, err
 	}
 
-	opts := new(bind.TransactOpts)
-	*opts = *c.NoSendTransactOpts
+	opts, err := c.GetNoSendTransactOpts()
+	if err != nil {
+		return nil, err
+	}
 	opts.Context = ctx
 	opts.Nonce = new(big.Int).SetUint64(tx.Nonce())
 	opts.GasTipCap = gasTipCap
@@ -207,7 +209,7 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 }
 
 func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
-	receipt, err := bind.WaitMined(ctx, c.Client, tx)
+	receipt, err := c.waitMined(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
 	}
@@ -217,6 +219,43 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 	}
 	c.Logger.Trace("successfully submitted transaction", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
 	return receipt, nil
+}
+
+// waitMined waits for tx to be mined on the blockchain.
+// Taken from https://github.com/ethereum/go-ethereum/blob/master/accounts/abi/bind/util.go#L32,
+// but added a check for number of confirmations.
+func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
+	queryTicker := time.NewTicker(3 * time.Second)
+	defer queryTicker.Stop()
+
+	for {
+		receipt, err := c.TransactionReceipt(ctx, tx.Hash())
+		if err == nil {
+			chainTip, err := c.BlockNumber(ctx)
+			if err == nil {
+				if receipt.BlockNumber.Uint64()+uint64(c.numConfirmations) > chainTip {
+					c.Logger.Trace("EnsureTransactionEvaled: transaction has been mined but don't have enough confirmations at current chain tip", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
+				} else {
+					return receipt, nil
+				}
+			} else {
+				c.Logger.Trace("EnsureTransactionEvaled: failed to get chain tip while waiting for transaction to mine", "err", err)
+			}
+		}
+
+		if errors.Is(err, ethereum.NotFound) {
+			c.Logger.Trace("Transaction not yet mined")
+		} else {
+			c.Logger.Trace("Receipt retrieval failed", "err", err)
+		}
+
+		// Wait for the next round.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-queryTicker.C:
+		}
+	}
 }
 
 // getGasFeeCap returns the gas fee cap for a transaction, calculated as:

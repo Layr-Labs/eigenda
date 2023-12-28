@@ -156,15 +156,8 @@ message BlobQuorumParam {
 	uint32 adversary_threshold_percentage = 2;
 	// Same as SecurityParams.quorum_threshold.
 	uint32 quorum_threshold_percentage = 3;
-	// This determines the nominal number of chunks for the blob, which is
-	// nominal_num_chunks = quantization_param * num_operators.
-	// A chunk is the smallest unit that's distributed to DA Nodes, corresponding to
-	// a set of evaluations of the polynomial (representing the blob) and a KZG multiproof.
-	// See more details in data model of EigenDA:
-	// https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/data-model.md
-	uint32 quantization_param = 4;
-	// The length of the blob after encoding (in number of symbols).
-	uint64 encoded_length = 5;
+	// The length of each chunk.
+	uint32 chunk_length = 4;
 }
 
 message BlobVerificationProof {

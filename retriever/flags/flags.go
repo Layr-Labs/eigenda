@@ -68,6 +68,18 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
+	GraphUrlFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "graph-url"),
+		Usage:    "The url of the graph node",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "GRAPH_URL"),
+	}
+	UseGraphFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
+		Usage:    "Whether to use the graph node",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "USE_GRAPH"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -82,6 +94,8 @@ var optionalFlags = []cli.Flag{
 	NumConnectionsFlag,
 	IndexerDataDirFlag,
 	MetricsHTTPPortFlag,
+	GraphUrlFlag,
+	UseGraphFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

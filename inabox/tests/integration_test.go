@@ -12,24 +12,35 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"golang.org/x/crypto/sha3"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
+func mineAnvilBlocks(numBlocks int) {
+	for i := 0; i < numBlocks; i++ {
+		err := rpcClient.CallContext(context.Background(), nil, "evm_mine")
+		Expect(err).To(BeNil())
+	}
+}
+
 var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 		defer cancel()
 
-		optsWithValue := new(bind.TransactOpts)
-		*optsWithValue = *ethClient.GetNoSendTransactOpts()
+		optsWithValue, err := ethClient.GetNoSendTransactOpts()
+		Expect(err).To(BeNil())
 		optsWithValue.Value = big.NewInt(1e18)
 		tx, err := mockRollup.RegisterValidator(optsWithValue)
 		Expect(err).To(BeNil())
-		_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "RegisterValidator", big.NewInt(1e18))
+		tx, err = ethClient.UpdateGas(ctx, tx, optsWithValue.Value)
+		Expect(err).To(BeNil())
+		err = ethClient.SendTransaction(ctx, tx)
+		Expect(err).To(BeNil())
+		mineAnvilBlocks(numConfirmations + 1)
+		_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "RegisterValidator")
 		Expect(err).To(BeNil())
 
 		disp := traffic.NewDisperserClient(&traffic.Config{
@@ -81,12 +92,20 @@ var _ = Describe("Inabox Integration", func() {
 					Expect(len(hash)).To(Equal(32))
 					// Copy hash into byte array
 					copy(byteArr[:], hash)
-
-					tx, err := mockRollup.PostCommitment(ethClient.GetNoSendTransactOpts(), blobHeader, verificationProof, byteArr)
+					opts, err := ethClient.GetNoSendTransactOpts()
 					Expect(err).To(BeNil())
-					_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, tx, "PostCommitment", nil)
+					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof, byteArr)
+					Expect(err).To(BeNil())
+					tx, err = ethClient.UpdateGas(ctx, tx, nil)
+					Expect(err).To(BeNil())
+					err = ethClient.SendTransaction(ctx, tx)
+					Expect(err).To(BeNil())
+					mineAnvilBlocks(numConfirmations + 1)
+					_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
 					Expect(err).To(BeNil())
 					break loop
+				} else {
+					mineAnvilBlocks(numConfirmations + 1)
 				}
 			}
 		}
@@ -102,7 +121,7 @@ var _ = Describe("Inabox Integration", func() {
 			0,
 		)
 		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(data))
+		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 	})
 })
 
@@ -130,7 +149,7 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) (rollupbindings.IEi
 			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
 			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			QuantizationParameter:        uint8(quorum.GetQuantizationParam()),
+			QuantizationParameter:        0,
 		}
 	}
 

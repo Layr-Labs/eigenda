@@ -146,8 +146,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 
 	for id, op := range state.IndexedOperators {
 		_, found := signerMap[id]
+		a.Logger.Trace("[state.IndexedOperators]", "operator", hexutil.Encode(id[:]), "G1X", op.PubkeyG1.X.Text(16), "G1Y", op.PubkeyG1.Y.Text(16))
 		if !found {
 			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			a.Logger.Trace("[state.IndexedOperators] Non signer found", "operator", hexutil.Encode(id[:]), "G1X", op.PubkeyG1.X.Text(16), "G1Y", op.PubkeyG1.Y.Text(16))
 			nonSignerOperatorIds = append(nonSignerOperatorIds, id)
 		}
 	}
@@ -231,14 +233,14 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
 	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
-	stakeThreshold = roundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(PercentMultiplier))
+	stakeThreshold = roundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
 
 	return stakeThreshold
 }
 
 func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
 
-	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(PercentMultiplier))
+	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
 	quorumThresholdBig := stakeAmount.Div(stakeAmount, state.Totals[quorum].Stake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())

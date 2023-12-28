@@ -150,6 +150,7 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 	ethClientCfg := geth.EthClientConfig{
 		RPCURL:           rpcURL,
 		PrivateKeyString: privateKey,
+		NumConfirmations: 0,
 	}
 
 	gethClient, err := geth.NewClient(ethClientCfg, logger)

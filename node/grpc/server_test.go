@@ -37,7 +37,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	chainState, _ = core_mock.NewChainDataMock(core.OperatorIndex(4))
+	chainState, _ = core_mock.MakeChainDataMock(core.OperatorIndex(4))
 	os.Exit(m.Run())
 }
 
@@ -94,6 +94,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 	if mockValidator {
 		mockVal := core_mock.NewMockChunkValidator()
 		mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
+		mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		val = mockVal
 	} else {
 
@@ -104,7 +105,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 
 		asn := &core.StdAssignmentCoordinator{}
 
-		cst, err := core_mock.NewChainDataMock(core.OperatorIndex(10))
+		cst, err := core_mock.MakeChainDataMock(core.OperatorIndex(10))
 		if err != nil {
 			panic("failed to create test encoder")
 		}
@@ -124,7 +125,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 	return grpc.NewServer(config, node, logger, ratelimiter)
 }
 
-func makeStoreChunksRequest(t *testing.T, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
+func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
 	var commitX, commitY, lengthX, lengthY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
 	assert.NoError(t, err)
@@ -144,15 +145,13 @@ func makeStoreChunksRequest(t *testing.T, adversaryThreshold uint8) (*pb.StoreCh
 		Y: lengthY,
 	}
 
-	numOperators := uint(10)
-
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
 			QuorumID:           0,
+			QuorumThreshold:    quorumThreshold,
 			AdversaryThreshold: adversaryThreshold,
 		},
-		QuantizationFactor: 1,
-		EncodedBlobLength:  32 * 1 * numOperators,
+		ChunkLength: 10,
 	}
 
 	blobHeaders := []*core.BlobHeader{
@@ -218,7 +217,8 @@ func makeStoreChunksRequest(t *testing.T, adversaryThreshold uint8) (*pb.StoreCh
 
 func storeChunks(t *testing.T, server *grpc.Server) ([32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
 	adversaryThreshold := uint8(90)
-	req, batchHeaderHash, batchRoot, blobHeaders, blobHeadersProto := makeStoreChunksRequest(t, adversaryThreshold)
+	quorumThreshold := uint8(100)
+	req, batchHeaderHash, batchRoot, blobHeaders, blobHeadersProto := makeStoreChunksRequest(t, quorumThreshold, adversaryThreshold)
 
 	reply, err := server.StoreChunks(context.Background(), req)
 	assert.NoError(t, err)
@@ -255,8 +255,9 @@ func TestRetrieveChunks(t *testing.T) {
 // If a batch fails to validate, it should not be stored in the store.
 func TestRevertInvalidBatch(t *testing.T) {
 	// This will fail the validation because the quorum threshold cannot be greater than 100.
+	quorumThreshold := uint8(100)
 	adversaryThreshold := uint8(100)
-	req, batchHeaderHash, _, _, _ := makeStoreChunksRequest(t, adversaryThreshold)
+	req, batchHeaderHash, _, _, _ := makeStoreChunksRequest(t, quorumThreshold, adversaryThreshold)
 
 	// Fail to store chunks, because invalid adversaryThreshold.
 	server := newTestServer(t, false)
@@ -306,9 +307,9 @@ func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader
 	assert.NoError(t, err)
 	quorumHeader := &pb.BlobQuorumInfo{
 		QuorumId:           uint32(blobHeader.QuorumInfos[0].QuorumID),
+		QuorumThreshold:    uint32(blobHeader.QuorumInfos[0].QuorumThreshold),
 		AdversaryThreshold: uint32(blobHeader.QuorumInfos[0].AdversaryThreshold),
-		QuantizationFactor: uint32(blobHeader.QuorumInfos[0].QuantizationFactor),
-		EncodedBlobLength:  uint32(blobHeader.QuorumInfos[0].EncodedBlobLength),
+		ChunkLength:        uint32(blobHeader.QuorumInfos[0].ChunkLength),
 	}
 
 	return &pb.BlobHeader{

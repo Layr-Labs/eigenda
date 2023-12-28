@@ -7,11 +7,12 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
+	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	subgraphOperatorRegistereds = []*subgraph.OperatorRegistered{
+	subgraphOperatorRegistereds = []*subgraph.Operator{
 		{
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
 			OperatorId:      "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
@@ -27,6 +28,17 @@ var (
 			BlockTimestamp:  "1696975459000000000",
 			BlockNumber:     "88",
 			TransactionHash: "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212",
+		},
+	}
+
+	subgraphOperatorDeregistereds = []*subgraph.Operator{
+		{
+			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
+			OperatorId:      "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+			Operator:        "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
+			BlockTimestamp:  "1702666046",
+			BlockNumber:     "22",
+			TransactionHash: "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
 		},
 	}
 
@@ -71,6 +83,25 @@ var (
 				GasPrice: "1000045336",
 				GasUsed:  "249815",
 				TxFee:    "249826325612840",
+			},
+		},
+	}
+
+	subgraphIndexedOperatorInfos = &subgraph.IndexedOperatorInfo{
+		Id:         "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
+		PubkeyG1_X: "3336192159512049190945679273141887248666932624338963482128432381981287252980",
+		PubkeyG1_Y: "15195175002875833468883745675063986308012687914999552116603423331534089122704",
+		PubkeyG2_X: []graphql.String{
+			"21597023645215426396093421944506635812143308313031252511177204078669540440732",
+			"11405255666568400552575831267661419473985517916677491029848981743882451844775",
+		},
+		PubkeyG2_Y: []graphql.String{
+			"9416989242565286095121881312760798075882411191579108217086927390793923664442",
+			"13612061731370453436662267863740141021994163834412349567410746669651828926551",
+		},
+		SocketUpdates: []subgraph.SocketUpdates{
+			{
+				Socket: "localhost:32006;32007",
 			},
 		},
 	}
@@ -126,6 +157,32 @@ func TestQueryOperators(t *testing.T) {
 	assert.Equal(t, uint64(1696975459), operators[1].BlockTimestamp)
 	assert.Equal(t, uint64(88), operators[1].BlockNumber)
 	assert.Equal(t, []byte("0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212"), operators[1].TransactionHash)
+}
+
+func TestQueryIndexedDeregisteredOperatorsInTheLast14Days(t *testing.T) {
+	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfos, nil)
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi)
+	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedDeregisteredOperatorsInTheLast14Days(context.Background())
+	assert.NoError(t, err)
+
+	operators := indexedDeregisteredOperatorState.Operators
+	assert.Equal(t, 1, len(operators))
+
+	var operatorId [32]byte
+	copy(operatorId[:], []byte("0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311"))
+	operator := operators[operatorId]
+
+	assert.NotNil(t, operator)
+
+	expectedIndexedOperatorInfo, err := dataapi.ConvertOperatorInfoGqlToIndexedOperatorInfo(subgraphIndexedOperatorInfos)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG1, operator.PubkeyG1)
+	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG2, operator.PubkeyG2)
+	assert.Equal(t, "localhost:32006;32007", operator.Socket)
+	assert.Equal(t, uint64(22), uint64(operator.BlockNumber))
 }
 
 func assertGasFees(t *testing.T, gasFees *dataapi.GasFees) {

@@ -11,13 +11,15 @@ type SecurityParam struct {
 	QuorumID QuorumID
 	// AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum
 	AdversaryThreshold uint8
+	// QuorumThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
+	QuorumThreshold uint8 `json:"quorum_threshold"`
 }
 
-// QuorumParam contains the quorum ID and the quorum threshold for the quorum
+// QuorumResult contains the quorum ID and the amount signed for the quorum
 type QuorumResult struct {
 	QuorumID QuorumID
-	// QuorumThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
-	QuorumThreshold uint8
+	// PercentSigned is percentage of the total stake for the quorum that signed for a particular batch.
+	PercentSigned uint8
 }
 ```
 
@@ -37,12 +39,16 @@ type BlobRequestHeader struct {
 
 ```go
 type BlobHeader struct {
-	BlobRequestHeader
 	BlobCommitments
-	// ChunkLength is the length of each chunk in symbols; all chunks in an encoded blob must be the same length
+	// QuorumInfos contains the quorum specific parameters for the blob
+	QuorumInfos []*BlobQuorumInfo
+}
+
+// BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
+type BlobQuorumInfo struct {
+	SecurityParam
+	// ChunkLength is the number of symbols in a chunk
 	ChunkLength uint
-	// QuantizationFactor determines the nominal number of chunks; NominalNumChunks = QuantizationFactor * NumOperatorsForQuorum
-	QuantizationFactor uint
 }
 
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree.

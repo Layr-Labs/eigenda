@@ -144,8 +144,7 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		quorumHeaders[i] = &node.BlobQuorumInfo{
 			QuorumId:           uint32(header.QuorumID),
 			AdversaryThreshold: uint32(header.AdversaryThreshold),
-			QuantizationFactor: uint32(header.QuantizationFactor),
-			EncodedBlobLength:  uint32(header.EncodedBlobLength),
+			ChunkLength:        uint32(header.ChunkLength),
 			QuorumThreshold:    uint32(header.QuorumThreshold),
 			Ratelimit:          header.QuorumRate,
 		}

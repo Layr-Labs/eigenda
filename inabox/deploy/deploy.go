@@ -36,15 +36,19 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 	stakers := make([]string, 0)
 	maxOperatorCount := env.Services.Counts.NumMaxOperatorCount
 
+	numStrategies := 2
 	total := float32(0)
-	stakes := [][]string{make([]string, len(env.Services.Stakes.Distribution))}
+	stakes := make([][]string, numStrategies)
 
 	for _, stake := range env.Services.Stakes.Distribution {
 		total += stake
 	}
 
-	for ind, stake := range env.Services.Stakes.Distribution {
-		stakes[0][ind] = strconv.FormatFloat(float64(stake/total*env.Services.Stakes.Total), 'f', 0, 32)
+	for i := 0; i < numStrategies; i++ {
+		stakes[i] = make([]string, len(env.Services.Stakes.Distribution))
+		for ind, stake := range env.Services.Stakes.Distribution {
+			stakes[i][ind] = strconv.FormatFloat(float64(stake/total*env.Services.Stakes.Total), 'f', 0, 32)
+		}
 	}
 
 	for i := 0; i < len(env.Services.Stakes.Distribution); i++ {
@@ -57,7 +61,7 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 
 	config := EigenDADeployConfig{
 		UseDefaults:         true,
-		NumStrategies:       1,
+		NumStrategies:       numStrategies,
 		MaxOperatorCount:    maxOperatorCount,
 		StakerPrivateKeys:   stakers,
 		StakerTokenAmounts:  stakes,
@@ -102,7 +106,6 @@ func (env *Config) deployEigenDAContracts() {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
-				QuantizationFactor: 1,
 			},
 		},
 	}
@@ -126,7 +129,7 @@ func (env *Config) deployEigenDAContracts() {
 
 // Deploys a EigenDA experiment
 func (env *Config) DeployExperiment() {
-
+	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 	defer env.SaveTestConfig()
 
 	log.Print("Deploying experiment...")
@@ -194,5 +197,32 @@ func (env *Config) StopAnvil() {
 	err := execCmd("./bin.sh", []string{"stop-anvil"}, []string{})
 	if err != nil {
 		log.Panicf("Failed to stop anvil. Err: %s", err)
+	}
+}
+
+func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
+	changeDirectory(filepath.Join(env.rootPath, "inabox"))
+
+	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT))
+
+	envVars := []string{
+		"NODE_OPERATION=" + operation,
+		"NODE_ECDSA_KEY_FILE=" + operator.NODE_ECDSA_KEY_FILE,
+		"NODE_BLS_KEY_FILE=" + operator.NODE_BLS_KEY_FILE,
+		"NODE_ECDSA_KEY_PASSWORD=" + operator.NODE_ECDSA_KEY_PASSWORD,
+		"NODE_BLS_KEY_PASSWORD=" + operator.NODE_BLS_KEY_PASSWORD,
+		"NODE_SOCKET=" + socket,
+		"NODE_QUORUM_ID_LIST=" + operator.NODE_QUORUM_ID_LIST,
+		"NODE_CHAIN_RPC=" + operator.NODE_CHAIN_RPC,
+		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
+		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
+		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
+		"NODE_NUM_CONFIRMATIONS=0",
+	}
+	
+	err := execCmd("./node-plugin.sh", []string{}, envVars)
+
+	if err != nil {
+		log.Panicf("Failed to run node plugin. Err: %s", err)
 	}
 }

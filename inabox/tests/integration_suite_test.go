@@ -1,8 +1,10 @@
 package integration_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,14 +18,15 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/ory/dockertest/v3"
-	"github.com/shurcooL/graphql"
 )
 
 var (
@@ -40,8 +43,10 @@ var (
 	bucketTableName   = "test-BucketStore"
 	logger            common.Logger
 	ethClient         common.EthClient
+	rpcClient         common.RPCEthClient
 	mockRollup        *rollupbindings.ContractMockRollup
 	retrievalClient   clients.RetrievalClient
+	numConfirmations  int = 3
 )
 
 func init() {
@@ -112,7 +117,10 @@ var _ = BeforeSuite(func() {
 	ethClient, err = geth.NewClient(geth.EthClientConfig{
 		RPCURL:           testConfig.Deployers[0].RPC,
 		PrivateKeyString: pk,
+		NumConfirmations: numConfirmations,
 	}, logger)
+	Expect(err).To(BeNil())
+	rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 	Expect(err).To(BeNil())
 	mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
 	Expect(err).To(BeNil())
@@ -124,10 +132,15 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
 		RPCURL:           testConfig.Deployers[0].RPC,
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
+		NumConfirmations: numConfirmations,
 	}
 	client, err := geth.NewClient(ethClientConfig, logger)
 	if err != nil {
 		return err
+	}
+	rpcClient, err := ethrpc.Dial(testConfig.Deployers[0].RPC)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
 	}
 	tx, err := eth.NewTransactor(logger, client, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
@@ -135,8 +148,6 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	}
 
 	cs := eth.NewChainState(tx, client)
-	querier := graphql.NewClient(testConfig.Churner.CHURNER_GRAPH_URL, nil)
-	ics := thegraph.NewIndexedChainState(cs, querier, logger)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
@@ -151,15 +162,37 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 			NumWorker:      1,
 			SRSOrder:       uint64(srsOrder),
 			Verbose:        true,
-			PreloadEncoder: true,
+			PreloadEncoder: false,
 		},
 	})
 	if err != nil {
 		return err
 	}
 
-	retrievalClient = clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, 10)
-	return nil
+	indexer, err := coreindexer.CreateNewIndexer(
+		&indexer.Config{
+			PullInterval: 100 * time.Millisecond,
+		},
+		client,
+		rpcClient,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER,
+		logger,
+	)
+	if err != nil {
+		return err
+	}
+
+	ics, err := coreindexer.NewIndexedChainState(cs, indexer)
+	if err != nil {
+		return err
+	}
+
+	retrievalClient, err = clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, 10)
+	if err != nil {
+		return err
+	}
+
+	return indexer.Index(context.Background())
 }
 
 var _ = AfterSuite(func() {

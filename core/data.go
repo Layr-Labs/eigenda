@@ -68,10 +68,8 @@ func (h *BlobRequestHeader) Validate() error {
 // BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
 type BlobQuorumInfo struct {
 	SecurityParam
-	// QuantizationFactor determines the nominal number of chunks
-	QuantizationFactor uint
-	// EncodedBlobLength is the nominal endcoded length of the blob in symbols; EncodedBlobLength = QuantizationFactor * NumOperatorsForQuorum * ChunkLength
-	EncodedBlobLength uint
+	// ChunkLength is the number of symbols in a chunk
+	ChunkLength uint
 }
 
 // BlobHeader contains all metadata related to a blob including commitments and parameters for encoding
@@ -84,11 +82,21 @@ type BlobHeader struct {
 	AccountID AccountID `json:"account_id"`
 }
 
+func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
+	for _, quorumInfo := range b.QuorumInfos {
+		if quorumInfo.QuorumID == quorum {
+			return quorumInfo
+		}
+	}
+	return nil
+}
+
 // Returns the total encoded size in bytes of the blob across all quorums.
 func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
-		size += int64(quorum.EncodedBlobLength) * int64(bn254.BYTES_PER_COEFFICIENT)
+
+		size += int64(roundUpDivide(b.Length*percentMultiplier*bn254.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -170,4 +178,19 @@ func (cb Bundles) Size() int64 {
 		}
 	}
 	return size
+}
+
+// Sample is a chunk with associated metadata used by the Universal Batch Verifier
+type Sample struct {
+	Commitment      *Commitment
+	Chunk           *Chunk
+	AssignmentIndex ChunkNumber
+	BlobIndex       int
+}
+
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+// Blobs with the same encoding parameters are collected in a single subBatch
+type SubBatch struct {
+	Samples  []Sample
+	NumBlobs int
 }

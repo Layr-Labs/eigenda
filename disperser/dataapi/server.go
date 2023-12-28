@@ -42,6 +42,7 @@ type (
 		BlobCommitment          *core.BlobCommitments `json:"blob_commitment"`
 		BatchId                 uint32                `json:"batch_id"`
 		ConfirmationBlockNumber uint32                `json:"confirmation_block_number"`
+		ConfirmationTxnHash     string                `json:"confirmation_txn_hash"`
 		Fee                     string                `json:"fee"`
 		SecurityParams          []*core.SecurityParam `json:"security_params"`
 		RequestAt               uint64                `json:"requested_at"`

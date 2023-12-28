@@ -201,9 +201,21 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("system ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
+			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
 			return errSystemRateLimit
 		}
+
+		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, systemQuorumKey, blobRateMultiplier, rates.TotalUnauthBlobRate)
+		if err != nil {
+			return fmt.Errorf("ratelimiter error: %v", err)
+		}
+		if !allowed {
+			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
+			return errSystemRateLimit
+		}
+
+		// Check Account Ratelimit
 
 		blob.RequestHeader.AccountID = "ip:" + origin
 
@@ -213,7 +225,17 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
+			s.logger.Warn("account byte ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
+			return errAccountRateLimit
+		}
+
+		userQuorumKey = fmt.Sprintf("%s:%d-blobrate", blob.RequestHeader.AccountID, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, blobRateMultiplier, rates.PerUserUnauthBlobRate)
+		if err != nil {
+			return fmt.Errorf("ratelimiter error: %v", err)
+		}
+		if !allowed {
+			s.logger.Warn("account blob ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", float32(rates.PerUserUnauthBlobRate)/blobRateMultiplier)
 			return errAccountRateLimit
 		}
 
@@ -271,8 +293,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 				QuorumNumber:                 uint32(quorumInfo.QuorumID),
 				AdversaryThresholdPercentage: uint32(quorumInfo.AdversaryThreshold),
 				QuorumThresholdPercentage:    uint32(quorumInfo.QuorumThreshold),
-				QuantizationParam:            uint32(quorumInfo.QuantizationFactor),
-				EncodedLength:                uint64(quorumInfo.EncodedBlobLength),
+				ChunkLength:                  uint32(quorumInfo.ChunkLength),
 			}
 			quorumNumbers[i] = quorumInfo.QuorumID
 			quorumPercentSigned[i] = confirmationInfo.QuorumResults[quorumInfo.QuorumID].PercentSigned
@@ -371,7 +392,8 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	pb.RegisterDisperserServer(gs, s)
 
 	// Register Server for Health Checks
-	healthcheck.RegisterHealthServer(gs)
+	name := pb.Disperser_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
 
 	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
