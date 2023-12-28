@@ -29,7 +29,7 @@ var (
 
 	dynamoClient     *dynamodb.Client
 	dynamoParamStore common.KVStoreVersioned[common.RateBucketParams]
-	bucketTableName  = "BucketStore"
+	bucketTableName  = "BucketStoreVersioned"
 )
 
 func TestMain(m *testing.M) {
