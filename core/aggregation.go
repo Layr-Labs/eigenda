@@ -30,7 +30,7 @@ type SignatureAggregation struct {
 	// Including those that did not sign
 	QuorumAggPubKeys []*G1Point
 	// AggPubKey is the aggregated public key for all of the operators that signed the message,
-	// further aggregrated across the quorums; operators signing for multiple quorums will be included in
+	// further aggregated across the quorums; operators signing for multiple quorums will be included in
 	// the aggregation multiple times
 	AggPubKey *G2Point
 	// AggSignature is the aggregated signature for all of the operators that signed the message, mirroring the
@@ -43,7 +43,7 @@ type SignatureAggregation struct {
 // SignatureAggregator is an interface for aggregating the signatures returned by DA nodes so that they can be verified by the DA contract
 type SignatureAggregator interface {
 
-	// AggregateSignatures blocks until it recieves a response for each operator in the operator state via messageChan, and then returns the aggregated signature.
+	// AggregateSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the aggregated signature.
 	// If the aggregated signature is invalid, an error is returned.
 	AggregateSignatures(state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SignerMessage) (*SignatureAggregation, error)
 }
@@ -140,7 +140,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(state *IndexedOperatorState
 		}
 	}
 
-	// Aggregrate Non signer Pubkey Id
+	// Aggregate Non signer Pubkey Id
 	nonSignerKeys := make([]*G1Point, 0)
 	nonSignerOperatorIds := make([]OperatorID, 0)
 
