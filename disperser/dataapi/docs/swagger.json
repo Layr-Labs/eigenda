@@ -207,6 +207,51 @@
                 }
             }
         },
+        "/metrics/operator_nonsigning_percentage": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch operators non signing percentage",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Interval to query for operators nonsigning percentage [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.OperatorsNonsigningPercentage"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/throughput": {
             "get": {
                 "produces": [
@@ -338,6 +383,9 @@
                 "confirmation_block_number": {
                     "type": "integer"
                 },
+                "confirmation_txn_hash": {
+                    "type": "string"
+                },
                 "fee": {
                     "type": "string"
                 },
@@ -391,8 +439,8 @@
         "dataapi.Metric": {
             "type": "object",
             "properties": {
-                "cost_in_wei": {
-                    "type": "integer"
+                "cost_in_gas": {
+                    "type": "number"
                 },
                 "throughput": {
                     "type": "number"
@@ -410,6 +458,34 @@
                 },
                 "operatorId": {
                     "type": "string"
+                }
+            }
+        },
+        "dataapi.OperatorNonsigningPercentageMetrics": {
+            "type": "object",
+            "properties": {
+                "percentage": {
+                    "type": "number"
+                },
+                "total_batches": {
+                    "type": "integer"
+                },
+                "total_unsigned_batches": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dataapi.OperatorsNonsigningPercentage": {
+            "type": "object",
+            "properties": {
+                "operators": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
+                    }
+                },
+                "total_non_signers": {
+                    "type": "integer"
                 }
             }
         },
