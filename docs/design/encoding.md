@@ -37,7 +37,7 @@ As the encoding interface calls for the construction of `NumChunks` Chunks of le
 
 ## Amortized Multireveal Proof Generation with the FFT
 
-The construction of the multireveal proofs can also be performed using a DFT (as in [“Fast Amortized Kate Proofs”](./https://eprint.iacr.org/2023/033.pdf)). Leaving the full details of this process to the referenced document, we describe here only 1) the index-assignment the scheme used by the amortized multiproof generation approach and 2) the constraints that this creates for the overall encoder interface.
+The construction of the multireveal proofs can also be performed using a DFT (as in [“Fast Amortized Kate Proofs”](https://eprint.iacr.org/2023/033.pdf)). Leaving the full details of this process to the referenced document, we describe here only 1) the index-assignment the scheme used by the amortized multiproof generation approach and 2) the constraints that this creates for the overall encoder interface.
 
 Given the group $S$ corresponding to the indices of the polynomial evaluations and a cyclic group $C$ which is a subgroup of $S$, the cosets of $C$ in $S$ are given by
 
