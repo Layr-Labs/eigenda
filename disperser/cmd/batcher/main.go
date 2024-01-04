@@ -75,7 +75,6 @@ func RunBatcher(ctx *cli.Context) error {
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout: config.TimeoutConfig.AttestationTimeout,
 	}, logger)
-	agg := core.NewStdSignatureAggregator(logger)
 	asgn := &core.StdAssignmentCoordinator{}
 
 	client, err := geth.NewClient(config.EthClientConfig, logger)
@@ -88,6 +87,10 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	tx, err := coreeth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	if err != nil {
+		return err
+	}
+	agg, err := core.NewStdSignatureAggregator(logger, tx)
 	if err != nil {
 		return err
 	}

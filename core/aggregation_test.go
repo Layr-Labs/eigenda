@@ -10,6 +10,7 @@ import (
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,12 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	logger := &commonmock.Logger{}
-	agg = core.NewStdSignatureAggregator(logger)
+	transactor := &mock.MockTransactor{}
+	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err = core.NewStdSignatureAggregator(logger, transactor)
+	if err != nil {
+		panic(err)
+	}
 
 	code := m.Run()
 	os.Exit(code)
@@ -124,7 +130,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				quorumIDs[ind] = quorum.QuorumID
 			}
 
-			sigAgg, err := agg.AggregateSignatures(state.IndexedOperatorState, quorumIDs, message, update)
+			sigAgg, err := agg.AggregateSignatures(context.Background(), state.IndexedOperatorState, quorumIDs, message, update)
 			assert.NoError(t, err)
 
 			for _, quorum := range tt.quorums {
@@ -150,7 +156,7 @@ func TestSortNonsigners(t *testing.T) {
 
 	quorums := []core.QuorumID{0}
 
-	sigAgg, err := agg.AggregateSignatures(state.IndexedOperatorState, quorums, message, update)
+	sigAgg, err := agg.AggregateSignatures(context.Background(), state.IndexedOperatorState, quorums, message, update)
 	assert.NoError(t, err)
 
 	for i := range sigAgg.NonSigners {

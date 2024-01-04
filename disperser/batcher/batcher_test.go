@@ -72,7 +72,10 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 	asgn := &core.StdAssignmentCoordinator{}
-	agg := core.NewStdSignatureAggregator(logger)
+	transactor := &coremock.MockTransactor{}
+	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err := core.NewStdSignatureAggregator(logger, transactor)
+	assert.NoError(t, err)
 	enc, err := makeTestEncoder()
 	assert.NoError(t, err)
 

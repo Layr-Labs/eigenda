@@ -123,7 +123,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger)
 
-	agg := core.NewStdSignatureAggregator(logger)
+	transactor := &coremock.MockTransactor{}
+	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err := core.NewStdSignatureAggregator(logger, transactor)
+	assert.NoError(t, err)
 
 	confirmer := dispersermock.NewBatchConfirmer()
 	// should be encoding 3 and 0
@@ -309,10 +312,6 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger common.
 			Transactor:              tx,
 			PubIPProvider:           pubIPProvider,
 			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
-		}
-
-		if err != nil {
-			t.Fatal(err)
 		}
 
 		ratelimiter := &commonmock.NoopRatelimiter{}
