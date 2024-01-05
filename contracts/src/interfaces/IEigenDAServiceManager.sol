@@ -10,7 +10,7 @@ import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 interface IEigenDAServiceManager is IServiceManager, IDelayedService {
     // EVENTS
     
-    /**b
+    /**
      * @notice Emitted when a Batch is confirmed.
      * @param batchHeaderHash The hash of the batch header
      * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)

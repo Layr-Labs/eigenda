@@ -47,7 +47,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                     abi.encodeWithSelector(
                         EigenDAServiceManager.initialize.selector,
                         pauserRegistry,
-                        serviceManagerOwner
+                        registryCoordinatorOwner
                     )
                 )
             )
@@ -154,12 +154,6 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         assertEq(eigenDAServiceManager.batchId(), batchIdToConfirm + 1);
     }
-
-    function testFreezeOperator_Revert() public {
-        cheats.expectRevert(bytes("EigenDAServiceManager.freezeOperator: not implemented"));
-        eigenDAServiceManager.freezeOperator(address(0));
-    }
-
 
     function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (IEigenDAServiceManager.BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
         // register a bunch of operators

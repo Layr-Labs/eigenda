@@ -35,4 +35,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
 
     /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
     mapping(uint32 => bytes32) public batchIdToBatchMetadataHash;
+
+    /// @notice metadata URI for the EigenDA AVS
+    string public metadataURI;
 }
