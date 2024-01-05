@@ -183,10 +183,9 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	stageTimer := time.Now()
 	// pull new blobs and send to encoder
 	e.mu.Lock()
-	// TODO: Get Limit from Config
 	metadatas, newExclusiveStartKey, err := e.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, int32(e.StreamerConfig.MaxBlobsToFetchFromStore), e.exclusiveStartKey)
 	e.exclusiveStartKey = newExclusiveStartKey
-	e.mu.Lock()
+	e.mu.Unlock()
 
 	if err != nil {
 		return fmt.Errorf("error getting blob metadatas: %w", err)
@@ -194,6 +193,10 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	if len(metadatas) == 0 {
 		e.logger.Info("no new metadatas to encode")
 		return nil
+	}
+
+	if len(metadatas) > e.StreamerConfig.MaxBlobsToFetchFromStore {
+		return fmt.Errorf("number of metadatas fetched from store is %d greater than configured max number of blobs to fetch from store: %d", len(metadatas), e.StreamerConfig.MaxBlobsToFetchFromStore)
 	}
 
 	// read lock to access e.ReferenceBlockNumber
