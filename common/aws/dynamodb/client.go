@@ -38,8 +38,8 @@ type Key = map[string]types.AttributeValue
 type ExpresseionValues = map[string]types.AttributeValue
 
 type QueryResult struct {
-	Items            []map[string]types.AttributeValue
-	LastEvaluatedKey map[string]types.AttributeValue
+	Items            []Item
+	LastEvaluatedKey Key
 }
 
 type Client struct {
