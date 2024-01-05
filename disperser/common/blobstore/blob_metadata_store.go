@@ -96,6 +96,28 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
+// GetBlobMetadataByStatusWithPagination returns all the metadata with the given status upto the specified limit
+// along with items, also returns a pagination token that can be used to fetch the next set of items
+func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey map[string]types.AttributeValue) ([]*disperser.BlobMetadata, error) {
+	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, statusIndexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: strconv.Itoa(int(status)),
+		}}, limit, exclusiveStartKey)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := make([]*disperser.BlobMetadata, len(queryResult.Items))
+	for i, item := range queryResult.Items {
+		metadata[i], err = UnmarshalBlobMetadata(item)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return metadata, nil
+}
+
 func (s *BlobMetadataStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
 	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, batchIndexName, "BatchHeaderHash = :batch_header_hash", commondynamodb.ExpresseionValues{
 		":batch_header_hash": &types.AttributeValueMemberB{

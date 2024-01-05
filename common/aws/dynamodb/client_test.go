@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -79,14 +80,47 @@ func teardown() {
 func createTable(t *testing.T, tableName string) {
 	ctx := context.Background()
 	tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("MetadataKey"),
-			AttributeType: types.ScalarAttributeTypeS,
-		}},
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("MetadataKey"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("BlobStatus"),
+				AttributeType: types.ScalarAttributeTypeN, // Assuming BlobStatus is a numeric value
+			},
+			{
+				AttributeName: aws.String("CreatedAt"),
+				AttributeType: types.ScalarAttributeTypeS, // Assuming CreatedAt is a string representing a timestamp
+			},
+		},
 		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String("MetadataKey"),
 			KeyType:       types.KeyTypeHash,
 		}},
+		// Add a global secondary index and CreatedAt for sorting
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
+			{
+				IndexName: aws.String("StatusIndex"),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("BlobStatus"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("CreatedAt"),
+						KeyType:       types.KeyTypeRange, // Using CreatedAt as sort key
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll, // You can choose ALL, KEYS_ONLY, or INCLUDE
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(10),
+					WriteCapacityUnits: aws.Int64(10),
+				},
+			},
+		},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(10),
@@ -233,4 +267,146 @@ func TestBatchOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Len(t, fetchedItem, 0)
+}
+
+func TestQueryIndex(t *testing.T) {
+	tableName := "ProcessingQueryIndex"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	items := make([]commondynamodb.Item, numItems)
+	for i := 0; i < numItems; i += 1 {
+		items[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"CreatedAt":   &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+		}
+	}
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	queryResult, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, len(queryResult), 30)
+}
+
+func TestQueryIndexPagination(t *testing.T) {
+	tableName := "ProcessingWithPagination"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	for i := 0; i < numItems; i += 1 {
+		createdAt := time.Now().Add(-time.Duration(i) * time.Second).Format(time.RFC3339)
+		// Create new item
+		item := commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"CreatedAt":   &types.AttributeValueMemberS{Value: createdAt},
+		}
+		dynamoClient.PutItem(ctx, tableName, item)
+	}
+
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, nil)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 10)
+	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.NotNil(t, queryResult.LastEvaluatedKey)
+	assert.Equal(t, "key20", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
+
+	// Get the next 10 items
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, queryResult.LastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 10)
+	assert.Equal(t, "key10", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
+
+	// Get the last 10 items
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, queryResult.LastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 10)
+	assert.Equal(t, "key0", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
+
+	// Empty result Since all items are processed
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, queryResult.LastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 0)
+	assert.Nil(t, queryResult.LastEvaluatedKey)
+}
+
+func TestQueryIndexWithPaginationForBatch(t *testing.T) {
+	tableName := "ProcessingWithPaginationForBatch"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	items := make([]commondynamodb.Item, numItems)
+	for i := 0; i < numItems; i += 1 {
+		items[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"CreatedAt":   &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+		}
+	}
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	// Get First 10 items
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, nil)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 10)
+
+	// Get the next 10 items
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, queryResult.LastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 10)
+
+	// Get the last 10 items
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, queryResult.LastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 10)
+
+	// Empty result Since all items are processed
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 10, queryResult.LastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 0)
+	assert.Nil(t, queryResult.LastEvaluatedKey)
 }
