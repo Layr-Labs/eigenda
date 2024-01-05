@@ -21,10 +21,10 @@ type BlobHolder struct {
 	Data []byte
 }
 
-var _ disperser.ExtendedBlobStore = (*BlobStore)(nil)
+var _ disperser.BlobStore = (*BlobStore)(nil)
 
 // NewBlobStore creates an empty BlobStore
-func NewBlobStore() disperser.ExtendedBlobStore {
+func NewBlobStore() disperser.BlobStore {
 	return &BlobStore{
 		Blobs:    make(map[disperser.BlobHash]*BlobHolder),
 		Metadata: make(map[disperser.BlobKey]*disperser.BlobMetadata),

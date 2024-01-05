@@ -154,20 +154,15 @@ type BlobStore interface {
 	GetBlobMetadataByStatus(ctx context.Context, blobStatus BlobStatus) ([]*BlobMetadata, error)
 	// GetMetadataInBatch returns the metadata in a given batch at given index.
 	GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*BlobMetadata, error)
+	// GetBlobMetadataByStatusWithPagination returns a list of blob metadata for blobs with the given status
+	// Results are limited to the given limit and the pagination token is returned
+	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *ExclusiveBlobStoreStartKey) ([]*BlobMetadata, *ExclusiveBlobStoreStartKey, error)
 	// GetAllBlobMetadataByBatch returns the metadata of all the blobs in the batch.
 	GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*BlobMetadata, error)
 	// GetBlobMetadata returns a blob metadata given a metadata key
 	GetBlobMetadata(ctx context.Context, blobKey BlobKey) (*BlobMetadata, error)
 	// HandleBlobFailure handles a blob failure by either incrementing the retry count or marking the blob as failed
 	HandleBlobFailure(ctx context.Context, metadata *BlobMetadata, maxRetry uint) error
-}
-
-// ExtendedBlobStore implements additional methods on top of BlobStore
-type ExtendedBlobStore interface {
-	BlobStore
-	// GetBlobMetadataByStatusWithPagination returns a list of blob metadata for blobs with the given status
-	// Results are limited to the given limit and the pagination token is returned
-	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *ExclusiveBlobStoreStartKey) ([]*BlobMetadata, *ExclusiveBlobStoreStartKey, error)
 }
 
 type Dispatcher interface {

@@ -53,7 +53,7 @@ type EncodingStreamer struct {
 	Pool                 common.WorkerPool
 	EncodedSizeNotifier  *EncodedSizeNotifier
 
-	blobStore             disperser.ExtendedBlobStore
+	blobStore             disperser.BlobStore
 	chainState            core.IndexedChainState
 	encoderClient         disperser.EncoderClient
 	assignmentCoordinator core.AssignmentCoordinator
@@ -87,7 +87,7 @@ func NewEncodedSizeNotifier(notify chan struct{}, threshold uint64) *EncodedSize
 
 func NewEncodingStreamer(
 	config StreamerConfig,
-	blobStore disperser.ExtendedBlobStore,
+	blobStore disperser.BlobStore,
 	chainState core.IndexedChainState,
 	encoderClient disperser.EncoderClient,
 	assignmentCoordinator core.AssignmentCoordinator,

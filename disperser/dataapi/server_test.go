@@ -235,13 +235,13 @@ func setUpRouter() *gin.Engine {
 	return gin.Default()
 }
 
-func queueBlob(t *testing.T, blob *core.Blob, queue disperser.ExtendedBlobStore) disperser.BlobKey {
+func queueBlob(t *testing.T, blob *core.Blob, queue disperser.BlobStore) disperser.BlobKey {
 	key, err := queue.StoreBlob(context.Background(), blob, expectedRequestedAt)
 	assert.NoError(t, err)
 	return key
 }
 
-func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, batchHeaderHash [32]byte, queue disperser.ExtendedBlobStore) {
+func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, batchHeaderHash [32]byte, queue disperser.BlobStore) {
 	// simulate blob confirmation
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")

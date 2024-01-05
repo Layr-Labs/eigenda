@@ -61,7 +61,7 @@ type Batcher struct {
 	Config
 	TimeoutConfig
 
-	Queue         disperser.ExtendedBlobStore
+	Queue         disperser.BlobStore
 	Dispatcher    disperser.Dispatcher
 	Confirmer     disperser.BatchConfirmer
 	EncoderClient disperser.EncoderClient
@@ -80,7 +80,7 @@ type Batcher struct {
 func NewBatcher(
 	config Config,
 	timeoutConfig TimeoutConfig,
-	queue disperser.ExtendedBlobStore,
+	queue disperser.BlobStore,
 	dispatcher disperser.Dispatcher,
 	confirmer disperser.BatchConfirmer,
 	chainState core.IndexedChainState,
