@@ -54,6 +54,12 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
         _;
     }
 
+    /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
+    modifier onlyBatchConfirmer() {
+        require(msg.sender == batchConfirmer, "onlyBatchConfirmer: not from batch confirmer");
+        _;
+    }
+
     constructor(
         IRegistryCoordinator _registryCoordinator,
         IStrategyManager _strategyManager,
@@ -70,13 +76,15 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
 
     function initialize(
         IPauserRegistry _pauserRegistry,
-        address initialOwner
+        address _initialOwner,
+        address _batchConfirmer
     )
         public
         initializer
     {
         _initializePauser(_pauserRegistry, UNPAUSE_ALL);
-        _transferOwnership(initialOwner);
+        _transferOwnership(_initialOwner);
+        batchConfirmer = _batchConfirmer;
     }
 
     /**
@@ -88,7 +96,7 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
     function confirmBatch(
         BatchHeader calldata batchHeader,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-    ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) {
+    ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
         require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
         // make sure the stakes against which the Batch is being confirmed are not stale
@@ -164,6 +172,10 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
      */
     function setMetadataURI(string memory _metadataURI) external onlyOwner() {
         metadataURI = _metadataURI;
+    }
+
+    function setBatchConfirmer(address _batchConfirmer) external onlyOwner() {
+        batchConfirmer = _batchConfirmer;
     }
 
     /// @notice Returns the current batchId
