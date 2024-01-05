@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	queue              disperser.BlobStore
+	queue              disperser.ExtendedBlobStore
 	dispersalServer    *apiserver.DispersalServer
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource

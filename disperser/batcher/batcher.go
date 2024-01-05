@@ -61,7 +61,7 @@ type Batcher struct {
 	Config
 	TimeoutConfig
 
-	Queue         disperser.BlobStore
+	Queue         disperser.ExtendedBlobStore
 	Dispatcher    disperser.Dispatcher
 	Confirmer     disperser.BatchConfirmer
 	EncoderClient disperser.EncoderClient

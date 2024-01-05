@@ -61,7 +61,7 @@ type blobResultOrError struct {
 	blobRequestHeader core.BlobRequestHeader
 }
 
-var _ disperser.BlobStore = (*SharedBlobStore)(nil)
+var _ disperser.ExtendedBlobStore = (*SharedBlobStore)(nil)
 
 func NewSharedStorage(bucketName string, s3Client s3.Client, blobMetadataStore *BlobMetadataStore, logger common.Logger) *SharedBlobStore {
 	return &SharedBlobStore{

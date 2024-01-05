@@ -117,7 +117,7 @@ type TestDisperser struct {
 	EncoderServer *encoder.Server
 }
 
-func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger common.Logger) TestDisperser {
+func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.ExtendedBlobStore, logger common.Logger) TestDisperser {
 	dispatcherConfig := &dispatcher.Config{
 		Timeout: time.Second,
 	}

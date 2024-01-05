@@ -33,7 +33,7 @@ var (
 
 type batcherComponents struct {
 	confirmer        *dmock.MockBatchConfirmer
-	blobStore        disperser.BlobStore
+	blobStore        disperser.ExtendedBlobStore
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
 	ethClient        *cmock.MockEthClient
@@ -118,7 +118,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	}, b
 }
 
-func queueBlob(t *testing.T, ctx context.Context, blob *core.Blob, blobStore disperser.BlobStore) (uint64, disperser.BlobKey) {
+func queueBlob(t *testing.T, ctx context.Context, blob *core.Blob, blobStore disperser.ExtendedBlobStore) (uint64, disperser.BlobKey) {
 	requestedAt := uint64(time.Now().UnixNano())
 	blobKey, err := blobStore.StoreBlob(ctx, blob, requestedAt)
 	assert.NoError(t, err)

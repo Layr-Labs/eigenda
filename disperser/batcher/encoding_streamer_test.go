@@ -30,7 +30,7 @@ var (
 const numOperators = 10
 
 type components struct {
-	blobStore     disperser.BlobStore
+	blobStore     disperser.ExtendedBlobStore
 	chainDataMock *coremock.ChainDataMock
 	encoderClient *disperser.LocalEncoderClient
 }
