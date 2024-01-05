@@ -21,9 +21,10 @@ import (
 
 var (
 	streamerConfig = batcher.StreamerConfig{
-		SRSOrder:               300000,
-		EncodingRequestTimeout: 5 * time.Second,
-		EncodingQueueLimit:     100,
+		SRSOrder:                 300000,
+		EncodingRequestTimeout:   5 * time.Second,
+		EncodingQueueLimit:       100,
+		MaxBlobsToFetchFromStore: 10,
 	}
 )
 
@@ -294,9 +295,10 @@ func TestEncodingFailure(t *testing.T) {
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 1e12)
 	workerpool := workerpool.New(5)
 	streamerConfig := batcher.StreamerConfig{
-		SRSOrder:               300000,
-		EncodingRequestTimeout: 5 * time.Second,
-		EncodingQueueLimit:     100,
+		SRSOrder:                 300000,
+		EncodingRequestTimeout:   5 * time.Second,
+		EncodingQueueLimit:       100,
+		MaxBlobsToFetchFromStore: 10,
 	}
 	metrics := batcher.NewMetrics("9100", logger)
 	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)

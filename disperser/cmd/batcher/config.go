@@ -51,6 +51,7 @@ func NewConfig(ctx *cli.Context) Config {
 			SRSOrder:                 ctx.GlobalInt(flags.SRSOrderFlag.Name),
 			MaxNumRetriesPerBlob:     ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
 			TargetNumChunks:          ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
+			MaxBlobsToFetchFromStore: ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
 			EncodingTimeout:    ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),

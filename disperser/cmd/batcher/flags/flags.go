@@ -164,6 +164,14 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TARGET_NUM_CHUNKS"),
 		Value:    0,
 	}
+
+	MaxBlobsToFetchFromStoreFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-blobs-to-fetch-from-store"),
+		Usage:    "Limit used to specify how many blobs to fetch from store at time when used with dynamodb pagination",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOBS_TO_FETCH_FROM_STORE"),
+		Value:    10,
+	}
 )
 
 var requiredFlags = []cli.Flag{
