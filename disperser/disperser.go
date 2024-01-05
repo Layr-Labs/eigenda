@@ -124,6 +124,11 @@ type ConfirmationInfo struct {
 	BlobQuorumInfos         []*core.BlobQuorumInfo               `json:"blob_quorum_infos"`
 }
 
+type ExclusiveBlobStoreStartKey struct {
+	BlobStatus  int32 // BlobStatus is an integer
+	RequestedAt int64 //  RequestedAt is epoch time in seconds
+}
+
 type BlobStore interface {
 	// StoreBlob adds a blob to the queue and returns a key that can be used to retrieve the blob later
 	StoreBlob(ctx context.Context, blob *core.Blob, requestedAt uint64) (BlobKey, error)
@@ -155,6 +160,14 @@ type BlobStore interface {
 	GetBlobMetadata(ctx context.Context, blobKey BlobKey) (*BlobMetadata, error)
 	// HandleBlobFailure handles a blob failure by either incrementing the retry count or marking the blob as failed
 	HandleBlobFailure(ctx context.Context, metadata *BlobMetadata, maxRetry uint) error
+}
+
+// ExtendedBlobStore implements additional methods on top of BlobStore
+type ExtendedBlobStore interface {
+	BlobStore
+	// GetBlobMetadataByStatusWithPagination returns a list of blob metadata for blobs with the given status
+	// Results are limited to the given limit and the pagination token is returned
+	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *ExclusiveBlobStoreStartKey) ([]*BlobMetadata, *ExclusiveBlobStoreStartKey, error)
 }
 
 type Dispatcher interface {

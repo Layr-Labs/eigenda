@@ -80,7 +80,7 @@ type Batcher struct {
 func NewBatcher(
 	config Config,
 	timeoutConfig TimeoutConfig,
-	queue disperser.BlobStore,
+	queue disperser.ExtendedBlobStore,
 	dispatcher disperser.Dispatcher,
 	confirmer disperser.BatchConfirmer,
 	chainState core.IndexedChainState,

@@ -53,7 +53,7 @@ type EncodingStreamer struct {
 	Pool                 common.WorkerPool
 	EncodedSizeNotifier  *EncodedSizeNotifier
 
-	blobStore             disperser.BlobStore
+	blobStore             disperser.ExtendedBlobStore
 	chainState            core.IndexedChainState
 	encoderClient         disperser.EncoderClient
 	assignmentCoordinator core.AssignmentCoordinator
@@ -62,6 +62,10 @@ type EncodingStreamer struct {
 
 	metrics *EncodingStreamerMetrics
 	logger  common.Logger
+
+	// Used to keep track of the last evaluated key for fetching metadatas
+	exclusiveStartKey     *disperser.ExclusiveBlobStoreStartKey
+	exclusiveStartKeyLock sync.Mutex
 }
 
 type batch struct {
@@ -83,7 +87,7 @@ func NewEncodedSizeNotifier(notify chan struct{}, threshold uint64) *EncodedSize
 
 func NewEncodingStreamer(
 	config StreamerConfig,
-	blobStore disperser.BlobStore,
+	blobStore disperser.ExtendedBlobStore,
 	chainState core.IndexedChainState,
 	encoderClient disperser.EncoderClient,
 	assignmentCoordinator core.AssignmentCoordinator,
@@ -107,6 +111,8 @@ func NewEncodingStreamer(
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
 		metrics:                metrics,
 		logger:                 logger,
+		exclusiveStartKey:      nil,
+		exclusiveStartKeyLock:  sync.Mutex{},
 	}, nil
 }
 
@@ -175,7 +181,12 @@ func (e *EncodingStreamer) dedupRequests(metadatas []*disperser.BlobMetadata, re
 func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan EncodingResultOrStatus) error {
 	stageTimer := time.Now()
 	// pull new blobs and send to encoder
-	metadatas, err := e.blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	e.exclusiveStartKeyLock.Lock()
+	// TODO: Get Limit from Config
+	metadatas, newExclusiveStartKey, err := e.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, 10, e.exclusiveStartKey)
+	e.exclusiveStartKey = newExclusiveStartKey
+	e.exclusiveStartKeyLock.Unlock()
+
 	if err != nil {
 		return fmt.Errorf("error getting blob metadatas: %w", err)
 	}
