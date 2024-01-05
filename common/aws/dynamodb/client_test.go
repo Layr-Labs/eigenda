@@ -315,7 +315,8 @@ func TestQueryIndexPagination(t *testing.T) {
 			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
 			"CreatedAt":   &types.AttributeValueMemberS{Value: createdAt},
 		}
-		dynamoClient.PutItem(ctx, tableName, item)
+		err := dynamoClient.PutItem(ctx, tableName, item)
+		assert.NoError(t, err)
 	}
 
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
