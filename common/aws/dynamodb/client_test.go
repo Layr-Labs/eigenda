@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -90,15 +91,16 @@ func createTable(t *testing.T, tableName string) {
 				AttributeType: types.ScalarAttributeTypeN, // Assuming BlobStatus is a numeric value
 			},
 			{
-				AttributeName: aws.String("CreatedAt"),
-				AttributeType: types.ScalarAttributeTypeS, // Assuming CreatedAt is a string representing a timestamp
+				AttributeName: aws.String("RequestedAt"),
+				AttributeType: types.ScalarAttributeTypeN, // Assuming RequestedAt is a string representing a timestamp
 			},
 		},
-		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("MetadataKey"),
-			KeyType:       types.KeyTypeHash,
-		}},
-		// Add a global secondary index and CreatedAt for sorting
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("MetadataKey"),
+				KeyType:       types.KeyTypeHash,
+			},
+		},
 		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
 			{
 				IndexName: aws.String("StatusIndex"),
@@ -108,12 +110,12 @@ func createTable(t *testing.T, tableName string) {
 						KeyType:       types.KeyTypeHash,
 					},
 					{
-						AttributeName: aws.String("CreatedAt"),
-						KeyType:       types.KeyTypeRange, // Using CreatedAt as sort key
+						AttributeName: aws.String("RequestedAt"),
+						KeyType:       types.KeyTypeRange, // Using RequestedAt as sort key
 					},
 				},
 				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // You can choose ALL, KEYS_ONLY, or INCLUDE
+					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
 				},
 				ProvisionedThroughput: &types.ProvisionedThroughput{
 					ReadCapacityUnits:  aws.Int64(10),
@@ -283,7 +285,7 @@ func TestQueryIndex(t *testing.T) {
 			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
 			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
 			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
-			"CreatedAt":   &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
 		}
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
@@ -306,14 +308,15 @@ func TestQueryIndexPagination(t *testing.T) {
 	ctx := context.Background()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
-		createdAt := time.Now().Add(-time.Duration(i) * time.Second).Format(time.RFC3339)
+		requestedAt := time.Now().Add(-time.Duration(i) * time.Second).Unix()
+
 		// Create new item
 		item := commondynamodb.Item{
 			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
 			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
 			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
 			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
-			"CreatedAt":   &types.AttributeValueMemberS{Value: createdAt},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(requestedAt, 10)},
 		}
 		err := dynamoClient.PutItem(ctx, tableName, item)
 		assert.NoError(t, err)
@@ -328,6 +331,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
 	assert.NotNil(t, queryResult.LastEvaluatedKey)
 	assert.Equal(t, "key20", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "0", queryResult.LastEvaluatedKey["BlobStatus"].(*types.AttributeValueMemberN).Value)
 
 	// Get the next 10 items
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
@@ -371,7 +375,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
 			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
 			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
-			"CreatedAt":   &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
 		}
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
