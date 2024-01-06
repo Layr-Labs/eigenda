@@ -380,10 +380,7 @@ var altLargeOperatorTestCases = []testCase{
 	},
 }
 
-func TestBenchmarkCompositeBatchVerifyChunks(t *testing.T) {
-	// t.Skip("This test is meant to be run manually, not as part of the test suite")
-
-	testCases := altLargeOperatorTestCases
+func testBenchmarkCompositeBatchVerifyChunks(t *testing.T, testCases []testCase, nCPU int) {
 
 	pool := workerpool.New(8)
 
@@ -404,7 +401,7 @@ func TestBenchmarkCompositeBatchVerifyChunks(t *testing.T) {
 	}
 
 	// Create worker pool
-	pool = workerpool.New(8)
+	pool = workerpool.New(nCPU)
 
 	start := time.Now()
 
@@ -431,5 +428,18 @@ func TestBenchmarkCompositeBatchVerifyChunks(t *testing.T) {
 
 	elapsed := time.Since(start)
 	fmt.Printf("UniversalVerifySubBatch took %s \n", elapsed)
+
+}
+
+func TestBenchmarkCompositeBatchVerifyChunks(t *testing.T) {
+	t.Skip("This test is meant to be run manually, not as part of the test suite")
+
+	testBenchmarkCompositeBatchVerifyChunks(t, smallOperatorTestCases, 2)
+
+	testBenchmarkCompositeBatchVerifyChunks(t, mediumOperatorTestCases, 2)
+
+	testBenchmarkCompositeBatchVerifyChunks(t, largeOperatorTestCases, 8)
+
+	testBenchmarkCompositeBatchVerifyChunks(t, altLargeOperatorTestCases, 8)
 
 }
