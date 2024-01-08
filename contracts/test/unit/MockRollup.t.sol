@@ -4,12 +4,12 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {BLSMockAVSDeployer} from "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {MockRollup} from "./mocks/MockRollup.sol";
-import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
-import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
-import {EigenDABlobUtils} from "../src/libraries/EigenDABlobUtils.sol";
+import {BLSMockAVSDeployer} from "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
+import {MockRollup} from "../../src/rollup/MockRollup.sol";
+import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 import "forge-std/StdStorage.sol";
@@ -93,7 +93,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         mockRollup.registerValidator{value: 1 ether}();
 
         //get commitment with illegal value
-        (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
+        (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
         stdstore
             .target(address(mockRollup))
@@ -118,7 +118,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         illegalCommitment = s0.scalar_mul(1).plus(s1.scalar_mul(1)).plus(s2.scalar_mul(1)).plus(s3.scalar_mul(1)).plus(s4.scalar_mul(1));
     }
 
-    function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDABlobUtils.BlobVerificationProof memory){
+    function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDARollupUtils.BlobVerificationProof memory){
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
         blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
@@ -149,7 +149,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));

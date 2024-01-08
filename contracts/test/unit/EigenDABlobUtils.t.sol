@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
-import {EigenDABlobUtils} from "../../src/libraries/EigenDABlobUtils.sol";
+import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDABlobUtilsHarness} from "../harnesses/EigenDABlobUtilsHarness.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
@@ -101,7 +101,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -124,10 +124,10 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
 
-        cheats.expectRevert("EigenDABlobUtils.verifyBlob: batchMetadata does not match stored metadata");
+        cheats.expectRevert("EigenDARollupUtils.verifyBlob: batchMetadata does not match stored metadata");
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
@@ -147,13 +147,13 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(bytes32(0));        
         blobVerificationProof.blobIndex = 1;
 
-        cheats.expectRevert("EigenDABlobUtils.verifyBlob: inclusion proof is invalid");
+        cheats.expectRevert("EigenDARollupUtils.verifyBlob: inclusion proof is invalid");
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
@@ -188,7 +188,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -235,7 +235,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -246,7 +246,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
         }
 
-        cheats.expectRevert("EigenDABlobUtils.verifyBlob: quorumNumber does not match");
+        cheats.expectRevert("EigenDARollupUtils.verifyBlob: quorumNumber does not match");
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
@@ -281,7 +281,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -292,7 +292,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDABlobUtils.verifyBlob: quorumThresholdPercentage is not met");
+        cheats.expectRevert("EigenDARollupUtils.verifyBlob: quorumThresholdPercentage is not met");
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 

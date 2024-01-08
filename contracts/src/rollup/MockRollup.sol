@@ -2,10 +2,9 @@
 
 pragma solidity ^0.8.9;
 
-import {EigenDAKZGUtils} from "../../src/libraries/EigenDAKZGUtils.sol";
-import {EigenDABlobUtils} from "../../src/libraries/EigenDABlobUtils.sol";
-import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
-import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {EigenDARollupUtils} from "../libraries/EigenDARollupUtils.sol";
+import {EigenDAServiceManager} from "../core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 struct Commitment {
@@ -57,7 +56,7 @@ contract MockRollup {
      */
     function postCommitment(
         IEigenDAServiceManager.BlobHeader memory blobHeader, 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof
     ) external { 
         require(validators[msg.sender], "MockRollup.postCommitment: Validator not registered");
         require(commitments[block.timestamp].validator == address(0), "MockRollup.postCommitment: Commitment already posted");
@@ -66,7 +65,7 @@ contract MockRollup {
         require(keccak256(abi.encode(blobHeader.quorumBlobParams)) == quorumBlobParamsHash, "MockRollup.postCommitment: QuorumBlobParams do not match quorumBlobParamsHash");
 
         // verify that the blob was included in the batch
-        EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
+        EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
 
         commitments[block.timestamp] = Commitment(msg.sender, blobHeader.dataLength, blobHeader.commitment);
     }
@@ -85,7 +84,7 @@ contract MockRollup {
         require(point < commitment.dataLength, "MockRollup.challengeCommitment: Point must be less than data length");
 
         // verify that the commitment contains the illegal value
-        require(EigenDAKZGUtils.openCommitment(point, illegalValue, tau, commitment.polynomialCommitment, proof), "MockRollup.challengeCommitment: Does not evaluate to illegal value");
+        require(EigenDARollupUtils.openCommitment(point, illegalValue, tau, commitment.polynomialCommitment, proof), "MockRollup.challengeCommitment: Does not evaluate to illegal value");
             
         // blacklist the validator
         validators[commitment.validator] = false;

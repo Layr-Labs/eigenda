@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.9;
 
-import "../../src/libraries/EigenDABlobUtils.sol";
+import "../../src/libraries/EigenDARollupUtils.sol";
 import "forge-std/Test.sol";
 
 contract EigenDABlobUtilsHarness is Test {    
@@ -10,8 +10,8 @@ contract EigenDABlobUtilsHarness is Test {
     function verifyBlob(
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         IEigenDAServiceManager eigenDAServiceManager,
-        EigenDABlobUtils.BlobVerificationProof calldata blobVerificationProof
+        EigenDARollupUtils.BlobVerificationProof calldata blobVerificationProof
     ) external view {
-        EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
+        EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
     }
 }
