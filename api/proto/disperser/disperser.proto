@@ -11,6 +11,8 @@ service Disperser {
 	// processing status of the blob.
 	rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
 
+	rpc DisperseBlobAuthenticated(stream AuthenticatedRequest) returns (stream AuthenticatedReply);
+
 	// This API is meant to be polled for the blob status.
 	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
@@ -25,6 +27,32 @@ service Disperser {
 
 // Requests and Responses
 
+// Authenicated Message Types
+
+message AuthenticatedRequest {
+    oneof payload {
+        DisperseBlobRequest disperse_request = 1;
+        ChallengeReply challenge_reply = 2;
+    }
+}
+
+message AuthenticatedReply {
+    oneof payload {
+        Challenge challenge = 1;
+        DisperseBlobReply disperse_reply = 2;
+    }
+}
+
+message Challenge {
+	uint32 challenge_parameter = 1;
+}
+
+message ChallengeReply {
+	bytes authentication_data = 1;
+}
+
+
+
 message DisperseBlobRequest {
 	// The data to be dispersed.
 	// The size of data must be <= 512KiB.
@@ -35,6 +63,8 @@ message DisperseBlobRequest {
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
 	repeated SecurityParams security_params = 2;
+
+	string account_id = 3;
 }
 
 message DisperseBlobReply {

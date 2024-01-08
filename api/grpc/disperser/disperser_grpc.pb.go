@@ -27,6 +27,7 @@ type DisperserClient interface {
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
+	DisperseBlobAuthenticated(ctx context.Context, opts ...grpc.CallOption) (Disperser_DisperseBlobAuthenticatedClient, error)
 	// This API is meant to be polled for the blob status.
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
 	// This retrieves the requested blob from the Disperser's backend.
@@ -53,6 +54,37 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, in *DisperseBlobRequ
 		return nil, err
 	}
 	return out, nil
+}
+
+func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, opts ...grpc.CallOption) (Disperser_DisperseBlobAuthenticatedClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Disperser_ServiceDesc.Streams[0], "/disperser.Disperser/DisperseBlobAuthenticated", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &disperserDisperseBlobAuthenticatedClient{stream}
+	return x, nil
+}
+
+type Disperser_DisperseBlobAuthenticatedClient interface {
+	Send(*AuthenticatedRequest) error
+	Recv() (*AuthenticatedReply, error)
+	grpc.ClientStream
+}
+
+type disperserDisperseBlobAuthenticatedClient struct {
+	grpc.ClientStream
+}
+
+func (x *disperserDisperseBlobAuthenticatedClient) Send(m *AuthenticatedRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *disperserDisperseBlobAuthenticatedClient) Recv() (*AuthenticatedReply, error) {
+	m := new(AuthenticatedReply)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *disperserClient) GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error) {
@@ -82,6 +114,7 @@ type DisperserServer interface {
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
+	DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error
 	// This API is meant to be polled for the blob status.
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)
 	// This retrieves the requested blob from the Disperser's backend.
@@ -100,6 +133,9 @@ type UnimplementedDisperserServer struct {
 
 func (UnimplementedDisperserServer) DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DisperseBlob not implemented")
+}
+func (UnimplementedDisperserServer) DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error {
+	return status.Errorf(codes.Unimplemented, "method DisperseBlobAuthenticated not implemented")
 }
 func (UnimplementedDisperserServer) GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlobStatus not implemented")
@@ -136,6 +172,32 @@ func _Disperser_DisperseBlob_Handler(srv interface{}, ctx context.Context, dec f
 		return srv.(DisperserServer).DisperseBlob(ctx, req.(*DisperseBlobRequest))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _Disperser_DisperseBlobAuthenticated_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DisperserServer).DisperseBlobAuthenticated(&disperserDisperseBlobAuthenticatedServer{stream})
+}
+
+type Disperser_DisperseBlobAuthenticatedServer interface {
+	Send(*AuthenticatedReply) error
+	Recv() (*AuthenticatedRequest, error)
+	grpc.ServerStream
+}
+
+type disperserDisperseBlobAuthenticatedServer struct {
+	grpc.ServerStream
+}
+
+func (x *disperserDisperseBlobAuthenticatedServer) Send(m *AuthenticatedReply) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *disperserDisperseBlobAuthenticatedServer) Recv() (*AuthenticatedRequest, error) {
+	m := new(AuthenticatedRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func _Disperser_GetBlobStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -194,6 +256,13 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Disperser_RetrieveBlob_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "DisperseBlobAuthenticated",
+			Handler:       _Disperser_DisperseBlobAuthenticated_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "disperser/disperser.proto",
 }
