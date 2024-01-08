@@ -3,15 +3,15 @@ package traffic
 import (
 	"time"
 
+	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/tools/traffic/flags"
 	"github.com/urfave/cli"
 )
 
 type Config struct {
-	Hostname               string
-	GrpcPort               string
-	Timeout                time.Duration
+	clients.Config
+
 	NumInstances           uint
 	RequestInterval        time.Duration
 	DataSize               uint64
@@ -25,9 +25,7 @@ type Config struct {
 
 func NewConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Hostname:               ctx.GlobalString(flags.HostnameFlag.Name),
-		GrpcPort:               ctx.GlobalString(flags.GrpcPortFlag.Name),
-		Timeout:                ctx.Duration(flags.TimeoutFlag.Name),
+		Config:                 *clients.NewConfig(ctx),
 		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
 		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
