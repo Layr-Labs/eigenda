@@ -233,7 +233,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	fmt.Println("quorumIDs", quorumIDs)
 
 	stageTimer = time.Now()
-	aggSig, err := b.Aggregator.AggregateSignatures(batch.State, quorumIDs, headerHash, update)
+	aggSig, err := b.Aggregator.AggregateSignatures(ctx, batch.State, quorumIDs, headerHash, update)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
