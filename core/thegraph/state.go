@@ -105,16 +105,25 @@ func (ics *indexedChainState) Start(ctx context.Context) error {
 	}
 }
 
-// GetIndexedOperatorState returns the IndexedOperatorState for the given block number and quorums
 func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
 	operatorState, err := ics.ChainState.GetOperatorState(ctx, blockNumber, quorums)
 	if err != nil {
 		return nil, err
 	}
 
-	aggregatePublicKeys, err := ics.getQuorumAPKs(ctx, quorums, uint32(blockNumber))
-	if err != nil {
-		return nil, err
+	aggregatePublicKeys := ics.getQuorumAPKs(ctx, quorums, uint32(blockNumber))
+	aggKeys := make(map[uint8]*core.G1Point)
+	for _, apk := range aggregatePublicKeys {
+		if apk.Err != nil {
+			ics.logger.Warn("Error getting aggregate public key", "err", apk.Err)
+			continue
+		}
+		if apk.Err == nil && apk.AggregatePubk != nil {
+			aggKeys[apk.QuorumNumber] = apk.AggregatePubk
+		}
+	}
+	if len(aggKeys) == 0 {
+		return nil, errors.New("no aggregate public keys found for any of the specified quorums")
 	}
 
 	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
@@ -125,7 +134,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	state := &core.IndexedOperatorState{
 		OperatorState:    operatorState,
 		IndexedOperators: indexedOperators,
-		AggKeys:          aggregatePublicKeys,
+		AggKeys:          aggKeys,
 	}
 	return state, nil
 }
@@ -147,21 +156,41 @@ func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Con
 	return convertIndexedOperatorInfoGqlToIndexedOperatorInfo(&query.Operator)
 }
 
+type quorumAPK struct {
+	QuorumNumber  uint8
+	AggregatePubk *core.G1Point
+	Err           error
+}
+
 // GetQuorumAPKs returns the Aggregate Public Keys for the given quorums at the given block number
-func (ics *indexedChainState) getQuorumAPKs(ctx context.Context, quorumIDs []core.QuorumID, blockNumber uint32) (map[uint8]*core.G1Point, error) {
-	quorumAPKs := make(map[uint8]*core.G1Point)
+func (ics *indexedChainState) getQuorumAPKs(ctx context.Context, quorumIDs []core.QuorumID, blockNumber uint32) map[uint8]*quorumAPK {
+	quorumAPKs := make(map[uint8]*quorumAPK)
 	for i := range quorumIDs {
 		id := quorumIDs[i]
-		quorumAPK, err := ics.getQuorumAPK(ctx, id, blockNumber)
+		apk, err := ics.getQuorumAPK(ctx, id, blockNumber)
 		if err != nil {
-			return nil, err
+			quorumAPKs[id] = &quorumAPK{
+				QuorumNumber:  uint8(id),
+				AggregatePubk: nil,
+				Err:           err,
+			}
+			continue
 		}
-		if quorumAPK == nil {
-			return nil, fmt.Errorf("quorum APK not found for quorum %d", id)
+		if apk == nil {
+			quorumAPKs[id] = &quorumAPK{
+				QuorumNumber:  uint8(id),
+				AggregatePubk: nil,
+				Err:           fmt.Errorf("quorum APK not found for quorum %d", id),
+			}
+			continue
 		}
-		quorumAPKs[id] = quorumAPK
+		quorumAPKs[id] = &quorumAPK{
+			QuorumNumber:  uint8(id),
+			AggregatePubk: apk,
+			Err:           nil,
+		}
 	}
-	return quorumAPKs, nil
+	return quorumAPKs
 }
 
 // GetQuorumAPK returns the Aggregate Public Key for the given quorum at the given block number
@@ -242,7 +271,7 @@ func (ics *indexedChainState) getAllOperatorsRegisteredAtBlockNumberWithPaginati
 		)
 		err := ics.querier.Query(ctx, &query, variables)
 		if err != nil {
-			ics.logger.Error("Error reqesting for operators", "err", err)
+			ics.logger.Error("Error requesting for operators", "err", err)
 			return nil, err
 		}
 

@@ -241,10 +241,11 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	e.logger.Trace("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
 	// Get the operator state
-	state, err := e.getOperatorStateForBlobs(ctx, metadatas, referenceBlockNumber)
+	state, err := e.getOperatorState(ctx, metadatas, referenceBlockNumber)
 	if err != nil {
 		return fmt.Errorf("error getting operator state: %w", err)
 	}
+	metadatas = e.validateMetadataQuorums(metadatas, state)
 
 	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata, 0)
 	for _, metadata := range metadatas {
@@ -525,7 +526,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		i++
 	}
 
-	state, err := e.getOperatorStateForBlobs(context.Background(), metadatas, e.ReferenceBlockNumber)
+	state, err := e.getOperatorState(context.Background(), metadatas, e.ReferenceBlockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +560,8 @@ func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
 	}
 }
 
-func (e *EncodingStreamer) getOperatorStateForBlobs(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*core.IndexedOperatorState, error) {
+// getOperatorState returns the operator state for the blobs that have valid quorums
+func (e *EncodingStreamer) getOperatorState(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*core.IndexedOperatorState, error) {
 
 	quorums := make(map[core.QuorumID]QuorumInfo, 0)
 	for _, metadata := range metadatas {
@@ -575,12 +577,33 @@ func (e *EncodingStreamer) getOperatorStateForBlobs(ctx context.Context, metadat
 		i++
 	}
 
-	// Get the operator state
+	// GetIndexedOperatorState should return state for valid quorums only
 	state, err := e.chainState.GetIndexedOperatorState(ctx, blockNumber, quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("error getting operator state at block number %d: %w", blockNumber, err)
 	}
-
 	return state, nil
+}
 
+// It also returns the list of valid blob metadatas (i.e. blobs that have valid quorums)
+func (e *EncodingStreamer) validateMetadataQuorums(metadatas []*disperser.BlobMetadata, state *core.IndexedOperatorState) []*disperser.BlobMetadata {
+	validMetadata := make([]*disperser.BlobMetadata, 0)
+	for _, metadata := range metadatas {
+		valid := true
+		for _, quorum := range metadata.RequestMetadata.SecurityParams {
+			if aggKey, ok := state.AggKeys[quorum.QuorumID]; !ok || aggKey == nil {
+				e.logger.Warn("got blob with a quorum without APK. Will skip.", "quorum", quorum.QuorumID)
+				valid = false
+			}
+		}
+		if valid {
+			validMetadata = append(validMetadata, metadata)
+		} else {
+			err := e.blobStore.HandleBlobFailure(context.Background(), metadata, 0)
+			if err != nil {
+				e.logger.Error("error handling blob failure", "err", err)
+			}
+		}
+	}
+	return validMetadata
 }

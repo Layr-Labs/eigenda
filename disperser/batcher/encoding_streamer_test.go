@@ -553,6 +553,61 @@ func TestIncorrectParameters(t *testing.T) {
 
 }
 
+func TestInvalidQuorum(t *testing.T) {
+	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
+
+	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10), nil)
+
+	out := make(chan batcher.EncodingResultOrStatus)
+
+	ctx := context.Background()
+
+	// this blob should not be encoded because the quorum does not exist
+	blob1 := makeTestBlob([]*core.SecurityParam{{
+		QuorumID:           0,
+		AdversaryThreshold: 75,
+		QuorumThreshold:    100,
+	}, {
+		QuorumID:           99, // this quorum does not exist
+		AdversaryThreshold: 75,
+		QuorumThreshold:    100,
+	}})
+
+	// this blob should be encoded
+	blob2 := makeTestBlob([]*core.SecurityParam{{
+		QuorumID:           0,
+		AdversaryThreshold: 75,
+		QuorumThreshold:    100,
+	}, {
+		QuorumID:           1,
+		AdversaryThreshold: 75,
+		QuorumThreshold:    100,
+	}})
+
+	metadataKey1, err := c.blobStore.StoreBlob(ctx, &blob1, uint64(time.Now().UnixNano()))
+	assert.Nil(t, err)
+	metadataKey2, err := c.blobStore.StoreBlob(ctx, &blob2, uint64(time.Now().UnixNano()))
+	assert.Nil(t, err)
+
+	// request encoding
+	err = encodingStreamer.RequestEncoding(context.Background(), out)
+	assert.Nil(t, err)
+
+	isRequested := encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey1, core.QuorumID(0), 10)
+	assert.False(t, isRequested)
+	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey1, core.QuorumID(99), 10)
+	assert.False(t, isRequested)
+
+	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey2, core.QuorumID(0), 10)
+	assert.True(t, isRequested)
+	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey2, core.QuorumID(1), 10)
+	assert.True(t, isRequested)
+
+	stats, err := c.blobStore.GetBlobMetadata(ctx, metadataKey1)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Failed, stats.BlobStatus)
+}
+
 func TestGetBatch(t *testing.T) {
 	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
 	ctx := context.Background()

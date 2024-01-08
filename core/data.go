@@ -9,7 +9,7 @@ import (
 
 type AccountID = string
 
-// Security and Quorum Paramaters
+// Security and Quorum Parameters
 
 // QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
 type QuorumID = uint8
@@ -40,7 +40,7 @@ type Blob struct {
 	Data          []byte
 }
 
-// BlobRequestHeader contains the orignal data size of a blob and the security required
+// BlobRequestHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// Commitments
 	BlobCommitments `json:"commitments"`
