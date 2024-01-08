@@ -300,6 +300,47 @@ func TestQueryIndex(t *testing.T) {
 	assert.Equal(t, len(queryResult), 30)
 }
 
+func TestQueryIndexPaginationSingleItem(t *testing.T) {
+	tableName := "ProcessingWithPaginationSingleItem"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	requestedAt := time.Now().Unix()
+	item := commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", 0)},
+		"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", 0)},
+		"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+		"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+		"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(requestedAt, 10)},
+	}
+	err := dynamoClient.PutItem(ctx, tableName, item)
+	assert.NoError(t, err)
+
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 1, nil)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 1)
+	assert.Equal(t, "key0", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.NotNil(t, queryResult.LastEvaluatedKey)
+	assert.Equal(t, "key0", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "0", queryResult.LastEvaluatedKey["BlobStatus"].(*types.AttributeValueMemberN).Value)
+
+	// Save Last Evaluated Key
+	lastEvaluatedKey := queryResult.LastEvaluatedKey
+
+	// Get the next item using LastEvaluatedKey expect to be nil
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 1, lastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 0)
+	assert.Nil(t, queryResult.LastEvaluatedKey)
+}
+
 func TestQueryIndexPagination(t *testing.T) {
 	tableName := "ProcessingWithPagination"
 	createTable(t, tableName)

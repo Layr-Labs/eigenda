@@ -150,12 +150,17 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, processing, 1)
 	assert.Equal(t, metadata1, processing[0])
-	assert.Nil(t, lastEvaluatedKey)
+	assert.NotNil(t, lastEvaluatedKey)
 
 	finalized, lastEvaluatedKey, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Finalized, 1, nil)
 	assert.NoError(t, err)
 	assert.Len(t, finalized, 1)
 	assert.Equal(t, metadata2, finalized[0])
+	assert.NotNil(t, lastEvaluatedKey)
+
+	finalized, lastEvaluatedKey, err = blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Finalized, 1, lastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, finalized, 0)
 	assert.Nil(t, lastEvaluatedKey)
 
 	deleteItems(t, []commondynamodb.Key{
