@@ -323,7 +323,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, err
 	}
 
-	// Sign batch header hash if all validation checks pass and data items are writen to database.
+	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
 	sig := n.KeyPair.SignMessage(batchHeaderHash)
 	log.Trace("Signed batch header hash", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()))

@@ -116,7 +116,7 @@ func execYarnCmd(command string) {
 		log.Print(out.String())
 	}
 
-	log.Print("yarn command ran succesfully")
+	log.Print("yarn command ran successfully")
 }
 
 // Executes a forge script with a given rpc and private key
@@ -167,7 +167,7 @@ func execForgeScript(script, privateKey string, deployer *ContractDeployer, extr
 		log.Print(out.String())
 	}
 
-	log.Print("Forge script ran succesfully!")
+	log.Print("Forge script ran successfully!")
 }
 
 func execBashCmd(command string) {
@@ -188,7 +188,7 @@ func execBashCmd(command string) {
 		log.Print(out.String())
 	}
 
-	log.Printf("bash command succeded with params: %s", cmd)
+	log.Printf("bash command succeeded with params: %s", cmd)
 }
 
 // Converts a private key to an address.
@@ -208,7 +208,7 @@ func GetAddress(privateKey string) string {
 		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
 	}
 
-	//log.Print("Cast wallet command ran succesfully")
+	//log.Print("Cast wallet command ran successfully")
 	return strings.Trim(out.String(), "\n")
 }
 
@@ -229,7 +229,7 @@ func CallContract(destination string, signature string, rpcUrl string) string {
 		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
 	}
 
-	log.Print("Cast call command ran succesfully")
+	log.Print("Cast call command ran successfully")
 	return strings.Trim(out.String(), "\n")
 }
 
@@ -248,7 +248,7 @@ func GetLatestBlockNumber(rpcUrl string) int {
 		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
 	}
 
-	log.Print("Cast bn command ran succesfully")
+	log.Print("Cast bn command ran successfully")
 	blockNum, err := strconv.ParseInt(strings.Trim(out.String(), "\n"), 10, 0)
 	if err != nil {
 		log.Print(fmt.Sprint(err) + ": " + stderr.String())
