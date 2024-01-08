@@ -91,6 +91,8 @@ type ChainState interface {
 // ChainState is an interface for getting information about the current chain state.
 type IndexedChainState interface {
 	ChainState
+	// GetIndexedOperatorState returns the IndexedOperatorState for the given block number and quorums
+	// If the quorum is not found, the quorum will be ignored and the IndexedOperatorState will be returned for the remaining quorums
 	GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*IndexedOperatorState, error)
 	Start(context context.Context) error
 }

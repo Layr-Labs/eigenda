@@ -173,7 +173,7 @@ func (c *churner) createChurnResponse(
 	}, nil
 }
 
-func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, operatorStakes [][]core.OperatorStake, operatorToRegisterAddress gethcommon.Address, currentBlockNumber uint32) ([]core.OperatorToChurn, error) {
+func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, operatorStakes core.OperatorStakes, operatorToRegisterAddress gethcommon.Address, currentBlockNumber uint32) ([]core.OperatorToChurn, error) {
 	operatorsToChurn := make([]core.OperatorToChurn, 0)
 	for i, quorumID := range quorumIDs {
 		operatorSetParams, err := c.Transactor.GetOperatorSetParams(ctx, quorumID)
@@ -185,7 +185,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 			return nil, errors.New("maxOperatorCount is 0")
 		}
 
-		if uint32(len(operatorStakes[i])) < operatorSetParams.MaxOperatorCount {
+		if uint32(len(operatorStakes[quorumID])) < operatorSetParams.MaxOperatorCount {
 			// quorum is not full, so we can continue
 			continue
 		}
@@ -197,9 +197,9 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 
 		// loop through operator stakes for the quorum and find the lowest one
 		totalStake := big.NewInt(0)
-		lowestStakeOperatorId := operatorStakes[i][0].OperatorID
-		lowestStake := operatorStakes[i][0].Stake
-		for _, operatorStake := range operatorStakes[i] {
+		lowestStakeOperatorId := operatorStakes[quorumID][0].OperatorID
+		lowestStake := operatorStakes[quorumID][0].Stake
+		for _, operatorStake := range operatorStakes[quorumID] {
 			if operatorStake.Stake.Cmp(lowestStake) < 0 {
 				lowestStake = operatorStake.Stake
 				lowestStakeOperatorId = operatorStake.OperatorID

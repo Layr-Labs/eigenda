@@ -26,6 +26,8 @@ type OperatorSetParam struct {
 	ChurnBIPsOfTotalStake    uint16
 }
 
+type OperatorStakes map[QuorumID]map[OperatorIndex]OperatorStake
+
 type Transactor interface {
 
 	// RegisterBLSPublicKey registers a new BLS public key with  the pubkey compendium smart contract.
@@ -54,11 +56,11 @@ type Transactor interface {
 	// GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
 	//  is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 	// are also returned.
-	GetOperatorStakes(ctx context.Context, operatorID OperatorID, blockNumber uint32) ([][]OperatorStake, []QuorumID, error)
+	GetOperatorStakes(ctx context.Context, operatorID OperatorID, blockNumber uint32) (OperatorStakes, []QuorumID, error)
 
 	// GetOperatorStakes returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
 	// The indices of the operators within each quorum are also returned.
-	GetOperatorStakesForQuorums(ctx context.Context, quorums []QuorumID, blockNumber uint32) ([][]OperatorStake, error)
+	GetOperatorStakesForQuorums(ctx context.Context, quorums []QuorumID, blockNumber uint32) (OperatorStakes, error)
 
 	// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
 	// specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
