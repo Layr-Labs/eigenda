@@ -56,7 +56,7 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 	}
 }
 
-func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint8) (*disperser.BlobStatus, []byte, error) {
+func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -74,9 +74,9 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumI
 		Data: data,
 		SecurityParams: []*disperser_rpc.SecurityParams{
 			{
-				QuorumId:           uint32(quorumID),
-				QuorumThreshold:    uint32(quorumThreshold),
-				AdversaryThreshold: uint32(adversityThreshold),
+				QuorumId:           quorumID,
+				QuorumThreshold:    quorumThreshold,
+				AdversaryThreshold: adversityThreshold,
 			},
 		},
 	}
