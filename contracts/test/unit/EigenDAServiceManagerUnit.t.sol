@@ -6,7 +6,9 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
@@ -45,7 +47,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                     abi.encodeWithSelector(
                         EigenDAServiceManager.initialize.selector,
                         pauserRegistry,
-                        serviceManagerOwner
+                        registryCoordinatorOwner,
+                        confirmer
                     )
                 )
             )
@@ -152,12 +155,6 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         assertEq(eigenDAServiceManager.batchId(), batchIdToConfirm + 1);
     }
-
-    function testFreezeOperator_Revert() public {
-        cheats.expectRevert(bytes("EigenDAServiceManager.freezeOperator: not implemented"));
-        eigenDAServiceManager.freezeOperator(address(0));
-    }
-
 
     function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (IEigenDAServiceManager.BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
         // register a bunch of operators

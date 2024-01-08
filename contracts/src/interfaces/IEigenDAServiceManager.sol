@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@eigenlayer-middleware/interfaces/IServiceManager.sol";
-import "@eigenlayer-middleware/interfaces/IDelayedService.sol";
-import "@eigenlayer-middleware/BLSSignatureChecker.sol";
-import "@eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
+import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
+import {IDelayedService} from "eigenlayer-middleware/interfaces/IDelayedService.sol";
+import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
+import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 interface IEigenDAServiceManager is IServiceManager, IDelayedService {
     // EVENTS
     
-    /**b
+    /**
      * @notice Emitted when a Batch is confirmed.
      * @param batchHeaderHash The hash of the batch header
      * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
