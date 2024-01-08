@@ -47,6 +47,8 @@ var (
 	mockRollup        *rollupbindings.ContractMockRollup
 	retrievalClient   clients.RetrievalClient
 	numConfirmations  int = 3
+
+	cancel context.CancelFunc
 )
 
 func init() {
@@ -192,11 +194,16 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	return indexer.Index(context.Background())
+	var ctx context.Context
+	ctx, cancel = context.WithCancel(context.Background())
+
+	return indexer.Index(ctx)
 }
 
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {
+
+		cancel()
 
 		fmt.Println("Stopping binaries")
 		testConfig.StopBinaries()
