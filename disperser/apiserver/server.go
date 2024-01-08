@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +19,10 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var errSystemRateLimit = fmt.Errorf("request ratelimited: system limit")
-var errAccountRateLimit = fmt.Errorf("request ratelimited: account limit")
+var errSystemBlobRateLimit = fmt.Errorf("request ratelimited: system blob limit")
+var errSystemThroughputRateLimit = fmt.Errorf("request ratelimited: system throughput limit")
+var errAccountBlobRateLimit = fmt.Errorf("request ratelimited: account blob limit")
+var errAccountThroughputRateLimit = fmt.Errorf("request ratelimited: account throughput limit")
 
 const systemAccountKey = "system"
 
@@ -55,6 +58,11 @@ func NewDispersalServer(
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
 ) *DispersalServer {
+	for ip, rateInfoByQuorum := range rateConfig.Allowlist {
+		for quorumID, rateInfo := range rateInfoByQuorum {
+			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
+		}
+	}
 	return &DispersalServer{
 		config:      config,
 		blobStore:   store,
@@ -139,9 +147,9 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		if err != nil {
 			for _, param := range securityParams {
 				quorumId := string(uint8(param.GetQuorumId()))
-				if errors.Is(err, errSystemRateLimit) {
+				if errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) {
 					s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-				} else if errors.Is(err, errAccountRateLimit) {
+				} else if errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit) {
 					s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
 				} else {
 					s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
@@ -173,23 +181,65 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	}, nil
 }
 
+func (s *DispersalServer) getAccountRate(origin string, quorumID core.QuorumID) (*PerUserRateInfo, error) {
+	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
+	if !ok {
+		return nil, fmt.Errorf("no configured rate exists for quorum %d", quorumID)
+	}
+
+	for ip, rateInfoByQuorum := range s.rateConfig.Allowlist {
+		if !strings.Contains(origin, ip) {
+			continue
+		}
+
+		rateInfo, ok := rateInfoByQuorum[quorumID]
+		if !ok {
+			continue
+		}
+
+		throughput := unauthRates.PerUserUnauthThroughput
+		if rateInfo.Throughput > 0 {
+			throughput = rateInfo.Throughput
+		}
+
+		blobRate := unauthRates.PerUserUnauthBlobRate
+		if rateInfo.BlobRate > 0 {
+			blobRate = rateInfo.BlobRate
+		}
+
+		return &PerUserRateInfo{
+			Throughput: throughput,
+			BlobRate:   blobRate,
+		}, nil
+	}
+
+	return &PerUserRateInfo{
+		Throughput: unauthRates.PerUserUnauthThroughput,
+		BlobRate:   unauthRates.PerUserUnauthBlobRate,
+	}, nil
+}
+
 func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin string) error {
 
 	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, param := range blob.RequestHeader.SecurityParams {
+	for i, param := range blob.RequestHeader.SecurityParams {
 
 		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
+		accountRates, err := s.getAccountRate(origin, param.QuorumID)
+		if err != nil {
+			return err
+		}
 
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		blobSize := len(blob.Data)
 		length := core.GetBlobLength(uint(blobSize))
-		encodedLength := core.GetEncodedBlobLength(length, uint8(blob.RequestHeader.SecurityParams[param.QuorumID].QuorumThreshold), uint8(blob.RequestHeader.SecurityParams[param.QuorumID].AdversaryThreshold))
+		encodedLength := core.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
 		encodedSize := core.GetBlobSize(encodedLength)
 
 		s.logger.Debug("checking rate limits", "origin", origin, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize)
@@ -202,7 +252,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
-			return errSystemRateLimit
+			return errSystemThroughputRateLimit
 		}
 
 		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
@@ -212,7 +262,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
-			return errSystemRateLimit
+			return errSystemBlobRateLimit
 		}
 
 		// Check Account Ratelimit
@@ -220,27 +270,27 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		blob.RequestHeader.AccountID = "ip:" + origin
 
 		userQuorumKey := fmt.Sprintf("%s:%d", blob.RequestHeader.AccountID, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, encodedSize, rates.PerUserUnauthThroughput)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, encodedSize, accountRates.Throughput)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account byte ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
-			return errAccountRateLimit
+			s.logger.Warn("account byte ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", accountRates.Throughput)
+			return errAccountThroughputRateLimit
 		}
 
 		userQuorumKey = fmt.Sprintf("%s:%d-blobrate", blob.RequestHeader.AccountID, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, blobRateMultiplier, rates.PerUserUnauthBlobRate)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, blobRateMultiplier, accountRates.BlobRate)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account blob ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", float32(rates.PerUserUnauthBlobRate)/blobRateMultiplier)
-			return errAccountRateLimit
+			s.logger.Warn("account blob ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
+			return errAccountBlobRateLimit
 		}
 
 		// Update the quorum rate
-		blob.RequestHeader.SecurityParams[param.QuorumID].QuorumRate = rates.PerUserUnauthThroughput
+		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
 	}
 	return nil
 
