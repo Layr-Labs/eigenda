@@ -2,14 +2,33 @@ package clients
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/retriever/flags"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+type Config struct {
+	Hostname          string
+	Port              string
+	Timeout           time.Duration
+	UseSecureGrpcFlag bool
+}
+
+func NewConfig(ctx *cli.Context) *Config {
+	return &Config{
+		Hostname: ctx.GlobalString(flags.HostnameFlag.Name),
+		Port:     ctx.GlobalString(flags.GrpcPortFlag.Name),
+		Timeout:  ctx.Duration(flags.TimeoutFlag.Name),
+	}
+}
 
 type DisperserClient interface {
 	DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error)
@@ -27,9 +46,21 @@ func NewDisperserClient(config *Config) DisperserClient {
 	}
 }
 
-func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
+func (c *disperserClient) getDialOptions() []grpc.DialOption {
+	if c.config.UseSecureGrpcFlag {
+		config := &tls.Config{}
+		credential := credentials.NewTLS(config)
+		return []grpc.DialOption{grpc.WithTransportCredentials(credential)}
+	} else {
+		return []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	}
+}
+
+func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint8) (*disperser.BlobStatus, []byte, error) {
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -43,9 +74,9 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumI
 		Data: data,
 		SecurityParams: []*disperser_rpc.SecurityParams{
 			{
-				QuorumId:           quorumID,
-				QuorumThreshold:    quorumThreshold,
-				AdversaryThreshold: adversityThreshold,
+				QuorumId:           uint32(quorumID),
+				QuorumThreshold:    uint32(quorumThreshold),
+				AdversaryThreshold: uint32(adversityThreshold),
 			},
 		},
 	}
