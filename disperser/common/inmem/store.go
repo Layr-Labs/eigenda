@@ -154,6 +154,38 @@ func (q *BlobStore) GetBlobMetadataByStatus(ctx context.Context, status disperse
 	return metas, nil
 }
 
+func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey) ([]*disperser.BlobMetadata, *disperser.ExclusiveBlobStoreStartKey, error) {
+	metas := make([]*disperser.BlobMetadata, 0)
+	foundStart := exclusiveStartKey == nil
+
+	for _, meta := range q.Metadata {
+		if meta.BlobStatus == status {
+			if foundStart {
+				metas = append(metas, meta)
+				if len(metas) == int(limit) {
+					nextKey := &disperser.ExclusiveBlobStoreStartKey{
+						BlobStatus:  int32(meta.BlobStatus),
+						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
+					}
+					return metas, nextKey, nil
+				}
+			} else if meta.BlobStatus == disperser.BlobStatus(exclusiveStartKey.BlobStatus) && meta.RequestMetadata.RequestedAt == uint64(exclusiveStartKey.RequestedAt) {
+				foundStart = true // Start appending metas after this item
+				metas = append(metas, meta)
+				if len(metas) == int(limit) {
+					return metas, &disperser.ExclusiveBlobStoreStartKey{
+						BlobStatus:  int32(meta.BlobStatus),
+						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
+					}, nil
+				}
+			}
+		}
+	}
+
+	// Return all the metas if limit is not reached
+	return metas, nil, nil
+}
+
 func (q *BlobStore) GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*disperser.BlobMetadata, error) {
 	for _, meta := range q.Metadata {
 		if meta.ConfirmationInfo != nil && meta.ConfirmationInfo.BatchHeaderHash == batchHeaderHash && meta.ConfirmationInfo.BlobIndex == blobIndex {

@@ -98,11 +98,23 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 
 // GetBlobMetadataByStatusWithPagination returns all the metadata with the given status upto the specified limit
 // along with items, also returns a pagination token that can be used to fetch the next set of items
-func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey map[string]types.AttributeValue) ([]*disperser.BlobMetadata, map[string]types.AttributeValue, error) {
+func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey) ([]*disperser.BlobMetadata, *disperser.ExclusiveBlobStoreStartKey, error) {
+
+	var attributeMap map[string]types.AttributeValue = nil
+	var err error
+
+	// Convert the exclusive start key to a map of AttributeValue
+	if exclusiveStartKey != nil {
+		attributeMap, err = convertExclusiveBlobStoreStartKeyToAttributeValueMap(exclusiveStartKey)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, statusIndexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
-		}}, limit, exclusiveStartKey)
+		}}, limit, attributeMap)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -119,7 +131,13 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 	if lastEvaluatedKey == nil {
 		return metadata, nil, nil
 	}
-	return metadata, lastEvaluatedKey, nil
+
+	// Convert the last evaluated key to a disperser.ExclusiveBlobStoreStartKey
+	exclusiveStartKey, err = converTypeAttributeValuetToExclusiveBlobStoreStartKey(lastEvaluatedKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	return metadata, exclusiveStartKey, nil
 }
 
 func (s *BlobMetadataStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
@@ -376,4 +394,39 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*disperser.BlobMetadata, e
 	metadata.ConfirmationInfo = &confirmationInfo
 
 	return &metadata, nil
+}
+
+func converTypeAttributeValuetToExclusiveBlobStoreStartKey(exclusiveStartKeyMap map[string]types.AttributeValue) (*disperser.ExclusiveBlobStoreStartKey, error) {
+	key := disperser.ExclusiveBlobStoreStartKey{}
+
+	if bs, ok := exclusiveStartKeyMap["BlobStatus"].(*types.AttributeValueMemberN); ok {
+		blobStatus, err := strconv.ParseInt(bs.Value, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing BlobStatus: %v", err)
+		}
+		key.BlobStatus = int32(blobStatus)
+	}
+
+	if ra, ok := exclusiveStartKeyMap["RequestedAt"].(*types.AttributeValueMemberN); ok {
+		requestedAt, err := strconv.ParseInt(ra.Value, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing RequestedAt: %v", err)
+		}
+		key.RequestedAt = requestedAt
+	}
+
+	return &key, nil
+}
+
+func convertExclusiveBlobStoreStartKeyToAttributeValueMap(s *disperser.ExclusiveBlobStoreStartKey) (map[string]types.AttributeValue, error) {
+	if s == nil {
+		// Return an empty map or nil, depending on your application logic
+		return nil, nil
+	}
+
+	av, err := attributevalue.MarshalMap(s)
+	if err != nil {
+		return nil, err
+	}
+	return av, nil
 }

@@ -41,6 +41,9 @@ type StreamerConfig struct {
 
 	// TargetNumChunks is the target number of chunks per encoded blob
 	TargetNumChunks uint
+
+	// Maximum number of Blobs to fetch from store
+	MaxBlobsToFetchFromStore int
 }
 
 type EncodingStreamer struct {
@@ -62,6 +65,9 @@ type EncodingStreamer struct {
 
 	metrics *EncodingStreamerMetrics
 	logger  common.Logger
+
+	// Used to keep track of the last evaluated key for fetching metadatas
+	exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey
 }
 
 type batch struct {
@@ -107,6 +113,7 @@ func NewEncodingStreamer(
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
 		metrics:                metrics,
 		logger:                 logger,
+		exclusiveStartKey:      nil,
 	}, nil
 }
 
@@ -175,13 +182,21 @@ func (e *EncodingStreamer) dedupRequests(metadatas []*disperser.BlobMetadata, re
 func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan EncodingResultOrStatus) error {
 	stageTimer := time.Now()
 	// pull new blobs and send to encoder
-	metadatas, err := e.blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	e.mu.Lock()
+	metadatas, newExclusiveStartKey, err := e.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, int32(e.StreamerConfig.MaxBlobsToFetchFromStore), e.exclusiveStartKey)
+	e.exclusiveStartKey = newExclusiveStartKey
+	e.mu.Unlock()
+
 	if err != nil {
 		return fmt.Errorf("error getting blob metadatas: %w", err)
 	}
 	if len(metadatas) == 0 {
 		e.logger.Info("no new metadatas to encode")
 		return nil
+	}
+
+	if len(metadatas) > e.StreamerConfig.MaxBlobsToFetchFromStore {
+		return fmt.Errorf("number of metadatas fetched from store is %d greater than configured max number of blobs to fetch from store: %d", len(metadatas), e.StreamerConfig.MaxBlobsToFetchFromStore)
 	}
 
 	// read lock to access e.ReferenceBlockNumber
