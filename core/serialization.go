@@ -200,8 +200,8 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 			Type: "uint8",
 		},
 		{
-			Name: "quantizationParameter",
-			Type: "uint8",
+			Name: "chunkLength",
+			Type: "uint32",
 		},
 	})
 
@@ -219,7 +219,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 		QuorumNumber                 uint8
 		AdversaryThresholdPercentage uint8
 		QuorumThresholdPercentage    uint8
-		QuantizationParameter        uint8
+		ChunkLength                  uint32
 	}
 
 	qbp := make([]quorumBlobParams, len(h.QuorumInfos))
@@ -228,7 +228,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
 			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
-			QuantizationParameter:        0,
+			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
 
@@ -287,8 +287,8 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 					Type: "uint8",
 				},
 				{
-					Name: "quantizationParameter",
-					Type: "uint8",
+					Name: "chunkLength",
+					Type: "uint32",
 				},
 			},
 		},
@@ -307,7 +307,7 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 		QuorumNumber                 uint8
 		AdversaryThresholdPercentage uint8
 		QuorumThresholdPercentage    uint8
-		QuantizationParameter        uint8
+		ChunkLength                  uint32
 	}
 
 	type commitment struct {
@@ -321,7 +321,7 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
 			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
-			QuantizationParameter:        0,
+			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
 

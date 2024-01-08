@@ -24,7 +24,7 @@ contract GenerateHashes is Script {
             quorumNumber: 0,
             adversaryThresholdPercentage: 80,
             quorumThresholdPercentage: 100,
-            quantizationParameter: 0
+            chunkLength: 10
         });
 
 
@@ -41,7 +41,7 @@ contract GenerateHashes is Script {
             quorumNumber: 1,
             adversaryThresholdPercentage: 80,
             quorumThresholdPercentage: 100,
-            quantizationParameter: 0
+            chunkLength: 10
         });
 
         IEigenDAServiceManager.BlobHeader memory header = IEigenDAServiceManager.BlobHeader({

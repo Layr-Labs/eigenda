@@ -29,8 +29,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
         uint8 quorumNumber;
         uint8 adversaryThresholdPercentage;
         uint8 quorumThresholdPercentage; 
-        uint8 quantizationParameter; // the quantization parameter used for determining
-                                    // the precision of the amount of data and the stake that nodes have
+        uint32 chunkLength; // the length of the chunks in the quorum
     }
 
     struct BlobHeader {
