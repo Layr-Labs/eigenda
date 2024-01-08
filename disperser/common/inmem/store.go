@@ -154,36 +154,6 @@ func (q *BlobStore) GetBlobMetadataByStatus(ctx context.Context, status disperse
 	return metas, nil
 }
 
-// func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey) ([]*disperser.BlobMetadata, *disperser.ExclusiveBlobStoreStartKey, error) {
-// 	metas := make([]*disperser.BlobMetadata, 0)
-// 	startKey := exclusiveStartKey
-// 	for _, meta := range q.Metadata {
-// 		if meta.BlobStatus == status {
-// 			if startKey == nil {
-// 				metas = append(metas, meta)
-// 				if len(metas) == int(limit) {
-// 					return metas, &disperser.ExclusiveBlobStoreStartKey{
-// 						BlobStatus:  int32(meta.BlobStatus),
-// 						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
-// 					}, nil
-// 				}
-// 			} else {
-// 				if meta.BlobStatus != disperser.BlobStatus(startKey.BlobStatus) && meta.RequestMetadata.RequestedAt != uint64(startKey.RequestedAt) {
-// 					continue
-// 				}
-// 				metas = append(metas, meta)
-// 				if len(metas) == int(limit) {
-// 					return metas, &disperser.ExclusiveBlobStoreStartKey{
-// 						BlobStatus:  int32(meta.BlobStatus),
-// 						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
-// 					}, nil
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return metas, nil, nil
-// }
-
 func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey) ([]*disperser.BlobMetadata, *disperser.ExclusiveBlobStoreStartKey, error) {
 	metas := make([]*disperser.BlobMetadata, 0)
 	foundStart := exclusiveStartKey == nil
