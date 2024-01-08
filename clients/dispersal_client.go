@@ -143,8 +143,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	// if err != nil {
 	// 	return nil, nil, fmt.Errorf("error signing blob request")
 	// }
-
-	authData := []byte(fmt.Sprint(challenge))
+	authData := []byte(fmt.Sprint(challenge.Challenge.ChallengeParameter + 1))
 
 	// Process challenge and send back challenge_reply
 	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_ChallengeReply{

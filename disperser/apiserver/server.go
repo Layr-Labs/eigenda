@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -115,6 +116,15 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	blob := getBlobFromRequest(request.DisperseRequest)
 
 	// TODO(mooselumph): Add auth data to blob object
+
+	receivedChallenge, err := strconv.ParseInt(string(challengeReply.ChallengeReply.AuthenticationData), 10, 32)
+	if err != nil {
+		return err
+	}
+	if uint32(receivedChallenge) != challenge+1 {
+		return fmt.Errorf("invalid challenge")
+	}
+
 	_ = challengeReply
 	// blob.RequestHeader.Nonce = challenge
 	// blob.RequestHeader.AuthenticationData = challengeReply.ChallengeReply.AuthenticationData
