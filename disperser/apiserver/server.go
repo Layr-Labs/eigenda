@@ -117,7 +117,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	// TODO(mooselumph): Add auth data to blob object
 
-	receivedChallenge, err := strconv.ParseInt(string(challengeReply.ChallengeReply.AuthenticationData), 10, 32)
+	receivedChallenge, err := strconv.ParseUint(string(challengeReply.ChallengeReply.AuthenticationData), 10, 32)
 	if err != nil {
 		return err
 	}
