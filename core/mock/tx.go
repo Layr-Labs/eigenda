@@ -71,7 +71,13 @@ func (t *MockTransactor) GetOperatorStakesForQuorums(ctx context.Context, quorum
 	return result.(core.OperatorStakes), args.Error(1)
 }
 
-func (t *MockTransactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation core.SignatureAggregation) (*types.Receipt, error) {
+func (t *MockTransactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(*types.Transaction), args.Error(1)
+}
+
+func (t *MockTransactor) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Receipt, error) {
 	args := t.Called()
 	var receipt *types.Receipt
 	if args.Get(0) != nil {
