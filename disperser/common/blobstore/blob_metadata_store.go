@@ -119,6 +119,11 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		return nil, nil, err
 	}
 
+	// When their are no more results to fetch, the LastEvaluatedKey is nil
+	if queryResult.Items == nil && queryResult.LastEvaluatedKey == nil {
+		return nil, nil, nil
+	}
+
 	metadata := make([]*disperser.BlobMetadata, len(queryResult.Items))
 	for i, item := range queryResult.Items {
 		metadata[i], err = UnmarshalBlobMetadata(item)

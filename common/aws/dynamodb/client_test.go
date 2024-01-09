@@ -337,7 +337,22 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 			Value: "0",
 		}}, 1, lastEvaluatedKey)
 	assert.NoError(t, err)
-	assert.Len(t, queryResult.Items, 0)
+	assert.Nil(t, queryResult.Items)
+	assert.Nil(t, queryResult.LastEvaluatedKey)
+}
+
+func TestQueryIndexPaginationNoStoredItems(t *testing.T) {
+	tableName := "ProcessingWithPaginationNoItem"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 1, nil)
+	assert.NoError(t, err)
+	assert.Nil(t, queryResult.Items)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
 }
 

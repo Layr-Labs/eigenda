@@ -175,6 +175,16 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreOperationsWithPaginationNoStoredBlob(t *testing.T) {
+	ctx := context.Background()
+	// Query BlobMetadataStore for a blob that does not exist
+	// This should return nil for both the blob and lastEvaluatedKey
+	processing, lastEvaluatedKey, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, 1, nil)
+	assert.NoError(t, err)
+	assert.Nil(t, processing)
+	assert.Nil(t, lastEvaluatedKey)
+}
+
 func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	_, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)

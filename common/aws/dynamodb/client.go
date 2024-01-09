@@ -187,6 +187,10 @@ func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string,
 		return QueryResult{}, err
 	}
 
+	if len(response.Items) == 0 {
+		return QueryResult{Items: nil, LastEvaluatedKey: nil}, nil
+	}
+
 	// Return the items and the pagination token
 	return QueryResult{
 		Items:            response.Items,
