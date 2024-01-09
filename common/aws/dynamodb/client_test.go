@@ -341,6 +341,51 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	assert.Nil(t, queryResult.LastEvaluatedKey)
 }
 
+func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
+	tableName := "ProcessingWithNoPaginationLimit"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	for i := 0; i < numItems; i += 1 {
+		requestedAt := time.Now().Add(-time.Duration(i) * time.Second).Unix()
+
+		// Create new item
+		item := commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(requestedAt, 10)},
+		}
+		err := dynamoClient.PutItem(ctx, tableName, item)
+		assert.NoError(t, err)
+	}
+
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 0, nil)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 30)
+	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.Nil(t, queryResult.LastEvaluatedKey)
+
+	// Save Last Evaluated Key
+	lastEvaluatedKey := queryResult.LastEvaluatedKey
+
+	// Get the next item using LastEvaluatedKey expect to be nil
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}}, 2, lastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult.Items, 2)
+	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.NotNil(t, queryResult.LastEvaluatedKey)
+}
+
 func TestQueryIndexPaginationNoStoredItems(t *testing.T) {
 	tableName := "ProcessingWithPaginationNoItem"
 	createTable(t, tableName)
