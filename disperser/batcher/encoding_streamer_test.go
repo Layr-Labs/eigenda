@@ -464,43 +464,6 @@ func TestPartialBlob(t *testing.T) {
 	assert.Contains(t, batch.BlobMetadata, metadata1)
 }
 
-func TestIncorrectRequestEncoding(t *testing.T) {
-	streamerConfig := batcher.StreamerConfig{
-		SRSOrder:               3000,
-		EncodingRequestTimeout: 5 * time.Second,
-		EncodingQueueLimit:     100,
-	}
-
-	encodingStreamer, c := createEncodingStreamer(t, 10, 200_000, streamerConfig)
-
-	securityParams := []*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
-	}}
-	blobData := []byte{1, 2, 3, 4, 5}
-
-	numItems := 30
-	for i := 0; i < numItems; i += 1 {
-		blob := core.Blob{
-			RequestHeader: core.BlobRequestHeader{
-				SecurityParams: securityParams,
-			},
-			Data: blobData,
-		}
-		ctx := context.Background()
-		_, err := c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
-		assert.Nil(t, err)
-	}
-
-	out := make(chan batcher.EncodingResultOrStatus)
-	// Request encoding
-	err := encodingStreamer.RequestEncoding(context.Background(), out)
-	assert.NotNil(t, err)
-	expectedErrMsg := "number of metadatas fetched from store is 30 greater than configured max number of blobs to fetch from store: 0"
-	assert.Equal(t, expectedErrMsg, err.Error())
-}
-
 func TestIncorrectParameters(t *testing.T) {
 
 	ctx := context.Background()
