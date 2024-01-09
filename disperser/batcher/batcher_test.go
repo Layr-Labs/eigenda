@@ -260,8 +260,15 @@ func TestBlobFailures(t *testing.T) {
 	metadatas, err := blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
 	assert.NoError(t, err)
 	assert.Len(t, metadatas, 1)
+	encodedResult, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.Error(t, err)
+	assert.Nil(t, encodedResult)
 
 	// Test with receipt response with no block number
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
 	components.encodingStreamer.ReferenceBlockNumber = 10
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
@@ -282,6 +289,10 @@ func TestBlobFailures(t *testing.T) {
 	assert.Equal(t, uint(2), meta.NumRetries)
 
 	// Try again
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
 	components.encodingStreamer.ReferenceBlockNumber = 10
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
@@ -301,6 +312,104 @@ func TestBlobFailures(t *testing.T) {
 	// should not be retried again
 	assert.Equal(t, disperser.Failed, meta.BlobStatus)
 	assert.Equal(t, uint(2), meta.NumRetries)
+}
+
+// TestBlobRetry tests that the blob that has been dispersed to DA nodes but is pending onchain confirmation isn't re-dispersed.
+func TestBlobRetry(t *testing.T) {
+	blob := makeTestBlob([]*core.SecurityParam{{
+		QuorumID:           0,
+		AdversaryThreshold: 80,
+		QuorumThreshold:    100,
+	}})
+
+	components, batcher := makeBatcher(t)
+	blobStore := components.blobStore
+	ctx := context.Background()
+	_, blobKey := queueBlob(t, ctx, &blob, blobStore)
+
+	// Start the batcher
+	out := make(chan bat.EncodingResultOrStatus)
+	err := components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+
+	encodedResult, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, encodedResult.Status, bat.PendingDispersal)
+
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
+	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+
+	meta, err := blobStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, encodedResult.Status, bat.PendingConfirmation)
+
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	timer := time.NewTimer(1 * time.Second)
+	select {
+	case <-out:
+		t.Fatal("shouldn't have picked up any blobs to encode")
+	case <-timer.C:
+	}
+	batch, err := components.encodingStreamer.CreateBatch()
+	assert.ErrorContains(t, err, "no encoded results")
+	assert.Nil(t, batch)
+
+	// Shouldn't pick up any blobs to encode
+	components.encodingStreamer.ReferenceBlockNumber = 12
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	timer = time.NewTimer(1 * time.Second)
+	select {
+	case <-out:
+		t.Fatal("shouldn't have picked up any blobs to encode")
+	case <-timer.C:
+	}
+
+	batch, err = components.encodingStreamer.CreateBatch()
+	assert.ErrorContains(t, err, "no encoded results")
+	assert.Nil(t, batch)
+	_, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+
+	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+
+	// Trigger a retry
+	confirmationErr := fmt.Errorf("error")
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt:  nil,
+		Err:      confirmationErr,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
+	assert.ErrorIs(t, err, confirmationErr)
+
+	components.encodingStreamer.ReferenceBlockNumber = 14
+	// Should pick up the blob to encode
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	timer = time.NewTimer(1 * time.Second)
+	var res bat.EncodingResultOrStatus
+	select {
+	case res = <-out:
+	case <-timer.C:
+		t.Fatal("should have picked up the blob to encode")
+	}
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, res)
+	assert.NoError(t, err)
+	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, encodedResult.Status, bat.PendingDispersal)
 }
 
 func TestRetryTxnReceipt(t *testing.T) {

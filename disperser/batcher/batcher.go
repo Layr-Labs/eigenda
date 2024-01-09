@@ -351,6 +351,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata, reason FailReason) error {
 	var result *multierror.Error
 	for _, metadata := range blobMetadatas {
+		b.EncodingStreamer.RemoveEncodedBlob(metadata)
 		err := b.Queue.HandleBlobFailure(ctx, metadata, b.MaxNumRetriesPerBlob)
 		if err != nil {
 			b.logger.Error("HandleSingleBatch: error handling blob failure", "err", err)
@@ -446,6 +447,13 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("HandleSingleBatch: error sending confirmBatch transaction: %w", err)
+	} else {
+		for _, metadata := range batch.BlobMetadata {
+			err = b.EncodingStreamer.MarkBlobPendingConfirmation(metadata)
+			if err != nil {
+				log.Error("HandleSingleBatch: error marking blob as pending confirmation", "err", err)
+			}
+		}
 	}
 
 	return nil
