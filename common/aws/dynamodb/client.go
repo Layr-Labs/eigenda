@@ -171,6 +171,7 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
 	var queryInput *dynamodb.QueryInput
 
+	// Fetch all items if limit is 0
 	if limit != 0 {
 		queryInput = &dynamodb.QueryInput{
 			TableName:                 aws.String(tableName),
@@ -201,8 +202,6 @@ func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string,
 	if len(response.Items) == 0 {
 		return QueryResult{Items: nil, LastEvaluatedKey: nil}, nil
 	}
-
-	fmt.Printf("response: %v\n", response.LastEvaluatedKey)
 
 	// Return the items and the pagination token
 	return QueryResult{
