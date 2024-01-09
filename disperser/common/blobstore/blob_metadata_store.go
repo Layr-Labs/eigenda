@@ -415,6 +415,14 @@ func converTypeAttributeValuetToExclusiveBlobStoreStartKey(exclusiveStartKeyMap 
 		key.RequestedAt = requestedAt
 	}
 
+	if bh, ok := exclusiveStartKeyMap["BlobHash"].(*types.AttributeValueMemberS); ok {
+		key.BlobHash = bh.Value
+	}
+
+	if mh, ok := exclusiveStartKeyMap["MetadataHash"].(*types.AttributeValueMemberS); ok {
+		key.MetadataHash = mh.Value
+	}
+
 	return &key, nil
 }
 

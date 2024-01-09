@@ -125,8 +125,10 @@ type ConfirmationInfo struct {
 }
 
 type ExclusiveBlobStoreStartKey struct {
-	BlobStatus  int32 // BlobStatus is an integer
-	RequestedAt int64 //  RequestedAt is epoch time in seconds
+	BlobHash     BlobHash
+	MetadataHash MetadataHash
+	BlobStatus   int32 // BlobStatus is an integer
+	RequestedAt  int64 //  RequestedAt is epoch time in seconds
 }
 
 type BlobStore interface {
