@@ -37,7 +37,7 @@ func TestProcessTransaction(t *testing.T) {
 		Value: nil,
 	})
 	assert.NoError(t, err)
-	receiptOrErr := <-txnManager.ReceiptChan
+	receiptOrErr := <-txnManager.ReceiptChan()
 	assert.NoError(t, receiptOrErr.Err)
 	assert.Equal(t, uint64(1), receiptOrErr.Receipt.BlockNumber.Uint64())
 	ethClient.AssertNumberOfCalls(t, "GetLatestGasCaps", 1)
@@ -55,7 +55,7 @@ func TestProcessTransaction(t *testing.T) {
 	})
 	<-ctx.Done()
 	assert.NoError(t, err)
-	receiptOrErr = <-txnManager.ReceiptChan
+	receiptOrErr = <-txnManager.ReceiptChan()
 	assert.Error(t, receiptOrErr.Err, randomErr)
 	assert.Nil(t, receiptOrErr.Receipt)
 	ethClient.AssertNumberOfCalls(t, "GetLatestGasCaps", 2)
