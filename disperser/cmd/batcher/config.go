@@ -33,11 +33,6 @@ type Config struct {
 
 func NewConfig(ctx *cli.Context) Config {
 
-	// maxBlobsToFetchFromStore := ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name)
-	// // Set Minimum Number if no value is set
-	// if maxBlobsToFetchFromStore == 0 {
-	// 	maxBlobsToFetchFromStore = 1
-	// }
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
