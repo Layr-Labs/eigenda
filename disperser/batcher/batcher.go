@@ -285,6 +285,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		var blobHeader *core.BlobHeader
 		var proof []byte
 		if status == disperser.Confirmed {
+			fmt.Printf("Batcher Blob Confirmed\n")
 			// generate inclusion proof
 			if blobIndex >= len(batch.BlobHeaders) {
 				return fmt.Errorf("HandleSingleBatch: error confirming blobs: blob header at index %d not found in batch", blobIndex)
@@ -292,6 +293,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 			blobHeader = batch.BlobHeaders[blobIndex]
 
 			blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+			fmt.Printf("Batcher BlobHeaderHash: %v\n", blobHeaderHash)
 			if err != nil {
 				return fmt.Errorf("HandleSingleBatch: failed to get blob header hash: %w", err)
 			}
@@ -299,8 +301,11 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("HandleSingleBatch: failed to generate blob header inclusion proof: %w", err)
 			}
+			fmt.Printf("Batcher MerkleProof: %v\n", merkleProof)
 			proof = serializeProof(merkleProof)
 		}
+
+		fmt.Printf("Batcher InclusionProof: %v\n", proof)
 
 		confirmationInfo := &disperser.ConfirmationInfo{
 			BatchHeaderHash:         headerHash,

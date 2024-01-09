@@ -68,6 +68,8 @@ type EncodingStreamer struct {
 
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey
+
+	count int
 }
 
 type batch struct {
@@ -114,6 +116,7 @@ func NewEncodingStreamer(
 		metrics:                metrics,
 		logger:                 logger,
 		exclusiveStartKey:      nil,
+		count:                  0,
 	}, nil
 }
 
@@ -185,6 +188,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	e.mu.Lock()
 	metadatas, newExclusiveStartKey, err := e.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, int32(e.StreamerConfig.MaxBlobsToFetchFromStore), e.exclusiveStartKey)
 	e.exclusiveStartKey = newExclusiveStartKey
+	e.count++
 	e.mu.Unlock()
 
 	if err != nil {
@@ -193,10 +197,6 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	if len(metadatas) == 0 {
 		e.logger.Info("no new metadatas to encode")
 		return nil
-	}
-
-	if len(metadatas) > e.StreamerConfig.MaxBlobsToFetchFromStore {
-		return fmt.Errorf("number of metadatas fetched from store is %d greater than configured max number of blobs to fetch from store: %d", len(metadatas), e.StreamerConfig.MaxBlobsToFetchFromStore)
 	}
 
 	// read lock to access e.ReferenceBlockNumber
@@ -263,10 +263,15 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 
 	for i := range metadatas {
 		metadata := metadatas[i]
+		fmt.Printf("RequestEncoding Metadata: %v\n", metadata)
+		fmt.Printf("RequestEncoding Blobs: %v\n", blobs[metadata.GetBlobKey()])
 
 		e.RequestEncodingForBlob(ctx, metadata, blobs[metadata.GetBlobKey()], state, referenceBlockNumber, encoderChan)
 	}
 
+	e.mu.Lock()
+	fmt.Printf("count: %d\n", e.count)
+	e.mu.Unlock()
 	return nil
 }
 
@@ -378,6 +383,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 				Err: nil,
 			}
 		})
+		fmt.Printf("RequestEncodingForBlob BlobKey: %v\n", blobKey)
 		e.EncodedBlobstore.PutEncodingRequest(blobKey, res.BlobQuorumInfo.QuorumID)
 
 	}
@@ -389,6 +395,7 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 		e.EncodedBlobstore.DeleteEncodingRequest(result.BlobMetadata.GetBlobKey(), result.BlobQuorumInfo.QuorumID)
 		return fmt.Errorf("error encoding blob: %w", result.Err)
 	}
+	fmt.Printf("ProcessEncodedBlobs Result: %v\n", result)
 
 	err := e.EncodedBlobstore.PutEncodingResult(&result.EncodingResult)
 	if err != nil {
@@ -444,6 +451,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	// Delete any encoded results that are not from the current batching iteration (i.e. that has different reference block number)
 	// If any pending encoded results are discarded here, it will be re-requested in the next iteration
 	encodedResults := e.EncodedBlobstore.GetNewAndDeleteStaleEncodingResults(e.ReferenceBlockNumber)
+	fmt.Printf("CreateBatch EncodedResults: %v\n", encodedResults)
 
 	// Reset the notifier
 	e.EncodedSizeNotifier.mu.Lock()
@@ -464,7 +472,9 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		// if the same blob has been dispersed multiple time with different security params,
 		// there will be multiple encoded results for that (blob, quorum)
 		result := encodedResults[i]
+		fmt.Printf("CreateBatch Result: %v\n", result)
 		blobKey := result.BlobMetadata.GetBlobKey()
+		fmt.Printf("CreateBatch BlobKey: %v\n", blobKey)
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
@@ -521,8 +531,11 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	i := 0
 	for key := range metadataByKey {
 		encodedBlobs[i] = encodedBlobByKey[key]
+		fmt.Printf("CreateBatch EncodedBlobs: %v\n", encodedBlobs[i])
 		blobHeaders[i] = blobHeaderByKey[key]
+		fmt.Printf("CreateBatch BlobHeaders: %v\n", blobHeaders[i])
 		metadatas[i] = metadataByKey[key]
+		fmt.Printf("CreateBatch Metadatas: %v\n", metadatas[i])
 		i++
 	}
 
