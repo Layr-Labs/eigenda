@@ -33,7 +33,7 @@ func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error 
 
 	publicKeyBytes, err := hexutil.Decode(header.AccountID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode public key (%v): %v", header.AccountID, err)
 	}
 
 	sig := header.AuthenticationData
@@ -41,11 +41,11 @@ func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error 
 	// Decode public key
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key: %v", err)
+		return fmt.Errorf("failed to decode public key (%v): %v", header.AccountID, err)
 	}
 
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	if len(sig) != 65 {
+	if sig == nil || len(sig) != 65 {
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 

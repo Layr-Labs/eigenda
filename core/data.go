@@ -40,10 +40,14 @@ type Blob struct {
 	Data          []byte
 }
 
+// BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
+// Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
+// using the signature to charge the user for a different blob or for dispersing the same blob
+// multiple times (Replay attack).
 type BlobAuthHeader struct {
 	// Commitments
 	BlobCommitments `json:"commitments"`
-	// AccountID is the account that is paying for the blob to be stored
+	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
 	AccountID AccountID `json:"account_id"`
 	// Nonce
 	Nonce uint32 `json:"nonce"`
