@@ -83,7 +83,7 @@ forge script script/MockRollupDeployer.s.sol:MockRollupDeployer --rpc-url http:/
     0xc5a5C42992dECbae36851359345FE25997F5C42d fb89ee77edb64bdddc6f0e840cf2265e481be2810a8868e2853243ff89bdc24e
 
 Generating variables
-Test environment has succesfully deployed!
+Test environment has successfully deployed!
 ```
 
 Copy generated states to states directory in this repo [here](https://github.com/Layr-Labs/eigenda-devops/tree/master/charts/anvil-chain/states)
