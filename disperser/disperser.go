@@ -124,7 +124,7 @@ type ConfirmationInfo struct {
 	BlobQuorumInfos         []*core.BlobQuorumInfo               `json:"blob_quorum_infos"`
 }
 
-type ExclusiveBlobStoreStartKey struct {
+type BlobStoreExclusiveStartKey struct {
 	BlobHash     BlobHash
 	MetadataHash MetadataHash
 	BlobStatus   int32 // BlobStatus is an integer
@@ -158,7 +158,7 @@ type BlobStore interface {
 	GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*BlobMetadata, error)
 	// GetBlobMetadataByStatusWithPagination returns a list of blob metadata for blobs with the given status
 	// Results are limited to the given limit and the pagination token is returned
-	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *ExclusiveBlobStoreStartKey) ([]*BlobMetadata, *ExclusiveBlobStoreStartKey, error)
+	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *BlobStoreExclusiveStartKey) ([]*BlobMetadata, *BlobStoreExclusiveStartKey, error)
 	// GetAllBlobMetadataByBatch returns the metadata of all the blobs in the batch.
 	GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*BlobMetadata, error)
 	// GetBlobMetadata returns a blob metadata given a metadata key

@@ -221,7 +221,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_FINALIZER_INTERVAL:            "6m",
 		BATCHER_ENCODING_REQUEST_QUEUE_SIZE:   "500",
 		BATCHER_NUM_CONFIRMATIONS:             "0",
-		BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE: "1",
+		BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE: "100",
 	}
 
 	env.applyDefaults(&v, "BATCHER", "batcher", ind)

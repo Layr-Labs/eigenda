@@ -67,7 +67,7 @@ type EncodingStreamer struct {
 	logger  common.Logger
 
 	// Used to keep track of the last evaluated key for fetching metadatas
-	exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey
+	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
 }
 
 type batch struct {

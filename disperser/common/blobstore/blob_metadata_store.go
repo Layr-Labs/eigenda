@@ -98,14 +98,14 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 
 // GetBlobMetadataByStatusWithPagination returns all the metadata with the given status upto the specified limit
 // along with items, also returns a pagination token that can be used to fetch the next set of items
-func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.ExclusiveBlobStoreStartKey) ([]*disperser.BlobMetadata, *disperser.ExclusiveBlobStoreStartKey, error) {
+func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.BlobStoreExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BlobStoreExclusiveStartKey, error) {
 
-	var attributeMap map[string]types.AttributeValue = nil
+	var attributeMap map[string]types.AttributeValue
 	var err error
 
 	// Convert the exclusive start key to a map of AttributeValue
 	if exclusiveStartKey != nil {
-		attributeMap, err = convertExclusiveBlobStoreStartKeyToAttributeValueMap(exclusiveStartKey)
+		attributeMap, err = convertBlobStoreExclusiveStartKeyToAttributeValueMap(exclusiveStartKey)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -115,11 +115,12 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		}}, limit, attributeMap)
+
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// When their are no more results to fetch, the LastEvaluatedKey is nil
+	// When no more results to fetch, the LastEvaluatedKey is nil
 	if queryResult.Items == nil && queryResult.LastEvaluatedKey == nil {
 		return nil, nil, nil
 	}
@@ -137,8 +138,8 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		return metadata, nil, nil
 	}
 
-	// Convert the last evaluated key to a disperser.ExclusiveBlobStoreStartKey
-	exclusiveStartKey, err = converTypeAttributeValuetToExclusiveBlobStoreStartKey(lastEvaluatedKey)
+	// Convert the last evaluated key to a disperser.BlobStoreExclusiveStartKey
+	exclusiveStartKey, err = converTypeAttributeValuetToBlobStoreExclusiveStartKey(lastEvaluatedKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -401,45 +402,25 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*disperser.BlobMetadata, e
 	return &metadata, nil
 }
 
-func converTypeAttributeValuetToExclusiveBlobStoreStartKey(exclusiveStartKeyMap map[string]types.AttributeValue) (*disperser.ExclusiveBlobStoreStartKey, error) {
-	key := disperser.ExclusiveBlobStoreStartKey{}
-
-	if bs, ok := exclusiveStartKeyMap["BlobStatus"].(*types.AttributeValueMemberN); ok {
-		blobStatus, err := strconv.ParseInt(bs.Value, 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing BlobStatus: %v", err)
-		}
-		key.BlobStatus = int32(blobStatus)
-	}
-
-	if ra, ok := exclusiveStartKeyMap["RequestedAt"].(*types.AttributeValueMemberN); ok {
-		requestedAt, err := strconv.ParseInt(ra.Value, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing RequestedAt: %v", err)
-		}
-		key.RequestedAt = requestedAt
-	}
-
-	if bh, ok := exclusiveStartKeyMap["BlobHash"].(*types.AttributeValueMemberS); ok {
-		key.BlobHash = bh.Value
-	}
-
-	if mh, ok := exclusiveStartKeyMap["MetadataHash"].(*types.AttributeValueMemberS); ok {
-		key.MetadataHash = mh.Value
-	}
-
-	return &key, nil
-}
-
-func convertExclusiveBlobStoreStartKeyToAttributeValueMap(s *disperser.ExclusiveBlobStoreStartKey) (map[string]types.AttributeValue, error) {
-	if s == nil {
-		// Return an empty map or nil, depending on your application logic
-		return nil, nil
-	}
-
-	av, err := attributevalue.MarshalMap(s)
+func converTypeAttributeValuetToBlobStoreExclusiveStartKey(exclusiveStartKeyMap map[string]types.AttributeValue) (*disperser.BlobStoreExclusiveStartKey, error) {
+	blobStoreExclusiveStartKey := disperser.BlobStoreExclusiveStartKey{}
+	err := attributevalue.UnmarshalMap(exclusiveStartKeyMap, &blobStoreExclusiveStartKey)
 	if err != nil {
 		return nil, err
 	}
-	return av, nil
+
+	return &blobStoreExclusiveStartKey, nil
+}
+
+func convertBlobStoreExclusiveStartKeyToAttributeValueMap(blobStoreExclusiveStartKey *disperser.BlobStoreExclusiveStartKey) (map[string]types.AttributeValue, error) {
+	if blobStoreExclusiveStartKey == nil {
+		// Return an empty map or nil
+		return nil, nil
+	}
+
+	avMap, err := attributevalue.MarshalMap(blobStoreExclusiveStartKey)
+	if err != nil {
+		return nil, err
+	}
+	return avMap, nil
 }
