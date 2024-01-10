@@ -39,6 +39,4 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice address that is permissioned to confirm batches
     address public batchConfirmer;
 
-    /// @notice metadata URI for the EigenDA AVS
-    string public metadataURI;
 }

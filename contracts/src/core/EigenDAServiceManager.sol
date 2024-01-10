@@ -1,27 +1,25 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
-import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
-import {BytesLib} from "eigenlayer-core/contracts/libraries/BytesLib.sol";
-import {Merkle} from "eigenlayer-core/contracts/libraries/Merkle.sol";
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
+import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
 import {ISlasher} from "eigenlayer-core/contracts/interfaces/ISlasher.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
 import {ISignatureUtils} from "eigenlayer-core/contracts/interfaces/ISignatureUtils.sol";
 
-import {BLSSignatureChecker, IRegistryCoordinator} from "eigenlayer-middleware/BLSSignatureChecker.sol";
-import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
+import {ServiceManagerBase} from "eigenlayer-middleware/ServiceManagerBase.sol";
+import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
+import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
-import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
+
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
 
 
-/**b
+/**
  * @title Primary entrypoint for procuring services from EigenDA.
  * @author Layr Labs, Inc.
  * @notice This contract is used for:
@@ -29,30 +27,14 @@ import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
  * - confirming the data store by the disperser with inferred aggregated signatures of the quorum
  * - freezing operators as the result of various "challenges"
  */
-contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServiceManagerStorage, BLSSignatureChecker, Pausable {
-    using BytesLib for bytes;
+contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
     using EigenDAHasher for BatchHeader;
     using EigenDAHasher for ReducedBatchHeader;
 
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
-    /**
-     * @notice The EigenLayer delegation contract for this EigenDA which is primarily used by
-     * delegators to delegate their stake to operators who would serve as EigenDA
-     * nodes and so on.
-     * @dev For more details, see DelegationManager.sol.
-     */
-    IDelegationManager public immutable delegationManager;
-
-    IStrategyManager public immutable strategyManager;
-
-    ISlasher public immutable slasher;
-
-    /// @notice when applied to a function, ensures that the function is only callable by the `registryCoordinator`.
-    modifier onlyRegistryCoordinator() {
-        require(msg.sender == address(registryCoordinator), "onlyRegistryCoordinator: not from registry coordinator");
-        _;
-    }
+    IStrategyManager public immutable _strategyManager;
+    ISlasher public immutable _slasher;
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
     modifier onlyBatchConfirmer() {
@@ -61,16 +43,17 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
     }
 
     constructor(
-        IRegistryCoordinator _registryCoordinator,
-        IStrategyManager _strategyManager,
-        IDelegationManager _delegationMananger,
-        ISlasher _slasher
+        IDelegationManager __delegationMananger,
+        IRegistryCoordinator __registryCoordinator,
+        IStrategyManager __strategyManager,
+        IStakeRegistry __stakeRegistry,
+        ISlasher __slasher
     )
-        BLSSignatureChecker(_registryCoordinator)
+        BLSSignatureChecker(__registryCoordinator)
+        ServiceManagerBase(__delegationMananger, __registryCoordinator, __stakeRegistry)
     {
-        strategyManager = _strategyManager;
-        delegationManager = _delegationMananger;
-        slasher = _slasher;
+        _strategyManager = __strategyManager;
+        _slasher = __slasher;
         _disableInitializers();
     }
 
@@ -84,7 +67,7 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
     {
         _initializePauser(_pauserRegistry, UNPAUSE_ALL);
         _transferOwnership(_initialOwner);
-        batchConfirmer = _batchConfirmer;
+        _setBatchConfirmer(_batchConfirmer);
     }
 
     /**
@@ -146,35 +129,11 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
         batchId = batchIdMemory + 1;
     }
 
-    /**
-     * @notice Forwards a call to EigenLayer's DelegationManager contract to confirm operator registration with the AVS
-     * @param operator The address of the operator to register.
-     * @param operatorSignature The signature, salt, and expiry of the operator's signature.
-     */
-    function registerOperatorToAVS(
-        address operator,
-        ISignatureUtils.SignatureWithSaltAndExpiry memory operatorSignature
-    ) external {
-        delegationManager.registerOperatorToAVS(operator, operatorSignature);
-    }
-
-    /**
-     * @notice Forwards a call to EigenLayer's DelegationManager contract to confirm operator deregistration from the AVS
-     * @param operator The address of the operator to deregister.
-     */
-    function deregisterOperatorFromAVS(address operator) external {
-        delegationManager.deregisterOperatorFromAVS(operator);
-    }
-
-    /**
-     * @notice Sets the metadata URI for the AVS
-     * @param _metadataURI is the metadata URI for the AVS
-     */
-    function setMetadataURI(string memory _metadataURI) external onlyOwner() {
-        metadataURI = _metadataURI;
-    }
-
     function setBatchConfirmer(address _batchConfirmer) external onlyOwner() {
+        _setBatchConfirmer(_batchConfirmer);
+    }
+
+    function _setBatchConfirmer(address _batchConfirmer) internal {
         batchConfirmer = _batchConfirmer;
     }
 
@@ -188,68 +147,4 @@ contract EigenDAServiceManager is Initializable, OwnableUpgradeable, EigenDAServ
         return uint32(block.number) + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
-    /**
-     * @notice Returns the list of strategies that the operator has potentially restaked on the AVS
-     * @param operator The address of the operator to get restaked strategies for
-     * @dev This function is intended to be called off-chain
-     * @dev No guarantee is made on whether the operator has shares for a strategy in a quorum or uniqueness 
-     *      of each element in the returned array. The off-chain service should do that validation separately
-     */
-    function getOperatorRestakedStrategies(address operator) external view returns (address[] memory) {
-        bytes32 operatorId = registryCoordinator.getOperatorId(operator);
-        uint256 quorumBitmap = registryCoordinator.getCurrentQuorumBitmap(operatorId);
-        bytes memory quorumBytesArray = BitmapUtils.bitmapToBytesArray(quorumBitmap);
-
-        uint256 strategiesLength;
-        for (uint i = 0; i < quorumBytesArray.length; i++) {
-            uint8 quorumNumber = uint8(quorumBytesArray[i]);
-            strategiesLength += stakeRegistry.strategyParamsLength(quorumNumber);
-        }
-
-        address[] memory restakedStrategies = new address[](strategiesLength);
-        uint256 index;
-        for (uint i = 0; i < quorumBytesArray.length; i++) {
-            uint8 quorumNumber = uint8(quorumBytesArray[i]);
-            uint256 strategyParamsLength = stakeRegistry.strategyParamsLength(quorumNumber);
-            for (uint j = 0; j < strategyParamsLength; j++) {
-                IStakeRegistry.StrategyParams memory strategyParams = stakeRegistry.strategyParamsByIndex(quorumNumber, j);
-                restakedStrategies[index] = address(strategyParams.strategy);
-                ++index;
-            }
-        }
-
-        return restakedStrategies;
-    }
-
-    /**
-     * @notice Returns the list of strategies that the AVS supports for restaking
-     * @dev This function is intended to be called off-chain
-     * @dev No guarantee is made on uniqueness of each element in the returned array. 
-     *      The off-chain service should do that validabution separately
-     */
-    function getRestakeableStrategies() external view returns (address[] memory) {
-        uint256 quorumBitmap;
-        uint256 strategiesLength;
-        for (uint8 i = 0; i < type(uint8).max; i++) {
-            if(stakeRegistry.minimumStakeForQuorum(i) > 0) {
-                quorumBitmap = BitmapUtils.setBit(quorumBitmap, i);
-                strategiesLength += stakeRegistry.strategyParamsLength(i);
-            }
-        }
-
-        bytes memory quorumBytesArray = BitmapUtils.bitmapToBytesArray(quorumBitmap);
-        address[] memory restakedStrategies = new address[](strategiesLength);
-        uint256 index;
-        for (uint i = 0; i < quorumBytesArray.length; i++) {
-            uint8 quorumNumber = uint8(quorumBytesArray[i]);
-            uint256 strategyParamsLength = stakeRegistry.strategyParamsLength(quorumNumber);
-            for (uint j = 0; j < strategyParamsLength; j++) {
-                IStakeRegistry.StrategyParams memory strategyParams = stakeRegistry.strategyParamsByIndex(quorumNumber, j);
-                restakedStrategies[index] = address(strategyParams.strategy);
-                ++index;
-            }
-        }
-
-        return restakedStrategies;
-    }
 }

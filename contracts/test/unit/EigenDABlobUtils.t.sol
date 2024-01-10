@@ -45,9 +45,10 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         _setUpBLSMockAVSDeployer();
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
+            delegationMock,
             registryCoordinator,
             strategyManagerMock,
-            delegationMock,
+            stakeRegistry,
             slasher
         );
 
