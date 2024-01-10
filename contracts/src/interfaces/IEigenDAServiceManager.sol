@@ -17,11 +17,12 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
      */
     event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee);
 
-    event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue);
-
-    event PaymentManagerSet(address previousAddress, address newAddress);
-
-    event FeeSetterChanged(address previousAddress, address newAddress);
+    /**
+     * @notice Emitted when the batch confirmer is changed.
+     * @param previousAddress The address of the previous batch confirmer
+     * @param newAddress The address of the new batch confirmer
+     */
+    event BatchConfirmerChanged(address previousAddress, address newAddress);
 
     // STRUCTS
 
@@ -84,4 +85,13 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
         BatchHeader calldata batchHeader,
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external;
+
+    /// @notice This function is used for changing the batch confirmer
+    function setBatchConfirmer(address _batchConfirmer) external;
+
+    /// @notice Returns the current batchId
+    function taskNumber() external view returns (uint32);
+
+    /// @notice Returns the block until which operators must serve.
+    function latestServeUntilBlock() external view returns (uint32);
 }

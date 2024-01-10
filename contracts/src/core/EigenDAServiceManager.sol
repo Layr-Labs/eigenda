@@ -129,12 +129,16 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         batchId = batchIdMemory + 1;
     }
 
+    /// @notice This function is used for changing the batch confirmer
     function setBatchConfirmer(address _batchConfirmer) external onlyOwner() {
         _setBatchConfirmer(_batchConfirmer);
     }
 
+    /// @notice changes the batch confirmer
     function _setBatchConfirmer(address _batchConfirmer) internal {
+        address previousBatchConfirmer = batchConfirmer;
         batchConfirmer = _batchConfirmer;
+        emit BatchConfirmerChanged(previousBatchConfirmer, batchConfirmer);
     }
 
     /// @notice Returns the current batchId
