@@ -419,7 +419,10 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 	log.Trace("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners))
+	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners), aggSig.QuorumResults)
+	for _, quorumResult := range aggSig.QuorumResults {
+		log.Info("[batcher] Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
+	}
 
 	numPassed := numBlobsAttested(aggSig.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
