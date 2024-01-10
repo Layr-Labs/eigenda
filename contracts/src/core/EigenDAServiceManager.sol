@@ -123,10 +123,41 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
         batchIdToBatchMetadataHash[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, fee, uint32(block.number));
 
-        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee);
+        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, false);
 
         // increment the batchId
         batchId = batchIdMemory + 1;
+    }
+
+    /// @notice This function is used for submitting data availabilty certificates optimistically
+    function confirmBatchOptimistically(
+        BatchHeader calldata batchHeader
+    ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
+        // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
+        require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
+        // make sure the stakes against which the Batch is being confirmed are not stale
+        require(
+            batchHeader.referenceBlockNumber <= block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
+        );
+
+        require(
+            (batchHeader.referenceBlockNumber + BLOCK_STALE_MEASURE) >= uint32(block.number),
+            "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"
+        );
+
+        // calculate reducedBatchHeaderHash which nodes signed
+        bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
+
+        // store the metadata hash
+        uint96 fee = 0;
+        uint32 batchIdMemory = batchIdOptimistic;
+        bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
+        batchIdToBatchMetadataHashOptimistic[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, fee, uint32(block.number));
+
+        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, true);
+
+        // increment the batchId
+        batchIdOptimistic = batchIdMemory + 1;
     }
 
     /// @notice This function is used for changing the batch confirmer

@@ -27,6 +27,20 @@ library EigenDAHasher {
     }
 
     /**
+     * @notice hashes the given metdata into the commitment that will be stored in the contract
+     * @param batchHeaderHash the hash of the batchHeader
+     * @param fee the fee paid in paymentToken for the batch
+     * @param blockNumber the block number at which the batch was confirmed
+     */
+    function hashBatchHashedMetadata(
+        bytes32 batchHeaderHash,
+        uint96 fee,
+        uint32 blockNumber
+    ) internal pure returns(bytes32) {
+        return keccak256(abi.encodePacked(batchHeaderHash, fee, blockNumber));
+    }
+
+    /**
      * @notice given the a batchHeader in the provided metdata, calculates the hash of the batchMetadata
      * @param batchMetadata the metadata of the batch
      * @return the hash of the batchMetadata
