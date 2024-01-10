@@ -168,26 +168,23 @@ func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, s
 				}
 			} else if meta.BlobStatus == disperser.BlobStatus(exclusiveStartKey.BlobStatus) && meta.RequestMetadata.RequestedAt == uint64(exclusiveStartKey.RequestedAt) {
 				foundStart = true // Found the starting point, start appending metas from next item
+				metas = append(metas, meta)
+				if len(metas) == int(limit) {
+					return metas, &disperser.BlobStoreExclusiveStartKey{
+						BlobStatus:  int32(meta.BlobStatus),
+						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
+					}, nil
+				}
 			}
 		}
 	}
 
-	// Sort the metas by RequestedAt
 	sort.SliceStable(metas, func(i, j int) bool {
 		return metas[i].RequestMetadata.RequestedAt < metas[j].RequestMetadata.RequestedAt
 	})
 
-	// Determine nextKey for pagination
-	var nextKey *disperser.BlobStoreExclusiveStartKey
-	if len(metas) > 0 {
-		lastMeta := metas[len(metas)-1]
-		nextKey = &disperser.BlobStoreExclusiveStartKey{
-			BlobStatus:  int32(lastMeta.BlobStatus),
-			RequestedAt: int64(lastMeta.RequestMetadata.RequestedAt),
-		}
-	}
-
-	return metas, nextKey, nil
+	// Return all the metas if limit is not reached
+	return metas, nil, nil
 }
 
 func (q *BlobStore) GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*disperser.BlobMetadata, error) {
