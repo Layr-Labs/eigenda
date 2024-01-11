@@ -62,7 +62,7 @@ func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	for _, quorum := range quorums {
 		key, ok := pubkeys.QuorumTotals[quorum]
 		if !ok {
-			return nil, errors.New("aggregate key for quorum not found")
+			continue
 		}
 		aggKeys[quorum] = &core.G1Point{G1Affine: key}
 	}

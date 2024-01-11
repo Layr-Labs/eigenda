@@ -9,7 +9,7 @@ import (
 
 type AccountID = string
 
-// Security and Quorum Paramaters
+// Security and Quorum Parameters
 
 // QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
 type QuorumID = uint8
@@ -40,7 +40,22 @@ type Blob struct {
 	Data          []byte
 }
 
-// BlobRequestHeader contains the orignal data size of a blob and the security required
+// BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
+// Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
+// using the signature to charge the user for a different blob or for dispersing the same blob
+// multiple times (Replay attack).
+type BlobAuthHeader struct {
+	// Commitments
+	BlobCommitments `json:"commitments"`
+	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
+	AccountID AccountID `json:"account_id"`
+	// Nonce
+	Nonce uint32 `json:"nonce"`
+	// AuthenticationData is the signature of the blob header by the account ID
+	AuthenticationData []byte `json:"authentication_data"`
+}
+
+// BlobRequestHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// Commitments
 	BlobCommitments `json:"commitments"`

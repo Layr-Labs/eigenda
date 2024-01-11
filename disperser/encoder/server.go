@@ -140,7 +140,8 @@ func (s *Server) Start() error {
 	pb.RegisterEncoderServer(gs, s)
 
 	// Register Server for Health Checks
-	healthcheck.RegisterHealthServer(gs)
+	name := pb.Encoder_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
 
 	s.close = func() {
 		err := listener.Close()

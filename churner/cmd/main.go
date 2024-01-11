@@ -99,7 +99,8 @@ func run(ctx *cli.Context) error {
 	pb.RegisterChurnerServer(gs, churnerServer)
 
 	// Register Server for Health Checks
-	healthcheck.RegisterHealthServer(gs)
+	name := pb.Churner_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
 
 	log.Printf("churner server listening at %s", addr)
 	return gs.Serve(listener)

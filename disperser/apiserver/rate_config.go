@@ -2,7 +2,9 @@ package apiserver
 
 import (
 	"fmt"
+	"log"
 	"strconv"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -16,6 +18,7 @@ const (
 	TotalUnauthBlobRateFlagName     = "auth.total-unauth-blob-rate"
 	PerUserUnauthBlobRateFlagName   = "auth.per-user-unauth-blob-rate"
 	ClientIPHeaderFlagName          = "auth.client-ip-header"
+	AllowlistFlagName               = "auth.allowlist"
 
 	// We allow the user to specify the blob rate in blobs/sec, but internally we use blobs/sec * 1e6 (i.e. blobs/microsec).
 	// This is because the rate limiter takes an integer rate.
@@ -29,9 +32,17 @@ type QuorumRateInfo struct {
 	TotalUnauthBlobRate     common.RateParam
 }
 
+type PerUserRateInfo struct {
+	Throughput common.RateParam
+	BlobRate   common.RateParam
+}
+
+type Allowlist = map[string]map[core.QuorumID]PerUserRateInfo
+
 type RateConfig struct {
 	QuorumRateInfos map[core.QuorumID]QuorumRateInfo
 	ClientIPHeader  string
+	Allowlist       Allowlist
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -73,6 +84,13 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Value:    "",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CLIENT_IP_HEADER"),
 		},
+		cli.StringSliceFlag{
+			Name:     AllowlistFlagName,
+			Usage:    "Allowlist of IPs and corresponding blob/byte rates to bypass rate limiting. Format: <IP>:<quorum ID>:<blob rate>:<byte rate>. Example: 127.0.0.1:0:10:10485760",
+			EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST"),
+			Required: false,
+			Value:    &cli.StringSlice{},
+		},
 	}
 }
 
@@ -112,8 +130,41 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		}
 	}
 
+	// Parse allowlist
+	allowlist := make(Allowlist)
+	for _, allowlistEntry := range c.StringSlice(AllowlistFlagName) {
+		allowlistEntrySplit := strings.Split(allowlistEntry, ":")
+		if len(allowlistEntrySplit) != 4 {
+			log.Printf("invalid allowlist entry: entry should contain exactly 4 elements: %s", allowlistEntry)
+			continue
+		}
+		ip := allowlistEntrySplit[0]
+		quorumID, err := strconv.Atoi(allowlistEntrySplit[1])
+		if err != nil {
+			log.Printf("invalid allowlist entry: failed to convert quorum ID from string: %s", allowlistEntry)
+			continue
+		}
+		blobRate, err := strconv.ParseFloat(allowlistEntrySplit[2], 64)
+		if err != nil {
+			log.Printf("invalid allowlist entry: failed to convert blob rate from string: %s", allowlistEntry)
+			continue
+		}
+		byteRate, err := strconv.ParseFloat(allowlistEntrySplit[3], 64)
+		if err != nil {
+			log.Printf("invalid allowlist entry: failed to convert throughput from string: %s", allowlistEntry)
+			continue
+		}
+		allowlist[ip] = map[core.QuorumID]PerUserRateInfo{
+			core.QuorumID(quorumID): {
+				Throughput: common.RateParam(byteRate),
+				BlobRate:   common.RateParam(blobRate * blobRateMultiplier),
+			},
+		}
+	}
+
 	return RateConfig{
 		QuorumRateInfos: quorumRateInfos,
 		ClientIPHeader:  c.String(ClientIPHeaderFlagName),
+		Allowlist:       allowlist,
 	}, nil
 }
