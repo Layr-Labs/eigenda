@@ -8,6 +8,7 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -106,6 +107,23 @@ func (s *dynamodbBucketStore[T]) UpdateItemWithVersion(ctx context.Context, requ
 	}
 
 	_, err = s.client.UpsertItemWithVersion(ctx, s.tableName, key, fields, expectedVersion)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *dynamodbBucketStore[T]) UpdateItemWithExpression(ctx context.Context, requesterID string, customUpdateExpr *expression.UpdateBuilder) error {
+
+	key := map[string]types.AttributeValue{
+		"RequesterID": &types.AttributeValueMemberS{
+			Value: requesterID,
+		},
+	}
+	_, err := s.client.UpdateWithExpression(ctx, s.tableName, key, customUpdateExpr)
 
 	if err != nil {
 		fmt.Println(err)

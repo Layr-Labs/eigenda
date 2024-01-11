@@ -158,6 +158,42 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
+// UpdateItemWithExpressionBuilder, pass a custom update expression
+// Returns the updated item if successful
+// Usage: Update BucketLevels with ADD Operation
+func (c *Client) UpdateWithExpression(ctx context.Context, tableName string, key Key, customUpdateExpr *expression.UpdateBuilder) (Item, error) {
+	var resp *dynamodb.UpdateItemOutput
+	var err error
+
+	if customUpdateExpr == nil {
+		return nil, fmt.Errorf("custom update expression is required")
+	}
+
+	// Use the provided custom update expression
+	update := *customUpdateExpr
+	// Build the expression
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	if err != nil {
+		return nil, err
+	}
+
+	// Perform the update
+	resp, err = c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       key,
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Attributes, nil
+}
+
 // UpsertItemWithExpressionBuilder, updates an item with optimistic locking
 // Puts an item if it does not exist
 // 2 retries are performed if the conditional check fails
@@ -247,8 +283,6 @@ func (c *Client) UpsertItemWithVersion(ctx context.Context, tableName string, ke
 	// Retry the operation twice if the conditional check fails
 	for attempt := 0; attempt < 2; attempt++ {
 		// Get the current version of the item
-		fmt.Println("Attempt", attempt)
-		fmt.Println("Key", key)
 		currentItem, currentVersion, err := c.GetItemWithVersion(ctx, tableName, key)
 		if err != nil {
 			return nil, err

@@ -2,6 +2,8 @@ package common
 
 import (
 	"context"
+
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 )
 
 // KVStore is a simple key value store interface.
@@ -20,4 +22,6 @@ type KVStoreVersioned[T any] interface {
 	GetItemWithVersion(ctx context.Context, key string) (*T, int, error)
 	// UpdateItem updates the value for the given key with version
 	UpdateItemWithVersion(ctx context.Context, key string, value *T, expectedVersion int) error
+
+	UpdateItemWithExpression(ctx context.Context, requesterID string, customUpdateExpr *expression.UpdateBuilder) error
 }

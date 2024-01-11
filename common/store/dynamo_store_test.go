@@ -14,6 +14,7 @@ import (
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 )
@@ -104,4 +105,47 @@ func TestDynamoBucketStoreVersioned(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, p, p2)
 	assert.Equal(t, 1, version)
+}
+
+func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
+
+	ctx := context.Background()
+
+	p := &common.RateBucketParams{
+		BucketLevels:    []time.Duration{30 * time.Second, 30 * time.Second},
+		LastRequestTime: time.Now().UTC(),
+	}
+	err := dynamoParamStore.UpdateItemWithVersion(ctx, "testRetriever2", p, 0)
+	assert.NoError(t, err)
+	assert.NoError(t, err)
+
+	// Retrieve and check the initial item
+	p2, _, err := dynamoParamStore.GetItemWithVersion(ctx, "testRetriever2")
+
+	assert.NoError(t, err)
+	for i := 0; i < len(p2.BucketLevels); i++ {
+		delta := 100 * time.Second
+		// Create a new UpdateBuilder for each attribute update
+		updateBuilder := expression.Set(
+			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)),
+			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)).Plus(expression.Value(delta)),
+		)
+		// Increment the Version attribute
+		versionName := expression.Name("Version")
+		updateBuilder = updateBuilder.Set(versionName, versionName.Plus(expression.Value(1)))
+
+		err := dynamoParamStore.UpdateItemWithExpression(ctx, "testRetriever2", &updateBuilder)
+		assert.NoError(t, err)
+	}
+
+	p2, version, err := dynamoParamStore.GetItemWithVersion(ctx, "testRetriever2")
+
+	// Validate that the item was updated
+	for i := 0; i < len(p2.BucketLevels); i++ {
+		p.BucketLevels[i] += 100 * time.Second
+		assert.Equal(t, p.BucketLevels[i], p2.BucketLevels[i])
+	}
+
+	assert.NoError(t, err)
+	assert.Equal(t, 3, version)
 }

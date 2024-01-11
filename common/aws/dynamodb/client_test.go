@@ -324,8 +324,8 @@ func TestUpsertItemWithVersion(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestUpsertItemWithVersion_UpdateDurations(t *testing.T) {
-	tableName := "VersionedValues"
+func TestUpsertMultipleUpdateAsOneOperation(t *testing.T) {
+	tableName := "VersionedValuesModified"
 	createTable(t, tableName)
 
 	ctx := context.Background()
@@ -381,7 +381,73 @@ func TestUpsertItemWithVersion_UpdateDurations(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// Helper function to convert []int64 to DynamoDB AttributeValue list
+func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
+	tableName := "VersionedValuesLevelByLevel"
+	createTable(t, tableName)
+
+	ctx := context.Background()
+
+	// Add key with initial bucket levels
+	initialBucketLevels := []int64{10000, 20000, 3000} // Example durations in milliseconds
+	_, err := dynamoClient.UpsertItemWithVersion(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, commondynamodb.Item{
+		"MetadataKey":     &types.AttributeValueMemberS{Value: "key"},
+		"Status":          &types.AttributeValueMemberS{Value: "Processing"},
+		"BatchHeaderHash": &types.AttributeValueMemberS{Value: "0x123"},
+		"BlobIndex":       &types.AttributeValueMemberN{Value: "0"},
+		"BucketLevels":    &types.AttributeValueMemberL{Value: convertToAttributeValueList(initialBucketLevels)},
+	}, 0)
+	assert.NoError(t, err)
+
+	// Retrieve and check the initial item
+	_, _, err = dynamoClient.GetItemWithVersion(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	})
+	assert.NoError(t, err)
+
+	// Update bucket levels using custom update expression
+	delta := int64(5000) // Delta to add in milliseconds
+
+	for i := 0; i < len(initialBucketLevels); i++ {
+		// Create a new UpdateBuilder for each attribute update
+		// Add Delta Time to BucketLevels
+		updateBuilder := expression.Add(
+			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)),
+			expression.Value(delta),
+		)
+		// Increment the Version attribute
+		versionName := expression.Name("Version")
+		updateBuilder = updateBuilder.Set(versionName, versionName.Plus(expression.Value(1)))
+
+		_, err := dynamoClient.UpdateWithExpression(ctx, tableName, commondynamodb.Key{"MetadataKey": &types.AttributeValueMemberS{Value: "key"}}, &updateBuilder)
+
+		assert.NoError(t, err)
+	}
+
+	// Retrieve and check the updated item
+	updatedItem, updatedVersion, err := dynamoClient.GetItemWithVersion(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 4, updatedVersion)
+	// Asserting the BucketLevels
+	bucketLevelsAttr, ok := updatedItem["BucketLevels"].(*types.AttributeValueMemberL)
+	assert.True(t, ok, "BucketLevels should be present and of type AttributeValueMemberL")
+
+	for i, v := range bucketLevelsAttr.Value {
+		bucketLevel, ok := v.(*types.AttributeValueMemberN)
+		assert.True(t, ok, "Bucket level should be of type AttributeValueMemberN")
+		expectedValue := initialBucketLevels[i] + delta
+		actualValue, convErr := strconv.ParseInt(bucketLevel.Value, 10, 64)
+		assert.NoError(t, convErr)
+		assert.Equal(t, expectedValue, actualValue, fmt.Sprintf("BucketLevels[%d] should be correctly updated", i))
+	}
+
+	err = dynamoClient.DeleteTable(ctx, tableName)
+	assert.NoError(t, err)
+}
+
 // Helper function to convert []int64 to DynamoDB AttributeValue list
 func convertToAttributeValueList(intSlice []int64) []types.AttributeValue {
 	avList := make([]types.AttributeValue, len(intSlice))
@@ -396,17 +462,10 @@ func buildBucketLevelsUpdateExpression(count int, delta int64) expression.Update
 	var updateBuilder expression.UpdateBuilder
 	for i := 0; i < count; i++ {
 		bucketLevelName := fmt.Sprintf("BucketLevels[%d]", i)
-		if i == 0 {
-			updateBuilder = expression.Set(
-				expression.Name(bucketLevelName),
-				expression.Name(bucketLevelName).Plus(expression.Value(delta)),
-			)
-		} else {
-			updateBuilder = updateBuilder.Set(
-				expression.Name(bucketLevelName),
-				expression.Name(bucketLevelName).Plus(expression.Value(delta)),
-			)
-		}
+		updateBuilder = updateBuilder.Set(
+			expression.Name(bucketLevelName),
+			expression.Name(bucketLevelName).Plus(expression.Value(delta)),
+		)
 	}
 	return updateBuilder
 }
