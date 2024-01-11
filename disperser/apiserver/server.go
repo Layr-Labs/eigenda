@@ -98,8 +98,8 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	// Send back challenge to client
 	challenge := rand.Uint32()
-	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_Challenge{
-		Challenge: &pb.Challenge{
+	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
+		BlobAuthHeader: &pb.BlobAuthHeader{
 			ChallengeParameter: challenge,
 		},
 	}})
@@ -113,15 +113,15 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return fmt.Errorf("error receiving next message: %v", err)
 	}
 
-	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_ChallengeReply)
+	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_AuthenticationData)
 	if !ok {
-		return errors.New("expected ChallengeReply")
+		return errors.New("expected AuthenticationData")
 	}
 
 	blob := getBlobFromRequest(request.DisperseRequest)
 
 	blob.RequestHeader.Nonce = challenge
-	blob.RequestHeader.AuthenticationData = challengeReply.ChallengeReply.AuthenticationData
+	blob.RequestHeader.AuthenticationData = challengeReply.AuthenticationData.AuthenticationData
 
 	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
 	if err != nil {

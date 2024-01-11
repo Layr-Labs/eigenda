@@ -144,7 +144,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	if err != nil {
 		return nil, nil, fmt.Errorf("error while receiving: %v", err)
 	}
-	challenge, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_Challenge)
+	authHeaderReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_BlobAuthHeader)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected challenge")
 	}
@@ -152,7 +152,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	authHeader := core.BlobAuthHeader{
 		BlobCommitments: core.BlobCommitments{},
 		AccountID:       "",
-		Nonce:           challenge.Challenge.ChallengeParameter,
+		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}
 
 	authData, err := c.signer.SignBlobRequest(authHeader)
@@ -161,8 +161,8 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 
 	// Process challenge and send back challenge_reply
-	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_ChallengeReply{
-		ChallengeReply: &disperser_rpc.ChallengeReply{
+	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_AuthenticationData{
+		AuthenticationData: &disperser_rpc.AuthenticationData{
 			AuthenticationData: authData,
 		},
 	}})
