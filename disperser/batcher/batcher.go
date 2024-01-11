@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -63,13 +64,14 @@ type Batcher struct {
 
 	Queue         disperser.BlobStore
 	Dispatcher    disperser.Dispatcher
-	Confirmer     disperser.BatchConfirmer
 	EncoderClient disperser.EncoderClient
 
 	ChainState            core.IndexedChainState
 	AssignmentCoordinator core.AssignmentCoordinator
 	Aggregator            core.SignatureAggregator
 	EncodingStreamer      *EncodingStreamer
+	Transactor            core.Transactor
+	TransactionManager    TxnManager
 	Metrics               *Metrics
 
 	ethClient common.EthClient
@@ -82,13 +84,14 @@ func NewBatcher(
 	timeoutConfig TimeoutConfig,
 	queue disperser.BlobStore,
 	dispatcher disperser.Dispatcher,
-	confirmer disperser.BatchConfirmer,
 	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	encoderClient disperser.EncoderClient,
 	aggregator core.SignatureAggregator,
 	ethClient common.EthClient,
 	finalizer Finalizer,
+	transactor core.Transactor,
+	txnManager TxnManager,
 	logger common.Logger,
 	metrics *Metrics,
 ) (*Batcher, error) {
@@ -114,13 +117,14 @@ func NewBatcher(
 
 		Queue:         queue,
 		Dispatcher:    dispatcher,
-		Confirmer:     confirmer,
 		EncoderClient: encoderClient,
 
 		ChainState:            chainState,
 		AssignmentCoordinator: assignmentCoordinator,
 		Aggregator:            aggregator,
 		EncodingStreamer:      encodingStreamer,
+		Transactor:            transactor,
+		TransactionManager:    txnManager,
 		Metrics:               metrics,
 
 		ethClient: ethClient,
@@ -142,6 +146,24 @@ func (b *Batcher) Start(ctx context.Context) error {
 		return err
 	}
 	batchTrigger := b.EncodingStreamer.EncodedSizeNotifier
+
+	go func() {
+		receiptChan := b.TransactionManager.ReceiptChan()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case receiptOrErr := <-receiptChan:
+				b.logger.Info("received response from transaction manager", "receipt", receiptOrErr.Receipt, "err", receiptOrErr.Err)
+				err := b.ProcessConfirmedBatch(ctx, receiptOrErr)
+				if err != nil {
+					b.logger.Error("failed to process confirmed batch", "err", err)
+				}
+			}
+		}
+	}()
+	b.TransactionManager.Start(ctx)
+
 	b.finalizer.Start(ctx)
 
 	go func() {
@@ -177,6 +199,155 @@ func (b *Batcher) Start(ctx context.Context) error {
 	return nil
 }
 
+// updateConfirmationInfo updates the confirmation info for each blob in the batch and returns failed blobs to retry.
+func (b *Batcher) updateConfirmationInfo(
+	ctx context.Context,
+	batchData confirmationMetadata,
+	txnReceipt *types.Receipt,
+) ([]*disperser.BlobMetadata, error) {
+	if txnReceipt.BlockNumber == nil {
+		return nil, fmt.Errorf("HandleSingleBatch: error getting transaction receipt block number")
+	}
+	if len(batchData.blobs) == 0 {
+		return nil, fmt.Errorf("failed to process confirmed batch: no blobs from transaction manager metadata")
+	}
+	if batchData.batchHeader == nil {
+		return nil, fmt.Errorf("failed to process confirmed batch: batch header from transaction manager metadata is nil")
+	}
+	if len(batchData.blobHeaders) == 0 {
+		return nil, fmt.Errorf("failed to process confirmed batch: no blob headers from transaction manager metadata")
+	}
+	if batchData.merkleTree == nil {
+		return nil, fmt.Errorf("failed to process confirmed batch: merkle tree from transaction manager metadata is nil")
+	}
+	if batchData.aggSig == nil {
+		return nil, fmt.Errorf("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
+	}
+	headerHash, err := batchData.batchHeader.GetBatchHeaderHash()
+	if err != nil {
+		return nil, fmt.Errorf("HandleSingleBatch: error getting batch header hash: %w", err)
+	}
+	batchID, err := b.getBatchID(ctx, txnReceipt)
+	if err != nil {
+		return nil, fmt.Errorf("HandleSingleBatch: error fetching batch ID: %w", err)
+	}
+
+	blobsToRetry := make([]*disperser.BlobMetadata, 0)
+	var updateConfirmationInfoErr error
+
+	for blobIndex, metadata := range batchData.blobs {
+		// Mark the blob failed if it didn't get enough signatures.
+		status := disperser.InsufficientSignatures
+
+		var proof []byte
+		if isBlobAttested(batchData.aggSig.QuorumResults, batchData.blobHeaders[blobIndex]) {
+			status = disperser.Confirmed
+			// generate inclusion proof
+			if blobIndex >= len(batchData.blobHeaders) {
+				b.logger.Error("HandleSingleBatch: error confirming blobs: blob header not found in batch", "index", blobIndex)
+				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
+				continue
+			}
+			blobHeader := batchData.blobHeaders[blobIndex]
+
+			blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+			if err != nil {
+				b.logger.Error("HandleSingleBatch: failed to get blob header hash", "err", err)
+				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
+				continue
+			}
+			merkleProof, err := batchData.merkleTree.GenerateProof(blobHeaderHash[:], 0)
+			if err != nil {
+				b.logger.Error("HandleSingleBatch: failed to generate blob header inclusion proof", "err", err)
+				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
+				continue
+			}
+			proof = serializeProof(merkleProof)
+		}
+
+		confirmationInfo := &disperser.ConfirmationInfo{
+			BatchHeaderHash:         headerHash,
+			BlobIndex:               uint32(blobIndex),
+			SignatoryRecordHash:     core.ComputeSignatoryRecordHash(uint32(batchData.batchHeader.ReferenceBlockNumber), batchData.aggSig.NonSigners),
+			ReferenceBlockNumber:    uint32(batchData.batchHeader.ReferenceBlockNumber),
+			BatchRoot:               batchData.batchHeader.BatchRoot[:],
+			BlobInclusionProof:      proof,
+			BlobCommitment:          &batchData.blobHeaders[blobIndex].BlobCommitments,
+			BatchID:                 uint32(batchID),
+			ConfirmationTxnHash:     txnReceipt.TxHash,
+			ConfirmationBlockNumber: uint32(txnReceipt.BlockNumber.Uint64()),
+			Fee:                     []byte{0}, // No fee
+			QuorumResults:           batchData.aggSig.QuorumResults,
+			BlobQuorumInfos:         batchData.blobHeaders[blobIndex].QuorumInfos,
+		}
+
+		if status == disperser.Confirmed {
+			if _, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
+				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
+				// remove encoded blob from storage so we don't disperse it again
+				b.EncodingStreamer.RemoveEncodedBlob(metadata)
+			}
+		} else if status == disperser.InsufficientSignatures {
+			if _, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
+				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
+				// remove encoded blob from storage so we don't disperse it again
+				b.EncodingStreamer.RemoveEncodedBlob(metadata)
+			}
+		} else {
+			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
+		}
+		if updateConfirmationInfoErr != nil {
+			b.logger.Error("HandleSingleBatch: error updating blob confirmed metadata", "err", updateConfirmationInfoErr)
+			blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
+		}
+		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
+		b.Metrics.ObserveLatency("E2E", float64(time.Since(requestTime).Milliseconds()))
+	}
+
+	return blobsToRetry, nil
+}
+
+func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *ReceiptOrErr) error {
+	if receiptOrErr.Metadata == nil {
+		return fmt.Errorf("failed to process confirmed batch: no metadata from transaction manager response")
+	}
+	confirmationMetadata := receiptOrErr.Metadata.(confirmationMetadata)
+	blobs := confirmationMetadata.blobs
+	if len(blobs) == 0 {
+		return fmt.Errorf("failed to process confirmed batch: no blobs from transaction manager metadata")
+	}
+	if receiptOrErr.Err != nil {
+		_ = b.handleFailure(ctx, blobs, FailConfirmBatch)
+		return fmt.Errorf("failed to confirm batch onchain: %w", receiptOrErr.Err)
+	}
+	if confirmationMetadata.aggSig == nil {
+		_ = b.handleFailure(ctx, blobs, FailNoAggregatedSignature)
+		return fmt.Errorf("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
+	}
+	b.logger.Info("received ConfirmBatch transaction receipt", "blockNumber", receiptOrErr.Receipt.BlockNumber, "txnHash", receiptOrErr.Receipt.TxHash.Hex())
+
+	// Mark the blobs as complete
+	stageTimer := time.Now()
+	blobsToRetry, err := b.updateConfirmationInfo(ctx, confirmationMetadata, receiptOrErr.Receipt)
+	if err != nil {
+		_ = b.handleFailure(ctx, blobs, FailUpdateConfirmationInfo)
+		return fmt.Errorf("failed to update confirmation info: %w", err)
+	}
+	if len(blobsToRetry) > 0 {
+		b.logger.Error("failed to update confirmation info", "failed", len(blobsToRetry), "total", len(blobs))
+		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
+	}
+	b.logger.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
+	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
+	batchSize := int64(0)
+	for _, blobMeta := range blobs {
+		batchSize += int64(blobMeta.RequestMetadata.BlobSize)
+	}
+	b.Metrics.IncrementBatchCount(batchSize)
+
+	return nil
+}
+
 func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata, reason FailReason) error {
 	var result *multierror.Error
 	for _, metadata := range blobMetadatas {
@@ -193,6 +364,15 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 	// Return the error(s)
 	return result.ErrorOrNil()
 }
+
+type confirmationMetadata struct {
+	batchHeader *core.BatchHeader
+	blobs       []*disperser.BlobMetadata
+	blobHeaders []*core.BlobHeader
+	merkleTree  *merkletree.MerkleTree
+	aggSig      *core.SignatureAggregation
+}
+
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
 	// start a timer
@@ -230,7 +410,6 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	for quorumID := range batch.State.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
 	}
-	fmt.Println("quorumIDs", quorumIDs)
 
 	stageTimer = time.Now()
 	aggSig, err := b.Aggregator.AggregateSignatures(ctx, batch.State, quorumIDs, headerHash, update)
@@ -240,9 +419,12 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 	log.Trace("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners))
+	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners), aggSig.QuorumResults)
+	for _, quorumResult := range aggSig.QuorumResults {
+		log.Info("[batcher] Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
+	}
 
-	passed, numPassed := getBlobQuorumPassStatus(aggSig.QuorumResults, batch.BlobHeaders)
+	numPassed := numBlobsAttested(aggSig.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailNoSignatures)
@@ -251,108 +433,24 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 
 	// Confirm the batch
 	log.Trace("[batcher] Confirming batch...")
-	stageTimer = time.Now()
-	txnReceipt, err := b.Confirmer.ConfirmBatch(ctx, batch.BatchHeader, aggSig.QuorumResults, aggSig)
+
+	txn, err := b.Transactor.BuildConfirmBatchTxn(ctx, batch.BatchHeader, aggSig.QuorumResults, aggSig)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
-		return fmt.Errorf("HandleSingleBatch: error confirming batch: %w", err)
+		return fmt.Errorf("HandleSingleBatch: error building confirmBatch transaction: %w", err)
 	}
-	log.Trace("[batcher] ConfirmBatch took", "duration", time.Since(stageTimer))
-	log.Info("[batcher] Batch confirmed at block", "blockNumber", txnReceipt.BlockNumber, "txnHash", txnReceipt.TxHash.Hex())
-	b.Metrics.ObserveLatency("ConfirmBatch", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.GasUsed.Set(float64(txnReceipt.GasUsed))
-
-	batchID, err := b.getBatchID(ctx, txnReceipt)
+	err = b.TransactionManager.ProcessTransaction(ctx, NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
+		batchHeader: batch.BatchHeader,
+		blobs:       batch.BlobMetadata,
+		blobHeaders: batch.BlobHeaders,
+		merkleTree:  batch.MerkleTree,
+		aggSig:      aggSig,
+	}))
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.BlobMetadata, FailGetBatchID)
-		return fmt.Errorf("HandleSingleBatch: error fetching batch ID: %w", err)
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
+		return fmt.Errorf("HandleSingleBatch: error sending confirmBatch transaction: %w", err)
 	}
 
-	// Mark the blobs as complete
-	log.Trace("[batcher] Marking blobs as complete...")
-	stageTimer = time.Now()
-	blobsToRetry := make([]*disperser.BlobMetadata, 0)
-	var updateConfirmationInfoErr error
-	for blobIndex, metadata := range batch.BlobMetadata {
-		// Mark the blob failed if it didn't get enough signatures.
-		status := disperser.Confirmed
-		if !passed[blobIndex] {
-			status = disperser.InsufficientSignatures
-		}
-
-		var blobHeader *core.BlobHeader
-		var proof []byte
-		if status == disperser.Confirmed {
-			// generate inclusion proof
-			if blobIndex >= len(batch.BlobHeaders) {
-				return fmt.Errorf("HandleSingleBatch: error confirming blobs: blob header at index %d not found in batch", blobIndex)
-			}
-			blobHeader = batch.BlobHeaders[blobIndex]
-
-			blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
-			if err != nil {
-				return fmt.Errorf("HandleSingleBatch: failed to get blob header hash: %w", err)
-			}
-			merkleProof, err := batch.MerkleTree.GenerateProof(blobHeaderHash[:], 0)
-			if err != nil {
-				return fmt.Errorf("HandleSingleBatch: failed to generate blob header inclusion proof: %w", err)
-			}
-			proof = serializeProof(merkleProof)
-		}
-
-		confirmationInfo := &disperser.ConfirmationInfo{
-			BatchHeaderHash:         headerHash,
-			BlobIndex:               uint32(blobIndex),
-			SignatoryRecordHash:     core.ComputeSignatoryRecordHash(uint32(batch.BatchHeader.ReferenceBlockNumber), aggSig.NonSigners),
-			ReferenceBlockNumber:    uint32(batch.BatchHeader.ReferenceBlockNumber),
-			BatchRoot:               batch.BatchHeader.BatchRoot[:],
-			BlobInclusionProof:      proof,
-			BlobCommitment:          &batch.BlobHeaders[blobIndex].BlobCommitments,
-			BatchID:                 uint32(batchID),
-			ConfirmationTxnHash:     txnReceipt.TxHash,
-			ConfirmationBlockNumber: uint32(txnReceipt.BlockNumber.Uint64()),
-			Fee:                     []byte{0}, // No fee
-			QuorumResults:           aggSig.QuorumResults,
-			BlobQuorumInfos:         batch.BlobHeaders[blobIndex].QuorumInfos,
-		}
-
-		if status == disperser.Confirmed {
-			if _, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
-				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
-				// remove encoded blob from storage so we don't disperse it again
-				b.EncodingStreamer.RemoveEncodedBlob(metadata)
-			}
-		} else if status == disperser.InsufficientSignatures {
-			if _, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
-				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
-				// remove encoded blob from storage so we don't disperse it again
-				b.EncodingStreamer.RemoveEncodedBlob(metadata)
-			}
-		} else {
-			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
-		}
-		if updateConfirmationInfoErr != nil {
-			log.Error("HandleSingleBatch: error updating blob confirmed metadata", "err", updateConfirmationInfoErr)
-			blobsToRetry = append(blobsToRetry, batch.BlobMetadata[blobIndex])
-		}
-		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
-		b.Metrics.ObserveLatency("E2E", float64(time.Since(requestTime).Milliseconds()))
-	}
-
-	if len(blobsToRetry) > 0 {
-		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
-		if len(blobsToRetry) == len(batch.BlobMetadata) {
-			return fmt.Errorf("HandleSingleBatch: failed to update blob confirmed metadata for all blobs in batch: %w", updateConfirmationInfoErr)
-		}
-	}
-
-	log.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
-	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
-	batchSize := int64(0)
-	for _, blobMeta := range batch.BlobMetadata {
-		batchSize += int64(blobMeta.RequestMetadata.BlobSize)
-	}
-	b.Metrics.IncrementBatchCount(batchSize)
 	return nil
 }
 
@@ -440,12 +538,10 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 	return batchID, nil
 }
 
-// Determine failure status for each blob based on stake signed per quorum. We fail a blob if it received
-// insufficient signatures for any quorum
-func getBlobQuorumPassStatus(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) ([]bool, int) {
+// numBlobsAttested returns the number of blobs that have been successfully attested by the given quorums
+func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) int {
 	numPassed := 0
-	passed := make([]bool, len(headers))
-	for ind, blob := range headers {
+	for _, blob := range headers {
 		thisPassed := true
 		for _, quorum := range blob.QuorumInfos {
 			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.QuorumThreshold {
@@ -453,11 +549,19 @@ func getBlobQuorumPassStatus(signedQuorums map[core.QuorumID]*core.QuorumResult,
 				break
 			}
 		}
-		passed[ind] = thisPassed
 		if thisPassed {
 			numPassed++
 		}
 	}
 
-	return passed, numPassed
+	return numPassed
+}
+
+func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {
+	for _, quorum := range header.QuorumInfos {
+		if signedQuorums[quorum.QuorumID].PercentSigned < quorum.QuorumThreshold {
+			return false
+		}
+	}
+	return true
 }

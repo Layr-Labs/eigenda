@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -22,6 +23,7 @@ const (
 	FailConfirmBatch           FailReason = "confirm_batch"
 	FailGetBatchID             FailReason = "get_batch_id"
 	FailUpdateConfirmationInfo FailReason = "update_confirmation_info"
+	FailNoAggregatedSignature  FailReason = "no_aggregated_signature"
 )
 
 type MetricsConfig struct {
@@ -123,9 +125,14 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	return metrics
 }
 
-func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int) {
+func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int, quorumResults map[core.QuorumID]*core.QuorumResult) {
 	g.Attestation.WithLabelValues("signers").Set(float64(operatorCount - nonSignerCount))
 	g.Attestation.WithLabelValues("non_signers").Set(float64(nonSignerCount))
+
+	for _, quorumResult := range quorumResults {
+		label := fmt.Sprintf("quorum_result_%d", quorumResult.QuorumID)
+		g.Attestation.WithLabelValues(label).Set(float64(quorumResult.PercentSigned))
+	}
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.
