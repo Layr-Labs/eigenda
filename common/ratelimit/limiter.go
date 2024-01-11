@@ -110,6 +110,91 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 	return allowed, nil
 }
 
+// func (d *RateLimiter) AllowRequestRunningTimeWorkingDontDelete(ctx context.Context, requesterID RequesterID, blobSize uint, rate RateParam) (bool, error) {
+// 	var bs common.KVStoreVersioned[common.RateBucketParams] = d.bucketStore.(common.KVStoreVersioned[common.RateBucketParams])
+// 	var version int = 0
+
+// 	now := time.Now().UTC()
+
+// 	// Calculate the required capacity for new request
+// 	requiredCapacity := time.Duration(float64(blobSize)/float64(rate)) * time.Second
+
+// 	// Fetch the current bucket parameters
+// 	bucketParams, err := bs.GetItemWithVersion(ctx, requesterID)
+// 	if err != nil {
+// 		return false, fmt.Errorf("error fetching bucket params: %v", err)
+// 	}
+
+// 	// Initialize bucket parameters if they don't exist
+// 	if bucketParams == nil {
+// 		bucketParams = &common.RateBucketParams{
+// 			BucketLevels:    make([]time.Duration, len(d.GlobalParams.BucketSizes)),
+// 			LastRequestTime: now,
+// 		}
+// 		// Initialize BucketLevels to their maximum sizes
+// 		for i, size := range d.GlobalParams.BucketSizes {
+// 			bucketParams.BucketLevels[i] = size
+// 		}
+// 		// Optionally persist the initial state ??
+// 	}
+
+// 	// Conservative check: Ensure that the request can potentially be allowed
+// 	canBeAllowed := true
+// 	for i, bucketSize := range d.GlobalParams.BucketSizes {
+// 		if bucketLevel[i]+requiredCapacity < bucketSize {
+// 			canBeAllowed = false
+// 			break
+// 		}
+// 	}
+
+// 	if !canBeAllowed {
+// 		return false, nil
+// 	}
+
+// 	// Build the update expression for each bucket level
+// 	updateBuilder := expression.UpdateBuilder{}
+// 	for i := range d.GlobalParams.BucketSizes {
+// 		bucketLevelKey := fmt.Sprintf("BucketLevels[%d]", i)
+
+// 		if updateKeySeparately {
+// 			updateBuilder = updateBuilder.Add(
+// 				expression.Name(bucketLevelKey),
+// 				expression.Value(-requiredCapacity.Milliseconds()),
+// 			)
+// 			updateBuilder = updateBuilder.Set(
+// 				expression.Name("LastRequestTime"),
+// 				expression.Value(now.UnixMilli()),
+// 			)
+
+// 			err = d.Store.UpdateItemWithExpression(ctx, requesterID, expr)
+// 			if err != nil {
+// 				return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
+// 			}
+// 			updateBuilder = expression.UpdateBuilder{} // Reset builder for next iteration
+// 		} else {
+// 			updateBuilder = updateBuilder.Add(
+// 				expression.Name(bucketLevelKey),
+// 				expression.Value(-requiredCapacity.Milliseconds()),
+// 			)
+// 		}
+// 	}
+
+// 	if !updateKeySeparately {
+// 		// Update last request time
+// 		updateBuilder = updateBuilder.Set(
+// 			expression.Name("LastRequestTime"),
+// 			expression.Value(now.UnixMilli()),
+// 		)
+// 		err = d.Store.UpdateItemWithExpression(ctx, requesterID, expr)
+// 		if err != nil {
+// 			return false, fmt.Errorf("failed to update bucket levels atomically: %v", err)
+// 		}
+// 	}
+
+// 	// Return true, assuming the request is allowed after the update
+// 	return true, nil
+// }
+
 func getBucketLevel(bucketLevel, bucketSize, interval, deduction time.Duration) time.Duration {
 
 	newLevel := bucketLevel + interval - deduction

@@ -177,6 +177,10 @@ func (c *Client) UpdateWithExpression(ctx context.Context, tableName string, key
 		return nil, err
 	}
 
+	fmt.Printf("Update Expression: %v\n", expr.Update())
+	fmt.Printf("ExpressionAttributeNames: %v\n", expr.Names())
+	fmt.Printf("ExpressionAttributeNames: %v\n", expr.Values())
+
 	// Perform the update
 	resp, err = c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(tableName),

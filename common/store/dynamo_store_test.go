@@ -126,7 +126,8 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 	for i := 0; i < len(p2.BucketLevels); i++ {
 		delta := 100 * time.Second
 		// Create a new UpdateBuilder for each attribute update
-		updateBuilder := expression.Set(
+		// Ideally This should be an ADD Operation but DynamoDB only supports numeric types (like integers or floating-point numbers) directly
+		updateBuilder := expression.Add(
 			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)),
 			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)).Plus(expression.Value(delta)),
 		)
@@ -138,12 +139,13 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	p2, version, err := dynamoParamStore.GetItemWithVersion(ctx, "testRetriever2")
+	p3, version, err := dynamoParamStore.GetItemWithVersion(ctx, "testRetriever2")
 
 	// Validate that the item was updated
 	for i := 0; i < len(p2.BucketLevels); i++ {
 		p.BucketLevels[i] += 100 * time.Second
-		assert.Equal(t, p.BucketLevels[i], p2.BucketLevels[i])
+		fmt.Printf("p3.BucketLevels[%d]: %v\n", i, p3.BucketLevels[i])
+		assert.Equal(t, p.BucketLevels[i], p3.BucketLevels[i])
 	}
 
 	assert.NoError(t, err)
