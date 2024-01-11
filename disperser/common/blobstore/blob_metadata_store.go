@@ -105,7 +105,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 
 	// Convert the exclusive start key to a map of AttributeValue
 	if exclusiveStartKey != nil {
-		attributeMap, err = convertBlobStoreExclusiveStartKeyToAttributeValueMap(exclusiveStartKey)
+		attributeMap, err = convertToAttribMap(exclusiveStartKey)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -139,7 +139,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 	}
 
 	// Convert the last evaluated key to a disperser.BlobStoreExclusiveStartKey
-	exclusiveStartKey, err = converTypeAttributeValuetToBlobStoreExclusiveStartKey(lastEvaluatedKey)
+	exclusiveStartKey, err = convertToExclusiveStartKey(lastEvaluatedKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -402,7 +402,7 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*disperser.BlobMetadata, e
 	return &metadata, nil
 }
 
-func converTypeAttributeValuetToBlobStoreExclusiveStartKey(exclusiveStartKeyMap map[string]types.AttributeValue) (*disperser.BlobStoreExclusiveStartKey, error) {
+func convertToExclusiveStartKey(exclusiveStartKeyMap map[string]types.AttributeValue) (*disperser.BlobStoreExclusiveStartKey, error) {
 	blobStoreExclusiveStartKey := disperser.BlobStoreExclusiveStartKey{}
 	err := attributevalue.UnmarshalMap(exclusiveStartKeyMap, &blobStoreExclusiveStartKey)
 	if err != nil {
@@ -412,7 +412,7 @@ func converTypeAttributeValuetToBlobStoreExclusiveStartKey(exclusiveStartKeyMap 
 	return &blobStoreExclusiveStartKey, nil
 }
 
-func convertBlobStoreExclusiveStartKeyToAttributeValueMap(blobStoreExclusiveStartKey *disperser.BlobStoreExclusiveStartKey) (map[string]types.AttributeValue, error) {
+func convertToAttribMap(blobStoreExclusiveStartKey *disperser.BlobStoreExclusiveStartKey) (map[string]types.AttributeValue, error) {
 	if blobStoreExclusiveStartKey == nil {
 		// Return an empty map or nil
 		return nil, nil
