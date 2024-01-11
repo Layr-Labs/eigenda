@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -44,11 +45,15 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "RegisterValidator")
 		Expect(err).To(BeNil())
 
+		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+		signer := auth.NewSigner(privateKeyHex)
+
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		})
+		}, signer)
+
 		Expect(disp).To(Not(BeNil()))
 
 		data := make([]byte, 1024)

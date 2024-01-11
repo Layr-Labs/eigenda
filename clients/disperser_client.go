@@ -7,6 +7,7 @@ import (
 	"time"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"github.com/urfave/cli"
@@ -38,11 +39,13 @@ type DisperserClient interface {
 
 type disperserClient struct {
 	config *Config
+	signer core.BlobRequestSigner
 }
 
-func NewDisperserClient(config *Config) DisperserClient {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner) DisperserClient {
 	return &disperserClient{
 		config: config,
+		signer: signer,
 	}
 }
 
@@ -113,8 +116,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, fmt.Errorf("frror while calling DisperseBlobAuthenticated: %v", err)
 	}
 
-	// TODO(mooselumph): Get account ID from signer
-
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data: data,
 		SecurityParams: []*disperser_rpc.SecurityParams{
@@ -124,7 +125,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 				AdversaryThreshold: adversityThreshold,
 			},
 		},
-		AccountId: "",
+		AccountId: c.signer.GetAccountID(),
 	}
 
 	// Send the initial request
@@ -146,19 +147,16 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, fmt.Errorf("expected challenge")
 	}
 
-	// TODO(mooselumph): Get auth data from signer
+	authHeader := core.BlobAuthHeader{
+		BlobCommitments: core.BlobCommitments{},
+		AccountID:       "",
+		Nonce:           challenge.Challenge.ChallengeParameter,
+	}
 
-	// authHeader := core.BlobAuthHeader{
-	// 	BlobCommitments: core.BlobCommitments{},
-	// 	AccountID:       "",
-	// 	Nonce:           challenge.Challenge.ChallengeParameter,
-	// }
-
-	// authData, err := c.signer.SignBlobRequest(ctxTimeout, authHeader)
-	// if err != nil {
-	// 	return nil, nil, fmt.Errorf("error signing blob request")
-	// }
-	authData := []byte(fmt.Sprint(challenge.Challenge.ChallengeParameter + 1))
+	authData, err := c.signer.SignBlobRequest(authHeader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error signing blob request")
+	}
 
 	// Process challenge and send back challenge_reply
 	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_ChallengeReply{

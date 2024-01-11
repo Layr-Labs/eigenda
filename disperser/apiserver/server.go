@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -40,8 +40,9 @@ type DispersalServer struct {
 	tx          core.Transactor
 	quorumCount uint16
 
-	rateConfig  RateConfig
-	ratelimiter common.RateLimiter
+	rateConfig    RateConfig
+	ratelimiter   common.RateLimiter
+	authenticator core.BlobRequestAuthenticator
 
 	metrics *disperser.Metrics
 
@@ -65,16 +66,20 @@ func NewDispersalServer(
 			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
 		}
 	}
+
+	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
+
 	return &DispersalServer{
-		config:      config,
-		blobStore:   store,
-		tx:          tx,
-		quorumCount: 0,
-		metrics:     metrics,
-		logger:      logger,
-		ratelimiter: ratelimiter,
-		rateConfig:  rateConfig,
-		mu:          &sync.Mutex{},
+		config:        config,
+		blobStore:     store,
+		tx:            tx,
+		quorumCount:   0,
+		metrics:       metrics,
+		logger:        logger,
+		ratelimiter:   ratelimiter,
+		authenticator: authenticator,
+		rateConfig:    rateConfig,
+		mu:            &sync.Mutex{},
 	}
 }
 
@@ -115,22 +120,16 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	blob := getBlobFromRequest(request.DisperseRequest)
 
-	// TODO(mooselumph): Add auth data to blob object
+	blob.RequestHeader.Nonce = challenge
+	blob.RequestHeader.AuthenticationData = challengeReply.ChallengeReply.AuthenticationData
 
-	receivedChallenge, err := strconv.ParseUint(string(challengeReply.ChallengeReply.AuthenticationData), 10, 32)
+	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to authenticate blob request: %v", err)
 	}
-	if uint32(receivedChallenge) != challenge+1 {
-		return fmt.Errorf("invalid challenge")
-	}
-
-	_ = challengeReply
-	// blob.RequestHeader.Nonce = challenge
-	// blob.RequestHeader.AuthenticationData = challengeReply.ChallengeReply.AuthenticationData
 
 	// Disperse the blob
-	reply, err := s.disperseBlob(stream.Context(), blob, true, challenge)
+	reply, err := s.disperseBlob(stream.Context(), blob)
 	if err != nil {
 		return err
 	}
@@ -151,11 +150,11 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	blob := getBlobFromRequest(req)
 
-	return s.disperseBlob(ctx, blob, false, 0)
+	return s.disperseBlob(ctx, blob)
 
 }
 
-func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticated bool, challengeParam uint32) (*pb.DisperseBlobReply, error) {
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
 	}))
@@ -579,6 +578,9 @@ func getBlobFromRequest(req *pb.DisperseBlobRequest) *core.Blob {
 
 	blob := &core.Blob{
 		RequestHeader: core.BlobRequestHeader{
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: req.AccountId,
+			},
 			SecurityParams: params,
 		},
 		Data: data,

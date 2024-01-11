@@ -29,7 +29,7 @@ func NewTrafficGenerator(config *Config) (*TrafficGenerator, error) {
 
 	return &TrafficGenerator{
 		Logger:          logger,
-		DisperserClient: clients.NewDisperserClient(&config.Config),
+		DisperserClient: clients.NewDisperserClient(&config.Config, nil),
 		Config:          config,
 	}, nil
 }
