@@ -359,6 +359,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					Commitment:           commits,
 					Chunks:               chunks,
 					Assignments:          res.Assignments,
+					Status:               PendingDispersal,
 				},
 				Err: nil,
 			}
@@ -543,6 +544,16 @@ func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
 	for _, sp := range metadata.RequestMetadata.SecurityParams {
 		e.EncodedBlobstore.DeleteEncodingResult(metadata.GetBlobKey(), sp.QuorumID)
 	}
+}
+
+func (e *EncodingStreamer) MarkBlobPendingConfirmation(metadata *disperser.BlobMetadata) error {
+	for _, sp := range metadata.RequestMetadata.SecurityParams {
+		err := e.EncodedBlobstore.MarkEncodedResultPendingConfirmation(metadata.GetBlobKey(), sp.QuorumID)
+		if err != nil {
+			return fmt.Errorf("error marking blob pending confirmation: %w", err)
+		}
+	}
+	return nil
 }
 
 // getOperatorState returns the operator state for the blobs that have valid quorums
