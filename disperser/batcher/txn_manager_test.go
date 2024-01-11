@@ -19,7 +19,8 @@ func TestProcessTransaction(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
 	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
 	assert.NoError(t, err)
-	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -68,7 +69,8 @@ func TestReplaceGasFee(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
 	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
 	assert.NoError(t, err)
-	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)

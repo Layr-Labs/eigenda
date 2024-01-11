@@ -57,11 +57,12 @@ type txnManager struct {
 	receiptChan        chan *ReceiptOrErr
 	queueSize          int
 	txnRefreshInterval time.Duration
+	metrics            *TxnManagerMetrics
 }
 
 var _ TxnManager = (*txnManager)(nil)
 
-func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger common.Logger) TxnManager {
+func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger common.Logger, metrics *TxnManagerMetrics) TxnManager {
 	return &txnManager{
 		ethClient:          ethClient,
 		requestChan:        make(chan *TxnRequest, queueSize),
@@ -69,6 +70,7 @@ func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval
 		receiptChan:        make(chan *ReceiptOrErr, queueSize),
 		queueSize:          queueSize,
 		txnRefreshInterval: txnRefreshInterval,
+		metrics:            metrics,
 	}
 }
 
@@ -103,7 +105,11 @@ func (t *txnManager) Start(ctx context.Context) {
 						Metadata: req.Metadata,
 						Err:      nil,
 					}
+					if receipt.GasUsed > 0 {
+						t.metrics.UpdateGasUsed(receipt.GasUsed)
+					}
 				}
+				t.metrics.ObserveLatency(float64(time.Since(req.requestedAt).Milliseconds()))
 			}
 		}
 	}()
@@ -143,6 +149,7 @@ func (t *txnManager) ReceiptChan() chan *ReceiptOrErr {
 // monitorTransaction monitors the transaction and resends it with a higher gas price if it is not mined without a timeout.
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
 func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
+	numSpeedUps := 0
 	for {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
@@ -154,6 +161,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			req.Tag,
 		)
 		if err == nil {
+			t.metrics.UpdateSpeedUps(numSpeedUps)
 			return receipt, nil
 		}
 
@@ -173,6 +181,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 				t.logger.Error("failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
 				continue
 			}
+			numSpeedUps++
 		} else {
 			t.logger.Error("transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
 			return nil, err
