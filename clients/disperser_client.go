@@ -100,7 +100,9 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumI
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
 	if err != nil {
 		return nil, nil, err
 	}
