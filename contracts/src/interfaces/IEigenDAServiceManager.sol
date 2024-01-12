@@ -88,7 +88,8 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
 
     /// @notice This function is used for submitting data availabilty certificates optimistically
     function confirmBatchOptimistically(
-        BatchHeader calldata batchHeader
+        BatchHeader calldata batchHeader,
+        bytes calldata nonSignerStakesAndSignature
     ) external;
 
     /// @notice This function is used for changing the batch confirmer

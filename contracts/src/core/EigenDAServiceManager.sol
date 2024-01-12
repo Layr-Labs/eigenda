@@ -131,7 +131,8 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /// @notice This function is used for submitting data availabilty certificates optimistically
     function confirmBatchOptimistically(
-        BatchHeader calldata batchHeader
+        BatchHeader calldata batchHeader,
+        bytes calldata nonSignerStakesAndSignature
     ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
         require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
@@ -152,7 +153,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         uint96 fee = 0;
         uint32 batchIdMemory = batchIdOptimistic;
         bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHashOptimistic[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, fee, uint32(block.number));
+        batchIdToBatchMetadataHashOptimistic[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, nonSignerStakesAndSignature, fee, uint32(block.number));
 
         emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, true);
 

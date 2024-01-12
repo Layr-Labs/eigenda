@@ -34,6 +34,7 @@ library EigenDAHasher {
      */
     function hashBatchHashedMetadata(
         bytes32 batchHeaderHash,
+        bytes memory nonSignerStakesAndSignature,
         uint96 fee,
         uint32 blockNumber
     ) internal pure returns(bytes32) {
