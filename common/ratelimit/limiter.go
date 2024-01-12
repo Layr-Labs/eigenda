@@ -3,13 +3,15 @@ package ratelimit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 )
 
-type BucketStore = common.KVStoreVersioned[common.RateBucketParams]
+type BucketStore = common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]
 
 type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
@@ -110,90 +112,111 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 	return allowed, nil
 }
 
-// func (d *RateLimiter) AllowRequestRunningTimeWorkingDontDelete(ctx context.Context, requesterID RequesterID, blobSize uint, rate RateParam) (bool, error) {
-// 	var bs common.KVStoreVersioned[common.RateBucketParams] = d.bucketStore.(common.KVStoreVersioned[common.RateBucketParams])
-// 	var version int = 0
+// RateLimiting Algorithm defined as per this specification: https://docs.google.com/document/d/1KbGTRfLYX0buD0baCCnh97L01QeHwqsxDeGS1IrBANc
+// Gist is to use running time.
+// Bucket is initialized with current time minus the global bucket size
+// If BucketLevel + Required Capacity (calclulated as blobSize/rate) is less than now then the request can be allowed
+// Versioning makes it optimisically safe
+// Using DynamodB Atomic ADD operation to update BucketLevel as opposed to GET and then SET
+// TODO: Add a Flag to switch between the two implementations
+func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
+	var bs common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe] = d.bucketStore.(common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe])
 
-// 	now := time.Now().UTC()
+	// Fetch the current bucket parameters
+	bucketParams, _, err := bs.GetItemWithVersion(ctx, requesterID)
+	if err != nil {
+		return false, fmt.Errorf("error fetching bucket params: %v", err)
+	}
 
-// 	// Calculate the required capacity for new request
-// 	requiredCapacity := time.Duration(float64(blobSize)/float64(rate)) * time.Second
+	// Initialize bucket parameters if they don't exist
+	if bucketParams == nil {
+		bucketParams = &common.RateBucketParamsConcurrencySafe{
+			BucketLevels: make([]uint64, len(d.globalRateParams.BucketSizes)),
+		}
 
-// 	// Fetch the current bucket parameters
-// 	bucketParams, err := bs.GetItemWithVersion(ctx, requesterID)
-// 	if err != nil {
-// 		return false, fmt.Errorf("error fetching bucket params: %v", err)
-// 	}
+		now := time.Now().UTC().UnixMilli()
+		// Initialize BucketLevels to their maximum sizes
+		for i, size := range d.globalRateParams.BucketSizes {
 
-// 	// Initialize bucket parameters if they don't exist
-// 	if bucketParams == nil {
-// 		bucketParams = &common.RateBucketParams{
-// 			BucketLevels:    make([]time.Duration, len(d.GlobalParams.BucketSizes)),
-// 			LastRequestTime: now,
-// 		}
-// 		// Initialize BucketLevels to their maximum sizes
-// 		for i, size := range d.GlobalParams.BucketSizes {
-// 			bucketParams.BucketLevels[i] = size
-// 		}
-// 		// Optionally persist the initial state ??
-// 	}
+			// Initialize BucketLevel to the current time minus the bucket size
+			// Converting to Uint64 to avoid overflow
+			bucketParams.BucketLevels[i] = uint64(now - size.Milliseconds())
+		}
+		// Optionally persist the initial state ??
+		// TODO: Double Check if these need to be set before checking BucketSize
+	}
 
-// 	// Conservative check: Ensure that the request can potentially be allowed
-// 	canBeAllowed := true
-// 	for i, bucketSize := range d.GlobalParams.BucketSizes {
-// 		if bucketLevel[i]+requiredCapacity < bucketSize {
-// 			canBeAllowed = false
-// 			break
-// 		}
-// 	}
+	// Conservative check: Ensure that the request can potentially be allowed
+	allowed := false
+	reachedMaxBucketSize := false
+	now := time.Now().UTC().UnixMilli()
+	bucketLevels := bucketParams.BucketLevels
+	for i, bucketSize := range d.globalRateParams.BucketSizes {
+		// BucketLevel is initialized as the current time minus the bucket size, so if the bucket level is greater than
+		// the current time + required capacity it will overflow bucketsize as a result the request should not be allowed
+		calclulatedSize := uint64(now - bucketSize.Milliseconds())
+		if bucketLevels[i] < calclulatedSize {
+			reachedMaxBucketSize = true
+			bucketLevels[i] = calclulatedSize
+			//break
+		}
 
-// 	if !canBeAllowed {
-// 		return false, nil
-// 	}
+		// Calculate the required capacity for new request
+		requiredCapacity := uint64(float64(blobSize) / float64(rate) * float64(time.Second.Milliseconds()))
+		// Since bucketsize is subtracted from now which is assigned to bucketLevel[i] above
+		// Now check if the required capacity + bucketLevel[i] is less than now
+		// If it is less than now then the request can be allowed
+		totalCapacity := bucketLevels[i] + requiredCapacity
+		allowed = totalCapacity <= uint64(now)
 
-// 	// Build the update expression for each bucket level
-// 	updateBuilder := expression.UpdateBuilder{}
-// 	for i := range d.GlobalParams.BucketSizes {
-// 		bucketLevelKey := fmt.Sprintf("BucketLevels[%d]", i)
+		if allowed || d.globalRateParams.CountFailed {
+			if !reachedMaxBucketSize {
 
-// 		if updateKeySeparately {
-// 			updateBuilder = updateBuilder.Add(
-// 				expression.Name(bucketLevelKey),
-// 				expression.Value(-requiredCapacity.Milliseconds()),
-// 			)
-// 			updateBuilder = updateBuilder.Set(
-// 				expression.Name("LastRequestTime"),
-// 				expression.Value(now.UnixMilli()),
-// 			)
+				// Update Bucket Level by required capacity as it is still less than now
+				updateBuilder := expression.Add(
+					expression.Name(fmt.Sprintf("BucketLevels[%d]", i)),
+					expression.Value(requiredCapacity),
+				).Add(
+					expression.Name("Version"),
+					expression.Value(1),
+				)
+				// TODO: Specifically Handle Case when this fails for same document being updated by multiple requests
+				// Handle this:error StatusCode: 400, RequestID: e5764d48-e0fd-46bc-8aca-42de3d38c055, api error ValidationException:
+				// Invalid UpdateExpression: Two document paths overlap with each other; must remove or rewrite one of these paths; path one: [Version], path two: [Version]
+				// Note this will result in a call to UpdateItem for each bucket level
+				// This should be revisited if needed later as it may result in too many calls to dynamodb
+				// Other alternative is to make all updates to each level as an array and then call UpdateItem once but that does not make it concurrency safe
+				err = bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
+				if err != nil {
+					return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
+				}
+				return allowed, nil
+			} else {
 
-// 			err = d.Store.UpdateItemWithExpression(ctx, requesterID, expr)
-// 			if err != nil {
-// 				return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
-// 			}
-// 			updateBuilder = expression.UpdateBuilder{} // Reset builder for next iteration
-// 		} else {
-// 			updateBuilder = updateBuilder.Add(
-// 				expression.Name(bucketLevelKey),
-// 				expression.Value(-requiredCapacity.Milliseconds()),
-// 			)
-// 		}
-// 	}
+				// Set
+				updateBuilder := expression.Set(
+					expression.Name(fmt.Sprintf("BucketLevels[%d]", i)),
+					expression.Value(totalCapacity),
+				).Add(
+					expression.Name("Version"),
+					expression.Value(1),
+				)
+				// TODO: Specifically Handle Case when this fails for same document being updated by multiple requests
+				// Handle this:error StatusCode: 400, RequestID: e5764d48-e0fd-46bc-8aca-42de3d38c055, api error ValidationException:
+				// Invalid UpdateExpression: Two document paths overlap with each other; must remove or rewrite one of these paths; path one: [Version], path two: [Version]
+				// Note this will result in a call to UpdateItem for each bucket level
+				// This should be revisited if needed later as it may result in too many calls to dynamodb
+				err = bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
+				if err != nil {
+					return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
+				}
+			}
+		}
 
-// 	if !updateKeySeparately {
-// 		// Update last request time
-// 		updateBuilder = updateBuilder.Set(
-// 			expression.Name("LastRequestTime"),
-// 			expression.Value(now.UnixMilli()),
-// 		)
-// 		err = d.Store.UpdateItemWithExpression(ctx, requesterID, expr)
-// 		if err != nil {
-// 			return false, fmt.Errorf("failed to update bucket levels atomically: %v", err)
-// 		}
-// 	}
+	}
 
-// 	// Return true, assuming the request is allowed after the update
-// 	return true, nil
-// }
+	return allowed, nil
+}
 
 func getBucketLevel(bucketLevel, bucketSize, interval, deduction time.Duration) time.Duration {
 

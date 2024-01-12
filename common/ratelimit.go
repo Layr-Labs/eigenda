@@ -46,6 +46,16 @@ type RateBucketParams struct {
 	LastRequestTime time.Time
 }
 
+// RateBucketParamsConcurrencySafe is a concurrency safe version of RateBucketParams
+// BucketLevels are being converted to uint64 in order to perform DynamodB atomic ADD operation
+// DynamodB ADD operation only supports numeric types
+type RateBucketParamsConcurrencySafe struct {
+	// BucketLevels stores the amount of time contained in each bucket. For instance, if the bucket contains 1 minute, this means
+	// that the requester can consume one minute worth of bandwidth (in terms of amount of data, this equals RateParam * one minute)
+	// before the rate limiter will throttle them
+	BucketLevels []uint64
+}
+
 // GetClientAddress returns the client address from the context. If the header is not empty, it will
 // take the ip address located at the `numProxies“ position from the end of the header. If the ip address cannot be
 // found in the header, it will use the connection ip if `allowDirectConnectionFallback` is true. Otherwise, it will return
