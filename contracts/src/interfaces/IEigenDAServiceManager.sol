@@ -15,7 +15,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
      * @param batchHeaderHash The hash of the batch header
      * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
      */
-    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee, bool optimistic);
+    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, bool optimistic);
 
     /**
      * @notice Emitted when the batch confirmer is changed.

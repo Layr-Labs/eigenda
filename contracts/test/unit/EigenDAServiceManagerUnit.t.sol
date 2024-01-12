@@ -24,7 +24,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
     uint256 feePerBytePerTime = 0;
 
-    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee, bool optimistic);
+    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, bool optimistic);
     event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue);
     event FeeSetterChanged(address previousAddress, address newAddress);
 
@@ -65,7 +65,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         cheats.prank(confirmer, confirmer);
         cheats.expectEmit(true, true, true, true, address(eigenDAServiceManager));
-        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm, 0, false);
+        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm, false);
         uint256 gasBefore = gasleft();
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -145,7 +145,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         cheats.prank(confirmer, confirmer);
         cheats.expectEmit(true, true, true, true, address(eigenDAServiceManager));
-        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm, 0, false);
+        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm, false);
         uint256 gasBefore = gasleft();
         eigenDAServiceManager.confirmBatch(
             batchHeader,

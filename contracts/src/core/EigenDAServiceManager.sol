@@ -118,12 +118,11 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         }
 
         // store the metadata hash
-        uint96 fee = 0;
         uint32 batchIdMemory = batchId;
         bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHash[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, fee, uint32(block.number));
+        batchIdToBatchMetadataHash[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, uint32(block.number));
 
-        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, false);
+        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, false);
 
         // increment the batchId
         batchId = batchIdMemory + 1;
@@ -132,7 +131,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     /// @notice This function is used for submitting data availabilty certificates optimistically
     function confirmBatchOptimistically(
         BatchHeader calldata batchHeader,
-        bytes calldata nonSignerStakesAndSignature
+        bytes calldata confirmationData
     ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
         require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
@@ -150,12 +149,11 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
 
         // store the metadata hash
-        uint96 fee = 0;
         uint32 batchIdMemory = batchIdOptimistic;
         bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHashOptimistic[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, nonSignerStakesAndSignature, fee, uint32(block.number));
+        batchIdToBatchMetadataHashOptimistic[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, confirmationData, uint32(block.number));
 
-        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, true);
+        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, true);
 
         // increment the batchId
         batchIdOptimistic = batchIdMemory + 1;
