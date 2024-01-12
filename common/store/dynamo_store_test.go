@@ -88,7 +88,7 @@ func TestDynamoBucketStoreVersioned(t *testing.T) {
 	ctx := context.Background()
 
 	p := &common.RateBucketParams{
-		BucketLevels:    []time.Duration{time.Second, time.Minute},
+		BucketLevels:    []uint64{uint64(time.Second), uint64(time.Minute)},
 		LastRequestTime: time.Now().UTC(),
 	}
 
@@ -112,7 +112,7 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 	ctx := context.Background()
 
 	p := &common.RateBucketParams{
-		BucketLevels:    []time.Duration{30 * time.Second, 30 * time.Second},
+		BucketLevels:    []uint64{uint64(30 * time.Second), uint64(30 * time.Second)},
 		LastRequestTime: time.Now().UTC(),
 	}
 	err := dynamoParamStore.UpdateItemWithVersion(ctx, "testRetriever2", p, 0)
@@ -124,16 +124,17 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 
 	assert.NoError(t, err)
 	for i := 0; i < len(p2.BucketLevels); i++ {
-		delta := 100 * time.Second
+		delta := uint64(100 * time.Second)
 		// Create a new UpdateBuilder for each attribute update
 		// Ideally This should be an ADD Operation but DynamoDB only supports numeric types (like integers or floating-point numbers) directly
+		// Chain VersionName in the update
 		updateBuilder := expression.Add(
 			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)),
-			expression.Name(fmt.Sprintf("BucketLevels[%d]", i)).Plus(expression.Value(delta)),
+			expression.Value(delta),
+		).Add(
+			expression.Name("Version"),
+			expression.Value(1),
 		)
-		// Increment the Version attribute
-		versionName := expression.Name("Version")
-		updateBuilder = updateBuilder.Set(versionName, versionName.Plus(expression.Value(1)))
 
 		err := dynamoParamStore.UpdateItemWithExpression(ctx, "testRetriever2", &updateBuilder)
 		assert.NoError(t, err)
@@ -143,7 +144,7 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 
 	// Validate that the item was updated
 	for i := 0; i < len(p2.BucketLevels); i++ {
-		p.BucketLevels[i] += 100 * time.Second
+		p.BucketLevels[i] += uint64(100 * time.Second)
 		fmt.Printf("p3.BucketLevels[%d]: %v\n", i, p3.BucketLevels[i])
 		assert.Equal(t, p.BucketLevels[i], p3.BucketLevels[i])
 	}
