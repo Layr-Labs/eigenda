@@ -171,16 +171,17 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 				continue
 			}
 			t.logger.Warn("transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
-			req.Tx, err = t.speedUpTxn(ctx, req.Tx, req.Tag)
+			newTx, err := t.speedUpTxn(ctx, req.Tx, req.Tag)
 			if err != nil {
 				t.logger.Error("failed to speed up transaction", "err", err)
 				continue
 			}
-			err = t.ethClient.SendTransaction(ctx, req.Tx)
+			err = t.ethClient.SendTransaction(ctx, newTx)
 			if err != nil {
 				t.logger.Error("failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
 				continue
 			}
+			req.Tx = newTx
 			numSpeedUps++
 		} else {
 			t.logger.Error("transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
@@ -219,9 +220,22 @@ func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag 
 }
 
 // increaseGasPrice increases the gas price by specified percentage.
-// i.e. gasPrice + (gasPrice * gasPricePercentageMultiplier / 100)
+// i.e. gasPrice + ((gasPrice * gasPricePercentageMultiplier + 99) / 100)
 func increaseGasPrice(gasPrice *big.Int) *big.Int {
+	if gasPrice == nil {
+		return nil
+	}
 	bump := new(big.Int).Mul(gasPrice, gasPricePercentageMultiplier)
-	bump.Div(bump, hundred)
+	bump = roundUpDivideBig(bump, hundred)
 	return new(big.Int).Add(gasPrice, bump)
+}
+
+func roundUpDivideBig(a, b *big.Int) *big.Int {
+	if a == nil || b == nil || b.Cmp(big.NewInt(0)) == 0 {
+		return nil
+	}
+	one := new(big.Int).SetUint64(1)
+	num := new(big.Int).Sub(new(big.Int).Add(a, b), one) // a + b - 1
+	res := new(big.Int).Div(num, b)                      // (a + b - 1) / b
+	return res
 }
