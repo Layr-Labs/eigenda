@@ -9,12 +9,11 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 
-	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/BLSOperatorStateRetriever"
-	blspubkeyreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSPubkeyRegistry"
-	blspubkeycompendium "github.com/Layr-Labs/eigenda/contracts/bindings/BLSPublicKeyCompendium"
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/BLSRegistryCoordinatorWithIndices"
+	blspubkeyreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
+	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -37,7 +36,7 @@ var _ core.Transactor = (*Transactor)(nil)
 
 type ContractBindings struct {
 	RegCoordinatorAddr     gethcommon.Address
-	BLSOpStateRetriever    *opstateretriever.ContractBLSOperatorStateRetriever
+	BLSOpStateRetriever    *opstateretriever.ContractOperatorStateRetriever
 	BLSPubkeyRegistry      *blspubkeyreg.ContractBLSPubkeyRegistry
 	IndexRegistry          *indexreg.ContractIIndexRegistry
 	BLSRegCoordWithIndices *regcoordinator.ContractBLSRegistryCoordinatorWithIndices

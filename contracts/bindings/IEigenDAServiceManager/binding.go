@@ -61,9 +61,20 @@ type IEigenDAServiceManagerBatchHeader struct {
 	ReferenceBlockNumber       uint32
 }
 
+// ISignatureUtilsSignatureWithSaltAndExpiry is an auto generated low-level Go binding around an user-defined struct.
+type ISignatureUtilsSignatureWithSaltAndExpiry struct {
+	Signature []byte
+	Salt      [32]byte
+	Expiry    *big.Int
+}
+
 // ContractIEigenDAServiceManagerMetaData contains all meta data concerning the ContractIEigenDAServiceManager contract.
 var ContractIEigenDAServiceManagerMetaData = &bind.MetaData{
+<<<<<<< Updated upstream
 	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"batchHeaderHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint32\",\"name\":\"batchId\",\"type\":\"uint32\"},{\"indexed\":false,\"internalType\":\"uint96\",\"name\":\"fee\",\"type\":\"uint96\"}],\"name\":\"BatchConfirmed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"previousValue\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"newValue\",\"type\":\"uint256\"}],\"name\":\"FeePerBytePerTimeSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"FeeSetterChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"PaymentManagerSet\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"BLOCK_STALE_MEASURE\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"batchId\",\"type\":\"uint32\"}],\"name\":\"batchIdToBatchMetadataHash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"quorumNumbers\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"quorumThresholdPercentages\",\"type\":\"bytes\"},{\"internalType\":\"uint32\",\"name\":\"referenceBlockNumber\",\"type\":\"uint32\"}],\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"name\":\"batchHeader\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"uint32[]\",\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"X\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"Y\",\"type\":\"uint256\"}],\"internalType\":\"structBN254.G1Point[]\",\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"X\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"Y\",\"type\":\"uint256\"}],\"internalType\":\"structBN254.G1Point[]\",\"name\":\"quorumApks\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"uint256[2]\",\"name\":\"X\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"Y\",\"type\":\"uint256[2]\"}],\"internalType\":\"structBN254.G2Point\",\"name\":\"apkG2\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"X\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"Y\",\"type\":\"uint256\"}],\"internalType\":\"structBN254.G1Point\",\"name\":\"sigma\",\"type\":\"tuple\"},{\"internalType\":\"uint32[]\",\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\"},{\"internalType\":\"uint32[]\",\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\"},{\"internalType\":\"uint32[][]\",\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\"}],\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\"}],\"name\":\"confirmBatch\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\"}],\"name\":\"freezeOperator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"slasher\",\"outputs\":[{\"internalType\":\"contractISlasher\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+=======
+	ABI: "[{\"type\":\"function\",\"name\":\"BLOCK_STALE_MEASURE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"batchIdToBatchMetadataHash\",\"inputs\":[{\"name\":\"batchId\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"confirmBatch\",\"inputs\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumThresholdPercentages\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"confirmBatchOptimistically\",\"inputs\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumThresholdPercentages\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deregisterOperatorFromAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOperatorRestakedStrategies\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRestakeableStrategies\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"latestServeUntilBlock\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registerOperatorToAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setBatchConfirmer\",\"inputs\":[{\"name\":\"_batchConfirmer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMetadataURI\",\"inputs\":[{\"name\":\"_metadataURI\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"taskNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"BatchConfirmed\",\"inputs\":[{\"name\":\"batchHeaderHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"batchId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"},{\"name\":\"fee\",\"type\":\"uint96\",\"indexed\":false,\"internalType\":\"uint96\"},{\"name\":\"optimistic\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"BatchConfirmerChanged\",\"inputs\":[{\"name\":\"previousAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false}]",
+>>>>>>> Stashed changes
 }
 
 // ContractIEigenDAServiceManagerABI is the input ABI used to generate the binding from.
@@ -274,66 +285,128 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSessi
 	return _ContractIEigenDAServiceManager.Contract.BatchIdToBatchMetadataHash(&_ContractIEigenDAServiceManager.CallOpts, batchId)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// GetOperatorRestakedStrategies is a free data retrieval call binding the contract method 0x33cfb7b7.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function getOperatorRestakedStrategies(address operator) view returns(address[])
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) GetOperatorRestakedStrategies(opts *bind.CallOpts, operator common.Address) ([]common.Address, error) {
 	var out []interface{}
-	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "owner")
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "getOperatorRestakedStrategies", operator)
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new([]common.Address), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
 
 	return out0, err
 
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// GetOperatorRestakedStrategies is a free data retrieval call binding the contract method 0x33cfb7b7.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) Owner() (common.Address, error) {
-	return _ContractIEigenDAServiceManager.Contract.Owner(&_ContractIEigenDAServiceManager.CallOpts)
+// Solidity: function getOperatorRestakedStrategies(address operator) view returns(address[])
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) GetOperatorRestakedStrategies(operator common.Address) ([]common.Address, error) {
+	return _ContractIEigenDAServiceManager.Contract.GetOperatorRestakedStrategies(&_ContractIEigenDAServiceManager.CallOpts, operator)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// GetOperatorRestakedStrategies is a free data retrieval call binding the contract method 0x33cfb7b7.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) Owner() (common.Address, error) {
-	return _ContractIEigenDAServiceManager.Contract.Owner(&_ContractIEigenDAServiceManager.CallOpts)
+// Solidity: function getOperatorRestakedStrategies(address operator) view returns(address[])
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) GetOperatorRestakedStrategies(operator common.Address) ([]common.Address, error) {
+	return _ContractIEigenDAServiceManager.Contract.GetOperatorRestakedStrategies(&_ContractIEigenDAServiceManager.CallOpts, operator)
 }
 
-// Slasher is a free data retrieval call binding the contract method 0xb1344271.
+// GetRestakeableStrategies is a free data retrieval call binding the contract method 0xe481af9d.
 //
-// Solidity: function slasher() view returns(address)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) Slasher(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function getRestakeableStrategies() view returns(address[])
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) GetRestakeableStrategies(opts *bind.CallOpts) ([]common.Address, error) {
 	var out []interface{}
-	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "slasher")
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "getRestakeableStrategies")
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new([]common.Address), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
 
 	return out0, err
 
 }
 
-// Slasher is a free data retrieval call binding the contract method 0xb1344271.
+// GetRestakeableStrategies is a free data retrieval call binding the contract method 0xe481af9d.
 //
-// Solidity: function slasher() view returns(address)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) Slasher() (common.Address, error) {
-	return _ContractIEigenDAServiceManager.Contract.Slasher(&_ContractIEigenDAServiceManager.CallOpts)
+// Solidity: function getRestakeableStrategies() view returns(address[])
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) GetRestakeableStrategies() ([]common.Address, error) {
+	return _ContractIEigenDAServiceManager.Contract.GetRestakeableStrategies(&_ContractIEigenDAServiceManager.CallOpts)
 }
 
-// Slasher is a free data retrieval call binding the contract method 0xb1344271.
+// GetRestakeableStrategies is a free data retrieval call binding the contract method 0xe481af9d.
 //
-// Solidity: function slasher() view returns(address)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) Slasher() (common.Address, error) {
-	return _ContractIEigenDAServiceManager.Contract.Slasher(&_ContractIEigenDAServiceManager.CallOpts)
+// Solidity: function getRestakeableStrategies() view returns(address[])
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) GetRestakeableStrategies() ([]common.Address, error) {
+	return _ContractIEigenDAServiceManager.Contract.GetRestakeableStrategies(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// LatestServeUntilBlock is a free data retrieval call binding the contract method 0x758f8dba.
+//
+// Solidity: function latestServeUntilBlock() view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) LatestServeUntilBlock(opts *bind.CallOpts) (uint32, error) {
+	var out []interface{}
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "latestServeUntilBlock")
+
+	if err != nil {
+		return *new(uint32), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
+
+	return out0, err
+
+}
+
+// LatestServeUntilBlock is a free data retrieval call binding the contract method 0x758f8dba.
+//
+// Solidity: function latestServeUntilBlock() view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) LatestServeUntilBlock() (uint32, error) {
+	return _ContractIEigenDAServiceManager.Contract.LatestServeUntilBlock(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// LatestServeUntilBlock is a free data retrieval call binding the contract method 0x758f8dba.
+//
+// Solidity: function latestServeUntilBlock() view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) LatestServeUntilBlock() (uint32, error) {
+	return _ContractIEigenDAServiceManager.Contract.LatestServeUntilBlock(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// TaskNumber is a free data retrieval call binding the contract method 0x72d18e8d.
+//
+// Solidity: function taskNumber() view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) TaskNumber(opts *bind.CallOpts) (uint32, error) {
+	var out []interface{}
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "taskNumber")
+
+	if err != nil {
+		return *new(uint32), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
+
+	return out0, err
+
+}
+
+// TaskNumber is a free data retrieval call binding the contract method 0x72d18e8d.
+//
+// Solidity: function taskNumber() view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) TaskNumber() (uint32, error) {
+	return _ContractIEigenDAServiceManager.Contract.TaskNumber(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// TaskNumber is a free data retrieval call binding the contract method 0x72d18e8d.
+//
+// Solidity: function taskNumber() view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) TaskNumber() (uint32, error) {
+	return _ContractIEigenDAServiceManager.Contract.TaskNumber(&_ContractIEigenDAServiceManager.CallOpts)
 }
 
 // ConfirmBatch is a paid mutator transaction binding the contract method 0x7794965a.
@@ -357,25 +430,109 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorS
 	return _ContractIEigenDAServiceManager.Contract.ConfirmBatch(&_ContractIEigenDAServiceManager.TransactOpts, batchHeader, nonSignerStakesAndSignature)
 }
 
-// FreezeOperator is a paid mutator transaction binding the contract method 0x38c8ee64.
+// ConfirmBatchOptimistically is a paid mutator transaction binding the contract method 0xf46b2f5b.
 //
-// Solidity: function freezeOperator(address operator) returns()
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) FreezeOperator(opts *bind.TransactOpts, operator common.Address) (*types.Transaction, error) {
-	return _ContractIEigenDAServiceManager.contract.Transact(opts, "freezeOperator", operator)
+// Solidity: function confirmBatchOptimistically((bytes32,bytes,bytes,uint32) batchHeader, bytes nonSignerStakesAndSignature) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) ConfirmBatchOptimistically(opts *bind.TransactOpts, batchHeader IEigenDAServiceManagerBatchHeader, nonSignerStakesAndSignature []byte) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.contract.Transact(opts, "confirmBatchOptimistically", batchHeader, nonSignerStakesAndSignature)
 }
 
-// FreezeOperator is a paid mutator transaction binding the contract method 0x38c8ee64.
+// ConfirmBatchOptimistically is a paid mutator transaction binding the contract method 0xf46b2f5b.
 //
-// Solidity: function freezeOperator(address operator) returns()
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) FreezeOperator(operator common.Address) (*types.Transaction, error) {
-	return _ContractIEigenDAServiceManager.Contract.FreezeOperator(&_ContractIEigenDAServiceManager.TransactOpts, operator)
+// Solidity: function confirmBatchOptimistically((bytes32,bytes,bytes,uint32) batchHeader, bytes nonSignerStakesAndSignature) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) ConfirmBatchOptimistically(batchHeader IEigenDAServiceManagerBatchHeader, nonSignerStakesAndSignature []byte) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.ConfirmBatchOptimistically(&_ContractIEigenDAServiceManager.TransactOpts, batchHeader, nonSignerStakesAndSignature)
 }
 
-// FreezeOperator is a paid mutator transaction binding the contract method 0x38c8ee64.
+// ConfirmBatchOptimistically is a paid mutator transaction binding the contract method 0xf46b2f5b.
 //
-// Solidity: function freezeOperator(address operator) returns()
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) FreezeOperator(operator common.Address) (*types.Transaction, error) {
-	return _ContractIEigenDAServiceManager.Contract.FreezeOperator(&_ContractIEigenDAServiceManager.TransactOpts, operator)
+// Solidity: function confirmBatchOptimistically((bytes32,bytes,bytes,uint32) batchHeader, bytes nonSignerStakesAndSignature) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) ConfirmBatchOptimistically(batchHeader IEigenDAServiceManagerBatchHeader, nonSignerStakesAndSignature []byte) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.ConfirmBatchOptimistically(&_ContractIEigenDAServiceManager.TransactOpts, batchHeader, nonSignerStakesAndSignature)
+}
+
+// DeregisterOperatorFromAVS is a paid mutator transaction binding the contract method 0xa364f4da.
+//
+// Solidity: function deregisterOperatorFromAVS(address operator) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) DeregisterOperatorFromAVS(opts *bind.TransactOpts, operator common.Address) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.contract.Transact(opts, "deregisterOperatorFromAVS", operator)
+}
+
+// DeregisterOperatorFromAVS is a paid mutator transaction binding the contract method 0xa364f4da.
+//
+// Solidity: function deregisterOperatorFromAVS(address operator) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) DeregisterOperatorFromAVS(operator common.Address) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.DeregisterOperatorFromAVS(&_ContractIEigenDAServiceManager.TransactOpts, operator)
+}
+
+// DeregisterOperatorFromAVS is a paid mutator transaction binding the contract method 0xa364f4da.
+//
+// Solidity: function deregisterOperatorFromAVS(address operator) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) DeregisterOperatorFromAVS(operator common.Address) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.DeregisterOperatorFromAVS(&_ContractIEigenDAServiceManager.TransactOpts, operator)
+}
+
+// RegisterOperatorToAVS is a paid mutator transaction binding the contract method 0x9926ee7d.
+//
+// Solidity: function registerOperatorToAVS(address operator, (bytes,bytes32,uint256) operatorSignature) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) RegisterOperatorToAVS(opts *bind.TransactOpts, operator common.Address, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.contract.Transact(opts, "registerOperatorToAVS", operator, operatorSignature)
+}
+
+// RegisterOperatorToAVS is a paid mutator transaction binding the contract method 0x9926ee7d.
+//
+// Solidity: function registerOperatorToAVS(address operator, (bytes,bytes32,uint256) operatorSignature) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) RegisterOperatorToAVS(operator common.Address, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.RegisterOperatorToAVS(&_ContractIEigenDAServiceManager.TransactOpts, operator, operatorSignature)
+}
+
+// RegisterOperatorToAVS is a paid mutator transaction binding the contract method 0x9926ee7d.
+//
+// Solidity: function registerOperatorToAVS(address operator, (bytes,bytes32,uint256) operatorSignature) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) RegisterOperatorToAVS(operator common.Address, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.RegisterOperatorToAVS(&_ContractIEigenDAServiceManager.TransactOpts, operator, operatorSignature)
+}
+
+// SetBatchConfirmer is a paid mutator transaction binding the contract method 0xf1220983.
+//
+// Solidity: function setBatchConfirmer(address _batchConfirmer) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) SetBatchConfirmer(opts *bind.TransactOpts, _batchConfirmer common.Address) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.contract.Transact(opts, "setBatchConfirmer", _batchConfirmer)
+}
+
+// SetBatchConfirmer is a paid mutator transaction binding the contract method 0xf1220983.
+//
+// Solidity: function setBatchConfirmer(address _batchConfirmer) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) SetBatchConfirmer(_batchConfirmer common.Address) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.SetBatchConfirmer(&_ContractIEigenDAServiceManager.TransactOpts, _batchConfirmer)
+}
+
+// SetBatchConfirmer is a paid mutator transaction binding the contract method 0xf1220983.
+//
+// Solidity: function setBatchConfirmer(address _batchConfirmer) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) SetBatchConfirmer(_batchConfirmer common.Address) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.SetBatchConfirmer(&_ContractIEigenDAServiceManager.TransactOpts, _batchConfirmer)
+}
+
+// SetMetadataURI is a paid mutator transaction binding the contract method 0x750521f5.
+//
+// Solidity: function setMetadataURI(string _metadataURI) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) SetMetadataURI(opts *bind.TransactOpts, _metadataURI string) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.contract.Transact(opts, "setMetadataURI", _metadataURI)
+}
+
+// SetMetadataURI is a paid mutator transaction binding the contract method 0x750521f5.
+//
+// Solidity: function setMetadataURI(string _metadataURI) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) SetMetadataURI(_metadataURI string) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.SetMetadataURI(&_ContractIEigenDAServiceManager.TransactOpts, _metadataURI)
+}
+
+// SetMetadataURI is a paid mutator transaction binding the contract method 0x750521f5.
+//
+// Solidity: function setMetadataURI(string _metadataURI) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) SetMetadataURI(_metadataURI string) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.SetMetadataURI(&_ContractIEigenDAServiceManager.TransactOpts, _metadataURI)
 }
 
 // ContractIEigenDAServiceManagerBatchConfirmedIterator is returned from FilterBatchConfirmed and is used to iterate over the raw logs and unpacked data for BatchConfirmed events raised by the ContractIEigenDAServiceManager contract.
@@ -450,12 +607,13 @@ type ContractIEigenDAServiceManagerBatchConfirmed struct {
 	BatchHeaderHash [32]byte
 	BatchId         uint32
 	Fee             *big.Int
+	Optimistic      bool
 	Raw             types.Log // Blockchain specific contextual infos
 }
 
-// FilterBatchConfirmed is a free log retrieval operation binding the contract event 0x2eaa707a79ac1f835863f5a6fdb5f27c0e295dc23adf970a445cd87d126c4d63.
+// FilterBatchConfirmed is a free log retrieval operation binding the contract event 0x629bd7d954977a694e8a110c3ec12da84410bbe09d57666add08320cc9f9ddb3.
 //
-// Solidity: event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee)
+// Solidity: event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee, bool optimistic)
 func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterBatchConfirmed(opts *bind.FilterOpts, batchHeaderHash [][32]byte) (*ContractIEigenDAServiceManagerBatchConfirmedIterator, error) {
 
 	var batchHeaderHashRule []interface{}
@@ -470,9 +628,9 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) F
 	return &ContractIEigenDAServiceManagerBatchConfirmedIterator{contract: _ContractIEigenDAServiceManager.contract, event: "BatchConfirmed", logs: logs, sub: sub}, nil
 }
 
-// WatchBatchConfirmed is a free log subscription operation binding the contract event 0x2eaa707a79ac1f835863f5a6fdb5f27c0e295dc23adf970a445cd87d126c4d63.
+// WatchBatchConfirmed is a free log subscription operation binding the contract event 0x629bd7d954977a694e8a110c3ec12da84410bbe09d57666add08320cc9f9ddb3.
 //
-// Solidity: event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee)
+// Solidity: event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee, bool optimistic)
 func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchBatchConfirmed(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerBatchConfirmed, batchHeaderHash [][32]byte) (event.Subscription, error) {
 
 	var batchHeaderHashRule []interface{}
@@ -512,9 +670,9 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) W
 	}), nil
 }
 
-// ParseBatchConfirmed is a log parse operation binding the contract event 0x2eaa707a79ac1f835863f5a6fdb5f27c0e295dc23adf970a445cd87d126c4d63.
+// ParseBatchConfirmed is a log parse operation binding the contract event 0x629bd7d954977a694e8a110c3ec12da84410bbe09d57666add08320cc9f9ddb3.
 //
-// Solidity: event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee)
+// Solidity: event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee, bool optimistic)
 func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParseBatchConfirmed(log types.Log) (*ContractIEigenDAServiceManagerBatchConfirmed, error) {
 	event := new(ContractIEigenDAServiceManagerBatchConfirmed)
 	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmed", log); err != nil {
@@ -524,9 +682,9 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) P
 	return event, nil
 }
 
-// ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator is returned from FilterFeePerBytePerTimeSet and is used to iterate over the raw logs and unpacked data for FeePerBytePerTimeSet events raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator struct {
-	Event *ContractIEigenDAServiceManagerFeePerBytePerTimeSet // Event containing the contract specifics and raw log
+// ContractIEigenDAServiceManagerBatchConfirmerChangedIterator is returned from FilterBatchConfirmerChanged and is used to iterate over the raw logs and unpacked data for BatchConfirmerChanged events raised by the ContractIEigenDAServiceManager contract.
+type ContractIEigenDAServiceManagerBatchConfirmerChangedIterator struct {
+	Event *ContractIEigenDAServiceManagerBatchConfirmerChanged // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -540,7 +698,7 @@ type ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator) Next() bool {
+func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -549,7 +707,7 @@ func (it *ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator) Next() boo
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractIEigenDAServiceManagerFeePerBytePerTimeSet)
+			it.Event = new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -564,7 +722,7 @@ func (it *ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator) Next() boo
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractIEigenDAServiceManagerFeePerBytePerTimeSet)
+		it.Event = new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -580,177 +738,42 @@ func (it *ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator) Next() boo
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator) Error() error {
+func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator) Close() error {
+func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractIEigenDAServiceManagerFeePerBytePerTimeSet represents a FeePerBytePerTimeSet event raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerFeePerBytePerTimeSet struct {
-	PreviousValue *big.Int
-	NewValue      *big.Int
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterFeePerBytePerTimeSet is a free log retrieval operation binding the contract event 0xcd1b2c2a220284accd1f9effd811cdecb6beaa4638618b48bbea07ce7ae16996.
-//
-// Solidity: event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterFeePerBytePerTimeSet(opts *bind.FilterOpts) (*ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator, error) {
-
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.FilterLogs(opts, "FeePerBytePerTimeSet")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractIEigenDAServiceManagerFeePerBytePerTimeSetIterator{contract: _ContractIEigenDAServiceManager.contract, event: "FeePerBytePerTimeSet", logs: logs, sub: sub}, nil
-}
-
-// WatchFeePerBytePerTimeSet is a free log subscription operation binding the contract event 0xcd1b2c2a220284accd1f9effd811cdecb6beaa4638618b48bbea07ce7ae16996.
-//
-// Solidity: event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchFeePerBytePerTimeSet(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerFeePerBytePerTimeSet) (event.Subscription, error) {
-
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.WatchLogs(opts, "FeePerBytePerTimeSet")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractIEigenDAServiceManagerFeePerBytePerTimeSet)
-				if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "FeePerBytePerTimeSet", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseFeePerBytePerTimeSet is a log parse operation binding the contract event 0xcd1b2c2a220284accd1f9effd811cdecb6beaa4638618b48bbea07ce7ae16996.
-//
-// Solidity: event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParseFeePerBytePerTimeSet(log types.Log) (*ContractIEigenDAServiceManagerFeePerBytePerTimeSet, error) {
-	event := new(ContractIEigenDAServiceManagerFeePerBytePerTimeSet)
-	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "FeePerBytePerTimeSet", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractIEigenDAServiceManagerFeeSetterChangedIterator is returned from FilterFeeSetterChanged and is used to iterate over the raw logs and unpacked data for FeeSetterChanged events raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerFeeSetterChangedIterator struct {
-	Event *ContractIEigenDAServiceManagerFeeSetterChanged // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractIEigenDAServiceManagerFeeSetterChangedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractIEigenDAServiceManagerFeeSetterChanged)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractIEigenDAServiceManagerFeeSetterChanged)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractIEigenDAServiceManagerFeeSetterChangedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractIEigenDAServiceManagerFeeSetterChangedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractIEigenDAServiceManagerFeeSetterChanged represents a FeeSetterChanged event raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerFeeSetterChanged struct {
+// ContractIEigenDAServiceManagerBatchConfirmerChanged represents a BatchConfirmerChanged event raised by the ContractIEigenDAServiceManager contract.
+type ContractIEigenDAServiceManagerBatchConfirmerChanged struct {
 	PreviousAddress common.Address
 	NewAddress      common.Address
 	Raw             types.Log // Blockchain specific contextual infos
 }
 
-// FilterFeeSetterChanged is a free log retrieval operation binding the contract event 0x774b126b94b3cc801460a024dd575406c3ebf27affd7c36198a53ac6655f056d.
+// FilterBatchConfirmerChanged is a free log retrieval operation binding the contract event 0xf024af0387e1367ceb1c6a3b6a00db4e9917e56bfb22a289808100f8e2b2c085.
 //
-// Solidity: event FeeSetterChanged(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterFeeSetterChanged(opts *bind.FilterOpts) (*ContractIEigenDAServiceManagerFeeSetterChangedIterator, error) {
+// Solidity: event BatchConfirmerChanged(address previousAddress, address newAddress)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterBatchConfirmerChanged(opts *bind.FilterOpts) (*ContractIEigenDAServiceManagerBatchConfirmerChangedIterator, error) {
 
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.FilterLogs(opts, "FeeSetterChanged")
+	logs, sub, err := _ContractIEigenDAServiceManager.contract.FilterLogs(opts, "BatchConfirmerChanged")
 	if err != nil {
 		return nil, err
 	}
-	return &ContractIEigenDAServiceManagerFeeSetterChangedIterator{contract: _ContractIEigenDAServiceManager.contract, event: "FeeSetterChanged", logs: logs, sub: sub}, nil
+	return &ContractIEigenDAServiceManagerBatchConfirmerChangedIterator{contract: _ContractIEigenDAServiceManager.contract, event: "BatchConfirmerChanged", logs: logs, sub: sub}, nil
 }
 
-// WatchFeeSetterChanged is a free log subscription operation binding the contract event 0x774b126b94b3cc801460a024dd575406c3ebf27affd7c36198a53ac6655f056d.
+// WatchBatchConfirmerChanged is a free log subscription operation binding the contract event 0xf024af0387e1367ceb1c6a3b6a00db4e9917e56bfb22a289808100f8e2b2c085.
 //
-// Solidity: event FeeSetterChanged(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchFeeSetterChanged(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerFeeSetterChanged) (event.Subscription, error) {
+// Solidity: event BatchConfirmerChanged(address previousAddress, address newAddress)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchBatchConfirmerChanged(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerBatchConfirmerChanged) (event.Subscription, error) {
 
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.WatchLogs(opts, "FeeSetterChanged")
+	logs, sub, err := _ContractIEigenDAServiceManager.contract.WatchLogs(opts, "BatchConfirmerChanged")
 	if err != nil {
 		return nil, err
 	}
@@ -760,8 +783,8 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) W
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractIEigenDAServiceManagerFeeSetterChanged)
-				if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "FeeSetterChanged", log); err != nil {
+				event := new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
+				if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmerChanged", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -782,147 +805,12 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) W
 	}), nil
 }
 
-// ParseFeeSetterChanged is a log parse operation binding the contract event 0x774b126b94b3cc801460a024dd575406c3ebf27affd7c36198a53ac6655f056d.
+// ParseBatchConfirmerChanged is a log parse operation binding the contract event 0xf024af0387e1367ceb1c6a3b6a00db4e9917e56bfb22a289808100f8e2b2c085.
 //
-// Solidity: event FeeSetterChanged(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParseFeeSetterChanged(log types.Log) (*ContractIEigenDAServiceManagerFeeSetterChanged, error) {
-	event := new(ContractIEigenDAServiceManagerFeeSetterChanged)
-	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "FeeSetterChanged", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractIEigenDAServiceManagerPaymentManagerSetIterator is returned from FilterPaymentManagerSet and is used to iterate over the raw logs and unpacked data for PaymentManagerSet events raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerPaymentManagerSetIterator struct {
-	Event *ContractIEigenDAServiceManagerPaymentManagerSet // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractIEigenDAServiceManagerPaymentManagerSetIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractIEigenDAServiceManagerPaymentManagerSet)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractIEigenDAServiceManagerPaymentManagerSet)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractIEigenDAServiceManagerPaymentManagerSetIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractIEigenDAServiceManagerPaymentManagerSetIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractIEigenDAServiceManagerPaymentManagerSet represents a PaymentManagerSet event raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerPaymentManagerSet struct {
-	PreviousAddress common.Address
-	NewAddress      common.Address
-	Raw             types.Log // Blockchain specific contextual infos
-}
-
-// FilterPaymentManagerSet is a free log retrieval operation binding the contract event 0xa3044efb81dffce20bbf49cae117f167852a973364ae504dfade51a8d022c95a.
-//
-// Solidity: event PaymentManagerSet(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterPaymentManagerSet(opts *bind.FilterOpts) (*ContractIEigenDAServiceManagerPaymentManagerSetIterator, error) {
-
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.FilterLogs(opts, "PaymentManagerSet")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractIEigenDAServiceManagerPaymentManagerSetIterator{contract: _ContractIEigenDAServiceManager.contract, event: "PaymentManagerSet", logs: logs, sub: sub}, nil
-}
-
-// WatchPaymentManagerSet is a free log subscription operation binding the contract event 0xa3044efb81dffce20bbf49cae117f167852a973364ae504dfade51a8d022c95a.
-//
-// Solidity: event PaymentManagerSet(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchPaymentManagerSet(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerPaymentManagerSet) (event.Subscription, error) {
-
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.WatchLogs(opts, "PaymentManagerSet")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractIEigenDAServiceManagerPaymentManagerSet)
-				if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "PaymentManagerSet", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParsePaymentManagerSet is a log parse operation binding the contract event 0xa3044efb81dffce20bbf49cae117f167852a973364ae504dfade51a8d022c95a.
-//
-// Solidity: event PaymentManagerSet(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParsePaymentManagerSet(log types.Log) (*ContractIEigenDAServiceManagerPaymentManagerSet, error) {
-	event := new(ContractIEigenDAServiceManagerPaymentManagerSet)
-	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "PaymentManagerSet", log); err != nil {
+// Solidity: event BatchConfirmerChanged(address previousAddress, address newAddress)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParseBatchConfirmerChanged(log types.Log) (*ContractIEigenDAServiceManagerBatchConfirmerChanged, error) {
+	event := new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
+	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmerChanged", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
