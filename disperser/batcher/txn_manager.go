@@ -122,7 +122,7 @@ func (t *txnManager) Start(ctx context.Context) {
 func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.logger.Debug("[ProcessTransaction] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
+	t.logger.Debug("[TxnManager] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
 	gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest gas caps: %w", err)
@@ -157,7 +157,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
 
-		t.logger.Debug("[monitorTransaction] monitoring transaction", "tag", req.Tag, "nonce", req.Tx.Nonce())
+		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
 		receipt, err := t.ethClient.EnsureTransactionEvaled(
 			ctxWithTimeout,
 			req.Tx,
@@ -171,10 +171,10 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 
 		if errors.Is(err, context.DeadlineExceeded) {
 			if receipt != nil {
-				t.logger.Warn("transaction has been mined, but hasn't accumulated the required number of confirmations", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
+				t.logger.Warn("[TxnManager] transaction has been mined, but hasn't accumulated the required number of confirmations", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
 				continue
 			}
-			t.logger.Warn("transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
+			t.logger.Warn("[TxnManager] transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
 			newTx, err := t.speedUpTxn(ctx, req.Tx, req.Tag)
 			if err != nil {
 				t.logger.Error("[TxnManager] failed to speed up transaction", "err", err)
@@ -192,7 +192,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			req.Tx = newTx
 			numSpeedUps++
 		} else {
-			t.logger.Error("transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
+			t.logger.Error("[TxnManager] transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
 			t.metrics.IncrementTxnCount("failure")
 			return nil, err
 		}
@@ -224,7 +224,7 @@ func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag 
 		newGasFeeCap = increasedGasFeeCap
 	}
 
-	t.logger.Debug("[speedUpTxn] increasing gas price", "tag", tag, "txHash", tx.Hash().Hex(), "nonce", tx.Nonce(), "prevGasTipCap", prevGasTipCap, "prevGasFeeCap", prevGasFeeCap, "newGasTipCap", newGasTipCap, "newGasFeeCap", newGasFeeCap)
+	t.logger.Info("[TxnManager] increasing gas price", "tag", tag, "txHash", tx.Hash().Hex(), "nonce", tx.Nonce(), "prevGasTipCap", prevGasTipCap, "prevGasFeeCap", prevGasFeeCap, "newGasTipCap", newGasTipCap, "newGasFeeCap", newGasFeeCap)
 	return t.ethClient.UpdateGas(ctx, tx, tx.Value(), newGasTipCap, newGasFeeCap)
 }
 
