@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -172,7 +173,7 @@ func (c *churner) createChurnResponse(
 	}, nil
 }
 
-func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, operatorStakes [][]core.OperatorStake, operatorToRegisterAddress gethcommon.Address, currentBlockNumber uint32) ([]core.OperatorToChurn, error) {
+func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, operatorStakes core.OperatorStakes, operatorToRegisterAddress gethcommon.Address, currentBlockNumber uint32) ([]core.OperatorToChurn, error) {
 	operatorsToChurn := make([]core.OperatorToChurn, 0)
 	for i, quorumID := range quorumIDs {
 		operatorSetParams, err := c.Transactor.GetOperatorSetParams(ctx, quorumID)
@@ -184,7 +185,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 			return nil, errors.New("maxOperatorCount is 0")
 		}
 
-		if uint32(len(operatorStakes[i])) < operatorSetParams.MaxOperatorCount {
+		if uint32(len(operatorStakes[quorumID])) < operatorSetParams.MaxOperatorCount {
 			// quorum is not full, so we can continue
 			continue
 		}
@@ -196,9 +197,9 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 
 		// loop through operator stakes for the quorum and find the lowest one
 		totalStake := big.NewInt(0)
-		lowestStakeOperatorId := operatorStakes[i][0].OperatorID
-		lowestStake := operatorStakes[i][0].Stake
-		for _, operatorStake := range operatorStakes[i] {
+		lowestStakeOperatorId := operatorStakes[quorumID][0].OperatorID
+		lowestStake := operatorStakes[quorumID][0].Stake
+		for _, operatorStake := range operatorStakes[quorumID] {
 			if operatorStake.Stake.Cmp(lowestStake) < 0 {
 				lowestStake = operatorStake.Stake
 				lowestStakeOperatorId = operatorStake.OperatorID
@@ -213,16 +214,26 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 
 		// verify the lowest stake against the registering operator's stake
 		// make sure that: lowestStake * churnBIPsOfOperatorStake < operatorToRegisterStake * bipMultiplier
+		// This means the registering operator needs to have greater than
+		// churnBIPsOfOperatorStake/10000 times the stake of lowest stake in order to
+		// churn the lowest-stake operator out.
+		// For example, when churnBIPsOfOperatorStake=11000, the operator trying to
+		// register needs to have 1.1 times the stake of the lowest-stake operator.
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
-			return nil, errors.New("registering operator has less than churnBIPsOfOperatorStake")
+			return nil, fmt.Errorf("registering operator must have %f%% more than the stake of the lowest-stake operator. Stake of registering operator: %d, stake of lowest-stake operator: %d, quorum ID: %d", float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, operatorToRegisterStake, lowestStake, quorumID)
 		}
 
 		// verify the lowest stake against the total stake
 		// make sure that: lowestStake * bipMultiplier < totalStake * churnBIPsOfTotalStake
+		// For the lowest-stake operator to be churned out, it must have less than
+		// churnBIPsOfTotalStake/10000 of the total stake.
+		// For example, when churnBIPsOfTotalStake=1001, the operator to be churned out
+		// (i.e. the lowest-stake operator) needs to have less than 10.01% of the total
+		// stake.
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
-			return nil, errors.New("operator to churn has less than churnBIPSOfTotalStake")
+			return nil, fmt.Errorf("operator to churn out must have less than %f%% of the total stake. Stake of the operator to churn: %d, total stake in quorum: %d, quorum ID: %d", float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, lowestStake, totalStake, quorumID)
 		}
 
 		operatorToChurnAddress, err := c.Transactor.OperatorIDToAddress(ctx, lowestStakeOperatorId)

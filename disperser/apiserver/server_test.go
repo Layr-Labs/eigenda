@@ -20,10 +20,11 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -53,7 +54,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDisperseBlob(t *testing.T) {
-	data := make([]byte, 1024)
+	data := make([]byte, 3*1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -154,8 +155,7 @@ func TestGetBlobStatus(t *testing.T) {
 			QuorumNumber:                 uint32(sp.QuorumID),
 			AdversaryThresholdPercentage: uint32(sp.AdversaryThreshold),
 			QuorumThresholdPercentage:    uint32(sp.QuorumThreshold),
-			QuantizationParam:            uint32(batcher.QuantizationFactor),
-			EncodedLength:                uint64(confirmedMetadata.ConfirmationInfo.BlobQuorumInfos[i].EncodedBlobLength),
+			ChunkLength:                  10,
 		}
 		quorumNumbers[i] = sp.QuorumID
 		quorumPercentSigned[i] = confirmedMetadata.ConfirmationInfo.QuorumResults[sp.QuorumID].PercentSigned
@@ -249,7 +249,7 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 }
 
 func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
-	data := make([]byte, 1024*512+10)
+	data := make([]byte, 2*1024*1024+10)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -276,7 +276,91 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "blob size cannot exceed 512 KiB")
+	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
+}
+
+func TestRatelimit(t *testing.T) {
+	data50KiB := make([]byte, 50*1024)
+	_, err := rand.Read(data50KiB)
+	assert.NoError(t, err)
+	data1KiB := make([]byte, 1024)
+	_, err = rand.Read(data1KiB)
+	assert.NoError(t, err)
+
+	// Try with a non-allowlisted IP
+	p := &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: 51001,
+		},
+	}
+	ctx := peer.NewContext(context.Background(), p)
+
+	// Try with non-allowlisted IP
+	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data50KiB,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    100,
+			},
+		},
+	})
+	assert.ErrorContains(t, err, "account throughput limit")
+
+	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
+	for i := 0; i < 10; i++ {
+		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+			Data: data1KiB,
+			SecurityParams: []*pb.SecurityParams{
+				{
+					QuorumId:           1,
+					AdversaryThreshold: 50,
+					QuorumThreshold:    100,
+				},
+			},
+		})
+	}
+	assert.ErrorContains(t, err, "account blob limit")
+
+	// Now try with an allowlisted IP
+	// This should succeed because the account throughput limit is 100 KiB/s for quorum 0
+	p = &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("1.2.3.4"),
+			Port: 51001,
+		},
+	}
+	ctx = peer.NewContext(context.Background(), p)
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data: data50KiB,
+		SecurityParams: []*pb.SecurityParams{
+			{
+				QuorumId:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    100,
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	// This should succeed because the account blob limit (5 blobs/s) X bucket size (3s) is larger than 10 blobs.
+	for i := 0; i < 10; i++ {
+		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+			Data: data1KiB,
+			SecurityParams: []*pb.SecurityParams{
+				{
+					QuorumId:           1,
+					AdversaryThreshold: 50,
+					QuorumThreshold:    100,
+				},
+			},
+		})
+		assert.NoError(t, err)
+	}
 }
 
 func setup(m *testing.M) {
@@ -335,15 +419,45 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
 
-	var ratelimiter common.RateLimiter
+	globalParams := common.GlobalRateParams{
+		CountFailed: false,
+		BucketSizes: []time.Duration{3 * time.Second},
+		Multipliers: []float32{1},
+	}
+	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](1000)
+	if err != nil {
+		panic("failed to create bucket store")
+	}
+	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+
 	rateConfig := apiserver.RateConfig{
 		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
 			0: {
-				PerUserUnauthThroughput: 0,
-				TotalUnauthThroughput:   0,
+				PerUserUnauthThroughput: 20 * 1024,
+				TotalUnauthThroughput:   1048576,
+				PerUserUnauthBlobRate:   3 * 1e6,
+				TotalUnauthBlobRate:     10 * 1e6,
+			},
+			1: {
+				PerUserUnauthThroughput: 20 * 1024,
+				TotalUnauthThroughput:   1048576,
+				PerUserUnauthBlobRate:   3 * 1e6,
+				TotalUnauthBlobRate:     10 * 1e6,
 			},
 		},
 		ClientIPHeader: "",
+		Allowlist: apiserver.Allowlist{
+			"1.2.3.4": map[uint8]apiserver.PerUserRateInfo{
+				0: {
+					Throughput: 100 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+				1: {
+					Throughput: 1024 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+			},
+		},
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
@@ -438,7 +552,6 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	sigRecordHash := [32]byte{0}
 	fee := []byte{0}
 	inclusionProof := []byte{1, 2, 3, 4, 5}
-	encodedBlobLength := 32
 	quorumResults := make(map[core.QuorumID]*core.QuorumResult, len(securityParams))
 	quorumInfos := make([]*core.BlobQuorumInfo, len(securityParams))
 	for i, sp := range securityParams {
@@ -447,9 +560,8 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 			PercentSigned: 100,
 		}
 		quorumInfos[i] = &core.BlobQuorumInfo{
-			SecurityParam:      *sp,
-			QuantizationFactor: batcher.QuantizationFactor,
-			EncodedBlobLength:  uint(encodedBlobLength),
+			SecurityParam: *sp,
+			ChunkLength:   10,
 		}
 	}
 

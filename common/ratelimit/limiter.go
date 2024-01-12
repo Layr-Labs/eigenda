@@ -11,8 +11,7 @@ type BucketStore = common.KVStore[common.RateBucketParams]
 
 type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
-
-	bucketStore BucketStore
+	bucketStore      BucketStore
 
 	logger common.Logger
 }
@@ -27,10 +26,8 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore,
 
 // Checks whether a request from the given requesterID is allowed
 func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
-
 	// Retrieve bucket params for the requester ID
 	// This will be from dynamo for Disperser and from local storage for DA node
-
 	bucketParams, err := d.bucketStore.GetItem(ctx, requesterID)
 	if err != nil {
 
@@ -58,7 +55,6 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 
 		// Update the bucket level
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
-
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 	}
 

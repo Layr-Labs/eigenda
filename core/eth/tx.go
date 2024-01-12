@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -123,7 +124,12 @@ func (t *Transactor) RegisterBLSPublicKey(ctx context.Context, keypair *core.Key
 		}
 
 		// assemble tx
-		tx, err := t.Bindings.PubkeyCompendium.RegisterBLSPublicKey(t.EthClient.GetNoSendTransactOpts(), signedMessageHashParam, pubkeyG1Param, pubkeyG2Param)
+		opts, err := t.EthClient.GetNoSendTransactOpts()
+		if err != nil {
+			t.Logger.Error("Failed to generate transact opts", "err", err)
+			return err
+		}
+		tx, err := t.Bindings.PubkeyCompendium.RegisterBLSPublicKey(opts, signedMessageHashParam, pubkeyG1Param, pubkeyG2Param)
 		if err != nil {
 			t.Logger.Error("Error assembling RegisterBLSPublicKey tx")
 			return err
@@ -173,8 +179,12 @@ func (t *Transactor) RegisterOperator(ctx context.Context, pubkeyG1 *core.G1Poin
 		Y: pubkey.Y,
 	}
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
-
-	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator1(t.EthClient.GetNoSendTransactOpts(), quorumNumbers, g1Point, socket)
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
+	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator1(opts, quorumNumbers, g1Point, socket)
 
 	if err != nil {
 		t.Logger.Error("Failed to register operator", "err", err)
@@ -221,8 +231,13 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *co
 		Expiry:    new(big.Int).SetInt64(churnReply.SignatureWithSaltAndExpiry.Expiry),
 	}
 
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
 	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator(
-		t.EthClient.GetNoSendTransactOpts(),
+		opts,
 		quorumNumbers,
 		operatorToRegisterPubkey,
 		socket,
@@ -247,7 +262,7 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *co
 // registered with at the supplied block number. To fully deregister an operator, this function should be called
 // with the current block number.
 func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32) error {
-	operatorId := hashPubKeyG1(pubkeyG1)
+	operatorId := HashPubKeyG1(pubkeyG1)
 	quorumBitmap, opStates, err := t.Bindings.BLSOpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operatorId, blockNumber)
@@ -270,8 +285,13 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 		Y: pubkey.Y,
 	}
 
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
 	tx, err := t.Bindings.BLSRegCoordWithIndices.DeregisterOperatorWithCoordinator(
-		t.EthClient.GetNoSendTransactOpts(),
+		opts,
 		quorumNumbers,
 		g1Point,
 	)
@@ -290,7 +310,12 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 
 // UpdateOperatorSocket updates the socket of the operator in all the quorums that it is
 func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) error {
-	tx, err := t.Bindings.BLSRegCoordWithIndices.UpdateSocket(t.EthClient.GetNoSendTransactOpts(), socket)
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
+	tx, err := t.Bindings.BLSRegCoordWithIndices.UpdateSocket(opts, socket)
 	if err != nil {
 		t.Logger.Error("Failed to update operator socket", "err", err)
 		return err
@@ -307,7 +332,7 @@ func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) er
 // GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
 // is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 // are also returned.
-func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.OperatorID, blockNumber uint32) ([][]core.OperatorStake, []core.QuorumID, error) {
+func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.OperatorID, blockNumber uint32) (core.OperatorStakes, []core.QuorumID, error) {
 	quorumBitmap, state_, err := t.Bindings.BLSOpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operator, blockNumber)
@@ -316,11 +341,13 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 		return nil, nil, err
 	}
 
-	state := make([][]core.OperatorStake, len(state_))
+	state := make(core.OperatorStakes, len(state_))
 	for i := range state_ {
-		state[i] = make([]core.OperatorStake, len(state_[i]))
+		quorumID := core.QuorumID(i)
+		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStake, len(state_[i]))
 		for j, op := range state_[i] {
-			state[i][j] = core.OperatorStake{
+			operatorIndex := core.OperatorIndex(j)
+			state[quorumID][operatorIndex] = core.OperatorStake{
 				Stake:      op.Stake,
 				OperatorID: op.OperatorId,
 			}
@@ -356,12 +383,13 @@ func (t *Transactor) GetStoreDurationBlocks(ctx context.Context) (uint32, error)
 
 // GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
 // The indices of the operators within each quorum are also returned.
-func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) ([][]core.OperatorStake, error) {
+func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakes, error) {
 	quorumBytes := make([]byte, len(quorums))
 	for ind, quorum := range quorums {
 		quorumBytes[ind] = byte(uint8(quorum))
 	}
 
+	// state_ is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
 	state_, err := t.Bindings.BLSOpStateRetriever.GetOperatorState(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
@@ -370,11 +398,13 @@ func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []
 		return nil, err
 	}
 
-	state := make([][]core.OperatorStake, len(state_))
+	state := make(core.OperatorStakes, len(state_))
 	for i := range state_ {
-		state[i] = make([]core.OperatorStake, len(state_[i]))
+		quorumID := quorums[i]
+		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStake, len(state_[i]))
 		for j, op := range state_[i] {
-			state[i][j] = core.OperatorStake{
+			operatorIndex := core.OperatorIndex(j)
+			state[quorumID][operatorIndex] = core.OperatorStake{
 				Stake:      op.Stake,
 				OperatorID: op.OperatorId,
 			}
@@ -384,15 +414,25 @@ func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []
 	return state, nil
 }
 
-// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
+// BuildConfirmBatchTxn builds a transaction to confirm a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
 // specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
-func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation core.SignatureAggregation) (*types.Receipt, error) {
+// Note that this function returns a transaction without publishing it to the blockchain. The caller is responsible for publishing the transaction.
+func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
 	quorumNumbers := quorumParamsToQuorumNumbers(quorums)
 	nonSignerOperatorIds := make([][32]byte, len(signatureAggregation.NonSigners))
 	for i := range signatureAggregation.NonSigners {
-		nonSignerOperatorIds[i] = hashPubKeyG1(signatureAggregation.NonSigners[i])
+		// TODO: instead of recalculating the operator id, we should just pass it in from the caller
+		nonSignerOperatorIds[i] = HashPubKeyG1(signatureAggregation.NonSigners[i])
+	}
+	sigAgg, err := json.Marshal(signatureAggregation)
+	if err == nil {
+		t.Logger.Trace("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
 	}
 
+	t.Logger.Trace("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
+	for _, ns := range nonSignerOperatorIds {
+		t.Logger.Trace("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
+	}
 	checkSignaturesIndices, err := t.Bindings.BLSOpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
 			Context: ctx,
@@ -403,7 +443,7 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 		nonSignerOperatorIds,
 	)
 	if err != nil {
-		t.Logger.Error("Failed to fetch checkSignaturesIndices", err)
+		t.Logger.Error("Failed to fetch checkSignaturesIndices", "err", err)
 		return nil, err
 	}
 
@@ -420,6 +460,7 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 		QuorumThresholdPercentages: quorumThresholdPercentages,
 		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
 	}
+	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -440,10 +481,25 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHea
 		TotalStakeIndices:            checkSignaturesIndices.TotalStakeIndices,
 		NonSignerStakeIndices:        checkSignaturesIndices.NonSignerStakeIndices,
 	}
+	sigChecker, err := json.Marshal(signatureChecker)
+	if err == nil {
+		t.Logger.Trace("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
+	}
 
-	tx, err := t.Bindings.EigenDAServiceManager.ConfirmBatch(t.EthClient.GetNoSendTransactOpts(), batchH, signatureChecker)
+	opts, err := t.EthClient.GetNoSendTransactOpts()
 	if err != nil {
-		t.Logger.Error("Failed to confirm batch", "err", err)
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return nil, err
+	}
+	return t.Bindings.EigenDAServiceManager.ConfirmBatch(opts, batchH, signatureChecker)
+}
+
+// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
+// specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
+func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Receipt, error) {
+	tx, err := t.BuildConfirmBatchTxn(ctx, batchHeader, quorums, signatureAggregation)
+	if err != nil {
+		t.Logger.Error("Failed to build a ConfirmBatch txn", "err", err)
 		return nil, err
 	}
 
@@ -675,9 +731,13 @@ func quorumParamsToThresholdPercentages(quorumParams map[core.QuorumID]*core.Quo
 	return thresholdPercentages
 }
 
-func hashPubKeyG1(pk *core.G1Point) [32]byte {
+func HashPubKeyG1(pk *core.G1Point) [32]byte {
 	gp := pubKeyG1ToBN254G1Point(pk)
-	return crypto.Keccak256Hash(append(gp.X.Bytes(), gp.Y.Bytes()...))
+	xBytes := make([]byte, 32)
+	yBytes := make([]byte, 32)
+	gp.X.FillBytes(xBytes)
+	gp.Y.FillBytes(yBytes)
+	return crypto.Keccak256Hash(append(xBytes, yBytes...))
 }
 
 func BitmapToQuorumIds(bitmap *big.Int) []core.QuorumID {

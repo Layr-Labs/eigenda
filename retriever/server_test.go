@@ -54,7 +54,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 
 	logger := &commock.Logger{}
 
-	indexedChainState, err = coremock.NewChainDataMock(core.OperatorIndex(numOperators))
+	indexedChainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
 	if err != nil {
 		log.Fatalf("failed to create new mocked chain data: %s", err)
 	}

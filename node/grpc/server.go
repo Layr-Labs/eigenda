@@ -189,8 +189,12 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, err
 	}
 
-	encodedBlobSize := core.GetBlobSize(blobHeader.QuorumInfos[in.GetQuorumId()].EncodedBlobLength)
-	rate := blobHeader.QuorumInfos[in.GetQuorumId()].QuorumRate
+	quorumInfo := blobHeader.GetQuorumInfo(uint8(in.GetQuorumId()))
+	if quorumInfo == nil {
+		return nil, fmt.Errorf("invalid request: quorum ID %d not found in blob header", in.GetQuorumId())
+	}
+	encodedBlobSize := core.GetBlobSize(core.GetEncodedBlobLength(blobHeader.Length, quorumInfo.QuorumThreshold, quorumInfo.AdversaryThreshold))
+	rate := quorumInfo.QuorumRate
 
 	s.mu.Lock()
 	allow, err := s.ratelimiter.AllowRequest(ctx, retrieverID, encodedBlobSize, rate)

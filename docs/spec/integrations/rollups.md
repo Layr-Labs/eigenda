@@ -5,11 +5,11 @@
 Rollups need to define the quorums they want to sign off on the availability of their data and their trust assumptions on each of those quorums. The rollups need to define:
 
 1. `AdversaryThresholdBPs`. This is the maximum ratio (in basis points) that can be adversarial in the quorum.
-2. `QuorumThresholdBPs`. This is the minimum ratio (in basis points) that can need to sign on the availbility of the rollups data for the rollup's contracts to consider the data available.
+2. `QuorumThresholdBPs`. This is the minimum ratio (in basis points) that can need to sign on the availability of the rollups data for the rollup's contracts to consider the data available.
 
 ## Requests to Store Data
 
-When the rollup has data that they want to make availbale, they construct a request to the disperser of the form [`BlobStoreRequest`](./types.md#blobstorerequest) and receive a response of the form [`BlobStoreResponse`](./types.md#blobstoreresponse).
+When the rollup has data that they want to make available, they construct a request to the disperser of the form [`BlobStoreRequest`](./types.md#blobstorerequest) and receive a response of the form [`BlobStoreResponse`](./types.md#blobstoreresponse).
 
 This flow is detailed [here](./disperser.md#requests-to-store-data).
 
@@ -21,11 +21,11 @@ When making state claims, validators of the optimistic rollup should resubmit th
 
 ### Revealing Data Onchain during Fraud Proofs (Optimistic rollups)
 
-To keep the interface between EIP-4844 and EigenDA the same, optimistic rollups need to reveal data onchain against the commitment to their own data instead of the concatenated data of of all of the `BlobStoreRequests` in the batch. To prove the rollups own data commitment against the batched (concatenated) commitment the was posted onchain in the dataStore header, rollups generate the following proof.
+To keep the interface between EIP-4844 and EigenDA the same, optimistic rollups need to reveal data onchain against the commitment to their own data instead of the concatenated data of all of the `BlobStoreRequests` in the batch. To prove the rollups own data commitment against the batched (concatenated) commitment that was posted onchain in the dataStore header, rollups generate the following proof.
 
 A challenger retrieves the data corresponding to the KZG commitment pointed to by validators of their rollup and parses their rollup's data from the claimed start and end degree. They then prove to a smart contract the commitment to the rollups data, along with their fraud proof, via the [subcommitment proofs](#subcommitment-proof). Note that the rollup's smart contract will implement the verifier described in the proof.
 
-[TODO: Explain how the powers of tau are put on chain (use logarthimic adding)]
+[TODO: Explain how the powers of tau are put on chain (use logarithmic adding)]
 
 ## ZK Rollups
 
@@ -52,12 +52,12 @@ The challenger can generate a proof of the commitment to $b(x)$, $B \in \mathbb{
 - Calculate $\pi = \pi_F + \beta \pi_B + \beta^2 \pi_G + \beta^3 \pi_C$
 
 
-The prover then submits to the verifier $F, B, G, L_F, L_B, L_G, \pi, f(\gamma), b(\gamma), g(\gamma), c(\gamma)$ along with $C$ from the dataStore header of the blob in question. The verifer then verifies:
+The prover then submits to the verifier $F, B, G, L_F, L_B, L_G, \pi, f(\gamma), b(\gamma), g(\gamma), c(\gamma)$ along with $C$ from the dataStore header of the blob in question. The verifier then verifies:
 
-- $e(F, [x^{\text{max degree} - n}]_2) = e(L_F, [1]_2)$. This verfies the low degreeness of $F$.
-- $e(B, [x^{\text{max degree} - (m - n)}]_2) = e(L_B, [1]_2)$. This verfies the low degreeness of $B$.
-- $e(G, [x^{\text{max degree} - (\text{degree} - m)}]_2) = e(L_G, [1]_2)$. This verfies the low degreeness of $G$.
+- $e(F, [x^{\text{max degree} - n}]_2) = e(L_F, [1]_2)$. This verifies the low degreeness of $F$.
+- $e(B, [x^{\text{max degree} - (m - n)}]_2) = e(L_B, [1]_2)$. This verifies the low degreeness of $B$.
+- $e(G, [x^{\text{max degree} - (\text{degree} - m)}]_2) = e(L_G, [1]_2)$. This verifies the low degreeness of $G$.
 - Calculate $\gamma = keccak256(C, F, B, G)$.
 - Calculate $\beta = keccak256(\gamma, \pi_F, \pi_B, \pi_G, \pi_C)$
-- $e(F - [f(\gamma)]_1 + \beta(B - [b(\gamma)]_1) + \beta^2(G - [g(\gamma)]_1) + \beta^3(C - [c(\gamma)]_1), [1]_2) = e(\pi, [x-\gamma]_2)$. This verifies a random openning of all of the claimed polynomials at the same x-coordinate.
+- $e(F - [f(\gamma)]_1 + \beta(B - [b(\gamma)]_1) + \beta^2(G - [g(\gamma)]_1) + \beta^3(C - [c(\gamma)]_1), [1]_2) = e(\pi, [x-\gamma]_2)$. This verifies a random opening of all of the claimed polynomials at the same x-coordinate.
 - $c(\gamma) = f(\gamma) + \gamma^nb(\gamma) + \gamma^mg(\gamma)$. This verifies that the polynomials have the claimed shifted relationship with $c(x)$.

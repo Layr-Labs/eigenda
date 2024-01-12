@@ -37,7 +37,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
-	dispersermock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
@@ -51,7 +50,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -112,9 +110,11 @@ func mustMakeTestBlob() core.Blob {
 }
 
 type TestDisperser struct {
-	Batcher       *batcher.Batcher
-	Server        *apiserver.DispersalServer
-	EncoderServer *encoder.Server
+	batcher       *batcher.Batcher
+	server        *apiserver.DispersalServer
+	encoderServer *encoder.Server
+	transactor    *coremock.MockTransactor
+	txnManager    *batchermock.MockTxnManager
 }
 
 func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger common.Logger) TestDisperser {
@@ -123,25 +123,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger)
 
-	agg := core.NewStdSignatureAggregator(logger)
-
-	confirmer := dispersermock.NewBatchConfirmer()
-	// should be encoding 3 and 0
-	logData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	receipt := &types.Receipt{
-		Logs: []*types.Log{
-			{
-				Topics: []gethcommon.Hash{common.BatchConfirmedEventSigHash, gethcommon.HexToHash("1234")},
-				Data:   logData,
-			},
-		},
-		BlockNumber: big.NewInt(123),
-	}
-	confirmer.On("ConfirmBatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(receipt, nil)
+	transactor := &coremock.MockTransactor{}
+	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err := core.NewStdSignatureAggregator(logger, transactor)
+	assert.NoError(t, err)
 
 	batcherConfig := batcher.Config{
 		PullInterval:             5 * time.Second,
@@ -173,8 +158,9 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	disperserMetrics := disperser.NewMetrics("9100", logger)
 	batcherMetrics := batcher.NewMetrics("9100", logger)
+	txnManager := batchermock.NewTxnManager()
 
-	batcher, err := batcher.NewBatcher(batcherConfig, timeoutConfig, store, dispatcher, confirmer, cst, asn, encoderClient, agg, &commonmock.MockEthClient{}, finalizer, logger, batcherMetrics)
+	batcher, err := batcher.NewBatcher(batcherConfig, timeoutConfig, store, dispatcher, cst, asn, encoderClient, agg, &commonmock.MockEthClient{}, finalizer, transactor, txnManager, logger, batcherMetrics)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,9 +184,11 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig)
 
 	return TestDisperser{
-		Batcher:       batcher,
-		Server:        server,
-		EncoderServer: grpcEncoder,
+		batcher:       batcher,
+		server:        server,
+		encoderServer: grpcEncoder,
+		transactor:    transactor,
+		txnManager:    txnManager,
 	}
 }
 
@@ -311,10 +299,6 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger common.
 			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
 		}
 
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
 		s := nodegrpc.NewServer(config, n, logger, ratelimiter)
@@ -360,7 +344,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	cst, err := coremock.NewChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.NoError(t, err)
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
@@ -370,10 +354,10 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store, logger)
 	go func() {
-		_ = dis.EncoderServer.Start()
+		_ = dis.encoderServer.Start()
 	}()
 	t.Cleanup(func() {
-		dis.EncoderServer.Close()
+		dis.encoderServer.Close()
 	})
 	ops := mustMakeOperators(t, cst, logger)
 	gethClient, _ := mustMakeRetriever(cst, logger)
@@ -395,13 +379,39 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	metadataKey, err := store.StoreBlob(ctx, &blob, requestedAt)
 	assert.NoError(t, err)
 	out := make(chan batcher.EncodingResultOrStatus)
-	err = dis.Batcher.EncodingStreamer.RequestEncoding(context.Background(), out)
+	err = dis.batcher.EncodingStreamer.RequestEncoding(context.Background(), out)
 	assert.NoError(t, err)
-	err = dis.Batcher.EncodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = dis.batcher.EncodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
 	assert.NoError(t, err)
-	dis.Batcher.EncodingStreamer.Pool.StopWait()
+	dis.batcher.EncodingStreamer.Pool.StopWait()
 
-	err = dis.Batcher.HandleSingleBatch(ctx)
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	dis.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	dis.txnManager.On("ProcessTransaction").Return(nil)
+
+	err = dis.batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+	assert.Greater(t, len(dis.txnManager.Requests), 0)
+	// should be encoding 3 and 0
+	logData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	receipt := &types.Receipt{
+		Logs: []*types.Log{
+			{
+				Topics: []gethcommon.Hash{common.BatchConfirmedEventSigHash, gethcommon.HexToHash("1234")},
+				Data:   logData,
+			},
+		},
+		BlockNumber: big.NewInt(123),
+	}
+	err = dis.batcher.ProcessConfirmedBatch(ctx, &batcher.ReceiptOrErr{
+		Receipt:  receipt,
+		Err:      nil,
+		Metadata: dis.txnManager.Requests[len(dis.txnManager.Requests)-1].Metadata,
+	})
 	assert.NoError(t, err)
 
 	// Check that the blob was processed
@@ -460,7 +470,21 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	assert.NoError(t, err)
-	assignments, info, err := asn.GetAssignments(operatorState, 0, batcher.QuantizationFactor)
+
+	blobLength := core.GetBlobLength(uint(len(blob.Data)))
+	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
+	assert.NoError(t, err)
+
+	blobQuorumInfo := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: q0AdversaryThreshold,
+			QuorumThreshold:    q0QuorumThreshold,
+		},
+		ChunkLength: chunkLength,
+	}
+
+	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
 	assert.NoError(t, err)
 
 	var indices []core.ChunkNumber
@@ -486,8 +510,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.Equal(t, uint32(0), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumId())
 		assert.Equal(t, uint32(q0QuorumThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumThreshold())
 		assert.Equal(t, uint32(q0AdversaryThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetAdversaryThreshold())
-		assert.Equal(t, uint32(batcher.QuantizationFactor), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuantizationFactor())
-		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetEncodedBlobLength(), uint32(0))
+		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {
 			blobHeader, err = nodegrpc.GetBlobHeaderFromProto(headerReply.GetBlobHeader())
@@ -513,8 +536,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	chunkLength, err := asn.GetChunkLengthFromHeader(operatorState, blobHeader.QuorumInfos[0])
-	assert.NoError(t, err)
 	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
 	recovered, err := enc.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)

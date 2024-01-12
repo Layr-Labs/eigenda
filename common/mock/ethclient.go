@@ -31,10 +31,10 @@ func (mock *MockEthClient) GetAccountAddress() common.Address {
 	return result.(common.Address)
 }
 
-func (mock *MockEthClient) GetNoSendTransactOpts() *bind.TransactOpts {
+func (mock *MockEthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
 	args := mock.Called()
 	result := args.Get(0)
-	return result.(*bind.TransactOpts)
+	return result.(*bind.TransactOpts), args.Error(1)
 }
 
 func (mock *MockEthClient) ChainID(ctx context.Context) (*big.Int, error) {
@@ -177,18 +177,43 @@ func (mock *MockEthClient) TransactionInBlock(ctx context.Context, blockHash com
 
 func (mock *MockEthClient) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	args := mock.Called()
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
+}
+
+func (mock *MockEthClient) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
+	args := mock.Called()
+	result1 := args.Get(0)
+	result2 := args.Get(1)
+	return result1.(*big.Int), result2.(*big.Int), args.Error(2)
+}
+
+func (mock *MockEthClient) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
+	args := mock.Called()
 	result := args.Get(0)
-	return result.(*types.Receipt), args.Error(1)
+	return result.(*types.Transaction), args.Error(1)
 }
 
 func (mock *MockEthClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Context, tx *types.Transaction, tag string, value *big.Int) (*types.Receipt, error) {
 	args := mock.Called()
-	result := args.Get(0)
-	return result.(*types.Receipt), args.Error(1)
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
 }
 
 func (mock *MockEthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	args := mock.Called()
-	result := args.Get(0)
-	return result.(*types.Receipt), args.Error(1)
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
 }

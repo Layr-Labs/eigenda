@@ -9,7 +9,7 @@ import (
 
 type AccountID = string
 
-// Security and Quorum Paramaters
+// Security and Quorum Parameters
 
 // QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
 type QuorumID = uint8
@@ -40,14 +40,27 @@ type Blob struct {
 	Data          []byte
 }
 
-// BlobRequestHeader contains the orignal data size of a blob and the security required
-type BlobRequestHeader struct {
+// BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
+// Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
+// using the signature to charge the user for a different blob or for dispersing the same blob
+// multiple times (Replay attack).
+type BlobAuthHeader struct {
 	// Commitments
 	BlobCommitments `json:"commitments"`
+	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
+	AccountID AccountID `json:"account_id"`
+	// Nonce
+	Nonce uint32 `json:"nonce"`
+	// AuthenticationData is the signature of the blob header by the account ID
+	AuthenticationData []byte `json:"authentication_data"`
+}
+
+// BlobRequestHeader contains the original data size of a blob and the security required
+type BlobRequestHeader struct {
+	// BlobAuthHeader
+	BlobAuthHeader `json:"blob_auth_header"`
 	// For a blob to be accepted by EigenDA, it satisfy the AdversaryThreshold of each quorum contained in SecurityParams
 	SecurityParams []*SecurityParam `json:"security_params"`
-	// AccountID is the account that is paying for the blob to be stored
-	AccountID AccountID `json:"account_id"`
 }
 
 func (h *BlobRequestHeader) Validate() error {
@@ -68,10 +81,8 @@ func (h *BlobRequestHeader) Validate() error {
 // BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
 type BlobQuorumInfo struct {
 	SecurityParam
-	// QuantizationFactor determines the nominal number of chunks
-	QuantizationFactor uint
-	// EncodedBlobLength is the nominal endcoded length of the blob in symbols; EncodedBlobLength = QuantizationFactor * NumOperatorsForQuorum * ChunkLength
-	EncodedBlobLength uint
+	// ChunkLength is the number of symbols in a chunk
+	ChunkLength uint
 }
 
 // BlobHeader contains all metadata related to a blob including commitments and parameters for encoding
@@ -84,11 +95,21 @@ type BlobHeader struct {
 	AccountID AccountID `json:"account_id"`
 }
 
+func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
+	for _, quorumInfo := range b.QuorumInfos {
+		if quorumInfo.QuorumID == quorum {
+			return quorumInfo
+		}
+	}
+	return nil
+}
+
 // Returns the total encoded size in bytes of the blob across all quorums.
-func (b *BlobHeader) EncodedSizeAllQuorums() int {
-	size := 0
+func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
+	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
-		size += int(quorum.EncodedBlobLength * bn254.BYTES_PER_COEFFICIENT)
+
+		size += int64(roundUpDivide(b.Length*percentMultiplier*bn254.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -159,4 +180,30 @@ func (cb Bundles) Serialize() ([][][]byte, error) {
 		}
 	}
 	return data, nil
+}
+
+// Returns the size of the bundles in bytes.
+func (cb Bundles) Size() int64 {
+	size := int64(0)
+	for _, bundle := range cb {
+		for _, chunk := range bundle {
+			size += int64(chunk.Size())
+		}
+	}
+	return size
+}
+
+// Sample is a chunk with associated metadata used by the Universal Batch Verifier
+type Sample struct {
+	Commitment      *Commitment
+	Chunk           *Chunk
+	AssignmentIndex ChunkNumber
+	BlobIndex       int
+}
+
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+// Blobs with the same encoding parameters are collected in a single subBatch
+type SubBatch struct {
+	Samples  []Sample
+	NumBlobs int
 }

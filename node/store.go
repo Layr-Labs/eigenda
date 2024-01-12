@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/node/leveldb"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"google.golang.org/protobuf/proto"
 )
@@ -119,7 +118,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 	}
 
 	// Calculate the num of bytes (for chunks) that will be purged from the database.
-	size := 0
+	size := int64(0)
 	// Scan for the batch header, blob headers and chunks of each expired batch.
 	for _, hash := range expiredBatches {
 		var batchHeaderHash [32]byte
@@ -132,14 +131,6 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		blobHeaderIter := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
 		for blobHeaderIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
-
-			// Collect the size in bytes for all the quorums of the blob.
-			var protoBlobHeader node.BlobHeader
-			if proto.Unmarshal(blobHeaderIter.Value(), &protoBlobHeader) == nil {
-				for _, qh := range protoBlobHeader.GetQuorumHeaders() {
-					size += int(qh.GetEncodedBlobLength() * bn254.BYTES_PER_COEFFICIENT)
-				}
-			}
 		}
 		blobHeaderIter.Release()
 
@@ -147,6 +138,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		blobIter := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
 		for blobIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
+			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
 	}
@@ -224,7 +216,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	values = append(values, batchHeaderHash[:])
 
 	// Generate key/value pairs for all blob headers and blob chunks .
-	size := 0
+	size := int64(0)
 	for idx, blob := range blobs {
 		// blob header
 		blobHeaderKey, err := EncodeBlobHeaderKey(batchHeaderHash, idx)
@@ -256,12 +248,12 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					log.Error("Cannot serialize chunk:", "err", err)
 					return nil, err
 				}
-				size += chunk.Size()
 			}
 			chunkBytes, err := encodeChunks(bundleRaw)
 			if err != nil {
 				return nil, err
 			}
+			size += int64(len(chunkBytes))
 
 			keys = append(keys, key)
 			values = append(values, chunkBytes)
@@ -275,7 +267,6 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
 	}
-	s.metrics.AddCurrentBatch(size)
 
 	return &keys, nil
 }

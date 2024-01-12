@@ -39,20 +39,20 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		Y: lengthY,
 	}
 
-	numOperators := uint(10)
 	adversaryThreshold := uint8(90)
+	quorumThreshold := uint8(100)
 
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
 			QuorumID:           0,
+			QuorumThreshold:    quorumThreshold,
 			AdversaryThreshold: adversaryThreshold,
 		},
-		QuantizationFactor: 1,
-		EncodedBlobLength:  32 * 1 * numOperators,
+		ChunkLength: 10,
 	}
 	chunk1 := &core.Chunk{
 		Proof:  commitment,
-		Coeffs: []core.Symbol{},
+		Coeffs: []core.Symbol{bn254.ONE},
 	}
 
 	blobMessage := []*core.BlobMessage{
@@ -99,8 +99,9 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 
 	quorumHeaderProto := &pb.BlobQuorumInfo{
 		QuorumId:           uint32(quorumHeader.QuorumID),
-		AdversaryThreshold: uint32(quorumHeader.AdversaryThreshold), QuantizationFactor: uint32(quorumHeader.QuantizationFactor),
-		EncodedBlobLength: uint32(quorumHeader.EncodedBlobLength),
+		AdversaryThreshold: uint32(quorumHeader.AdversaryThreshold),
+		QuorumThreshold:    uint32(quorumHeader.QuorumThreshold),
+		ChunkLength:        uint32(quorumHeader.ChunkLength),
 	}
 
 	blobHeaderProto0 := &pb.BlobHeader{

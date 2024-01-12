@@ -9,10 +9,10 @@ import (
 
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/grpc/retriever"
+	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,9 +31,9 @@ type result struct {
 	err  error
 }
 
-func dispserse(t *testing.T, ctx context.Context, client traffic.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
+func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
 
-	blobStatus, key, err := client.DisperseBlob(ctx, data, param.QuorumID, param.QuorumThreshold, param.AdversaryThreshold)
+	blobStatus, key, err := client.DisperseBlob(ctx, data, uint32(param.QuorumID), uint32(param.QuorumThreshold), uint32(param.AdversaryThreshold))
 	if err != nil {
 		resultChan <- result{
 			err: err,
@@ -107,14 +107,11 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	disp := traffic.NewDisperserClient(&traffic.Config{
-		Hostname:        "localhost",
-		GrpcPort:        testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
-		NumInstances:    1,
-		DataSize:        1000_000,
-		RequestInterval: 1 * time.Second,
-		Timeout:         10 * time.Second,
-	})
+	disp := clients.NewDisperserClient(&clients.Config{
+		Hostname: "localhost",
+		Port:     testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
+		Timeout:  10 * time.Second,
+	}, nil)
 	assert.NotNil(t, disp)
 
 	data := make([]byte, c.blobSize)
@@ -127,7 +124,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	go func() {
 		for i := 0; i < c.numDispersal; i++ {
 			<-dispersalTicker.C
-			go dispserse(t, ctx, disp, resultChan, data, c.param)
+			go disperse(t, ctx, disp, resultChan, data, c.param)
 		}
 	}()
 
@@ -181,7 +178,7 @@ func TestRatelimit(t *testing.T) {
 	}
 	testConfig := deploy.NewTestConfig(testname, rootPath)
 
-	if testConfig.Dispersers[0].DISPERSER_SERVER_PER_USER_UNAUTH_THROUGHPUT != fmt.Sprint(perUserThroughput) {
+	if testConfig.Dispersers[0].DISPERSER_SERVER_PER_USER_UNAUTH_BYTE_RATE != fmt.Sprint(perUserThroughput) {
 		t.Fatalf("per user throughput should be %v", perUserThroughput)
 	}
 	if testConfig.Dispersers[0].DISPERSER_SERVER_BUCKET_MULTIPLIERS != fmt.Sprint(dispersalMultiplier) {
@@ -278,6 +275,33 @@ func TestRatelimit(t *testing.T) {
 		fmt.Println("Retrieval Ratelimited: ", retrievalErrors)
 		assert.Equal(t, 0, dispersalErrors)
 		assert.Greater(t, retrievalErrors, 0)
+
+	})
+
+	t.Run("ratelimiting when dispersing greater than blob rate", func(t *testing.T) {
+
+		t.Skip("Manual test for now")
+
+		testCase := ratelimitTestCase{
+			numDispersal:      200,
+			numRetrieval:      0,
+			dispersalInterval: 450 * time.Millisecond,
+			retrievalInterval: 500 * time.Millisecond,
+			pause:             0,
+			blobSize:          5,
+			param: core.SecurityParam{
+				QuorumID:           0,
+				AdversaryThreshold: 50,
+				QuorumThreshold:    100,
+			},
+		}
+
+		dispersalErrors, retrievalErrors := testRatelimit(t, testConfig, testCase)
+
+		fmt.Println("Dispersal Ratelimited: ", dispersalErrors)
+
+		assert.Greater(t, dispersalErrors, 0)
+		assert.Equal(t, 0, retrievalErrors)
 
 	})
 

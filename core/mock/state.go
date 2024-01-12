@@ -14,6 +14,8 @@ type ChainDataMock struct {
 
 	KeyPairs     []*core.KeyPair
 	NumOperators core.OperatorIndex
+
+	Stakes []int
 }
 
 var _ core.ChainState = (*ChainDataMock)(nil)
@@ -40,7 +42,9 @@ func makeOperatorId(id int) core.OperatorID {
 	return data
 }
 
-func NewChainDataMock(numOperators core.OperatorIndex) (*ChainDataMock, error) {
+func NewChainDataMock(stakes []int) (*ChainDataMock, error) {
+	numOperators := uint(len(stakes))
+
 	keyPairs := make([]*core.KeyPair, numOperators)
 	for ind := core.OperatorIndex(0); ind < numOperators; ind++ {
 		keyPair, err := core.GenRandomBlsKeys()
@@ -53,7 +57,19 @@ func NewChainDataMock(numOperators core.OperatorIndex) (*ChainDataMock, error) {
 	return &ChainDataMock{
 		NumOperators: numOperators,
 		KeyPairs:     keyPairs,
+		Stakes:       stakes,
 	}, nil
+
+}
+
+func MakeChainDataMock(numOperators core.OperatorIndex) (*ChainDataMock, error) {
+
+	stakes := make([]int, numOperators)
+	for ind := core.OperatorIndex(0); ind < numOperators; ind++ {
+		stakes[ind] = int(ind + 1)
+	}
+	return NewChainDataMock(stakes)
+
 }
 
 func (d *ChainDataMock) GetTotalOperatorState(ctx context.Context, blockNumber uint) *PrivateOperatorState {
@@ -77,7 +93,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			aggPubKey.Add(d.KeyPairs[ind].GetPubKeyG1())
 		}
 
-		stake := ind + 1
+		stake := d.Stakes[ind]
 		host := "0.0.0.0"
 		dispersalPort := fmt.Sprintf("3%03v", int(2*ind))
 		retrievalPort := fmt.Sprintf("3%03v", int(2*ind+1))

@@ -37,6 +37,11 @@ type Item = map[string]types.AttributeValue
 type Key = map[string]types.AttributeValue
 type ExpresseionValues = map[string]types.AttributeValue
 
+type QueryResult struct {
+	Items            []Item
+	LastEvaluatedKey Key
+}
+
 type Client struct {
 	dynamoClient *dynamodb.Client
 	logger       common.Logger
@@ -159,6 +164,51 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	}
 
 	return response.Items, nil
+}
+
+// QueryIndexWithPagination returns all items in the index that match the given key
+// Results are limited to the given limit and the pagination token is returned
+// When limit is is 0, all items are returned
+func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
+	var queryInput *dynamodb.QueryInput
+
+	// Fetch all items if limit is 0
+	if limit > 0 {
+		queryInput = &dynamodb.QueryInput{
+			TableName:                 aws.String(tableName),
+			IndexName:                 aws.String(indexName),
+			KeyConditionExpression:    aws.String(keyCondition),
+			ExpressionAttributeValues: expAttributeValues,
+			Limit:                     &limit,
+		}
+	} else {
+		queryInput = &dynamodb.QueryInput{
+			TableName:                 aws.String(tableName),
+			IndexName:                 aws.String(indexName),
+			KeyConditionExpression:    aws.String(keyCondition),
+			ExpressionAttributeValues: expAttributeValues,
+		}
+	}
+
+	// If a pagination token was provided, set it as the ExclusiveStartKey
+	if exclusiveStartKey != nil {
+		queryInput.ExclusiveStartKey = exclusiveStartKey
+	}
+
+	response, err := c.dynamoClient.Query(ctx, queryInput)
+	if err != nil {
+		return QueryResult{}, err
+	}
+
+	if len(response.Items) == 0 {
+		return QueryResult{Items: nil, LastEvaluatedKey: nil}, nil
+	}
+
+	// Return the items and the pagination token
+	return QueryResult{
+		Items:            response.Items,
+		LastEvaluatedKey: response.LastEvaluatedKey,
+	}, nil
 }
 
 func (c *Client) DeleteItem(ctx context.Context, tableName string, key Key) error {

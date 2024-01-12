@@ -203,6 +203,10 @@ func (s *SharedBlobStore) GetBlobMetadataByStatus(ctx context.Context, blobStatu
 	return s.blobMetadataStore.GetBlobMetadataByStatus(ctx, blobStatus)
 }
 
+func (s *SharedBlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.BlobStoreExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BlobStoreExclusiveStartKey, error) {
+	return s.blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, blobStatus, limit, exclusiveStartKey)
+}
+
 func (s *SharedBlobStore) GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*disperser.BlobMetadata, error) {
 	return s.blobMetadataStore.GetBlobMetadataInBatch(ctx, batchHeaderHash, blobIndex)
 }
@@ -214,6 +218,14 @@ func (s *SharedBlobStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHe
 // GetMetadata returns a blob metadata given a metadata key
 func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
+}
+
+func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) error {
+	if metadata.NumRetries < maxRetry {
+		return s.IncrementBlobRetryCount(ctx, metadata)
+	} else {
+		return s.MarkBlobFailed(ctx, metadata.GetBlobKey())
+	}
 }
 
 func getMetadataHash(requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {

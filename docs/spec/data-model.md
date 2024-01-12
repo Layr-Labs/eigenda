@@ -3,7 +3,7 @@
 ### Quorum Information
 
 ```go
-// QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
+// QuorumID is a unique identifier for a quorum; initially EigenDA will support up to 256 quorums
 type QuorumID = uint8
 
 // SecurityParam contains the quorum ID and the adversary threshold for the quorum;
@@ -11,24 +11,26 @@ type SecurityParam struct {
 	QuorumID QuorumID
 	// AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum
 	AdversaryThreshold uint8
+	// QuorumThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
+	QuorumThreshold uint8 `json:"quorum_threshold"`
 }
 
-// QuorumParam contains the quorum ID and the quorum threshold for the quorum
+// QuorumResult contains the quorum ID and the amount signed for the quorum
 type QuorumResult struct {
 	QuorumID QuorumID
-	// QuorumThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
-	QuorumThreshold uint8
+	// PercentSigned is percentage of the total stake for the quorum that signed for a particular batch.
+	PercentSigned uint8
 }
 ```
 
 ### Blob Requests
 
 ```go
-// BlobHeader contains the orignal data size of a blob and the security requi
+// BlobHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// BlobSize is the size of the original data in bytes
 	BlobSize uint32
-	// For a blob to be accepted by EigenDA, it satisfy the AdversaryThreshold of each quorum contained in SecurityParams
+	// For a blob to be accepted by EigenDA, it satisfies the AdversaryThreshold of each quorum contained in SecurityParams
 	SecurityParams []SecurityParam
 }
 ```
@@ -37,12 +39,16 @@ type BlobRequestHeader struct {
 
 ```go
 type BlobHeader struct {
-	BlobRequestHeader
 	BlobCommitments
-	// ChunkLength is the length of each chunk in symbols; all chunks in an encoded blob must be the same length
+	// QuorumInfos contains the quorum specific parameters for the blob
+	QuorumInfos []*BlobQuorumInfo
+}
+
+// BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
+type BlobQuorumInfo struct {
+	SecurityParam
+	// ChunkLength is the number of symbols in a chunk
 	ChunkLength uint
-	// QuantizationFactor determines the nominal number of chunks; NominalNumChunks = QuantizationFactor * NumOperatorsForQuorum
-	QuantizationFactor uint
 }
 
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
@@ -79,7 +85,7 @@ type EncodedBatch struct {
 // Chunk is the smallest unit that is distributed to DA nodes, including both data and the associated polynomial opening proofs.
 // A chunk corresponds to a set of evaluations of the global polynomial whose coefficients are used to construct the blob Commitment.
 type Chunk struct {
-	// The Coeffs field contains the coefficients of the polynomial which interolates these evaluations. This is the same as the
+	// The Coeffs field contains the coefficients of the polynomial which interpolates these evaluations. This is the same as the
 	// interpolating polynomial, I(X), used in the KZG multi-reveal (https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html#multiproofs)
 	Coeffs []Symbol
 	Proof  Proof
@@ -113,7 +119,7 @@ type OperatorInfo struct {
 
 // OperatorState contains information about the current state of operators which is stored in the blockchain state
 type OperatorState struct {
-	// Operators is a map from quorum ID to a map from the operators in that quourm to their StoredOperatorInfo. Membership
+	// Operators is a map from quorum ID to a map from the operators in that quorum to their StoredOperatorInfo. Membership
 	// in the map implies membership in the quorum.
 	Operators map[QuorumID]map[OperatorID]*OperatorInfo
 	// Totals is a map from quorum ID to the total stake (Stake) and total count (Index) of all operators in that quorum

@@ -35,20 +35,21 @@ var _ RetrievalClient = (*retrievalClient)(nil)
 
 func NewRetrievalClient(
 	logger common.Logger,
-	indexedChainState core.IndexedChainState,
+	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	encoder core.Encoder,
 	numConnections int,
-) *retrievalClient {
+) (*retrievalClient, error) {
+
 	return &retrievalClient{
 		logger:                logger,
-		indexedChainState:     indexedChainState,
+		indexedChainState:     chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
 		encoder:               encoder,
 		numConnections:        numConnections,
-	}
+	}, nil
 }
 
 func (r *retrievalClient) RetrieveBlob(
@@ -113,7 +114,13 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, fmt.Errorf("no quorum header for quorum %d", quorumID)
 	}
 
-	assignements, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, quorumID, uint(quorumHeader.QuantizationFactor))
+	// Validate the blob length
+	err = r.encoder.VerifyBlobLength(blobHeader.BlobCommitments)
+	if err != nil {
+		return nil, err
+	}
+
+	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments")
 	}
@@ -126,8 +133,12 @@ func (r *retrievalClient) RetrieveBlob(
 		opInfo := indexedOperatorState.IndexedOperators[opID]
 		pool.Submit(func() {
 			r.nodeClient.GetChunks(ctx, opID, opInfo, batchHeaderHash, blobIndex, quorumID, chunksChan)
-			// TODO(ian-shim): validate chunks received from nodes
 		})
+	}
+
+	encodingParams, err := core.GetEncodingParams(quorumHeader.ChunkLength, info.TotalChunks)
+	if err != nil {
+		return nil, err
 	}
 
 	var chunks []*core.Chunk
@@ -136,25 +147,24 @@ func (r *retrievalClient) RetrieveBlob(
 	for i := 0; i < len(operators); i++ {
 		reply := <-chunksChan
 		if reply.Err != nil {
+			r.logger.Error("failed to get chunks from operator", "operator", reply.OperatorID, "err", reply.Err)
 			continue
 		}
-		assignment, ok := assignements[reply.OperatorID]
+		assignment, ok := assignments[reply.OperatorID]
 		if !ok {
 			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
 		}
 
+		err = r.encoder.VerifyChunks(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
+		if err != nil {
+			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID, "err", err)
+			continue
+		} else {
+			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID)
+		}
+
 		chunks = append(chunks, reply.Chunks...)
 		indices = append(indices, assignment.GetIndices()...)
-	}
-
-	chunkLength, err := r.assignmentCoordinator.GetChunkLengthFromHeader(indexedOperatorState.OperatorState, quorumHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
-	if err != nil {
-		return nil, err
 	}
 
 	return r.encoder.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)

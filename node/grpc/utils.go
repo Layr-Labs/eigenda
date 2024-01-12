@@ -75,8 +75,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 				QuorumThreshold:    uint8(header.GetQuorumThreshold()),
 				QuorumRate:         header.GetRatelimit(),
 			},
-			QuantizationFactor: uint(header.GetQuantizationFactor()),
-			EncodedBlobLength:  uint(header.GetEncodedBlobLength()),
+			ChunkLength: uint(header.GetChunkLength()),
 		}
 	}
 

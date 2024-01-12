@@ -9,7 +9,7 @@ We will also highlight the additional constraints on the Encoding interface whic
 
 ## Deriving the polynomial coefficients and commitment
 
-As described in the [Encoding Module Specification](../spec/protocol-modules/storage/encoding.md), given a blob of data, we convert the blob to a polynomial $p(X) = \sum_{i=0}^{m-1} c_iX^i$ by simply slicing the data into a string of symbols, and interpretting this list of symbols as the tuple $(c_i)_{i=0}^{m-1}$.
+As described in the [Encoding Module Specification](../spec/protocol-modules/storage/encoding.md), given a blob of data, we convert the blob to a polynomial $p(X) = \sum_{i=0}^{m-1} c_iX^i$ by simply slicing the data into a string of symbols, and interpreting this list of symbols as the tuple $(c_i)_{i=0}^{m-1}$.
 
 In the case of the KZG-FFT encoder, the polynomial lives on the field associated with the BN-254 elliptic curve, which as order [TODO: fill in order].
 
@@ -37,9 +37,9 @@ As the encoding interface calls for the construction of `NumChunks` Chunks of le
 
 ## Amortized Multireveal Proof Generation with the FFT
 
-The construction of the multireveal proofs can also be performed using a DFT (as in [“Fast Amortized Kate Proofs”](./https://eprint.iacr.org/2023/033.pdf)). Leaving the full details of this process to the referenced document, we describe here only 1) the index-assignment the scheme used by the amortized multiproof generation approach and 2) the constraints that this creates for the overall encoder interface.
+The construction of the multireveal proofs can also be performed using a DFT (as in [“Fast Amortized Kate Proofs”](https://eprint.iacr.org/2023/033.pdf)). Leaving the full details of this process to the referenced document, we describe here only 1) the index-assignment the scheme used by the amortized multiproof generation approach and 2) the constraints that this creates for the overall encoder interface.
 
-Given the group $S$ corresponding to the indices of the polynomial evalutions and a cyclic group $C$ which is a subgroup of $S$, the cosets of $C$ in $S$ are given by
+Given the group $S$ corresponding to the indices of the polynomial evaluations and a cyclic group $C$ which is a subgroup of $S$, the cosets of $C$ in $S$ are given by
 
 $$
 s+C = \{g+c : c \in C\} \text{ for } s \in S.

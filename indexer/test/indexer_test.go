@@ -51,7 +51,7 @@ func TestIndex(t *testing.T) {
 	config := indexer.Config{
 		PullInterval: 100 * time.Millisecond,
 	}
-	indexer := indexer.NewIndexer(
+	indexer := indexer.New(
 		&config,
 		handlers,
 		headerSrvc,

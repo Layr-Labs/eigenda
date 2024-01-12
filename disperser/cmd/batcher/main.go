@@ -9,11 +9,8 @@ import (
 
 	"github.com/shurcooL/graphql"
 
-	"github.com/Layr-Labs/eigenda/core/indexer"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-
-	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -22,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/batcher/eth"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -78,7 +74,6 @@ func RunBatcher(ctx *cli.Context) error {
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout: config.TimeoutConfig.AttestationTimeout,
 	}, logger)
-	agg := core.NewStdSignatureAggregator(logger)
 	asgn := &core.StdAssignmentCoordinator{}
 
 	client, err := geth.NewClient(config.EthClientConfig, logger)
@@ -94,11 +89,10 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	confirmer, err := eth.NewBatchConfirmer(tx, config.TimeoutConfig.ChainWriteTimeout)
+	agg, err := core.NewStdSignatureAggregator(logger, tx)
 	if err != nil {
 		return err
 	}
-
 	blockStaleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
@@ -121,9 +115,17 @@ func RunBatcher(ctx *cli.Context) error {
 	} else {
 		logger.Info("Using built-in indexer")
 
-		store := inmemstore.NewHeaderStore()
-
-		ics, err = indexer.NewIndexedChainState(&config.IndexerConfig, gethcommon.HexToAddress(config.EigenDAServiceManagerAddr), cs, store, client, rpcClient, logger)
+		indexer, err := coreindexer.CreateNewIndexer(
+			&config.IndexerConfig,
+			client,
+			rpcClient,
+			config.EigenDAServiceManagerAddr,
+			logger,
+		)
+		if err != nil {
+			return err
+		}
+		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
 		if err != nil {
 			return err
 		}
@@ -138,8 +140,9 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, logger)
-	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, confirmer, ics, asgn, encoderClient, agg, client, finalizer, logger, metrics)
+	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, logger)
+	txnManager := batcher.NewTxnManager(client, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
+	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics)
 	if err != nil {
 		return err
 	}

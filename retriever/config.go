@@ -23,6 +23,8 @@ type Config struct {
 	NumConnections                int
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	GraphUrl                      string
+	UseGraph                      bool
 }
 
 func NewConfig(ctx *cli.Context) *Config {
@@ -39,5 +41,7 @@ func NewConfig(ctx *cli.Context) *Config {
 		NumConnections:                ctx.Int(flags.NumConnectionsFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		GraphUrl:                      ctx.GlobalString(flags.GraphUrlFlag.Name),
+		UseGraph:                      ctx.GlobalBool(flags.UseGraphFlag.Name),
 	}
 }

@@ -33,7 +33,7 @@ and any $U_a \subseteq U_q$ such
 $$ \sum_{i \in U_a} S_i \le \alpha \sum_{i \in O}S_i$$
 
 
-we need to be able to reconstuct from $U_q \setminus U_a$. But we can see that the total stake held by this group will satisfy
+we need to be able to reconstruct from $U_q \setminus U_a$. But we can see that the total stake held by this group will satisfy
 
 $$
 \sum_{i \in U_q \setminus U_a} S_i = \sum_{i \in U_q}S_i - \sum_{i \in U_a}S_i \ge (\beta-\alpha)\sum_{i \in O}S_i  = \gamma \sum_{i \in O}S_i.
@@ -49,13 +49,13 @@ Note that if blob data were distributed exactly in accordance with stake, an ope
 
 $$\gamma \tilde{B}_i = B\frac{S_i}{\sum_j S_j}.$$
 
-We require that portion of the blob stored by n operator $i$ will exceed its proportional allocation by no more than $B/n\gamma$. That is 
+We require that portion of the blob stored by an operator $i$ will exceed its proportional allocation by no more than $B/n\gamma$. That is 
 
 $$\max_{\{S_j:j\in O\}} \gamma\frac{B_i - \tilde{B}_i}{B} \le 1/n.$$
 
 ### 3. Minimizes encoding complexity
 
-The system should minimize coding and verification computational complexity for both the disperser and operators. The computational complexity roughly scales with the number of chunks (or more specifcally, inversely with the chunk size) [clarification required]. Thus, the system should minimize the number of chunks, subject to requirements 1 and 2. 
+The system should minimize coding and verification computational complexity for both the disperser and operators. The computational complexity roughly scales with the number of chunks (or more specifically, inversely with the chunk size) [clarification required]. Thus, the system should minimize the number of chunks, subject to requirements 1 and 2. 
 
 ## Proposed solution
 
@@ -116,12 +116,12 @@ We can therefore satisfy requirement 2 by letting $\rho=1$.
 
 ### Assessment of coding complexity
 
-It turns out that to meet the desired requirements, we do not need to increase the encoding complexity (i.e. decrease chunk size) compared to the default case. Increase in the total number of chunks due to the `ceil()` function can be handled by increasing the number of parity symbols. 
+It turns out that to meet the desired requirements, we do not need to increase the encoding complexity (i.e. decrease chunk size) compared to the default case. An increase in the total number of chunks due to the `ceil()` function can be handled by increasing the number of parity symbols. 
 
-Moreover, the optimization routing described for finding $m$ will serve only to improve beyond the baseline (lower bound), which already achieves desired performance. 
+Moreover, the optimization routine described for finding $m$ will serve only to improve beyond the baseline (lower bound), which already achieves desired performance. 
 
 ## FAQs
 
-Q1. Can increasing the number of parity symbols increase the total degree of the polynomial, resulting in greator coding complexity. 
+Q1. Can increasing the number of parity symbols increase the total degree of the polynomial, resulting in greater coding complexity. 
 
 A1. This seems like a possibility. In general, interactions with constraints of the proving system are not covered here. However, if this is a concern it should be possible to adjust block size constraints accordingly to avoid pushing over some limit. 

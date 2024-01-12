@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 )
 
@@ -23,7 +23,7 @@ type EncodedSizeNotifier struct {
 
 	Notify chan struct{}
 	// threshold is the size of the total encoded blob results in bytes that triggers the notifier
-	threshold uint
+	threshold uint64
 	// active is set to false after the notifier is triggered to prevent it from triggering again for the same batch
 	// This is reset when CreateBatch is called and the encoded results have been consumed
 	active bool
@@ -39,8 +39,11 @@ type StreamerConfig struct {
 	// EncodingQueueLimit is the maximum number of encoding requests that can be queued
 	EncodingQueueLimit int
 
-	// PoolSize is the number of workers in the worker pool
-	PoolSize int
+	// TargetNumChunks is the target number of chunks per encoded blob
+	TargetNumChunks uint
+
+	// Maximum number of Blobs to fetch from store
+	MaxBlobsToFetchFromStore int
 }
 
 type EncodingStreamer struct {
@@ -50,7 +53,7 @@ type EncodingStreamer struct {
 
 	EncodedBlobstore     *encodedBlobStore
 	ReferenceBlockNumber uint
-	Pool                 *workerpool.WorkerPool
+	Pool                 common.WorkerPool
 	EncodedSizeNotifier  *EncodedSizeNotifier
 
 	blobStore             disperser.BlobStore
@@ -60,24 +63,23 @@ type EncodingStreamer struct {
 
 	encodingCtxCancelFuncs []context.CancelFunc
 
-	logger common.Logger
-}
+	metrics *EncodingStreamerMetrics
+	logger  common.Logger
 
-type batchMetadata struct {
-	QuorumInfos map[core.QuorumID]QuorumInfo
-	State       *core.IndexedOperatorState
+	// Used to keep track of the last evaluated key for fetching metadatas
+	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
 }
 
 type batch struct {
-	EncodedBlobs  []core.EncodedBlob
-	BlobMetadata  []*disperser.BlobMetadata
-	BlobHeaders   []*core.BlobHeader
-	BatchHeader   *core.BatchHeader
-	BatchMetadata *batchMetadata
-	MerkleTree    *merkletree.MerkleTree
+	EncodedBlobs []core.EncodedBlob
+	BlobMetadata []*disperser.BlobMetadata
+	BlobHeaders  []*core.BlobHeader
+	BatchHeader  *core.BatchHeader
+	State        *core.IndexedOperatorState
+	MerkleTree   *merkletree.MerkleTree
 }
 
-func NewEncodedSizeNotifier(notify chan struct{}, threshold uint) *EncodedSizeNotifier {
+func NewEncodedSizeNotifier(notify chan struct{}, threshold uint64) *EncodedSizeNotifier {
 	return &EncodedSizeNotifier{
 		Notify:    notify,
 		threshold: threshold,
@@ -92,6 +94,8 @@ func NewEncodingStreamer(
 	encoderClient disperser.EncoderClient,
 	assignmentCoordinator core.AssignmentCoordinator,
 	encodedSizeNotifier *EncodedSizeNotifier,
+	workerPool common.WorkerPool,
+	metrics *EncodingStreamerMetrics,
 	logger common.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
@@ -100,14 +104,16 @@ func NewEncodingStreamer(
 		StreamerConfig:         config,
 		EncodedBlobstore:       newEncodedBlobStore(logger),
 		ReferenceBlockNumber:   uint(0),
-		Pool:                   workerpool.New(config.PoolSize),
+		Pool:                   workerPool,
 		EncodedSizeNotifier:    encodedSizeNotifier,
 		blobStore:              blobStore,
 		chainState:             chainState,
 		encoderClient:          encoderClient,
 		assignmentCoordinator:  assignmentCoordinator,
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
+		metrics:                metrics,
 		logger:                 logger,
+		exclusiveStartKey:      nil,
 	}, nil
 }
 
@@ -123,9 +129,11 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case response := <-encoderChan:
 				err := e.ProcessEncodedBlobs(ctx, response)
 				if err != nil {
-					if !errors.Is(err, context.Canceled) {
-						e.logger.Error("error processing encoded blobs", "err", err)
+					if strings.Contains(err.Error(), context.Canceled.Error()) {
+						// ignore canceled errors because canceled encoding requests are normal
+						continue
 					}
+					e.logger.Error("error processing encoded blobs", "err", err)
 				}
 			}
 		}
@@ -143,7 +151,7 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 			case <-ticker.C:
 				err := e.RequestEncoding(ctx, encoderChan)
 				if err != nil {
-					e.logger.Error("error requesting encoding", "err", err)
+					e.logger.Warn("error requesting encoding", "err", err)
 				}
 			}
 		}
@@ -174,7 +182,11 @@ func (e *EncodingStreamer) dedupRequests(metadatas []*disperser.BlobMetadata, re
 func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan EncodingResultOrStatus) error {
 	stageTimer := time.Now()
 	// pull new blobs and send to encoder
-	metadatas, err := e.blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	e.mu.Lock()
+	metadatas, newExclusiveStartKey, err := e.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, int32(e.StreamerConfig.MaxBlobsToFetchFromStore), e.exclusiveStartKey)
+	e.exclusiveStartKey = newExclusiveStartKey
+	e.mu.Unlock()
+
 	if err != nil {
 		return fmt.Errorf("error getting blob metadatas: %w", err)
 	}
@@ -224,10 +236,12 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 
 	e.logger.Trace("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
-	batchMetadata, err := e.getBatchMetadata(ctx, metadatas, referenceBlockNumber)
+	// Get the operator state
+	state, err := e.getOperatorState(ctx, metadatas, referenceBlockNumber)
 	if err != nil {
-		return fmt.Errorf("error getting quorum infos: %w", err)
+		return fmt.Errorf("error getting operator state: %w", err)
 	}
+	metadatas = e.validateMetadataQuorums(metadatas, state)
 
 	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata, 0)
 	for _, metadata := range metadatas {
@@ -246,7 +260,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	for i := range metadatas {
 		metadata := metadatas[i]
 
-		e.RequestEncodingForBlob(ctx, metadata, blobs[metadata.GetBlobKey()], batchMetadata, referenceBlockNumber, encoderChan)
+		e.RequestEncodingForBlob(ctx, metadata, blobs[metadata.GetBlobKey()], state, referenceBlockNumber, encoderChan)
 	}
 
 	return nil
@@ -255,9 +269,10 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 type pendingRequestInfo struct {
 	BlobQuorumInfo *core.BlobQuorumInfo
 	EncodingParams core.EncodingParams
+	Assignments    map[core.OperatorID]core.Assignment
 }
 
-func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata *disperser.BlobMetadata, blob *core.Blob, batchMetadata *batchMetadata, referenceBlockNumber uint, encoderChan chan EncodingResultOrStatus) {
+func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata *disperser.BlobMetadata, blob *core.Blob, state *core.IndexedOperatorState, referenceBlockNumber uint, encoderChan chan EncodingResultOrStatus) {
 
 	// Validate the encoding parameters for each quorum
 
@@ -268,21 +283,37 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 	for ind := range metadata.RequestMetadata.SecurityParams {
 
 		quorum := metadata.RequestMetadata.SecurityParams[ind]
+
 		// Check if the blob has already been encoded for this quorum
 		if e.EncodedBlobstore.HasEncodingRequested(blobKey, quorum.QuorumID, referenceBlockNumber) {
 			continue
 		}
 
-		quorumInfo := batchMetadata.QuorumInfos[quorum.QuorumID]
 		blobLength := core.GetBlobLength(metadata.RequestMetadata.BlobSize)
-		numOperators := uint(len(quorumInfo.Assignments))
-		chunkLength, err := e.assignmentCoordinator.GetMinimumChunkLength(numOperators, blobLength, quorumInfo.QuantizationFactor, quorum.QuorumThreshold, quorum.AdversaryThreshold)
+
+		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, e.StreamerConfig.TargetNumChunks, quorum)
 		if err != nil {
-			// This error shouldn't happen because we check blob headers before adding them blob store
-			e.logger.Error("[RequestEncodingForBlob] invalid request parameters", "err", err)
+			e.logger.Error("[RequestEncodingForBlob] error calculating chunk length", "err", err)
 			continue
 		}
-		params, err := core.GetEncodingParams(chunkLength, quorumInfo.Info.TotalChunks)
+
+		blobQuorumInfo := &core.BlobQuorumInfo{
+			SecurityParam: core.SecurityParam{
+				QuorumID:           quorum.QuorumID,
+				AdversaryThreshold: quorum.AdversaryThreshold,
+				QuorumThreshold:    quorum.QuorumThreshold,
+				QuorumRate:         quorum.QuorumRate,
+			},
+			ChunkLength: chunkLength,
+		}
+
+		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, blobLength, blobQuorumInfo)
+		if err != nil {
+			e.logger.Error("[RequestEncodingForBlob] error getting assignments", "err", err)
+			continue
+		}
+
+		params, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
 		if err != nil {
 			e.logger.Error("[RequestEncodingForBlob] error getting encoding params", "err", err)
 			continue
@@ -299,20 +330,10 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			return
 		}
 
-		blobQuorumInfo := &core.BlobQuorumInfo{
-			SecurityParam: core.SecurityParam{
-				QuorumID:           quorum.QuorumID,
-				AdversaryThreshold: quorum.AdversaryThreshold,
-				QuorumThreshold:    quorum.QuorumThreshold,
-				QuorumRate:         quorum.QuorumRate,
-			},
-			QuantizationFactor: quorumInfo.QuantizationFactor,
-			EncodedBlobLength:  params.ChunkLength * quorumInfo.QuantizationFactor * numOperators,
-		}
-
 		pending = append(pending, pendingRequestInfo{
 			BlobQuorumInfo: blobQuorumInfo,
 			EncodingParams: params,
+			Assignments:    assignments,
 		})
 	}
 
@@ -348,7 +369,8 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					BlobQuorumInfo:       res.BlobQuorumInfo,
 					Commitment:           commits,
 					Chunks:               chunks,
-					Assignments:          batchMetadata.QuorumInfos[res.BlobQuorumInfo.QuorumID].Assignments,
+					Assignments:          res.Assignments,
+					Status:               PendingDispersal,
 				},
 				Err: nil,
 			}
@@ -370,7 +392,8 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 		return fmt.Errorf("failed to putEncodedBlob: %w", err)
 	}
 
-	encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
+	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
+	e.metrics.UpdateEncodedBlobs(count, encodedSize)
 	if e.EncodedSizeNotifier.threshold > 0 && encodedSize >= e.EncodedSizeNotifier.threshold {
 		e.EncodedSizeNotifier.mu.Lock()
 
@@ -500,7 +523,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		i++
 	}
 
-	batchMetadata, err := e.getBatchMetadata(context.Background(), metadatas, e.ReferenceBlockNumber)
+	state, err := e.getOperatorState(context.Background(), metadatas, e.ReferenceBlockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -519,12 +542,12 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	e.ReferenceBlockNumber = 0
 
 	return &batch{
-		EncodedBlobs:  encodedBlobs,
-		BatchHeader:   batchHeader,
-		BlobHeaders:   blobHeaders,
-		BlobMetadata:  metadatas,
-		BatchMetadata: batchMetadata,
-		MerkleTree:    tree,
+		EncodedBlobs: encodedBlobs,
+		BatchHeader:  batchHeader,
+		BlobHeaders:  blobHeaders,
+		BlobMetadata: metadatas,
+		State:        state,
+		MerkleTree:   tree,
 	}, nil
 }
 
@@ -534,7 +557,19 @@ func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
 	}
 }
 
-func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*batchMetadata, error) {
+func (e *EncodingStreamer) MarkBlobPendingConfirmation(metadata *disperser.BlobMetadata) error {
+	for _, sp := range metadata.RequestMetadata.SecurityParams {
+		err := e.EncodedBlobstore.MarkEncodedResultPendingConfirmation(metadata.GetBlobKey(), sp.QuorumID)
+		if err != nil {
+			return fmt.Errorf("error marking blob pending confirmation: %w", err)
+		}
+	}
+	return nil
+}
+
+// getOperatorState returns the operator state for the blobs that have valid quorums
+func (e *EncodingStreamer) getOperatorState(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*core.IndexedOperatorState, error) {
+
 	quorums := make(map[core.QuorumID]QuorumInfo, 0)
 	for _, metadata := range metadatas {
 		for _, quorum := range metadata.RequestMetadata.SecurityParams {
@@ -549,26 +584,33 @@ func (e *EncodingStreamer) getBatchMetadata(ctx context.Context, metadatas []*di
 		i++
 	}
 
-	// Get the operator state
+	// GetIndexedOperatorState should return state for valid quorums only
 	state, err := e.chainState.GetIndexedOperatorState(ctx, blockNumber, quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("error getting operator state at block number %d: %w", blockNumber, err)
 	}
+	return state, nil
+}
 
-	for quorumID := range quorums {
-		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, quorumID, QuantizationFactor)
-		if err != nil {
-			return nil, err
+// It also returns the list of valid blob metadatas (i.e. blobs that have valid quorums)
+func (e *EncodingStreamer) validateMetadataQuorums(metadatas []*disperser.BlobMetadata, state *core.IndexedOperatorState) []*disperser.BlobMetadata {
+	validMetadata := make([]*disperser.BlobMetadata, 0)
+	for _, metadata := range metadatas {
+		valid := true
+		for _, quorum := range metadata.RequestMetadata.SecurityParams {
+			if aggKey, ok := state.AggKeys[quorum.QuorumID]; !ok || aggKey == nil {
+				e.logger.Warn("got blob with a quorum without APK. Will skip.", "quorum", quorum.QuorumID)
+				valid = false
+			}
 		}
-		quorums[quorumID] = QuorumInfo{
-			Assignments:        assignments,
-			Info:               info,
-			QuantizationFactor: QuantizationFactor,
+		if valid {
+			validMetadata = append(validMetadata, metadata)
+		} else {
+			err := e.blobStore.HandleBlobFailure(context.Background(), metadata, 0)
+			if err != nil {
+				e.logger.Error("error handling blob failure", "err", err)
+			}
 		}
 	}
-
-	return &batchMetadata{
-		QuorumInfos: quorums,
-		State:       state,
-	}, nil
+	return validMetadata
 }
