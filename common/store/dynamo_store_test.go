@@ -88,7 +88,7 @@ func TestDynamoBucketStoreVersioned(t *testing.T) {
 	ctx := context.Background()
 
 	p := &common.RateBucketParams{
-		BucketLevels:    []uint64{uint64(time.Second), uint64(time.Minute)},
+		BucketLevels:    []time.Duration{time.Second, time.Minute},
 		LastRequestTime: time.Now().UTC(),
 	}
 
@@ -112,7 +112,7 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 	ctx := context.Background()
 
 	p := &common.RateBucketParams{
-		BucketLevels:    []uint64{uint64(30 * time.Second), uint64(30 * time.Second)},
+		BucketLevels:    []time.Duration{30 * time.Second, 30 * time.Second},
 		LastRequestTime: time.Now().UTC(),
 	}
 	err := dynamoParamStore.UpdateItemWithVersion(ctx, "testRetriever2", p, 0)
@@ -144,7 +144,7 @@ func TestUpsertMultipleUpdateAsSeparateOperationWithExpression(t *testing.T) {
 
 	// Validate that the item was updated
 	for i := 0; i < len(p2.BucketLevels); i++ {
-		p.BucketLevels[i] += uint64(100 * time.Second)
+		p.BucketLevels[i] += 100 * time.Second
 		fmt.Printf("p3.BucketLevels[%d]: %v\n", i, p3.BucketLevels[i])
 		assert.Equal(t, p.BucketLevels[i], p3.BucketLevels[i])
 	}
