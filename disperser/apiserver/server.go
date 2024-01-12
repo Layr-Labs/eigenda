@@ -16,6 +16,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -128,8 +130,24 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return fmt.Errorf("failed to authenticate blob request: %v", err)
 	}
 
+	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
+	authenticatedAddress := ""
+	// Decode public key
+	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
+	if err != nil {
+		s.logger.Warn("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+	} else {
+		pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+		if err != nil {
+			s.logger.Warn("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+		} else {
+			// Get the address
+			authenticatedAddress = crypto.PubkeyToAddress(*pubKey).String()
+		}
+	}
+
 	// Disperse the blob
-	reply, err := s.disperseBlob(stream.Context(), blob)
+	reply, err := s.disperseBlob(stream.Context(), blob, authenticatedAddress)
 	if err != nil {
 		return err
 	}
@@ -150,11 +168,11 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	blob := getBlobFromRequest(req)
 
-	return s.disperseBlob(ctx, blob)
+	return s.disperseBlob(ctx, blob, "")
 
 }
 
-func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob) (*pb.DisperseBlobReply, error) {
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
 	}))
@@ -219,7 +237,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob) (*p
 	}
 
 	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRates(ctx, blob, origin)
+		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
 			for _, param := range securityParams {
 				quorumId := string(param.QuorumID)
@@ -257,14 +275,14 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob) (*p
 	}, nil
 }
 
-func (s *DispersalServer) getAccountRate(origin string, quorumID core.QuorumID) (*PerUserRateInfo, error) {
+func (s *DispersalServer) getAccountRate(origin, address string, quorumID core.QuorumID) (*PerUserRateInfo, error) {
 	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
 	if !ok {
 		return nil, fmt.Errorf("no configured rate exists for quorum %d", quorumID)
 	}
 
-	for ip, rateInfoByQuorum := range s.rateConfig.Allowlist {
-		if !strings.Contains(origin, ip) {
+	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
+		if !strings.Contains(origin, account) && !strings.EqualFold(address, account) {
 			continue
 		}
 
@@ -295,7 +313,7 @@ func (s *DispersalServer) getAccountRate(origin string, quorumID core.QuorumID) 
 	}, nil
 }
 
-func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin string) error {
+func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
 
 	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
 	s.mu.Lock()
@@ -307,7 +325,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
-		accountRates, err := s.getAccountRate(origin, param.QuorumID)
+		accountRates, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
 			return err
 		}
