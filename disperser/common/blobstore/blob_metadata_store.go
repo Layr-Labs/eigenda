@@ -98,13 +98,31 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 
 // GetBlobMetadataByStatusWithPagination returns all the metadata with the given status upto the specified limit
 // along with items, also returns a pagination token that can be used to fetch the next set of items
-func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey map[string]types.AttributeValue) ([]*disperser.BlobMetadata, map[string]types.AttributeValue, error) {
+func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.BlobStoreExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BlobStoreExclusiveStartKey, error) {
+
+	var attributeMap map[string]types.AttributeValue
+	var err error
+
+	// Convert the exclusive start key to a map of AttributeValue
+	if exclusiveStartKey != nil {
+		attributeMap, err = convertToAttribMap(exclusiveStartKey)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, statusIndexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
-		}}, limit, exclusiveStartKey)
+		}}, limit, attributeMap)
+
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// When no more results to fetch, the LastEvaluatedKey is nil
+	if queryResult.Items == nil && queryResult.LastEvaluatedKey == nil {
+		return nil, nil, nil
 	}
 
 	metadata := make([]*disperser.BlobMetadata, len(queryResult.Items))
@@ -119,7 +137,13 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 	if lastEvaluatedKey == nil {
 		return metadata, nil, nil
 	}
-	return metadata, lastEvaluatedKey, nil
+
+	// Convert the last evaluated key to a disperser.BlobStoreExclusiveStartKey
+	exclusiveStartKey, err = convertToExclusiveStartKey(lastEvaluatedKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	return metadata, exclusiveStartKey, nil
 }
 
 func (s *BlobMetadataStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
@@ -376,4 +400,27 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*disperser.BlobMetadata, e
 	metadata.ConfirmationInfo = &confirmationInfo
 
 	return &metadata, nil
+}
+
+func convertToExclusiveStartKey(exclusiveStartKeyMap map[string]types.AttributeValue) (*disperser.BlobStoreExclusiveStartKey, error) {
+	blobStoreExclusiveStartKey := disperser.BlobStoreExclusiveStartKey{}
+	err := attributevalue.UnmarshalMap(exclusiveStartKeyMap, &blobStoreExclusiveStartKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blobStoreExclusiveStartKey, nil
+}
+
+func convertToAttribMap(blobStoreExclusiveStartKey *disperser.BlobStoreExclusiveStartKey) (map[string]types.AttributeValue, error) {
+	if blobStoreExclusiveStartKey == nil {
+		// Return an empty map or nil
+		return nil, nil
+	}
+
+	avMap, err := attributevalue.MarshalMap(blobStoreExclusiveStartKey)
+	if err != nil {
+		return nil, err
+	}
+	return avMap, nil
 }

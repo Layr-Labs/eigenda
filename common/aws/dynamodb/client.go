@@ -168,13 +168,26 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 
 // QueryIndexWithPagination returns all items in the index that match the given key
 // Results are limited to the given limit and the pagination token is returned
+// When limit is is 0, all items are returned
 func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
-	queryInput := &dynamodb.QueryInput{
-		TableName:                 aws.String(tableName),
-		IndexName:                 aws.String(indexName),
-		KeyConditionExpression:    aws.String(keyCondition),
-		ExpressionAttributeValues: expAttributeValues,
-		Limit:                     &limit,
+	var queryInput *dynamodb.QueryInput
+
+	// Fetch all items if limit is 0
+	if limit > 0 {
+		queryInput = &dynamodb.QueryInput{
+			TableName:                 aws.String(tableName),
+			IndexName:                 aws.String(indexName),
+			KeyConditionExpression:    aws.String(keyCondition),
+			ExpressionAttributeValues: expAttributeValues,
+			Limit:                     &limit,
+		}
+	} else {
+		queryInput = &dynamodb.QueryInput{
+			TableName:                 aws.String(tableName),
+			IndexName:                 aws.String(indexName),
+			KeyConditionExpression:    aws.String(keyCondition),
+			ExpressionAttributeValues: expAttributeValues,
+		}
 	}
 
 	// If a pagination token was provided, set it as the ExclusiveStartKey
@@ -185,6 +198,10 @@ func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string,
 	response, err := c.dynamoClient.Query(ctx, queryInput)
 	if err != nil {
 		return QueryResult{}, err
+	}
+
+	if len(response.Items) == 0 {
+		return QueryResult{Items: nil, LastEvaluatedKey: nil}, nil
 	}
 
 	// Return the items and the pagination token

@@ -32,6 +32,7 @@ type Config struct {
 }
 
 func NewConfig(ctx *cli.Context) Config {
+
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -51,6 +52,7 @@ func NewConfig(ctx *cli.Context) Config {
 			SRSOrder:                 ctx.GlobalInt(flags.SRSOrderFlag.Name),
 			MaxNumRetriesPerBlob:     ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
 			TargetNumChunks:          ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
+			MaxBlobsToFetchFromStore: ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
 			EncodingTimeout:    ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),

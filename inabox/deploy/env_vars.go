@@ -139,6 +139,8 @@ type BatcherVars struct {
 	BATCHER_AWS_SECRET_ACCESS_KEY string
 
 	BATCHER_AWS_ENDPOINT_URL string
+
+	BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE string
 }
 
 func (vars BatcherVars) getEnvMap() map[string]string {
