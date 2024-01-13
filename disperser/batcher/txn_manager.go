@@ -135,10 +135,13 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 	err = t.ethClient.SendTransaction(ctx, txn)
 	if err != nil {
 		return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
+	} else {
+		t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", txn.Hash().Hex())
 	}
 	req.Tx = txn
 
 	t.requestChan <- req
+	t.metrics.UpdateTxQueue(len(t.requestChan))
 	return nil
 }
 
@@ -162,6 +165,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 		)
 		if err == nil {
 			t.metrics.UpdateSpeedUps(numSpeedUps)
+			t.metrics.IncrementTxnCount("success")
 			return receipt, nil
 		}
 
@@ -173,18 +177,23 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			t.logger.Warn("transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
 			newTx, err := t.speedUpTxn(ctx, req.Tx, req.Tag)
 			if err != nil {
-				t.logger.Error("failed to speed up transaction", "err", err)
-				continue
+				t.logger.Error("[TxnManager] failed to speed up transaction", "err", err)
+				t.metrics.IncrementTxnCount("failure")
+				return nil, err
 			}
 			err = t.ethClient.SendTransaction(ctx, newTx)
 			if err != nil {
-				t.logger.Error("failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
-				continue
+				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
+				t.metrics.IncrementTxnCount("failure")
+				return nil, err
+			} else {
+				t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", newTx.Hash().Hex())
 			}
 			req.Tx = newTx
 			numSpeedUps++
 		} else {
 			t.logger.Error("transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
+			t.metrics.IncrementTxnCount("failure")
 			return nil, err
 		}
 	}
