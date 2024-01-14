@@ -36,12 +36,6 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
     mapping(uint32 => bytes32) public batchIdToBatchMetadataHash;
 
-    /// @notice The current batchIdOptimistic
-    uint32 public batchIdOptimistic;
-
-    /// @notice mapping between the batchIdOptimistic to the hash of the metadata of the corresponding Optimistic Batch
-    mapping(uint32 => bytes32) public batchIdToBatchMetadataHashOptimistic;
-
     /// @notice address that is permissioned to confirm batches
     address public batchConfirmer;
 

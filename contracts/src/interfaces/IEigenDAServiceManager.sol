@@ -15,7 +15,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
      * @param batchHeaderHash The hash of the batch header
      * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
      */
-    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, bool optimistic);
+    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
 
     /**
      * @notice Emitted when the batch confirmer is changed.
@@ -83,12 +83,6 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
     function confirmBatch(
         BatchHeader calldata batchHeader,
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-    ) external;
-
-    /// @notice This function is used for submitting data availabilty certificates optimistically
-    function confirmBatchOptimistically(
-        BatchHeader calldata batchHeader,
-        bytes calldata nonSignerStakesAndSignature
     ) external;
 
     /// @notice This function is used for changing the batch confirmer
