@@ -2,10 +2,10 @@
 
 pragma solidity ^0.8.9;
 
-import "eigenlayer-core/contracts/libraries/Merkle.sol";
-import "./EigenDAHasher.sol";
-import "../interfaces/IEigenDAServiceManager.sol";
+import {Merkle} from "eigenlayer-core/contracts/libraries/Merkle.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {EigenDAHasher} from "./EigenDAHasher.sol";
+import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to prove blobs on EigenDA and open KZG commitments.

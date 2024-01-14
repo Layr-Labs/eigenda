@@ -34,7 +34,6 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             delegationMock,
             registryCoordinator,
-            strategyManagerMock,
             stakeRegistry
         );
 
@@ -82,6 +81,18 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata"));
         cheats.prank(confirmer, notConfirmer);
+        eigenDAServiceManager.confirmBatch(
+            batchHeader,
+            nonSignerStakesAndSignature
+        );
+    }
+
+    function testConfirmBatch_Revert_NotConfirmer(uint256 pseudoRandomNumber) public {
+        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+            = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
+
+        cheats.expectRevert(bytes("onlyBatchConfirmer: not from batch confirmer"));
+        cheats.prank(notConfirmer, notConfirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
             nonSignerStakesAndSignature
@@ -155,6 +166,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         assertEq(eigenDAServiceManager.batchId(), batchIdToConfirm + 1);
     }
+
+
 
     function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (IEigenDAServiceManager.BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
         // register a bunch of operators

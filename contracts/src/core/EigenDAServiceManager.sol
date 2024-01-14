@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
 import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
-import {IStrategyManager} from "eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
-import {ISlasher} from "eigenlayer-core/contracts/interfaces/ISlasher.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
-import {ISignatureUtils} from "eigenlayer-core/contracts/interfaces/ISignatureUtils.sol";
 
 import {ServiceManagerBase} from "eigenlayer-middleware/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
@@ -17,7 +12,6 @@ import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.so
 
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
-
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
@@ -33,8 +27,6 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
-    IStrategyManager public immutable _strategyManager;
-
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
     modifier onlyBatchConfirmer() {
         require(msg.sender == batchConfirmer, "onlyBatchConfirmer: not from batch confirmer");
@@ -44,13 +36,11 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     constructor(
         IDelegationManager __delegationMananger,
         IRegistryCoordinator __registryCoordinator,
-        IStrategyManager __strategyManager,
         IStakeRegistry __stakeRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__delegationMananger, __registryCoordinator, __stakeRegistry)
     {
-        _strategyManager = __strategyManager;
         _disableInitializers();
     }
 

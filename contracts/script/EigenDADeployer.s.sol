@@ -187,7 +187,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             delegation,
             registryCoordinator,
-            strategyManager,
             stakeRegistry
         );
 
