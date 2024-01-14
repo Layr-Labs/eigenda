@@ -62,7 +62,7 @@ contract MockRollup {
         require(commitments[block.timestamp].validator == address(0), "MockRollup.postCommitment: Commitment already posted");
 
         // verify that the blob was included in the batch
-        EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
+        EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
 
         // zero out the chunkLengths (this a temporary hack)
         for (uint256 i = 0; i < blobHeader.quorumBlobParams.length; i++)
