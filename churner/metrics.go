@@ -20,7 +20,7 @@ const (
 	FailReasonInsufficientStakeToChurn    FailReason = "insufficient_stake_to_churn"    // Operator doesn't have enough stake to be churned
 	FailReasonQuorumIdOutOfRange          FailReason = "quorum_id_out_of_range"         // Quorum ID out of range: quorum is not in the range of [0, QuorumCount]
 	FailReasonPrevApprovalNotExpired      FailReason = "prev_approval_not_expired"      // Expiry: previous approval hasn't expired
-	FailReasonInvalidSignature            FailReason = "invalid_signature"              // Invalid signature: operator's signature is wong
+	FailReasonInvalidSignature            FailReason = "invalid_signature"              // Invalid signature: operator's signature is wrong
 	FailReasonProcessChurnRequestFailed   FailReason = "failed_process_churn_request"   // Failed to process churn request
 	FailReasonInvalidRequest              FailReason = "invalid_request"                // Invalid request: request is malformed
 )
