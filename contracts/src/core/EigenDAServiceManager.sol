@@ -34,7 +34,6 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
     IStrategyManager public immutable _strategyManager;
-    ISlasher public immutable _slasher;
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
     modifier onlyBatchConfirmer() {
@@ -46,14 +45,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IDelegationManager __delegationMananger,
         IRegistryCoordinator __registryCoordinator,
         IStrategyManager __strategyManager,
-        IStakeRegistry __stakeRegistry,
-        ISlasher __slasher
+        IStakeRegistry __stakeRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__delegationMananger, __registryCoordinator, __stakeRegistry)
     {
         _strategyManager = __strategyManager;
-        _slasher = __slasher;
         _disableInitializers();
     }
 

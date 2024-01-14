@@ -35,8 +35,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             delegationMock,
             registryCoordinator,
             strategyManagerMock,
-            stakeRegistry,
-            slasher
+            stakeRegistry
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.

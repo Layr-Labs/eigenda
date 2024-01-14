@@ -1,28 +1,30 @@
 // SPDX-License-Identifier: UNLICENSED 
-/*
 pragma solidity ^0.8.9;
 
-import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
 import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
-import {BLSPublicKeyCompendium} from "eigenlayer-middleware/BLSPublicKeyCompendium.sol";
-import {BLSRegistryCoordinatorWithIndices, IBLSRegistryCoordinatorWithIndices} from "eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
-import {BLSPubkeyRegistry, IBLSPubkeyRegistry} from "eigenlayer-middleware/BLSPubkeyRegistry.sol";
-import {IndexRegistry, IIndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
-import {StakeRegistry, IStakeRegistry, IServiceManager} from "eigenlayer-middleware/StakeRegistry.sol";
-import {BLSOperatorStateRetriever} from "eigenlayer-middleware/BLSOperatorStateRetriever.sol";
+
+import {BLSApkRegistry} from "eigenlayer-middleware/BLSApkRegistry.sol";
+import {RegistryCoordinator} from "eigenlayer-middleware/RegistryCoordinator.sol";
+import {OperatorStateRetriever} from "eigenlayer-middleware/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
+import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
+import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
+import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
+import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
+import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
+
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 
+import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
-// TODO: REVIEW AND FIX THIS ENTIRE SCRIPT
-
 // # To load the variables in the .env file
 // source .env
-
 // # To deploy and verify our contract
 // forge script script/Deployer.s.sol:EigenDADeployer --rpc-url $RPC_URL  --private-key $PRIVATE_KEY --broadcast -vvvv
 contract EigenDADeployer is DeployOpenEigenLayer {
@@ -30,17 +32,16 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ProxyAdmin public eigenDAProxyAdmin;
     PauserRegistry public eigenDAPauserReg;
 
-    BLSPublicKeyCompendium public pubkeyCompendium;
+    BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
-    BLSRegistryCoordinatorWithIndices public registryCoordinator;
-    IBLSPubkeyRegistry public blsPubkeyRegistry;
+    RegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
-    BLSOperatorStateRetriever public blsOperatorStateRetriever;
+    OperatorStateRetriever public operatorStateRetriever;
 
+    BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
-    IBLSRegistryCoordinatorWithIndices public registryCoordinatorImplementation;
-    IBLSPubkeyRegistry public blsPubkeyRegistryImplementation;
+    IRegistryCoordinator public registryCoordinatorImplementation;
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
 
@@ -93,15 +94,11 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         *//*
+         */
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
-        pubkeyCompendium = new BLSPublicKeyCompendium();
-        registryCoordinator = BLSRegistryCoordinatorWithIndices(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
-        );
-        blsPubkeyRegistry = IBLSPubkeyRegistry(
+        registryCoordinator = RegistryCoordinator(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
         indexRegistry = IIndexRegistry(
@@ -110,77 +107,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         stakeRegistry = IStakeRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
-
-        // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
-        {
-            stakeRegistryImplementation = new StakeRegistry(
-                registryCoordinator,
-                strategyManager,
-                IServiceManager(address(eigenDAServiceManager))
-            );
-
-            // set up a quorum with each strategy that needs to be set up
-            uint96[] memory minimumStakeForQuourm = new uint96[](numStrategies);
-            IVoteWeigher.StrategyAndWeightingMultiplier[][] memory strategyAndWeightingMultipliers = new IVoteWeigher.StrategyAndWeightingMultiplier[][](numStrategies);
-            for (uint i = 0; i < numStrategies; i++) {
-                strategyAndWeightingMultipliers[i] = new IVoteWeigher.StrategyAndWeightingMultiplier[](1);
-                strategyAndWeightingMultipliers[i][0] = IVoteWeigher.StrategyAndWeightingMultiplier({
-                    strategy: deployedStrategyArray[i],
-                    multiplier: 1 ether
-                });
-            }
-
-            eigenDAProxyAdmin.upgradeAndCall(
-                TransparentUpgradeableProxy(payable(address(stakeRegistry))),
-                address(stakeRegistryImplementation),
-                abi.encodeWithSelector(
-                    StakeRegistry.initialize.selector,
-                    minimumStakeForQuourm,
-                    strategyAndWeightingMultipliers
-                )
-            );
-        }
-
-        registryCoordinatorImplementation = new BLSRegistryCoordinatorWithIndices(
-            slasher,
-            IServiceManager(address(eigenDAServiceManager)),
-            stakeRegistry,
-            blsPubkeyRegistry,
-            indexRegistry
-        );
-        
-        {
-            IBLSRegistryCoordinatorWithIndices.OperatorSetParam[] memory operatorSetParams = new IBLSRegistryCoordinatorWithIndices.OperatorSetParam[](numStrategies);
-            for (uint i = 0; i < numStrategies; i++) {
-                // hard code these for now
-                operatorSetParams[i] = IBLSRegistryCoordinatorWithIndices.OperatorSetParam({
-                    maxOperatorCount: uint32(maxOperatorCount),
-                    kickBIPsOfOperatorStake: 11000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
-                    kickBIPsOfTotalStake: 1001 // an operator needs to have less than kickBIPsOfTotalStake / 10000 of the total stake to be kicked out
-                });
-            }
-            eigenDAProxyAdmin.upgradeAndCall(
-                TransparentUpgradeableProxy(payable(address(registryCoordinator))),
-                address(registryCoordinatorImplementation),
-                abi.encodeWithSelector(
-                    BLSRegistryCoordinatorWithIndices.initialize.selector,
-                    addressConfig.churner,
-                    addressConfig.ejector,
-                    operatorSetParams,
-                    IPauserRegistry(address(eigenDAPauserReg)),
-                    0 // initial paused status is nothing paused
-                )
-            );
-        }
-
-        blsPubkeyRegistryImplementation = new BLSPubkeyRegistry(
-            registryCoordinator,
-            pubkeyCompendium
-        );
-
-        eigenDAProxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(blsPubkeyRegistry))),
-            address(blsPubkeyRegistryImplementation)
+        apkRegistry = BLSApkRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
 
         indexRegistryImplementation = new IndexRegistry(
@@ -192,11 +120,75 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(indexRegistryImplementation)
         );
 
+        stakeRegistryImplementation = new StakeRegistry(
+            registryCoordinator,
+            delegation
+        );
+
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(stakeRegistry))),
+            address(stakeRegistryImplementation)
+        );
+
+        apkRegistryImplementation = new BLSApkRegistry(
+            registryCoordinator
+        );
+
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(apkRegistry))),
+            address(apkRegistryImplementation)
+        );
+
+        registryCoordinatorImplementation = new RegistryCoordinator(
+                IServiceManager(address(eigenDAServiceManager)),
+                stakeRegistry,
+                apkRegistry,
+                indexRegistry
+            );
+
+        {
+            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams = new IRegistryCoordinator.OperatorSetParam[](numStrategies);
+            for (uint i = 0; i < numStrategies; i++) {
+                // hard code these for now
+                operatorSetParams[i] = IRegistryCoordinator.OperatorSetParam({
+                    maxOperatorCount: uint32(maxOperatorCount),
+                    kickBIPsOfOperatorStake: 11000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
+                    kickBIPsOfTotalStake: 1001 // an operator needs to have less than kickBIPsOfTotalStake / 10000 of the total stake to be kicked out
+                });
+            }
+
+            uint96[] memory minimumStakeForQuourm = new uint96[](numStrategies);
+            IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers = new IStakeRegistry.StrategyParams[][](numStrategies);
+            for (uint i = 0; i < numStrategies; i++) {
+                strategyAndWeightingMultipliers[i] = new IStakeRegistry.StrategyParams[](1);
+                strategyAndWeightingMultipliers[i][0] = IStakeRegistry.StrategyParams({
+                    strategy: deployedStrategyArray[i],
+                    multiplier: 1 ether
+                });
+            }
+
+            eigenDAProxyAdmin.upgradeAndCall(
+                TransparentUpgradeableProxy(payable(address(registryCoordinator))),
+                address(registryCoordinatorImplementation),
+                abi.encodeWithSelector(
+                    RegistryCoordinator.initialize.selector,
+                    addressConfig.eigenDACommunityMultisig,
+                    addressConfig.churner,
+                    addressConfig.ejector,
+                    IPauserRegistry(address(eigenDAPauserReg)),
+                    0, // initial paused status is nothing paused
+                    operatorSetParams, 
+                    minimumStakeForQuourm,
+                    strategyAndWeightingMultipliers 
+                )
+            );
+        }
+
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
+            delegation,
             registryCoordinator,
             strategyManager,
-            delegation,
-            slasher
+            stakeRegistry
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
@@ -212,7 +204,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             )
         );
 
-        blsOperatorStateRetriever = new BLSOperatorStateRetriever();
+        operatorStateRetriever = new OperatorStateRetriever();
     }
 }
-*/

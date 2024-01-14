@@ -58,8 +58,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             delegationMock,
             registryCoordinator,
             strategyManagerMock,
-            stakeRegistry,
-            slasher
+            stakeRegistry
         );
 
         eigenDAServiceManager = EigenDAServiceManager(
