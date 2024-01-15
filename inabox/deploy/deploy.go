@@ -162,7 +162,7 @@ func (env *Config) DeployExperiment() {
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
 
-	fmt.Println("Test environment has succesfully deployed!")
+	fmt.Println("Test environment has successfully deployed!")
 }
 
 // TODO: Supply the test path to the runner utility

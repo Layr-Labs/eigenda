@@ -17,6 +17,7 @@ type RequesterID = string
 
 type RateLimiter interface {
 	AllowRequest(ctx context.Context, requesterID RequesterID, blobSize uint, rate RateParam) (bool, error)
+	AllowRequestConcurrencySafeVersion(ctx context.Context, requesterID RequesterID, blobSize uint, rate RateParam) (bool, error)
 }
 
 type GlobalRateParams struct {

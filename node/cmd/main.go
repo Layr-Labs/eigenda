@@ -80,7 +80,7 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, []string{}, logger)
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
 	if err != nil {
 		return err
 	}

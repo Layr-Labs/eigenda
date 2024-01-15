@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -22,6 +23,7 @@ const (
 	FailConfirmBatch           FailReason = "confirm_batch"
 	FailGetBatchID             FailReason = "get_batch_id"
 	FailUpdateConfirmationInfo FailReason = "update_confirmation_info"
+	FailNoAggregatedSignature  FailReason = "no_aggregated_signature"
 )
 
 type MetricsConfig struct {
@@ -33,15 +35,21 @@ type EncodingStreamerMetrics struct {
 	EncodedBlobs *prometheus.GaugeVec
 }
 
+type TxnManagerMetrics struct {
+	Latency  prometheus.Summary
+	GasUsed  prometheus.Gauge
+	SpeedUps prometheus.Gauge
+}
+
 type Metrics struct {
 	*EncodingStreamerMetrics
+	*TxnManagerMetrics
 
 	registry *prometheus.Registry
 
 	Blob             *prometheus.CounterVec
 	Batch            *prometheus.CounterVec
 	BatchProcLatency *prometheus.SummaryVec
-	GasUsed          prometheus.Gauge
 	Attestation      *prometheus.GaugeVec
 	BatchError       *prometheus.CounterVec
 
@@ -66,8 +74,34 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 		),
 	}
 
+	txnManagerMetrics := TxnManagerMetrics{
+		Latency: promauto.With(reg).NewSummary(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "txn_manager_latency_ms",
+				Help:       "transaction confirmation latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+		),
+		GasUsed: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "gas_used",
+				Help:      "gas used for onchain batch confirmation",
+			},
+		),
+		SpeedUps: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "speed_ups",
+				Help:      "number of times the gas price was increased",
+			},
+		),
+	}
+
 	metrics := &Metrics{
 		EncodingStreamerMetrics: &encodingStreamerMetrics,
+		TxnManagerMetrics:       &txnManagerMetrics,
 		Blob: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -93,13 +127,6 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 			},
 			[]string{"stage"},
 		),
-		GasUsed: promauto.With(reg).NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "gas_used",
-				Help:      "gas used for onchain batch confirmation",
-			},
-		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -123,9 +150,14 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	return metrics
 }
 
-func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int) {
+func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int, quorumResults map[core.QuorumID]*core.QuorumResult) {
 	g.Attestation.WithLabelValues("signers").Set(float64(operatorCount - nonSignerCount))
 	g.Attestation.WithLabelValues("non_signers").Set(float64(nonSignerCount))
+
+	for _, quorumResult := range quorumResults {
+		label := fmt.Sprintf("quorum_result_%d", quorumResult.QuorumID)
+		g.Attestation.WithLabelValues(label).Set(float64(quorumResult.PercentSigned))
+	}
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.
@@ -179,4 +211,16 @@ func (g *Metrics) Start(ctx context.Context) {
 func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
 	e.EncodedBlobs.WithLabelValues("size").Set(float64(size))
 	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
+}
+
+func (t *TxnManagerMetrics) ObserveLatency(latencyMs float64) {
+	t.Latency.Observe(latencyMs)
+}
+
+func (t *TxnManagerMetrics) UpdateGasUsed(gasUsed uint64) {
+	t.GasUsed.Set(float64(gasUsed))
+}
+
+func (t *TxnManagerMetrics) UpdateSpeedUps(speedUps int) {
+	t.SpeedUps.Set(float64(speedUps))
 }

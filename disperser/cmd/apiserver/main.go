@@ -109,7 +109,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 				return err
 			}
 		}
-		ratelimiter, err = ratelimit.NewRateLimiter(globalParams, bucketStore, config.RatelimiterConfig.Allowlist, logger)
+		ratelimiter, err = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
 		if err != nil {
 			return err
 		}

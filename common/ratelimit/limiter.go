@@ -4,66 +4,63 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 )
 
-type BucketStore = common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]
+type BucketStoreConcurrencySafe = common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]
+type BucketStore = common.KVStore[common.RateBucketParams]
 
 type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
 
 	bucketStore interface{}
-	allowlist   []string
-
-	logger common.Logger
+	logger      common.Logger
 }
 
-// Note: This could instead be a factor of RateLimiter with different bucket types
-func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{}, allowlist []string, logger common.Logger) (common.RateLimiter, error) {
-
-	if _, isKVStore := bucketStore.(common.KVStore[common.RateBucketParams]); !isKVStore {
-		if _, isKVStoreVersioned := bucketStore.(common.KVStoreVersioned[common.RateBucketParams]); !isKVStoreVersioned {
-			return nil, errors.New("bucketStore must be either KVStore or KVStoreVersioned")
-		}
+// NewRateLimiter is a factory function to create new RateLimiter
+func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{}, logger common.Logger) (common.RateLimiter, error) {
+	switch bs := bucketStore.(type) {
+	case common.KVStore[common.RateBucketParams]:
+		return newRateLimiter(rateParams, bs, logger), nil
+	case common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]:
+		return newVersionedConcurrencySafeRateLimiter(rateParams, bs, logger), nil
+	default:
+		return nil, errors.New("unsupported bucketStore type")
 	}
+}
 
+// Specific constructors for each type of RateLimiter
+func newRateLimiter(rateParams common.GlobalRateParams, bucketStore common.KVStore[common.RateBucketParams], logger common.Logger) common.RateLimiter {
+	// initialize and return a simple rate limiter
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
-		allowlist:        allowlist,
 		logger:           logger,
-	}, nil
+	}
 }
 
-func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
-	// TODO: temporary allowlist that unconditionally allows request
-	// for testing purposes only
-	for _, id := range d.allowlist {
-		if strings.Contains(requesterID, id) {
-			return true, nil
-		}
+func newVersionedConcurrencySafeRateLimiter(rateParams common.GlobalRateParams, bucketStore common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe], logger common.Logger) common.RateLimiter {
+	// initialize and return a versioned, concurrency-safe rate limiter
+	// initialize and return a simple rate limiter
+	return &rateLimiter{
+		globalRateParams: rateParams,
+		bucketStore:      bucketStore,
+		logger:           logger,
 	}
+}
+
+// Checks whether a request from the given requesterID is allowed
+func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
+	var bs BucketStore = d.bucketStore.(BucketStore)
 
 	// Retrieve bucket params for the requester ID
-	var bucketParams *common.RateBucketParams
-	var err error
-	var version int = 0
-
-	// Determine the type of bucketStore and use the appropriate GetItem method
-	switch bs := d.bucketStore.(type) {
-	case common.KVStoreVersioned[common.RateBucketParams]:
-		bucketParams, version, err = bs.GetItemWithVersion(ctx, requesterID)
-	case common.KVStore[common.RateBucketParams]:
-		bucketParams, err = bs.GetItem(ctx, requesterID)
-	default:
-		return false, errors.New("unknown bucketStore type")
-	}
-
+	// This will be from dynamo for Disperser and from local storage for DA node
+	bucketParams, err := bs.GetItem(ctx, requesterID)
 	if err != nil {
+
 		bucketLevels := make([]time.Duration, len(d.globalRateParams.BucketSizes))
 		copy(bucketLevels, d.globalRateParams.BucketSizes)
 
@@ -82,34 +79,28 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 	// Calculate updated bucket levels
 	allowed := true
 	for i, size := range d.globalRateParams.BucketSizes {
+
 		// Determine bucket deduction
 		deduction := time.Microsecond * time.Duration(1e6*float32(blobSize)/float32(rate)/d.globalRateParams.Multipliers[i])
 
 		// Update the bucket level
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
-
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 	}
 
 	// Update the bucket based on blob size and current rate
 	if allowed || d.globalRateParams.CountFailed {
-		switch bs := d.bucketStore.(type) {
-		case common.KVStoreVersioned[common.RateBucketParams]:
-			// Use UpdateItemWithVersion for KVStoreVersioned
-			err = bs.UpdateItemWithVersion(ctx, requesterID, bucketParams, version)
-		case common.KVStore[common.RateBucketParams]:
-			// Use UpdateItem for KVStore
-			err = bs.UpdateItem(ctx, requesterID, bucketParams)
-		default:
-			return false, errors.New("unknown bucketStore type")
-		}
-
+		// Update bucket params
+		err := bs.UpdateItem(ctx, requesterID, bucketParams)
 		if err != nil {
 			return allowed, err
 		}
+
 	}
 
 	return allowed, nil
+
+	// (DA Node) Store the rate params and account ID along with the blob
 }
 
 // RateLimiting Algorithm defined as per this specification: https://docs.google.com/document/d/1KbGTRfLYX0buD0baCCnh97L01QeHwqsxDeGS1IrBANc
@@ -120,16 +111,22 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 // Using DynamodB Atomic ADD operation to update BucketLevel as opposed to GET and then SET
 // TODO: Add a Flag to switch between the two implementations
 func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
-	var bs common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe] = d.bucketStore.(common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe])
+	fmt.Println("AllowRequestConcurrencySafeVersion")
+	var bs BucketStoreConcurrencySafe = d.bucketStore.(BucketStoreConcurrencySafe)
 
+	if bs == nil {
+		return false, errors.New("bucketStore must be KVStoreVersioned")
+	}
 	// Fetch the current bucket parameters
 	bucketParams, _, err := bs.GetItemWithVersion(ctx, requesterID)
 	if err != nil {
-		return false, fmt.Errorf("error fetching bucket params: %v", err)
+		fmt.Printf("err %v\n", err)
+		fmt.Printf("Item not found for requesterID %v\n", requesterID)
 	}
-
+	fmt.Printf("bucketParams %v\n", bucketParams)
 	// Initialize bucket parameters if they don't exist
 	if bucketParams == nil {
+		fmt.Printf("Initialize BucketParams\n")
 		bucketParams = &common.RateBucketParamsConcurrencySafe{
 			BucketLevels: make([]uint64, len(d.globalRateParams.BucketSizes)),
 		}
@@ -142,8 +139,12 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 			// Converting to Uint64 to avoid overflow
 			bucketParams.BucketLevels[i] = uint64(now - size.Milliseconds())
 		}
-		// Optionally persist the initial state ??
-		// TODO: Double Check if these need to be set before checking BucketSize
+		// Save BucketParams for Requester
+		err := bs.UpdateItem(ctx, requesterID, bucketParams)
+
+		if err != nil {
+			return false, fmt.Errorf("failed to save bucket params dynamodB: %v", err)
+		}
 	}
 
 	// Conservative check: Ensure that the request can potentially be allowed
@@ -162,12 +163,13 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 		}
 
 		// Calculate the required capacity for new request
-		requiredCapacity := uint64(float64(blobSize) / float64(rate) * float64(time.Second.Milliseconds()))
+		requiredCapacity := uint64(time.Duration(uint32(blobSize) / rate))
 		// Since bucketsize is subtracted from now which is assigned to bucketLevel[i] above
 		// Now check if the required capacity + bucketLevel[i] is less than now
 		// If it is less than now then the request can be allowed
 		totalCapacity := bucketLevels[i] + requiredCapacity
-		allowed = totalCapacity <= uint64(now)
+		allowed = totalCapacity < uint64(now)
+		fmt.Printf("allowed %v\n", allowed)
 
 		if allowed || d.globalRateParams.CountFailed {
 			if !reachedMaxBucketSize {
@@ -188,7 +190,7 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 				// Other alternative is to make all updates to each level as an array and then call UpdateItem once but that does not make it concurrency safe
 				err = bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
 				if err != nil {
-					return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
+					return false, fmt.Errorf("failed to update bucket level %d atomically: %v with required capacity %v", i, err, requiredCapacity)
 				}
 				return allowed, nil
 			} else {

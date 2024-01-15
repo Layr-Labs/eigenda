@@ -99,6 +99,92 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
+	ctx := context.Background()
+	blobKey1 := disperser.BlobKey{
+		BlobHash:     blobHash,
+		MetadataHash: "hash",
+	}
+	metadata1 := &disperser.BlobMetadata{
+		MetadataHash: blobKey1.MetadataHash,
+		BlobHash:     blobHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+	}
+	blobKey2 := disperser.BlobKey{
+		BlobHash:     "blob2",
+		MetadataHash: "hash2",
+	}
+	metadata2 := &disperser.BlobMetadata{
+		MetadataHash: blobKey2.MetadataHash,
+		BlobHash:     blobKey2.BlobHash,
+		BlobStatus:   disperser.Finalized,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+		ConfirmationInfo: &disperser.ConfirmationInfo{},
+	}
+	err := blobMetadataStore.QueueNewBlobMetadata(ctx, metadata1)
+	assert.NoError(t, err)
+	err = blobMetadataStore.QueueNewBlobMetadata(ctx, metadata2)
+	assert.NoError(t, err)
+
+	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata1, fetchedMetadata)
+	fetchedMetadata, err = blobMetadataStore.GetBlobMetadata(ctx, blobKey2)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata2, fetchedMetadata)
+
+	processing, lastEvaluatedKey, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, 1, nil)
+	assert.NoError(t, err)
+	assert.Len(t, processing, 1)
+	assert.Equal(t, metadata1, processing[0])
+	assert.NotNil(t, lastEvaluatedKey)
+
+	finalized, lastEvaluatedKey, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Finalized, 1, nil)
+	assert.NoError(t, err)
+	assert.Len(t, finalized, 1)
+	assert.Equal(t, metadata2, finalized[0])
+	assert.NotNil(t, lastEvaluatedKey)
+
+	finalized, lastEvaluatedKey, err = blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Finalized, 1, lastEvaluatedKey)
+	assert.NoError(t, err)
+	assert.Len(t, finalized, 0)
+	assert.Nil(t, lastEvaluatedKey)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
+		},
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey2.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey2.BlobHash},
+		},
+	})
+}
+
+func TestBlobMetadataStoreOperationsWithPaginationNoStoredBlob(t *testing.T) {
+	ctx := context.Background()
+	// Query BlobMetadataStore for a blob that does not exist
+	// This should return nil for both the blob and lastEvaluatedKey
+	processing, lastEvaluatedKey, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, 1, nil)
+	assert.NoError(t, err)
+	assert.Nil(t, processing)
+	assert.Nil(t, lastEvaluatedKey)
+}
+
 func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	_, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)

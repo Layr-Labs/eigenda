@@ -29,9 +29,10 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4566"
 
-	dynamoClient     *dynamodb.Client
-	dynamoParamStore common.KVStoreVersioned[common.RateBucketParams]
-	bucketTableName  = "BucketStoreRateLimit"
+	dynamoClient                    *dynamodb.Client
+	dynamoParamStore                common.KVStoreVersioned[common.RateBucketParams]
+	dynamoParamStoreConccurencySafe common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]
+	bucketTableName                 = "BucketStoreRateLimit"
 )
 
 func makeTestRatelimiter() (common.RateLimiter, error) {
@@ -47,7 +48,7 @@ func makeTestRatelimiter() (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, []string{"testRetriever2"}, &mock.Logger{})
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, &mock.Logger{})
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +101,62 @@ func makeTestRatelimiterDynamodB() (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, []string{}, &mock.Logger{})
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, &mock.Logger{})
 	if err != nil {
+		return nil, err
+	}
+
+	return ratelimiter, nil
+
+}
+
+func makeTestRatelimiterDynamodBConccurencySafe() (common.RateLimiter, error) {
+
+	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalStack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+
+	if deployLocalStack {
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			panic("failed to start localstack container")
+		}
+	}
+
+	cfg := aws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+	}
+
+	_, err := test_utils.CreateTable(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
+	if err != nil {
+		panic("failed to create dynamodb table: " + err.Error())
+	}
+
+	dynamoClient, err = dynamodb.NewClient(cfg, logger)
+	if err != nil {
+		panic("failed to create dynamodb client: " + err.Error())
+	}
+
+	dynamoParamStoreConccurencySafe = store.NewDynamoParamStore[common.RateBucketParamsConcurrencySafe](dynamoClient, bucketTableName)
+
+	globalParams := common.GlobalRateParams{
+		BucketSizes: []time.Duration{time.Second, time.Second},
+		Multipliers: []float32{1, 1},
+	}
+	fmt.Printf("DynamoStore %v\n", dynamoParamStoreConccurencySafe)
+
+	bucketStore := store.NewDynamoParamStore[common.RateBucketParamsConcurrencySafe](dynamoClient, bucketTableName)
+
+	fmt.Printf("bucketStore %v\n", bucketStore)
+
+	ratelimiter, err := ratelimit.NewRateLimiter(globalParams, bucketStore, &mock.Logger{})
+	if err != nil {
+		fmt.Printf("err %v\n", err)
 		return nil, err
 	}
 
@@ -135,26 +190,6 @@ func TestRatelimit(t *testing.T) {
 	assert.Equal(t, false, allow)
 }
 
-func TestRatelimitAllowlist(t *testing.T) {
-	ratelimiter, err := makeTestRatelimiter()
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-
-	retreiverID := "testRetriever2"
-
-	// 10x more requests allowed for allowlisted IDs
-	for i := 0; i < 100; i++ {
-		allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
-		assert.NoError(t, err)
-		assert.Equal(t, true, allow)
-	}
-
-	allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
-	assert.NoError(t, err)
-	assert.Equal(t, true, allow)
-}
-
 func TestRatelimitDynamodBStore(t *testing.T) {
 
 	ratelimiter, err := makeTestRatelimiterDynamodB()
@@ -165,13 +200,58 @@ func TestRatelimitDynamodBStore(t *testing.T) {
 	retreiverID := "testRetriever"
 
 	for i := 0; i < 10; i++ {
-		fmt.Println("i", i)
 		allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
 		assert.NoError(t, err)
 		assert.Equal(t, true, allow)
 	}
 
 	allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 1000, 100)
+	assert.NoError(t, err)
+	assert.Equal(t, false, allow)
+
+	teardown()
+}
+
+func TestRatelimitDynamodBStoreConccurencySafe(t *testing.T) {
+
+	ratelimiter, err := makeTestRatelimiterDynamodBConccurencySafe()
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	retreiverID := "testRetriever2"
+
+	// Allow small blob at rate of 1
+	allow, err := ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 10, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, true, allow)
+
+	// Allow small blob at rate of 10
+	allow, err = ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 10, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, true, allow)
+
+	// Allow small blob at rate of 10
+	allow, err = ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 100, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, true, allow)
+
+	// Allow small of volume 1000 blob at rate of 10 because calculate rate is 100
+	allow, err = ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 1000, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, true, allow)
+
+	// Larger Blob of volume 10000 fails at rate of 10
+	allow, err = ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 10000, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, false, allow)
+
+	// // Disperse a smaller Blob should succeed
+	allow, err = ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 100000, 10000)
+	assert.NoError(t, err)
+	assert.Equal(t, true, allow)
+
+	allow, err = ratelimiter.AllowRequestConcurrencySafeVersion(ctx, retreiverID, 1000000000, 10000)
 	assert.NoError(t, err)
 	assert.Equal(t, false, allow)
 

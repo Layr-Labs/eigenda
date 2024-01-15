@@ -19,7 +19,7 @@ type ChunkValidator interface {
 	UpdateOperatorID(OperatorID)
 }
 
-// chunkValidator implements the validation logic that a DA node should apply to its recieved chunks
+// chunkValidator implements the validation logic that a DA node should apply to its received chunks
 type chunkValidator struct {
 	encoder    Encoder
 	assignment AssignmentCoordinator

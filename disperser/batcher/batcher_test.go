@@ -17,6 +17,7 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
+	"github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
@@ -24,7 +25,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -32,7 +32,8 @@ var (
 )
 
 type batcherComponents struct {
-	confirmer        *dmock.MockBatchConfirmer
+	transactor       *coremock.MockTransactor
+	txnManager       *mock.MockTxnManager
 	blobStore        disperser.BlobStore
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
@@ -72,7 +73,10 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 	asgn := &core.StdAssignmentCoordinator{}
-	agg := core.NewStdSignatureAggregator(logger)
+	transactor := &coremock.MockTransactor{}
+	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err := core.NewStdSignatureAggregator(logger, transactor)
+	assert.NoError(t, err)
 	enc, err := makeTestEncoder()
 	assert.NoError(t, err)
 
@@ -80,7 +84,6 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 
 	// Disperser Components
 	dispatcher := dmock.NewDispatcher(state)
-	confirmer := dmock.NewBatchConfirmer()
 	blobStore := inmem.NewBlobStore()
 
 	pullInterval := 100 * time.Millisecond
@@ -104,13 +107,15 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	encoderClient := disperser.NewLocalEncoderClient(enc)
 	finalizer := batchermock.NewFinalizer()
 	ethClient := &cmock.MockEthClient{}
+	txnManager := mock.NewTxnManager()
 
-	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, confirmer, cst, asgn, encoderClient, agg, ethClient, finalizer, logger, metrics)
+	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics)
 	assert.NoError(t, err)
 
 	// Make the batcher
 	return &batcherComponents{
-		confirmer:        confirmer,
+		transactor:       transactor,
+		txnManager:       txnManager,
 		blobStore:        blobStore,
 		encoderClient:    encoderClient,
 		encodingStreamer: b.EncodingStreamer,
@@ -142,6 +147,8 @@ func TestBatcherIterations(t *testing.T) {
 	logData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000")
 	assert.NoError(t, err)
 
+	txHash := gethcommon.HexToHash("0x1234")
+	blockNumber := big.NewInt(123)
 	receipt := &types.Receipt{
 		Logs: []*types.Log{
 			{
@@ -149,9 +156,9 @@ func TestBatcherIterations(t *testing.T) {
 				Data:   logData,
 			},
 		},
-		BlockNumber: big.NewInt(123),
+		BlockNumber: blockNumber,
+		TxHash:      txHash,
 	}
-	components.confirmer.On("ConfirmBatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(receipt, nil)
 	blobStore := components.blobStore
 	ctx := context.Background()
 	requestedAt1, blobKey1 := queueBlob(t, ctx, &blob1, blobStore)
@@ -169,7 +176,18 @@ func TestBatcherIterations(t *testing.T) {
 	assert.Equal(t, 2, count)
 	assert.Equal(t, uint64(197632), size)
 
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
 	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+	assert.Greater(t, len(components.txnManager.Requests), 0)
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt:  receipt,
+		Err:      nil,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
 	assert.NoError(t, err)
 	// Check that the blob was processed
 	meta1, err := blobStore.GetBlobMetadata(ctx, blobKey1)
@@ -178,6 +196,8 @@ func TestBatcherIterations(t *testing.T) {
 	assert.Equal(t, requestedAt1, meta1.RequestMetadata.RequestedAt)
 	assert.Equal(t, disperser.Confirmed, meta1.BlobStatus)
 	assert.Equal(t, meta1.ConfirmationInfo.BatchID, uint32(3))
+	assert.Equal(t, meta1.ConfirmationInfo.ConfirmationTxnHash, txHash)
+	assert.Equal(t, meta1.ConfirmationInfo.ConfirmationBlockNumber, uint32(blockNumber.Int64()))
 
 	meta2, err := blobStore.GetBlobMetadata(ctx, blobKey2)
 	assert.NoError(t, err)
@@ -204,7 +224,6 @@ func TestBlobFailures(t *testing.T) {
 
 	components, batcher := makeBatcher(t)
 	confirmationErr := fmt.Errorf("error")
-	components.confirmer.On("ConfirmBatch").Return(nil, confirmationErr)
 	blobStore := components.blobStore
 	ctx := context.Background()
 	requestedAt, blobKey := queueBlob(t, ctx, &blob, blobStore)
@@ -216,8 +235,21 @@ func TestBlobFailures(t *testing.T) {
 	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.NoError(t, err)
 
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
+	// Test with receipt response with error
 	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+	assert.Greater(t, len(components.txnManager.Requests), 0)
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt:  nil,
+		Err:      confirmationErr,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
 	assert.ErrorIs(t, err, confirmationErr)
+
 	meta, err := blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
 	assert.Equal(t, blobKey, meta.GetBlobKey())
@@ -228,10 +260,27 @@ func TestBlobFailures(t *testing.T) {
 	metadatas, err := blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
 	assert.NoError(t, err)
 	assert.Len(t, metadatas, 1)
+	encodedResult, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.Error(t, err)
+	assert.Nil(t, encodedResult)
 
+	// Test with receipt response with no block number
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
 	components.encodingStreamer.ReferenceBlockNumber = 10
 	err = batcher.HandleSingleBatch(ctx)
-	assert.ErrorIs(t, err, confirmationErr)
+	assert.NoError(t, err)
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt: &types.Receipt{
+			TxHash: gethcommon.HexToHash("0x1234"),
+		},
+		Err:      nil,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
+	assert.ErrorContains(t, err, "error getting transaction receipt block number")
+
 	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
 
@@ -239,15 +288,128 @@ func TestBlobFailures(t *testing.T) {
 	assert.Equal(t, disperser.Processing, meta.BlobStatus)
 	assert.Equal(t, uint(2), meta.NumRetries)
 
+	// Try again
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
 	components.encodingStreamer.ReferenceBlockNumber = 10
 	err = batcher.HandleSingleBatch(ctx)
-	assert.ErrorIs(t, err, confirmationErr)
+	assert.NoError(t, err)
+
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt: &types.Receipt{
+			TxHash: gethcommon.HexToHash("0x1234"),
+		},
+		Err:      nil,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
+	assert.ErrorContains(t, err, "error getting transaction receipt block number")
+
 	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
 
 	// should not be retried again
 	assert.Equal(t, disperser.Failed, meta.BlobStatus)
 	assert.Equal(t, uint(2), meta.NumRetries)
+}
+
+// TestBlobRetry tests that the blob that has been dispersed to DA nodes but is pending onchain confirmation isn't re-dispersed.
+func TestBlobRetry(t *testing.T) {
+	blob := makeTestBlob([]*core.SecurityParam{{
+		QuorumID:           0,
+		AdversaryThreshold: 80,
+		QuorumThreshold:    100,
+	}})
+
+	components, batcher := makeBatcher(t)
+	blobStore := components.blobStore
+	ctx := context.Background()
+	_, blobKey := queueBlob(t, ctx, &blob, blobStore)
+
+	// Start the batcher
+	out := make(chan bat.EncodingResultOrStatus)
+	err := components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+
+	encodedResult, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, encodedResult.Status, bat.PendingDispersal)
+
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
+	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+
+	meta, err := blobStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, encodedResult.Status, bat.PendingConfirmation)
+
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	timer := time.NewTimer(1 * time.Second)
+	select {
+	case <-out:
+		t.Fatal("shouldn't have picked up any blobs to encode")
+	case <-timer.C:
+	}
+	batch, err := components.encodingStreamer.CreateBatch()
+	assert.ErrorContains(t, err, "no encoded results")
+	assert.Nil(t, batch)
+
+	// Shouldn't pick up any blobs to encode
+	components.encodingStreamer.ReferenceBlockNumber = 12
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	timer = time.NewTimer(1 * time.Second)
+	select {
+	case <-out:
+		t.Fatal("shouldn't have picked up any blobs to encode")
+	case <-timer.C:
+	}
+
+	batch, err = components.encodingStreamer.CreateBatch()
+	assert.ErrorContains(t, err, "no encoded results")
+	assert.Nil(t, batch)
+	_, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+
+	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+
+	// Trigger a retry
+	confirmationErr := fmt.Errorf("error")
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt:  nil,
+		Err:      confirmationErr,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
+	assert.ErrorIs(t, err, confirmationErr)
+
+	components.encodingStreamer.ReferenceBlockNumber = 14
+	// Should pick up the blob to encode
+	err = components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	timer = time.NewTimer(1 * time.Second)
+	var res bat.EncodingResultOrStatus
+	select {
+	case res = <-out:
+	case <-timer.C:
+		t.Fatal("should have picked up the blob to encode")
+	}
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, res)
+	assert.NoError(t, err)
+	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, encodedResult.Status, bat.PendingDispersal)
 }
 
 func TestRetryTxnReceipt(t *testing.T) {
@@ -281,7 +443,6 @@ func TestRetryTxnReceipt(t *testing.T) {
 		BlockNumber: big.NewInt(123),
 	}
 
-	components.confirmer.On("ConfirmBatch").Return(invalidReceipt, nil)
 	components.ethClient.On("TransactionReceipt").Return(invalidReceipt, nil).Twice()
 	components.ethClient.On("TransactionReceipt").Return(validReceipt, nil).Once()
 	blobStore := components.blobStore
@@ -295,7 +456,17 @@ func TestRetryTxnReceipt(t *testing.T) {
 	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
 	assert.NoError(t, err)
 
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
 	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt:  invalidReceipt,
+		Err:      nil,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
 	assert.NoError(t, err)
 	// Check that the blob was processed
 	meta, err := blobStore.GetBlobMetadata(ctx, blobKey)
