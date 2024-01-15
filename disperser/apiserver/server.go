@@ -361,9 +361,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 
 		// Check Account Ratelimit
 
-		blob.RequestHeader.AccountID = "ip:" + origin
-
-		userQuorumKey := fmt.Sprintf("%s:%d", blob.RequestHeader.AccountID, param.QuorumID)
+		userQuorumKey := fmt.Sprintf("%s:%d", "ip:"+origin, param.QuorumID)
 		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, encodedSize, accountRates.Throughput)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
