@@ -27,7 +27,7 @@ func TestRatelimit(t *testing.T) {
 	// Try with a non-allowlisted IP
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
-			IP:   net.ParseIP("0.0.0.0"),
+			IP:   net.ParseIP("1.1.1.1"),
 			Port: 51001,
 		},
 	}
@@ -120,7 +120,7 @@ func TestAuthRatelimit(t *testing.T) {
 	errorChan := make(chan error, 10)
 
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
-	simulateClient(t, signer, "1.1.1.1", data50KiB, []*pb.SecurityParams{
+	simulateClient(t, signer, "2.2.2.2", data50KiB, []*pb.SecurityParams{
 		{
 			QuorumId:           0,
 			AdversaryThreshold: 50,
@@ -133,7 +133,7 @@ func TestAuthRatelimit(t *testing.T) {
 
 	// Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
 	for i := 0; i < 10; i++ {
-		simulateClient(t, signer, "2.2.2.2", data1KiB, []*pb.SecurityParams{
+		simulateClient(t, signer, "3.3.3.3", data1KiB, []*pb.SecurityParams{
 			{
 				QuorumId:           1,
 				AdversaryThreshold: 50,
@@ -155,7 +155,7 @@ func TestAuthRatelimit(t *testing.T) {
 	signer = auth.NewSigner(privateKeyHex)
 
 	// This should succeed because the account throughput limit is 100 KiB/s for quorum 0
-	simulateClient(t, signer, "3.3.3.3", data50KiB, []*pb.SecurityParams{
+	simulateClient(t, signer, "4.4.4.4", data50KiB, []*pb.SecurityParams{
 		{
 			QuorumId:           0,
 			AdversaryThreshold: 50,
@@ -168,7 +168,7 @@ func TestAuthRatelimit(t *testing.T) {
 
 	// This should succeed because the account blob limit (5 blobs/s) X bucket size (3s) is larger than 10 blobs.
 	for i := 0; i < 10; i++ {
-		simulateClient(t, signer, "4.4.4.4", data1KiB, []*pb.SecurityParams{
+		simulateClient(t, signer, "5.5.5.5", data1KiB, []*pb.SecurityParams{
 			{
 				QuorumId:           1,
 				AdversaryThreshold: 50,
