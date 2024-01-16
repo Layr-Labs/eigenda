@@ -132,7 +132,7 @@ func TestAuthRatelimit(t *testing.T) {
 	assert.ErrorContains(t, err, "account throughput limit")
 
 	// Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		simulateClient(t, signer, "3.3.3.3", data1KiB, []*pb.SecurityParams{
 			{
 				QuorumId:           1,
@@ -142,7 +142,7 @@ func TestAuthRatelimit(t *testing.T) {
 		}, errorChan, false)
 	}
 	numLimited := 0
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		err = <-errorChan
 		if err != nil && strings.Contains(err.Error(), "account blob limit") {
 			numLimited++
