@@ -236,7 +236,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 	}
 
 	// sort non signer keys according to how it's checked onchain
-	// ref: https://github.com/Layr-Labs/eigenlayer-contracts/blob/master/src/contracts/middleware/BLSSignatureChecker.sol#L99
+	// ref: https://github.com/Layr-Labs/eigenlayer-middleware/blob/m2-mainnet/src/BLSSignatureChecker.sol#L99
 	sort.Slice(nonSignerKeys, func(i, j int) bool {
 		hash1 := nonSignerKeys[i].Hash()
 		hash2 := nonSignerKeys[j].Hash()
