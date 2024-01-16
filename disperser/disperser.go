@@ -12,7 +12,6 @@ import (
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	gcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type BlobStatus uint
@@ -169,10 +168,6 @@ type BlobStore interface {
 
 type Dispatcher interface {
 	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader) chan core.SignerMessage
-}
-
-type BatchConfirmer interface {
-	ConfirmBatch(context.Context, *core.BatchHeader, map[core.QuorumID]*core.QuorumResult, *core.SignatureAggregation) (*types.Receipt, error)
 }
 
 // GenerateReverseIndexKey returns the key used to store the blob key in the reverse index
