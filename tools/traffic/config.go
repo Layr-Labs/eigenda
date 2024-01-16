@@ -20,12 +20,16 @@ type Config struct {
 	LoggingConfig          logging.Config
 	RandomizeBlobs         bool
 	InstanceLaunchInterval time.Duration
-	UseSecureGrpcFlag      bool
 }
 
 func NewConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Config:                 *clients.NewConfig(ctx),
+		Config: *clients.NewConfig(
+			ctx.GlobalString(flags.HostnameFlag.Name),
+			ctx.GlobalString(flags.GrpcPortFlag.Name),
+			ctx.Duration(flags.TimeoutFlag.Name),
+			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
+		),
 		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
 		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
@@ -34,6 +38,5 @@ func NewConfig(ctx *cli.Context) *Config {
 		LoggingConfig:          logging.ReadCLIConfig(ctx, flags.FlagPrefix),
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
-		UseSecureGrpcFlag:      ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
 	}
 }
