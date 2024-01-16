@@ -131,20 +131,18 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
-	authenticatedAddress := ""
 	// Decode public key
 	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
 	if err != nil {
-		s.logger.Warn("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
-	} else {
-		pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-		if err != nil {
-			s.logger.Warn("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
-		} else {
-			// Get the address
-			authenticatedAddress = crypto.PubkeyToAddress(*pubKey).String()
-		}
+		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
 	}
+
+	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+	}
+
+	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
 
 	// Disperse the blob
 	reply, err := s.disperseBlob(stream.Context(), blob, authenticatedAddress)
