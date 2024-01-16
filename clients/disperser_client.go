@@ -9,8 +9,6 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/retriever/flags"
-	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,11 +21,12 @@ type Config struct {
 	UseSecureGrpcFlag bool
 }
 
-func NewConfig(ctx *cli.Context) *Config {
+func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag bool) *Config {
 	return &Config{
-		Hostname: ctx.GlobalString(flags.HostnameFlag.Name),
-		Port:     ctx.GlobalString(flags.GrpcPortFlag.Name),
-		Timeout:  ctx.Duration(flags.TimeoutFlag.Name),
+		Hostname:          hostname,
+		Port:              port,
+		Timeout:           timeout,
+		UseSecureGrpcFlag: useSecureGrpcFlag,
 	}
 }
 
