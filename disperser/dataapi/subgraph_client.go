@@ -157,13 +157,14 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 		mu                   sync.Mutex
 		numBatchesByOperator = make(map[string]int, 0)
 		intervalEventsPool   = workerpool.New(maxWorkerPoolSize)
+		currentTs            = uint64(time.Now().Unix())
 	)
 	for ie := range intervalEvents {
 		interval := ie
 		intervalEventsPool.Submit(func() {
 			end := interval.Events[1]
 			if end == 0 {
-				end = uint64(time.Now().Unix())
+				end = currentTs
 			}
 			batches, err := sc.api.QueryBatchesByBlockTimestampRange(ctx, interval.Events[0], end)
 			if err != nil {
