@@ -80,6 +80,8 @@ message DisperseBlobRequest {
 	// within the same batch.
 	repeated SecurityParams security_params = 2;
 
+	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
+	// corresponding to the key used by the client to sign the BlobAuthHeader.
 	string account_id = 3;
 }
 
