@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/cenkalti/backoff/v4"
 )
 
 type BucketStoreConcurrencySafe = common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]
@@ -16,39 +19,48 @@ type BucketStore = common.KVStore[common.RateBucketParams]
 type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
 
-	bucketStore interface{}
-	logger      common.Logger
+	bucketStore      interface{}
+	logger           common.Logger
+	retryWithBackOff backoff.BackOff
 }
 
 // NewRateLimiter is a factory function to create new RateLimiter
 func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{}, logger common.Logger) (common.RateLimiter, error) {
+
+	retryWithBackOff := backoff.NewExponentialBackOff()
+	retryWithBackOff.MaxElapsedTime = 5 * time.Minute
+	retryWithBackOff.MaxInterval = 15 * time.Second
+	retryWithBackOff.InitialInterval = 1 * time.Second
+
 	switch bs := bucketStore.(type) {
 	case common.KVStore[common.RateBucketParams]:
-		return newRateLimiter(rateParams, bs, logger), nil
+		return newRateLimiter(rateParams, bs, logger, retryWithBackOff), nil
 	case common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe]:
-		return newVersionedConcurrencySafeRateLimiter(rateParams, bs, logger), nil
+		return newVersionedConcurrencySafeRateLimiter(rateParams, bs, logger, retryWithBackOff), nil
 	default:
 		return nil, errors.New("unsupported bucketStore type")
 	}
 }
 
 // Specific constructors for each type of RateLimiter
-func newRateLimiter(rateParams common.GlobalRateParams, bucketStore common.KVStore[common.RateBucketParams], logger common.Logger) common.RateLimiter {
+func newRateLimiter(rateParams common.GlobalRateParams, bucketStore common.KVStore[common.RateBucketParams], logger common.Logger, retryWithBackOff backoff.BackOff) common.RateLimiter {
 	// initialize and return a simple rate limiter
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
 		logger:           logger,
+		retryWithBackOff: retryWithBackOff,
 	}
 }
 
-func newVersionedConcurrencySafeRateLimiter(rateParams common.GlobalRateParams, bucketStore common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe], logger common.Logger) common.RateLimiter {
+func newVersionedConcurrencySafeRateLimiter(rateParams common.GlobalRateParams, bucketStore common.KVStoreVersioned[common.RateBucketParamsConcurrencySafe], logger common.Logger, retryWithBackOff backoff.BackOff) common.RateLimiter {
 	// initialize and return a versioned, concurrency-safe rate limiter
 	// initialize and return a simple rate limiter
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
 		logger:           logger,
+		retryWithBackOff: retryWithBackOff,
 	}
 }
 
@@ -182,9 +194,6 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 					expression.Name("Version"),
 					expression.Value(1),
 				)
-				// TODO: Specifically Handle Case when this fails for same document being updated by multiple requests
-				// Handle this:error StatusCode: 400, RequestID: e5764d48-e0fd-46bc-8aca-42de3d38c055, api error ValidationException:
-				// Invalid UpdateExpression: Two document paths overlap with each other; must remove or rewrite one of these paths; path one: [Version], path two: [Version]
 				// Note this will result in a call to UpdateItem for each bucket level
 				// This should be revisited if needed later as it may result in too many calls to dynamodb
 				// Other alternative is to make all updates to each level as an array and then call UpdateItem once but that does not make it concurrency safe
@@ -192,6 +201,24 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 				if err != nil {
 					return false, fmt.Errorf("failed to update bucket level %d atomically: %v with required capacity %v", i, err, requiredCapacity)
 				}
+
+				operationUpdateItemWithExpression := func() error {
+					err := bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
+					if err != nil {
+						// Return transient error to trigger a retry
+						if isConcurrentUpdateError(err) {
+							return err
+						}
+					}
+					return nil // No error, no retry
+				}
+
+				// Retry with exponential backoff
+				err := backoff.Retry(operationUpdateItemWithExpression, d.retryWithBackOff)
+				if err != nil {
+					return false, fmt.Errorf("failed after retries: %w", err)
+				}
+
 				return allowed, nil
 			} else {
 
@@ -203,14 +230,29 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 					expression.Name("Version"),
 					expression.Value(1),
 				)
-				// TODO: Specifically Handle Case when this fails for same document being updated by multiple requests
-				// Handle this:error StatusCode: 400, RequestID: e5764d48-e0fd-46bc-8aca-42de3d38c055, api error ValidationException:
-				// Invalid UpdateExpression: Two document paths overlap with each other; must remove or rewrite one of these paths; path one: [Version], path two: [Version]
 				// Note this will result in a call to UpdateItem for each bucket level
 				// This should be revisited if needed later as it may result in too many calls to dynamodb
 				err = bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
 				if err != nil {
 					return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
+				}
+
+				operationUpdateItemWithExpression := func() error {
+					err := bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
+					if err != nil {
+						// Return transient error to trigger a retry
+						if isConcurrentUpdateError(err) {
+							return err
+						}
+					}
+					// For other errors, do not retry
+					return nil // No error, no retry
+				}
+
+				// Retry with exponential backoff
+				err := backoff.Retry(operationUpdateItemWithExpression, d.retryWithBackOff)
+				if err != nil {
+					return false, fmt.Errorf("failed after retries: %w", err)
 				}
 			}
 		}
@@ -232,4 +274,15 @@ func getBucketLevel(bucketLevel, bucketSize, interval, deduction time.Duration) 
 
 	return newLevel
 
+}
+
+func isConcurrentUpdateError(err error) bool {
+	if awsErr, ok := err.(awserr.Error); ok {
+		// Check if the error code is ValidationException, which is used for a variety of input errors
+		if awsErr.Code() == "ValidationException" {
+			// Check if the message contains the specific error detail
+			return strings.Contains(awsErr.Message(), "Two document paths overlap with each other")
+		}
+	}
+	return false
 }
