@@ -98,6 +98,22 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return errors.New("expected DisperseBlobRequest")
 	}
 
+	blob := getBlobFromRequest(request.DisperseRequest)
+
+	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
+	// Decode public key
+	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+	}
+
+	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+	}
+
+	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
+
 	// Send back challenge to client
 	challenge := rand.Uint32()
 	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
@@ -120,8 +136,6 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return errors.New("expected AuthenticationData")
 	}
 
-	blob := getBlobFromRequest(request.DisperseRequest)
-
 	blob.RequestHeader.Nonce = challenge
 	blob.RequestHeader.AuthenticationData = challengeReply.AuthenticationData.AuthenticationData
 
@@ -129,20 +143,6 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		return fmt.Errorf("failed to authenticate blob request: %v", err)
 	}
-
-	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
-	// Decode public key
-	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
-	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
-	}
-
-	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
-	}
-
-	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
 
 	// Disperse the blob
 	reply, err := s.disperseBlob(stream.Context(), blob, authenticatedAddress)
@@ -273,27 +273,38 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}, nil
 }
 
-type RateKeys struct {
-	ThroughputKey string
-	BlobRateKey   string
-}
-
-func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, *RateKeys, error) {
+func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
 	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
 	if !ok {
-		return nil, nil, fmt.Errorf("no configured rate exists for quorum %d", quorumID)
+		return nil, "", fmt.Errorf("no configured rate exists for quorum %d", quorumID)
 	}
 
-	// Check if the origin is in the allowlist
 	rates := &PerUserRateInfo{
 		Throughput: unauthRates.PerUserUnauthThroughput,
 		BlobRate:   unauthRates.PerUserUnauthBlobRate,
 	}
 
-	keys := &RateKeys{
-		ThroughputKey: "ip:" + origin,
-		BlobRateKey:   "ip:" + origin,
+	// Check if the address is in the allowlist
+	if len(authenticatedAddress) > 0 {
+		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
+		if ok {
+			rateInfo, ok := quorumRates[quorumID]
+			if ok {
+				key := "address:" + authenticatedAddress
+				if rateInfo.Throughput > 0 {
+					rates.Throughput = rateInfo.Throughput
+				}
+				if rateInfo.BlobRate > 0 {
+					rates.BlobRate = rateInfo.BlobRate
+				}
+				return rates, key, nil
+			}
+		}
 	}
+
+	// Check if the origin is in the allowlist
+
+	key := "ip:" + origin
 
 	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
 		if !strings.Contains(origin, account) {
@@ -305,37 +316,18 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 			break
 		}
 
-		if rateInfo.Throughput > unauthRates.PerUserUnauthThroughput {
+		if rateInfo.Throughput > 0 {
 			rates.Throughput = rateInfo.Throughput
 		}
 
-		if rateInfo.BlobRate > unauthRates.PerUserUnauthBlobRate {
+		if rateInfo.BlobRate > 0 {
 			rates.BlobRate = rateInfo.BlobRate
 		}
 
 		break
 	}
 
-	// Check if the address is in the allowlist
-	quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
-	if ok {
-		rateInfo, ok := quorumRates[quorumID]
-		if ok {
-
-			if rateInfo.Throughput > rates.Throughput {
-				rates.Throughput = rateInfo.Throughput
-				keys.ThroughputKey = "address:" + authenticatedAddress
-			}
-
-			if rateInfo.BlobRate > rates.BlobRate {
-				rates.BlobRate = rateInfo.BlobRate
-				keys.BlobRateKey = "address:" + authenticatedAddress
-			}
-
-		}
-	}
-
-	return rates, keys, nil
+	return rates, key, nil
 
 }
 
@@ -351,7 +343,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
-		accountRates, keys, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
+		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
 			return err
 		}
@@ -363,8 +355,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		encodedSize := core.GetBlobSize(encodedLength)
 
 		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
-			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate,
-			"throughputKey", keys.ThroughputKey, "blobRateKey", keys.BlobRateKey)
+			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate, "accountKey", accountKey)
 
 		// Check System Ratelimit
 		systemQuorumKey := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
@@ -389,23 +380,23 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 
 		// Check Account Ratelimit
 
-		userQuorumKey := fmt.Sprintf("%s:%d", keys.ThroughputKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, encodedSize, accountRates.Throughput)
+		accountQuorumKey := fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, encodedSize, accountRates.Throughput)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account byte ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", accountRates.Throughput)
+			s.logger.Warn("account byte ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", accountRates.Throughput)
 			return errAccountThroughputRateLimit
 		}
 
-		userQuorumKey = fmt.Sprintf("%s:%d-blobrate", keys.BlobRateKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, blobRateMultiplier, accountRates.BlobRate)
+		accountQuorumKey = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, blobRateMultiplier, accountRates.BlobRate)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account blob ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
+			s.logger.Warn("account blob ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
 			return errAccountBlobRateLimit
 		}
 
