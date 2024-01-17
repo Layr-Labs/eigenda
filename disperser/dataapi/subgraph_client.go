@@ -2,14 +2,21 @@ package dataapi
 
 import (
 	"context"
+	"sort"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	"github.com/gammazero/workerpool"
 )
 
-const _14Days = 14 * 24 * time.Hour
+const (
+	_14Days           = 14 * 24 * time.Hour
+	maxWorkerPoolSize = 10
+)
 
 type (
 	SubgraphClient interface {
@@ -17,6 +24,7 @@ type (
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
 		QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error)
+		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64) (map[string]int, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -49,19 +57,24 @@ type (
 	IndexedDeregisteredOperatorState struct {
 		Operators map[core.OperatorID]*DeregisteredOperatorInfo
 	}
-	subgraphClient struct {
-		api subgraph.Api
+	OperatorEvents struct {
+		OperatorId string
+		Events     []uint64
 	}
 	NonSigner struct {
 		OperatorId string
 		Count      int
 	}
+	subgraphClient struct {
+		api    subgraph.Api
+		logger common.Logger
+	}
 )
 
 var _ SubgraphClient = (*subgraphClient)(nil)
 
-func NewSubgraphClient(api subgraph.Api) *subgraphClient {
-	return &subgraphClient{api: api}
+func NewSubgraphClient(api subgraph.Api, logger common.Logger) *subgraphClient {
+	return &subgraphClient{api: api, logger: logger}
 }
 
 func (sc *subgraphClient) QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error) {
@@ -106,6 +119,69 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return batchNonSigningOperatorIds, nil
 }
 
+func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64) (map[string]int, error) {
+	var (
+		registeredOperators   []*subgraph.Operator
+		deregisteredOperators []*subgraph.Operator
+		err                   error
+		pool                  = workerpool.New(maxWorkerPoolSize)
+	)
+
+	pool.Submit(func() {
+		operators, errQ := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, blockTimestamp)
+		if errQ != nil {
+			err = errQ
+		}
+		registeredOperators = operators
+	})
+
+	pool.Submit(func() {
+		operators, errQ := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, blockTimestamp)
+		if errQ != nil {
+			err = errQ
+		}
+		deregisteredOperators = operators
+	})
+	pool.StopWait()
+
+	if err != nil {
+		return nil, err
+	}
+
+	intervalEvents, err := getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		mu                   sync.Mutex
+		numBatchesByOperator = make(map[string]int, 0)
+		intervalEventsPool   = workerpool.New(maxWorkerPoolSize)
+		currentTs            = uint64(time.Now().Unix())
+	)
+	for ie := range intervalEvents {
+		interval := ie
+		intervalEventsPool.Submit(func() {
+			end := interval.Events[1]
+			if end == 0 {
+				end = currentTs
+			}
+			batches, err := sc.api.QueryBatchesByBlockTimestampRange(ctx, interval.Events[0], end)
+			if err != nil {
+				sc.logger.Error("failed to query batches by block timestamp range", "start", interval.Events[0], "end", end, "err", err)
+				return
+			}
+			if len(batches) > 0 {
+				mu.Lock()
+				numBatchesByOperator[interval.OperatorId] += len(batches)
+				mu.Unlock()
+			}
+		})
+	}
+	intervalEventsPool.StopWait()
+	return numBatchesByOperator, nil
+}
+
 func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error) {
 	last14Days := uint64(time.Now().Add(-_14Days).Unix())
 	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, last14Days)
@@ -142,6 +218,86 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx c
 	return &IndexedDeregisteredOperatorState{
 		Operators: operators,
 	}, nil
+}
+
+func getOperatorsWithRegisteredDeregisteredIntervalEvents(
+	ctx context.Context,
+	registeredOperators []*subgraph.Operator,
+	deregisteredOperators []*subgraph.Operator,
+) (chan OperatorEvents, error) {
+	sort.SliceStable(registeredOperators, func(i, j int) bool {
+		return registeredOperators[i].BlockTimestamp < registeredOperators[j].BlockTimestamp
+	})
+
+	sort.SliceStable(deregisteredOperators, func(i, j int) bool {
+		return deregisteredOperators[i].BlockTimestamp < deregisteredOperators[j].BlockTimestamp
+	})
+
+	// First position is for registered events and second position is for deregistered events
+	operators := make(map[string][][]uint64, 0)
+	for i := range registeredOperators {
+		operator := registeredOperators[i]
+		operatorId := string(operator.OperatorId)
+
+		if _, ok := operators[operatorId]; !ok {
+			operators[operatorId] = make([][]uint64, 2)
+		}
+		timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		operators[operatorId][0] = append(operators[operatorId][0], timestamp)
+	}
+
+	for i := range deregisteredOperators {
+		operator := deregisteredOperators[i]
+		operatorId := string(operator.OperatorId)
+
+		timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
+		if err != nil || timestamp == 0 {
+			return nil, err
+		}
+		if _, ok := operators[operatorId]; ok {
+			operators[operatorId][1] = append(operators[operatorId][1], timestamp)
+		}
+	}
+
+	operatorEventsChan := make(chan OperatorEvents, 1)
+	go func() {
+		defer close(operatorEventsChan)
+		pool := workerpool.New(10)
+		for o, e := range operators {
+			operatorId, events := o, e
+			pool.Submit(func() {
+				var lastDeregistered uint64
+				for i := 0; i < len(events[0]); i++ {
+					var (
+						// we start with the assumption that the operator is still registered
+						// a 0 value means that the operator is still registered
+						deregistered uint64
+						registered   = events[0][i]
+					)
+
+					// if there is a deregistered event that macthes in same position of registered event, we use it
+					if i < len(events[1]) {
+						deregistered = events[1][i]
+					}
+
+					// if there is no deregistered event that matches in same position of registered event, we use the last one
+					if i == 0 || registered > lastDeregistered {
+						lastDeregistered = deregistered
+						operatorEventsChan <- OperatorEvents{
+							OperatorId: operatorId,
+							Events:     []uint64{registered, deregistered},
+						}
+					}
+				}
+			})
+		}
+		pool.StopWait()
+	}()
+
+	return operatorEventsChan, nil
 }
 
 func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
