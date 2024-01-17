@@ -19,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/batcher/eth"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -75,7 +74,6 @@ func RunBatcher(ctx *cli.Context) error {
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout: config.TimeoutConfig.AttestationTimeout,
 	}, logger)
-	agg := core.NewStdSignatureAggregator(logger)
 	asgn := &core.StdAssignmentCoordinator{}
 
 	client, err := geth.NewClient(config.EthClientConfig, logger)
@@ -91,11 +89,10 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	confirmer, err := eth.NewBatchConfirmer(tx, config.TimeoutConfig.ChainWriteTimeout)
+	agg, err := core.NewStdSignatureAggregator(logger, tx)
 	if err != nil {
 		return err
 	}
-
 	blockStaleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
@@ -144,7 +141,8 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, logger)
-	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, confirmer, ics, asgn, encoderClient, agg, client, finalizer, logger, metrics)
+	txnManager := batcher.NewTxnManager(client, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
+	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics)
 	if err != nil {
 		return err
 	}

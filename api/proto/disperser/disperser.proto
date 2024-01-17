@@ -11,6 +11,17 @@ service Disperser {
 	// processing status of the blob.
 	rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
 
+
+	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
+	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
+	// 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
+	// 2. The Disperser sends back a BlobAuthHeader message containing information for the client to
+	//    verify and sign. 
+	// 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 
+	//	  AuthenticationData message.
+	// 4. The Disperser verifies the signature and returns a DisperseBlobReply message.
+	rpc DisperseBlobAuthenticated(stream AuthenticatedRequest) returns (stream AuthenticatedReply);
+
 	// This API is meant to be polled for the blob status.
 	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
@@ -25,6 +36,39 @@ service Disperser {
 
 // Requests and Responses
 
+// Authenicated Message Types
+
+message AuthenticatedRequest {
+    oneof payload {
+        DisperseBlobRequest disperse_request = 1;
+        AuthenticationData authentication_data = 2;
+    }
+}
+
+message AuthenticatedReply {
+    oneof payload {
+        BlobAuthHeader blob_auth_header = 1;
+        DisperseBlobReply disperse_reply = 2;
+    }
+}
+
+// BlobAuthHeader contains information about the blob for the client to verify and sign.
+// - Once payments are enabled, the BlobAuthHeader the KZG commitment to the blob, which the client 
+ // will verify and sign. Having the client verify the KZG commitment instead of calculating it avoids
+// the need for the client to have the KZG structured reference string (SRS), which can be large. 
+// The signed KZG commitment prevents the disperser from sending a different blob to the DA Nodes
+// than the one the client sent.
+// - In the meantime, the BlobAuthHeader contains a simple challenge parameter is used to prevent
+// replay attacks in the event that a signature is leaked. 
+message BlobAuthHeader {
+	uint32 challenge_parameter = 1;
+}
+
+// AuthenticationData contains the signature of the BlobAuthHeader.
+message AuthenticationData {
+	bytes authentication_data = 1;
+}
+
 message DisperseBlobRequest {
 	// The data to be dispersed.
 	// The size of data must be <= 512KiB.
@@ -35,6 +79,8 @@ message DisperseBlobRequest {
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
 	repeated SecurityParams security_params = 2;
+
+	string account_id = 3;
 }
 
 message DisperseBlobReply {

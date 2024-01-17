@@ -144,7 +144,8 @@ func RetrieverMain(ctx *cli.Context) error {
 	pb.RegisterRetrieverServer(gs, retrieverServiceServer)
 
 	// Register Server for Health Checks
-	healthcheck.RegisterHealthServer(gs)
+	name := pb.Retriever_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
 
 	log.Printf("server listening at %s", addr)
 	return gs.Serve(listener)

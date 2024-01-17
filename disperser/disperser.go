@@ -12,7 +12,6 @@ import (
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	gcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type BlobStatus uint
@@ -124,6 +123,13 @@ type ConfirmationInfo struct {
 	BlobQuorumInfos         []*core.BlobQuorumInfo               `json:"blob_quorum_infos"`
 }
 
+type BlobStoreExclusiveStartKey struct {
+	BlobHash     BlobHash
+	MetadataHash MetadataHash
+	BlobStatus   int32 // BlobStatus is an integer
+	RequestedAt  int64 //  RequestedAt is epoch time in seconds
+}
+
 type BlobStore interface {
 	// StoreBlob adds a blob to the queue and returns a key that can be used to retrieve the blob later
 	StoreBlob(ctx context.Context, blob *core.Blob, requestedAt uint64) (BlobKey, error)
@@ -149,6 +155,9 @@ type BlobStore interface {
 	GetBlobMetadataByStatus(ctx context.Context, blobStatus BlobStatus) ([]*BlobMetadata, error)
 	// GetMetadataInBatch returns the metadata in a given batch at given index.
 	GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*BlobMetadata, error)
+	// GetBlobMetadataByStatusWithPagination returns a list of blob metadata for blobs with the given status
+	// Results are limited to the given limit and the pagination token is returned
+	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *BlobStoreExclusiveStartKey) ([]*BlobMetadata, *BlobStoreExclusiveStartKey, error)
 	// GetAllBlobMetadataByBatch returns the metadata of all the blobs in the batch.
 	GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*BlobMetadata, error)
 	// GetBlobMetadata returns a blob metadata given a metadata key
@@ -159,10 +168,6 @@ type BlobStore interface {
 
 type Dispatcher interface {
 	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader) chan core.SignerMessage
-}
-
-type BatchConfirmer interface {
-	ConfirmBatch(context.Context, *core.BatchHeader, map[core.QuorumID]*core.QuorumResult, *core.SignatureAggregation) (*types.Receipt, error)
 }
 
 // GenerateReverseIndexKey returns the key used to store the blob key in the reverse index

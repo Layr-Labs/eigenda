@@ -48,7 +48,7 @@ function setup {
 	if [ "$#" -ne 3 ]; then
 		tput setaf 1
 		echo "Usage. num-key<int> private_keys_path<str> geth_password_path<str>"
-		echo "exmaple: setup 10 ../secrets/ecdsa_keys/private_keys_hex.txt ./secret/geth-account-password"
+		echo "example: setup 10 ../secrets/ecdsa_keys/private_keys_hex.txt ./secret/geth-account-password"
 		tput sgr0
 		exit 1
 	fi

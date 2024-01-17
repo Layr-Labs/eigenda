@@ -8,10 +8,11 @@ import (
 	"time"
 
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/clients"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/tools/traffic"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +35,9 @@ var _ = Describe("Inabox Integration", func() {
 		optsWithValue.Value = big.NewInt(1e18)
 		tx, err := mockRollup.RegisterValidator(optsWithValue)
 		Expect(err).To(BeNil())
-		tx, err = ethClient.UpdateGas(ctx, tx, optsWithValue.Value)
+		gasTipCap, gasFeeCap, err := ethClient.GetLatestGasCaps(ctx)
+		Expect(err).To(BeNil())
+		tx, err = ethClient.UpdateGas(ctx, tx, optsWithValue.Value, gasTipCap, gasFeeCap)
 		Expect(err).To(BeNil())
 		err = ethClient.SendTransaction(ctx, tx)
 		Expect(err).To(BeNil())
@@ -42,14 +45,15 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "RegisterValidator")
 		Expect(err).To(BeNil())
 
-		disp := traffic.NewDisperserClient(&traffic.Config{
-			Hostname:        "localhost",
-			GrpcPort:        "32003",
-			NumInstances:    1,
-			DataSize:        1000_000,
-			RequestInterval: 1 * time.Second,
-			Timeout:         10 * time.Second,
-		})
+		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+		signer := auth.NewSigner(privateKeyHex)
+
+		disp := clients.NewDisperserClient(&clients.Config{
+			Hostname: "localhost",
+			Port:     "32003",
+			Timeout:  10 * time.Second,
+		}, signer)
+
 		Expect(disp).To(Not(BeNil()))
 
 		data := make([]byte, 1024)
@@ -62,7 +66,7 @@ var _ = Describe("Inabox Integration", func() {
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlob(ctx, data, 0, 100, 80)
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, 0, 100, 80)
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -91,7 +95,7 @@ var _ = Describe("Inabox Integration", func() {
 					Expect(err).To(BeNil())
 					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
 					Expect(err).To(BeNil())
-					tx, err = ethClient.UpdateGas(ctx, tx, nil)
+					tx, err = ethClient.UpdateGas(ctx, tx, nil, gasTipCap, gasFeeCap)
 					Expect(err).To(BeNil())
 					err = ethClient.SendTransaction(ctx, tx)
 					Expect(err).To(BeNil())
