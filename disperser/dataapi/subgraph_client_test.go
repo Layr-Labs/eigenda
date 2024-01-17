@@ -159,12 +159,12 @@ func TestQueryOperators(t *testing.T) {
 	assert.Equal(t, []byte("0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212"), operators[1].TransactionHash)
 }
 
-func TestQueryIndexedDeregisteredOperatorsInTheLast14Days(t *testing.T) {
+func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfos, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi)
-	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedDeregisteredOperatorsInTheLast14Days(context.Background())
+	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(context.Background(), 1)
 	assert.NoError(t, err)
 
 	operators := indexedDeregisteredOperatorState.Operators
@@ -179,9 +179,9 @@ func TestQueryIndexedDeregisteredOperatorsInTheLast14Days(t *testing.T) {
 	expectedIndexedOperatorInfo, err := dataapi.ConvertOperatorInfoGqlToIndexedOperatorInfo(subgraphIndexedOperatorInfos)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG1, operator.PubkeyG1)
-	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG2, operator.PubkeyG2)
-	assert.Equal(t, "localhost:32006;32007", operator.Socket)
+	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG1, operator.IndexedOperatorInfo.PubkeyG1)
+	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG2, operator.IndexedOperatorInfo.PubkeyG2)
+	assert.Equal(t, "localhost:32006;32007", operator.IndexedOperatorInfo.Socket)
 	assert.Equal(t, uint64(22), uint64(operator.BlockNumber))
 	assert.Equal(t, []byte("0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311"), operator.Metadata.OperatorId)
 	assert.Equal(t, []byte("0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211"), operator.Metadata.TransactionHash)

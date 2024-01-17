@@ -69,7 +69,7 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
-	DeRegisteredOperatorsResponse struct {
+	DeregisteredOperatorsResponse struct {
 		Meta Meta                        `json:"meta"`
 		Data []*DeregisteredOperatorInfo `json:"data"`
 	}
@@ -137,7 +137,7 @@ func (s *server) Start() error {
 		}
 		operatorsInfo := v1.Group("/operatorsInfo")
 		{
-			operatorsInfo.GET("/deRegisteredLast14days", s.FetchDeRegisteredOperators)
+			operatorsInfo.GET("/deRegisteredOperators", s.FetchDeregisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -367,35 +367,46 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 	c.JSON(http.StatusOK, metric)
 }
 
-// FetchDeRegisteredOperators godoc
+// FetchDeregisteredOperators godoc
 //
-//	@Summary	Fetch list of DeregisteredOperators Last 14 days
+//	@Summary	Fetch list of DeregisteredOperators for days
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Success	200		{object}	BlobsResponse
 //	@Failure	400		{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
-//	@Router		/operatorsInfo/deRegisteredLast14days [get]
-func (s *server) FetchDeRegisteredOperators(c *gin.Context) {
+//	@Router		/operatorsInfo/deRegisteredState [get]
+func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchDeRegisteredOperatorsLast14days", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
-	metadatas, err := s.getDeregisterdOperatorsLast14days(c.Request.Context())
+	// Get query parameters
+	// Default Value 14 days
+	days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+
+	// Convert days to integer
+	daysInt, err := strconv.Atoi(days)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchDeRegisteredOperatorsLast14days")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+
+	operatorMetadatas, err := s.getDeregisterdOperatorForDays(c.Request.Context(), int32(daysInt))
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
 		errorResponse(c, err)
 		return
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchDeRegisteredOperatorsLast14days")
-	c.JSON(http.StatusOK, DeRegisteredOperatorsResponse{
+	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
+	c.JSON(http.StatusOK, DeregisteredOperatorsResponse{
 		Meta: Meta{
-			Size: len(metadatas),
+			Size: len(operatorMetadatas),
 		},
-		Data: metadatas,
+		Data: operatorMetadatas,
 	})
 }
 
