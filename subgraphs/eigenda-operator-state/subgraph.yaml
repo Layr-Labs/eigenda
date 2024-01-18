@@ -3,11 +3,11 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum
-    name: BLSRegistryCoordinatorWithIndices
+    name: RegistryCoordinator
     network: devnet
     source:
       address: "0x0000000000000000000000000000000000000000"
-      abi: BLSRegistryCoordinatorWithIndices
+      abi: RegistryCoordinator
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -21,8 +21,8 @@ dataSources:
         - OperatorSetParamsUpdated
         - OperatorSocketUpdate
       abis:
-        - name: BLSRegistryCoordinatorWithIndices
-          file: ./abis/BLSRegistryCoordinatorWithIndices.json
+        - name: RegistryCoordinator
+          file: ./abis/RegistryCoordinator.json
       eventHandlers:
         - event: ChurnApproverUpdated(address,address)
           handler: handleChurnApproverUpdated
@@ -36,11 +36,11 @@ dataSources:
           handler: handleOperatorSocketUpdate
       file: ./src/bls-registry-coordinator-with-indices.ts
   - kind: ethereum
-    name: BLSPubkeyRegistry
+    name: BLSApkRegistry
     network: devnet
     source:
       address: "0x0000000000000000000000000000000000000000"
-      abi: BLSPubkeyRegistry
+      abi: BLSApkRegistry
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -50,8 +50,8 @@ dataSources:
         - OperatorAddedToQuorums
         - OperatorRemovedFromQuorums
       abis:
-        - name: BLSPubkeyRegistry
-          file: ./abis/BLSPubkeyRegistry.json
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
       eventHandlers:
         - event: OperatorAddedToQuorums(address,bytes)
           handler: handleOperatorAddedToQuorums
@@ -59,11 +59,11 @@ dataSources:
           handler: handleOperatorRemovedFromQuorums
       file: ./src/bls-pubkey-registry.ts
   - kind: ethereum
-    name: BLSPubkeyCompendium
+    name: BLSApkRegistry
     network: devnet
     source:
       address: "0x0000000000000000000000000000000000000000"
-      abi: BLSPubkeyCompendium
+      abi: BLSApkRegistry
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -72,18 +72,18 @@ dataSources:
       entities:
         - NewPubkeyRegistration
       abis:
-        - name: BLSPubkeyCompendium
-          file: ./abis/BLSPubkeyCompendium.json
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
       eventHandlers:
         - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
           handler: handleNewPubkeyRegistration
       file: ./src/bls-pubkey-compendium.ts
   - kind: ethereum
-    name: BLSPubkeyCompendium_Operator
+    name: BLSApkRegistry_Operator
     network: devnet
     source:
       address: "0x0000000000000000000000000000000000000000"
-      abi: BLSPubkeyCompendium
+      abi: BLSApkRegistry
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -92,8 +92,8 @@ dataSources:
       entities:
         - Operator
       abis:
-        - name: BLSPubkeyCompendium
-          file: ./abis/BLSPubkeyCompendium.json
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
       eventHandlers:
         - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
           handler: handleNewPubkeyRegistration
@@ -122,11 +122,11 @@ dataSources:
           handler: handleOperatorRegistered
       file: ./src/operator-registration-status.ts
   - kind: ethereum
-    name: BLSPubkeyRegistry_QuorumApkUpdates
+    name: BLSApkRegistry_QuorumApkUpdates
     network: devnet
     source:
       address: "0x0000000000000000000000000000000000000000"
-      abi: BLSPubkeyRegistry
+      abi: BLSApkRegistry
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -136,8 +136,8 @@ dataSources:
         - OperatorAddedToQuorums
         - OperatorRemovedFromQuorums
       abis:
-        - name: BLSPubkeyRegistry
-          file: ./abis/BLSPubkeyRegistry.json
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
       eventHandlers:
         - event: OperatorAddedToQuorums(address,bytes)
           handler: handleOperatorAddedToQuorums
