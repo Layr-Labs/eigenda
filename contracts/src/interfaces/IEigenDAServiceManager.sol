@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {IDelayedService} from "eigenlayer-middleware/interfaces/IDelayedService.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
@@ -15,7 +14,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
      * @param batchHeaderHash The hash of the batch header
      * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
      */
-    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee, bool optimistic);
+    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
 
     /**
      * @notice Emitted when the batch confirmer is changed.
@@ -30,8 +29,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
         uint8 quorumNumber;
         uint8 adversaryThresholdPercentage;
         uint8 quorumThresholdPercentage; 
-        uint8 quantizationParameter; // the quantization parameter used for determining
-                                    // the precision of the amount of data and the stake that nodes have
+        uint32 chunkLength; // the length of the chunks in the quorum
     }
 
     struct BlobHeader {
@@ -84,12 +82,6 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
     function confirmBatch(
         BatchHeader calldata batchHeader,
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-    ) external;
-
-    /// @notice This function is used for submitting data availabilty certificates optimistically
-    function confirmBatchOptimistically(
-        BatchHeader calldata batchHeader,
-        bytes calldata nonSignerStakesAndSignature
     ) external;
 
     /// @notice This function is used for changing the batch confirmer

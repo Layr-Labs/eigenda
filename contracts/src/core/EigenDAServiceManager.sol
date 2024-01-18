@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
 import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
-import {IStrategyManager} from "eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
-import {ISlasher} from "eigenlayer-core/contracts/interfaces/ISlasher.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
-import {ISignatureUtils} from "eigenlayer-core/contracts/interfaces/ISignatureUtils.sol";
 
 import {ServiceManagerBase} from "eigenlayer-middleware/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
@@ -17,7 +12,6 @@ import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.so
 
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
-
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
@@ -33,9 +27,6 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
-    IStrategyManager public immutable _strategyManager;
-    ISlasher public immutable _slasher;
-
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
     modifier onlyBatchConfirmer() {
         require(msg.sender == batchConfirmer, "onlyBatchConfirmer: not from batch confirmer");
@@ -45,15 +36,11 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     constructor(
         IDelegationManager __delegationMananger,
         IRegistryCoordinator __registryCoordinator,
-        IStrategyManager __strategyManager,
-        IStakeRegistry __stakeRegistry,
-        ISlasher __slasher
+        IStakeRegistry __stakeRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__delegationMananger, __registryCoordinator, __stakeRegistry)
     {
-        _strategyManager = __strategyManager;
-        _slasher = __slasher;
         _disableInitializers();
     }
 
@@ -118,47 +105,14 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         }
 
         // store the metadata hash
-        uint96 fee = 0;
         uint32 batchIdMemory = batchId;
         bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHash[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, fee, uint32(block.number));
+        batchIdToBatchMetadataHash[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, uint32(block.number));
 
-        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, false);
+        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory);
 
         // increment the batchId
         batchId = batchIdMemory + 1;
-    }
-
-    /// @notice This function is used for submitting data availabilty certificates optimistically
-    function confirmBatchOptimistically(
-        BatchHeader calldata batchHeader,
-        bytes calldata nonSignerStakesAndSignature
-    ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
-        // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
-        require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
-        // make sure the stakes against which the Batch is being confirmed are not stale
-        require(
-            batchHeader.referenceBlockNumber <= block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
-        );
-
-        require(
-            (batchHeader.referenceBlockNumber + BLOCK_STALE_MEASURE) >= uint32(block.number),
-            "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"
-        );
-
-        // calculate reducedBatchHeaderHash which nodes signed
-        bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
-
-        // store the metadata hash
-        uint96 fee = 0;
-        uint32 batchIdMemory = batchIdOptimistic;
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHashOptimistic[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, nonSignerStakesAndSignature, fee, uint32(block.number));
-
-        emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory, fee, true);
-
-        // increment the batchId
-        batchIdOptimistic = batchIdMemory + 1;
     }
 
     /// @notice This function is used for changing the batch confirmer

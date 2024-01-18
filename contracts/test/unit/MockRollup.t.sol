@@ -57,9 +57,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             delegationMock,
             registryCoordinator,
-            strategyManagerMock,
-            stakeRegistry,
-            slasher
+            stakeRegistry
         );
 
         eigenDAServiceManager = EigenDAServiceManager(
@@ -96,10 +94,17 @@ contract MockRollupTest is BLSMockAVSDeployer {
         //get commitment with illegal value
         (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
+        IEigenDAServiceManager.QuorumBlobParam[] memory quorumBlobParamsCopy = new IEigenDAServiceManager.QuorumBlobParam[](2);
+        for (uint i = 0; i < blobHeader.quorumBlobParams.length; i++) {
+            quorumBlobParamsCopy[i].quorumNumber = blobHeader.quorumBlobParams[i].quorumNumber;
+            quorumBlobParamsCopy[i].adversaryThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage;
+            quorumBlobParamsCopy[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].quorumThresholdPercentage;
+        }
+        
         stdstore
             .target(address(mockRollup))
             .sig("quorumBlobParamsHash()")
-            .checked_write(keccak256(abi.encode(blobHeader.quorumBlobParams)));
+            .checked_write(keccak256(abi.encode(quorumBlobParamsCopy)));
 
         //post commitment
         vm.prank(alice);
@@ -188,7 +193,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
                 blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", j)))) % 100;
                 j++;
             }
-            blobHeader.quorumBlobParams[i].quantizationParameter = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quantizationParameter", i))));
+            blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }
         // mark all quorum numbers as unused

@@ -47,9 +47,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             delegationMock,
             registryCoordinator,
-            strategyManagerMock,
-            stakeRegistry,
-            slasher
+            stakeRegistry
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
@@ -325,7 +323,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", j)))) % 100;
                 j++;
             }
-            blobHeader.quorumBlobParams[i].quantizationParameter = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quantizationParameter", i))));
+            blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }
         // mark all quorum numbers as unused
