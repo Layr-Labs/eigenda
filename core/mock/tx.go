@@ -33,17 +33,12 @@ func (t *MockTransactor) GetRegisteredQuorumIdsForOperator(ctx context.Context, 
 	return result.([]core.QuorumID), args.Error(1)
 }
 
-func (t *MockTransactor) RegisterBLSPublicKey(ctx context.Context, keypair *core.KeyPair) error {
+func (t *MockTransactor) RegisterOperator(ctx context.Context, keypair *core.KeyPair, socket string, quorumIds []core.QuorumID) error {
 	args := t.Called()
 	return args.Error(0)
 }
 
-func (t *MockTransactor) RegisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, socket string, quorumIds []core.QuorumID) error {
-	args := t.Called()
-	return args.Error(0)
-}
-
-func (t *MockTransactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *core.G1Point, socket string, quorumIds []core.QuorumID, churnReply *churner.ChurnReply) error {
+func (t *MockTransactor) RegisterOperatorWithChurn(ctx context.Context, keypair *core.KeyPair, socket string, quorumIds []core.QuorumID, churnReply *churner.ChurnReply) error {
 	args := t.Called()
 	return args.Error(0)
 }
@@ -140,10 +135,10 @@ func (t *MockTransactor) GetCurrentBlockNumber(ctx context.Context) (uint32, err
 	return result.(uint32), args.Error(1)
 }
 
-func (t *MockTransactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error) {
+func (t *MockTransactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(uint16), args.Error(1)
+	return result.(uint8), args.Error(1)
 }
 
 func (t *MockTransactor) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {

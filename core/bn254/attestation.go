@@ -143,13 +143,10 @@ func DeserializeG2(b []byte) *bn254.G2Affine {
 	return p
 }
 
-func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Address, compendiumAddress common.Address, chainId *big.Int) *bn254.G1Affine {
+func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Address) *bn254.G1Affine {
 	toHash := make([]byte, 0)
+	toHash = append(toHash, crypto.Keccak256([]byte("BN254PubkeyRegistration(address operator)"))...)
 	toHash = append(toHash, operatorAddress.Bytes()...)
-	toHash = append(toHash, compendiumAddress.Bytes()...)
-	// make sure chainId is 32 bytes
-	toHash = append(toHash, common.LeftPadBytes(chainId.Bytes(), 32)...)
-	toHash = append(toHash, []byte("EigenLayer_BN254_Pubkey_Registration")...)
 
 	msgHash := crypto.Keccak256(toHash)
 	// convert to [32]byte

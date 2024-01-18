@@ -30,20 +30,17 @@ type OperatorStakes map[QuorumID]map[OperatorIndex]OperatorStake
 
 type Transactor interface {
 
-	// RegisterBLSPublicKey registers a new BLS public key with  the pubkey compendium smart contract.
-	RegisterBLSPublicKey(ctx context.Context, keypair *KeyPair) error
-
 	// GetRegisteredQuorumIdsForOperator returns the quorum ids that the operator is registered in with the given public key.
 	GetRegisteredQuorumIdsForOperator(ctx context.Context, operatorID OperatorID) ([]QuorumID, error)
 
 	// RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
 	// If the operator is already registered with a given quorum id, the transaction will fail (noop) and an error
 	// will be returned.
-	RegisterOperator(ctx context.Context, pubkeyG1 *G1Point, socket string, quorumIds []QuorumID) error
+	RegisterOperator(ctx context.Context, keypair *KeyPair, socket string, quorumIds []QuorumID) error
 
 	// RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
 	// with the provided signature from the churner
-	RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *G1Point, socket string, quorumIds []QuorumID, churnReply *churner.ChurnReply) error
+	RegisterOperatorWithChurn(ctx context.Context, keypair *KeyPair, socket string, quorumIds []QuorumID, churnReply *churner.ChurnReply) error
 
 	// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
 	// registered with at the supplied block number. To fully deregister an operator, this function should be called
@@ -105,5 +102,5 @@ type Transactor interface {
 	GetCurrentBlockNumber(ctx context.Context) (uint32, error)
 
 	// GetQuorumCount returns the number of quorums registered at given block number.
-	GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error)
+	GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error)
 }
