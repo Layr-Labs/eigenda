@@ -49,12 +49,9 @@ func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
 		keyPair, err := core.MakeKeyPairFromString(op.NODE_TEST_PRIVATE_BLS)
 		Expect(err).To(BeNil())
 
-		err = tx.RegisterBLSPublicKey(context.Background(), keyPair)
-		Expect(err).To(BeNil())
-
 		socket := fmt.Sprintf("%v:%v", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT)
 
-		err = tx.RegisterOperator(context.Background(), keyPair.GetPubKeyG1(), socket, quorums)
+		err = tx.RegisterOperator(context.Background(), keyPair, socket, quorums)
 		Expect(err).To(BeNil())
 	}
 }
