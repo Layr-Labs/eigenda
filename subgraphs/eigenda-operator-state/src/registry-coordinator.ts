@@ -5,7 +5,7 @@ import {
   OperatorRegistered as OperatorRegisteredEvent,
   OperatorSetParamsUpdated as OperatorSetParamsUpdatedEvent,
   OperatorSocketUpdate as OperatorSocketUpdateEvent
-} from "../generated/BLSRegistryCoordinatorWithIndices/BLSRegistryCoordinatorWithIndices"
+} from "../generated/RegistryCoordinator/RegistryCoordinator"
 import {
   ChurnApproverUpdated,
   OperatorDeregistered,

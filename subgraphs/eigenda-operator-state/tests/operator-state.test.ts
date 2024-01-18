@@ -12,7 +12,7 @@ import {
   import { createNewOperatorDeregisteredEvent, createNewOperatorRegisteredEvent, createNewOperatorSocketUpdateEvent, createNewPubkeyRegistrationEvent } from "./operator-state-utils"
   import { handleNewPubkeyRegistration } from "../src/operator-creation"
   import { handleOperatorDeregistered, handleOperatorRegistered } from "../src/operator-registration-status"
-  import { handleOperatorSocketUpdate } from "../src/bls-registry-coordinator-with-indices"
+  import { handleOperatorSocketUpdate } from "../src/registry-coordinator"
   
   
   let operator: Address = Address.fromBytes(Bytes.fromHexString("0xa16081f360e3847006db660bae1c6d1b2e17ec2a"))

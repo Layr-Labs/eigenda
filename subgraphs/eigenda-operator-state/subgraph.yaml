@@ -34,7 +34,7 @@ dataSources:
           handler: handleOperatorSetParamsUpdated
         - event: OperatorSocketUpdate(indexed bytes32,string)
           handler: handleOperatorSocketUpdate
-      file: ./src/bls-registry-coordinator-with-indices.ts
+      file: ./src/registry-coordinator.ts
   - kind: ethereum
     name: BLSApkRegistry
     network: devnet
@@ -57,27 +57,9 @@ dataSources:
           handler: handleOperatorAddedToQuorums
         - event: OperatorRemovedFromQuorums(address,bytes)
           handler: handleOperatorRemovedFromQuorums
-      file: ./src/bls-pubkey-registry.ts
-  - kind: ethereum
-    name: BLSApkRegistry
-    network: devnet
-    source:
-      address: "0x0000000000000000000000000000000000000000"
-      abi: BLSApkRegistry
-      startBlock: 0
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.7
-      language: wasm/assemblyscript
-      entities:
-        - NewPubkeyRegistration
-      abis:
-        - name: BLSApkRegistry
-          file: ./abis/BLSApkRegistry.json
-      eventHandlers:
         - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
           handler: handleNewPubkeyRegistration
-      file: ./src/bls-pubkey-compendium.ts
+      file: ./src/bls-apk-registry.ts
   - kind: ethereum
     name: BLSApkRegistry_Operator
     network: devnet
@@ -99,11 +81,11 @@ dataSources:
           handler: handleNewPubkeyRegistration
       file: ./src/operator-creation.ts
   - kind: ethereum
-    name: BLSRegistryCoordinatorWithIndices_Operator
+    name: RegistryCoordinator_Operator
     network: devnet
     source:
       address: "0x0000000000000000000000000000000000000000"
-      abi: BLSRegistryCoordinatorWithIndices
+      abi: RegistryCoordinator
       startBlock: 0
     mapping:
       kind: ethereum/events
@@ -113,8 +95,8 @@ dataSources:
         - OperatorDeregistered
         - OperatorRegistered
       abis:
-        - name: BLSRegistryCoordinatorWithIndices
-          file: ./abis/BLSRegistryCoordinatorWithIndices.json
+        - name: RegistryCoordinator
+          file: ./abis/RegistryCoordinator.json
       eventHandlers:
         - event: OperatorDeregistered(indexed address,indexed bytes32)
           handler: handleOperatorDeregistered
