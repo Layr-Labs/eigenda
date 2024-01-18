@@ -41,7 +41,7 @@ These requirements result in the following design choices:
 - If an attestation is reorged out and if the transaction containing the header of a batch is not present within `BLOCK_STALE_MEASURE` blocks since `referenceBlockNumber` and the block that is `BLOCK_STALE_MEASURE` blocks since `referenceBlockNumber`  is finalized, then the disperser should again start a new dispersal with that blob of data. Otherwise, the disperser must not re-submit another transaction containing the header of a batch associated with the same blob of data.
 - Payment payloads sent to DA nodes should only take into account finalized attestations.
 
-The first and second decisions satisfies requirements 1 and 2. The three decisions together satisfy requirement 3.
+The first and second decisions satisfy requirements 1 and 2. The three decisions together satisfy requirement 3.
 
 Whenever the `confirmBatch` method of the [ServiceMananger.sol](../contracts-service-manager.md) is called, the following checks are used to ensure that only finalized registration state is utilized:
 - Stake staleness check. The `referenceBlockNumber` is verified to be within `BLOCK_STALE_MEASURE` blocks before the confirmation block.This is to make sure that batches using outdated stakes are not confirmed. It is assured that stakes from within `BLOCK_STALE_MEASURE` blocks before confirmation are valid by delaying removal of stakes by `BLOCK_STALE_MEASURE + MAX_DURATION_BLOCKS`.
