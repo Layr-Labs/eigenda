@@ -102,7 +102,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 		ChainWriteTimeout:  10 * time.Second,
 	}
 
-	metrics := bat.NewMetrics("9100", logger)
+	metrics := bat.NewMetrics(nil, "9100", logger)
 
 	encoderClient := disperser.NewLocalEncoderClient(enc)
 	finalizer := batchermock.NewFinalizer()
