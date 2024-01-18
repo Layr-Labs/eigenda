@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -28,7 +29,11 @@ var (
 
 // Assignment
 
-type OperatorID = [32]byte
+type OperatorID [32]byte
+
+func (id OperatorID) Hex() string {
+	return hex.EncodeToString(id[:])
+}
 
 type OperatorIndex = uint
 
@@ -156,7 +161,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 
 	// Check that the chunk length meets the minimum requirement
 	if info.ChunkLength < MinChunkLength {
-		return false, ErrChunkLengthTooSmall
+		return false, fmt.Errorf("%w: chunk length: %d, min chunk length: %d", ErrChunkLengthTooSmall, info.ChunkLength, MinChunkLength)
 	}
 
 	// Get minimum stake amont
@@ -183,7 +188,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		maxChunkLength = uint(nextPowerOf2(uint64(maxChunkLength)))
 
 		if info.ChunkLength > maxChunkLength {
-			return false, ErrChunkLengthTooLarge
+			return false, fmt.Errorf("%w: chunk length: %d, max chunk length: %d", ErrChunkLengthTooLarge, info.ChunkLength, maxChunkLength)
 		}
 
 	}

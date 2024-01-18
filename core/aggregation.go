@@ -102,7 +102,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
 		r := <-messageChan
-		operatorIDHex := hexutil.Encode(r.Operator[:])
+		operatorIDHex := r.Operator.Hex()
 		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
 		if !ok && a.Transactor != nil {
 			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
