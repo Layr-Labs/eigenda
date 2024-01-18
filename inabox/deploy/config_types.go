@@ -96,12 +96,11 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 }
 
 type EigenDAContract struct {
-	Deployer                       string `yaml:"deployer"`
-	ServiceManager                 string `json:"eigenDAServiceManager"`
-	OperatorStateRetreiver         string `json:"blsOperatorStateRetriever"`
-	PubkeyRegistry                 string `json:"blsPubkeyRegistry"`
-	PubkeyCompendium               string `json:"pubkeyCompendium"`
-	RegistryCoordinatorWithIndices string `json:"blsRegistryCoordinatorWithIndices"`
+	Deployer               string `yaml:"deployer"`
+	ServiceManager         string `json:"eigenDAServiceManager"`
+	OperatorStateRetreiver string `json:"operatorStateRetriever"`
+	BlsApkRegistry         string `json:"blsApkRegistry"`
+	RegistryCoordinator    string `json:"registryCoordinator"`
 }
 
 type ServicesSpec struct {
