@@ -102,7 +102,11 @@ func TestChurner(t *testing.T) {
 	keyPair, err := dacore.GenRandomBlsKeys()
 	assert.NoError(t, err)
 
-	err = operatorTransactor.RegisterBLSPublicKey(ctx, keyPair)
+	quorumIds_ := make([]uint8, len(quorumIds))
+	for i, q := range quorumIds {
+		quorumIds_[i] = uint8(q)
+	}
+	err = operatorTransactor.RegisterOperator(ctx, keyPair, "socket", quorumIds_)
 	assert.NoError(t, err)
 
 	server := newTestServer(t)

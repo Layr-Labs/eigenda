@@ -37,12 +37,6 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 		return nil
 	}
 
-	// if the operator is not registered, we may need to register the BLSPublicKey
-	err = transactor.RegisterBLSPublicKey(ctx, operator.KeyPair)
-	if err != nil {
-		return fmt.Errorf("failed to register the nodes bls public key: %w", err)
-	}
-
 	logger.Info("Quorums to register for", "quorums", operator.QuorumIDs)
 
 	if len(operator.QuorumIDs) == 0 {
@@ -79,10 +73,10 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
 
-		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair.PubKey, operator.Socket, operator.QuorumIDs, churnReply)
+		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, churnReply)
 	} else {
 		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.KeyPair.PubKey, operator.Socket, operator.QuorumIDs)
+		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs)
 	}
 }
 
