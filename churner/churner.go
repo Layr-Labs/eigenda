@@ -47,7 +47,7 @@ type churner struct {
 	mu          sync.Mutex
 	Indexer     thegraph.IndexedChainState
 	Transactor  core.Transactor
-	QuorumCount uint16
+	QuorumCount uint8
 
 	privateKey *ecdsa.PrivateKey
 	logger     common.Logger

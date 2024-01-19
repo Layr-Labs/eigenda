@@ -66,6 +66,7 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 		StakerPrivateKeys:   stakers,
 		StakerTokenAmounts:  stakes,
 		OperatorPrivateKeys: operators,
+		ConfirmerPrivateKey: env.getKeyString("batcher0"),
 	}
 
 	return config
@@ -219,7 +220,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
 		"NODE_NUM_CONFIRMATIONS=0",
 	}
-	
+
 	err := execCmd("./node-plugin.sh", []string{}, envVars)
 
 	if err != nil {

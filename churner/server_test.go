@@ -118,7 +118,7 @@ func setupMockTransactor() {
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
 	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(2), nil)
 	transactorMock.On("GetCurrentBlockNumber").Return(uint32(2), nil)
-	transactorMock.On("GetQuorumCount").Return(uint16(1), nil)
+	transactorMock.On("GetQuorumCount").Return(uint8(1), nil)
 	transactorMock.On("GetOperatorStakesForQuorums").Return(dacore.OperatorStakes{
 		0: {
 			0: {
