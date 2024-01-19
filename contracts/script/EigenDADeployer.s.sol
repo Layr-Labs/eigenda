@@ -53,6 +53,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address eigenDAPauser;
         address churner;
         address ejector;
+        address confirmer;
     }
     
     function _deployEigenDAAndEigenLayerContracts(

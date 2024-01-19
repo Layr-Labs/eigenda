@@ -45,6 +45,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             addressConfig.eigenDAPauser = msg.sender;
             addressConfig.churner = msg.sender;
             addressConfig.ejector = msg.sender;
+            addressConfig.confirmer = msg.sender;
 
             uint256 initialSupply = 1000 ether;
             address tokenOwner = msg.sender;
@@ -65,6 +66,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 maxOperatorCount = stdJson.readUint(config_data, ".maxOperatorCount");
             }
 
+            
+            addressConfig.confirmer = vm.addr(stdJson.readUint(config_data, ".confirmerPrivateKey"));
+
 
             vm.startBroadcast();
 
@@ -75,6 +79,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 tokenOwner,
                 maxOperatorCount
             );
+            
+            eigenDAServiceManager.setBatchConfirmer(addressConfig.confirmer);
 
             vm.stopBroadcast();
         }
@@ -169,9 +175,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         string memory output = "eigenDA deployment output";
         vm.serializeAddress(output, "eigenDAServiceManager", address(eigenDAServiceManager));
-        vm.serializeAddress(output, "blsOperatorStateRetriever", address(operatorStateRetriever));
+        vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
         vm.serializeAddress(output, "blsApkRegistry" , address(apkRegistry));
-        vm.serializeAddress(output, "blsRegistryCoordinatorWithIndices", address(registryCoordinator));
+        vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 
