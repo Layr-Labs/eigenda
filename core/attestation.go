@@ -6,6 +6,7 @@ import (
 
 	bn254utils "github.com/Layr-Labs/eigenda/core/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -14,6 +15,21 @@ import (
 
 type G1Point struct {
 	*bn254.G1Affine
+}
+
+func newFpElement(x *big.Int) fp.Element {
+	var p fp.Element
+	p.SetBigInt(x)
+	return p
+}
+
+func NewG1Point(x, y *big.Int) *G1Point {
+	return &G1Point{
+		&bn254.G1Affine{
+			X: newFpElement(x),
+			Y: newFpElement(y),
+		},
+	}
 }
 
 // Add another G1 point to this one
@@ -129,6 +145,11 @@ func (k *KeyPair) SignMessage(message [32]byte) *Signature {
 	return &Signature{&G1Point{sig}}
 }
 
+func (k *KeyPair) SignHashedToCurveMessage(g1HashedMsg *G1Point) *Signature {
+	sig := new(bn254.G1Affine).ScalarMultiplication(g1HashedMsg.G1Affine, k.PrivKey.BigInt(new(big.Int)))
+	return &Signature{&G1Point{sig}}
+}
+
 func (k *KeyPair) GetPubKeyG2() *G2Point {
 	return &G2Point{bn254utils.MulByGeneratorG2(k.PrivKey)}
 }
@@ -141,7 +162,7 @@ func (k *KeyPair) GetPubKeyG1() *G1Point {
 // The values returned constitute a proof that the operator knows the secret key corresponding to the public key, and prevents the operator
 // from attacking the signature protocol by registering a public key that is derived from other public keys.
 // (e.g., see https://medium.com/@coolcottontail/rogue-key-attack-in-bls-signature-and-harmony-security-eac1ea2370ee)
-func (k *KeyPair) MakePubkeyRegistrationData(operatorAddress common.Address, compendiumAddress common.Address, chainId *big.Int) *G1Point {
-	return &G1Point{bn254utils.MakePubkeyRegistrationData(k.PrivKey, operatorAddress, compendiumAddress, chainId)}
+func (k *KeyPair) MakePubkeyRegistrationData(operatorAddress common.Address) *G1Point {
+	return &G1Point{bn254utils.MakePubkeyRegistrationData(k.PrivKey, operatorAddress)}
 
 }
