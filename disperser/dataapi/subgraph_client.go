@@ -9,8 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 )
 
-const _14Days = 14 * 24 * time.Hour
-
 type (
 	SubgraphClient interface {
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
@@ -210,6 +208,7 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Operator{
 		Id:              []byte(operator.Id),
 		OperatorId:      []byte(operator.OperatorId),

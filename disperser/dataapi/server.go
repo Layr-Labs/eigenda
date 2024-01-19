@@ -69,9 +69,16 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
+	DeRegisteredOperatorMetadata struct {
+		OperatorId  string `json:"operator_id"`
+		BlockNumber uint   `json:"block_number"`
+		IpAddress   string `json:"ip_address"`
+		IsOnline    bool   `json:"is_online"`
+	}
+
 	DeregisteredOperatorsResponse struct {
-		Meta Meta                        `json:"meta"`
-		Data []*DeregisteredOperatorInfo `json:"data"`
+		Meta Meta                            `json:"meta"`
+		Data []*DeRegisteredOperatorMetadata `json:"data"`
 	}
 
 	ErrorResponse struct {

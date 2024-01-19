@@ -5,7 +5,9 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -24,6 +27,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/goleak"
 )
 
@@ -57,6 +61,10 @@ var (
 	expectedInclusionProof          = []byte{1, 2, 3, 4, 5}
 	gettysburgAddressBytes          = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 )
+
+type MockSubgraphClient struct {
+	mock.Mock
+}
 
 func TestFetchBlobHandler(t *testing.T) {
 	r := setUpRouter()
@@ -187,7 +195,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.Throughput)
-	assert.Equal(t, float64(85.14485344239945), response.CostInGas)
+	assert.Equal(t, float64(170.2897068847989), response.CostInGas)
 	assert.Equal(t, uint64(1), response.TotalStake)
 }
 
@@ -229,6 +237,328 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 	assert.Equal(t, float64(11666.666666666666), response[0].Throughput)
 	assert.Equal(t, uint64(1701292800), response[0].Timestamp)
 	assert.Equal(t, float64(3.599722666666646e+07), totalThroughput)
+}
+
+func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/?days=14", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+
+	for _, data := range response.Data {
+		fmt.Printf("Data: %v\n", data)
+		assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", data.OperatorId)
+		assert.Equal(t, uint(22), data.BlockNumber)
+		assert.Equal(t, "localhost:32007", data.IpAddress)
+	}
+}
+
+func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOffline(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/?days=14", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+
+	operator1Data := response.Data[0]
+	operator2Data := response.Data[1]
+	fmt.Printf("Operator1Data: %v\n", operator1Data)
+	fmt.Printf("Operator2Data: %v\n", operator2Data)
+
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
+	assert.Equal(t, uint(22), operator1Data.BlockNumber)
+	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, false, operator1Data.IsOnline)
+
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
+	assert.Equal(t, uint(24), operator2Data.BlockNumber)
+	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, false, operator2Data.IsOnline)
+}
+
+func TestFetchDeregisteredOperatorsHandlerOperatorOnline(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+
+	// Start the test server
+	closeServer, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
+	if err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer closeServer() // Ensure the server is closed after the test
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/?days=14", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+	assert.Equal(t, true, response.Data[0].IsOnline)
+}
+
+func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOneOnline(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+
+	// Start the test server
+	closeServer, err := startTestTCPServer("localhost:32009")
+	if err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer closeServer()
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/?days=14", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+
+	operator1Data := response.Data[0]
+	operator2Data := response.Data[1]
+
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
+	assert.Equal(t, uint(22), operator1Data.BlockNumber)
+	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, false, operator1Data.IsOnline)
+
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
+	assert.Equal(t, uint(24), operator2Data.BlockNumber)
+	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, true, operator2Data.IsOnline)
+}
+
+func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+
+	// Start the test server
+	closeServer1, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
+	if err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer closeServer1() // Ensure the server is closed after the test
+
+	// Start the test server
+	closeServer2, err := startTestTCPServer("localhost:32009") // Let the OS assign a free port
+	if err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer closeServer2() // Ensure the server is closed after the test
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/?days=14", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+}
+
+func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineSameBlock(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
+	indexedOperatorStates[core.OperatorID{2}] = subgraphDeregisteredOperatorInfo3
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphThreeOperatorsDeregistered, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo3, nil).Once()
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/?days=14", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 3, response.Meta.Size)
+	assert.Equal(t, 3, len(response.Data))
+
+	operator1Data := response.Data[0]
+
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
+	assert.Equal(t, uint(22), operator1Data.BlockNumber)
+	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, false, operator1Data.IsOnline)
+
+	operator2Data := getOperatorData(response.Data, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	operator3Data := getOperatorData(response.Data, "0xe24cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568313")
+
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
+	assert.Equal(t, uint(24), operator2Data.BlockNumber)
+	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, false, operator1Data.IsOnline)
+
+	assert.Equal(t, "0xe24cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568313", operator3Data.OperatorId)
+	assert.Equal(t, uint(24), operator3Data.BlockNumber)
+	assert.Equal(t, "localhost:32011", operator3Data.IpAddress)
+	assert.Equal(t, false, operator3Data.IsOnline)
 }
 
 func setUpRouter() *gin.Engine {
@@ -305,4 +635,37 @@ func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8) core.Blob {
 		Data: gettysburgAddressBytes,
 	}
 	return blob
+}
+
+func startTestTCPServer(address string) (closeFunc func(), err error) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+
+	closeFunc = func() { listener.Close() }
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			conn.Close() // Close the connection immediately
+		}
+	}()
+
+	return closeFunc, nil
+}
+
+// Helper to get OperatorData from response
+func getOperatorData(operatorMetadtas []*dataapi.DeRegisteredOperatorMetadata, operatorId string) dataapi.DeRegisteredOperatorMetadata {
+
+	for _, operatorMetadata := range operatorMetadtas {
+		if operatorMetadata.OperatorId == operatorId {
+			return *operatorMetadata
+		}
+	}
+	return dataapi.DeRegisteredOperatorMetadata{}
+
 }
