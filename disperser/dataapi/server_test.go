@@ -345,6 +345,61 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {
 	}
 }
 
+func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineWithoutDaysQueryParam(t *testing.T) {
+
+	defer goleak.VerifyNone(t)
+
+	r := setUpRouter()
+
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
+	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+
+	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+
+	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+
+	operator1Data := response.Data[0]
+	operator2Data := response.Data[1]
+	fmt.Printf("Operator1Data: %v\n", operator1Data)
+	fmt.Printf("Operator2Data: %v\n", operator2Data)
+
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
+	assert.Equal(t, uint(22), operator1Data.BlockNumber)
+	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, false, operator1Data.IsOnline)
+
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
+	assert.Equal(t, uint(24), operator2Data.BlockNumber)
+	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, false, operator2Data.IsOnline)
+}
+
 func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOffline(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
