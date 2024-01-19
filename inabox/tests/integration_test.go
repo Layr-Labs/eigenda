@@ -148,7 +148,7 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 	}
 }
 
-func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDABlobUtilsBlobVerificationProof {
+func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDARollupUtilsBlobVerificationProof {
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
@@ -168,7 +168,7 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
-	return rollupbindings.EigenDABlobUtilsBlobVerificationProof{
+	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
 		BatchId:                verificationProof.GetBatchId(),
 		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
 		BatchMetadata:          batchMetadata,

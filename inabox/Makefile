@@ -19,6 +19,11 @@ new-anvil:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil.yaml "testdata/$(dt)/config.yaml"
 
+new-anvil-nochurner:
+	mkdir -p "testdata/$(dt)"
+	cp ./templates/testconfig-anvil-nochurner.yaml "testdata/$(dt)/config.yaml"
+
+
 new-docker-anvil:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-docker.yaml "testdata/$(dt)/config.yaml"
