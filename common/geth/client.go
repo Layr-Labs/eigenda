@@ -98,19 +98,8 @@ func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
 	return opts, nil
 }
 
-// UpdateGas returns an otherwise identical txn to the one provided but with updated
-// gas prices sampled from the existing network conditions and an accurate gasLimit.
-// Note that this method does not publish the transaction.
-//
-// Note: tx must be a to a contract, not an EOA
-//
-// Slightly modified from: https://github.com/ethereum-optimism/optimism/blob/ec266098641820c50c39c31048aa4e953bece464/batch-submitter/drivers/sequencer/driver.go#L314
-func (c *EthClient) UpdateGas(
-	ctx context.Context,
-	tx *types.Transaction,
-	value *big.Int,
-) (*types.Transaction, error) {
-	gasTipCap, err := c.SuggestGasTipCap(ctx)
+func (c *EthClient) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
+	gasTipCap, err = c.SuggestGasTipCap(ctx)
 	if err != nil {
 		// If the transaction failed because the backend does not support
 		// eth_maxPriorityFeePerGas, fallback to using the default constant.
@@ -132,14 +121,13 @@ func (c *EthClient) UpdateGas(
 
 	header, err := c.HeaderByNumber(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	gasFeeCap := getGasFeeCap(gasTipCap, header.BaseFee)
+	gasFeeCap = getGasFeeCap(gasTipCap, header.BaseFee)
+	return
+}
 
-	// The estimated gas limits performed by RawTransact fail semi-regularly
-	// with out of gas exceptions. To remedy this we extract the internal calls
-	// to perform gas price/gas limit estimation here and add a buffer to
-	// account for any network variability.
+func (c *EthClient) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
 	gasLimit, err := c.Client.EstimateGas(ctx, ethereum.CallMsg{
 		From:      c.AccountAddress,
 		To:        tx.To(),
@@ -172,13 +160,10 @@ func (c *EthClient) UpdateGas(
 		// cache the contract for later use
 		c.Contracts[*tx.To()] = contract
 	}
-
 	return contract.RawTransact(opts, tx.Data())
 }
 
-// EstimateGasPriceAndLimitAndSendTx sends and returns an otherwise identical txn
-// to the one provided but with updated gas prices sampled from the existing network
-// conditions and an accurate gasLimit
+// EstimateGasPriceAndLimitAndSendTx sends and returns a transaction receipt.
 //
 // Note: tx must be a to a contract, not an EOA
 func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
@@ -187,10 +172,16 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 	tag string,
 	value *big.Int,
 ) (*types.Receipt, error) {
-	tx, err := c.UpdateGas(ctx, tx, value)
+	gasTipCap, gasFeeCap, err := c.GetLatestGasCaps(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("EstimateGasPriceAndLimitAndSendTx: failed to get gas price for txn (%s): %w", tag, err)
+	}
+
+	tx, err = c.UpdateGas(ctx, tx, value, gasTipCap, gasFeeCap)
 	if err != nil {
 		return nil, fmt.Errorf("EstimateGasPriceAndLimitAndSendTx: failed to update gas for txn (%s): %w", tag, err)
 	}
+
 	err = c.SendTransaction(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("EstimateGasPriceAndLimitAndSendTx: failed to send txn (%s): %w", tag, err)
@@ -208,28 +199,32 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 	return receipt, err
 }
 
+// EnsureTransactionEvaled waits for tx to be mined on the blockchain and returns the receipt.
+// If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
 func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	receipt, err := c.waitMined(ctx, tx)
 	if err != nil {
-		return nil, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
+		return receipt, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
 	}
 	if receipt.Status != 1 {
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
 		return nil, ErrTransactionFailed
 	}
-	c.Logger.Trace("successfully submitted transaction", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
+	c.Logger.Trace("transaction confirmed", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
 	return receipt, nil
 }
 
-// waitMined waits for tx to be mined on the blockchain.
+// waitMined waits for tx to be mined on the blockchain and returns the receipt.
+// If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
 // Taken from https://github.com/ethereum/go-ethereum/blob/master/accounts/abi/bind/util.go#L32,
 // but added a check for number of confirmations.
 func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*types.Receipt, error) {
 	queryTicker := time.NewTicker(3 * time.Second)
 	defer queryTicker.Stop()
-
+	var receipt *types.Receipt
+	var err error
 	for {
-		receipt, err := c.TransactionReceipt(ctx, tx.Hash())
+		receipt, err = c.TransactionReceipt(ctx, tx.Hash())
 		if err == nil {
 			chainTip, err := c.BlockNumber(ctx)
 			if err == nil {
@@ -244,15 +239,15 @@ func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*type
 		}
 
 		if errors.Is(err, ethereum.NotFound) {
-			c.Logger.Trace("Transaction not yet mined")
-		} else {
+			c.Logger.Trace("Transaction not yet mined", "txHash", tx.Hash().Hex())
+		} else if err != nil {
 			c.Logger.Trace("Receipt retrieval failed", "err", err)
 		}
 
 		// Wait for the next round.
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return receipt, ctx.Err()
 		case <-queryTicker.C:
 		}
 	}

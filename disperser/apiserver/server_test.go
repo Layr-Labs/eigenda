@@ -20,6 +20,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -52,7 +54,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDisperseBlob(t *testing.T) {
-	data := make([]byte, 1024)
+	data := make([]byte, 3*1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -247,7 +249,7 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 }
 
 func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
-	data := make([]byte, 1024*512+10)
+	data := make([]byte, 2*1024*1024+10)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -274,7 +276,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "blob size cannot exceed 512 KiB")
+	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
 }
 
 func setup(m *testing.M) {
@@ -333,15 +335,55 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
 
-	var ratelimiter common.RateLimiter
+	globalParams := common.GlobalRateParams{
+		CountFailed: false,
+		BucketSizes: []time.Duration{3 * time.Second},
+		Multipliers: []float32{1},
+	}
+	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](1000)
+	if err != nil {
+		panic("failed to create bucket store")
+	}
+	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+
 	rateConfig := apiserver.RateConfig{
 		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
 			0: {
-				PerUserUnauthThroughput: 0,
-				TotalUnauthThroughput:   0,
+				PerUserUnauthThroughput: 20 * 1024,
+				TotalUnauthThroughput:   1048576,
+				PerUserUnauthBlobRate:   3 * 1e6,
+				TotalUnauthBlobRate:     100 * 1e6,
+			},
+			1: {
+				PerUserUnauthThroughput: 20 * 1024,
+				TotalUnauthThroughput:   1048576,
+				PerUserUnauthBlobRate:   3 * 1e6,
+				TotalUnauthBlobRate:     100 * 1e6,
 			},
 		},
 		ClientIPHeader: "",
+		Allowlist: apiserver.Allowlist{
+			"1.2.3.4": map[uint8]apiserver.PerUserRateInfo{
+				0: {
+					Throughput: 100 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+				1: {
+					Throughput: 1024 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+			},
+			"0x1aa8226f6d354380dDE75eE6B634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
+				0: {
+					Throughput: 100 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+				1: {
+					Throughput: 1024 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+			},
+		},
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)

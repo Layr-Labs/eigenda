@@ -3,15 +3,15 @@ package traffic
 import (
 	"time"
 
+	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/tools/traffic/flags"
 	"github.com/urfave/cli"
 )
 
 type Config struct {
-	Hostname               string
-	GrpcPort               string
-	Timeout                time.Duration
+	clients.Config
+
 	NumInstances           uint
 	RequestInterval        time.Duration
 	DataSize               uint64
@@ -20,14 +20,16 @@ type Config struct {
 	LoggingConfig          logging.Config
 	RandomizeBlobs         bool
 	InstanceLaunchInterval time.Duration
-	UseSecureGrpcFlag      bool
 }
 
 func NewConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Hostname:               ctx.GlobalString(flags.HostnameFlag.Name),
-		GrpcPort:               ctx.GlobalString(flags.GrpcPortFlag.Name),
-		Timeout:                ctx.Duration(flags.TimeoutFlag.Name),
+		Config: *clients.NewConfig(
+			ctx.GlobalString(flags.HostnameFlag.Name),
+			ctx.GlobalString(flags.GrpcPortFlag.Name),
+			ctx.Duration(flags.TimeoutFlag.Name),
+			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
+		),
 		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
 		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
@@ -36,6 +38,5 @@ func NewConfig(ctx *cli.Context) *Config {
 		LoggingConfig:          logging.ReadCLIConfig(ctx, flags.FlagPrefix),
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
-		UseSecureGrpcFlag:      ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
 	}
 }

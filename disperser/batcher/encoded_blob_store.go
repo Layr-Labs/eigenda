@@ -10,6 +10,12 @@ import (
 )
 
 type requestID string
+type status uint
+
+const (
+	PendingDispersal status = iota
+	PendingConfirmation
+)
 
 type encodedBlobStore struct {
 	mu sync.RWMutex
@@ -30,6 +36,7 @@ type EncodingResult struct {
 	Commitment           *core.BlobCommitments
 	Chunks               []*core.Chunk
 	Assignments          map[core.OperatorID]core.Assignment
+	Status               status
 }
 
 // EncodingResultOrStatus is a wrapper for EncodingResult that also contains an error
@@ -66,7 +73,7 @@ func (e *encodedBlobStore) HasEncodingRequested(blobKey disperser.BlobKey, quoru
 	}
 
 	res, ok := e.encoded[requestID]
-	if ok && res.ReferenceBlockNumber == referenceBlockNumber {
+	if ok && (res.Status == PendingConfirmation || res.ReferenceBlockNumber == referenceBlockNumber) {
 		return true
 	}
 	return false
@@ -132,23 +139,28 @@ func (e *encodedBlobStore) DeleteEncodingResult(blobKey disperser.BlobKey, quoru
 	e.encodedResultSize -= getChunksSize(encodedResult)
 }
 
-// GetNewAndDeleteStaleEncodingResults returns all the fresh encoded results and deletes all the stale results
+// GetNewAndDeleteStaleEncodingResults returns all the fresh encoded results that are pending dispersal, and deletes all the stale results that are older than the given block number
 func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint) []*EncodingResult {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	fetched := make([]*EncodingResult, 0)
 	staleCount := 0
+	pendingConfirmation := 0
 	for k, encodedResult := range e.encoded {
-		if encodedResult.ReferenceBlockNumber < blockNumber {
+		if encodedResult.Status == PendingConfirmation {
+			pendingConfirmation++
+		} else if encodedResult.ReferenceBlockNumber == blockNumber {
+			fetched = append(fetched, encodedResult)
+		} else if encodedResult.ReferenceBlockNumber < blockNumber {
 			// this is safe: https://go.dev/doc/effective_go#for
 			delete(e.encoded, k)
 			staleCount++
 			e.encodedResultSize -= getChunksSize(encodedResult)
 		} else {
-			fetched = append(fetched, encodedResult)
+			e.logger.Error("GetNewAndDeleteStaleEncodingResults: unexpected case", "refBlockNumber", encodedResult.ReferenceBlockNumber, "blockNumber", blockNumber, "status", encodedResult.Status)
 		}
 	}
-	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "blockNumber", blockNumber, "encodedSize", e.encodedResultSize)
+	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "pendingConfirmation", pendingConfirmation, "blockNumber", blockNumber, "encodedSize", e.encodedResultSize)
 
 	return fetched
 }
@@ -159,6 +171,19 @@ func (e *encodedBlobStore) GetEncodedResultSize() (int, uint64) {
 	defer e.mu.RUnlock()
 
 	return len(e.encoded), e.encodedResultSize
+}
+
+func (e *encodedBlobStore) MarkEncodedResultPendingConfirmation(blobKey disperser.BlobKey, quorumID core.QuorumID) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	requestID := getRequestID(blobKey, quorumID)
+	if _, ok := e.encoded[requestID]; !ok {
+		return fmt.Errorf("MarkEncodedBlobPendingConfirmation: no such key (%s) in encoded set", requestID)
+	}
+
+	e.encoded[requestID].Status = PendingConfirmation
+	return nil
 }
 
 func getRequestID(key disperser.BlobKey, quorumID core.QuorumID) requestID {

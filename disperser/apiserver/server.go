@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,18 +14,23 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-var errSystemRateLimit = fmt.Errorf("request ratelimited: system limit")
-var errAccountRateLimit = fmt.Errorf("request ratelimited: account limit")
+var errSystemBlobRateLimit = fmt.Errorf("request ratelimited: system blob limit")
+var errSystemThroughputRateLimit = fmt.Errorf("request ratelimited: system throughput limit")
+var errAccountBlobRateLimit = fmt.Errorf("request ratelimited: account blob limit")
+var errAccountThroughputRateLimit = fmt.Errorf("request ratelimited: account throughput limit")
 
 const systemAccountKey = "system"
 
-const maxBlobSize = 1024 * 512 // 512 KiB
+const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
@@ -35,8 +42,9 @@ type DispersalServer struct {
 	tx          core.Transactor
 	quorumCount uint16
 
-	rateConfig  RateConfig
-	ratelimiter common.RateLimiter
+	rateConfig    RateConfig
+	ratelimiter   common.RateLimiter
+	authenticator core.BlobRequestAuthenticator
 
 	metrics *disperser.Metrics
 
@@ -55,26 +63,120 @@ func NewDispersalServer(
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
 ) *DispersalServer {
+	for ip, rateInfoByQuorum := range rateConfig.Allowlist {
+		for quorumID, rateInfo := range rateInfoByQuorum {
+			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
+		}
+	}
+
+	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
+
 	return &DispersalServer{
-		config:      config,
-		blobStore:   store,
-		tx:          tx,
-		quorumCount: 0,
-		metrics:     metrics,
-		logger:      logger,
-		ratelimiter: ratelimiter,
-		rateConfig:  rateConfig,
-		mu:          &sync.Mutex{},
+		config:        config,
+		blobStore:     store,
+		tx:            tx,
+		quorumCount:   0,
+		metrics:       metrics,
+		logger:        logger,
+		ratelimiter:   ratelimiter,
+		authenticator: authenticator,
+		rateConfig:    rateConfig,
+		mu:            &sync.Mutex{},
 	}
 }
 
+func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_DisperseBlobAuthenticatedServer) error {
+
+	// Process disperse_request
+	in, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("error receiving next message: %v", err)
+	}
+
+	request, ok := in.Payload.(*pb.AuthenticatedRequest_DisperseRequest)
+	if !ok {
+		return errors.New("expected DisperseBlobRequest")
+	}
+
+	blob := getBlobFromRequest(request.DisperseRequest)
+
+	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
+	// Decode public key
+	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+	}
+
+	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+	}
+
+	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
+
+	// Send back challenge to client
+	challenge := rand.Uint32()
+	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
+		BlobAuthHeader: &pb.BlobAuthHeader{
+			ChallengeParameter: challenge,
+		},
+	}})
+	if err != nil {
+		return err
+	}
+
+	// Recieve challenge_reply
+	in, err = stream.Recv()
+	if err != nil {
+		return fmt.Errorf("error receiving next message: %v", err)
+	}
+
+	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_AuthenticationData)
+	if !ok {
+		return errors.New("expected AuthenticationData")
+	}
+
+	blob.RequestHeader.Nonce = challenge
+	blob.RequestHeader.AuthenticationData = challengeReply.AuthenticationData.AuthenticationData
+
+	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
+	if err != nil {
+		return fmt.Errorf("failed to authenticate blob request: %v", err)
+	}
+
+	// Disperse the blob
+	reply, err := s.disperseBlob(stream.Context(), blob, authenticatedAddress)
+	if err != nil {
+		return err
+	}
+
+	// Send back disperse_reply
+	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_DisperseReply{
+		DisperseReply: reply,
+	}})
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+
+	blob := getBlobFromRequest(req)
+
+	return s.disperseBlob(ctx, blob, "")
+
+}
+
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
-	securityParams := req.GetSecurityParams()
+	securityParams := blob.RequestHeader.SecurityParams
 	if len(securityParams) == 0 {
 		return nil, fmt.Errorf("invalid request: security_params must not be empty")
 	}
@@ -82,42 +184,40 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		return nil, fmt.Errorf("invalid request: security_params must not exceed 256")
 	}
 
-	seenQuorums := make(map[uint32]struct{})
+	seenQuorums := make(map[uint8]struct{})
 	// The quorum ID must be in range [0, 255]. It'll actually be converted
 	// to uint8, so it cannot be greater than 255.
 	for _, param := range securityParams {
-		if _, ok := seenQuorums[param.QuorumId]; ok {
+		if _, ok := seenQuorums[param.QuorumID]; ok {
 			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
 		}
-		seenQuorums[param.QuorumId] = struct{}{}
+		seenQuorums[param.QuorumID] = struct{}{}
 
-		if param.GetQuorumId() >= uint32(s.quorumCount) {
+		if uint16(param.QuorumID) >= s.quorumCount {
 			err := s.updateQuorumCount(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
 			}
 
-			if param.GetQuorumId() >= uint32(s.quorumCount) {
-				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.GetQuorumId())
+			if uint16(param.QuorumID) >= s.quorumCount {
+				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
 			}
 		}
 	}
 
-	blobSize := len(req.GetData())
+	blobSize := len(blob.Data)
 	// The blob size in bytes must be in range [1, maxBlobSize].
 	if blobSize > maxBlobSize {
-		return nil, fmt.Errorf("blob size cannot exceed 512 KiB")
+		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
 	}
 	if blobSize == 0 {
 		return nil, fmt.Errorf("blob size must be greater than 0")
 	}
 
-	blob := getBlobFromRequest(req)
-
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		for _, param := range securityParams {
-			quorumId := string(uint8(param.GetQuorumId()))
+			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
 		return nil, err
@@ -128,20 +228,20 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	if err := blob.RequestHeader.Validate(); err != nil {
 		s.logger.Warn("invalid header", "err", err)
 		for _, param := range securityParams {
-			quorumId := string(uint8(param.GetQuorumId()))
+			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
 		return nil, err
 	}
 
 	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRates(ctx, blob, origin)
+		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
 			for _, param := range securityParams {
-				quorumId := string(uint8(param.GetQuorumId()))
-				if errors.Is(err, errSystemRateLimit) {
+				quorumId := string(param.QuorumID)
+				if errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) {
 					s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-				} else if errors.Is(err, errAccountRateLimit) {
+				} else if errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit) {
 					s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
 				} else {
 					s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
@@ -155,14 +255,14 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
 	if err != nil {
 		for _, param := range securityParams {
-			quorumId := string(uint8(param.GetQuorumId()))
+			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
 		return nil, err
 	}
 
 	for _, param := range securityParams {
-		quorumId := string(uint8(param.GetQuorumId()))
+		quorumId := string(param.QuorumID)
 		s.metrics.HandleSuccessfulRequest(quorumId, blobSize, "DisperseBlob")
 	}
 
@@ -173,26 +273,89 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	}, nil
 }
 
-func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin string) error {
+func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
+	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
+	if !ok {
+		return nil, "", fmt.Errorf("no configured rate exists for quorum %d", quorumID)
+	}
+
+	rates := &PerUserRateInfo{
+		Throughput: unauthRates.PerUserUnauthThroughput,
+		BlobRate:   unauthRates.PerUserUnauthBlobRate,
+	}
+
+	// Check if the address is in the allowlist
+	if len(authenticatedAddress) > 0 {
+		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
+		if ok {
+			rateInfo, ok := quorumRates[quorumID]
+			if ok {
+				key := "address:" + authenticatedAddress
+				if rateInfo.Throughput > 0 {
+					rates.Throughput = rateInfo.Throughput
+				}
+				if rateInfo.BlobRate > 0 {
+					rates.BlobRate = rateInfo.BlobRate
+				}
+				return rates, key, nil
+			}
+		}
+	}
+
+	// Check if the origin is in the allowlist
+
+	key := "ip:" + origin
+
+	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
+		if !strings.Contains(origin, account) {
+			continue
+		}
+
+		rateInfo, ok := rateInfoByQuorum[quorumID]
+		if !ok {
+			break
+		}
+
+		if rateInfo.Throughput > 0 {
+			rates.Throughput = rateInfo.Throughput
+		}
+
+		if rateInfo.BlobRate > 0 {
+			rates.BlobRate = rateInfo.BlobRate
+		}
+
+		break
+	}
+
+	return rates, key, nil
+
+}
+
+func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
 
 	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, param := range blob.RequestHeader.SecurityParams {
+	for i, param := range blob.RequestHeader.SecurityParams {
 
 		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
+		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
+		if err != nil {
+			return err
+		}
 
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		blobSize := len(blob.Data)
 		length := core.GetBlobLength(uint(blobSize))
-		encodedLength := core.GetEncodedBlobLength(length, uint8(blob.RequestHeader.SecurityParams[param.QuorumID].QuorumThreshold), uint8(blob.RequestHeader.SecurityParams[param.QuorumID].AdversaryThreshold))
+		encodedLength := core.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
 		encodedSize := core.GetBlobSize(encodedLength)
 
-		s.logger.Debug("checking rate limits", "origin", origin, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize)
+		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
+			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate, "accountKey", accountKey)
 
 		// Check System Ratelimit
 		systemQuorumKey := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
@@ -202,7 +365,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
-			return errSystemRateLimit
+			return errSystemThroughputRateLimit
 		}
 
 		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
@@ -212,35 +375,33 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
-			return errSystemRateLimit
+			return errSystemBlobRateLimit
 		}
 
 		// Check Account Ratelimit
 
-		blob.RequestHeader.AccountID = "ip:" + origin
-
-		userQuorumKey := fmt.Sprintf("%s:%d", blob.RequestHeader.AccountID, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, encodedSize, rates.PerUserUnauthThroughput)
+		accountQuorumKey := fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, encodedSize, accountRates.Throughput)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account byte ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", rates.PerUserUnauthThroughput)
-			return errAccountRateLimit
+			s.logger.Warn("account byte ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", accountRates.Throughput)
+			return errAccountThroughputRateLimit
 		}
 
-		userQuorumKey = fmt.Sprintf("%s:%d-blobrate", blob.RequestHeader.AccountID, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, userQuorumKey, blobRateMultiplier, rates.PerUserUnauthBlobRate)
+		accountQuorumKey = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
+		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, blobRateMultiplier, accountRates.BlobRate)
 		if err != nil {
 			return fmt.Errorf("ratelimiter error: %v", err)
 		}
 		if !allowed {
-			s.logger.Warn("account blob ratelimit exceeded", "userQuorumKey", userQuorumKey, "rate", float32(rates.PerUserUnauthBlobRate)/blobRateMultiplier)
-			return errAccountRateLimit
+			s.logger.Warn("account blob ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
+			return errAccountBlobRateLimit
 		}
 
 		// Update the quorum rate
-		blob.RequestHeader.SecurityParams[param.QuorumID].QuorumRate = rates.PerUserUnauthThroughput
+		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
 	}
 	return nil
 
@@ -452,6 +613,9 @@ func getBlobFromRequest(req *pb.DisperseBlobRequest) *core.Blob {
 
 	blob := &core.Blob{
 		RequestHeader: core.BlobRequestHeader{
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: req.AccountId,
+			},
 			SecurityParams: params,
 		},
 		Data: data,

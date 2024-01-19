@@ -69,6 +69,17 @@ type (
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
+	OperatorNonsigningPercentageMetrics struct {
+		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
+		TotalBatches         int     `json:"total_batches"`
+		Percentage           float64 `json:"percentage"`
+	}
+
+	OperatorsNonsigningPercentage struct {
+		TotalNonSigners int                                            `json:"total_non_signers"`
+		Operators       map[string]OperatorNonsigningPercentageMetrics `json:"operators"`
+	}
+
 	DeRegisteredOperatorMetadata struct {
 		OperatorId  string `json:"operator_id"`
 		BlockNumber uint   `json:"block_number"`
@@ -151,6 +162,7 @@ func (s *server) Start() error {
 			metrics.GET("/", s.FetchMetricsHandler)
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
 			metrics.GET("/non_signers", s.FetchNonSigners)
+			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -371,6 +383,38 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchNonSigners")
+	c.JSON(http.StatusOK, metric)
+}
+
+// FetchOperatorsNonsigningPercentageHandler godoc
+//
+//	@Summary	Fetch operators non signing percentage
+//	@Tags		Metrics
+//	@Produce	json
+//	@Param		interval	query		int	false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Success	200			{object}	OperatorsNonsigningPercentage
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/operator_nonsigning_percentage  [get]
+func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 3600
+	}
+	metric, err := s.getOperatorNonsigningPercentage(c.Request.Context(), interval)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
 	c.JSON(http.StatusOK, metric)
 }
 

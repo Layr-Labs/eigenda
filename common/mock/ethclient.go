@@ -185,10 +185,20 @@ func (mock *MockEthClient) TransactionReceipt(ctx context.Context, txHash common
 	return result, args.Error(1)
 }
 
-func (mock *MockEthClient) UpdateGas(ctx context.Context, tx *types.Transaction, value *big.Int) (*types.Transaction, error) {
+func (mock *MockEthClient) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
 	args := mock.Called()
-	result := args.Get(0)
-	return result.(*types.Transaction), args.Error(1)
+	result1 := args.Get(0)
+	result2 := args.Get(1)
+	return result1.(*big.Int), result2.(*big.Int), args.Error(2)
+}
+
+func (mock *MockEthClient) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
+	args := mock.Called()
+	var newTx *types.Transaction
+	if args.Get(0) != nil {
+		newTx = args.Get(0).(*types.Transaction)
+	}
+	return newTx, args.Error(1)
 }
 
 func (mock *MockEthClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Context, tx *types.Transaction, tag string, value *big.Int) (*types.Receipt, error) {

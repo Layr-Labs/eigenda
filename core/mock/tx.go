@@ -58,20 +58,26 @@ func (t *MockTransactor) UpdateOperatorSocket(ctx context.Context, socket string
 	return args.Error(0)
 }
 
-func (t *MockTransactor) GetOperatorStakes(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) ([][]core.OperatorStake, []core.QuorumID, error) {
+func (t *MockTransactor) GetOperatorStakes(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (core.OperatorStakes, []core.QuorumID, error) {
 	args := t.Called()
 	result0 := args.Get(0)
 	result1 := args.Get(1)
-	return result0.([][]core.OperatorStake), result1.([]core.QuorumID), args.Error(1)
+	return result0.(core.OperatorStakes), result1.([]core.QuorumID), args.Error(1)
 }
 
-func (t *MockTransactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) ([][]core.OperatorStake, error) {
+func (t *MockTransactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakes, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.([][]core.OperatorStake), args.Error(1)
+	return result.(core.OperatorStakes), args.Error(1)
 }
 
-func (t *MockTransactor) ConfirmBatch(ctx context.Context, batchHeader core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation core.SignatureAggregation) (*types.Receipt, error) {
+func (t *MockTransactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(*types.Transaction), args.Error(1)
+}
+
+func (t *MockTransactor) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Receipt, error) {
 	args := t.Called()
 	var receipt *types.Receipt
 	if args.Get(0) != nil {
