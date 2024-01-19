@@ -1,8 +1,8 @@
 import { newMockEvent } from "matchstick-as"
 import { ethereum, BigInt, Bytes, Address } from "@graphprotocol/graph-ts"
-import { NewPubkeyRegistration as NewPubkeyRegistrationEvent, NewPubkeyRegistrationPubkeyG1Struct, NewPubkeyRegistrationPubkeyG2Struct } from "../generated/BLSPubkeyCompendium_Operator/BLSPubkeyCompendium"
-import { OperatorRegistered as OperatorRegisteredEvent, OperatorDeregistered as OperatorDeregisteredEvent } from "../generated/BLSRegistryCoordinatorWithIndices_Operator/BLSRegistryCoordinatorWithIndices"
-import { OperatorSocketUpdate as OperatorSocketUpdateEvent } from "../generated/BLSRegistryCoordinatorWithIndices/BLSRegistryCoordinatorWithIndices"
+import { NewPubkeyRegistration as NewPubkeyRegistrationEvent, NewPubkeyRegistrationPubkeyG1Struct, NewPubkeyRegistrationPubkeyG2Struct } from "../generated/BLSApkRegistry_Operator/BLSApkRegistry"
+import { OperatorRegistered as OperatorRegisteredEvent, OperatorDeregistered as OperatorDeregisteredEvent } from "../generated/RegistryCoordinator_Operator/RegistryCoordinator"
+import { OperatorSocketUpdate as OperatorSocketUpdateEvent } from "../generated/RegistryCoordinator/RegistryCoordinator"
 
 export function createNewPubkeyRegistrationEvent(
   operator: Address,

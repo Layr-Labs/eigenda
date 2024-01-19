@@ -9,7 +9,7 @@ import {
     createMockedFunction
   } from "matchstick-as/assembly/index"
   import { Address, BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts"
-  import { BLSPubkeyRegistry, BLSPubkeyRegistry__getApkForQuorumResultValue0Struct } from "../generated/BLSPubkeyRegistry_QuorumApkUpdates/BLSPubkeyRegistry"
+  import { BLSApkRegistry, BLSApkRegistry__getApkResultValue0Struct } from "../generated/BLSApkRegistry_QuorumApkUpdates/BLSApkRegistry"
   import { createNewOperatorAddedToQuorumsEvent, createNewOperatorRemovedFromQuorumsEvent } from "./quorum-apk-utils"
   import { handleOperatorAddedToQuorums, handleOperatorRemovedFromQuorums } from "../src/quorum-apk-updates"
   
@@ -21,7 +21,7 @@ import {
     let pubkeyG1_X = BigInt.fromString(seed)
     let pubkeyG1_Y = BigInt.fromString(seed + "1")
   
-    let apk = new BLSPubkeyRegistry__getApkForQuorumResultValue0Struct(2);
+    let apk = new BLSApkRegistry__getApkResultValue0Struct(2);
     apk[0] = ethereum.Value.fromUnsignedBigInt(pubkeyG1_X)
     apk[1] = ethereum.Value.fromUnsignedBigInt(pubkeyG1_Y)
     
@@ -59,11 +59,11 @@ import {
         quorumNumbers1
       )
       
-      // for each quroum in quorumNumbers, mock the call to getApkForQuorum
+      // for each quroum in quorumNumbers, mock the call to getApk
       for(let i = 0; i < quorumNumbers1.length; i++) {
         let quorumNumber = quorumNumbers1[i]
         let quorumNumberBigInt = BigInt.fromI32(quorumNumber)
-        createMockedFunction(newOperatorAddedToQuorumsEvent1.address, 'getApkForQuorum', 'getApkForQuorum(uint8):((uint256,uint256))')
+        createMockedFunction(newOperatorAddedToQuorumsEvent1.address, 'getApk', 'getApk(uint8):((uint256,uint256))')
           .withArgs([ethereum.Value.fromUnsignedBigInt(quorumNumberBigInt)])
           .returns([ethereum.Value.fromTuple(quorumApks1[i])])
       }
@@ -78,11 +78,11 @@ import {
       let newOperatorRemovedFromQuorumsEvent2 = createNewOperatorRemovedFromQuorumsEvent(operator, quorumNumbers2)
       newOperatorRemovedFromQuorumsEvent2.logIndex = newOperatorAddedToQuorumsEvent1.logIndex.plus(BigInt.fromI32(1))
   
-      // for each quroum in quorumNumbers, mock the call to getApkForQuorum
+      // for each quroum in quorumNumbers, mock the call to getApk
       for(let i = 0; i < quorumNumbers2.length; i++) {
         let quorumNumber = quorumNumbers2[i]
         let quorumNumberBigInt = BigInt.fromI32(quorumNumber)
-        createMockedFunction(newOperatorRemovedFromQuorumsEvent2.address, 'getApkForQuorum', 'getApkForQuorum(uint8):((uint256,uint256))')
+        createMockedFunction(newOperatorRemovedFromQuorumsEvent2.address, 'getApk', 'getApk(uint8):((uint256,uint256))')
           .withArgs([ethereum.Value.fromUnsignedBigInt(quorumNumberBigInt)])
           .returns([ethereum.Value.fromTuple(quorumApks2[i])])
       }
