@@ -47,7 +47,7 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), batchThreshold)
 	workerpool := workerpool.New(5)
-	metrics := batcher.NewMetrics(nil, "9100", logger)
+	metrics := batcher.NewMetrics("9100", logger)
 	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = initialBlockNumber
@@ -69,7 +69,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 100000)
 	pool := &cmock.MockWorkerpool{}
-	metrics := batcher.NewMetrics(nil, "9100", logger)
+	metrics := batcher.NewMetrics("9100", logger)
 	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, pool, metrics.EncodingStreamerMetrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
@@ -300,7 +300,7 @@ func TestEncodingFailure(t *testing.T) {
 		EncodingQueueLimit:       100,
 		MaxBlobsToFetchFromStore: 10,
 	}
-	metrics := batcher.NewMetrics(nil, "9100", logger)
+	metrics := batcher.NewMetrics("9100", logger)
 	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10

@@ -131,7 +131,7 @@ func RunBatcher(ctx *cli.Context) error {
 		}
 	}
 
-	metrics := batcher.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
 		return fmt.Errorf("encoder socket must be specified")
