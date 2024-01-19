@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -36,11 +37,28 @@ type Transactor interface {
 	// RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
 	// If the operator is already registered with a given quorum id, the transaction will fail (noop) and an error
 	// will be returned.
-	RegisterOperator(ctx context.Context, keypair *KeyPair, socket string, quorumIds []QuorumID) error
+	RegisterOperator(
+		ctx context.Context,
+		keypair *KeyPair,
+		socket string,
+		quorumIds []QuorumID,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		operatorToAvsRegistrationSigSalt [32]byte,
+		operatorToAvsRegistrationSigExpiry *big.Int,
+	) error
 
 	// RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
 	// with the provided signature from the churner
-	RegisterOperatorWithChurn(ctx context.Context, keypair *KeyPair, socket string, quorumIds []QuorumID, churnReply *churner.ChurnReply) error
+	RegisterOperatorWithChurn(
+		ctx context.Context,
+		keypair *KeyPair,
+		socket string,
+		quorumIds []QuorumID,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		operatorToAvsRegistrationSigSalt [32]byte,
+		operatorToAvsRegistrationSigExpiry *big.Int,
+		churnReply *churner.ChurnReply,
+	) error
 
 	// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
 	// registered with at the supplied block number. To fully deregister an operator, this function should be called

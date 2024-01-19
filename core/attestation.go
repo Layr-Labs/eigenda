@@ -6,6 +6,7 @@ import (
 
 	bn254utils "github.com/Layr-Labs/eigenda/core/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -14,6 +15,21 @@ import (
 
 type G1Point struct {
 	*bn254.G1Affine
+}
+
+func newFpElement(x *big.Int) fp.Element {
+	var p fp.Element
+	p.SetBigInt(x)
+	return p
+}
+
+func NewG1Point(x, y *big.Int) *G1Point {
+	return &G1Point{
+		&bn254.G1Affine{
+			X: newFpElement(x),
+			Y: newFpElement(y),
+		},
+	}
 }
 
 // Add another G1 point to this one
@@ -126,6 +142,11 @@ func GenRandomBlsKeys() (*KeyPair, error) {
 func (k *KeyPair) SignMessage(message [32]byte) *Signature {
 	H := bn254utils.MapToCurve(message)
 	sig := new(bn254.G1Affine).ScalarMultiplication(H, k.PrivKey.BigInt(new(big.Int)))
+	return &Signature{&G1Point{sig}}
+}
+
+func (k *KeyPair) SignHashedToCurveMessage(g1HashedMsg *G1Point) *Signature {
+	sig := new(bn254.G1Affine).ScalarMultiplication(g1HashedMsg.G1Affine, k.PrivKey.BigInt(new(big.Int)))
 	return &Signature{&G1Point{sig}}
 }
 

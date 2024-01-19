@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
+	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
@@ -36,6 +38,8 @@ var _ core.Transactor = (*Transactor)(nil)
 
 type ContractBindings struct {
 	RegCoordinatorAddr    gethcommon.Address
+	ServiceManagerAddr    gethcommon.Address
+	DelegationManager     *delegationmgr.ContractDelegationManager
 	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
 	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
 	IndexRegistry         *indexreg.ContractIIndexRegistry
@@ -94,17 +98,29 @@ func (t *Transactor) GetRegisteredQuorumIdsForOperator(ctx context.Context, oper
 	return quorumIds, nil
 }
 
-func (t *Transactor) getRegistrationParam(ctx context.Context, keypair *core.KeyPair) (*regcoordinator.IBLSApkRegistryPubkeyRegistrationParams, error) {
+func (t *Transactor) getRegistrationParams(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+) (*regcoordinator.IBLSApkRegistryPubkeyRegistrationParams, *regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry, error) {
 
 	operatorAddress := t.EthClient.GetAccountAddress()
 
-	signedMessageHash := keypair.MakePubkeyRegistrationData(operatorAddress)
-
-	signedMessageHashParam_ := pubKeyG1ToBN254G1Point(signedMessageHash)
-	signedMessageHashParam := regcoordinator.BN254G1Point{
-		X: signedMessageHashParam_.X,
-		Y: signedMessageHashParam_.Y,
+	msgToSignG1_, err := t.Bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{}, operatorAddress)
+	if err != nil {
+		return nil, nil, err
 	}
+
+	msgToSignG1 := core.NewG1Point(msgToSignG1_.X, msgToSignG1_.Y)
+	signature := keypair.SignHashedToCurveMessage(msgToSignG1)
+
+	signedMessageHashParam := regcoordinator.BN254G1Point{
+		X: signature.X.BigInt(big.NewInt(0)),
+		Y: signature.Y.BigInt(big.NewInt(0)),
+	}
+
 	g1Point_ := pubKeyG1ToBN254G1Point(keypair.GetPubKeyG1())
 	g1Point := regcoordinator.BN254G1Point{
 		X: g1Point_.X,
@@ -122,16 +138,44 @@ func (t *Transactor) getRegistrationParam(ctx context.Context, keypair *core.Key
 		PubkeyG2:                    g2Point,
 	}
 
-	return &params, nil
+	// params to register operator in delegation manager's operator-avs mapping
+	msgToSign, err := t.Bindings.DelegationManager.CalculateOperatorAVSRegistrationDigestHash(
+		&bind.CallOpts{}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	if err != nil {
+		return nil, nil, err
+	}
+	operatorSignature, err := crypto.Sign(msgToSign[:], operatorEcdsaPrivateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	// this is annoying, and not sure why its needed, but seems like some historical baggage
+	// see https://github.com/ethereum/go-ethereum/issues/28757#issuecomment-1874525854
+	// and https://twitter.com/pcaversaccio/status/1671488928262529031
+	operatorSignature[64] += 27
+	operatorSignatureWithSaltAndExpiry := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
+		Signature: operatorSignature,
+		Salt:      operatorToAvsRegistrationSigSalt,
+		Expiry:    operatorToAvsRegistrationSigExpiry,
+	}
+
+	return &params, &operatorSignatureWithSaltAndExpiry, nil
 
 }
 
 // RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
 // If the operator is already registered with a given quorum id, the transaction will fail (noop) and an error
 // will be returned.
-func (t *Transactor) RegisterOperator(ctx context.Context, keypair *core.KeyPair, socket string, quorumIds []core.QuorumID) error {
+func (t *Transactor) RegisterOperator(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	socket string,
+	quorumIds []core.QuorumID,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+) error {
 
-	params, err := t.getRegistrationParam(ctx, keypair)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.Logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -144,10 +188,7 @@ func (t *Transactor) RegisterOperator(ctx context.Context, keypair *core.KeyPair
 		return err
 	}
 
-	// TODO(mooselumph): Fill out operatorSignature
-	operatorSignature := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{}
-
-	tx, err := t.Bindings.RegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, operatorSignature)
+	tx, err := t.Bindings.RegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, *operatorSignature)
 
 	if err != nil {
 		t.Logger.Error("Failed to register operator", "err", err)
@@ -164,9 +205,18 @@ func (t *Transactor) RegisterOperator(ctx context.Context, keypair *core.KeyPair
 
 // RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
 // with the provided signature from the churner
-func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, keypair *core.KeyPair, socket string, quorumIds []core.QuorumID, churnReply *churner.ChurnReply) error {
+func (t *Transactor) RegisterOperatorWithChurn(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	socket string,
+	quorumIds []core.QuorumID,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+	churnReply *churner.ChurnReply,
+) error {
 
-	params, err := t.getRegistrationParam(ctx, keypair)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.Logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -184,7 +234,7 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, keypair *cor
 
 	var salt [32]byte
 	copy(salt[:], churnReply.SignatureWithSaltAndExpiry.Salt[:])
-	signatureWithSaltAndExpiry := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
+	churnApproverSignature := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
 		Signature: churnReply.SignatureWithSaltAndExpiry.Signature,
 		Salt:      salt,
 		Expiry:    new(big.Int).SetInt64(churnReply.SignatureWithSaltAndExpiry.Expiry),
@@ -197,7 +247,6 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, keypair *cor
 	}
 
 	// TODO(mooselumph): Fill out these
-	operatorSignature := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{}
 	kickParams := []regcoordinator.IRegistryCoordinatorOperatorKickParam{}
 
 	tx, err := t.Bindings.RegistryCoordinator.RegisterOperatorWithChurn(
@@ -206,8 +255,8 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, keypair *cor
 		socket,
 		*params,
 		kickParams,
-		signatureWithSaltAndExpiry,
-		operatorSignature,
+		churnApproverSignature,
+		*operatorSignature,
 	)
 
 	if err != nil {
@@ -562,9 +611,22 @@ func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (ui
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
+
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)
 	if err != nil {
 		t.Logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
+		return err
+	}
+
+	delegationManagerAddr, err := contractEigenDAServiceManager.Delegation(&bind.CallOpts{})
+	if err != nil {
+		t.Logger.Error("Failed to fetch DelegationManager address", "err", err)
+		return err
+	}
+
+	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.EthClient)
+	if err != nil {
+		t.Logger.Error("Failed to fetch DelegationManager contract", "err", err)
 		return err
 	}
 
@@ -591,6 +653,8 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		t.Logger.Error("Failed to fetch BlsPubkeyRegistry address", "err", err)
 		return err
 	}
+
+	t.Logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
 
 	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.EthClient)
 	if err != nil {
@@ -623,6 +687,7 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 	}
 
 	t.Bindings = &ContractBindings{
+		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
 		OpStateRetriever:      contractBLSOpStateRetr,
 		BLSApkRegistry:        contractBLSPubkeyReg,
@@ -630,6 +695,7 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		RegistryCoordinator:   contractIRegistryCoordinator,
 		StakeRegistry:         contractStakeRegistry,
 		EigenDAServiceManager: contractEigenDAServiceManager,
+		DelegationManager:     contractDelegationManager,
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -33,12 +34,28 @@ func (t *MockTransactor) GetRegisteredQuorumIdsForOperator(ctx context.Context, 
 	return result.([]core.QuorumID), args.Error(1)
 }
 
-func (t *MockTransactor) RegisterOperator(ctx context.Context, keypair *core.KeyPair, socket string, quorumIds []core.QuorumID) error {
+func (t *MockTransactor) RegisterOperator(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	socket string,
+	quorumIds []core.QuorumID,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+) error {
 	args := t.Called()
 	return args.Error(0)
 }
 
-func (t *MockTransactor) RegisterOperatorWithChurn(ctx context.Context, keypair *core.KeyPair, socket string, quorumIds []core.QuorumID, churnReply *churner.ChurnReply) error {
+func (t *MockTransactor) RegisterOperatorWithChurn(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	socket string,
+	quorumIds []core.QuorumID,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+	churnReply *churner.ChurnReply) error {
 	args := t.Called()
 	return args.Error(0)
 }

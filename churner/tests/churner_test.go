@@ -2,9 +2,11 @@ package test
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"testing"
 
@@ -106,7 +108,16 @@ func TestChurner(t *testing.T) {
 	for i, q := range quorumIds {
 		quorumIds_[i] = uint8(q)
 	}
-	err = operatorTransactor.RegisterOperator(ctx, keyPair, "socket", quorumIds_)
+
+	operatorSalt := [32]byte{}
+	_, err = rand.Read(operatorSalt[:])
+	assert.NoError(t, err)
+
+	expiry := big.NewInt(1000)
+	privKey, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+
+	err = operatorTransactor.RegisterOperator(ctx, keyPair, "socket", quorumIds_, privKey, operatorSalt, expiry)
 	assert.NoError(t, err)
 
 	server := newTestServer(t)
