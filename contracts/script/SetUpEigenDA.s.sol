@@ -169,9 +169,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         string memory output = "eigenDA deployment output";
         vm.serializeAddress(output, "eigenDAServiceManager", address(eigenDAServiceManager));
-        vm.serializeAddress(output, "blsOperatorStateRetriever", address(operatorStateRetriever));
+        vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
         vm.serializeAddress(output, "blsApkRegistry" , address(apkRegistry));
-        vm.serializeAddress(output, "blsRegistryCoordinatorWithIndices", address(registryCoordinator));
+        vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 
