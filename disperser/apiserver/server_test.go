@@ -310,8 +310,8 @@ func TestRatelimit(t *testing.T) {
 	})
 	assert.ErrorContains(t, err, "account throughput limit")
 
-	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
-	for i := 0; i < 10; i++ {
+	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 20 blobs.
+	for i := 0; i < 20; i++ {
 		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 			Data: data1KiB,
 			SecurityParams: []*pb.SecurityParams{
@@ -463,7 +463,7 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 	tx := &mock.MockTransactor{}
 	tx.On("GetCurrentBlockNumber").Return(uint32(100), nil)
-	tx.On("GetQuorumCount").Return(uint16(2), nil)
+	tx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort: "51001",

@@ -38,7 +38,7 @@ type DispersalServer struct {
 
 	blobStore   disperser.BlobStore
 	tx          core.Transactor
-	quorumCount uint16
+	quorumCount uint8
 
 	rateConfig    RateConfig
 	ratelimiter   common.RateLimiter
@@ -177,13 +177,13 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob) (*p
 		}
 		seenQuorums[param.QuorumID] = struct{}{}
 
-		if uint16(param.QuorumID) >= s.quorumCount {
+		if param.QuorumID >= s.quorumCount {
 			err := s.updateQuorumCount(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
 			}
 
-			if uint16(param.QuorumID) >= s.quorumCount {
+			if param.QuorumID >= s.quorumCount {
 				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
 			}
 		}
