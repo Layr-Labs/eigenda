@@ -103,7 +103,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	cst := eth.NewChainState(tx, client)
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, "localhost:"+config.NodeApiPort, logger)
+	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
 
 	// Make validator
 	enc, err := encoding.NewEncoder(config.EncoderConfig)
