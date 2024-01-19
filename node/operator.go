@@ -2,9 +2,11 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	grpcchurner "github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -20,6 +22,7 @@ import (
 type Operator struct {
 	Socket     string
 	Timeout    time.Duration
+	PrivKey    *ecdsa.PrivateKey
 	KeyPair    *core.KeyPair
 	OperatorId core.OperatorID
 	QuorumIDs  []core.QuorumID
@@ -35,12 +38,6 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 	logger.Debug("Registered quorum ids", "registeredQuorumIds", registeredQuorumIds)
 	if len(registeredQuorumIds) != 0 {
 		return nil
-	}
-
-	// if the operator is not registered, we may need to register the BLSPublicKey
-	err = transactor.RegisterBLSPublicKey(ctx, operator.KeyPair)
-	if err != nil {
-		return fmt.Errorf("failed to register the nodes bls public key: %w", err)
 	}
 
 	logger.Info("Quorums to register for", "quorums", operator.QuorumIDs)
@@ -72,6 +69,15 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 
 	logger.Info("Should call churner", "shouldCallChurner", shouldCallChurner)
 
+	// Generate salt and expiry
+
+	privateKeyBytes := []byte(operator.KeyPair.PrivKey.String())
+	salt := [32]byte{}
+	copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), operator.QuorumIDs[:], privateKeyBytes))
+
+	// Get the current block number
+	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
+
 	// if we should call the churner, call it
 	if shouldCallChurner {
 		churnReply, err := requestChurnApproval(ctx, operator, churnerUrl, useSecureGrpc, logger)
@@ -79,10 +85,10 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
 
-		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair.PubKey, operator.Socket, operator.QuorumIDs, churnReply)
+		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, operator.PrivKey, salt, expiry, churnReply)
 	} else {
 		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.KeyPair.PubKey, operator.Socket, operator.QuorumIDs)
+		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, operator.PrivKey, salt, expiry)
 	}
 }
 
