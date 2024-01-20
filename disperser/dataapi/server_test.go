@@ -357,6 +357,8 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineWitho
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+
+	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
@@ -412,6 +414,8 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOffline(t *t
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+
+	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
@@ -471,7 +475,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOnline(t *testing.T) {
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
-	// Start the test server
+	// Start test server for Operator
 	closeServer, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
@@ -513,13 +517,15 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOn
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
+
+	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
-	// Start the test server
+	// Start the test server for Operator 2
 	closeServer, err := startTestTCPServer("localhost:32009")
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
@@ -579,14 +585,14 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t 
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
-	// Start the test server
+	// Start test server for Operator 1
 	closeServer1, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
 	}
 	defer closeServer1() // Ensure the server is closed after the test
 
-	// Start the test server
+	// Start test server for Operator 2
 	closeServer2, err := startTestTCPServer("localhost:32009") // Let the OS assign a free port
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
@@ -628,6 +634,8 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineSameB
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphThreeOperatorsDeregistered, nil)
+
+	// Set up the mock calls for the three operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo3, nil).Once()
