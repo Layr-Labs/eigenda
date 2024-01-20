@@ -427,7 +427,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Failure	400		{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
-//	@Router		/operatorsInfo/deRegisteredState [get]
+//	@Router		/operatorsInfo/deRegisteredOperators [get]
 func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
@@ -442,6 +442,11 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	daysInt, err := strconv.Atoi(days)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+
+	if daysInt > 30 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
 		return
 	}
 
