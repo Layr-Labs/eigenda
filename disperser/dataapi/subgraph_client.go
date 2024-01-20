@@ -119,7 +119,7 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return batchNonSigningOperatorIds, nil
 }
 
-func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonsigners map[string]int) (map[string]int, error) {
+func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonSigners map[string]int) (map[string]int, error) {
 	var (
 		registeredOperators   []*subgraph.Operator
 		deregisteredOperators []*subgraph.Operator
@@ -148,7 +148,7 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 		return nil, err
 	}
 
-	intervalEvents, err := getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators, nonsigners, blockTimestamp)
+	intervalEvents, err := getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators, blockTimestamp, nonSigners)
 	if err != nil {
 		return nil, err
 	}
@@ -224,8 +224,8 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 	ctx context.Context,
 	registeredOperators []*subgraph.Operator,
 	deregisteredOperators []*subgraph.Operator,
-	nonsigners map[string]int,
 	blockTimestamp uint64,
+	nonSigners map[string]int,
 ) (chan OperatorEvents, error) {
 	sort.SliceStable(registeredOperators, func(i, j int) bool {
 		return registeredOperators[i].BlockTimestamp < registeredOperators[j].BlockTimestamp
@@ -235,12 +235,12 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		return deregisteredOperators[i].BlockTimestamp < deregisteredOperators[j].BlockTimestamp
 	})
 
-	// First position is for registered events and second position is for deregistered events
+	// First position is for registration events and second position is for deregistration events
 	operators := make(map[string][][]uint64, 0)
-	for operatorId := range nonsigners {
+	for operatorId := range nonSigners {
 		operators[operatorId] = make([][]uint64, 2)
-		operators[operatorId][0] = make([]uint64, 0)
-		operators[operatorId][1] = make([]uint64, 0)
+		operators[operatorId][0] = make([]uint64, 0) // registration events
+		operators[operatorId][1] = make([]uint64, 0) // deregistration events
 	}
 	for i := range registeredOperators {
 		operator := registeredOperators[i]
@@ -264,7 +264,6 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		if err != nil || timestamp == 0 {
 			return nil, err
 		}
-
 		if _, ok := operators[operatorId]; ok {
 			operators[operatorId][1] = append(operators[operatorId][1], timestamp)
 		}
@@ -274,26 +273,38 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 	operatorEventsChan := make(chan OperatorEvents, 1)
 	go func() {
 		defer close(operatorEventsChan)
-		for operatorId := range nonsigners {
+
+		// For the time window [blockTimestamp, now], compute the sub intervals during
+		// which the operator is live in EigenDA network for validating batches.
+		for operatorId := range nonSigners {
 			reg := operators[operatorId][0]
 			dereg := operators[operatorId][1]
 			if len(reg) == 0 && len(dereg) == 0 {
+				// The operator has no registration/deregistration events: it's live
+				// during the entire time window.
 				operatorEventsChan <- OperatorEvents{
 					OperatorId: operatorId,
 					Events:     []uint64{blockTimestamp, currentTs},
 				}
 			} else if len(reg) == 0 {
+				// The operator has only deregistration event: it's live from the beginning
+				// until the deregistration.
 				operatorEventsChan <- OperatorEvents{
 					OperatorId: operatorId,
 					Events:     []uint64{blockTimestamp, dereg[0]},
 				}
 			} else if len(dereg) == 0 {
+				// The operator has only registration event: it's live from registration to
+				// the end of the time window.
 				operatorEventsChan <- OperatorEvents{
 					OperatorId: operatorId,
 					Events:     []uint64{reg[0], currentTs},
 				}
 			} else {
+				// The operator has both registration and deregistration events in the time
+				// window of interest.
 				if reg[0] < dereg[0] {
+					// The first event in the time window is registration.
 					for i := 0; i < len(reg); i++ {
 						if i < len(dereg) {
 							operatorEventsChan <- OperatorEvents{
@@ -308,6 +319,7 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 						}
 					}
 				} else {
+					// The first event in the time window is deregistration.
 					operatorEventsChan <- OperatorEvents{
 						OperatorId: operatorId,
 						Events:     []uint64{blockTimestamp, dereg[0]},

@@ -43,7 +43,7 @@ var (
 		},
 	}
 
-	nonsigners = map[string]int{
+	nonSigners = map[string]int{
 		"0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211": 1,
 		"0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212": 1,
 		"0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222": 1,
@@ -198,7 +198,7 @@ func TestQueryNumBatchesByOperatorsInThePastBlockTimestamp(t *testing.T) {
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryBatchesByBlockTimestampRange").Return(subgraphBatches, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
-	numBatchesByOperators, err := subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(context.Background(), uint64(1), nonsigners)
+	numBatchesByOperators, err := subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(context.Background(), uint64(1), nonSigners)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(numBatchesByOperators))
