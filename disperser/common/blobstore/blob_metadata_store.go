@@ -96,6 +96,21 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
+// GetBlobMetadataByStatusCount returns the count of all the metadata with the given status
+// Because this function scans the entire index, it should only be used for status with a limited number of items.
+// It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
+func (s *BlobMetadataStore) GetBlobMetadataByStatusCount(ctx context.Context, status disperser.BlobStatus) (int32, error) {
+	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, statusIndexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: strconv.Itoa(int(status)),
+		}})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // GetBlobMetadataByStatusWithPagination returns all the metadata with the given status upto the specified limit
 // along with items, also returns a pagination token that can be used to fetch the next set of items
 func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, status disperser.BlobStatus, limit int32, exclusiveStartKey *disperser.BlobStoreExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BlobStoreExclusiveStartKey, error) {
