@@ -281,14 +281,14 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 			dereg := operators[operatorId][1]
 			if len(reg) == 0 && len(dereg) == 0 {
 				// The operator has no registration/deregistration events: it's live
-				// during the entire time window.
+				// for the entire time window.
 				operatorEventsChan <- OperatorEvents{
 					OperatorId: operatorId,
 					Events:     []uint64{blockTimestamp, currentTs},
 				}
 			} else if len(reg) == 0 {
 				// The operator has only deregistration event: it's live from the beginning
-				// until the deregistration.
+				// of the time window until the deregistration.
 				operatorEventsChan <- OperatorEvents{
 					OperatorId: operatorId,
 					Events:     []uint64{blockTimestamp, dereg[0]},
@@ -302,9 +302,10 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 				}
 			} else {
 				// The operator has both registration and deregistration events in the time
-				// window of interest.
+				// window.
 				if reg[0] < dereg[0] {
-					// The first event in the time window is registration.
+					// The first event in the time window is registration. This means at
+					// the beginning (i.e. blockTimestamp) it's not live.
 					for i := 0; i < len(reg); i++ {
 						if i < len(dereg) {
 							operatorEventsChan <- OperatorEvents{
@@ -319,7 +320,8 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 						}
 					}
 				} else {
-					// The first event in the time window is deregistration.
+					// The first event in the time window is deregistration. This means at
+					// the beginning (i.e. blockTimestamp) it's live already.
 					operatorEventsChan <- OperatorEvents{
 						OperatorId: operatorId,
 						Events:     []uint64{blockTimestamp, dereg[0]},
