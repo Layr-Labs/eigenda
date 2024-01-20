@@ -80,7 +80,7 @@ type (
 		Operators       map[string]OperatorNonsigningPercentageMetrics `json:"operators"`
 	}
 
-	DeRegisteredOperatorMetadata struct {
+	DeregisteredOperatorMetadata struct {
 		OperatorId  string `json:"operator_id"`
 		BlockNumber uint   `json:"block_number"`
 		IpAddress   string `json:"ip_address"`
@@ -89,7 +89,7 @@ type (
 
 	DeregisteredOperatorsResponse struct {
 		Meta Meta                            `json:"meta"`
-		Data []*DeRegisteredOperatorMetadata `json:"data"`
+		Data []*DeregisteredOperatorMetadata `json:"data"`
 	}
 
 	ErrorResponse struct {

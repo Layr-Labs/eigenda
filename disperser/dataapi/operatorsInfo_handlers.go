@@ -19,10 +19,10 @@ var (
 	// TODO: this should be configurable
 	numWorkers                      = 10
 	operatorOnlineStatusChan        chan OperatorOnlineStatus
-	operatorOnlineStatusresultsChan chan *DeRegisteredOperatorMetadata
+	operatorOnlineStatusresultsChan chan *DeregisteredOperatorMetadata
 )
 
-func (s *server) getDeregisterdOperatorForDays(ctx context.Context, days int32) ([]*DeRegisteredOperatorMetadata, error) {
+func (s *server) getDeregisterdOperatorForDays(ctx context.Context, days int32) ([]*DeregisteredOperatorMetadata, error) {
 	// Track Time taken to get deregistered operators
 	startTime := time.Now()
 
@@ -35,23 +35,23 @@ func (s *server) getDeregisterdOperatorForDays(ctx context.Context, days int32) 
 	operators := indexedDeregisteredOperatorState.Operators
 
 	operatorOnlineStatusChan = make(chan OperatorOnlineStatus, len(operators))
-	operatorOnlineStatusresultsChan = make(chan *DeRegisteredOperatorMetadata, len(operators))
+	operatorOnlineStatusresultsChan = make(chan *DeregisteredOperatorMetadata, len(operators))
 	processOperatorsInParallel(indexedDeregisteredOperatorState, operatorOnlineStatusChan, operatorOnlineStatusresultsChan, s.logger)
 
 	// Collect results of work done
-	deRegisteredOperatorMetadata := make([]*DeRegisteredOperatorMetadata, 0, len(operators))
+	DeregisteredOperatorMetadata := make([]*DeregisteredOperatorMetadata, 0, len(operators))
 	for range operators {
 		metadata := <-operatorOnlineStatusresultsChan
-		deRegisteredOperatorMetadata = append(deRegisteredOperatorMetadata, metadata)
+		DeregisteredOperatorMetadata = append(DeregisteredOperatorMetadata, metadata)
 	}
 
 	// Log the time taken
 	s.logger.Info("Time taken to get deregistered operators for days: %v", time.Since(startTime))
-	sort.Slice(deRegisteredOperatorMetadata, func(i, j int) bool {
-		return deRegisteredOperatorMetadata[i].BlockNumber < deRegisteredOperatorMetadata[j].BlockNumber
+	sort.Slice(DeregisteredOperatorMetadata, func(i, j int) bool {
+		return DeregisteredOperatorMetadata[i].BlockNumber < DeregisteredOperatorMetadata[j].BlockNumber
 	})
 
-	return deRegisteredOperatorMetadata, nil
+	return DeregisteredOperatorMetadata, nil
 }
 
 // method to check if operator is online
@@ -66,7 +66,7 @@ func checkIsOperatorOnline(ipAddress string) bool {
 }
 
 // Helper Function to Process Operators in Parallel
-func processOperatorsInParallel(deRegisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusChan chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeRegisteredOperatorMetadata, logger common.Logger) {
+func processOperatorsInParallel(deRegisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusChan chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
 
 	operators := deRegisteredOperatorState.Operators
 	// Start worker goroutines
@@ -84,7 +84,7 @@ func processOperatorsInParallel(deRegisteredOperatorState *IndexedDeregisteredOp
 				}
 
 				// Create the metadata regardless of online status
-				metadata := &DeRegisteredOperatorMetadata{
+				metadata := &DeregisteredOperatorMetadata{
 					OperatorId:  string(item.OperatorInfo.OperatorId[:]),
 					BlockNumber: uint(item.OperatorInfo.BlockNumber),
 					IpAddress:   ipAddress,

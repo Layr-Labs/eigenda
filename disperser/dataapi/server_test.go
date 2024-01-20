@@ -783,13 +783,13 @@ func startTestTCPServer(address string) (closeFunc func(), err error) {
 }
 
 // Helper to get OperatorData from response
-func getOperatorData(operatorMetadtas []*dataapi.DeRegisteredOperatorMetadata, operatorId string) dataapi.DeRegisteredOperatorMetadata {
+func getOperatorData(operatorMetadtas []*dataapi.DeregisteredOperatorMetadata, operatorId string) dataapi.DeregisteredOperatorMetadata {
 
 	for _, operatorMetadata := range operatorMetadtas {
 		if operatorMetadata.OperatorId == operatorId {
 			return *operatorMetadata
 		}
 	}
-	return dataapi.DeRegisteredOperatorMetadata{}
+	return dataapi.DeregisteredOperatorMetadata{}
 
 }
