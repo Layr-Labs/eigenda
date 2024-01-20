@@ -155,7 +155,7 @@ func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSe
 	}
 
 	pastBlockTimestamp := uint64(time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix())
-	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp)
+	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp, nonSigners)
 	if err != nil {
 		return nil, err
 	}

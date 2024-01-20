@@ -24,7 +24,7 @@ type (
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
 		QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error)
-		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64) (map[string]int, error)
+		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonsigers map[string]int) (map[string]int, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -119,7 +119,7 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return batchNonSigningOperatorIds, nil
 }
 
-func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64) (map[string]int, error) {
+func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonsigners map[string]int) (map[string]int, error) {
 	var (
 		registeredOperators   []*subgraph.Operator
 		deregisteredOperators []*subgraph.Operator
@@ -148,7 +148,7 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 		return nil, err
 	}
 
-	intervalEvents, err := getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators)
+	intervalEvents, err := getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators, nonsigners, blockTimestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +224,8 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 	ctx context.Context,
 	registeredOperators []*subgraph.Operator,
 	deregisteredOperators []*subgraph.Operator,
+	nonsigners map[string]int,
+	blockTimestamp uint64,
 ) (chan OperatorEvents, error) {
 	sort.SliceStable(registeredOperators, func(i, j int) bool {
 		return registeredOperators[i].BlockTimestamp < registeredOperators[j].BlockTimestamp
@@ -235,6 +237,11 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 
 	// First position is for registered events and second position is for deregistered events
 	operators := make(map[string][][]uint64, 0)
+	for operatorId := range nonsigners {
+		operators[operatorId] = make([][]uint64, 2)
+		operators[operatorId][0] = make([]uint64, 0)
+		operators[operatorId][1] = make([]uint64, 0)
+	}
 	for i := range registeredOperators {
 		operator := registeredOperators[i]
 		operatorId := string(operator.OperatorId)
@@ -257,44 +264,70 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		if err != nil || timestamp == 0 {
 			return nil, err
 		}
+
 		if _, ok := operators[operatorId]; ok {
 			operators[operatorId][1] = append(operators[operatorId][1], timestamp)
 		}
 	}
 
+	currentTs := uint64(time.Now().Unix())
 	operatorEventsChan := make(chan OperatorEvents, 1)
 	go func() {
 		defer close(operatorEventsChan)
-		pool := workerpool.New(10)
-		for o, e := range operators {
-			operatorId, events := o, e
-			pool.Submit(func() {
-				var lastDeregistered uint64
-				for i := 0; i < len(events[0]); i++ {
-					var (
-						// we start with the assumption that the operator is still registered
-						// a 0 value means that the operator is still registered
-						deregistered uint64
-						registered   = events[0][i]
-					)
-
-					// if there is a deregistered event that macthes in same position of registered event, we use it
-					if i < len(events[1]) {
-						deregistered = events[1][i]
+		for operatorId := range nonsigners {
+			reg := operators[operatorId][0]
+			dereg := operators[operatorId][1]
+			if len(reg) == 0 && len(dereg) == 0 {
+				operatorEventsChan <- OperatorEvents{
+					OperatorId: operatorId,
+					Events:     []uint64{blockTimestamp, currentTs},
+				}
+			} else if len(reg) == 0 {
+				operatorEventsChan <- OperatorEvents{
+					OperatorId: operatorId,
+					Events:     []uint64{blockTimestamp, dereg[0]},
+				}
+			} else if len(dereg) == 0 {
+				operatorEventsChan <- OperatorEvents{
+					OperatorId: operatorId,
+					Events:     []uint64{reg[0], currentTs},
+				}
+			} else {
+				if reg[0] < dereg[0] {
+					for i := 0; i < len(reg); i++ {
+						if i < len(dereg) {
+							operatorEventsChan <- OperatorEvents{
+								OperatorId: operatorId,
+								Events:     []uint64{reg[i], dereg[i]},
+							}
+						} else {
+							operatorEventsChan <- OperatorEvents{
+								OperatorId: operatorId,
+								Events:     []uint64{reg[i], currentTs},
+							}
+						}
 					}
-
-					// if there is no deregistered event that matches in same position of registered event, we use the last one
-					if i == 0 || registered > lastDeregistered {
-						lastDeregistered = deregistered
-						operatorEventsChan <- OperatorEvents{
-							OperatorId: operatorId,
-							Events:     []uint64{registered, deregistered},
+				} else {
+					operatorEventsChan <- OperatorEvents{
+						OperatorId: operatorId,
+						Events:     []uint64{blockTimestamp, dereg[0]},
+					}
+					for i := 0; i < len(reg); i++ {
+						if i+1 < len(dereg) {
+							operatorEventsChan <- OperatorEvents{
+								OperatorId: operatorId,
+								Events:     []uint64{reg[i], dereg[i+1]},
+							}
+						} else {
+							operatorEventsChan <- OperatorEvents{
+								OperatorId: operatorId,
+								Events:     []uint64{reg[i], currentTs},
+							}
 						}
 					}
 				}
-			})
+			}
 		}
-		pool.StopWait()
 	}()
 
 	return operatorEventsChan, nil
