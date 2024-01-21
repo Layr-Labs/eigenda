@@ -1,0 +1,43 @@
+name: Automate Operator Setup PR
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  pr:
+    name: Automate Operator Setup PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: layr-labs/eigenda-operator-setup
+      - name: Checkout a new branch
+        run : |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b release-${{ github.event.release.tag_name }}
+      - name: Update EigenDA version
+        run: |
+          new_version=${{ github.event.release.tag_name }}
+          version_without_v="${version#v}"
+          sed -i '' -E 's/(MAIN_SERVICE_IMAGE=ghcr\.io\/layr-labs\/eigenda\/opr-node:release-)[0-9]+\.[0-9]+\.[0-9]+/\1$version_without_v/' .env.example
+          sed -i '' -E 's/(ghcr\.io\/layr-labs\/eigenda\/opr-nodeplugin:release-)[0-9]+\.[0-9]+\.[0-9]+/\1$version_without_v/g' run.sh
+      - name: Commit changes
+        run: |
+          git add .env.example run.sh
+          git commit -m "Update EigenDA version to ${{ github.event.release.tag_name }}"
+      - name: Push changes
+        run : |
+          git push origin release-${{ github.event.release.tag_name }}
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v5
+        with:
+          repository: layr-labs/eigenda-operator-setup
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Add changes"
+          title: "Create Pull Request"
+          branch: release-${{ github.event.release.tag_name }}
+          
