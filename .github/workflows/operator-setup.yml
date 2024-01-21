@@ -3,7 +3,7 @@ name: Automate Operator Setup PR
 on:
   release:
     types:
-      - created
+      - published
 
 jobs:
   pr:
