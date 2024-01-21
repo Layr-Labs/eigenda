@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/goleak"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -349,52 +351,6 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-// func TestFetchDeregisteredOperatorWithoutDaysQueryParam(t *testing.T) {
-
-// 	defer goleak.VerifyNone(t)
-
-// 	r := setUpRouter()
-
-// 	indexedOperatorState := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
-// 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
-
-// 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
-// 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
-// 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-// 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
-
-// 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
-
-// 	// Start test server for Operator
-// 	closeServer, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
-// 	if err != nil {
-// 		t.Fatalf("Failed to start test server: %v", err)
-// 	}
-// 	defer closeServer() // Ensure the server is closed after the test
-
-// 	r.GET("/v1/operatorsInfo/deRegisteredOperators/", testDataApiServer.FetchDeregisteredOperators)
-
-// 	w := httptest.NewRecorder()
-// 	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deRegisteredOperators/", nil)
-// 	r.ServeHTTP(w, req)
-
-// 	res := w.Result()
-// 	defer res.Body.Close()
-
-// 	data, err := io.ReadAll(res.Body)
-// 	assert.NoError(t, err)
-
-// 	var response dataapi.DeregisteredOperatorsResponse
-// 	err = json.Unmarshal(data, &response)
-// 	assert.NoError(t, err)
-// 	assert.NotNil(t, response)
-
-// 	assert.Equal(t, http.StatusOK, res.StatusCode)
-// 	assert.Equal(t, 1, response.Meta.Size)
-// 	assert.Equal(t, 1, len(response.Data))
-// 	assert.Equal(t, true, response.Data[0].IsOnline)
-// }
-
 func TestFetchDeregisteredOperatorWithoutDaysQueryParam(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
@@ -620,7 +576,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOnline(t *testing.T) {
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
 	// Start test server for Operator
-	closeServer, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
+	closeServer, err := startTestGRPCServer("localhost:32007") // Let the OS assign a free port
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
 	}
@@ -674,7 +630,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOn
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
 	// Start the test server for Operator 2
-	closeServer, err := startTestTCPServer("localhost:32009")
+	closeServer, err := startTestGRPCServer("localhost:32009")
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
 	}
@@ -738,14 +694,14 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
 	// Start test server for Operator 1
-	closeServer1, err := startTestTCPServer("localhost:32007") // Let the OS assign a free port
+	closeServer1, err := startTestGRPCServer("localhost:32007") // Let the OS assign a free port
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
 	}
 	defer closeServer1() // Ensure the server is closed after the test
 
 	// Start test server for Operator 2
-	closeServer2, err := startTestTCPServer("localhost:32009") // Let the OS assign a free port
+	closeServer2, err := startTestGRPCServer("localhost:32009") // Let the OS assign a free port
 	if err != nil {
 		t.Fatalf("Failed to start test server: %v", err)
 	}
@@ -921,25 +877,30 @@ func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8) core.Blob {
 	return blob
 }
 
-func startTestTCPServer(address string) (closeFunc func(), err error) {
-	listener, err := net.Listen("tcp", address)
+// startTestGRPCServer starts a gRPC server on a specified address.
+// It returns a function to stop the server.
+func startTestGRPCServer(address string) (stopFunc func(), err error) {
+	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, err
 	}
 
-	closeFunc = func() { listener.Close() }
+	grpcServer := grpc.NewServer()
+	// Here, you would normally register your server with the gRPC server, like so:
+	// pb.RegisterYourServiceServer(grpcServer, &yourServer{})
+
+	stopFunc = func() {
+		grpcServer.Stop()
+		lis.Close()
+	}
 
 	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			conn.Close() // Close the connection immediately
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
 		}
 	}()
 
-	return closeFunc, nil
+	return stopFunc, nil
 }
 
 // Helper to get OperatorData from response
