@@ -32,12 +32,13 @@ jobs:
       - name: Push changes
         run : |
           git push origin release-${{ github.event.release.tag_name }}
-      - name: Create PR
-        uses: peter-evans/create-pull-request@v5
-        with:
-          repository: layr-labs/eigenda-operator-setup
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Add changes"
-          title: "Create Pull Request"
-          branch: release-${{ github.event.release.tag_name }}
+          gh pr create --title "create release" --body "release" --head "release-${{ github.event.release.tag_name }}" --base master
+#      - name: Create PR
+#        uses: peter-evans/create-pull-request@v5
+#        with:
+#          repository: layr-labs/eigenda-operator-setup
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#          commit-message: "Add changes"
+#          title: "Create Pull Request"
+#          branch: release-${{ github.event.release.tag_name }}
           
