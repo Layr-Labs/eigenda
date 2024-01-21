@@ -55,6 +55,8 @@ func (s *server) getDeregisterdOperatorForDays(ctx context.Context, days int32) 
 }
 
 // method to check if operator is online
+// Note: This method is least intrusive wat to check if operator is online
+// AlternateSolution: Should we add an endpt to check if operator is online?
 func checkIsOperatorOnline(ipAddress string) bool {
 	timeout := time.Second * 10
 	conn, err := net.DialTimeout("tcp", ipAddress, timeout)

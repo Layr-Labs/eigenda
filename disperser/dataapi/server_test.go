@@ -886,8 +886,6 @@ func startTestGRPCServer(address string) (stopFunc func(), err error) {
 	}
 
 	grpcServer := grpc.NewServer()
-	// Here, you would normally register your server with the gRPC server, like so:
-	// pb.RegisterYourServiceServer(grpcServer, &yourServer{})
 
 	stopFunc = func() {
 		grpcServer.Stop()
