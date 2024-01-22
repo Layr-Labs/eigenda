@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -28,9 +26,9 @@ type rateLimiter struct {
 func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore interface{}, logger common.Logger) (common.RateLimiter, error) {
 
 	retryWithBackOff := backoff.NewExponentialBackOff()
-	retryWithBackOff.MaxElapsedTime = 5 * time.Minute
 	retryWithBackOff.MaxInterval = 15 * time.Second
 	retryWithBackOff.InitialInterval = 1 * time.Second
+	retryWithBackOff.MaxElapsedTime = 100 * time.Second // Total max time for retries
 
 	switch bs := bucketStore.(type) {
 	case common.KVStore[common.RateBucketParams]:
@@ -164,6 +162,11 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 	}
 
 	// Conservative check: Ensure that the request can potentially be allowed
+	exponentialBackOff, ok := d.retryWithBackOff.(*backoff.ExponentialBackOff)
+	if !ok {
+		// Handle the error - the type assertion failed
+		return false, fmt.Errorf("retry policy is not of type *backoff.ExponentialBackOff")
+	}
 	allowed := false
 	reachedMaxBucketSize := false
 	now := time.Now().UTC().UnixMilli()
@@ -201,26 +204,11 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 				// Note this will result in a call to UpdateItem for each bucket level
 				// This should be revisited if needed later as it may result in too many calls to dynamodb
 				// Other alternative is to make all updates to each level as an array and then call UpdateItem once but that does not make it concurrency safe
-				err = bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
-				if err != nil {
-					return false, fmt.Errorf("failed to update bucket level %d atomically: %v with required capacity %v", i, err, requiredCapacity)
-				}
+				err = updateItemWithRetry(ctx, requesterID, &updateBuilder, bs, exponentialBackOff)
 
-				operationUpdateItemWithExpression := func() error {
-					err := bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
-					if err != nil {
-						// Return transient error to trigger a retry
-						if isConcurrentUpdateError(err) {
-							return err
-						}
-					}
-					return nil // No error, no retry
-				}
-
-				// Retry with exponential backoff
-				err := backoff.Retry(operationUpdateItemWithExpression, d.retryWithBackOff)
+				// Return any non-concurrent update errors
 				if err != nil {
-					return false, fmt.Errorf("failed after retries: %w", err)
+					return false, err
 				}
 
 				return allowed, nil
@@ -236,27 +224,11 @@ func (d *rateLimiter) AllowRequestConcurrencySafeVersion(ctx context.Context, re
 				)
 				// Note this will result in a call to UpdateItem for each bucket level
 				// This should be revisited if needed later as it may result in too many calls to dynamodb
-				err = bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
-				if err != nil {
-					return false, fmt.Errorf("failed to update bucket level %d atomically: %v", i, err)
-				}
+				err = updateItemWithRetry(ctx, requesterID, &updateBuilder, bs, exponentialBackOff)
 
-				operationUpdateItemWithExpression := func() error {
-					err := bs.UpdateItemWithExpression(ctx, requesterID, &updateBuilder)
-					if err != nil {
-						// Return transient error to trigger a retry
-						if isConcurrentUpdateError(err) {
-							return err
-						}
-					}
-					// For other errors, do not retry
-					return nil // No error, no retry
-				}
-
-				// Retry with exponential backoff
-				err := backoff.Retry(operationUpdateItemWithExpression, d.retryWithBackOff)
+				// Return any non-concurrent update errors
 				if err != nil {
-					return false, fmt.Errorf("failed after retries: %w", err)
+					return false, err
 				}
 			}
 		}
@@ -278,15 +250,4 @@ func getBucketLevel(bucketLevel, bucketSize, interval, deduction time.Duration) 
 
 	return newLevel
 
-}
-
-func isConcurrentUpdateError(err error) bool {
-	if awsErr, ok := err.(awserr.Error); ok {
-		// Check if the error code is ValidationException, which is used for a variety of input errors
-		if awsErr.Code() == "ValidationException" {
-			// Check if the message contains the specific error detail
-			return strings.Contains(awsErr.Message(), "Two document paths overlap with each other")
-		}
-	}
-	return false
 }
