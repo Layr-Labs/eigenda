@@ -114,7 +114,7 @@ func (f *operatorSocketsFilterer) WatchOperatorSocketUpdate(ctx context.Context,
 	}
 
 	sink := make(chan *blsregcoord.ContractBLSRegistryCoordinatorWithIndicesOperatorSocketUpdate)
-	operatorID := []core.OperatorID{operatorId}
+	operatorID := [][32]byte{operatorId}
 	_, err = filterer.WatchOperatorSocketUpdate(&bind.WatchOpts{Context: ctx}, sink, operatorID)
 	if err != nil {
 		return nil, err
