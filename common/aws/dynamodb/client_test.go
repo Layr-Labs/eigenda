@@ -300,6 +300,35 @@ func TestQueryIndex(t *testing.T) {
 	assert.Equal(t, len(queryResult), 30)
 }
 
+func TestQueryIndexCount(t *testing.T) {
+	tableName := "ProcessingQueryIndexCount"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	items := make([]commondynamodb.Item, numItems)
+	for i := 0; i < numItems; i += 1 {
+		items[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+		}
+	}
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	count, err := dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, int(count), 30)
+}
+
 func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	tableName := "ProcessingWithPaginationSingleItem"
 	createTable(t, tableName)
