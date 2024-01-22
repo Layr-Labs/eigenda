@@ -297,7 +297,6 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 			}
 			return
 		}
-		n.Logger.Debug("Store batch took", "duration:", time.Since(start))
 		storeChan <- storeResult{err: nil, keys: keys, latency: float64(time.Since(start).Milliseconds())}
 	}(n)
 
@@ -325,6 +324,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, err
 	}
 	if result.keys != nil {
+		n.Logger.Debug("Store batch took", "duration:", time.Duration(result.latency))
 		n.Metrics.AcceptBatches("stored", batchSize)
 		n.Metrics.ObserveLatency("StoreChunks", "stored", result.latency)
 	}
