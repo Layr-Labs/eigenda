@@ -17,7 +17,7 @@ type OperatorOnlineStatus struct {
 
 var (
 	// TODO: this should be configurable
-	numWorkers                      = 10
+	numWorkers                      = 25
 	operatorOnlineStatusChan        chan OperatorOnlineStatus
 	operatorOnlineStatusresultsChan chan *DeregisteredOperatorMetadata
 )
@@ -36,7 +36,7 @@ func (s *server) getDeregisterdOperatorForDays(ctx context.Context, days int32) 
 
 	operatorOnlineStatusChan = make(chan OperatorOnlineStatus, len(operators))
 	operatorOnlineStatusresultsChan = make(chan *DeregisteredOperatorMetadata, len(operators))
-	processOperatorsInParallel(indexedDeregisteredOperatorState, operatorOnlineStatusChan, operatorOnlineStatusresultsChan, s.logger)
+	processOperatorOnlineCheck(indexedDeregisteredOperatorState, operatorOnlineStatusChan, operatorOnlineStatusresultsChan, s.logger)
 
 	// Collect results of work done
 	DeregisteredOperatorMetadata := make([]*DeregisteredOperatorMetadata, 0, len(operators))
@@ -68,7 +68,7 @@ func checkIsOperatorOnline(ipAddress string) bool {
 }
 
 // Helper Function to Process Operators in Parallel
-func processOperatorsInParallel(deRegisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusChan chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
+func processOperatorOnlineCheck(deRegisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusChan chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
 
 	operators := deRegisteredOperatorState.Operators
 	// Start worker goroutines
