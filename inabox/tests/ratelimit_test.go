@@ -9,10 +9,10 @@ import (
 
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/grpc/retriever"
+	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,9 +31,9 @@ type result struct {
 	err  error
 }
 
-func disperse(t *testing.T, ctx context.Context, client traffic.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
+func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
 
-	blobStatus, key, err := client.DisperseBlob(ctx, data, param.QuorumID, param.QuorumThreshold, param.AdversaryThreshold)
+	blobStatus, key, err := client.DisperseBlob(ctx, data, uint32(param.QuorumID), uint32(param.QuorumThreshold), uint32(param.AdversaryThreshold))
 	if err != nil {
 		resultChan <- result{
 			err: err,
@@ -107,14 +107,11 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	disp := traffic.NewDisperserClient(&traffic.Config{
-		Hostname:        "localhost",
-		GrpcPort:        testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
-		NumInstances:    1,
-		DataSize:        1000_000,
-		RequestInterval: 1 * time.Second,
-		Timeout:         10 * time.Second,
-	})
+	disp := clients.NewDisperserClient(&clients.Config{
+		Hostname: "localhost",
+		Port:     testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
+		Timeout:  10 * time.Second,
+	}, nil)
 	assert.NotNil(t, disp)
 
 	data := make([]byte, c.blobSize)

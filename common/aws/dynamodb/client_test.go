@@ -638,7 +638,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	ctx := context.Background()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
-		requestedAt := time.Now().Add(-time.Duration(i) * time.Second).Unix()
+		requestedAt := time.Now().Add(-time.Duration(3*i) * time.Second).Unix()
 
 		// Create new item
 		item := commondynamodb.Item{
@@ -698,7 +698,16 @@ func TestQueryIndexPagination(t *testing.T) {
 	ctx := context.Background()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
-		requestedAt := time.Now().Add(-time.Duration(i) * time.Second).Unix()
+		// Noticed same timestamp for multiple items which resulted in key28
+		// being returned when 10 items were queried as first item,hence multiplying
+		// by random number 3 here to avoid such a situation
+		// requestedAt: 1705040877
+		// metadataKey: key28
+		// BlobKey: blob28
+		// requestedAt: 1705040877
+		// metadataKey: key29
+		// BlobKey: blob29
+		requestedAt := time.Now().Add(-time.Duration(3*i) * time.Second).Unix()
 
 		// Create new item
 		item := commondynamodb.Item{

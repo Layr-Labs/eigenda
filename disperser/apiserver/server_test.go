@@ -279,90 +279,6 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
 }
 
-func TestRatelimit(t *testing.T) {
-	data50KiB := make([]byte, 50*1024)
-	_, err := rand.Read(data50KiB)
-	assert.NoError(t, err)
-	data1KiB := make([]byte, 1024)
-	_, err = rand.Read(data1KiB)
-	assert.NoError(t, err)
-
-	// Try with a non-allowlisted IP
-	p := &peer.Peer{
-		Addr: &net.TCPAddr{
-			IP:   net.ParseIP("0.0.0.0"),
-			Port: 51001,
-		},
-	}
-	ctx := peer.NewContext(context.Background(), p)
-
-	// Try with non-allowlisted IP
-	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
-	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data: data50KiB,
-		SecurityParams: []*pb.SecurityParams{
-			{
-				QuorumId:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
-			},
-		},
-	})
-	assert.ErrorContains(t, err, "account throughput limit")
-
-	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
-	for i := 0; i < 10; i++ {
-		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-			Data: data1KiB,
-			SecurityParams: []*pb.SecurityParams{
-				{
-					QuorumId:           1,
-					AdversaryThreshold: 50,
-					QuorumThreshold:    100,
-				},
-			},
-		})
-	}
-	assert.ErrorContains(t, err, "account blob limit")
-
-	// Now try with an allowlisted IP
-	// This should succeed because the account throughput limit is 100 KiB/s for quorum 0
-	p = &peer.Peer{
-		Addr: &net.TCPAddr{
-			IP:   net.ParseIP("1.2.3.4"),
-			Port: 51001,
-		},
-	}
-	ctx = peer.NewContext(context.Background(), p)
-
-	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data: data50KiB,
-		SecurityParams: []*pb.SecurityParams{
-			{
-				QuorumId:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
-			},
-		},
-	})
-	assert.NoError(t, err)
-
-	// This should succeed because the account blob limit (5 blobs/s) X bucket size (3s) is larger than 10 blobs.
-	for i := 0; i < 10; i++ {
-		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-			Data: data1KiB,
-			SecurityParams: []*pb.SecurityParams{
-				{
-					QuorumId:           1,
-					AdversaryThreshold: 50,
-					QuorumThreshold:    100,
-				},
-			},
-		})
-		assert.NoError(t, err)
-	}
-}
-
 func setup(m *testing.M) {
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
@@ -436,18 +352,28 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 				PerUserUnauthThroughput: 20 * 1024,
 				TotalUnauthThroughput:   1048576,
 				PerUserUnauthBlobRate:   3 * 1e6,
-				TotalUnauthBlobRate:     10 * 1e6,
+				TotalUnauthBlobRate:     100 * 1e6,
 			},
 			1: {
 				PerUserUnauthThroughput: 20 * 1024,
 				TotalUnauthThroughput:   1048576,
 				PerUserUnauthBlobRate:   3 * 1e6,
-				TotalUnauthBlobRate:     10 * 1e6,
+				TotalUnauthBlobRate:     100 * 1e6,
 			},
 		},
 		ClientIPHeader: "",
 		Allowlist: apiserver.Allowlist{
 			"1.2.3.4": map[uint8]apiserver.PerUserRateInfo{
+				0: {
+					Throughput: 100 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+				1: {
+					Throughput: 1024 * 1024,
+					BlobRate:   5 * 1e6,
+				},
+			},
+			"0x1aa8226f6d354380dDE75eE6B634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
 				0: {
 					Throughput: 100 * 1024,
 					BlobRate:   5 * 1e6,

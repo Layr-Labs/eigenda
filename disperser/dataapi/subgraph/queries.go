@@ -50,14 +50,20 @@ type (
 	queryBatches struct {
 		Batches []*Batches `graphql:"batches(orderDirection: $orderDirection, orderBy: $orderBy, first: $first, skip: $skip)"`
 	}
+	queryBatchesByBlockTimestampRange struct {
+		Batches []*Batches `graphql:"batches(first: $first, orderBy: blockTimestamp, where: {and: [{ blockTimestamp_gte: $blockTimestamp_gte}, {blockTimestamp_lte: $blockTimestamp_lte}]})"`
+	}
 	queryOperatorRegistereds struct {
 		OperatorRegistereds []*Operator `graphql:"operatorRegistereds(first: $first)"`
 	}
 	queryBatchNonSigningOperatorIdsInInterval struct {
 		BatchNonSigningOperatorIds []*BatchNonSigningOperatorIds `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
 	}
-	queryOperatorDeregistereds struct {
-		OperatorDeregistereds []*Operator `graphql:"operatorDeregistereds(where: {blockTimestamp_gt: $blockTimestamp_gt})"`
+	queryOperatorRegisteredsGTBlockTimestamp struct {
+		OperatorRegistereds []*Operator `graphql:"operatorRegistereds(orderBy: blockTimestamp, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
+	}
+	queryOperatorDeregisteredsGTBlockTimestamp struct {
+		OperatorDeregistereds []*Operator `graphql:"operatorDeregistereds(orderBy: blockTimestamp, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
 	}
 	queryOperatorById struct {
 		Operator IndexedOperatorInfo `graphql:"operator(id: $id)"`

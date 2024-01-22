@@ -57,12 +57,10 @@ type BlobAuthHeader struct {
 
 // BlobRequestHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
-	// Commitments
-	BlobCommitments `json:"commitments"`
+	// BlobAuthHeader
+	BlobAuthHeader `json:"blob_auth_header"`
 	// For a blob to be accepted by EigenDA, it satisfy the AdversaryThreshold of each quorum contained in SecurityParams
 	SecurityParams []*SecurityParam `json:"security_params"`
-	// AccountID is the account that is paying for the blob to be stored
-	AccountID AccountID `json:"account_id"`
 }
 
 func (h *BlobRequestHeader) Validate() error {

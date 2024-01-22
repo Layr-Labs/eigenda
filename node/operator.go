@@ -25,7 +25,7 @@ type Operator struct {
 	QuorumIDs  []core.QuorumID
 }
 
-// Register operator registers the operator with the given public key for the given quorum IDs.
+// RegisterOperator operator registers the operator with the given public key for the given quorum IDs.
 func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerUrl string, useSecureGrpc bool, logger common.Logger) error {
 	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, operator.OperatorId)
 	if err != nil {
@@ -109,6 +109,11 @@ func UpdateOperatorQuorums(
 		return fmt.Errorf("failed to deregister operator: %w", err)
 	}
 	return RegisterOperator(ctx, operator, transactor, churnerUrl, useSecureGrpc, logger)
+}
+
+// UpdateOperatorSocket updates the socket for the given operator
+func UpdateOperatorSocket(ctx context.Context, transactor core.Transactor, socket string) error {
+	return transactor.UpdateOperatorSocket(ctx, socket)
 }
 
 func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger common.Logger) (*grpcchurner.ChurnReply, error) {

@@ -20,9 +20,11 @@ var (
 type (
 	Api interface {
 		QueryBatches(ctx context.Context, descending bool, orderByField string, first, skip int) ([]*Batches, error)
+		QueryBatchesByBlockTimestampRange(ctx context.Context, start, end uint64) ([]*Batches, error)
 		QueryOperators(ctx context.Context, first int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningOperatorIds, error)
 		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
+		QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
 	}
 
@@ -64,6 +66,21 @@ func (a *api) QueryBatches(ctx context.Context, descending bool, orderByField st
 	}
 
 	return result.Batches, nil
+}
+
+func (a *api) QueryBatchesByBlockTimestampRange(ctx context.Context, start, end uint64) ([]*Batches, error) {
+	variables := map[string]any{
+		"first":              graphql.Int(maxEntriesPerQuery),
+		"blockTimestamp_gte": graphql.Int(start),
+		"blockTimestamp_lte": graphql.Int(end),
+	}
+	query := new(queryBatchesByBlockTimestampRange)
+	err := a.uiMonitoringGgl.Query(ctx, query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return query.Batches, nil
 }
 
 func (a *api) QueryOperators(ctx context.Context, first int) ([]*Operator, error) {
@@ -109,11 +126,23 @@ func (a *api) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, int
 	return result.BatchNonSigningOperatorIds, nil
 }
 
+func (a *api) QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error) {
+	variables := map[string]any{
+		"blockTimestamp_gt": graphql.Int(blockTimestamp),
+	}
+	query := new(queryOperatorRegisteredsGTBlockTimestamp)
+	err := a.operatorStateGql.Query(ctx, &query, variables)
+	if err != nil {
+		return nil, err
+	}
+	return query.OperatorRegistereds, nil
+}
+
 func (a *api) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error) {
 	variables := map[string]any{
 		"blockTimestamp_gt": graphql.Int(blockTimestamp),
 	}
-	query := new(queryOperatorDeregistereds)
+	query := new(queryOperatorDeregisteredsGTBlockTimestamp)
 	err := a.operatorStateGql.Query(ctx, &query, variables)
 	if err != nil {
 		return nil, err

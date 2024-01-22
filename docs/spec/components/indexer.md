@@ -9,11 +9,11 @@ The indexer has the function of maintaining accumulators based on events.
 
 An accumulator consists of an object, an event filter, and a mutator. Whenever an event matching the filter is received, the event is fed to the mutator, which updates the object (possibly making calls to the current smart contract state). We can configure how much history of the accumulator to store. 
 
-An accumulator can optionally define a custom method for initializing the accumulator from state from an intermediate checkpoint. This includes methods such as pulling state from a smart contract or getting calldata associated with a particular transaction. 
+An accumulator can optionally define a custom method for initializing the accumulator from state at an intermediate checkpoint. This includes methods such as pulling state from a smart contract or getting calldata associated with a particular transaction. 
 
 The indexer is one of the only stateful components of the operator. To avoid reindexing on restarts, the state of the indexer is stored in a database. We will use a schemaless db to avoid migrations.
 
-The indexer must also support reorg resistance. We can achieve simple reorg resilience in the following way:
+The indexer must also support reorg resistance. We can achieve simple reorg resilience in the following ways:
 - For every accumulator, we make sure to store history long enough that we always have access to a finalized state. 
 - In the event reorg is detected, we can revert to the most recent finalized state, and then reindex to head. 
 

@@ -13,7 +13,7 @@ Code is based on:
 - [KZG Data availability code by Dankrad](https://github.com/ethereum/research/tree/master/kzg_data_availability)
 - [Verkle and FFT code by Dankrad and Vitalik](https://github.com/ethereum/research/tree/master/verkle)
 - [Reed solomon erasure code recovery with FFTs by Vitalik](https://ethresear.ch/t/reed-solomon-erasure-code-recovery-in-n-log-2-n-time-with-ffts/3039)
-- [FFT explainer by Vitalik](https://vitalik.ca/general/2019/05/12/fft.html)
+- [FFT explainer by Vitalik](https://vitalik.eth.limo/general/2019/05/12/fft.html)
 - [Kate explainer by Dankrad](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html)
 - [Kate amortized paper by Dankrad and Dmitry](https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf)
 
