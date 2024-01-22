@@ -728,6 +728,19 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t 
 	assert.Equal(t, 2, response.Meta.Size)
 	assert.Equal(t, 2, len(response.Data))
 
+	operator1Data := response.Data[0]
+	operator2Data := response.Data[1]
+
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
+	assert.Equal(t, uint(22), operator1Data.BlockNumber)
+	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, true, operator1Data.IsOnline)
+
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
+	assert.Equal(t, uint(24), operator2Data.BlockNumber)
+	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, true, operator2Data.IsOnline)
+
 	// Reset the mock
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
