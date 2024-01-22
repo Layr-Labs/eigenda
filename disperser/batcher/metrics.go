@@ -64,7 +64,6 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-
 	encodingStreamerMetrics := EncodingStreamerMetrics{
 		EncodedBlobs: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
