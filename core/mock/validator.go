@@ -10,7 +10,6 @@ import (
 
 var (
 	ErrChunkLengthMismatch = errors.New("chunk length mismatch")
-	ErrInvalidHeader       = errors.New("invalid header")
 )
 
 // MockChunkValidator is a mock implementation of ChunkValidator

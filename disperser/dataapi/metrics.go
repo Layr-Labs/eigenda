@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -27,12 +29,12 @@ type Metrics struct {
 	logger   common.Logger
 }
 
-func NewMetrics(httpPort string, logger common.Logger) *Metrics {
+func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string, logger common.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-
+	reg.MustRegister(NewDynamoDBCollector(blobMetadataStore, logger))
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
@@ -93,4 +95,41 @@ func (g *Metrics) Start(ctx context.Context) {
 		err := http.ListenAndServe(addr, mux)
 		log.Error("Prometheus server failed", "err", err)
 	}()
+}
+
+type DynamoDBCollector struct {
+	blobMetadataStore *blobstore.BlobMetadataStore
+	blobStatusMetric  *prometheus.Desc
+	logger            common.Logger
+}
+
+func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger common.Logger) *DynamoDBCollector {
+	return &DynamoDBCollector{
+		blobMetadataStore: blobMetadataStore,
+		blobStatusMetric: prometheus.NewDesc("dynamodb_blob_metadata_status_count",
+			"Number of blobs with specific status in DynamoDB",
+			[]string{"status"},
+			nil,
+		),
+		logger: logger,
+	}
+}
+
+func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- collector.blobStatusMetric
+}
+
+func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
+	count, err := collector.blobMetadataStore.GetBlobMetadataByStatusCount(context.Background(), disperser.Processing)
+	if err != nil {
+		collector.logger.Error("failed to get count of blob metadata by status", "err", err)
+		return
+	}
+
+	ch <- prometheus.MustNewConstMetric(
+		collector.blobStatusMetric,
+		prometheus.GaugeValue,
+		float64(count),
+		disperser.Processing.String(),
+	)
 }

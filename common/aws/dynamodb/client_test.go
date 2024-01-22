@@ -300,6 +300,59 @@ func TestQueryIndex(t *testing.T) {
 	assert.Equal(t, len(queryResult), 30)
 }
 
+func TestQueryIndexCount(t *testing.T) {
+	tableName := "ProcessingQueryIndexCount"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItemsProcessing := 10
+	items1 := make([]commondynamodb.Item, numItemsProcessing)
+	for i := 0; i < numItemsProcessing; i += 1 {
+		items1[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+		}
+	}
+
+	numItemsConfirmed := 20
+	items2 := make([]commondynamodb.Item, numItemsConfirmed)
+	for i := 0; i < numItemsConfirmed; i += 1 {
+		items2[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i+numItemsProcessing)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i+numItemsProcessing)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "1"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+		}
+	}
+
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items1)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	unprocessed, err = dynamoClient.PutItems(ctx, tableName, items2)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	count, err := dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, int(count), 10)
+
+	count, err = dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "1",
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, int(count), 20)
+}
+
 func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	tableName := "ProcessingWithPaginationSingleItem"
 	createTable(t, tableName)

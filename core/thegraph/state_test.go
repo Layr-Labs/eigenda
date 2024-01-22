@@ -146,7 +146,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	assert.NoError(t, err)
 
 	opID := ethcomm.HexToHash("0x3eb7d5df61c48ec2718d8c8ad52304effc970ae92f19138e032dae07b7c0d629")
-	info, err := cs.GetIndexedOperatorInfoByOperatorId(context.Background(), opID, uint32(headerNum))
+	info, err := cs.GetIndexedOperatorInfoByOperatorId(context.Background(), core.OperatorID(opID.Bytes()), uint32(headerNum))
 	assert.NoError(t, err)
 	assert.Equal(t, "3336192159512049190945679273141887248666932624338963482128432381981287252980", info.PubkeyG1.X.String())
 	assert.Equal(t, "15195175002875833468883745675063986308012687914999552116603423331534089122704", info.PubkeyG1.Y.String())
