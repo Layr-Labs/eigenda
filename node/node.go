@@ -324,9 +324,10 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, err
 	}
 	if result.keys != nil {
-		n.Logger.Debug("Store batch took", "duration:", time.Duration(result.latency))
 		n.Metrics.AcceptBatches("stored", batchSize)
 		n.Metrics.ObserveLatency("StoreChunks", "stored", result.latency)
+		n.Logger.Debug("Store batch took", "duration:", time.Duration(result.latency*float64(time.Second)).Milliseconds())
+
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
