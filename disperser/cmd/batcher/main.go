@@ -32,9 +32,18 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+	// Note: Changing these paths will require updating the k8s deployment
+	readinessProbePath string = "/tmp/ready"
+	healthProbePath    string = "/tmp/health"
 )
 
 func main() {
+
+	// Start filebased probe for health checks
+	// Create a file in /tmp/health every 2 minutes
+	// Should  TimeDuration
+	go createFileBasedProbe(healthProbePath, 240*time.Second)
+
 	app := cli.NewApp()
 	app.Flags = flags.Flags
 	app.Version = fmt.Sprintf("%s-%s-%s", version, gitCommit, gitDate)
@@ -52,6 +61,11 @@ func main() {
 }
 
 func RunBatcher(ctx *cli.Context) error {
+	// Clean up readiness file
+	if err := os.Remove(readinessProbePath); err != nil && !os.IsNotExist(err) {
+		log.Printf("Failed to clean up readiness file: %v", err)
+	}
+
 	config := NewConfig(ctx)
 
 	logger, err := logging.GetLogger(config.LoggerConfig)
@@ -159,6 +173,39 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
+	// Signal readiness
+	if _, err := os.Create(readinessProbePath); err != nil {
+		log.Printf("Failed to create readiness file: %v", err)
+	}
+
 	return nil
 
+}
+
+// Helper method to create a heartbeat file
+// Used by k8s file based probe for liveness checks
+func createFileBasedProbe(filePath string, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Check if the heartbeat file exists
+		_, err := os.Stat(filePath)
+		if os.IsNotExist(err) {
+			// Create the file if it does not exist
+			file, err := os.Create(filePath)
+			if err != nil {
+				log.Printf("Failed to create heartbeat file: %v\n", err)
+				continue
+			}
+			if err := file.Close(); err != nil {
+				log.Printf("Failed to close file: %v\n", err)
+			}
+			log.Printf("Heartbeat file created\n")
+		} else if err != nil {
+			log.Printf("Error checking heartbeat file: %v\n", err)
+		} else {
+			log.Printf("Heartbeat file exists\n")
+		}
+	}
 }
