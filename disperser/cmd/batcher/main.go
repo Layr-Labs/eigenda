@@ -33,16 +33,15 @@ var (
 	gitCommit string
 	gitDate   string
 	// Note: Changing these paths will require updating the k8s deployment
-	readinessProbePath string = "/tmp/ready"
-	healthProbePath    string = "/tmp/health"
+	readinessProbePath string        = "/tmp/ready"
+	healthProbePath    string        = "/tmp/health"
+	maxStallDuration   time.Duration = 240 * time.Second
 )
 
 func main() {
-
-	// Start filebased probe for health checks
-	// Create a file in /tmp/health every 2 minutes
-	// Should  TimeDuration be a configurable parameter?
-	go createFileBasedHealthProbe(healthProbePath, 120*time.Second)
+	probeChan := make(chan time.Time)
+	// Channel for signaling errors from the app goroutine
+	errorChan := make(chan error)
 
 	app := cli.NewApp()
 	app.Flags = flags.Flags
@@ -52,12 +51,31 @@ func main() {
 	app.Description = "Service for creating a batch from queued blobs, distributing coded chunks to nodes, and confirming onchain"
 
 	app.Action = RunBatcher
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatalf("application failed: %v", err)
-	}
+	// Run the CLI app in a separate goroutine
+	go func() {
+		if err := app.Run(os.Args); err != nil {
+			errorChan <- err
+		}
+	}()
 
-	select {}
+	// Start File based liveness probe
+	// go createFileBasedHealthProbe(healthProbePath, 120*time.Second, probeChan)
+	go createFileBasedHealthProbe(healthProbePath, probeChan, maxStallDuration)
+
+	ticker := time.NewTicker(120 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Signal the health probe to update the file
+			probeChan <- time.Now()
+		case err := <-errorChan:
+			log.Printf("Batcher exited with error: %v\n", err)
+			close(probeChan) // Signal the health probe to stop
+			return
+		}
+	}
 }
 
 func RunBatcher(ctx *cli.Context) error {
@@ -183,30 +201,31 @@ func RunBatcher(ctx *cli.Context) error {
 
 }
 
-// Helper method to create a heartbeat file
-// Used by k8s file based probe for liveness checks
-func createFileBasedHealthProbe(filePath string, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+// Update time in a file to signal liveness
+func createFileBasedHealthProbe(filePath string, probeChan <-chan time.Time, maxStallDuration time.Duration) {
+	var lastHeartbeat time.Time
 
-	for range ticker.C {
-		// Check if the heartbeat file exists
-		_, err := os.Stat(filePath)
-		if os.IsNotExist(err) {
-			// Create the file if it does not exist
-			file, err := os.Create(filePath)
-			if err != nil {
-				log.Printf("Failed to create heartbeat file: %v\n", err)
-				continue
+	for {
+		select {
+		case heartbeat, ok := <-probeChan:
+			if !ok {
+				log.Println("Stopping health probe")
+				return
 			}
-			if err := file.Close(); err != nil {
-				log.Printf("Failed to close file: %v\n", err)
+
+			lastHeartbeat = heartbeat
+
+		// K8s will check the timestamp in this file every 120 seconds
+		//  hence update this file every 115 seconds and avoid false positives
+		case <-time.After(115 * time.Second): // Check interval
+			if time.Since(lastHeartbeat) > maxStallDuration {
+				log.Println("Application stall detected, stopping file updates")
+				return
 			}
-			log.Printf("Heartbeat file created\n")
-		} else if err != nil {
-			log.Printf("Error checking heartbeat file: %v\n", err)
-		} else {
-			log.Printf("Heartbeat file exists\n")
+			// Update file to indicate healthiness
+			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
+				log.Printf("Failed to update heartbeat file: %v", err)
+			}
 		}
 	}
 }
