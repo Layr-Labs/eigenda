@@ -41,8 +41,8 @@ func main() {
 
 	// Start filebased probe for health checks
 	// Create a file in /tmp/health every 2 minutes
-	// Should  TimeDuration
-	go createFileBasedProbe(healthProbePath, 240*time.Second)
+	// Should  TimeDuration be a configurable parameter?
+	go createFileBasedHealthProbe(healthProbePath, 120*time.Second)
 
 	app := cli.NewApp()
 	app.Flags = flags.Flags
@@ -61,9 +61,10 @@ func main() {
 }
 
 func RunBatcher(ctx *cli.Context) error {
+
 	// Clean up readiness file
 	if err := os.Remove(readinessProbePath); err != nil && !os.IsNotExist(err) {
-		log.Printf("Failed to clean up readiness file: %v", err)
+		log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
 	}
 
 	config := NewConfig(ctx)
@@ -184,7 +185,7 @@ func RunBatcher(ctx *cli.Context) error {
 
 // Helper method to create a heartbeat file
 // Used by k8s file based probe for liveness checks
-func createFileBasedProbe(filePath string, interval time.Duration) {
+func createFileBasedHealthProbe(filePath string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
