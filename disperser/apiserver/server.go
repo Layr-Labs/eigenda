@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -445,6 +446,9 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 
 		dataLength := uint32(confirmationInfo.BlobCommitment.Length)
 		quorumInfos := confirmationInfo.BlobQuorumInfos
+		slices.SortStableFunc[[]*core.BlobQuorumInfo](quorumInfos, func(a, b *core.BlobQuorumInfo) int {
+			return int(a.QuorumID) - int(b.QuorumID)
+		})
 		blobQuorumParams := make([]*pb.BlobQuorumParam, len(quorumInfos))
 		quorumNumbers := make([]byte, len(quorumInfos))
 		quorumPercentSigned := make([]byte, len(quorumInfos))

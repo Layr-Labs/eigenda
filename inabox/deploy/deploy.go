@@ -36,22 +36,24 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 	stakers := make([]string, 0)
 	maxOperatorCount := env.Services.Counts.NumMaxOperatorCount
 
-	numStrategies := 2
-	total := float32(0)
+	numStrategies := len(env.Services.Stakes)
+	total := make([]float32, numStrategies)
 	stakes := make([][]string, numStrategies)
 
-	for _, stake := range env.Services.Stakes.Distribution {
-		total += stake
-	}
-
-	for i := 0; i < numStrategies; i++ {
-		stakes[i] = make([]string, len(env.Services.Stakes.Distribution))
-		for ind, stake := range env.Services.Stakes.Distribution {
-			stakes[i][ind] = strconv.FormatFloat(float64(stake/total*env.Services.Stakes.Total), 'f', 0, 32)
+	for quorum, stake := range env.Services.Stakes {
+		for _, s := range stake.Distribution {
+			total[quorum] += s
 		}
 	}
 
-	for i := 0; i < len(env.Services.Stakes.Distribution); i++ {
+	for quorum := 0; quorum < numStrategies; quorum++ {
+		stakes[quorum] = make([]string, len(env.Services.Stakes[quorum].Distribution))
+		for ind, stake := range env.Services.Stakes[quorum].Distribution {
+			stakes[quorum][ind] = strconv.FormatFloat(float64(stake/total[quorum]*env.Services.Stakes[quorum].Total), 'f', 0, 32)
+		}
+	}
+
+	for i := 0; i < len(env.Services.Stakes[0].Distribution); i++ {
 		stakerName := fmt.Sprintf("staker%d", i)
 		operatorName := fmt.Sprintf("opr%d", i)
 
@@ -98,23 +100,7 @@ func (env *Config) deployEigenDAContracts() {
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	blobHeader := &core.BlobHeader{
-		QuorumInfos: []*core.BlobQuorumInfo{
-			{
-				SecurityParam: core.SecurityParam{
-					QuorumID:           0,
-					AdversaryThreshold: 80,
-					QuorumThreshold:    100,
-				},
-			},
-		},
-	}
-	hash, err := blobHeader.GetQuorumBlobParamsHash()
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
-	}
-	hashStr := fmt.Sprintf("%x", hash)
-	execForgeScript("script/MockRollupDeployer.s.sol:MockRollupDeployer", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(address,bytes32,uint256)", env.EigenDA.ServiceManager, hashStr, big.NewInt(1e18).String()})
+	execForgeScript("script/MockRollupDeployer.s.sol:MockRollupDeployer", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(address,uint256)", env.EigenDA.ServiceManager, big.NewInt(1e18).String()})
 
 	//add rollup address to path
 	data = readFile("script/output/mock_rollup_deploy_output.json")
@@ -123,7 +109,6 @@ func (env *Config) deployEigenDAContracts() {
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-
 	env.MockRollup = rollupAddr.MockRollup
 }
 
@@ -219,7 +204,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
 		"NODE_NUM_CONFIRMATIONS=0",
 	}
-	
+
 	err := execCmd("./node-plugin.sh", []string{}, envVars)
 
 	if err != nil {
