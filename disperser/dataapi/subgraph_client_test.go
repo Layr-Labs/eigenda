@@ -44,9 +44,9 @@ var (
 	}
 
 	nonSigners = map[string]int{
-		"0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211": 1,
-		"0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212": 1,
-		"0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222": 1,
+		"0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
+		"0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310": 1,
+		"0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
 	}
 
 	subgraphBatches = []*subgraph.Batches{
@@ -201,7 +201,8 @@ func TestQueryNumBatchesByOperatorsInThePastBlockTimestamp(t *testing.T) {
 	numBatchesByOperators, err := subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(context.Background(), uint64(1), nonSigners)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 2, len(numBatchesByOperators))
+	// We compute the num batches for each nonsigning operator.
+	assert.Equal(t, 3, len(numBatchesByOperators))
 
 	numBatches := numBatchesByOperators["0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"]
 	assert.Equal(t, 3, numBatches)
