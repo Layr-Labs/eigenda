@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
@@ -25,6 +26,10 @@ type SecurityParam struct {
 	// for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
 	// data was posted to the DA node.
 	QuorumRate common.RateParam `json:"quorum_rate"`
+}
+
+func (s *SecurityParam) String() string {
+	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, QuorumThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.QuorumThreshold)
 }
 
 // QuorumResult contains the quorum ID and the amount signed for the quorum

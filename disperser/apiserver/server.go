@@ -223,7 +223,11 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, err
 	}
 
-	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", securityParams)
+	securityParamsStrings := make([]string, len(securityParams))
+	for i, sp := range securityParams {
+		securityParamsStrings[i] = sp.String()
+	}
+	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if err := blob.RequestHeader.Validate(); err != nil {
 		s.logger.Warn("invalid header", "err", err)
