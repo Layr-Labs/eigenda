@@ -396,10 +396,16 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort)
-			if err != nil {
-				n.Logger.Error("failed to get socket address", "err", err)
-				continue
+			var newSocketAddr string
+			var err error
+			if n.Config.PubIP != "" {
+				newSocketAddr = string(core.MakeOperatorSocket(n.Config.PubIP, n.Config.DispersalPort, n.Config.RetrievalPort))
+			} else {
+				newSocketAddr, err = SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort)
+				if err != nil {
+					n.Logger.Error("failed to get socket address", "err", err)
+					continue
+				}
 			}
 			n.updateSocketAddress(ctx, newSocketAddr)
 		}

@@ -62,6 +62,7 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	PubIPProvider                 string
+	PubIP                         string
 	PubIPCheckInterval            time.Duration
 	ChurnerUrl                    string
 	NumBatchValidators            int
@@ -160,6 +161,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LoggingConfig:                 logging.ReadCLIConfig(ctx, flags.FlagPrefix),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		PubIP:                         ctx.GlobalString(flags.PubIPFlag.Name),
 		PubIPProvider:                 ctx.GlobalString(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:            ctx.GlobalDuration(flags.PubIPCheckIntervalFlag.Name),
 		ChurnerUrl:                    ctx.GlobalString(flags.ChurnerUrlFlag.Name),
