@@ -108,7 +108,9 @@ func (t *Transactor) getRegistrationParams(
 
 	operatorAddress := t.EthClient.GetAccountAddress()
 
-	msgToSignG1_, err := t.Bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{}, operatorAddress)
+	msgToSignG1_, err := t.Bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
+		Context: ctx,
+	}, operatorAddress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -140,7 +142,9 @@ func (t *Transactor) getRegistrationParams(
 
 	// params to register operator in delegation manager's operator-avs mapping
 	msgToSign, err := t.Bindings.DelegationManager.CalculateOperatorAVSRegistrationDigestHash(
-		&bind.CallOpts{}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+		&bind.CallOpts{
+			Context: ctx,
+		}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -292,12 +296,6 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 	}
 
 	quorumNumbers := bitmapToBytesArray(quorumBitmap)
-
-	// pubkey := pubKeyG1ToBN254G1Point(pubkeyG1)
-	// g1Point := regcoordinator.BN254G1Point{
-	// 	X: pubkey.X,
-	// 	Y: pubkey.Y,
-	// }
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
 	if err != nil {
@@ -582,15 +580,10 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 ) ([32]byte, error) {
 	opKickParams := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(operatorsToChurn))
 	for i := range operatorsToChurn {
-		// pubkey := operatorsToChurn[i].Pubkey
 
 		opKickParams[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
 			QuorumNumber: operatorsToChurn[i].QuorumId,
 			Operator:     operatorsToChurn[i].Operator,
-			// Pubkey: regcoordinator.BN254G1Point{
-			// 	X: pubkey.X.BigInt(new(big.Int)),
-			// 	Y: pubkey.Y.BigInt(new(big.Int)),
-			// },
 		}
 	}
 	return t.Bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
@@ -603,7 +596,6 @@ func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) 
 }
 
 func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
-	//TODO(mooselumph): What is the correct function to use here?
 	return t.Bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
