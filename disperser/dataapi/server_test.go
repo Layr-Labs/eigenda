@@ -286,11 +286,11 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 
 	operator := response.Operators["0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"]
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, 1, response.TotalNonSigners)
+	assert.Equal(t, 2, response.TotalNonSigners)
 	assert.Equal(t, 3, operator.TotalBatches)
 	assert.Equal(t, 1, operator.TotalUnsignedBatches)
 	assert.Equal(t, float64(33.33), operator.Percentage)
-	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, 2, len(response.Operators))
 }
 
 func setUpRouter() *gin.Engine {
