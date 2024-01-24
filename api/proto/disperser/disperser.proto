@@ -254,7 +254,8 @@ message BatchMetadata {
 message BatchHeader {
 	// The root of the merkle tree with the hashes of blob headers as leaves.
 	bytes batch_root = 1;
-	// All quorums associated with blobs in this batch.
+	// All quorums associated with blobs in this batch. Sorted in ascending order.
+	// Ex. [0, 2, 1] => 0x000102
 	bytes quorum_numbers = 2;
 	// The percentage of stake that has signed for this batch.
 	// The quorum_signed_percentages[i] is percentage for the quorum_numbers[i].

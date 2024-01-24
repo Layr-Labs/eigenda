@@ -173,15 +173,15 @@ type BlobMessage struct {
 }
 
 // Serialize encodes a batch of chunks into a byte array
-func (cb Bundles) Serialize() ([][][]byte, error) {
-	data := make([][][]byte, len(cb))
-	for i, bundle := range cb {
+func (cb Bundles) Serialize() (map[uint32][][]byte, error) {
+	data := make(map[uint32][][]byte, len(cb))
+	for quorumID, bundle := range cb {
 		for _, chunk := range bundle {
 			chunkData, err := chunk.Serialize()
 			if err != nil {
 				return nil, err
 			}
-			data[i] = append(data[i], chunkData)
+			data[uint32(quorumID)] = append(data[uint32(quorumID)], chunkData)
 		}
 	}
 	return data, nil

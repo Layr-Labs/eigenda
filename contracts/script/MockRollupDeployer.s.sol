@@ -15,14 +15,13 @@ contract MockRollupDeployer is Script {
     
     // forge script script/MockRollupDeployer.s.sol:MockRollupDeployer --sig "run(address, bytes32, uint256)" <DASM address> <security hash> <stake> --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast -vvvv
     // <security hash> = keccak256(abi.encode(blobHeader.quorumBlobParams))
-    function run(address _eigenDAServiceManager, bytes32 _quorumBlobParamsHash, uint256 _stakeRequired) external {
+    function run(address _eigenDAServiceManager, uint256 _stakeRequired) external {
         vm.startBroadcast();
 
         mockRollup = new MockRollup(
             IEigenDAServiceManager(_eigenDAServiceManager),
             s1,
             illegalValue,
-            _quorumBlobParamsHash,
             _stakeRequired
         );
 

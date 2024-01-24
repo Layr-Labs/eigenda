@@ -26,8 +26,10 @@ services:
     operators: 4
     maxOperatorCount: 3
   stakes:
-    total: 100e18
-    distribution: [1, 4, 6, 10]
+    - total: 100e18
+      distribution: [1, 4, 6, 10]
+    - total: 100e18
+      distribution: [2, 3, 5, 8]
   basePort: 32000
   variables:
     globals:
