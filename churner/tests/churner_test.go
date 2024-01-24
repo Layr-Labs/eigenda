@@ -80,7 +80,7 @@ func setup(m *testing.M) {
 
 func teardown() {
 	if testConfig != nil {
-		fmt.Println("Stoping anvil")
+		fmt.Println("Stopping anvil")
 		testConfig.StopAnvil()
 		testConfig.StopGraphNode()
 	}
