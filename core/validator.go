@@ -9,7 +9,6 @@ import (
 
 var (
 	ErrChunkLengthMismatch = errors.New("chunk length mismatch")
-	ErrInvalidHeader       = errors.New("invalid header")
 	ErrBlobQuorumSkip      = errors.New("blob skipped for a quorum before verification")
 )
 
@@ -38,12 +37,12 @@ func NewChunkValidator(enc Encoder, asgn AssignmentCoordinator, cst ChainState, 
 
 func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*Chunk, *Assignment, *EncodingParams, error) {
 	if quorumHeader.AdversaryThreshold >= quorumHeader.QuorumThreshold {
-		return nil, nil, nil, errors.New("invalid header: quorum threshold does not exceed adversary threshold")
+		return nil, nil, nil, fmt.Errorf("invalid header: quorum threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
 	}
 
 	// Check if the operator is a member of the quorum
 	if _, ok := operatorState.Operators[quorumHeader.QuorumID]; !ok {
-		return nil, nil, nil, ErrBlobQuorumSkip
+		return nil, nil, nil, fmt.Errorf("%w: operator %s is not a member of quorum %d", ErrBlobQuorumSkip, v.operatorID.Hex(), quorumHeader.QuorumID)
 	}
 
 	// Get the assignments for the quorum
@@ -54,10 +53,10 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 
 	// Validate the number of chunks
 	if assignment.NumChunks == 0 {
-		return nil, nil, nil, ErrBlobQuorumSkip
+		return nil, nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, v.operatorID.Hex(), quorumHeader.QuorumID)
 	}
 	if assignment.NumChunks != uint(len(blob.Bundles[quorumHeader.QuorumID])) {
-		return nil, nil, nil, errors.New("number of chunks does not match assignment")
+		return nil, nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Bundles[quorumHeader.QuorumID]), assignment.NumChunks, quorumHeader.QuorumID)
 	}
 
 	// Validate the chunkLength against the quorum and adversary threshold parameters
@@ -70,7 +69,7 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	chunks := blob.Bundles[quorumHeader.QuorumID]
 	for _, chunk := range chunks {
 		if uint(chunk.Length()) != quorumHeader.ChunkLength {
-			return nil, nil, nil, ErrChunkLengthMismatch
+			return nil, nil, nil, fmt.Errorf("%w: chunk length (%d) does not match quorum header (%d) for quorum %d", ErrChunkLengthMismatch, chunk.Length(), quorumHeader.ChunkLength, quorumHeader.QuorumID)
 		}
 	}
 
@@ -81,7 +80,7 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	if params.ChunkLength != quorumHeader.ChunkLength {
-		return nil, nil, nil, errors.New("invalid chunk length")
+		return nil, nil, nil, fmt.Errorf("%w: chunk length from encoding parameters (%d) does not match quorum header (%d)", ErrChunkLengthMismatch, params.ChunkLength, quorumHeader.ChunkLength)
 	}
 
 	return chunks, &assignment, &params, nil
@@ -89,7 +88,7 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 
 func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *OperatorState) error {
 	if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
-		return errors.New("number of bundles does not match number of quorums")
+		return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobHeader.QuorumInfos))
 	}
 
 	// Validate the blob length
@@ -127,7 +126,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 
 	for k, blob := range blobs {
 		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
-			return errors.New("number of bundles does not match number of quorums")
+			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobHeader.QuorumInfos))
 		}
 
 		// Saved for the blob length validation

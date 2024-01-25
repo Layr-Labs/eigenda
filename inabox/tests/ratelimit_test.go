@@ -33,7 +33,13 @@ type result struct {
 
 func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
 
-	blobStatus, key, err := client.DisperseBlob(ctx, data, uint32(param.QuorumID), uint32(param.QuorumThreshold), uint32(param.AdversaryThreshold))
+	blobStatus, key, err := client.DisperseBlob(ctx, data, []*core.SecurityParam{
+		{
+			QuorumID:           param.QuorumID,
+			AdversaryThreshold: param.AdversaryThreshold,
+			QuorumThreshold:    param.QuorumThreshold,
+		},
+	})
 	if err != nil {
 		resultChan <- result{
 			err: err,

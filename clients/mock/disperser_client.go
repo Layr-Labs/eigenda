@@ -5,6 +5,7 @@ import (
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/clients"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,8 +20,8 @@ func NewMockDisperserClient() *MockDisperserClient {
 	return &MockDisperserClient{}
 }
 
-func (c *MockDisperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
-	args := c.Called(data, quorumID, quorumThreshold, adversityThreshold)
+func (c *MockDisperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error) {
+	args := c.Called(data, securityParams)
 	var status *disperser.BlobStatus
 	if args.Get(0) != nil {
 		status = (args.Get(0)).(*disperser.BlobStatus)
@@ -36,8 +37,8 @@ func (c *MockDisperserClient) DisperseBlobAuthenticated(ctx context.Context, dat
 	return status, key, err
 }
 
-func (c *MockDisperserClient) DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
-	args := c.Called(data, quorumID, quorumThreshold, adversityThreshold)
+func (c *MockDisperserClient) DisperseBlob(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error) {
+	args := c.Called(data, securityParams)
 	var status *disperser.BlobStatus
 	if args.Get(0) != nil {
 		status = (args.Get(0)).(*disperser.BlobStatus)

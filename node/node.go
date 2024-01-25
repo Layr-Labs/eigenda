@@ -103,7 +103,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	cst := eth.NewChainState(tx, client)
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, "localhost:"+config.NodeApiPort, logger)
+	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
 
 	// Make validator
 	enc, err := encoding.NewEncoder(config.EncoderConfig)
@@ -276,8 +276,12 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		err error
 
 		// The keys that are stored to database for a single batch.
-		// Undefined if the err is not nil or err is ErrBatchAlreadyExist.
+		// Defined only if the batch not already exists and gets stored to database successfully.
 		keys *[][]byte
+
+		// Latency (in ms) to store the batch.
+		// Defined only if the batch not already exists and gets stored to database successfully.
+		latency float64
 	}
 	storeChan := make(chan storeResult)
 	go func(n *Node) {
@@ -287,16 +291,13 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 			// If batch already exists, we don't store it again, but we should not
 			// error out in such case.
 			if err == ErrBatchAlreadyExist {
-				storeChan <- storeResult{err: nil, keys: nil}
+				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
 			} else {
-				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil}
+				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil, latency: 0}
 			}
 			return
 		}
-		n.Metrics.AcceptBatches("stored", batchSize)
-		n.Metrics.ObserveLatency("StoreChunks", "stored", float64(time.Since(start).Milliseconds()))
-		n.Logger.Debug("Store batch took", "duration:", time.Since(start))
-		storeChan <- storeResult{err: nil, keys: keys}
+		storeChan <- storeResult{err: nil, keys: keys, latency: float64(time.Since(start).Milliseconds())}
 	}(n)
 
 	// Validate batch.
@@ -321,6 +322,11 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	result := <-storeChan
 	if result.err != nil {
 		return nil, err
+	}
+	if result.keys != nil {
+		n.Metrics.AcceptBatches("stored", batchSize)
+		n.Metrics.ObserveLatency("StoreChunks", "stored", result.latency)
+		n.Logger.Debug("Store batch took", "duration:", time.Duration(result.latency*float64(time.Millisecond)))
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.

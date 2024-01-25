@@ -52,7 +52,7 @@ var (
 
 	mockTx                          = &coremock.MockTransactor{}
 	mockChainState, _               = coremock.MakeChainDataMock(core.OperatorIndex(1))
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics("9001", mockLogger))
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
@@ -295,11 +295,11 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 
 	operator := response.Operators["0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"]
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, 1, response.TotalNonSigners)
+	assert.Equal(t, 2, response.TotalNonSigners)
 	assert.Equal(t, 3, operator.TotalBatches)
 	assert.Equal(t, 1, operator.TotalUnsignedBatches)
 	assert.Equal(t, float64(33.33), operator.Percentage)
-	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, 2, len(response.Operators))
 }
 
 func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {

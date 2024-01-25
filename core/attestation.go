@@ -84,7 +84,7 @@ func (s *Signature) Verify(pubkey *G2Point, message [32]byte) bool {
 func (p *G1Point) GetOperatorID() OperatorID {
 	x := p.X.BigInt(new(big.Int))
 	y := p.Y.BigInt(new(big.Int))
-	return crypto.Keccak256Hash(append(math.U256Bytes(x), math.U256Bytes(y)...))
+	return OperatorID(crypto.Keccak256Hash(append(math.U256Bytes(x), math.U256Bytes(y)...)))
 }
 
 type PrivateKey = fr.Element
