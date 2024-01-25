@@ -53,6 +53,7 @@ type EigenDADeployConfig struct {
 	NumStrategies       int        `json:"numStrategies"`
 	MaxOperatorCount    int        `json:"maxOperatorCount"`
 	StakerPrivateKeys   []string   `json:"stakerPrivateKeys"`
+	ConfirmerPrivateKey string     `json:"confirmerPrivateKey"`
 	StakerTokenAmounts  [][]string `json:"-"`
 	OperatorPrivateKeys []string   `json:"-"`
 }
@@ -79,10 +80,11 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 
 	// Marshal the remaining fields
 	remainingFields := map[string]interface{}{
-		"useDefaults":       cfg.UseDefaults,
-		"numStrategies":     cfg.NumStrategies,
-		"maxOperatorCount":  cfg.MaxOperatorCount,
-		"stakerPrivateKeys": cfg.StakerPrivateKeys,
+		"useDefaults":         cfg.UseDefaults,
+		"numStrategies":       cfg.NumStrategies,
+		"maxOperatorCount":    cfg.MaxOperatorCount,
+		"stakerPrivateKeys":   cfg.StakerPrivateKeys,
+		"confirmerPrivateKey": cfg.ConfirmerPrivateKey,
 	}
 
 	remainingJSON, err := json.Marshal(remainingFields)
@@ -96,12 +98,11 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 }
 
 type EigenDAContract struct {
-	Deployer                       string `yaml:"deployer"`
-	ServiceManager                 string `json:"eigenDAServiceManager"`
-	OperatorStateRetreiver         string `json:"blsOperatorStateRetriever"`
-	PubkeyRegistry                 string `json:"blsPubkeyRegistry"`
-	PubkeyCompendium               string `json:"pubkeyCompendium"`
-	RegistryCoordinatorWithIndices string `json:"blsRegistryCoordinatorWithIndices"`
+	Deployer               string `yaml:"deployer"`
+	ServiceManager         string `json:"eigenDAServiceManager"`
+	OperatorStateRetreiver string `json:"operatorStateRetriever"`
+	BlsApkRegistry         string `json:"blsApkRegistry"`
+	RegistryCoordinator    string `json:"registryCoordinator"`
 }
 
 type ServicesSpec struct {
