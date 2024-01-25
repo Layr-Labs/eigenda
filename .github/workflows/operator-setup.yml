@@ -5,40 +5,36 @@ on:
     types:
       - published
 
+
 jobs:
   pr:
     name: Automate Operator Setup PR
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          repository: layr-labs/eigenda-operator-setup
-      - name: Checkout a new branch
-        run : |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Create PR
+        run: |
+          git clone https://${{secrets.OPERATOR_SETUP_TOKEN}}@github.com/Layr-Labs/eigenda-operator-setup
+          cd eigenda-operator-setup
+          ls -l
+          
           git checkout -b release-${{ github.event.release.tag_name }}
-      - name: Update EigenDA version
-        run: |
+          
           new_version=${{ github.event.release.tag_name }}
-          version_without_v="${version#v}"
-          sed -i '' -E 's/(MAIN_SERVICE_IMAGE=ghcr\.io\/layr-labs\/eigenda\/opr-node:release-)[0-9]+\.[0-9]+\.[0-9]+/\1$version_without_v/' .env.example
-          sed -i '' -E 's/(ghcr\.io\/layr-labs\/eigenda\/opr-nodeplugin:release-)[0-9]+\.[0-9]+\.[0-9]+/\1$version_without_v/g' run.sh
-      - name: Commit changes
-        run: |
+          # Strip the leading 'v' from the version
+          version_without_v="${new_version:1}"
+          echo $version_without_v
+          sed -i -E "s/(MAIN_SERVICE_IMAGE=ghcr\.io\/layr-labs\/eigenda\/opr-node:release-)[0-9]+\.[0-9]+\.[0-9]+/\1$version_without_v/" .env.example
+          sed -i -E "s/(ghcr\.io\/layr-labs\/eigenda\/opr-nodeplugin:release-)[0-9]+\.[0-9]+\.[0-9]+/\1$version_without_v/g" run.sh
+          
+          git config --global user.name "Madhur Shrimal"
+          git config --global user.email "madhur@eigenlabs.org"
           git add .env.example run.sh
           git commit -m "Update EigenDA version to ${{ github.event.release.tag_name }}"
-      - name: Push changes
-        run : |
           git push origin release-${{ github.event.release.tag_name }}
-          gh pr create --title "create release" --body "release" --head "release-${{ github.event.release.tag_name }}" --base master
-#      - name: Create PR
-#        uses: peter-evans/create-pull-request@v5
-#        with:
-#          repository: layr-labs/eigenda-operator-setup
-#          token: ${{ secrets.GITHUB_TOKEN }}
-#          commit-message: "Add changes"
-#          title: "Create Pull Request"
-#          branch: release-${{ github.event.release.tag_name }}
-          
+
+          echo "${{ secrets.OPERATOR_SETUP_TOKEN }}" > token.txt
+
+          # Authorize GitHub CLI for the current repository and
+          # create a pull-requests containing the updates.
+          gh auth login --with-token < token.txt
+          gh pr create --title "create release release-${{ github.event.release.tag_name }}" --body "release" --head "release-${{ github.event.release.tag_name }}" --base master
