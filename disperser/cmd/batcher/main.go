@@ -39,7 +39,7 @@ var (
 )
 
 func main() {
-	probeChan := make(chan time.Time)
+	probeChan := make(chan time.Time, 1)
 	// Channel for signaling errors from the app goroutine
 	errorChan := make(chan error)
 
@@ -58,11 +58,13 @@ func main() {
 		}
 	}()
 
+	if _, err := os.Create(healthProbePath); err != nil {
+		log.Printf("Failed to create readiness file: %v", err)
+	}
 	// Start File based liveness probe
-	// go createFileBasedHealthProbe(healthProbePath, 120*time.Second, probeChan)
-	go createFileBasedHealthProbe(healthProbePath, probeChan, maxStallDuration)
+	go heartBeatMonitor(healthProbePath, probeChan, maxStallDuration)
 
-	ticker := time.NewTicker(120 * time.Second)
+	ticker := time.NewTicker(118 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -70,6 +72,7 @@ func main() {
 		case <-ticker.C:
 			// Signal the health probe to update the file
 			probeChan <- time.Now()
+			log.Printf("File Probe Timer Ticked: time %v Sent\n", time.Now())
 		case err := <-errorChan:
 			log.Printf("Batcher exited with error: %v\n", err)
 			close(probeChan) // Signal the health probe to stop
@@ -201,31 +204,30 @@ func RunBatcher(ctx *cli.Context) error {
 
 }
 
-// Update time in a file to signal liveness
-func createFileBasedHealthProbe(filePath string, probeChan <-chan time.Time, maxStallDuration time.Duration) {
+// process signal from main to signal liveness
+func heartBeatMonitor(filePath string, probeChan <-chan time.Time, maxStallDuration time.Duration) {
 	var lastHeartbeat time.Time
+	stallTimer := time.NewTimer(maxStallDuration)
 
 	for {
 		select {
 		case heartbeat, ok := <-probeChan:
 			if !ok {
-				log.Println("Stopping health probe")
+				log.Println("probeChan closed, stopping health probe")
 				return
 			}
-
+			log.Printf("Received heartbeat: %v\n", heartbeat)
 			lastHeartbeat = heartbeat
-
-		// K8s will check the timestamp in this file every 120 seconds
-		//  hence update this file every 115 seconds and avoid false positives
-		case <-time.After(115 * time.Second): // Check interval
-			if time.Since(lastHeartbeat) > maxStallDuration {
-				log.Println("Application stall detected, stopping file updates")
-				return
-			}
-			// Update file to indicate healthiness
 			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
 				log.Printf("Failed to update heartbeat file: %v", err)
+			} else {
+				log.Printf("Updated heartbeat file: %v with time %v\n", filePath, lastHeartbeat)
 			}
+			stallTimer.Reset(maxStallDuration) // Reset timer on new heartbeat
+
+		case <-stallTimer.C:
+			log.Println("No heartbeat received within max stall duration, stopping health probe")
+			return
 		}
 	}
 }
