@@ -117,7 +117,7 @@ func (g *Metrics) HandleFailedRequest(quorum string, blobBytes int, method strin
 	}).Add(float64(blobBytes))
 }
 
-// HandleBlobStoreFailedRequest updates the number of requests fail to store blob and the size of the blob
+// HandleBlobStoreFailedRequest updates the number of requests failed to store blob and the size of the blob
 func (g *Metrics) HandleBlobStoreFailedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
 		"status": StoreBlobFailure,
