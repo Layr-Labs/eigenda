@@ -497,8 +497,8 @@ func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.
 				return 0, fmt.Errorf("failed to unpack BatchConfirmed log data: %w", err)
 			}
 
-			// There should be exactly two inputs in the data field, batchId.
-			// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L20
+			// There should be exactly one input in the data field, batchId.
+			// Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L17
 			if len(unpackedData) != 1 {
 				return 0, fmt.Errorf("BatchConfirmed log should contain exactly 1 inputs. Found %d", len(unpackedData))
 			}
