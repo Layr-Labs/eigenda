@@ -2,9 +2,11 @@ package test
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"testing"
 
@@ -102,7 +104,20 @@ func TestChurner(t *testing.T) {
 	keyPair, err := dacore.GenRandomBlsKeys()
 	assert.NoError(t, err)
 
-	err = operatorTransactor.RegisterBLSPublicKey(ctx, keyPair)
+	quorumIds_ := make([]uint8, len(quorumIds))
+	for i, q := range quorumIds {
+		quorumIds_[i] = uint8(q)
+	}
+
+	operatorSalt := [32]byte{}
+	_, err = rand.Read(operatorSalt[:])
+	assert.NoError(t, err)
+
+	expiry := big.NewInt(1000)
+	privKey, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+
+	err = operatorTransactor.RegisterOperator(ctx, keyPair, "socket", quorumIds_, privKey, operatorSalt, expiry)
 	assert.NoError(t, err)
 
 	server := newTestServer(t)
