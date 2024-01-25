@@ -28,6 +28,13 @@ type Metrics struct {
 	logger   common.Logger
 }
 
+// The error space of dispersal requests.
+const (
+	StoreBlobFailure          string = "store-blob-failed"   // Fail to store the blob to S3
+	SystemRateLimitedFailure  string = "ratelimited-system"  // The request rate limited at system level
+	AccountRateLimitedFailure string = "ratelimited-account" // The request rate limited at account level
+)
+
 func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	namespace := "eigenda_disperser"
 	reg := prometheus.NewRegistry()
@@ -110,15 +117,29 @@ func (g *Metrics) HandleFailedRequest(quorum string, blobBytes int, method strin
 	}).Add(float64(blobBytes))
 }
 
-// HandleSystemRateLimitedRequest updates the number of system rate limited requests and the size of the blob
-func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, method string) {
+// HandleBlobStoreFailedRequest updates the number of requests fail to store blob and the size of the blob
+func (g *Metrics) HandleBlobStoreFailedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": "ratelimited-system",
+		"status": StoreBlobFailure,
 		"quorum": quorum,
 		"method": method,
 	}).Inc()
 	g.BlobSize.With(prometheus.Labels{
-		"status": "ratelimited-system",
+		"status": StoreBlobFailure,
+		"quorum": quorum,
+		"method": method,
+	}).Add(float64(blobBytes))
+}
+
+// HandleSystemRateLimitedRequest updates the number of system rate limited requests and the size of the blob
+func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, method string) {
+	g.NumBlobRequests.With(prometheus.Labels{
+		"status": SystemRateLimitedFailure,
+		"quorum": quorum,
+		"method": method,
+	}).Inc()
+	g.BlobSize.With(prometheus.Labels{
+		"status": SystemRateLimitedFailure,
 		"quorum": quorum,
 		"method": method,
 	}).Add(float64(blobBytes))
@@ -127,12 +148,12 @@ func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, m
 // HandleAccountRateLimitedRequest updates the number of account rate limited requests and the size of the blob
 func (g *Metrics) HandleAccountRateLimitedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": "ratelimited-account",
+		"status": AccountRateLimitedFailure,
 		"quorum": quorum,
 		"method": method,
 	}).Inc()
 	g.BlobSize.With(prometheus.Labels{
-		"status": "ratelimited-account",
+		"status": AccountRateLimitedFailure,
 		"quorum": quorum,
 		"method": method,
 	}).Add(float64(blobBytes))
