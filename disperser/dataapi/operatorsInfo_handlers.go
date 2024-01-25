@@ -22,7 +22,7 @@ var (
 	operatorOnlineStatusresultsChan chan *DeregisteredOperatorMetadata
 )
 
-func (s *server) getDeregisterdOperatorForDays(ctx context.Context, days int32) ([]*DeregisteredOperatorMetadata, error) {
+func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*DeregisteredOperatorMetadata, error) {
 	// Track Time taken to get deregistered operators
 	startTime := time.Now()
 
@@ -67,36 +67,12 @@ func checkIsOperatorOnline(ipAddress string) bool {
 	return true
 }
 
-// Helper Function to Process Operators in Parallel
-func processOperatorOnlineCheck(deRegisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusChan chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
+func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusChan chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
+	operators := deregisteredOperatorState.Operators
 
-	operators := deRegisteredOperatorState.Operators
 	// Start worker goroutines
 	for i := 0; i < numWorkers; i++ {
-		go func() {
-			for item := range operatorOnlineStatusChan {
-				ipAddress := core.OperatorSocket(item.IndexedOperatorInfo.Socket).GetRetrievalSocket()
-				isOnline := checkIsOperatorOnline(ipAddress)
-
-				// Log the online status
-				if isOnline {
-					logger.Debug("Operator %v is online at %s", item.IndexedOperatorInfo, ipAddress)
-				} else {
-					logger.Debug("Operator %v is offline at %s", item.IndexedOperatorInfo, ipAddress)
-				}
-
-				// Create the metadata regardless of online status
-				metadata := &DeregisteredOperatorMetadata{
-					OperatorId:  string(item.OperatorInfo.OperatorId[:]),
-					BlockNumber: uint(item.OperatorInfo.BlockNumber),
-					IpAddress:   ipAddress,
-					IsOnline:    isOnline,
-				}
-
-				// Send the metadata to the results channel
-				operatorOnlineStatusresultsChan <- metadata
-			}
-		}()
+		go operatorIsOnlineCheckWorker(operatorOnlineStatusChan, operatorOnlineStatusresultsChan, logger)
 	}
 
 	// Send work to the workers
@@ -108,5 +84,29 @@ func processOperatorOnlineCheck(deRegisteredOperatorState *IndexedDeregisteredOp
 		operatorOnlineStatusChan <- operatorOnlineStatus
 	}
 	close(operatorOnlineStatusChan) // Close the channel after sending all tasks
+}
 
+func operatorIsOnlineCheckWorker(operatorOnlineStatusChan <-chan OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
+	for item := range operatorOnlineStatusChan {
+		ipAddress := core.OperatorSocket(item.IndexedOperatorInfo.Socket).GetRetrievalSocket()
+		isOnline := checkIsOperatorOnline(ipAddress)
+
+		// Log the online status
+		if isOnline {
+			logger.Debug("Operator %v is online at %s", item.IndexedOperatorInfo, ipAddress)
+		} else {
+			logger.Debug("Operator %v is offline at %s", item.IndexedOperatorInfo, ipAddress)
+		}
+
+		// Create the metadata regardless of online status
+		metadata := &DeregisteredOperatorMetadata{
+			OperatorId:  string(item.OperatorInfo.OperatorId[:]),
+			BlockNumber: uint(item.OperatorInfo.BlockNumber),
+			IpAddress:   ipAddress,
+			IsOnline:    isOnline,
+		}
+
+		// Send the metadata to the results channel
+		operatorOnlineStatusresultsChan <- metadata
+	}
 }

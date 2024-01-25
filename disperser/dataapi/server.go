@@ -155,7 +155,7 @@ func (s *server) Start() error {
 		}
 		operatorsInfo := v1.Group("/operatorsInfo")
 		{
-			operatorsInfo.GET("/deRegisteredOperators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/deregisteredOperators", s.FetchDeregisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -420,14 +420,14 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 
 // FetchDeregisteredOperators godoc
 //
-//	@Summary	Fetch list of DeregisteredOperators for days
+//	@Summary	Fetch list of operators that have been deregistered for days
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Success	200		{object}	BlobsResponse
 //	@Failure	400		{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
-//	@Router		/operatorsInfo/deRegisteredOperators [get]
+//	@Router		/operatorsInfo/deregisteredOperators [get]
 func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
@@ -450,7 +450,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 		return
 	}
 
-	operatorMetadatas, err := s.getDeregisterdOperatorForDays(c.Request.Context(), int32(daysInt))
+	operatorMetadatas, err := s.getDeregisteredOperatorForDays(c.Request.Context(), int32(daysInt))
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
 		errorResponse(c, err)
