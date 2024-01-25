@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
 
@@ -9,12 +10,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 
-	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/BLSOperatorStateRetriever"
-	blspubkeyreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSPubkeyRegistry"
-	blspubkeycompendium "github.com/Layr-Labs/eigenda/contracts/bindings/BLSPublicKeyCompendium"
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/BLSRegistryCoordinatorWithIndices"
+	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
+	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
+	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -36,14 +37,15 @@ type Transactor struct {
 var _ core.Transactor = (*Transactor)(nil)
 
 type ContractBindings struct {
-	RegCoordinatorAddr     gethcommon.Address
-	BLSOpStateRetriever    *opstateretriever.ContractBLSOperatorStateRetriever
-	BLSPubkeyRegistry      *blspubkeyreg.ContractBLSPubkeyRegistry
-	IndexRegistry          *indexreg.ContractIIndexRegistry
-	BLSRegCoordWithIndices *regcoordinator.ContractBLSRegistryCoordinatorWithIndices
-	StakeRegistry          *stakereg.ContractStakeRegistry
-	EigenDAServiceManager  *eigendasrvmg.ContractEigenDAServiceManager
-	PubkeyCompendium       *blspubkeycompendium.ContractBLSPublicKeyCompendium
+	RegCoordinatorAddr    gethcommon.Address
+	ServiceManagerAddr    gethcommon.Address
+	DelegationManager     *delegationmgr.ContractDelegationManager
+	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
+	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
+	IndexRegistry         *indexreg.ContractIIndexRegistry
+	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
+	StakeRegistry         *stakereg.ContractStakeRegistry
+	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
 }
 
 type BN254G1Point struct {
@@ -74,85 +76,12 @@ func NewTransactor(
 	return e, err
 }
 
-func (t *Transactor) RegisterBLSPublicKey(ctx context.Context, keypair *core.KeyPair) error {
-	// first register the public key with the compendium
-
-	operatorAddress := t.EthClient.GetAccountAddress()
-
-	pkh, err := t.Bindings.PubkeyCompendium.OperatorToPubkeyHash(&bind.CallOpts{
-		Context: ctx,
-	}, operatorAddress)
-	if err != nil {
-		t.Logger.Error("Failed to retrieve bls pubkey registered status from chain")
-		return err
-	}
-
-	// if no pubkey registered already, then register
-	if pkh == [32]byte{} {
-		t.Logger.Info("Registering BLS public key with compendium")
-
-		chainId, err := t.EthClient.ChainID(context.Background())
-		if err != nil {
-			t.Logger.Error("Failed to retrieve chain id")
-			return err
-		}
-
-		compendiumAddress, err := t.Bindings.BLSPubkeyRegistry.PubkeyCompendium(&bind.CallOpts{
-			Context: ctx,
-		})
-		if err != nil {
-			t.Logger.Errorf("Failed to retrieve compendium address", "error", err)
-			return err
-		}
-
-		signedMessageHash := keypair.MakePubkeyRegistrationData(operatorAddress, compendiumAddress, chainId)
-
-		signedMessageHashParam_ := pubKeyG1ToBN254G1Point(signedMessageHash)
-		signedMessageHashParam := blspubkeycompendium.BN254G1Point{
-			X: signedMessageHashParam_.X,
-			Y: signedMessageHashParam_.Y,
-		}
-		pubkeyG1Param_ := pubKeyG1ToBN254G1Point(keypair.GetPubKeyG1())
-		pubkeyG1Param := blspubkeycompendium.BN254G1Point{
-			X: pubkeyG1Param_.X,
-			Y: pubkeyG1Param_.Y,
-		}
-		pubkeyG2Param_ := pubKeyG2ToBN254G2Point(keypair.GetPubKeyG2())
-		pubkeyG2Param := blspubkeycompendium.BN254G2Point{
-			X: pubkeyG2Param_.X,
-			Y: pubkeyG2Param_.Y,
-		}
-
-		// assemble tx
-		opts, err := t.EthClient.GetNoSendTransactOpts()
-		if err != nil {
-			t.Logger.Error("Failed to generate transact opts", "err", err)
-			return err
-		}
-		tx, err := t.Bindings.PubkeyCompendium.RegisterBLSPublicKey(opts, signedMessageHashParam, pubkeyG1Param, pubkeyG2Param)
-		if err != nil {
-			t.Logger.Error("Error assembling RegisterBLSPublicKey tx")
-			return err
-		}
-		// estimate gas and send tx
-
-		_, err = t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterBLSPubkey", nil)
-		if err != nil {
-			t.Logger.Error("Failed to estimate gas price and limit", "err", err)
-			return err
-		}
-
-	}
-
-	return nil
-}
-
 // GetRegisteredQuorumIdsForOperator returns the quorum ids that the operator is registered in with the given public key.
 func (t *Transactor) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator core.OperatorID) ([]core.QuorumID, error) {
 	// TODO: Properly handle the case where the operator is not registered in any quorum. The current behavior of the smart contracts is to revert instead of returning an empty bitmap.
 	//  We should probably change this.
 	emptyBitmapErr := "execution reverted: BLSRegistryCoordinator.getCurrentQuorumBitmapByOperatorId: no quorum bitmap history for operatorId"
-	quorumBitmap, err := t.Bindings.BLSRegCoordWithIndices.GetCurrentQuorumBitmapByOperatorId(&bind.CallOpts{
+	quorumBitmap, err := t.Bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operator)
 	if err != nil {
@@ -169,22 +98,101 @@ func (t *Transactor) GetRegisteredQuorumIdsForOperator(ctx context.Context, oper
 	return quorumIds, nil
 }
 
+func (t *Transactor) getRegistrationParams(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+) (*regcoordinator.IBLSApkRegistryPubkeyRegistrationParams, *regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry, error) {
+
+	operatorAddress := t.EthClient.GetAccountAddress()
+
+	msgToSignG1_, err := t.Bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
+		Context: ctx,
+	}, operatorAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	msgToSignG1 := core.NewG1Point(msgToSignG1_.X, msgToSignG1_.Y)
+	signature := keypair.SignHashedToCurveMessage(msgToSignG1)
+
+	signedMessageHashParam := regcoordinator.BN254G1Point{
+		X: signature.X.BigInt(big.NewInt(0)),
+		Y: signature.Y.BigInt(big.NewInt(0)),
+	}
+
+	g1Point_ := pubKeyG1ToBN254G1Point(keypair.GetPubKeyG1())
+	g1Point := regcoordinator.BN254G1Point{
+		X: g1Point_.X,
+		Y: g1Point_.Y,
+	}
+	g2Point_ := pubKeyG2ToBN254G2Point(keypair.GetPubKeyG2())
+	g2Point := regcoordinator.BN254G2Point{
+		X: g2Point_.X,
+		Y: g2Point_.Y,
+	}
+
+	params := regcoordinator.IBLSApkRegistryPubkeyRegistrationParams{
+		PubkeyRegistrationSignature: signedMessageHashParam,
+		PubkeyG1:                    g1Point,
+		PubkeyG2:                    g2Point,
+	}
+
+	// params to register operator in delegation manager's operator-avs mapping
+	msgToSign, err := t.Bindings.DelegationManager.CalculateOperatorAVSRegistrationDigestHash(
+		&bind.CallOpts{
+			Context: ctx,
+		}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	if err != nil {
+		return nil, nil, err
+	}
+	operatorSignature, err := crypto.Sign(msgToSign[:], operatorEcdsaPrivateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	// this is annoying, and not sure why its needed, but seems like some historical baggage
+	// see https://github.com/ethereum/go-ethereum/issues/28757#issuecomment-1874525854
+	// and https://twitter.com/pcaversaccio/status/1671488928262529031
+	operatorSignature[64] += 27
+	operatorSignatureWithSaltAndExpiry := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
+		Signature: operatorSignature,
+		Salt:      operatorToAvsRegistrationSigSalt,
+		Expiry:    operatorToAvsRegistrationSigExpiry,
+	}
+
+	return &params, &operatorSignatureWithSaltAndExpiry, nil
+
+}
+
 // RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
 // If the operator is already registered with a given quorum id, the transaction will fail (noop) and an error
 // will be returned.
-func (t *Transactor) RegisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, socket string, quorumIds []core.QuorumID) error {
-	pubkey := pubKeyG1ToBN254G1Point(pubkeyG1)
-	g1Point := regcoordinator.BN254G1Point{
-		X: pubkey.X,
-		Y: pubkey.Y,
+func (t *Transactor) RegisterOperator(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	socket string,
+	quorumIds []core.QuorumID,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+) error {
+
+	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	if err != nil {
+		t.Logger.Error("Failed to get registration params", "err", err)
+		return err
 	}
+
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
 	opts, err := t.EthClient.GetNoSendTransactOpts()
 	if err != nil {
 		t.Logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator1(opts, quorumNumbers, g1Point, socket)
+
+	tx, err := t.Bindings.RegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, *operatorSignature)
 
 	if err != nil {
 		t.Logger.Error("Failed to register operator", "err", err)
@@ -201,31 +209,36 @@ func (t *Transactor) RegisterOperator(ctx context.Context, pubkeyG1 *core.G1Poin
 
 // RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
 // with the provided signature from the churner
-func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *core.G1Point, socket string, quorumIds []core.QuorumID, churnReply *churner.ChurnReply) error {
-	pubkeyTmp := pubKeyG1ToBN254G1Point(pubkeyG1)
-	operatorToRegisterPubkey := regcoordinator.BN254G1Point{
-		X: pubkeyTmp.X,
-		Y: pubkeyTmp.Y,
+func (t *Transactor) RegisterOperatorWithChurn(
+	ctx context.Context,
+	keypair *core.KeyPair,
+	socket string,
+	quorumIds []core.QuorumID,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorToAvsRegistrationSigSalt [32]byte,
+	operatorToAvsRegistrationSigExpiry *big.Int,
+	churnReply *churner.ChurnReply,
+) error {
+
+	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	if err != nil {
+		t.Logger.Error("Failed to get registration params", "err", err)
+		return err
 	}
+
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
 
-	operatorsToChurn := make([]regcoordinator.IBLSRegistryCoordinatorWithIndicesOperatorKickParam, len(churnReply.OperatorsToChurn))
+	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.OperatorsToChurn))
 	for i := range churnReply.OperatorsToChurn {
-		operatorToChurnPubkeyTmp := pubKeyG1ToBN254G1Point(new(core.G1Point).Deserialize(churnReply.OperatorsToChurn[i].Pubkey))
-		operatorToChurnPubkey := regcoordinator.BN254G1Point{
-			X: operatorToChurnPubkeyTmp.X,
-			Y: operatorToChurnPubkeyTmp.Y,
-		}
-		operatorsToChurn[i] = regcoordinator.IBLSRegistryCoordinatorWithIndicesOperatorKickParam{
+		operatorsToChurn[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
 			QuorumNumber: uint8(churnReply.OperatorsToChurn[i].QuorumId),
 			Operator:     gethcommon.BytesToAddress(churnReply.OperatorsToChurn[i].Operator),
-			Pubkey:       operatorToChurnPubkey,
 		}
 	}
 
 	var salt [32]byte
 	copy(salt[:], churnReply.SignatureWithSaltAndExpiry.Salt[:])
-	signatureWithSaltAndExpiry := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
+	churnApproverSignature := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
 		Signature: churnReply.SignatureWithSaltAndExpiry.Signature,
 		Salt:      salt,
 		Expiry:    new(big.Int).SetInt64(churnReply.SignatureWithSaltAndExpiry.Expiry),
@@ -236,13 +249,18 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *co
 		t.Logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.Bindings.BLSRegCoordWithIndices.RegisterOperatorWithCoordinator(
+
+	// TODO(mooselumph): Fill out these
+	kickParams := []regcoordinator.IRegistryCoordinatorOperatorKickParam{}
+
+	tx, err := t.Bindings.RegistryCoordinator.RegisterOperatorWithChurn(
 		opts,
 		quorumNumbers,
-		operatorToRegisterPubkey,
 		socket,
-		operatorsToChurn,
-		signatureWithSaltAndExpiry,
+		*params,
+		kickParams,
+		churnApproverSignature,
+		*operatorSignature,
 	)
 
 	if err != nil {
@@ -263,7 +281,7 @@ func (t *Transactor) RegisterOperatorWithChurn(ctx context.Context, pubkeyG1 *co
 // with the current block number.
 func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32) error {
 	operatorId := HashPubKeyG1(pubkeyG1)
-	quorumBitmap, opStates, err := t.Bindings.BLSOpStateRetriever.GetOperatorState0(&bind.CallOpts{
+	quorumBitmap, opStates, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operatorId, blockNumber)
 	if err != nil {
@@ -279,21 +297,14 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 
 	quorumNumbers := bitmapToBytesArray(quorumBitmap)
 
-	pubkey := pubKeyG1ToBN254G1Point(pubkeyG1)
-	g1Point := regcoordinator.BN254G1Point{
-		X: pubkey.X,
-		Y: pubkey.Y,
-	}
-
 	opts, err := t.EthClient.GetNoSendTransactOpts()
 	if err != nil {
 		t.Logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.Bindings.BLSRegCoordWithIndices.DeregisterOperatorWithCoordinator(
+	tx, err := t.Bindings.RegistryCoordinator.DeregisterOperator(
 		opts,
 		quorumNumbers,
-		g1Point,
 	)
 	if err != nil {
 		t.Logger.Error("Failed to deregister operator", "err", err)
@@ -315,7 +326,7 @@ func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) er
 		t.Logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.Bindings.BLSRegCoordWithIndices.UpdateSocket(opts, socket)
+	tx, err := t.Bindings.RegistryCoordinator.UpdateSocket(opts, socket)
 	if err != nil {
 		t.Logger.Error("Failed to update operator socket", "err", err)
 		return err
@@ -333,7 +344,7 @@ func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) er
 // is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 // are also returned.
 func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.OperatorID, blockNumber uint32) (core.OperatorStakes, []core.QuorumID, error) {
-	quorumBitmap, state_, err := t.Bindings.BLSOpStateRetriever.GetOperatorState0(&bind.CallOpts{
+	quorumBitmap, state_, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operator, blockNumber)
 	if err != nil {
@@ -390,7 +401,7 @@ func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []
 	}
 
 	// state_ is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
-	state_, err := t.Bindings.BLSOpStateRetriever.GetOperatorState(&bind.CallOpts{
+	state_, err := t.Bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
 	if err != nil {
@@ -433,7 +444,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	for _, ns := range nonSignerOperatorIds {
 		t.Logger.Trace("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
 	}
-	checkSignaturesIndices, err := t.Bindings.BLSOpStateRetriever.GetCheckSignaturesIndices(
+	checkSignaturesIndices, err := t.Bindings.OpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
 			Context: ctx,
 		},
@@ -513,26 +524,26 @@ func (t *Transactor) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHe
 }
 
 func (t *Transactor) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
-	return t.Bindings.BLSRegCoordWithIndices.StakeRegistry(&bind.CallOpts{
+	return t.Bindings.RegistryCoordinator.StakeRegistry(&bind.CallOpts{
 		Context: ctx,
 	})
 }
 
 func (t *Transactor) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
-	return t.Bindings.PubkeyCompendium.PubkeyHashToOperator(&bind.CallOpts{
+	return t.Bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
 
 func (t *Transactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
-	return t.Bindings.BLSRegCoordWithIndices.GetCurrentQuorumBitmapByOperatorId(&bind.CallOpts{
+	return t.Bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
 
 func (t *Transactor) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
 
-	operatorSetParams, err := t.Bindings.BLSRegCoordWithIndices.GetOperatorSetParams(&bind.CallOpts{
+	operatorSetParams, err := t.Bindings.RegistryCoordinator.GetOperatorSetParams(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID)
 	if err != nil {
@@ -567,20 +578,15 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 	salt [32]byte,
 	expiry *big.Int,
 ) ([32]byte, error) {
-	opKickParams := make([]regcoordinator.IBLSRegistryCoordinatorWithIndicesOperatorKickParam, len(operatorsToChurn))
+	opKickParams := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(operatorsToChurn))
 	for i := range operatorsToChurn {
-		pubkey := operatorsToChurn[i].Pubkey
 
-		opKickParams[i] = regcoordinator.IBLSRegistryCoordinatorWithIndicesOperatorKickParam{
+		opKickParams[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
 			QuorumNumber: operatorsToChurn[i].QuorumId,
 			Operator:     operatorsToChurn[i].Operator,
-			Pubkey: regcoordinator.BN254G1Point{
-				X: pubkey.X.BigInt(new(big.Int)),
-				Y: pubkey.Y.BigInt(new(big.Int)),
-			},
 		}
 	}
-	return t.Bindings.BLSRegCoordWithIndices.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
+	return t.Bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId, opKickParams, salt, expiry)
 }
@@ -589,17 +595,30 @@ func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) 
 	return t.EthClient.GetCurrentBlockNumber(ctx)
 }
 
-func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint16, error) {
-	return t.Bindings.StakeRegistry.QuorumCount(&bind.CallOpts{
+func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
+	return t.Bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
+
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)
 	if err != nil {
 		t.Logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
+		return err
+	}
+
+	delegationManagerAddr, err := contractEigenDAServiceManager.Delegation(&bind.CallOpts{})
+	if err != nil {
+		t.Logger.Error("Failed to fetch DelegationManager address", "err", err)
+		return err
+	}
+
+	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.EthClient)
+	if err != nil {
+		t.Logger.Error("Failed to fetch DelegationManager contract", "err", err)
 		return err
 	}
 
@@ -609,31 +628,33 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		return err
 	}
 
-	contractIBLSRegCoordWithIndices, err := regcoordinator.NewContractBLSRegistryCoordinatorWithIndices(registryCoordinatorAddr, t.EthClient)
+	contractIRegistryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddr, t.EthClient)
 	if err != nil {
 		t.Logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
 		return err
 	}
 
-	contractBLSOpStateRetr, err := opstateretriever.NewContractBLSOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.EthClient)
+	contractBLSOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.EthClient)
 	if err != nil {
 		t.Logger.Error("Failed to fetch BLSOperatorStateRetriever contract", "err", err)
 		return err
 	}
 
-	blsPubkeyRegistryAddr, err := contractIBLSRegCoordWithIndices.BlsPubkeyRegistry(&bind.CallOpts{})
+	blsPubkeyRegistryAddr, err := contractIRegistryCoordinator.BlsApkRegistry(&bind.CallOpts{})
 	if err != nil {
 		t.Logger.Error("Failed to fetch BlsPubkeyRegistry address", "err", err)
 		return err
 	}
 
-	contractBLSPubkeyReg, err := blspubkeyreg.NewContractBLSPubkeyRegistry(blsPubkeyRegistryAddr, t.EthClient)
+	t.Logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+
+	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.EthClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch IBLSPubkeyRegistry contract", "err", err)
+		t.Logger.Error("Failed to fetch IBLSApkRegistry contract", "err", err)
 		return err
 	}
 
-	indexRegistryAddr, err := contractIBLSRegCoordWithIndices.IndexRegistry(&bind.CallOpts{})
+	indexRegistryAddr, err := contractIRegistryCoordinator.IndexRegistry(&bind.CallOpts{})
 	if err != nil {
 		t.Logger.Error("Failed to fetch IndexRegistry address", "err", err)
 		return err
@@ -645,7 +666,7 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		return err
 	}
 
-	stakeRegistryAddr, err := contractIBLSRegCoordWithIndices.StakeRegistry(&bind.CallOpts{})
+	stakeRegistryAddr, err := contractIRegistryCoordinator.StakeRegistry(&bind.CallOpts{})
 	if err != nil {
 		t.Logger.Error("Failed to fetch StakeRegistry address", "err", err)
 		return err
@@ -657,27 +678,16 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		return err
 	}
 
-	pubkeyCompendiumAddr, err := contractBLSPubkeyReg.PubkeyCompendium(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch PubkeyCompendium address", "err", err)
-		return err
-	}
-
-	contractPubkeyCompendium, err := blspubkeycompendium.NewContractBLSPublicKeyCompendium(pubkeyCompendiumAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch IBLSPublicKeyCompendium contract", "err", err)
-		return err
-	}
-
 	t.Bindings = &ContractBindings{
-		RegCoordinatorAddr:     registryCoordinatorAddr,
-		BLSOpStateRetriever:    contractBLSOpStateRetr,
-		BLSPubkeyRegistry:      contractBLSPubkeyReg,
-		IndexRegistry:          contractIIndexReg,
-		BLSRegCoordWithIndices: contractIBLSRegCoordWithIndices,
-		StakeRegistry:          contractStakeRegistry,
-		EigenDAServiceManager:  contractEigenDAServiceManager,
-		PubkeyCompendium:       contractPubkeyCompendium,
+		ServiceManagerAddr:    eigenDAServiceManagerAddr,
+		RegCoordinatorAddr:    registryCoordinatorAddr,
+		OpStateRetriever:      contractBLSOpStateRetr,
+		BLSApkRegistry:        contractBLSPubkeyReg,
+		IndexRegistry:         contractIIndexReg,
+		RegistryCoordinator:   contractIRegistryCoordinator,
+		StakeRegistry:         contractStakeRegistry,
+		EigenDAServiceManager: contractEigenDAServiceManager,
+		DelegationManager:     contractDelegationManager,
 	}
 	return nil
 }
