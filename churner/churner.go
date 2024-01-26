@@ -28,6 +28,7 @@ type ChurnRequest struct {
 	OperatorToRegisterPubkeyG1 *core.G1Point
 	OperatorToRegisterPubkeyG2 *core.G2Point
 	OperatorRequestSignature   *core.Signature
+	OperatorAddress            gethcommon.Address
 	Salt                       [32]byte
 	QuorumIDs                  []core.QuorumID
 }
@@ -78,6 +79,7 @@ func NewChurner(
 }
 
 func (c *churner) VerifyRequestSignature(ctx context.Context, churnRequest *ChurnRequest) (gethcommon.Address, error) {
+	operatorToRegisterAddress := churnRequest.OperatorAddress
 	isEqual, err := churnRequest.OperatorToRegisterPubkeyG1.VerifyEquivalence(churnRequest.OperatorToRegisterPubkeyG2)
 	if err != nil {
 		return gethcommon.Address{}, err
