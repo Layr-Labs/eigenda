@@ -78,14 +78,6 @@ func NewChurner(
 }
 
 func (c *churner) VerifyRequestSignature(ctx context.Context, churnRequest *ChurnRequest) (gethcommon.Address, error) {
-	operatorToRegisterAddress, err := c.Transactor.OperatorIDToAddress(ctx, churnRequest.OperatorToRegisterPubkeyG1.GetOperatorID())
-	if err != nil {
-		return gethcommon.Address{}, err
-	}
-	if operatorToRegisterAddress == gethcommon.HexToAddress(zeroAddressString) {
-		return gethcommon.Address{}, errors.New("operatorToRegisterPubkey is not registered with bls pubkey compendium")
-	}
-
 	isEqual, err := churnRequest.OperatorToRegisterPubkeyG1.VerifyEquivalence(churnRequest.OperatorToRegisterPubkeyG2)
 	if err != nil {
 		return gethcommon.Address{}, err
