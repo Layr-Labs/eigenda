@@ -1,0 +1,55 @@
+{
+  "chainInfo": {
+    "chainId": 5
+  },
+
+  "permissions" : {
+    "owner": "0x1000000000000000000000000000000000000000",
+    "upgrader": "0x2000000000000000000000000000000000000000",
+    "churner": "0x3000000000000000000000000000000000000000",
+    "ejector": "0x4000000000000000000000000000000000000000",
+    "batchConfirmer": "0x5000000000000000000000000000000000000000"
+  },
+
+  "minimumStakes": [
+    0,
+    0
+  ],
+
+  "strategyWeights": [
+    [
+      {
+        "0_strategy": "0x0000000000000000000000000000000000000000",
+        "1_multiplier": 1
+      },
+      {
+        "0_strategy": "0x0000000000000000000000000000000000000001",
+        "1_multiplier": 1
+      },
+      {
+        "0_strategy": "0x0000000000000000000000000000000000000002",
+        "1_multiplier": 1
+      }
+    ],
+    [
+      {
+        "0_strategy": "0x0000000000000000000000000000000000000003",
+        "1_multiplier": 1
+      }
+    ]
+  ],
+
+  "operatorSetParams": [
+    {
+      "0_maxOperatorCount" : 200,
+      "1_kickBIPsOfOperatorStake" : 11000,
+      "2_kickBIPsOfTotalStake" : 50
+    },
+    {
+      "0_maxOperatorCount" : 200,
+      "1_kickBIPsOfOperatorStake" : 11000,
+      "2_kickBIPsOfTotalStake" : 50
+    }
+  ]
+
+}
