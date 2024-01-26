@@ -23,23 +23,23 @@
   },
   "anvil": {
     "RegistryCoordinator": {
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
     "BLSApkRegistry": {
-      "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
     "BLSApkRegistry_Operator": {
-      "address": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933",
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
     "RegistryCoordinator_Operator": {
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
     "BLSApkRegistry_QuorumApkUpdates": {
-      "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     }
   },
