@@ -30,7 +30,7 @@ type Metrics struct {
 
 // The error space of dispersal requests.
 const (
-	StoreBlobFailure          string = "store-blob-failed"   // Fail to store the blob to S3
+	StoreBlobFailure          string = "store-blob-failed"   // Fail to store the blob
 	SystemRateLimitedFailure  string = "ratelimited-system"  // The request rate limited at system level
 	AccountRateLimitedFailure string = "ratelimited-account" // The request rate limited at account level
 )
