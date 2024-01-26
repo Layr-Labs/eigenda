@@ -35,6 +35,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
     address public eigenDAOwner;
     address public eigenDAUpgrader;
     address public batchConfirmer;
+    uint256 public initalPausedStatus;
 
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
@@ -66,6 +67,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
         eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
         batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
+        initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
 
         vm.startBroadcast();
 
@@ -156,7 +158,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
                 churner,
                 ejector,
                 IPauserRegistry(address(eigenLayerPauserReg)),
-                1, // initial paused status is nothing paused
+                initalPausedStatus, 
                 operatorSetParams, 
                 minimumStakeForQuourm,
                 strategyAndWeightingMultipliers 
@@ -247,13 +249,13 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         require(eigenDAServiceManager.owner() == eigenDAOwner, "eigenDAServiceManager.owner() != eigenDAOwner");
         require(eigenDAServiceManager.pauserRegistry() == eigenLayerPauserReg, "eigenDAServiceManager: pauser registry not set correctly");
         require(eigenDAServiceManager.batchConfirmer() == batchConfirmer, "eigenDAServiceManager.batchConfirmer() != batchConfirmer");
-        require(eigenDAServiceManager.paused() == 1, "eigenDAServiceManager: init paused status set incorrectly");
+        require(eigenDAServiceManager.paused() == initalPausedStatus, "eigenDAServiceManager: init paused status set incorrectly");
 
         require(registryCoordinator.owner() == eigenDAOwner, "registryCoordinator.owner() != eigenDAOwner");
         require(registryCoordinator.churnApprover() == churner, "registryCoordinator.churner() != churner");
         require(registryCoordinator.ejector() == ejector, "registryCoordinator.ejector() != ejector");
         require(registryCoordinator.pauserRegistry() == eigenLayerPauserReg, "registryCoordinator: pauser registry not set correctly");
-        require(registryCoordinator.paused() == 1, "registryCoordinator: init paused status set incorrectly");
+        require(registryCoordinator.paused() == initalPausedStatus, "registryCoordinator: init paused status set incorrectly");
         
         for (uint8 i = 0; i < operatorSetParams.length; ++i) {
             require(keccak256(abi.encode(registryCoordinator.getOperatorSetParams(i))) == keccak256(abi.encode(operatorSetParams[i])), "registryCoordinator.operatorSetParams != operatorSetParams");
