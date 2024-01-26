@@ -250,15 +250,12 @@ func (t *Transactor) RegisterOperatorWithChurn(
 		return err
 	}
 
-	// TODO(mooselumph): Fill out these
-	kickParams := []regcoordinator.IRegistryCoordinatorOperatorKickParam{}
-
 	tx, err := t.Bindings.RegistryCoordinator.RegisterOperatorWithChurn(
 		opts,
 		quorumNumbers,
 		socket,
 		*params,
-		kickParams,
+		operatorsToChurn,
 		churnApproverSignature,
 		*operatorSignature,
 	)
