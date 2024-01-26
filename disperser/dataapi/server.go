@@ -423,10 +423,10 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Summary	Fetch list of operators that have been deregistered for days
 //	@Tags		OperatorsInfo
 //	@Produce	json
-//	@Success	200		{object}	BlobsResponse
-//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404		{object}	ErrorResponse	"error: Not found"
-//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Success	200	{object}	BlobsResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operatorsInfo/deregisteredOperators [get]
 func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {

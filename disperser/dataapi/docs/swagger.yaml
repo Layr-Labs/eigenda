@@ -343,6 +343,30 @@ paths:
       summary: Fetch throughput time series
       tags:
       - Metrics
+  /operatorsInfo/deregisteredOperators:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.BlobsResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch list of operators that have been deregistered for days
+      tags:
+      - OperatorsInfo
 schemes:
 - https
 - http
