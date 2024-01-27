@@ -286,6 +286,7 @@ func CalculateRequestHash(churnRequest *ChurnRequest) [32]byte {
 		[]byte("ChurnRequest"),
 		churnRequest.OperatorToRegisterPubkeyG1.Serialize(),
 		churnRequest.OperatorToRegisterPubkeyG2.Serialize(),
+		churnRequest.OperatorAddress.Hex(),
 		churnRequest.Salt[:],
 	)
 	copy(requestHash[:], requestHashBytes)
