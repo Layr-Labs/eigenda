@@ -159,14 +159,27 @@ func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, s
 	metas := make([]*disperser.BlobMetadata, 0)
 	foundStart := exclusiveStartKey == nil
 
-	for _, meta := range q.Metadata {
+	keys := make([]disperser.BlobKey, len(q.Metadata))
+	i := 0
+	for k := range q.Metadata {
+		keys[i] = k
+		i++
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return q.Metadata[keys[i]].RequestMetadata.RequestedAt < q.Metadata[keys[j]].RequestMetadata.RequestedAt
+	})
+	for _, key := range keys {
+		meta := q.Metadata[key]
 		if meta.BlobStatus == status {
 			if foundStart {
 				metas = append(metas, meta)
 				if len(metas) == int(limit) {
-					break
+					return metas, &disperser.BlobStoreExclusiveStartKey{
+						BlobStatus:  int32(meta.BlobStatus),
+						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
+					}, nil
 				}
-			} else if meta.BlobStatus == disperser.BlobStatus(exclusiveStartKey.BlobStatus) && meta.RequestMetadata.RequestedAt == uint64(exclusiveStartKey.RequestedAt) {
+			} else if meta.BlobStatus == disperser.BlobStatus(exclusiveStartKey.BlobStatus) && meta.RequestMetadata.RequestedAt > uint64(exclusiveStartKey.RequestedAt) {
 				foundStart = true // Found the starting point, start appending metas from next item
 				metas = append(metas, meta)
 				if len(metas) == int(limit) {
@@ -178,10 +191,6 @@ func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, s
 			}
 		}
 	}
-
-	sort.SliceStable(metas, func(i, j int) bool {
-		return metas[i].RequestMetadata.RequestedAt < metas[j].RequestMetadata.RequestedAt
-	})
 
 	// Return all the metas if limit is not reached
 	return metas, nil, nil

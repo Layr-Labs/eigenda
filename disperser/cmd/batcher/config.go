@@ -45,6 +45,7 @@ func NewConfig(ctx *cli.Context) Config {
 		BatcherConfig: batcher.Config{
 			PullInterval:             ctx.GlobalDuration(flags.PullIntervalFlag.Name),
 			FinalizerInterval:        ctx.GlobalDuration(flags.FinalizerIntervalFlag.Name),
+			FinalizerPoolSize:        ctx.GlobalInt(flags.FinalizerPoolSizeFlag.Name),
 			EncoderSocket:            ctx.GlobalString(flags.EncoderSocket.Name),
 			NumConnections:           ctx.GlobalInt(flags.NumConnectionsFlag.Name),
 			EncodingRequestQueueSize: ctx.GlobalInt(flags.EncodingRequestQueueSizeFlag.Name),

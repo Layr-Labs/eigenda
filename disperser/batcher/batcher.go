@@ -47,6 +47,7 @@ type TimeoutConfig struct {
 type Config struct {
 	PullInterval             time.Duration
 	FinalizerInterval        time.Duration
+	FinalizerPoolSize        int
 	EncoderSocket            string
 	SRSOrder                 int
 	NumConnections           int

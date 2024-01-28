@@ -43,9 +43,16 @@ type TxnManagerMetrics struct {
 	NumTx    *prometheus.CounterVec
 }
 
+type FinalizerMetrics struct {
+	NumBlobs               *prometheus.CounterVec
+	LastSeenFinalizedBlock prometheus.Gauge
+	Latency                *prometheus.SummaryVec
+}
+
 type Metrics struct {
 	*EncodingStreamerMetrics
 	*TxnManagerMetrics
+	*FinalizerMetrics
 
 	registry *prometheus.Registry
 
@@ -115,9 +122,37 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 		),
 	}
 
+	finalizerMetrics := FinalizerMetrics{
+		NumBlobs: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "finalizer_num_blobs",
+				Help:      "number of blobs in each state",
+			},
+			[]string{"state"}, // possible values are "processed", "failed", "finalized"
+		),
+		LastSeenFinalizedBlock: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "last_finalized_block",
+				Help:      "last finalized block number",
+			},
+		),
+		Latency: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "finalizer_process_latency_ms",
+				Help:       "finalizer process latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			[]string{"stage"}, // possible values are "round" and "total"
+		),
+	}
+
 	metrics := &Metrics{
 		EncodingStreamerMetrics: &encodingStreamerMetrics,
 		TxnManagerMetrics:       &txnManagerMetrics,
+		FinalizerMetrics:        &finalizerMetrics,
 		Blob: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -247,4 +282,20 @@ func (t *TxnManagerMetrics) UpdateTxQueue(txQueue int) {
 
 func (t *TxnManagerMetrics) IncrementTxnCount(state string) {
 	t.NumTx.WithLabelValues(state).Inc()
+}
+
+func (f *FinalizerMetrics) IncrementNumBlobs(state string) {
+	f.NumBlobs.WithLabelValues(state).Inc()
+}
+
+func (f *FinalizerMetrics) UpdateNumBlobs(state string, count int) {
+	f.NumBlobs.WithLabelValues(state).Add(float64(count))
+}
+
+func (f *FinalizerMetrics) UpdateLastSeenFinalizedBlock(blockNumber uint64) {
+	f.LastSeenFinalizedBlock.Set(float64(blockNumber))
+}
+
+func (f *FinalizerMetrics) ObserveLatency(stage string, latencyMs float64) {
+	f.Latency.WithLabelValues(stage).Observe(latencyMs)
 }

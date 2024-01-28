@@ -39,7 +39,8 @@ func TestFinalizedBlob(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1_000_000),
 	}, nil)
 
-	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, 1, 1, logger, metrics.FinalizerMetrics)
 
 	requestedAt := uint64(time.Now().UnixNano())
 	blob := makeTestBlob([]*core.SecurityParam{{
@@ -47,7 +48,9 @@ func TestFinalizedBlob(t *testing.T) {
 		AdversaryThreshold: 80,
 	}})
 	ctx := context.Background()
-	metadataKey, err := queue.StoreBlob(ctx, &blob, requestedAt)
+	metadataKey1, err := queue.StoreBlob(ctx, &blob, requestedAt)
+	assert.NoError(t, err)
+	metadataKey2, err := queue.StoreBlob(ctx, &blob, requestedAt+1)
 	assert.NoError(t, err)
 	batchHeaderHash := [32]byte{1, 2, 3}
 	blobIndex := uint32(10)
@@ -66,9 +69,9 @@ func TestFinalizedBlob(t *testing.T) {
 		ConfirmationBlockNumber: uint32(150),
 		Fee:                     []byte{0},
 	}
-	metadata := &disperser.BlobMetadata{
-		BlobHash:     metadataKey.BlobHash,
-		MetadataHash: metadataKey.MetadataHash,
+	metadata1 := &disperser.BlobMetadata{
+		BlobHash:     metadataKey1.BlobHash,
+		MetadataHash: metadataKey1.MetadataHash,
 		BlobStatus:   disperser.Processing,
 		Expiry:       0,
 		NumRetries:   0,
@@ -79,7 +82,23 @@ func TestFinalizedBlob(t *testing.T) {
 			RequestedAt: requestedAt,
 		},
 	}
-	m, err := queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
+	metadata2 := &disperser.BlobMetadata{
+		BlobHash:     metadataKey2.BlobHash,
+		MetadataHash: metadataKey2.MetadataHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: core.BlobRequestHeader{
+				SecurityParams: blob.RequestHeader.SecurityParams,
+			},
+			RequestedAt: requestedAt + 1,
+		},
+	}
+	m, err := queue.MarkBlobConfirmed(ctx, metadata1, confirmationInfo)
+	assert.Equal(t, disperser.Confirmed, m.BlobStatus)
+	assert.NoError(t, err)
+	m, err = queue.MarkBlobConfirmed(ctx, metadata2, confirmationInfo)
 	assert.Equal(t, disperser.Confirmed, m.BlobStatus)
 	assert.NoError(t, err)
 
@@ -92,12 +111,14 @@ func TestFinalizedBlob(t *testing.T) {
 
 	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Finalized)
 	assert.NoError(t, err)
-	assert.Len(t, metadatas, 1)
+	assert.Len(t, metadatas, 2)
 
-	assert.Equal(t, metadatas[0].BlobHash, metadataKey.BlobHash)
+	assert.ElementsMatch(t, []string{metadatas[0].BlobHash, metadatas[1].BlobHash}, []string{metadataKey1.BlobHash, metadataKey2.BlobHash})
 	assert.Equal(t, metadatas[0].BlobStatus, disperser.Finalized)
-	assert.Equal(t, metadatas[0].RequestMetadata.RequestedAt, requestedAt)
+	assert.Equal(t, metadatas[1].BlobStatus, disperser.Finalized)
+	assert.ElementsMatch(t, []uint64{metadatas[0].RequestMetadata.RequestedAt, metadatas[1].RequestMetadata.RequestedAt}, []uint64{requestedAt, requestedAt + 1})
 	assert.Equal(t, metadatas[0].RequestMetadata.SecurityParams, blob.RequestHeader.SecurityParams)
+	assert.Equal(t, metadatas[1].RequestMetadata.SecurityParams, blob.RequestHeader.SecurityParams)
 }
 
 func TestUnfinalizedBlob(t *testing.T) {
@@ -117,7 +138,8 @@ func TestUnfinalizedBlob(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1_000_100),
 	}, nil)
 
-	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, 1, 1, logger, metrics.FinalizerMetrics)
 
 	requestedAt := uint64(time.Now().UnixNano())
 	blob := makeTestBlob([]*core.SecurityParam{{
@@ -187,7 +209,8 @@ func TestNoReceipt(t *testing.T) {
 		}).Return(nil)
 	ethClient.On("TransactionReceipt", m.Anything, m.Anything).Return(nil, ethereum.NotFound)
 
-	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, logger)
+	metrics := batcher.NewMetrics("9100", logger)
+	finalizer := batcher.NewFinalizer(timeout, loopInterval, queue, ethClient, rpcClient, 1, 1, 1, logger, metrics.FinalizerMetrics)
 
 	requestedAt := uint64(time.Now().UnixNano())
 	blob := makeTestBlob([]*core.SecurityParam{{
