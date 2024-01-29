@@ -58,9 +58,15 @@ type (
 	IndexedDeregisteredOperatorState struct {
 		Operators map[core.OperatorID]*DeregisteredOperatorInfo
 	}
-	OperatorEvents struct {
+	// OperatorInterval describes a time interval where the operator is live in
+	// EigenDA.
+	OperatorInterval struct {
 		OperatorId string
-		Events     []uint64
+
+		// The operator is live from start to end.
+		start uint64
+		// If the operator is still live now in EigenDA netowrk, end is set to 0.
+		end uint64
 	}
 	NonSigner struct {
 		OperatorId string
@@ -163,13 +169,13 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 	for _, ie := range intervalEvents {
 		interval := ie
 		intervalEventsPool.Submit(func() {
-			end := interval.Events[1]
+			end := interval.end
 			if end == 0 {
 				end = currentTs
 			}
-			batches, err := sc.api.QueryBatchesByBlockTimestampRange(ctx, interval.Events[0], end)
+			batches, err := sc.api.QueryBatchesByBlockTimestampRange(ctx, interval.start, end)
 			if err != nil {
-				sc.logger.Error("failed to query batches by block timestamp range", "start", interval.Events[0], "end", end, "err", err)
+				sc.logger.Error("failed to query batches by block timestamp range", "start", interval.start, "end", end, "err", err)
 				return
 			}
 			if len(batches) > 0 {
@@ -227,7 +233,7 @@ func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 	deregisteredOperators []*subgraph.Operator,
 	blockTimestamp uint64,
 	nonSigners map[string]int,
-) ([]OperatorEvents, error) {
+) ([]OperatorInterval, error) {
 	sort.SliceStable(registeredOperators, func(i, j int) bool {
 		return registeredOperators[i].BlockTimestamp < registeredOperators[j].BlockTimestamp
 	})
@@ -270,7 +276,7 @@ func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		}
 	}
 
-	events, err := getOperatorsEvents(ctx, operators, blockTimestamp, nonSigners)
+	events, err := getOperatorInterval(ctx, operators, blockTimestamp, nonSigners)
 	if err != nil {
 		return nil, err
 	}
@@ -278,14 +284,14 @@ func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 	return events, nil
 }
 
-func getOperatorsEvents(
+func getOperatorInterval(
 	ctx context.Context,
 	operators map[string][][]uint64,
 	blockTimestamp uint64,
 	nonSigners map[string]int,
-) ([]OperatorEvents, error) {
+) ([]OperatorInterval, error) {
 	currentTs := uint64(time.Now().Unix())
-	events := make([]OperatorEvents, 0)
+	intervals := make([]OperatorInterval, 0)
 
 	// For the time window [blockTimestamp, now], compute the sub intervals during
 	// which the operator is live in EigenDA network for validating batches.
@@ -306,23 +312,26 @@ func getOperatorsEvents(
 		if len(reg) == 0 && len(dereg) == 0 {
 			// The operator has no registration/deregistration events: it's live
 			// for the entire time window.
-			events = append(events, OperatorEvents{
+			intervals = append(intervals, OperatorInterval{
 				OperatorId: operatorId,
-				Events:     []uint64{blockTimestamp, currentTs},
+				start:      blockTimestamp,
+				end:        currentTs,
 			})
 		} else if len(reg) == 0 {
 			// The operator has only deregistration event: it's live from the beginning
 			// of the time window until the deregistration.
-			events = append(events, OperatorEvents{
+			intervals = append(intervals, OperatorInterval{
 				OperatorId: operatorId,
-				Events:     []uint64{blockTimestamp, dereg[0]},
+				start:      blockTimestamp,
+				end:        dereg[0],
 			})
 		} else if len(dereg) == 0 {
 			// The operator has only registration event: it's live from registration to
 			// the end of the time window.
-			events = append(events, OperatorEvents{
+			intervals = append(intervals, OperatorInterval{
 				OperatorId: operatorId,
-				Events:     []uint64{reg[0], currentTs},
+				start:      reg[0],
+				end:        currentTs,
 			})
 		} else {
 			// The operator has both registration and deregistration events in the time
@@ -332,34 +341,39 @@ func getOperatorsEvents(
 				// the beginning (i.e. blockTimestamp) it's not live.
 				for i := 0; i < len(reg); i++ {
 					if i < len(dereg) {
-						events = append(events, OperatorEvents{
+						intervals = append(intervals, OperatorInterval{
 							OperatorId: operatorId,
-							Events:     []uint64{reg[i], dereg[i]},
+							start:      reg[i],
+							end:        dereg[i],
 						})
 					} else {
-						events = append(events, OperatorEvents{
+						intervals = append(intervals, OperatorInterval{
 							OperatorId: operatorId,
-							Events:     []uint64{reg[i], currentTs},
+							start:      reg[i],
+							end:        currentTs,
 						})
 					}
 				}
 			} else {
 				// The first event in the time window is deregistration. This means at
 				// the beginning (i.e. blockTimestamp) it's live already.
-				events = append(events, OperatorEvents{
+				intervals = append(intervals, OperatorInterval{
 					OperatorId: operatorId,
-					Events:     []uint64{blockTimestamp, dereg[0]},
+					start:      blockTimestamp,
+					end:        dereg[0],
 				})
 				for i := 0; i < len(reg); i++ {
 					if i+1 < len(dereg) {
-						events = append(events, OperatorEvents{
+						intervals = append(intervals, OperatorInterval{
 							OperatorId: operatorId,
-							Events:     []uint64{reg[i], dereg[i+1]},
+							start:      reg[i],
+							end:        dereg[i+1],
 						})
 					} else {
-						events = append(events, OperatorEvents{
+						intervals = append(intervals, OperatorInterval{
 							OperatorId: operatorId,
-							Events:     []uint64{reg[i], currentTs},
+							start:      reg[i],
+							end:        currentTs,
 						})
 					}
 				}
@@ -368,16 +382,16 @@ func getOperatorsEvents(
 	}
 
 	// Validate the registration and deregistration events are in timeline order.
-	for i := 0; i < len(events); i++ {
-		if events[i].Events[0] > events[i].Events[1] {
-			return nil, fmt.Errorf("Registration timestamp should not be greater than deregistration or current timestamp for operatorId %s, registration timestamp: %d, deregistration or current timestamp: %d", events[i].OperatorId, events[i].Events[0], events[i].Events[1])
+	for i := 0; i < len(intervals); i++ {
+		if intervals[i].start > intervals[i].end {
+			return nil, fmt.Errorf("Start timestamp should not be greater than end or current timestamp for operatorId %s, start timestamp: %d, end or current timestamp: %d", intervals[i].OperatorId, intervals[i].start, intervals[i].end)
 		}
-		if i > 0 && events[i-1].OperatorId == events[i].OperatorId && events[i-1].Events[1] > events[i].Events[0] {
-			return nil, fmt.Errorf("Registration should not happen when the operator is already registered, but found two consecutive registrations at timestamp %d and %d for operatorId %s", events[i-1].Events[0], events[i].Events[0], events[i].OperatorId)
+		if i > 0 && intervals[i-1].OperatorId == intervals[i].OperatorId && intervals[i-1].end > intervals[i].start {
+			return nil, fmt.Errorf("the operator live intervals should never overlap, but found two overlapping intervals [%d, %d] and [%d, %d] for operatorId %s", intervals[i-1].start, intervals[i-1].end, intervals[i].start, intervals[i].end, intervals[i].OperatorId)
 		}
 	}
 
-	return events, nil
+	return intervals, nil
 }
 
 func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
