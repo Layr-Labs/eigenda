@@ -163,6 +163,7 @@ func (s *server) Start() error {
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
 			metrics.GET("/non_signers", s.FetchNonSigners)
 			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
+			metrics.GET("/deregisteredOperators", s.FetchDeregisteredOperators)
 		}
 		swagger := v1.Group("/swagger")
 		{
