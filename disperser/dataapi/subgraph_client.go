@@ -270,6 +270,20 @@ func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		}
 	}
 
+	events, err := getOperatorsEvents(ctx, operators, blockTimestamp, nonSigners)
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func getOperatorsEvents(
+	ctx context.Context,
+	operators map[string][][]uint64,
+	blockTimestamp uint64,
+	nonSigners map[string]int,
+) ([]OperatorEvents, error) {
 	currentTs := uint64(time.Now().Unix())
 	events := make([]OperatorEvents, 0)
 
