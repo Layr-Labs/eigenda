@@ -39,4 +39,8 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice address that is permissioned to confirm batches
     address public batchConfirmer;
 
+     // storage gap for upgradeability
+     // slither-disable-next-line shadowing-state
+     uint256[47] private __GAP;
+
 }
