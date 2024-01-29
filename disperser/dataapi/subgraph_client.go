@@ -68,6 +68,14 @@ type (
 		// If the operator is still live now in EigenDA netowrk, end is set to 0.
 		end uint64
 	}
+	// OperatorEvents describes all the registration and deregistration events associated
+	// with an operator.
+	OperatorEvents struct {
+		// Timestamps of operator's registration, in ascending order.
+		RegistrationEvents []uint64
+		// Timestamps of operator's deregistration, in ascending order.
+		DeregistrationEvents []uint64
+	}
 	NonSigner struct {
 		OperatorId string
 		Count      int
@@ -242,37 +250,44 @@ func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		return deregisteredOperators[i].BlockTimestamp < deregisteredOperators[j].BlockTimestamp
 	})
 
-	// First position is for registration events and second position is for deregistration events
-	operators := make(map[string][][]uint64, 0)
+	operators := make(map[string]OperatorEvents)
 	for operatorId := range nonSigners {
-		operators[operatorId] = make([][]uint64, 2)
-		operators[operatorId][0] = make([]uint64, 0) // registration events
-		operators[operatorId][1] = make([]uint64, 0) // deregistration events
+		operators[operatorId] = OperatorEvents{
+			RegistrationEvents:   []uint64{},
+			DeregistrationEvents: []uint64{},
+		}
 	}
 	for i := range registeredOperators {
-		operator := registeredOperators[i]
-		operatorId := string(operator.OperatorId)
+		reg := registeredOperators[i]
+		operatorId := string(reg.OperatorId)
 
 		if _, ok := operators[operatorId]; !ok {
-			operators[operatorId] = make([][]uint64, 2)
+			operators[operatorId] = OperatorEvents{
+				RegistrationEvents:   []uint64{},
+				DeregistrationEvents: []uint64{},
+			}
 		}
-		timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
+		operator := operators[operatorId]
+		timestamp, err := strconv.ParseUint(string(reg.BlockTimestamp), 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		operators[operatorId][0] = append(operators[operatorId][0], timestamp)
+		operator.RegistrationEvents = append(operator.RegistrationEvents, timestamp)
+		operators[operatorId] = operator
 	}
 
 	for i := range deregisteredOperators {
-		operator := deregisteredOperators[i]
-		operatorId := string(operator.OperatorId)
+		dereg := deregisteredOperators[i]
+		operatorId := string(dereg.OperatorId)
 
-		timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
+		timestamp, err := strconv.ParseUint(string(dereg.BlockTimestamp), 10, 64)
 		if err != nil || timestamp == 0 {
 			return nil, err
 		}
+		operator := operators[operatorId]
 		if _, ok := operators[operatorId]; ok {
-			operators[operatorId][1] = append(operators[operatorId][1], timestamp)
+			operator.DeregistrationEvents = append(operator.DeregistrationEvents, timestamp)
+			operators[operatorId] = operator
 		}
 	}
 
@@ -286,7 +301,7 @@ func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 
 func getOperatorInterval(
 	ctx context.Context,
-	operators map[string][][]uint64,
+	operators map[string]OperatorEvents,
 	blockTimestamp uint64,
 	nonSigners map[string]int,
 ) ([]OperatorInterval, error) {
@@ -296,8 +311,8 @@ func getOperatorInterval(
 	// For the time window [blockTimestamp, now], compute the sub intervals during
 	// which the operator is live in EigenDA network for validating batches.
 	for operatorId := range nonSigners {
-		reg := operators[operatorId][0]
-		dereg := operators[operatorId][1]
+		reg := operators[operatorId].RegistrationEvents
+		dereg := operators[operatorId].DeregistrationEvents
 
 		// In EigenDA, the registration and deregistration events on timeline for an
 		// operator will be like reg-dereg-reg-dereg...
