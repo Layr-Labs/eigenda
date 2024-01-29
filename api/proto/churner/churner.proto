@@ -24,8 +24,6 @@ message ChurnRequest {
 	// The operator's BLS signature signed on the keccak256 hash of
 	// concat("ChurnRequest", g1, g2, salt).
 	bytes operator_request_signature = 3;
-	// The Ethereum address of the operator.
-	string operator_address = 6;
 	// The salt used as part of the message to sign on for operator_request_signature.
 	bytes salt = 4;
 	// The quorums to register for.
@@ -35,6 +33,8 @@ message ChurnRequest {
 	//   - If any of the quorum fails to register, this entire request will fail.
 	// The IDs must be in range [0, 255].
 	repeated uint32 quorum_ids = 5;
+	// The Ethereum address of the operator.
+	string operator_address = 6;
 }
 
 message ChurnReply {

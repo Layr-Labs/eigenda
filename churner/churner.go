@@ -284,9 +284,9 @@ func CalculateRequestHash(churnRequest *ChurnRequest) [32]byte {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
+		[]byte(churnRequest.OperatorAddress.Hex()),
 		churnRequest.OperatorToRegisterPubkeyG1.Serialize(),
 		churnRequest.OperatorToRegisterPubkeyG2.Serialize(),
-		[]byte(churnRequest.OperatorAddress.Hex()),
 		churnRequest.Salt[:],
 	)
 	copy(requestHash[:], requestHashBytes)

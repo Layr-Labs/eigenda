@@ -20,6 +20,7 @@ import (
 )
 
 type Operator struct {
+	Address    string
 	Socket     string
 	Timeout    time.Duration
 	PrivKey    *ecdsa.PrivateKey
@@ -140,14 +141,15 @@ func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl st
 	ctx, cancel := context.WithTimeout(ctx, operator.Timeout)
 	defer cancel()
 
-	request := newChurnRequest(operator.KeyPair, operator.QuorumIDs)
+	request := newChurnRequest(operator.Address, operator.KeyPair, operator.QuorumIDs)
 	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 300)
 
 	return gc.Churn(ctx, request, opt)
 }
 
-func newChurnRequest(KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
+func newChurnRequest(address string, KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
 	churnRequest := &churner.ChurnRequest{
+		OperatorAddress:            address,
 		OperatorToRegisterPubkeyG1: KeyPair.PubKey,
 		OperatorToRegisterPubkeyG2: KeyPair.GetPubKeyG2(),
 		QuorumIDs:                  QuorumIDs,

@@ -173,10 +173,10 @@ func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
 	}
 
 	return &ChurnRequest{
+		OperatorAddress:            address,
 		OperatorToRegisterPubkeyG1: new(core.G1Point).Deserialize(req.GetOperatorToRegisterPubkeyG1()),
 		OperatorToRegisterPubkeyG2: new(core.G2Point).Deserialize(req.GetOperatorToRegisterPubkeyG2()),
 		OperatorRequestSignature:   signature,
-		OperatorAddress:            address,
 		Salt:                       salt,
 		QuorumIDs:                  quorumIDs,
 	}
