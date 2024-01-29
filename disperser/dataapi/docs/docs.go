@@ -318,7 +318,7 @@ const docTemplate = `{
                 "tags": [
                     "OperatorsInfo"
                 ],
-                "summary": "Fetch list of operators that have been deregistered for days",
+                "summary": "Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.",
                 "responses": {
                     "200": {
                         "description": "OK",

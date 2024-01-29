@@ -421,7 +421,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 
 // FetchDeregisteredOperators godoc
 //
-//	@Summary	Fetch list of operators that have been deregistered for days
+//	@Summary	Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Success	200	{object}	BlobsResponse
