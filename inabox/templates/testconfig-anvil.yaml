@@ -29,7 +29,7 @@ services:
     - total: 100e18
       distribution: [1, 4, 6, 10]
     - total: 100e18
-      distribution: [2, 3, 5, 8]
+      distribution: [1, 3, 8, 9]
   basePort: 32000
   variables:
     globals:
