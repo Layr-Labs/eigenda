@@ -660,6 +660,9 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOn
 	operator1Data := response.Data[0]
 	operator2Data := response.Data[1]
 
+	responseJson := string(data)
+	fmt.Printf("Response: %v\n", responseJson)
+
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
 	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
