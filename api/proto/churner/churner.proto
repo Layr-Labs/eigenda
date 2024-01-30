@@ -33,7 +33,7 @@ message ChurnRequest {
 	//   - If any of the quorum fails to register, this entire request will fail.
 	// The IDs must be in range [0, 255].
 	repeated uint32 quorum_ids = 5;
-	// The Ethereum address of the operator.
+	// The Ethereum address (in hex like "0x123abcdef...") of the operator.
 	string operator_address = 6;
 }
 
