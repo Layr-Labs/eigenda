@@ -108,6 +108,8 @@ definitions:
     type: object
   dataapi.OperatorNonsigningPercentageMetrics:
     properties:
+      operator_id:
+        type: string
       percentage:
         type: number
       total_batches:
@@ -117,12 +119,12 @@ definitions:
     type: object
   dataapi.OperatorsNonsigningPercentage:
     properties:
-      operators:
-        additionalProperties:
+      data:
+        items:
           $ref: '#/definitions/dataapi.OperatorNonsigningPercentageMetrics'
-        type: object
-      total_non_signers:
-        type: integer
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
     type: object
   dataapi.Throughput:
     properties:
