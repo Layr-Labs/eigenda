@@ -22,7 +22,7 @@ dataSources:
         - function: confirmBatch((bytes32,bytes,bytes,uint32),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]))
           handler: handleConfirmBatchCall
       eventHandlers:
-        - event: BatchConfirmed(indexed bytes32,uint32,uint96)
+        - event: BatchConfirmed(indexed bytes32,uint32)
           handler: handleBatchConfirmed
           receipt: true
       file: ./src/edasm.ts
