@@ -150,7 +150,6 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-
 	var lengthProof, lengthCommitment bn254.G2Point
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
