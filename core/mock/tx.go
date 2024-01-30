@@ -136,6 +136,7 @@ func (t *MockTransactor) WeightOfOperatorForQuorum(ctx context.Context, quorumID
 
 func (t *MockTransactor) CalculateOperatorChurnApprovalDigestHash(
 	ctx context.Context,
+	operatorAddress gethcommon.Address,
 	operatorId core.OperatorID,
 	operatorsToChurn []core.OperatorToChurn,
 	salt [32]byte,
