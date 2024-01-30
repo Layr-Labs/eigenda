@@ -573,6 +573,7 @@ func (t *Transactor) WeightOfOperatorForQuorum(ctx context.Context, quorumID cor
 
 func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 	ctx context.Context,
+	operatorAddress gethcommon.Address,
 	operatorId core.OperatorID,
 	operatorsToChurn []core.OperatorToChurn,
 	salt [32]byte,
@@ -588,7 +589,7 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 	}
 	return t.Bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
 		Context: ctx,
-	}, operatorId, opKickParams, salt, expiry)
+	}, operatorAddress, operatorId, opKickParams, salt, expiry)
 }
 
 func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {

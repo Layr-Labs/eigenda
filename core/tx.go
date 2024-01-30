@@ -110,6 +110,7 @@ type Transactor interface {
 	// CalculateOperatorChurnApprovalDigestHash returns calculated operator churn approval digest hash.
 	CalculateOperatorChurnApprovalDigestHash(
 		ctx context.Context,
+		operatorAddress gethcommon.Address,
 		operatorId OperatorID,
 		operatorsToChurn []OperatorToChurn,
 		salt [32]byte,
