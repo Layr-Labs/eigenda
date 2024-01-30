@@ -32,13 +32,7 @@ func GetLogger(cfg Config) (common.Logger, error) {
 	}
 
 	logger := &Logger{Logger: log.New()}
-	// This is required to print locations of log calls
-	// This was recently added in this PR: https://github.com/ethereum/go-ethereum/pull/28069/files
-	// where the default behavior was changed to not print origins
-	// This was due to it being very expensive to compute origins
-	// We should evaluate enabling/disabling this based on the flag
-	log.PrintOrigins(true)
-	stdh := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
+	stdh := log.StreamHandler(os.Stdout, log.LogfmtFormat())
 	stdHandler := log.CallerFileHandler(log.LvlFilterHandler(stdLevel, stdh))
 	if cfg.Path != "" {
 		fh, err := log.FileHandler(cfg.Path, log.LogfmtFormat())
