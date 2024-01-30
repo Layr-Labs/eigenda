@@ -176,20 +176,15 @@ func TestThrottling(t *testing.T) {
 	encoder := &encoding.MockEncoder{
 		Delay: 500 * time.Millisecond,
 	}
+
 	blobCommitment := core.BlobCommitments{
-		Commitment: &core.Commitment{
-			G1Point: &bn254.G1Point{
-				X: X1,
-				Y: Y1,
-			},
+		Commitment: &core.G1Commitment{
+			X: X1,
+			Y: Y1,
 		},
-		LengthCommitment: &core.LengthCommitment{
-			G2Point: &lengthCommitment,
-		},
-		LengthProof: &core.LengthProof{
-			G2Point: &lengthProof,
-		},
-		Length: 10,
+		LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
+		LengthProof:      (*core.G2Commitment)(&lengthProof),
+		Length:           10,
 	}
 
 	encoder.On("Encode", mock.Anything, mock.Anything).Return(blobCommitment, []*core.Chunk{}, nil)

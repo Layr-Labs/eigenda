@@ -157,9 +157,6 @@ var _ = Describe("Inabox Integration", func() {
 })
 
 func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEigenDAServiceManagerBlobHeader {
-	commitmentBytes := blobHeader.GetCommitment()
-	commitment, err := new(core.Commitment).Deserialize(commitmentBytes)
-	Expect(err).To(BeNil())
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
@@ -169,11 +166,10 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 			ChunkLength:                  quorum.ChunkLength,
 		}
 	}
-
 	return rollupbindings.IEigenDAServiceManagerBlobHeader{
 		Commitment: rollupbindings.BN254G1Point{
-			X: commitment.X.BigInt(new(big.Int)),
-			Y: commitment.Y.BigInt(new(big.Int)),
+			X: new(big.Int).SetBytes(blobHeader.GetCommitment().X),
+			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().Y),
 		},
 		DataLength:       blobHeader.GetDataLength(),
 		QuorumBlobParams: quorums,

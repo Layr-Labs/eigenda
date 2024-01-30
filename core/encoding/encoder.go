@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
@@ -82,9 +83,9 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 
 	length := uint(len(encoder.ToFrArray(data)))
 	commitments := core.BlobCommitments{
-		Commitment:       &core.Commitment{G1Point: commit},
-		LengthCommitment: &core.LengthCommitment{G2Point: lowDegreeCommit},
-		LengthProof:      &core.LengthProof{G2Point: lowDegreeProof},
+		Commitment:       (*core.G1Commitment)(commit),
+		LengthCommitment: (*core.G2Commitment)(lowDegreeCommit),
+		LengthProof:      (*core.G2Commitment)(lowDegreeProof),
 		Length:           length,
 	}
 
@@ -99,8 +100,7 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 }
 
 func (e *Encoder) VerifyBlobLength(commitments core.BlobCommitments) error {
-	//commitments.Commitment.G1Point,
-	return e.EncoderGroup.VerifyCommit(commitments.LengthCommitment.G2Point, commitments.LengthProof.G2Point, uint64(commitments.Length))
+	return e.EncoderGroup.VerifyCommit((*bn254.G2Point)(commitments.LengthCommitment), (*bn254.G2Point)(commitments.LengthProof), uint64(commitments.Length))
 
 }
 
@@ -115,7 +115,7 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 
 	for ind := range chunks {
 		err = verifier.VerifyFrame(
-			commitments.Commitment.G1Point,
+			(*bn254.G1Point)(commitments.Commitment),
 			&kzgEncoder.Frame{
 				Proof:  chunks[ind].Proof,
 				Coeffs: chunks[ind].Coeffs,
@@ -137,8 +137,8 @@ func (e *Encoder) VerifyCommitEquivalenceBatch(commitments []core.BlobCommitment
 
 	for i, c := range commitments {
 		commitmentsPair[i] = kzgEncoder.CommitmentPair{
-			Commitment:       *c.Commitment.G1Point,
-			LengthCommitment: *c.LengthCommitment.G2Point,
+			Commitment:       (bn254.G1Point)(*c.Commitment),
+			LengthCommitment: (bn254.G2Point)(*c.LengthCommitment),
 		}
 	}
 	return e.EncoderGroup.BatchVerifyCommitEquivalence(commitmentsPair)
@@ -159,7 +159,7 @@ func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCor
 		}
 
 		sample := kzgEncoder.Sample{
-			Commitment: *sc.Commitment.G1Point,
+			Commitment: (bn254.G1Point)(*sc.Commitment),
 			Proof:      sc.Chunk.Proof,
 			RowIndex:   sc.BlobIndex,
 			Coeffs:     sc.Chunk.Coeffs,

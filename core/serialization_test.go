@@ -57,7 +57,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
 
-	commitment := &kzgbn254.G1Point{
+	commitment := &core.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
@@ -82,16 +82,10 @@ func TestBlobHeaderEncoding(t *testing.T) {
 
 	blobHeader := &core.BlobHeader{
 		BlobCommitments: core.BlobCommitments{
-			Commitment: &core.Commitment{
-				commitment,
-			},
-			LengthCommitment: &core.LengthCommitment{
-				&lengthCommitment,
-			},
-			LengthProof: &core.LengthProof{
-				&lengthProof,
-			},
-			Length: 10,
+			Commitment:       commitment,
+			LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
+			LengthProof:      (*core.G2Commitment)(&lengthProof),
+			Length:           10,
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{
 			{
@@ -152,17 +146,15 @@ func TestCommitmentMarshaling(t *testing.T) {
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
 
-	commitment := &core.Commitment{
-		G1Point: &kzgbn254.G1Point{
-			X: commitX,
-			Y: commitY,
-		},
+	commitment := &core.G1Commitment{
+		X: commitX,
+		Y: commitY,
 	}
 
 	marshalled, err := json.Marshal(commitment)
 	assert.NoError(t, err)
 
-	recovered := new(core.Commitment)
+	recovered := new(core.G1Commitment)
 	err = json.Unmarshal(marshalled, recovered)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, commitment)

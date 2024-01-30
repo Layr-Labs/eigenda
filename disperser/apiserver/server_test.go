@@ -26,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
@@ -141,9 +140,10 @@ func TestGetBlobStatus(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
-	actualCommitment, err := new(core.Commitment).Deserialize(reply.GetInfo().GetBlobHeader().GetCommitment())
-	assert.NoError(t, err)
-	assert.Equal(t, actualCommitment, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment)
+	actualCommitX := reply.GetInfo().GetBlobHeader().GetCommitment().X
+	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().Y
+	assert.Equal(t, actualCommitX, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.X.Marshal())
+	assert.Equal(t, actualCommitY, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.Y.Marshal())
 	assert.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(), uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))
 
 	actualBlobQuorumParams := make([]*pb.BlobQuorumParam, len(securityParams))
@@ -464,11 +464,9 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
 
-	commitment := &core.Commitment{
-		G1Point: &bn254.G1Point{
-			X: commitX,
-			Y: commitY,
-		},
+	commitment := &core.G1Commitment{
+		X: commitX,
+		Y: commitY,
 	}
 	dataLength := 32
 	batchID := uint32(99)

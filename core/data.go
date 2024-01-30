@@ -121,10 +121,10 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
 type BlobCommitments struct {
-	Commitment       *Commitment       `json:"commitment"`
-	LengthCommitment *LengthCommitment `json:"length_commitment"`
-	LengthProof      *LengthProof      `json:"length_proof"`
-	Length           uint              `json:"length"`
+	Commitment       *G1Commitment `json:"commitment"`
+	LengthCommitment *G2Commitment `json:"length_commitment"`
+	LengthProof      *LengthProof  `json:"length_proof"`
+	Length           uint          `json:"length"`
 }
 
 // Batch
@@ -201,7 +201,7 @@ func (cb Bundles) Size() int64 {
 
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier
 type Sample struct {
-	Commitment      *Commitment
+	Commitment      *G1Commitment
 	Chunk           *Chunk
 	AssignmentIndex ChunkNumber
 	BlobIndex       int
