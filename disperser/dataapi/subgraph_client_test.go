@@ -18,7 +18,7 @@ var (
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
 			OperatorId:      "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
 			Operator:        "0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
-			BlockTimestamp:  "1696975449000000000",
+			BlockTimestamp:  "1696975449",
 			BlockNumber:     "87",
 			TransactionHash: "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
 		},
@@ -26,7 +26,7 @@ var (
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212",
 			OperatorId:      "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310",
 			Operator:        "0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212",
-			BlockTimestamp:  "1696975459000000000",
+			BlockTimestamp:  "1696975459",
 			BlockNumber:     "88",
 			TransactionHash: "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212",
 		},
@@ -54,7 +54,7 @@ var (
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f207",
 			BatchId:         "1",
 			BatchHeaderHash: "0x890588400acb4f9f7f438c0d21734acb36a6c4c75df6560827e23b452bbdcc69",
-			BlockTimestamp:  "1696975449000000000",
+			BlockTimestamp:  "1696975449",
 			BlockNumber:     "87",
 			TxHash:          "0x63fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f207",
 			GasFees: subgraph.GasFees{
@@ -68,7 +68,7 @@ var (
 			Id:              "0x0007c601ff50ae500ec114a4430c1af872b14488a447f378c5c64adc36476e1101e1",
 			BatchId:         "0",
 			BatchHeaderHash: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310",
-			BlockTimestamp:  "1696975448000000000",
+			BlockTimestamp:  "1696975448",
 			BlockNumber:     "86",
 			TxHash:          "0xc601ff50ae500ec114a4430c1af872b14488a447f378c5c64adc36476e1101e1",
 			GasFees: subgraph.GasFees{
@@ -82,7 +82,7 @@ var (
 			Id:              "0x0007de6f42234e643c6b427c349778cb41418f590ba899ac079c24427369d9c029aa",
 			BatchId:         "2",
 			BatchHeaderHash: "0x46c57a96296eb1b1d23f72b9ce3b2252fc5e2534c3008f5ce5e2afb06487a5eb",
-			BlockTimestamp:  "1696975450000000000",
+			BlockTimestamp:  "169697545",
 			BlockNumber:     "88",
 			TxHash:          "0xde6f42234e643c6b427c349778cb41418f590ba899ac079c24427369d9c029aa",
 			GasFees: subgraph.GasFees{
@@ -126,7 +126,7 @@ func TestQueryBatchesWithLimit(t *testing.T) {
 	assert.Equal(t, []byte("0x0007de6f42234e643c6b427c349778cb41418f590ba899ac079c24427369d9c029aa"), batches[0].Id)
 	assert.Equal(t, uint64(2), batches[0].BatchId)
 	assert.Equal(t, []byte("0x46c57a96296eb1b1d23f72b9ce3b2252fc5e2534c3008f5ce5e2afb06487a5eb"), batches[0].BatchHeaderHash)
-	assert.Equal(t, uint64(1696975450), batches[0].BlockTimestamp)
+	assert.Equal(t, uint64(169697545), batches[0].BlockTimestamp)
 	assert.Equal(t, uint64(88), batches[0].BlockNumber)
 	assert.Equal(t, []byte("0xde6f42234e643c6b427c349778cb41418f590ba899ac079c24427369d9c029aa"), batches[0].TxHash)
 	assertGasFees(t, batches[0].GasFees)
