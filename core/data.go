@@ -121,9 +121,10 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
 type BlobCommitments struct {
-	Commitment  *Commitment `json:"commitment"`
-	LengthProof *Commitment `json:"length_proof"`
-	Length      uint        `json:"length"`
+	Commitment       *Commitment       `json:"commitment"`
+	LengthCommitment *LengthCommitment `json:"length_commitment"`
+	LengthProof      *LengthProof      `json:"length_proof"`
+	Length           uint              `json:"length"`
 }
 
 // Batch

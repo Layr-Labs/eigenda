@@ -51,7 +51,7 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams core
 	if err != nil {
 		return nil, nil, err
 	}
-	lengthProof, err := new(core.Commitment).Deserialize(reply.GetCommitment().GetLengthProof())
+	lengthProof, err := new(core.LengthProof).Deserialize(reply.GetCommitment().GetLengthProof())
 	if err != nil {
 		return nil, nil, err
 	}

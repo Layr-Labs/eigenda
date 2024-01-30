@@ -400,6 +400,52 @@ func (c *Commitment) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (c LengthCommitment) Serialize() ([]byte, error) {
+	return encode(c)
+}
+
+func (c *LengthCommitment) Deserialize(data []byte) (*LengthCommitment, error) {
+	err := decode(data, c)
+	return c, err
+}
+
+func (c *LengthCommitment) UnmarshalJSON(data []byte) error {
+	var g2Point bn.G2Affine
+	err := json.Unmarshal(data, &g2Point)
+	if err != nil {
+		return err
+	}
+	c.G2Point = &bn254.G2Point{
+		X: g2Point.X,
+		Y: g2Point.Y,
+	}
+
+	return nil
+}
+
+func (c LengthProof) Serialize() ([]byte, error) {
+	return encode(c)
+}
+
+func (c *LengthProof) Deserialize(data []byte) (*LengthProof, error) {
+	err := decode(data, c)
+	return c, err
+}
+
+func (c *LengthProof) UnmarshalJSON(data []byte) error {
+	var g2Point bn.G2Affine
+	err := json.Unmarshal(data, &g2Point)
+	if err != nil {
+		return err
+	}
+	c.G2Point = &bn254.G2Point{
+		X: g2Point.X,
+		Y: g2Point.Y,
+	}
+
+	return nil
+}
+
 func encode(obj any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)

@@ -205,21 +205,22 @@ func (g *KzgEncoderGroup) newKzgEncoder(params rs.EncodingParams) (*KzgEncoder, 
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *KzgEncoder) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G1Point, []Frame, []uint32, error) {
+func (g *KzgEncoder) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []Frame, []uint32, error) {
 	inputFr := rs.ToFrArray(inputBytes)
 	return g.Encode(inputFr)
 }
 
-func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G1Point, []Frame, []uint32, error) {
+func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []Frame, []uint32, error) {
 
 	startTime := time.Now()
 	poly, frames, indices, err := g.Encoder.Encode(inputFr)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// compute commit for the full poly
 	commit := g.Commit(poly.Coeffs)
+	lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
 
 	intermediate := time.Now()
 
@@ -234,10 +235,10 @@ func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G1Point, []Fra
 		log.Println("low degree verification info")
 	}
 
-	shiftedSecret := g.Srs.G1[g.SRSOrder-polyDegreePlus1:]
+	shiftedSecret := g.Srs.G2[g.SRSOrder-polyDegreePlus1:]
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
-	lowDegreeProof := bls.LinCombG1(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
+	lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
 	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
 	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
 	//if !ok {
@@ -258,7 +259,7 @@ func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G1Point, []Fra
 
 	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLen, g.NumWorker)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
 	}
 
 	if g.Verbose {
@@ -276,7 +277,7 @@ func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G1Point, []Fra
 	if g.Verbose {
 		log.Printf("Total encoding took      %v\n", time.Since(startTime))
 	}
-	return &commit, lowDegreeProof, kzgFrames, indices, nil
+	return &commit, lowDegreeCommitment, lowDegreeProof, kzgFrames, indices, nil
 }
 
 func (g *KzgEncoder) Commit(polyFr []bls.Fr) bls.G1Point {
@@ -290,8 +291,8 @@ func (g *KzgEncoder) Commit(polyFr []bls.Fr) bls.G1Point {
 // proof = commit(shiftedPoly) on G1
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLowDegreeProof(poly, proof *bls.G1Point, claimedDegree, SRSOrder uint64, srsG2 []bls.G2Point) bool {
-	return bls.PairingsVerify(poly, &srsG2[SRSOrder-1-claimedDegree], proof, &bls.GenG2)
+func VerifyLowDegreeProof(lengthCommit *bls.G2Point, proof *bls.G2Point, claimedDegree uint64, SRSOrder uint64, srsG1 []bls.G1Point) bool {
+	return bls.PairingsVerify(&srsG1[SRSOrder-1-claimedDegree], lengthCommit, &bls.GenG1, proof)
 }
 
 // get Fiat-Shamir challenge

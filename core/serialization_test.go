@@ -56,23 +56,34 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	var commitX, commitY, lengthX, lengthY fp.Element
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
-	lengthX = *lengthX.SetBigInt(big.NewInt(1))
-	lengthY = *lengthY.SetBigInt(big.NewInt(2))
+
+	lengthXA0 := new(big.Int)
+	lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781", 10)
+	lengthXA1 := new(big.Int)
+	lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634", 10)
+
+	lengthYA0 := new(big.Int)
+	lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930", 10)
+	lengthYA1 := new(big.Int)
+	lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531", 10)
+	
 
 	commitment := &kzgbn254.G1Point{
 		X: commitX,
 		Y: commitY,
 	}
-	lengthProof := &kzgbn254.G1Point{
-		X: lengthX,
-		Y: lengthY,
-	}
+	var lengthProof kzgbn254.G2Point{}
+	lengthProof.X.A0 = lengthXA0
+	lengthProof.X.A1 = lengthXA1
+	lengthProof.Y.A0 = lengthYA0
+	lengthProof.Y.A1 = lengthYA1
+
 	blobHeader := &core.BlobHeader{
 		BlobCommitments: core.BlobCommitments{
 			Commitment: &core.Commitment{
 				commitment,
 			},
-			LengthProof: &core.Commitment{
+			LengthProof: &core.LengthProof{
 				lengthProof,
 			},
 			Length: 10,

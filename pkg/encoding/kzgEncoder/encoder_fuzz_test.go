@@ -22,7 +22,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		}
 
 		//encode the data
-		_, _, frames, _, err := enc.EncodeBytes(input)
+		_, _, _, frames, _, err := enc.EncodeBytes(input)
 
 		for _, frame := range frames {
 			assert.NotEqual(t, len(frame.Coeffs), 0)

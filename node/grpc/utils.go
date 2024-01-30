@@ -61,7 +61,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	if err != nil {
 		return nil, err
 	}
-	lenProof, err := new(core.Commitment).Deserialize(h.GetLengthProof())
+	lenProof, err := new(core.LengthProof).Deserialize(h.GetLengthProof())
 	if err != nil {
 		return nil, err
 	}
