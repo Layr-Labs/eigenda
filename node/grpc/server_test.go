@@ -140,10 +140,19 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 		X: commitX,
 		Y: commitY,
 	}
-	lengthProof := bn254.G1Point{
-		X: lengthX,
-		Y: lengthY,
-	}
+	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
+	lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
+	lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
+	lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
+	lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
+
+	var lengthProof, lengthCommitment bn254.G2Point
+	lengthProof.X.A0 = lengthXA0
+	lengthProof.X.A1 = lengthXA1
+	lengthProof.Y.A0 = lengthYA0
+	lengthProof.Y.A1 = lengthYA1
+
+	lengthCommitment = lengthProof
 
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
@@ -157,17 +166,19 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	blobHeaders := []*core.BlobHeader{
 		{
 			BlobCommitments: core.BlobCommitments{
-				Commitment:  &core.Commitment{G1Point: &commitment},
-				LengthProof: &core.Commitment{G1Point: &lengthProof},
-				Length:      48,
+				Commitment:       &core.Commitment{G1Point: &commitment},
+				LengthCommitment: &core.LengthCommitment{G2Point: &lengthCommitment},
+				LengthProof:      &core.LengthProof{G2Point: &lengthProof},
+				Length:           48,
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
 		{
 			BlobCommitments: core.BlobCommitments{
-				Commitment:  &core.Commitment{G1Point: &commitment},
-				LengthProof: &core.Commitment{G1Point: &lengthProof},
-				Length:      50,
+				Commitment:       &core.Commitment{G1Point: &commitment},
+				LengthCommitment: &core.LengthCommitment{G2Point: &lengthCommitment},
+				LengthProof:      &core.LengthProof{G2Point: &lengthProof},
+				Length:           50,
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},

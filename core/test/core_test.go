@@ -125,6 +125,7 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 		blobHeader := &core.BlobHeader{
 			BlobCommitments: core.BlobCommitments{
 				Commitment:  commitments.Commitment,
+				LengthCommitment: commitments.LengthCommitment,
 				LengthProof: commitments.LengthProof,
 				Length:      commitments.Length,
 			},
@@ -181,7 +182,6 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 		for z, encodedBlob := range encodedBlobs {
 			blobMessages[z] = encodedBlob[id]
 		}
-
 		err := val.ValidateBatch(blobMessages, state.OperatorState, pool)
 		assert.NoError(t, err)
 	}

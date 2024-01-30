@@ -21,7 +21,7 @@ func TestProveZeroPadding(t *testing.T) {
 
 	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
-	_, _, _, _, err = enc.Encode(inputFr)
+	_, _, _, _, _, err = enc.Encode(inputFr)
 	require.Nil(t, err)
 
 	assert.True(t, true, "Proof %v failed\n")
