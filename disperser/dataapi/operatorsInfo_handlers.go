@@ -20,7 +20,6 @@ var (
 	// TODO: Poolsize should be configurable
 	// Observe performance and tune accordingly
 	poolSize                        = 50
-	operatorOnlineStatusChan        chan OperatorOnlineStatus
 	operatorOnlineStatusresultsChan chan *DeregisteredOperatorMetadata
 )
 
@@ -36,7 +35,6 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	// Convert the map to a slice.
 	operators := indexedDeregisteredOperatorState.Operators
 
-	operatorOnlineStatusChan = make(chan OperatorOnlineStatus, len(operators))
 	operatorOnlineStatusresultsChan = make(chan *DeregisteredOperatorMetadata, len(operators))
 	processOperatorOnlineCheck(indexedDeregisteredOperatorState, operatorOnlineStatusresultsChan, s.logger)
 
