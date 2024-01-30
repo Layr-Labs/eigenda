@@ -73,7 +73,7 @@ type Transactor interface {
 	// are also returned.
 	GetOperatorStakes(ctx context.Context, operatorID OperatorID, blockNumber uint32) (OperatorStakes, []QuorumID, error)
 
-	// GetOperatorStakes returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
+	// GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
 	// The indices of the operators within each quorum are also returned.
 	GetOperatorStakesForQuorums(ctx context.Context, quorums []QuorumID, blockNumber uint32) (OperatorStakes, error)
 

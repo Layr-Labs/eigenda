@@ -67,6 +67,10 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.Len(t, processing, 1)
 	assert.Equal(t, metadata1, processing[0])
 
+	processingCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), processingCount)
+
 	err = blobMetadataStore.IncrementNumRetries(ctx, metadata1)
 	assert.NoError(t, err)
 	fetchedMetadata, err = blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
@@ -79,6 +83,10 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.Len(t, finalized, 1)
 	assert.Equal(t, metadata2, finalized[0])
 
+	finalizedCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Finalized)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), finalizedCount)
+
 	confirmedMetadata := getConfirmedMetadata(t, blobKey1)
 	err = blobMetadataStore.UpdateBlobMetadata(ctx, blobKey1, confirmedMetadata)
 	assert.NoError(t, err)
@@ -86,6 +94,10 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	metadata, err := blobMetadataStore.GetBlobMetadataInBatch(ctx, confirmedMetadata.ConfirmationInfo.BatchHeaderHash, confirmedMetadata.ConfirmationInfo.BlobIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, metadata, confirmedMetadata)
+
+	confirmedCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Confirmed)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), confirmedCount)
 
 	deleteItems(t, []commondynamodb.Key{
 		{

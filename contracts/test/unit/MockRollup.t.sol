@@ -49,7 +49,6 @@ contract MockRollupTest is BLSMockAVSDeployer {
     uint256 illegalPoint = 6;
     uint256 illegalValue = 1555;
     BN254.G2Point illegalProof;
-    bytes32 quorumBlobParamsHash = keccak256(abi.encodePacked("quorumBlobParamsHash"));
 
     function setUp() public {
         _setUpBLSMockAVSDeployer();
@@ -75,7 +74,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             )
         );
 
-        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, quorumBlobParamsHash, defaultStakeRequired);
+        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, defaultStakeRequired);
 
         //hardcode g2 proof
         illegalProof.X[1] = 11151623676041303181597631684634074376466382703418354161831688442589830350329;
@@ -93,18 +92,6 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
         //get commitment with illegal value
         (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
-
-        IEigenDAServiceManager.QuorumBlobParam[] memory quorumBlobParamsCopy = new IEigenDAServiceManager.QuorumBlobParam[](2);
-        for (uint i = 0; i < blobHeader.quorumBlobParams.length; i++) {
-            quorumBlobParamsCopy[i].quorumNumber = blobHeader.quorumBlobParams[i].quorumNumber;
-            quorumBlobParamsCopy[i].adversaryThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage;
-            quorumBlobParamsCopy[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].quorumThresholdPercentage;
-        }
-        
-        stdstore
-            .target(address(mockRollup))
-            .sig("quorumBlobParamsHash()")
-            .checked_write(keccak256(abi.encode(quorumBlobParamsCopy)));
 
         //post commitment
         vm.prank(alice);

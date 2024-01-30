@@ -60,13 +60,35 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, 0, 100, 80)
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []*core.SecurityParam{
+			{
+				QuorumID:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumID:           1,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+		})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, 0, 100, 80)
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []*core.SecurityParam{
+			{
+				QuorumID:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumID:           1,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+		})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -117,7 +139,17 @@ var _ = Describe("Inabox Integration", func() {
 			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0,
+			0, // retrieve from quorum 0
+		)
+		Expect(err).To(BeNil())
+		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+
+		retrieved, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			1, // retrieve from quorum 1
 		)
 		Expect(err).To(BeNil())
 		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))

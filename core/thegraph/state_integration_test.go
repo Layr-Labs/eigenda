@@ -63,7 +63,7 @@ func setup() {
 }
 
 func teardown() {
-	fmt.Println("Stoping anvil")
+	fmt.Println("Stopping anvil")
 	testConfig.StopAnvil()
 
 	fmt.Println("Stop graph node")

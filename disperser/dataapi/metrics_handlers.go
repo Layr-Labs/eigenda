@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -141,4 +142,52 @@ func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]N
 	}
 
 	return &nonSignersObj, nil
+}
+
+func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSeconds int64) (*OperatorsNonsigningPercentage, error) {
+	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(nonSigners) == 0 {
+		return &OperatorsNonsigningPercentage{}, nil
+	}
+
+	pastBlockTimestamp := uint64(time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix())
+	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp, nonSigners)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(numBatchesByOperators) == 0 {
+		return &OperatorsNonsigningPercentage{}, nil
+	}
+
+	operators := make(map[string]OperatorNonsigningPercentageMetrics, 0)
+
+	for operatorId, totalUnsignedBatches := range nonSigners {
+		if totalUnsignedBatches > 0 {
+			numBatches := numBatchesByOperators[operatorId]
+			if numBatches == 0 {
+				continue
+			}
+			ps := fmt.Sprintf("%.2f", (float64(totalUnsignedBatches)/float64(numBatches))*100)
+			pf, err := strconv.ParseFloat(ps, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			operators[operatorId] = OperatorNonsigningPercentageMetrics{
+				TotalUnsignedBatches: totalUnsignedBatches,
+				TotalBatches:         numBatches,
+				Percentage:           pf,
+			}
+		}
+	}
+
+	return &OperatorsNonsigningPercentage{
+		TotalNonSigners: len(operators),
+		Operators:       operators,
+	}, nil
 }

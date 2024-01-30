@@ -194,7 +194,7 @@ func setup(t *testing.T) {
 }
 
 func mustMakeOpertatorPubKeysPair(t *testing.T) *coreindexer.OperatorPubKeys {
-	operators := make(map[[32]byte]coreindexer.OperatorPubKeysPair, len(operatorState.Operators))
+	operators := make(map[core.OperatorID]coreindexer.OperatorPubKeysPair, len(operatorState.Operators))
 	for operatorId := range operatorState.Operators[0] {
 		keyPair, err := core.GenRandomBlsKeys()
 		if err != nil {

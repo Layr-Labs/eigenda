@@ -9,8 +9,6 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/retriever/flags"
-	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,17 +21,18 @@ type Config struct {
 	UseSecureGrpcFlag bool
 }
 
-func NewConfig(ctx *cli.Context) *Config {
+func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag bool) *Config {
 	return &Config{
-		Hostname: ctx.GlobalString(flags.HostnameFlag.Name),
-		Port:     ctx.GlobalString(flags.GrpcPortFlag.Name),
-		Timeout:  ctx.Duration(flags.TimeoutFlag.Name),
+		Hostname:          hostname,
+		Port:              port,
+		Timeout:           timeout,
+		UseSecureGrpcFlag: useSecureGrpcFlag,
 	}
 }
 
 type DisperserClient interface {
-	DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error)
-	DisperseBlobAuthenticated(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error)
+	DisperseBlob(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error)
+	DisperseBlobAuthenticated(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 }
 
@@ -59,7 +58,7 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 	}
 }
 
-func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
+func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error) {
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -73,15 +72,18 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumI
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
 	defer cancel()
 
+	sp := make([]*disperser_rpc.SecurityParams, len(securityParams))
+	for i, s := range securityParams {
+		sp[i] = &disperser_rpc.SecurityParams{
+			QuorumId:           uint32(s.QuorumID),
+			QuorumThreshold:    uint32(s.QuorumThreshold),
+			AdversaryThreshold: uint32(s.AdversaryThreshold),
+		}
+	}
+
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*disperser_rpc.SecurityParams{
-			{
-				QuorumId:           quorumID,
-				QuorumThreshold:    quorumThreshold,
-				AdversaryThreshold: adversityThreshold,
-			},
-		},
+		Data:           data,
+		SecurityParams: sp,
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)
@@ -97,7 +99,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorumI
 	return blobStatus, reply.GetRequestId(), nil
 }
 
-func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorumID, quorumThreshold, adversityThreshold uint32) (*disperser.BlobStatus, []byte, error) {
+func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error) {
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
@@ -118,16 +120,19 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, fmt.Errorf("frror while calling DisperseBlobAuthenticated: %v", err)
 	}
 
+	sp := make([]*disperser_rpc.SecurityParams, len(securityParams))
+	for i, s := range securityParams {
+		sp[i] = &disperser_rpc.SecurityParams{
+			QuorumId:           uint32(s.QuorumID),
+			QuorumThreshold:    uint32(s.QuorumThreshold),
+			AdversaryThreshold: uint32(s.AdversaryThreshold),
+		}
+	}
+
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*disperser_rpc.SecurityParams{
-			{
-				QuorumId:           quorumID,
-				QuorumThreshold:    quorumThreshold,
-				AdversaryThreshold: adversityThreshold,
-			},
-		},
-		AccountId: c.signer.GetAccountID(),
+		Data:           data,
+		SecurityParams: sp,
+		AccountId:      c.signer.GetAccountID(),
 	}
 
 	// Send the initial request

@@ -147,6 +147,14 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated quorums, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
+	} else if config.Operation == "update-socket" {
+		log.Printf("Info: Operator with Operator Address: %x is updating its socket: %s", sk.Address, config.Socket)
+		err = node.UpdateOperatorSocket(context.Background(), tx, config.Socket)
+		if err != nil {
+			log.Printf("Error: failed to update socket for operator ID: %x, operator address: %x, socket: %s, error: %v", operatorID, sk.Address, config.Socket, err)
+			return
+		}
+		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}

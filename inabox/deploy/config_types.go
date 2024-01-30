@@ -105,16 +105,18 @@ type EigenDAContract struct {
 	RegistryCoordinator    string `json:"registryCoordinator"`
 }
 
+type Stakes struct {
+	Total        float32   `yaml:"total"`
+	Distribution []float32 `yaml:"distribution"`
+}
+
 type ServicesSpec struct {
 	Counts struct {
 		NumDis              int `yaml:"dispersers"`
 		NumOpr              int `yaml:"operators"`
 		NumMaxOperatorCount int `yaml:"maxOperatorCount"`
 	} `yaml:"counts"`
-	Stakes struct {
-		Total        float32   `yaml:"total"`
-		Distribution []float32 `yaml:"distribution"`
-	} `yaml:"stakes"`
+	Stakes    []Stakes  `yaml:"stakes"`
 	BasePort  int       `yaml:"basePort"`
 	Variables Variables `yaml:"variables"`
 }

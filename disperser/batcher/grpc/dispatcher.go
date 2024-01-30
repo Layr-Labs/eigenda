@@ -48,7 +48,6 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 			for i, blob := range blobs {
 				blobMessages[i] = blob[id]
 			}
-
 			sig, err := c.sendChunks(ctx, blobMessages, header, &op)
 			if err != nil {
 				update <- core.SignerMessage{
@@ -155,9 +154,11 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		return nil, err
 	}
 	bundles := make([]*node.Bundle, len(blob.Bundles))
-	for i := range blob.Bundles {
+	// the ordering of quorums in bundles must be same as in quorumHeaders
+	for i, quorumHeader := range quorumHeaders {
+		quorum := quorumHeader.QuorumId
 		bundles[i] = &node.Bundle{
-			Chunks: data[i],
+			Chunks: data[quorum],
 		}
 	}
 

@@ -8,6 +8,7 @@ COPY common /app/common
 COPY core /app/core
 COPY api /app/api
 COPY contracts /app/contracts
+COPY disperser /app/disperser
 COPY clients /app/clients
 COPY node /app/node
 COPY churner /app/churner

@@ -166,6 +166,22 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	return response.Items, nil
 }
 
+// QueryIndexCount returns the count of the items in the index that match the given key
+func (c *Client) QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues) (int32, error) {
+	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
+		IndexName:                 aws.String(indexName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeValues: expAttributeValues,
+		Select:                    types.SelectCount,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return response.Count, nil
+}
+
 // QueryIndexWithPagination returns all items in the index that match the given key
 // Results are limited to the given limit and the pagination token is returned
 // When limit is is 0, all items are returned

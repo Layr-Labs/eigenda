@@ -80,6 +80,8 @@ message DisperseBlobRequest {
 	// within the same batch.
 	repeated SecurityParams security_params = 2;
 
+	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
+	// corresponding to the key used by the client to sign the BlobAuthHeader.
 	string account_id = 3;
 }
 
@@ -252,7 +254,8 @@ message BatchMetadata {
 message BatchHeader {
 	// The root of the merkle tree with the hashes of blob headers as leaves.
 	bytes batch_root = 1;
-	// All quorums associated with blobs in this batch.
+	// All quorums associated with blobs in this batch. Sorted in ascending order.
+	// Ex. [0, 2, 1] => 0x000102
 	bytes quorum_numbers = 2;
 	// The percentage of stake that has signed for this batch.
 	// The quorum_signed_percentages[i] is percentage for the quorum_numbers[i].

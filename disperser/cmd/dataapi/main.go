@@ -85,9 +85,9 @@ func RunDataApi(ctx *cli.Context) error {
 		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
 		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
 		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
-		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi)
+		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
-		metrics           = dataapi.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{
 				ServerMode:   config.ServerMode,

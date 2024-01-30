@@ -39,6 +39,8 @@ type TxnManagerMetrics struct {
 	Latency  prometheus.Summary
 	GasUsed  prometheus.Gauge
 	SpeedUps prometheus.Gauge
+	TxQueue  prometheus.Gauge
+	NumTx    *prometheus.CounterVec
 }
 
 type Metrics struct {
@@ -62,7 +64,6 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-
 	encodingStreamerMetrics := EncodingStreamerMetrics{
 		EncodedBlobs: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -96,6 +97,21 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 				Name:      "speed_ups",
 				Help:      "number of times the gas price was increased",
 			},
+		),
+		TxQueue: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "tx_queue",
+				Help:      "number of transactions in transaction queue",
+			},
+		),
+		NumTx: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "tx_total",
+				Help:      "number of transactions processed",
+			},
+			[]string{"state"},
 		),
 	}
 
@@ -223,4 +239,12 @@ func (t *TxnManagerMetrics) UpdateGasUsed(gasUsed uint64) {
 
 func (t *TxnManagerMetrics) UpdateSpeedUps(speedUps int) {
 	t.SpeedUps.Set(float64(speedUps))
+}
+
+func (t *TxnManagerMetrics) UpdateTxQueue(txQueue int) {
+	t.TxQueue.Set(float64(txQueue))
+}
+
+func (t *TxnManagerMetrics) IncrementTxnCount(state string) {
+	t.NumTx.WithLabelValues(state).Inc()
 }
