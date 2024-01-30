@@ -137,10 +137,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         {
             IStrategy[] memory strategies = new IStrategy[](numStrategies);
+            bool[] memory transferLocks = new bool[](numStrategies);
             for (uint8 i = 0; i < numStrategies; i++) {
                 strategies[i] = deployedStrategyArray[i];
             }
-            strategyManager.addStrategiesToDepositWhitelist(strategies);
+            strategyManager.addStrategiesToDepositWhitelist(strategies, transferLocks);
         }
 
         vm.stopBroadcast();
