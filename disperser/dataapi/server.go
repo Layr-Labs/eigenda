@@ -155,7 +155,7 @@ func (s *server) Start() error {
 		}
 		operatorsInfo := v1.Group("/operatorsInfo")
 		{
-			operatorsInfo.GET("/deregisteredOperators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/deregistered_operators", s.FetchDeregisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -163,7 +163,7 @@ func (s *server) Start() error {
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
 			metrics.GET("/non_signers", s.FetchNonSigners)
 			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			metrics.GET("/deregisteredOperators", s.FetchDeregisteredOperators)
+			metrics.GET("/deregistered_operators", s.FetchDeregisteredOperators)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -428,7 +428,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/operatorsInfo/deregisteredOperators [get]
+//	@Router		/operatorsInfo/deregistered_operators [get]
 func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds

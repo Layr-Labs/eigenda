@@ -343,7 +343,7 @@ paths:
       summary: Fetch throughput time series
       tags:
       - Metrics
-  /operatorsInfo/deregisteredOperators:
+  /operatorsInfo/deregistered_operators:
     get:
       produces:
       - application/json

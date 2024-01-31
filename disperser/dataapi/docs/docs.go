@@ -310,7 +310,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operatorsInfo/deregisteredOperators": {
+        "/operatorsInfo/deregistered_operators": {
             "get": {
                 "produces": [
                     "application/json"

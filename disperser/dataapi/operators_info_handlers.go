@@ -97,7 +97,7 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 }
 
 // method to check if operator is online
-// Note: This method is least intrusive wat to check if operator is online
+// Note: This method is least intrusive way to check if operator is online
 // AlternateSolution: Should we add an endpt to check if operator is online?
 func checkIsOperatorOnline(socket string) bool {
 	timeout := time.Second * 10
