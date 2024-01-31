@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -153,8 +154,9 @@ func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl st
 }
 
 func newChurnRequest(address string, KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
+
 	churnRequest := &churner.ChurnRequest{
-		OperatorAddress:            address,
+		OperatorAddress:            gethcommon.HexToAddress(address),
 		OperatorToRegisterPubkeyG1: KeyPair.PubKey,
 		OperatorToRegisterPubkeyG2: KeyPair.GetPubKeyG2(),
 		QuorumIDs:                  QuorumIDs,
