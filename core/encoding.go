@@ -54,8 +54,8 @@ type Encoder interface {
 	// VerifyBlobLength takes in the commitments and returns an error if the blob length is invalid.
 	VerifyBlobLength(commitments BlobCommitments) error
 
-	// VerifyCommitEquivalence takes in commitments and returns an error if the commitment of G1 and G2 are inconsistent
-	VerifyCommitEquivalence(commitments []BlobCommitments) error
+	// VerifyCommitEquivalence takes in a list of commitments and returns an error if the commitment of G1 and G2 are inconsistent
+	VerifyCommitEquivalenceBatch(commitments []BlobCommitments) error
 
 	// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 	Decode(chunks []*Chunk, indices []ChunkNumber, params EncodingParams, inputSize uint64) ([]byte, error)

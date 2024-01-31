@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBatchVerifyCommitEquivalence(t *testing.T) {
+func TestBatch(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 

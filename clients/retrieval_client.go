@@ -120,6 +120,13 @@ func (r *retrievalClient) RetrieveBlob(
 		return nil, err
 	}
 
+	// Validate the commitments are equivalent
+	commitmentBatch := []core.BlobCommitments{blobHeader.BlobCommitments}
+	err = r.encoder.VerifyCommitEquivalenceBatch(commitmentBatch)
+	if err != nil {
+		return nil, err
+	}
+
 	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments")

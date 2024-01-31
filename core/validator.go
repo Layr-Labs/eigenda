@@ -194,7 +194,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		})
 	}
 	// check if commitments are equivalent
-	err := v.encoder.VerifyCommitEquivalence(blobCommitmentList)
+	err := v.encoder.VerifyCommitEquivalenceBatch(blobCommitmentList)
 	if err != nil {
 		return err
 	}

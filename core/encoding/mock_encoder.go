@@ -32,7 +32,7 @@ func (e *MockEncoder) UniversalVerifySubBatch(params core.EncodingParams, sample
 	time.Sleep(e.Delay)
 	return args.Error(0)
 }
-func (e *MockEncoder) VerifyCommitEquivalence(commitments []core.BlobCommitments) error {
+func (e *MockEncoder) VerifyCommitEquivalenceBatch(commitments []core.BlobCommitments) error {
 	args := e.Called(commitments)
 	time.Sleep(e.Delay)
 	return args.Error(0)

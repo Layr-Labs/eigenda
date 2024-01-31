@@ -132,7 +132,7 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 
 }
 
-func (e *Encoder) VerifyCommitEquivalence(commitments []core.BlobCommitments) error {
+func (e *Encoder) VerifyCommitEquivalenceBatch(commitments []core.BlobCommitments) error {
 	commitmentsPair := make([]kzgEncoder.CommitmentPair, len(commitments))
 
 	for i, c := range commitments {
