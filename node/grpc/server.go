@@ -159,6 +159,7 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 	// Record metrics.
 	if err != nil {
 		s.node.Metrics.RecordRPCRequest("StoreChunks", "failure")
+		s.node.Logger.Error("StoreChunks failed", "err", err)
 	} else {
 		s.node.Metrics.RecordRPCRequest("StoreChunks", "success")
 	}

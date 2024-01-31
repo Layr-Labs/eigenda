@@ -23,7 +23,6 @@ contract MockRollup {
     IEigenDAServiceManager public eigenDAServiceManager; // EigenDASM contract
     BN254.G1Point public tau; //power of tau
     uint256 public illegalValue; // special "illegal" value that should not be included in blob
-    bytes32 public quorumBlobParamsHash; // hash of the security parameters
     uint256 public stakeRequired; // amount of stake required to register as a validator
 
     ///@notice mapping of validators who have registered
@@ -33,11 +32,10 @@ contract MockRollup {
     ///@notice mapping of timestamps to commitments
     mapping(uint256 => Commitment) public commitments;
 
-    constructor(IEigenDAServiceManager _eigenDAServiceManager, BN254.G1Point memory _tau, uint256 _illegalValue, bytes32 _quorumBlobParamsHash, uint256 _stakeRequired) {
+    constructor(IEigenDAServiceManager _eigenDAServiceManager, BN254.G1Point memory _tau, uint256 _illegalValue, uint256 _stakeRequired) {
         eigenDAServiceManager = _eigenDAServiceManager;
         tau = _tau;
         illegalValue = _illegalValue;
-        quorumBlobParamsHash = _quorumBlobParamsHash;
         stakeRequired = _stakeRequired;
     }
 
@@ -63,16 +61,6 @@ contract MockRollup {
 
         // verify that the blob was included in the batch
         EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
-
-        // zero out the chunkLengths (this a temporary hack)
-        for (uint256 i = 0; i < blobHeader.quorumBlobParams.length; i++)
-        {
-            blobHeader.quorumBlobParams[i].chunkLength = 0;
-        }
-
-        // verify that the blob header contains the correct quorumBlobParams
-        require(keccak256(abi.encode(blobHeader.quorumBlobParams)) == quorumBlobParamsHash, "MockRollup.postCommitment: QuorumBlobParams do not match quorumBlobParamsHash");
-
 
         commitments[block.timestamp] = Commitment(msg.sender, blobHeader.dataLength, blobHeader.commitment);
     }

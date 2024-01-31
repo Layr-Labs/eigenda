@@ -86,7 +86,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.StringSliceFlag{
 			Name:     AllowlistFlagName,
-			Usage:    "Allowlist of IPs and corresponding blob/byte rates to bypass rate limiting. Format: <IP>:<quorum ID>:<blob rate>:<byte rate>. Example: 127.0.0.1:0:10:10485760",
+			Usage:    "Allowlist of IPs or ethereum addresses (including initial \"0x\") and corresponding blob/byte rates to bypass rate limiting. Format: [<IP>||<ETH ADDRESS>]/<quorum ID>/<blob rate>/<byte rate>. Example: 127.0.0.1/0/10/10485760",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST"),
 			Required: false,
 			Value:    &cli.StringSlice{},
@@ -133,7 +133,7 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 	// Parse allowlist
 	allowlist := make(Allowlist)
 	for _, allowlistEntry := range c.StringSlice(AllowlistFlagName) {
-		allowlistEntrySplit := strings.Split(allowlistEntry, ":")
+		allowlistEntrySplit := strings.Split(allowlistEntry, "/")
 		if len(allowlistEntrySplit) != 4 {
 			log.Printf("invalid allowlist entry: entry should contain exactly 4 elements: %s", allowlistEntry)
 			continue

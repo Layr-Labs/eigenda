@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	commock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
@@ -17,12 +18,14 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
+	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 )
@@ -34,16 +37,17 @@ var (
 	mockPrometheusRespAvgThroughput string
 
 	expectedBlobCommitment *core.BlobCommitments
+	mockLogger             = &commock.Logger{}
 	blobstore              = inmem.NewBlobStore()
 	mockPrometheusApi      = &prommock.MockPrometheusApi{}
 	prometheusClient       = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
-	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi)
+	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
 	config                 = dataapi.Config{ServerMode: "test", SocketAddr: ":8080"}
 
 	mockTx                          = &coremock.MockTransactor{}
 	mockChainState, _               = coremock.MakeChainDataMock(core.OperatorIndex(1))
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics("9001", &commock.Logger{}))
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
@@ -229,6 +233,64 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 	assert.Equal(t, float64(11666.666666666666), response[0].Throughput)
 	assert.Equal(t, uint64(1701292800), response[0].Timestamp)
 	assert.Equal(t, float64(3.599722666666646e+07), totalThroughput)
+}
+
+func TestFetchUnsignedBatchesHandler(t *testing.T) {
+	r := setUpRouter()
+
+	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
+
+	nonSigning := struct {
+		NonSigners []struct {
+			OperatorId graphql.String `graphql:"operatorId"`
+		} `graphql:"nonSigners"`
+	}{
+		NonSigners: []struct {
+			OperatorId graphql.String `graphql:"operatorId"`
+		}{
+			{OperatorId: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"},
+			{OperatorId: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568312"},
+		},
+	}
+	batchNonSigningOperatorIds := []*subgraph.BatchNonSigningOperatorIds{
+		{
+			NonSigning: nonSigning,
+		},
+	}
+
+	mockSubgraphApi.On("QueryBatchNonSigningOperatorIdsInInterval").Return(batchNonSigningOperatorIds, nil).Once()
+	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistereds, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryBatchesByBlockTimestampRange").Return(subgraphBatches, nil)
+
+	r.GET("/v1/metrics/operators_nonsigning_percentage", testDataApiServer.FetchOperatorsNonsigningPercentageHandler)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/operators_nonsigning_percentage", nil)
+	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
+	defer cancel()
+
+	req = req.WithContext(ctxWithDeadline)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.OperatorsNonsigningPercentage
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	operator := response.Operators["0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"]
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.TotalNonSigners)
+	assert.Equal(t, 3, operator.TotalBatches)
+	assert.Equal(t, 1, operator.TotalUnsignedBatches)
+	assert.Equal(t, float64(33.33), operator.Percentage)
+	assert.Equal(t, 2, len(response.Operators))
 }
 
 func setUpRouter() *gin.Engine {

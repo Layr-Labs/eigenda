@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"slices"
 
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
@@ -324,6 +325,9 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
+	slices.SortStableFunc[[]quorumBlobParams](qbp, func(a, b quorumBlobParams) int {
+		return int(a.QuorumNumber) - int(b.QuorumNumber)
+	})
 
 	s := struct {
 		Commitment       commitment

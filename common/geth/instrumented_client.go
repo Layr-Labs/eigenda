@@ -586,7 +586,7 @@ func instrumentFunction[T any](
 
 // Not sure why this method is not exposed in the ethclient itself...
 // but it is needed to comply with the rpc metrics defined in avs-node spec
-// https://eigen.nethermind.io/docs/metrics/metrics-prom-spec
+// https://eigen.nethermind.io/docs/spec/metrics/metrics-prom-spec
 func getClientAndVersion(client *EthClient) string {
 	var clientVersion string
 	err := client.Client.Client().Call(&clientVersion, "web3_clientVersion")

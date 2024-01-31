@@ -300,6 +300,59 @@ func TestQueryIndex(t *testing.T) {
 	assert.Equal(t, len(queryResult), 30)
 }
 
+func TestQueryIndexCount(t *testing.T) {
+	tableName := "ProcessingQueryIndexCount"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItemsProcessing := 10
+	items1 := make([]commondynamodb.Item, numItemsProcessing)
+	for i := 0; i < numItemsProcessing; i += 1 {
+		items1[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+		}
+	}
+
+	numItemsConfirmed := 20
+	items2 := make([]commondynamodb.Item, numItemsConfirmed)
+	for i := 0; i < numItemsConfirmed; i += 1 {
+		items2[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i+numItemsProcessing)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i+numItemsProcessing)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "1"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+		}
+	}
+
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items1)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	unprocessed, err = dynamoClient.PutItems(ctx, tableName, items2)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	count, err := dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "0",
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, int(count), 10)
+
+	count, err = dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: "1",
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, int(count), 20)
+}
+
 func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	tableName := "ProcessingWithPaginationSingleItem"
 	createTable(t, tableName)
@@ -349,7 +402,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	ctx := context.Background()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
-		requestedAt := time.Now().Add(-time.Duration(i) * time.Second).Unix()
+		requestedAt := time.Now().Add(-time.Duration(3*i) * time.Second).Unix()
 
 		// Create new item
 		item := commondynamodb.Item{
@@ -409,7 +462,16 @@ func TestQueryIndexPagination(t *testing.T) {
 	ctx := context.Background()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
-		requestedAt := time.Now().Add(-time.Duration(i) * time.Second).Unix()
+		// Noticed same timestamp for multiple items which resulted in key28
+		// being returned when 10 items were queried as first item,hence multiplying
+		// by random number 3 here to avoid such a situation
+		// requestedAt: 1705040877
+		// metadataKey: key28
+		// BlobKey: blob28
+		// requestedAt: 1705040877
+		// metadataKey: key29
+		// BlobKey: blob29
+		requestedAt := time.Now().Add(-time.Duration(3*i) * time.Second).Unix()
 
 		// Create new item
 		item := commondynamodb.Item{

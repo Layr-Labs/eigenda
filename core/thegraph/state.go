@@ -144,7 +144,7 @@ func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Con
 	var (
 		query     QueryOperatorByIdGql
 		variables = map[string]any{
-			"id": graphql.String(fmt.Sprintf("0x%s", hex.EncodeToString(operatorId[:]))),
+			"id": graphql.String(fmt.Sprintf("0x%s", operatorId.Hex())),
 		}
 	)
 	err := ics.querier.Query(context.Background(), &query, variables)
@@ -235,7 +235,7 @@ func (ics *indexedChainState) getRegisteredIndexedOperatorInfo(ctx context.Conte
 		return nil, err
 	}
 
-	operators := make(map[[32]byte]*core.IndexedOperatorInfo, len(operatorsGql))
+	operators := make(map[core.OperatorID]*core.IndexedOperatorInfo, len(operatorsGql))
 	for i := range operatorsGql {
 		operator := operatorsGql[i]
 		operatorIndexedInfo, err := convertIndexedOperatorInfoGqlToIndexedOperatorInfo(&operator)

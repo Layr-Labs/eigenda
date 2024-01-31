@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
+	"slices"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
@@ -721,8 +722,16 @@ func quorumIDsToQuorumNumbers(quorumIds []core.QuorumID) []byte {
 
 func quorumParamsToQuorumNumbers(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
 	quorumNumbers := make([]byte, len(quorumParams))
+	quorums := make([]uint8, len(quorumParams))
 	i := 0
-	for _, qp := range quorumParams {
+	for k := range quorumParams {
+		quorums[i] = k
+		i++
+	}
+	slices.Sort(quorums)
+	i = 0
+	for _, quorum := range quorums {
+		qp := quorumParams[quorum]
 		quorumNumbers[i] = byte(qp.QuorumID)
 		i++
 	}
@@ -731,8 +740,16 @@ func quorumParamsToQuorumNumbers(quorumParams map[core.QuorumID]*core.QuorumResu
 
 func quorumParamsToThresholdPercentages(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
 	thresholdPercentages := make([]byte, len(quorumParams))
+	quorums := make([]uint8, len(quorumParams))
 	i := 0
-	for _, qp := range quorumParams {
+	for k := range quorumParams {
+		quorums[i] = k
+		i++
+	}
+	slices.Sort(quorums)
+	i = 0
+	for _, quorum := range quorums {
+		qp := quorumParams[quorum]
 		thresholdPercentages[i] = byte(qp.PercentSigned)
 		i++
 	}

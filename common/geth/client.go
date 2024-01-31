@@ -210,7 +210,7 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
 		return nil, ErrTransactionFailed
 	}
-	c.Logger.Trace("successfully submitted transaction", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
+	c.Logger.Trace("transaction confirmed", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
 	return receipt, nil
 }
 
@@ -239,7 +239,7 @@ func (c *EthClient) waitMined(ctx context.Context, tx *types.Transaction) (*type
 		}
 
 		if errors.Is(err, ethereum.NotFound) {
-			c.Logger.Trace("Transaction not yet mined")
+			c.Logger.Trace("Transaction not yet mined", "txHash", tx.Hash().Hex())
 		} else if err != nil {
 			c.Logger.Trace("Receipt retrieval failed", "err", err)
 		}
