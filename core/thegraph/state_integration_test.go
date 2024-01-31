@@ -81,8 +81,10 @@ func TestIndexerIntegration(t *testing.T) {
 	defer teardown()
 
 	logger, err := logging.GetLogger(logging.Config{
-		StdLevel:  "debug",
-		FileLevel: "debug",
+		StdFormat:  "terminal",
+		StdLevel:   "debug",
+		FileFormat: "logfmt",
+		FileLevel:  "debug",
 	})
 	assert.NoError(t, err)
 
