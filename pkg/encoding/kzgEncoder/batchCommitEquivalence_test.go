@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBatch(t *testing.T) {
+func TestBatchEquivalence(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
@@ -19,7 +19,7 @@ func TestBatch(t *testing.T) {
 	require.Nil(t, err)
 
 	numBlob := 5
-	commitPairs := make([]kzgRs.CommitmentPair, 0)
+	commitPairs := make([]kzgRs.CommitmentPair, numBlob)
 	for z := 0; z < numBlob; z++ {
 		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
