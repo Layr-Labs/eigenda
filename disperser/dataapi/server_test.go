@@ -343,7 +343,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {
 		fmt.Printf("Data: %v\n", data)
 		assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", data.OperatorId)
 		assert.Equal(t, uint(22), data.BlockNumber)
-		assert.Equal(t, "localhost:32007", data.IpAddress)
+		assert.Equal(t, "localhost:32007", data.Socket)
 	}
 
 	// Reset the mock
@@ -399,12 +399,12 @@ func TestFetchDeregisteredOperatorWithoutDaysQueryParam(t *testing.T) {
 
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
-	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, "localhost:32007", operator1Data.Socket)
 	assert.Equal(t, false, operator1Data.IsOnline)
 
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
 	assert.Equal(t, uint(24), operator2Data.BlockNumber)
-	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, "localhost:32009", operator2Data.Socket)
 	assert.Equal(t, false, operator2Data.IsOnline)
 
 	// Reset the mock
@@ -546,12 +546,12 @@ func TestFetchDeregisteredOperatorsHandlerMultiplerOperatorsOffline(t *testing.T
 
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
-	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, "localhost:32007", operator1Data.Socket)
 	assert.Equal(t, false, operator1Data.IsOnline)
 
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
 	assert.Equal(t, uint(24), operator2Data.BlockNumber)
-	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, "localhost:32009", operator2Data.Socket)
 	assert.Equal(t, false, operator2Data.IsOnline)
 
 	// Reset the mock
@@ -665,12 +665,12 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOn
 
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
-	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, "localhost:32007", operator1Data.Socket)
 	assert.Equal(t, false, operator1Data.IsOnline)
 
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
 	assert.Equal(t, uint(24), operator2Data.BlockNumber)
-	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, "localhost:32009", operator2Data.Socket)
 	assert.Equal(t, true, operator2Data.IsOnline)
 
 	// Reset the mock
@@ -736,12 +736,12 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t 
 
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
-	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, "localhost:32007", operator1Data.Socket)
 	assert.Equal(t, true, operator1Data.IsOnline)
 
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
 	assert.Equal(t, uint(24), operator2Data.BlockNumber)
-	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, "localhost:32009", operator2Data.Socket)
 	assert.Equal(t, true, operator2Data.IsOnline)
 
 	// Reset the mock
@@ -796,7 +796,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineSameB
 
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator1Data.OperatorId)
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
-	assert.Equal(t, "localhost:32007", operator1Data.IpAddress)
+	assert.Equal(t, "localhost:32007", operator1Data.Socket)
 	assert.Equal(t, false, operator1Data.IsOnline)
 
 	operator2Data := getOperatorData(response.Data, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
@@ -804,12 +804,12 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineSameB
 
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
 	assert.Equal(t, uint(24), operator2Data.BlockNumber)
-	assert.Equal(t, "localhost:32009", operator2Data.IpAddress)
+	assert.Equal(t, "localhost:32009", operator2Data.Socket)
 	assert.Equal(t, false, operator1Data.IsOnline)
 
 	assert.Equal(t, "0xe24cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568313", operator3Data.OperatorId)
 	assert.Equal(t, uint(24), operator3Data.BlockNumber)
-	assert.Equal(t, "localhost:32011", operator3Data.IpAddress)
+	assert.Equal(t, "localhost:32011", operator3Data.Socket)
 	assert.Equal(t, false, operator3Data.IsOnline)
 
 	// Reset the mock

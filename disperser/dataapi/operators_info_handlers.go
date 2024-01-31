@@ -24,7 +24,7 @@ var (
 )
 
 func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*DeregisteredOperatorMetadata, error) {
-	// Track Time taken to get deregistered operators
+	// Track time taken to get deregistered operators
 	startTime := time.Now()
 
 	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(ctx, days)
@@ -74,21 +74,21 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 }
 
 func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
-	ipAddress := core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
-	isOnline := checkIsOperatorOnline(ipAddress)
+	socket := core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
+	isOnline := checkIsOperatorOnline(socket)
 
 	// Log the online status
 	if isOnline {
-		logger.Debug("Operator %v is online at %s", operatorStatus.IndexedOperatorInfo, ipAddress)
+		logger.Debug("Operator %v is online at %s", operatorStatus.IndexedOperatorInfo, socket)
 	} else {
-		logger.Debug("Operator %v is offline at %s", operatorStatus.IndexedOperatorInfo, ipAddress)
+		logger.Debug("Operator %v is offline at %s", operatorStatus.IndexedOperatorInfo, socket)
 	}
 
 	// Create the metadata regardless of online status
 	metadata := &DeregisteredOperatorMetadata{
 		OperatorId:  string(operatorStatus.OperatorInfo.OperatorId[:]),
 		BlockNumber: uint(operatorStatus.OperatorInfo.BlockNumber),
-		IpAddress:   ipAddress,
+		Socket:      socket,
 		IsOnline:    isOnline,
 	}
 
@@ -99,9 +99,9 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 // method to check if operator is online
 // Note: This method is least intrusive wat to check if operator is online
 // AlternateSolution: Should we add an endpt to check if operator is online?
-func checkIsOperatorOnline(ipAddress string) bool {
+func checkIsOperatorOnline(socket string) bool {
 	timeout := time.Second * 10
-	conn, err := net.DialTimeout("tcp", ipAddress, timeout)
+	conn, err := net.DialTimeout("tcp", socket, timeout)
 	if err != nil {
 		return false
 	}

@@ -83,7 +83,7 @@ type (
 	DeregisteredOperatorMetadata struct {
 		OperatorId  string `json:"operator_id"`
 		BlockNumber uint   `json:"block_number"`
-		IpAddress   string `json:"ip_address"`
+		Socket      string `json:"socket"`
 		IsOnline    bool   `json:"is_online"`
 	}
 
