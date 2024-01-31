@@ -6,16 +6,20 @@ import (
 )
 
 const (
-	PathFlagName      = "log.path"
-	FileLevelFlagName = "log.level-file"
-	StdLevelFlagName  = "log.level-std"
+	PathFlagName       = "log.path"
+	FileFormatFlagName = "log.format-file"
+	FileLevelFlagName  = "log.level-file"
+	StdFormatFlagName  = "log.format-std"
+	StdLevelFlagName   = "log.level-std"
 )
 
 type Config struct {
-	Path      string
-	Prefix    string
-	FileLevel string
-	StdLevel  string
+	Path       string
+	Prefix     string
+	FileLevel  string
+	FileFormat string
+	StdLevel   string
+	StdFormat  string
 }
 
 func CLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -38,21 +42,37 @@ func CLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Value:  "",
 			EnvVar: common.PrefixEnvVar(envPrefix, "LOG_PATH"),
 		},
+		cli.StringFlag{
+			Name:   common.PrefixFlag(flagPrefix, StdFormatFlagName),
+			Usage:  "Format of the log messages. Accepted options are 'terminal', 'json', and 'logfmt'",
+			Value:  "terminal",
+			EnvVar: common.PrefixEnvVar(envPrefix, "STD_LOG_FORMAT"),
+		},
+		cli.StringFlag{
+			Name:   common.PrefixFlag(flagPrefix, FileFormatFlagName),
+			Usage:  "Format of the log messages. Accepted options are 'terminal', 'json', and 'logfmt'",
+			Value:  "logfmt",
+			EnvVar: common.PrefixEnvVar(envPrefix, "FILE_LOG_FORMAT"),
+		},
 	}
 }
 
 func DefaultCLIConfig() Config {
 	return Config{
-		Path:      "",
-		FileLevel: "debug",
-		StdLevel:  "debug",
+		Path:       "",
+		FileFormat: "logfmt",
+		FileLevel:  "debug",
+		StdFormat:  "terminal",
+		StdLevel:   "debug",
 	}
 }
 
 func ReadCLIConfig(ctx *cli.Context, flagPrefix string) Config {
 	cfg := DefaultCLIConfig()
+	cfg.StdFormat = ctx.GlobalString(common.PrefixFlag(flagPrefix, StdFormatFlagName))
 	cfg.StdLevel = ctx.GlobalString(common.PrefixFlag(flagPrefix, StdLevelFlagName))
 	cfg.FileLevel = ctx.GlobalString(common.PrefixFlag(flagPrefix, FileLevelFlagName))
+	cfg.FileFormat = ctx.GlobalString(common.PrefixFlag(flagPrefix, FileFormatFlagName))
 	cfg.Path = ctx.GlobalString(common.PrefixFlag(flagPrefix, PathFlagName))
 	return cfg
 }
