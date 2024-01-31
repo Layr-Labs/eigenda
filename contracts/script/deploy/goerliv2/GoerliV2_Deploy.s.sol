@@ -149,7 +149,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
             IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers
         ) = _parseStakeRegistryParams(config_data);
         (
-            IRegistryCoordinator[] memory operatorSetParams, 
+            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams, 
             address churner, 
             address ejector
         ) = _parseRegistryCoordinatorParams(config_data);
@@ -271,7 +271,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
             IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers
         ) = _parseStakeRegistryParams(config_data);
         (
-            IRegistryCoordinator[] memory operatorSetParams, 
+            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams, 
             address churner, 
             address ejector
         ) = _parseRegistryCoordinatorParams(config_data);
@@ -351,9 +351,9 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         strategyAndWeightingMultipliers = abi.decode(strategyConfigsRaw, (IStakeRegistry.StrategyParams[][]));
     }
 
-    function _parseRegistryCoordinatorParams(string memory config_data) internal returns (IRegistryCoordinator[] memory operatorSetParams, address churner, address ejector) {
+    function _parseRegistryCoordinatorParams(string memory config_data) internal returns (IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams, address churner, address ejector) {
         bytes memory operatorConfigsRaw = stdJson.parseRaw(config_data, ".operatorSetParams");
-        operatorSetParams = abi.decode(operatorConfigsRaw, (IRegistryCoordinator[]));
+        operatorSetParams = abi.decode(operatorConfigsRaw, (IRegistryCoordinator.OperatorSetParam[]));
 
         churner = stdJson.readAddress(config_data, ".permissions.churner");
         ejector = stdJson.readAddress(config_data, ".permissions.ejector");
