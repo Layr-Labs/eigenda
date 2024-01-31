@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
-import {IDelegationManager} from "eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
+import {IAVSDirectory} from "eigenlayer-core/contracts/interfaces/IAVSDirectory.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
 
 import {ServiceManagerBase} from "eigenlayer-middleware/ServiceManagerBase.sol";
@@ -34,12 +34,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     constructor(
-        IDelegationManager __delegationMananger,
+        IAVSDirectory __avsDirectory,
         IRegistryCoordinator __registryCoordinator,
         IStakeRegistry __stakeRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
-        ServiceManagerBase(__delegationMananger, __registryCoordinator, __stakeRegistry)
+        ServiceManagerBase(__avsDirectory, __registryCoordinator, __stakeRegistry)
     {
         _disableInitializers();
     }

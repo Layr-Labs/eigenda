@@ -2,11 +2,10 @@
 pragma solidity ^0.8.9;
 
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
-import {IDelayedService} from "eigenlayer-middleware/interfaces/IDelayedService.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
-interface IEigenDAServiceManager is IServiceManager, IDelayedService {
+interface IEigenDAServiceManager is IServiceManager {
     // EVENTS
     
     /**
@@ -92,4 +91,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
 
     /// @notice Returns the block until which operators must serve.
     function latestServeUntilBlock() external view returns (uint32);
+
+    /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
+    function BLOCK_STALE_MEASURE() external view returns (uint32);
 }
