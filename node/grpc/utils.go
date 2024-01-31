@@ -61,6 +61,11 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	if err != nil {
 		return nil, err
 	}
+	lengthCommitment, err := new(core.LengthCommitment).Deserialize(h.GetLengthCommitment())
+	if err != nil {
+		return nil, err
+	}
+
 	lenProof, err := new(core.LengthProof).Deserialize(h.GetLengthProof())
 	if err != nil {
 		return nil, err
@@ -80,9 +85,14 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	}
 
 	return &core.BlobHeader{
-		BlobCommitments: core.BlobCommitments{Commitment: commitment, LengthProof: lenProof, Length: uint(h.GetLength())},
-		QuorumInfos:     quorumHeaders,
-		AccountID:       h.AccountId,
+		BlobCommitments: core.BlobCommitments{
+			Commitment:       commitment,
+			LengthCommitment: lengthCommitment,
+			LengthProof:      lenProof,
+			Length:           uint(h.GetLength()),
+		},
+		QuorumInfos: quorumHeaders,
+		AccountID:   h.AccountId,
 	}, nil
 }
 
