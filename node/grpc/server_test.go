@@ -318,6 +318,8 @@ func TestGetBlobHeader(t *testing.T) {
 func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader {
 	serializedCommitment, err := blobHeader.Commitment.Serialize()
 	assert.NoError(t, err)
+	serializedLengthCommitment, err := blobHeader.LengthCommitment.Serialize()
+	assert.NoError(t, err)
 	serializedLengthProof, err := blobHeader.LengthProof.Serialize()
 	assert.NoError(t, err)
 	quorumHeader := &pb.BlobQuorumInfo{
@@ -328,9 +330,10 @@ func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader
 	}
 
 	return &pb.BlobHeader{
-		Commitment:    serializedCommitment,
-		LengthProof:   serializedLengthProof,
-		Length:        uint32(blobHeader.Length),
-		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeader},
+		Commitment:       serializedCommitment,
+		LengthCommitment: serializedLengthCommitment,
+		LengthProof:      serializedLengthProof,
+		Length:           uint32(blobHeader.Length),
+		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeader},
 	}
 }
