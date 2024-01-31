@@ -469,6 +469,9 @@ const docTemplate = `{
         "dataapi.OperatorNonsigningPercentageMetrics": {
             "type": "object",
             "properties": {
+                "operator_id": {
+                    "type": "string"
+                },
                 "percentage": {
                     "type": "number"
                 },
@@ -483,14 +486,14 @@ const docTemplate = `{
         "dataapi.OperatorsNonsigningPercentage": {
             "type": "object",
             "properties": {
-                "operators": {
-                    "type": "object",
-                    "additionalProperties": {
+                "data": {
+                    "type": "array",
+                    "items": {
                         "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
                     }
                 },
-                "total_non_signers": {
-                    "type": "integer"
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
                 }
             }
         },

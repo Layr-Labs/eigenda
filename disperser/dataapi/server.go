@@ -70,14 +70,15 @@ type (
 	}
 
 	OperatorNonsigningPercentageMetrics struct {
+		OperatorId           string  `json:"operator_id"`
 		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 		TotalBatches         int     `json:"total_batches"`
 		Percentage           float64 `json:"percentage"`
 	}
 
 	OperatorsNonsigningPercentage struct {
-		TotalNonSigners int                                            `json:"total_non_signers"`
-		Operators       map[string]OperatorNonsigningPercentageMetrics `json:"operators"`
+		Meta Meta                                   `json:"meta"`
+		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
 	ErrorResponse struct {

@@ -110,6 +110,11 @@ type Stakes struct {
 	Distribution []float32 `yaml:"distribution"`
 }
 
+type Stakes struct {
+	Total        float32   `yaml:"total"`
+	Distribution []float32 `yaml:"distribution"`
+}
+
 type ServicesSpec struct {
 	Counts struct {
 		NumDis              int `yaml:"dispersers"`

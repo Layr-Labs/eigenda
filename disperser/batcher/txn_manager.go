@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	gcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -117,8 +118,8 @@ func (t *txnManager) Start(ctx context.Context) {
 }
 
 // ProcessTransaction sends the transaction and queues the transaction for monitoring.
-// It returns an error if the transaction fails to be sent for reasons other than timeouts.
-// TxnManager monitors the transaction and resends it with a higher gas price if it is not mined without a timeout.
+// It returns an error if the transaction fails to be confirmed for reasons other than timeouts.
+// TxnManager monitors the transaction and resends it with a higher gas price if it is not mined without a timeout until the transaction is confirmed or failed.
 func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -149,7 +150,8 @@ func (t *txnManager) ReceiptChan() chan *ReceiptOrErr {
 	return t.receiptChan
 }
 
-// monitorTransaction monitors the transaction and resends it with a higher gas price if it is not mined without a timeout.
+// monitorTransaction waits until the transaction is confirmed (or failed) and resends it with a higher gas price if it is not mined without a timeout.
+// It returns the receipt once the transaction has been confirmed.
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
 func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
 	numSpeedUps := 0
@@ -183,6 +185,13 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			}
 			err = t.ethClient.SendTransaction(ctx, newTx)
 			if err != nil {
+				if errors.Is(err, gcore.ErrNonceTooLow) {
+					// try to get the receipt again to see if the transaction has been mined
+					_, receiptErr := t.ethClient.TransactionReceipt(ctx, req.Tx.Hash())
+					if receiptErr == nil {
+						continue
+					}
+				}
 				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
 				t.metrics.IncrementTxnCount("failure")
 				return nil, err

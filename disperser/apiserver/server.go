@@ -266,7 +266,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
+			s.metrics.HandleBlobStoreFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
 		s.logger.Error("failed to store blob", "err", err)
 		return nil, fmt.Errorf("failed to store blob, please try again later")
