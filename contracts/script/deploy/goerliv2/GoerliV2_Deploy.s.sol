@@ -29,7 +29,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
     string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_preprod_deployment_2024_30_1.json"));
     //string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/prod.config.json"));
     string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/preprod.config.json"));
-    string public outputPath = string.concat("script/m2/output/M2_deployment_data.json");
+    string public outputPath = string.concat("script/deploy/goerliv2/output/GV2_preprod_deployment_data.json");
 
     ProxyAdmin public eigenDAProxyAdmin;
     address public eigenDAOwner;
@@ -199,6 +199,29 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
 
         vm.stopBroadcast();
+
+        // sanity checks
+        _verifyContractPointers(
+            apkRegistry,
+            eigenDAServiceManager,
+            registryCoordinator,
+            indexRegistry,
+            stakeRegistry
+        );
+
+        _verifyContractPointers(
+            apkRegistryImplementation,
+            eigenDAServiceManagerImplementation,
+            registryCoordinatorImplementation,
+            indexRegistryImplementation,
+            stakeRegistryImplementation
+        );
+
+        _verifyImplementations();
+        _verifyInitalizations(config_data);
+
+        //write output
+        _writeOutput(config_data);
     }
 
     function _verifyContractPointers(
@@ -283,7 +306,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         require(operatorSetParams.length == strategyAndWeightingMultipliers.length && operatorSetParams.length == minimumStakeForQuourm.length, "operatorSetParams, strategyAndWeightingMultipliers, and minimumStakeForQuourm must be the same length");
     }
 
-    function _writeOutput(address churner, address ejector) internal {
+    function _writeOutput(string memory config_data) internal {
         string memory parent_object = "parent object";
 
         string memory deployed_addresses = "addresses";
@@ -304,6 +327,8 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         vm.serializeUint(chain_info, "deploymentBlock", block.number);
         string memory chain_info_output = vm.serializeUint(chain_info, "chainId", block.chainid);
 
+        address churner = stdJson.readAddress(config_data, ".permissions.churner");
+        address ejector = stdJson.readAddress(config_data, ".permissions.ejector");
         string memory permissions = "permissions";
         vm.serializeAddress(permissions, "eigenDAOwner", eigenDAOwner);
         vm.serializeAddress(permissions, "eigenDAUpgrader", eigenDAUpgrader);
