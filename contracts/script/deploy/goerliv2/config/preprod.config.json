@@ -4,16 +4,16 @@
   },
 
   "permissions" : {
-    "owner": "0x1000000000000000000000000000000000000000",
-    "upgrader": "0x2000000000000000000000000000000000000000",
-    "churner": "0x3000000000000000000000000000000000000000",
-    "ejector": "0x4000000000000000000000000000000000000000",
-    "batchConfirmer": "0x5000000000000000000000000000000000000000",
-    "initalPausedStatus": 0
+    "owner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "upgrader": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "churner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "ejector": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "batchConfirmer": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "pauser": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "initalPausedStatus": 1
   },
 
   "minimumStakes": [
-    0,
     0
   ],
 
@@ -51,21 +51,10 @@
         "0_strategy": "0x1755d34476BB4DaEd726ee4a81E8132dF00F9b14", 
         "1_multiplier": 1002859280743792963
       }
-    ],
-    [
-      {
-        "0_strategy": "0x0000000000000000000000000000000000000001",
-        "1_multiplier": 1000000000000000000
-      }
     ]
   ],
 
   "operatorSetParams": [
-    {
-      "0_maxOperatorCount" : 200,
-      "1_kickBIPsOfOperatorStake" : 11000,
-      "2_kickBIPsOfTotalStake" : 50
-    },
     {
       "0_maxOperatorCount" : 200,
       "1_kickBIPsOfOperatorStake" : 11000,

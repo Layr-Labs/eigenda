@@ -46,13 +46,14 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     function initialize(
         IPauserRegistry _pauserRegistry,
+        uint256 _initialPausedStatus,
         address _initialOwner,
         address _batchConfirmer
     )
         public
         initializer
     {
-        _initializePauser(_pauserRegistry, UNPAUSE_ALL);
+        _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
         _setBatchConfirmer(_batchConfirmer);
     }

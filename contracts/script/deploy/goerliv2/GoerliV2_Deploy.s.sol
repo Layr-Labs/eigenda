@@ -26,7 +26,7 @@ import "forge-std/StdJson.sol";
 contract Deployer_GV2 is ExistingDeploymentParser {
 
     //string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/M1_deployment_goerli_2023_3_23.json"));
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/M2_from_scratch_deployment_data.json"));
+    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_preprod_deployment_2024_30_1.json"));
     //string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/prod.config.json"));
     string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/preprod.config.json"));
     string public outputPath = string.concat("script/m2/output/M2_deployment_data.json");
@@ -35,6 +35,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
     address public eigenDAOwner;
     address public eigenDAUpgrader;
     address public batchConfirmer;
+    address public pauser;
     uint256 public initalPausedStatus;
 
     BLSApkRegistry public apkRegistry;
@@ -67,7 +68,12 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
         eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
         batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
+        pauser = stdJson.readAddress(config_data, ".permissions.pauser");
         initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
+
+        if(pauser == address(0)) {
+            pauser = address(eigenLayerPauserReg);
+        }
 
         vm.startBroadcast();
 
@@ -157,7 +163,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
                 eigenDAOwner,
                 churner,
                 ejector,
-                IPauserRegistry(address(eigenLayerPauserReg)),
+                IPauserRegistry(pauser),
                 initalPausedStatus, 
                 operatorSetParams, 
                 minimumStakeForQuourm,
@@ -168,7 +174,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
 
         //deploy the eigenDA service manager implementation
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
-            delegation,
+            avsDirectory,
             registryCoordinator,
             stakeRegistry
         );
@@ -179,7 +185,8 @@ contract Deployer_GV2 is ExistingDeploymentParser {
             address(eigenDAServiceManagerImplementation),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
-                IPauserRegistry(address(eigenLayerPauserReg)),
+                IPauserRegistry(pauser),
+                initalPausedStatus,
                 eigenDAOwner,
                 batchConfirmer
             )
@@ -247,21 +254,21 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         ) = _parseRegistryCoordinatorParams(config_data);
 
         require(eigenDAServiceManager.owner() == eigenDAOwner, "eigenDAServiceManager.owner() != eigenDAOwner");
-        require(eigenDAServiceManager.pauserRegistry() == eigenLayerPauserReg, "eigenDAServiceManager: pauser registry not set correctly");
+        require(eigenDAServiceManager.pauserRegistry() == IPauserRegistry(pauser), "eigenDAServiceManager: pauser registry not set correctly");
         require(eigenDAServiceManager.batchConfirmer() == batchConfirmer, "eigenDAServiceManager.batchConfirmer() != batchConfirmer");
         require(eigenDAServiceManager.paused() == initalPausedStatus, "eigenDAServiceManager: init paused status set incorrectly");
 
         require(registryCoordinator.owner() == eigenDAOwner, "registryCoordinator.owner() != eigenDAOwner");
         require(registryCoordinator.churnApprover() == churner, "registryCoordinator.churner() != churner");
         require(registryCoordinator.ejector() == ejector, "registryCoordinator.ejector() != ejector");
-        require(registryCoordinator.pauserRegistry() == eigenLayerPauserReg, "registryCoordinator: pauser registry not set correctly");
+        require(registryCoordinator.pauserRegistry() == IPauserRegistry(pauser), "registryCoordinator: pauser registry not set correctly");
         require(registryCoordinator.paused() == initalPausedStatus, "registryCoordinator: init paused status set incorrectly");
         
         for (uint8 i = 0; i < operatorSetParams.length; ++i) {
             require(keccak256(abi.encode(registryCoordinator.getOperatorSetParams(i))) == keccak256(abi.encode(operatorSetParams[i])), "registryCoordinator.operatorSetParams != operatorSetParams");
         }
 
-        for (uint256 i = 0; i < minimumStakeForQuourm.length; ++i) {
+        for (uint8 i = 0; i < minimumStakeForQuourm.length; ++i) {
             require(stakeRegistry.minimumStakeForQuorum(i) == minimumStakeForQuourm[i], "stakeRegistry.minimumStakeForQuourm != minimumStakeForQuourm");
         }
 
@@ -302,7 +309,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         vm.serializeAddress(permissions, "eigenDAUpgrader", eigenDAUpgrader);
         vm.serializeAddress(permissions, "eigenDAChurner", churner);
         vm.serializeAddress(permissions, "eigenDABatchConfirmer", batchConfirmer);
-        vm.serializeAddress(permissions, "eigenLayerPauserRegistry", address(eigenLayerPauserReg));
+        vm.serializeAddress(permissions, "pauserRegistry", pauser);
         string memory permissions_output = vm.serializeAddress(permissions, "eigenDAEjector", ejector);
         
         vm.serializeString(parent_object, chain_info, chain_info_output);
