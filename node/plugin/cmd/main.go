@@ -116,7 +116,7 @@ func pluginOps(ctx *cli.Context) {
 	}
 
 	operator := &node.Operator{
-		Address:    config.Address,
+		Address:    sk.Address.Hex(),
 		Socket:     socket,
 		Timeout:    10 * time.Second,
 		PrivKey:    sk.PrivateKey,
