@@ -8,9 +8,9 @@
     "upgrader": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
     "churner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
     "ejector": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
-    "batchConfirmer": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
-    "pauser": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
-    "initalPausedStatus": 1
+    "batchConfirmer": "0x09983E7E97cF430c1dE8408Ccf67261FC8317EA6",
+    "pauser": "0x0000000000000000000000000000000000000000",
+    "initalPausedStatus": 0
   },
 
   "minimumStakes": [
