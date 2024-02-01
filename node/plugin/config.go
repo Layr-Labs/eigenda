@@ -57,14 +57,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_KEY_PASSWORD"),
 	}
 
-	// The address of the operator.
-	AddressFlag = cli.StringFlag{
-		Name:     "address",
-		Required: true,
-		Usage:    "The address of the operator to register in EigenDA",
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "ADDRESS"),
-	}
-
 	// The socket and the quorums to register.
 	SocketFlag = cli.StringFlag{
 		Name:     "socket",
@@ -120,7 +112,6 @@ type Config struct {
 	BlsKeyFile                    string
 	EcdsaKeyPassword              string
 	BlsKeyPassword                string
-	Address                       string
 	Socket                        string
 	QuorumIDList                  []core.QuorumID
 	ChainRpcUrl                   string
@@ -153,7 +144,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BlsKeyPassword:                ctx.GlobalString(BlsKeyPasswordFlag.Name),
 		EcdsaKeyFile:                  ctx.GlobalString(EcdsaKeyFileFlag.Name),
 		BlsKeyFile:                    ctx.GlobalString(BlsKeyFileFlag.Name),
-		Address:                       ctx.GlobalString(AddressFlag.Name),
 		Socket:                        ctx.GlobalString(SocketFlag.Name),
 		QuorumIDList:                  ids,
 		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
