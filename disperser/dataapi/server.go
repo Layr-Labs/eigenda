@@ -424,7 +424,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Summary	Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.
 //	@Tags		OperatorsInfo
 //	@Produce	json
-//	@Success	200	{object}	BlobsResponse
+//	@Success	200	{object}	DeregisteredOperatorsResponse
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"

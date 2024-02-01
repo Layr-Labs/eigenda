@@ -323,7 +323,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobsResponse"
+                            "$ref": "#/definitions/dataapi.DeregisteredOperatorsResponse"
                         }
                     },
                     "400": {
@@ -454,6 +454,37 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dataapi.BlobMetadataResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.DeregisteredOperatorMetadata": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "is_online": {
+                    "type": "boolean"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "socket": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.DeregisteredOperatorsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.DeregisteredOperatorMetadata"
                     }
                 },
                 "meta": {

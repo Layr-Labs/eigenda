@@ -80,6 +80,26 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
+  dataapi.DeregisteredOperatorMetadata:
+    properties:
+      block_number:
+        type: integer
+      is_online:
+        type: boolean
+      operator_id:
+        type: string
+      socket:
+        type: string
+    type: object
+  dataapi.DeregisteredOperatorsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dataapi.DeregisteredOperatorMetadata'
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
+    type: object
   dataapi.ErrorResponse:
     properties:
       error:
@@ -351,7 +371,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.BlobsResponse'
+            $ref: '#/definitions/dataapi.DeregisteredOperatorsResponse'
         "400":
           description: 'error: Bad request'
           schema:
