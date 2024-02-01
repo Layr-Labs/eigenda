@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 
+	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
@@ -47,6 +48,7 @@ type ContractBindings struct {
 	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
 	StakeRegistry         *stakereg.ContractStakeRegistry
 	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
+	AVSDirectory          *avsdir.ContractAVSDirectory
 }
 
 type BN254G1Point struct {
@@ -142,7 +144,7 @@ func (t *Transactor) getRegistrationParams(
 	}
 
 	// params to register operator in delegation manager's operator-avs mapping
-	msgToSign, err := t.Bindings.DelegationManager.CalculateOperatorAVSRegistrationDigestHash(
+	msgToSign, err := t.Bindings.AVSDirectory.CalculateOperatorAVSRegistrationDigestHash(
 		&bind.CallOpts{
 			Context: ctx,
 		}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
@@ -615,6 +617,18 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		return err
 	}
 
+	avsDirectoryAddr, err := contractEigenDAServiceManager.AvsDirectory(&bind.CallOpts{})
+	if err != nil {
+		t.Logger.Error("Failed to fetch AVSDirectory address", "err", err)
+		return err
+	}
+
+	contractAVSDirectory, err := avsdir.NewContractAVSDirectory(avsDirectoryAddr, t.EthClient)
+	if err != nil {
+		t.Logger.Error("Failed to fetch AVSDirectory contract", "err", err)
+		return err
+	}
+
 	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.EthClient)
 	if err != nil {
 		t.Logger.Error("Failed to fetch DelegationManager contract", "err", err)
@@ -680,6 +694,7 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 	t.Bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
+		AVSDirectory:          contractAVSDirectory,
 		OpStateRetriever:      contractBLSOpStateRetr,
 		BLSApkRegistry:        contractBLSPubkeyReg,
 		IndexRegistry:         contractIIndexReg,
