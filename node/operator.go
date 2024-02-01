@@ -155,16 +155,19 @@ func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl st
 
 func newChurnRequest(address string, KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
 
+	// generate salt
+	privateKeyBytes := []byte(KeyPair.PrivKey.String())
+	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), QuorumIDs[:], privateKeyBytes)
+
 	churnRequest := &churner.ChurnRequest{
 		OperatorAddress:            gethcommon.HexToAddress(address),
 		OperatorToRegisterPubkeyG1: KeyPair.PubKey,
 		OperatorToRegisterPubkeyG2: KeyPair.GetPubKeyG2(),
+		OperatorRequestSignature:   &core.Signature{},
 		QuorumIDs:                  QuorumIDs,
 	}
-	// generate salt
-	privateKeyBytes := []byte(KeyPair.PrivKey.String())
-	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), QuorumIDs[:], privateKeyBytes)
-	copy(churnRequest.Salt[:], salt[:])
+
+	copy(churnRequest.Salt[:], salt)
 
 	// sign the request
 	churnRequest.OperatorRequestSignature = KeyPair.SignMessage(churner.CalculateRequestHash(churnRequest))
@@ -173,15 +176,15 @@ func newChurnRequest(address string, KeyPair *core.KeyPair, QuorumIDs []core.Quo
 	churnRequestPb := &grpcchurner.ChurnRequest{
 		OperatorToRegisterPubkeyG1: churnRequest.OperatorToRegisterPubkeyG1.Serialize(),
 		OperatorToRegisterPubkeyG2: churnRequest.OperatorToRegisterPubkeyG2.Serialize(),
+		OperatorRequestSignature:   churnRequest.OperatorRequestSignature.Serialize(),
+		Salt:                       salt[:],
+		OperatorAddress:            address,
 	}
 
 	churnRequestPb.QuorumIds = make([]uint32, len(QuorumIDs))
 	for i, quorumID := range QuorumIDs {
 		churnRequestPb.QuorumIds[i] = uint32(quorumID)
 	}
-
-	churnRequestPb.OperatorRequestSignature = churnRequest.OperatorRequestSignature.Serialize()
-	churnRequestPb.Salt = churnRequest.Salt[:]
 
 	return churnRequestPb
 }

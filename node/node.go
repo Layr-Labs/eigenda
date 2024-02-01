@@ -195,6 +195,7 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
 		}
 		operator := &Operator{
+			Address:    crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
 			Socket:     socket,
 			Timeout:    10 * time.Second,
 			PrivKey:    privateKey,
