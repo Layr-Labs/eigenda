@@ -38,6 +38,9 @@ func TestPointG1Marshalling(t *testing.T) {
 
 	bytes := point.MarshalText()
 
+	// The point is serialized to raw bytes and it should be 32 bytes.
+	assert.Equal(t, len(bytes), 32)
+
 	var anotherPoint G1Point
 	err := anotherPoint.UnmarshalText(bytes)
 	require.Nil(t, err)
@@ -65,6 +68,8 @@ func TestPointG2Marshalling(t *testing.T) {
 	MulG2(&point, &GenG2, &x)
 
 	bytes := point.MarshalText()
+	// The point is serialized to raw bytes and it should be 64 bytes (2x the G1).
+	assert.Equal(t, len(bytes), 64)
 
 	var anotherPoint G2Point
 	err := anotherPoint.UnmarshalText(bytes)
