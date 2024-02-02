@@ -6,7 +6,9 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
@@ -22,7 +24,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
     uint256 feePerBytePerTime = 0;
 
-    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee);
+    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
     event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue);
     event FeeSetterChanged(address previousAddress, address newAddress);
 
@@ -30,10 +32,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         _setUpBLSMockAVSDeployer();
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
+            avsDirectory,
             registryCoordinator,
-            strategyManagerMock,
-            delegationMock,
-            slasher
+            stakeRegistry
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
@@ -45,7 +46,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                     abi.encodeWithSelector(
                         EigenDAServiceManager.initialize.selector,
                         pauserRegistry,
-                        serviceManagerOwner
+                        0,
+                        registryCoordinatorOwner,
+                        confirmer
                     )
                 )
             )
@@ -61,7 +64,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         cheats.prank(confirmer, confirmer);
         cheats.expectEmit(true, true, true, true, address(eigenDAServiceManager));
-        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm, 0);
+        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm);
         uint256 gasBefore = gasleft();
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -79,6 +82,18 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata"));
         cheats.prank(confirmer, notConfirmer);
+        eigenDAServiceManager.confirmBatch(
+            batchHeader,
+            nonSignerStakesAndSignature
+        );
+    }
+
+    function testConfirmBatch_Revert_NotConfirmer(uint256 pseudoRandomNumber) public {
+        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+            = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
+
+        cheats.expectRevert(bytes("onlyBatchConfirmer: not from batch confirmer"));
+        cheats.prank(notConfirmer, notConfirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
             nonSignerStakesAndSignature
@@ -141,7 +156,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         cheats.prank(confirmer, confirmer);
         cheats.expectEmit(true, true, true, true, address(eigenDAServiceManager));
-        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm, 0);
+        emit BatchConfirmed(batchHeaderHash, batchIdToConfirm);
         uint256 gasBefore = gasleft();
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -153,10 +168,6 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         assertEq(eigenDAServiceManager.batchId(), batchIdToConfirm + 1);
     }
 
-    function testFreezeOperator_Revert() public {
-        cheats.expectRevert(bytes("EigenDAServiceManager.freezeOperator: not implemented"));
-        eigenDAServiceManager.freezeOperator(address(0));
-    }
 
 
     function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (IEigenDAServiceManager.BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {

@@ -486,21 +486,21 @@ func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.
 		if log.Topics[0] == common.BatchConfirmedEventSigHash {
 			smAbi, err := abi.JSON(bytes.NewReader(common.ServiceManagerAbi))
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("failed to parse ServiceManager ABI: %w", err)
 			}
 			eventAbi, err := smAbi.EventByID(common.BatchConfirmedEventSigHash)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("failed to parse BatchConfirmed event ABI: %w", err)
 			}
 			unpackedData, err := eventAbi.Inputs.Unpack(log.Data)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("failed to unpack BatchConfirmed log data: %w", err)
 			}
 
-			// There should be exactly two inputs in the data field, batchId and fee.
-			// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L20
-			if len(unpackedData) != 2 {
-				return 0, fmt.Errorf("BatchConfirmed log should contain exactly 2 inputs. Found %d", len(unpackedData))
+			// There should be exactly one input in the data field, batchId.
+			// Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L17
+			if len(unpackedData) != 1 {
+				return 0, fmt.Errorf("BatchConfirmed log should contain exactly 1 inputs. Found %d", len(unpackedData))
 			}
 			return unpackedData[0].(uint32), nil
 		}

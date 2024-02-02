@@ -68,6 +68,7 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 		StakerPrivateKeys:   stakers,
 		StakerTokenAmounts:  stakes,
 		OperatorPrivateKeys: operators,
+		ConfirmerPrivateKey: env.getKeyString("batcher0"),
 	}
 
 	return config

@@ -6,8 +6,7 @@ import (
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/common"
-	blspubkeyreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSPubkeyRegistry"
-	blspubkeycompendium "github.com/Layr-Labs/eigenda/contracts/bindings/BLSPublicKeyCompendium"
+	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/indexer"
 
@@ -18,8 +17,8 @@ import (
 )
 
 type PubKeyAddedEvent struct {
-	AddedEvent *blspubkeyreg.ContractBLSPubkeyRegistryOperatorAddedToQuorums
-	RegEvent   *blspubkeycompendium.ContractBLSPublicKeyCompendiumNewPubkeyRegistration
+	AddedEvent *blsapkreg.ContractBLSApkRegistryOperatorAddedToQuorums
+	RegEvent   *blsapkreg.ContractBLSApkRegistryNewPubkeyRegistration
 }
 
 type operatorPubKeysEvent struct {
@@ -32,7 +31,7 @@ type operatorPubKeysEvent struct {
 }
 
 type operatorPubKeysEventFilterer struct {
-	f  *blspubkeyreg.ContractBLSPubkeyRegistryFilterer
+	f  *blsapkreg.ContractBLSApkRegistryFilterer
 	cf *pubkeyRegistrationEventFilterer
 }
 
@@ -41,7 +40,7 @@ func newOperatorPubKeysEventFilterer(
 	filterer bind.ContractFilterer,
 	regFilterer *pubkeyRegistrationEventFilterer,
 ) (*operatorPubKeysEventFilterer, error) {
-	f, err := blspubkeyreg.NewContractBLSPubkeyRegistryFilterer(addr, filterer)
+	f, err := blsapkreg.NewContractBLSApkRegistryFilterer(addr, filterer)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +82,7 @@ func (f operatorPubKeysEventFilterer) filterPubKeyAddedToQuorums(
 	}
 
 	events, err := f.filterEvents(headers, it, func(it any) operatorPubKeysEvent {
-		event := it.(*blspubkeyreg.ContractBLSPubkeyRegistryOperatorAddedToQuorumsIterator).Event
+		event := it.(*blsapkreg.ContractBLSApkRegistryOperatorAddedToQuorumsIterator).Event
 		return operatorPubKeysEvent{
 			BlockHash:   event.Raw.BlockHash,
 			BlockNumber: event.Raw.BlockNumber,
@@ -115,7 +114,7 @@ func (f operatorPubKeysEventFilterer) filterPubKeyRemovedFromQuorums(
 		return nil, err
 	}
 	return f.filterEvents(headers, it, func(it any) operatorPubKeysEvent {
-		event := it.(*blspubkeyreg.ContractBLSPubkeyRegistryOperatorRemovedFromQuorumsIterator).Event
+		event := it.(*blsapkreg.ContractBLSApkRegistryOperatorRemovedFromQuorumsIterator).Event
 		return operatorPubKeysEvent{
 			BlockHash:   event.Raw.BlockHash,
 			BlockNumber: event.Raw.BlockNumber,
@@ -157,7 +156,7 @@ func (f operatorPubKeysEventFilterer) filterEvents(
 
 type pubkeyRegistrationEventFilterer struct {
 	addr     gethcommon.Address
-	f        *blspubkeycompendium.ContractBLSPublicKeyCompendiumFilterer
+	f        *blsapkreg.ContractBLSApkRegistryFilterer
 	filterer bind.ContractFilterer
 }
 
@@ -165,7 +164,7 @@ func newPubkeyRegistrationEventFilterer(
 	addr gethcommon.Address,
 	filterer bind.ContractFilterer,
 ) (*pubkeyRegistrationEventFilterer, error) {
-	f, err := blspubkeycompendium.NewContractBLSPublicKeyCompendiumFilterer(addr, filterer)
+	f, err := blsapkreg.NewContractBLSApkRegistryFilterer(addr, filterer)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +214,7 @@ func (f pubkeyRegistrationEventFilterer) addPubkeyRegistration(events []operator
 		return nil, errors.New("no pubkey registration events found")
 	}
 
-	eventMap := make(map[gethcommon.Address]*blspubkeycompendium.ContractBLSPublicKeyCompendiumNewPubkeyRegistration, len(vLogs))
+	eventMap := make(map[gethcommon.Address]*blsapkreg.ContractBLSApkRegistryNewPubkeyRegistration, len(vLogs))
 	for _, vLog := range vLogs {
 		event, err := f.f.ParseNewPubkeyRegistration(vLog)
 		if err != nil {
@@ -238,10 +237,9 @@ func (f pubkeyRegistrationEventFilterer) addPubkeyRegistration(events []operator
 }
 
 type OperatorPubKeysFilterer struct {
-	Logger                  common.Logger
-	Filterer                bind.ContractFilterer
-	BlsRegAddress           gethcommon.Address
-	PubKeyCompendiumAddress gethcommon.Address
+	Logger        common.Logger
+	Filterer      bind.ContractFilterer
+	BlsRegAddress gethcommon.Address
 
 	FastMode bool
 }
@@ -253,25 +251,14 @@ func NewOperatorPubKeysFilterer(eigenDAServiceManagerAddr gethcommon.Address, cl
 		return nil, err
 	}
 
-	blsRegAddress, err := contractEigenDAServiceManager.BlsPubkeyRegistry(&bind.CallOpts{})
-	if err != nil {
-		return nil, err
-	}
-
-	blsRegistry, err := blspubkeyreg.NewContractBLSPubkeyRegistry(blsRegAddress, client)
-	if err != nil {
-		return nil, err
-	}
-
-	pubkeyCompendiumAddress, err := blsRegistry.PubkeyCompendium(&bind.CallOpts{})
+	blsRegAddress, err := contractEigenDAServiceManager.BlsApkRegistry(&bind.CallOpts{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &OperatorPubKeysFilterer{
-		Filterer:                client,
-		BlsRegAddress:           blsRegAddress,
-		PubKeyCompendiumAddress: pubkeyCompendiumAddress,
+		Filterer:      client,
+		BlsRegAddress: blsRegAddress,
 	}, nil
 }
 
@@ -282,7 +269,7 @@ func (f *OperatorPubKeysFilterer) FilterHeaders(headers indexer.Headers) ([]inde
 		return nil, err
 	}
 
-	regFilterer, err := newPubkeyRegistrationEventFilterer(f.PubKeyCompendiumAddress, f.Filterer)
+	regFilterer, err := newPubkeyRegistrationEventFilterer(f.BlsRegAddress, f.Filterer)
 	if err != nil {
 		return nil, err
 	}

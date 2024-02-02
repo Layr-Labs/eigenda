@@ -1,37 +1,28 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: UNLICENSED 
 pragma solidity ^0.8.9;
 
-import "@eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
+import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
+import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
 
-import "@eigenlayer-core/contracts/permissions/PauserRegistry.sol";
-import "@eigenlayer-core/test/mocks/EmptyContract.sol";
-
-import "@eigenlayer-middleware/BLSPublicKeyCompendium.sol";
-import "@eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
-import "@eigenlayer-middleware/BLSPubkeyRegistry.sol";
-import "@eigenlayer-middleware/IndexRegistry.sol";
-import "@eigenlayer-middleware/StakeRegistry.sol";
-
+import {RegistryCoordinator} from "eigenlayer-middleware/RegistryCoordinator.sol";
+import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
+import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
+import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
 
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
-import "../src/libraries/EigenDAHasher.sol";
+import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
+import {EigenDADeployer} from "./EigenDADeployer.s.sol";
+import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
-import "./EigenDADeployer.s.sol";
-import "./EigenLayerUtils.s.sol";
-
+import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
-
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
-// TODO: REVIEW AND FIX THIS ENTIRE SCRIPT
-
 // # To load the variables in the .env file
 // source .env
-
 // # To deploy and verify our contract
 // forge script script/Deployer.s.sol:SetupEigenDA --rpc-url $RPC_URL  --private-key $PRIVATE_KEY --broadcast -vvvv
-
 contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
     string deployConfigPath = "script/eigenda_deploy_config.json";
@@ -54,6 +45,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             addressConfig.eigenDAPauser = msg.sender;
             addressConfig.churner = msg.sender;
             addressConfig.ejector = msg.sender;
+            addressConfig.confirmer = msg.sender;
 
             uint256 initialSupply = 1000 ether;
             address tokenOwner = msg.sender;
@@ -74,6 +66,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 maxOperatorCount = stdJson.readUint(config_data, ".maxOperatorCount");
             }
 
+            
+            addressConfig.confirmer = vm.addr(stdJson.readUint(config_data, ".confirmerPrivateKey"));
+
 
             vm.startBroadcast();
 
@@ -84,6 +79,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 tokenOwner,
                 maxOperatorCount
             );
+            
+            eigenDAServiceManager.setBatchConfirmer(addressConfig.confirmer);
 
             vm.stopBroadcast();
         }
@@ -140,10 +137,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         {
             IStrategy[] memory strategies = new IStrategy[](numStrategies);
+            bool[] memory transferLocks = new bool[](numStrategies);
             for (uint8 i = 0; i < numStrategies; i++) {
                 strategies[i] = deployedStrategyArray[i];
             }
-            strategyManager.addStrategiesToDepositWhitelist(strategies);
+            strategyManager.addStrategiesToDepositWhitelist(strategies, transferLocks);
         }
 
         vm.stopBroadcast();
@@ -178,10 +176,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         string memory output = "eigenDA deployment output";
         vm.serializeAddress(output, "eigenDAServiceManager", address(eigenDAServiceManager));
-        vm.serializeAddress(output, "blsOperatorStateRetriever", address(blsOperatorStateRetriever));
-        vm.serializeAddress(output, "pubkeyCompendium", address(pubkeyCompendium));
-        vm.serializeAddress(output, "blsPubkeyRegistry", address(blsPubkeyRegistry));
-        vm.serializeAddress(output, "blsRegistryCoordinatorWithIndices", address(registryCoordinator));
+        vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
+        vm.serializeAddress(output, "blsApkRegistry" , address(apkRegistry));
+        vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 

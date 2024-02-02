@@ -80,9 +80,6 @@ export function createNewBatchConfirmedEvent(
   batchConfirmedEvent.parameters.push(
     new ethereum.EventParam("batchId", ethereum.Value.fromUnsignedBigInt(batchId))
   )
-  batchConfirmedEvent.parameters.push(
-    new ethereum.EventParam("fee", ethereum.Value.fromUnsignedBigInt(fee))
-  )
   
   return batchConfirmedEvent
 }
