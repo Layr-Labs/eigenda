@@ -40,6 +40,7 @@ func TestChurn(t *testing.T) {
 
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{
+		OperatorAddress:            operatorAddr.Hex(),
 		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
 		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
 		Salt:                       salt,
@@ -49,6 +50,7 @@ func TestChurn(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
+		[]byte(request.OperatorAddress),
 		request.OperatorToRegisterPubkeyG1,
 		request.OperatorToRegisterPubkeyG2,
 		request.Salt,

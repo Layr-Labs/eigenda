@@ -427,6 +427,8 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 
 // we only need to build the sdk clients for eigenmetrics right now,
 // but we might eventually want to move as much as possible to the sdk
+//
+//lint:ignore U1000 this function will be used once we move to the sdk
 func buildSdkClients(config *Config, logger common.Logger) (*constructor.Clients, error) {
 	// we need to make a transactor just so we can get the registryCoordinatorAddr
 	// to pass to the sdk config
