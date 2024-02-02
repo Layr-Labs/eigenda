@@ -17,6 +17,7 @@ const (
 	VerboseFlagName           = "kzg.verbose"
 	PreloadEncoderFlagName    = "kzg.preload-encoder"
 	CacheEncodedBlobsFlagName = "cache-encoded-blobs"
+	SRSLoadingNumberFlagName  = "kzg.srs-load"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -44,6 +45,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "Order of the SRS",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_ORDER"),
+		},
+		cli.Uint64Flag{
+			Name:     SRSLoadingNumberFlagName,
+			Usage:    "Number of the SRS to load into memory",
+			Required: true,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_LOAD"),
 		},
 		cli.Uint64Flag{
 			Name:     NumWorkerFlagName,
@@ -79,6 +86,7 @@ func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
 	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
 	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)
 	cfg.SRSOrder = ctx.GlobalUint64(SRSOrderFlagName)
+	cfg.SRSNumberToLoad = ctx.GlobalUint64(SRSLoadingNumberFlagName)
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
 	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)

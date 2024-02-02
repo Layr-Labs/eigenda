@@ -35,6 +35,7 @@ func makeTestEncoder() (*encoding.Encoder, ServerConfig) {
 		G2Path:    "../../inabox/resources/kzg/g2.point",
 		CacheDir:  "../../inabox/resources/kzg/SRSTables",
 		SRSOrder:  3000,
+		SRSNumberToLoad: 3000,
 		NumWorker: uint64(runtime.GOMAXPROCS(0)),
 	}
 

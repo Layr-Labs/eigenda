@@ -71,9 +71,15 @@ func (g *KzgEncoderGroup) newKzgVerifier(params rs.EncodingParams) (*KzgVerifier
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
-func (v *KzgEncoderGroup) VerifyCommit(lengthCommit *wbls.G2Point, lowDegreeProof *wbls.G2Point, degree uint64) error {
+func (v *KzgEncoderGroup) VerifyCommit(lengthCommit *wbls.G2Point, lowDegreeProof *wbls.G2Point, length uint64) error {
 
-	if !VerifyLowDegreeProof(lengthCommit, lowDegreeProof, degree, v.SRSOrder, v.Srs.G1) {
+	g1Challenge, err := v.ReadG1Point(v.SRSOrder - length)
+	if err != nil {
+		return err
+	}
+	//fmt.Printf("claimed length is %v the challeng point is %v\n", length, string(g1Challenge.MarshalText()))
+
+	if !VerifyLowDegreeProof(lengthCommit, lowDegreeProof, &g1Challenge) {
 		return errors.New("low degree proof fails")
 	}
 	return nil

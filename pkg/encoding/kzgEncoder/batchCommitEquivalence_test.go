@@ -5,6 +5,7 @@ import (
 
 	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
 	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,4 +34,20 @@ func TestBatchEquivalence(t *testing.T) {
 	}
 
 	assert.True(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence test failed\n")
+
+	for z := 0; z < numBlob; z++ {
+		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+
+		commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+		require.Nil(t, err)
+
+		var modifiedCommit bn254.G1Point
+		bn254.AddG1(&modifiedCommit, commit, commit)
+		commitPairs[z] = kzgRs.CommitmentPair{
+			Commitment:       modifiedCommit,
+			LengthCommitment: *g2commit,
+		}
+	}
+
+	assert.False(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence negative test failed\n")
 }

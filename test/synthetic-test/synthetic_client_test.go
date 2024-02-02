@@ -579,11 +579,12 @@ func TestEncodeBlob(t *testing.T) {
 
 	// Test Assumes below params set for Encoder
 	kzgConfig := kzgEncoder.KzgConfig{
-		G1Path:    "/data/kzg/g1.point",
-		G2Path:    "/data/kzg/g2.point",
-		CacheDir:  "/data/kzg/SRSTables",
-		SRSOrder:  300000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "/data/kzg/g1.point",
+		G2Path:          "/data/kzg/g2.point",
+		CacheDir:        "/data/kzg/SRSTables",
+		SRSOrder:        300000,
+		SRSNumberToLoad: 300000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	encodingConfig := encoding.EncoderConfig{KzgConfig: kzgConfig}

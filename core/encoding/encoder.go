@@ -100,7 +100,7 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 
 func (e *Encoder) VerifyBlobLength(commitments core.BlobCommitments) error {
 	//commitments.Commitment.G1Point,
-	return e.EncoderGroup.VerifyCommit(commitments.LengthCommitment.G2Point, commitments.LengthProof.G2Point, uint64(commitments.Length-1))
+	return e.EncoderGroup.VerifyCommit(commitments.LengthCommitment.G2Point, commitments.LengthProof.G2Point, uint64(commitments.Length))
 
 }
 

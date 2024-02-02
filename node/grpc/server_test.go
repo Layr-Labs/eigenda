@@ -48,6 +48,7 @@ func makeTestEncoder() (core.Encoder, error) {
 		G2Path:    "../../inabox/resources/kzg/g2.point.300000",
 		CacheDir:  "../../inabox/resources/kzg/SRSTables",
 		SRSOrder:  300000,
+		SRSNumberToLoad: 300000,
 		NumWorker: uint64(runtime.GOMAXPROCS(0)),
 	}
 

@@ -45,6 +45,7 @@ services:
       G2_PATH: /data/kzg/g2.point
       CACHE_PATH: /data/kzg/SRSTables
       SRS_ORDER: 3000
+      SRS_LOAD: 2000
       CHALLENGE_ORDER: 3000
       STD_LOG_LEVEL: "trace"
       VERBOSE: true

@@ -98,6 +98,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 	return s1Outs, nil
 }
 
+// from is inclusive, to is exclusive
 func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bls.G1Point, error) {
 	g1f, err := os.Open(filepath)
 	if err != nil {
@@ -243,6 +244,82 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 	start := uint64(0)
 	end := uint64(0)
 	size := n / numWorker
+	for i := uint64(0); i < numWorker; i++ {
+		start = i * size
+
+		if i == numWorker-1 {
+			end = n
+		} else {
+			end = (i + 1) * size
+		}
+		//todo: handle error?
+
+		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, &wg)
+	}
+	wg.Wait()
+
+	// measure parsing time
+	t = time.Now()
+	elapsed = t.Sub(startTimer)
+	log.Println("    Parsing takes", elapsed)
+	return s2Outs, nil
+}
+
+func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bls.G2Point, error) {
+	g2f, err := os.Open(filepath)
+	if err != nil {
+		log.Println("ReadG2PointSection.ERR.0", err)
+		return nil, err
+	}
+
+	//todo: how to handle?
+	defer func() {
+		if err := g2f.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	n := to - from
+
+	startTimer := time.Now()
+	g2r := bufio.NewReaderSize(g2f, int(to*G2PointBytes))
+
+	_, err = g2f.Seek(int64(from*G2PointBytes), 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if n < numWorker {
+		numWorker = n
+	}
+
+	buf, err := ReadDesiredBytes(g2r, n*G2PointBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if uint64(len(buf)) < G2PointBytes*n {
+		log.Printf("Error. Insufficient G2 points. Only contains %v. Requesting %v\n", len(buf)/G2PointBytes, n)
+		log.Println()
+		log.Println("ReadG2PointSection.ERR.1", err)
+		return nil, err
+	}
+
+	// measure reading time
+	t := time.Now()
+	elapsed := t.Sub(startTimer)
+	log.Printf("    Reading G2 points (%v bytes) takes %v\n", (n * G2PointBytes), elapsed)
+	startTimer = time.Now()
+
+	s2Outs := make([]bls.G2Point, n)
+
+	var wg sync.WaitGroup
+	wg.Add(int(numWorker))
+
+	start := uint64(0)
+	end := uint64(0)
+	size := n / numWorker
+
 	for i := uint64(0); i < numWorker; i++ {
 		start = i * size
 
