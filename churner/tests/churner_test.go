@@ -2,11 +2,9 @@ package test
 
 import (
 	"context"
-	"crypto/rand"
 	"flag"
 	"fmt"
 	"log"
-	"math/big"
 	"os"
 	"testing"
 
@@ -39,7 +37,7 @@ var (
 	logger                         = &commock.Logger{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
-	quorumIds                      = []uint32{0}
+	quorumIds                      = []uint32{0, 1}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
@@ -91,39 +89,14 @@ func teardown() {
 func TestChurner(t *testing.T) {
 	ctx := context.Background()
 
-	// get the operator to churn in's transactor and bls public key registered
-	op := testConfig.Operators[0]
-	operatorTransactor, err := createTransactorFromScratch(
-		op.NODE_PRIVATE_KEY,
-		testConfig.EigenDA.OperatorStateRetreiver,
-		testConfig.EigenDA.ServiceManager,
-		logger,
-	)
-	assert.NoError(t, err)
-
 	keyPair, err := dacore.GenRandomBlsKeys()
-	assert.NoError(t, err)
-
-	quorumIds_ := make([]uint8, len(quorumIds))
-	for i, q := range quorumIds {
-		quorumIds_[i] = uint8(q)
-	}
-
-	operatorSalt := [32]byte{}
-	_, err = rand.Read(operatorSalt[:])
-	assert.NoError(t, err)
-
-	expiry := big.NewInt(1000)
-	privKey, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-
-	err = operatorTransactor.RegisterOperator(ctx, keyPair, "socket", quorumIds_, privKey, operatorSalt, expiry)
 	assert.NoError(t, err)
 
 	server := newTestServer(t)
 
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{
+		OperatorAddress:            operatorAddr.Hex(),
 		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
 		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
 		Salt:                       salt,
@@ -133,6 +106,7 @@ func TestChurner(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
+		[]byte(request.OperatorAddress),
 		request.OperatorToRegisterPubkeyG1,
 		request.OperatorToRegisterPubkeyG2,
 		request.Salt,
@@ -147,6 +121,7 @@ func TestChurner(t *testing.T) {
 	}, nil)
 
 	reply, err := server.Churn(ctx, request)
+
 	assert.NoError(t, err)
 	assert.NotNil(t, reply)
 	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSalt())
@@ -159,6 +134,7 @@ func TestChurner(t *testing.T) {
 		assert.Equal(t, operatorAddr.Bytes(), param.GetOperator())
 		assert.Equal(t, keyPair.PubKey.Serialize(), param.GetPubkey())
 	}
+
 }
 
 func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger common.Logger) (*eth.Transactor, error) {
