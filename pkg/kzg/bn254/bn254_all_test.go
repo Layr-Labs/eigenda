@@ -52,10 +52,10 @@ func TestPointG1Marshalling_InvalidG1(t *testing.T) {
 
 	g1 = new(G1Point)
 	err = g1.UnmarshalText([]byte("G"))
-	assert.EqualError(t, err, "encoding/hex: invalid byte: U+0047 'G'")
+	assert.EqualError(t, err, "short buffer")
 
 	err = g1.UnmarshalText([]byte("8000000000000000000000000000000000000000000000000000000000000099"))
-	assert.EqualError(t, err, "invalid compressed coordinate: square root doesn't exist")
+	assert.EqualError(t, err, "invalid fp.Element encoding")
 }
 
 func TestPointG2Marshalling(t *testing.T) {
@@ -80,12 +80,12 @@ func TestPointG2Marshalling_InvalidG2(t *testing.T) {
 
 	g2 = new(G2Point)
 	err = g2.UnmarshalText([]byte("G"))
-	assert.EqualError(t, err, "encoding/hex: invalid byte: U+0047 'G'")
+	assert.EqualError(t, err, "short buffer")
 
 	err = g2.UnmarshalText([]byte("898e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c21800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed"))
-	assert.EqualError(t, err, "invalid point: subgroup check failed")
+	assert.EqualError(t, err, "invalid fp.Element encoding")
 
 	err = g2.UnmarshalText([]byte("998e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c21800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992ffff"))
-	assert.EqualError(t, err, "invalid compressed coordinate: square root doesn't exist")
+	assert.EqualError(t, err, "invalid fp.Element encoding")
 
 }
