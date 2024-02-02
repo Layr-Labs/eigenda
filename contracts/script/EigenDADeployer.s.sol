@@ -199,7 +199,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 EigenDAServiceManager.initialize.selector,
                 eigenDAPauserReg,
                 addressConfig.eigenDACommunityMultisig,
-                0,
                 addressConfig.eigenDACommunityMultisig
             )
         );

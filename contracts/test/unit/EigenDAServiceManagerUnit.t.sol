@@ -46,6 +46,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                     abi.encodeWithSelector(
                         EigenDAServiceManager.initialize.selector,
                         pauserRegistry,
+                        0,
                         registryCoordinatorOwner,
                         confirmer
                     )

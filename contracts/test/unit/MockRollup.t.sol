@@ -67,6 +67,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
                     abi.encodeWithSelector(
                         EigenDAServiceManager.initialize.selector,
                         pauserRegistry,
+                        0,
                         registryCoordinatorOwner,
                         registryCoordinatorOwner
                     )
