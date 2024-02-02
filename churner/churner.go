@@ -21,7 +21,6 @@ import (
 var (
 	bipMultiplier     = big.NewInt(10000)
 	secondsTillExpiry = 90 * time.Second
-	zeroAddressString = "0x0000000000000000000000000000000000000000"
 )
 
 type ChurnRequest struct {
