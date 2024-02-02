@@ -108,9 +108,9 @@ message Bundle {
 message BlobHeader {
 	// The KZG commitment to the polynomial representing the blob.
 	bytes commitment = 1;
-  	// The KZG commitment to the polynomial representing the blob on G2, it is uesd 
-  	// for proving the degree of the polynomial
-  	bytes length_commitment = 2;
+  // The KZG commitment to the polynomial representing the blob on G2, it is uesd 
+  // for proving the degree of the polynomial
+  bytes length_commitment = 2;
 	// The low degree proof. It's the KZG commitment to the polynomial shifted to
 	// the largest SRS degree.
 	bytes length_proof = 3;
