@@ -83,7 +83,7 @@ jobs:
         run: make build && go test -v ./core/thegraph
 
       - name: Inabox E2E
-        run: make build && cd inabox && make run-e2e-nochurner
+        run: make build && cd inabox && make run-e2e
 
       - name: Save logs
         if: always()

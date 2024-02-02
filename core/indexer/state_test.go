@@ -58,8 +58,8 @@ func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
 		_, err = rand.Read(salt[:])
 		Expect(err).To(BeNil())
 
-		expiry := big.NewInt(1000)
-		privKey, err := crypto.GenerateKey()
+		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
+		privKey, err := crypto.HexToECDSA(op.NODE_PRIVATE_KEY)
 		Expect(err).To(BeNil())
 
 		err = tx.RegisterOperator(context.Background(), keyPair, socket, quorums, privKey, salt, expiry)
