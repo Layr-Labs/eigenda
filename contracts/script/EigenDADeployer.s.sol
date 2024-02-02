@@ -198,6 +198,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
                 eigenDAPauserReg,
+                0,
                 addressConfig.eigenDACommunityMultisig,
                 addressConfig.eigenDACommunityMultisig
             )
