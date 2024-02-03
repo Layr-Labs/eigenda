@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -57,9 +56,6 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 	buf, err := ReadFile(g1r)
 	if err != nil {
 		return nil, err
-	}
-	if n == 3000 {
-		fmt.Println("XXX buflen:", len(buf), " file:", filepath)
 	}
 
 	if uint64(len(buf)) < 32*n {

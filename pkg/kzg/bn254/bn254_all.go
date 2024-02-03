@@ -29,7 +29,6 @@ import (
 )
 
 func (p *G1Point) MarshalText() []byte {
-	// return []byte(hex.EncodeToString(ToCompressedG1(p)))
 	return ToCompressedG1(p)
 }
 
