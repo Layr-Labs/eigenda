@@ -30,7 +30,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 	}()
 
 	startTimer := time.Now()
-	g1r := bufio.NewReaderSize(g1f, int(n*64))
+	g1r := bufio.NewReaderSize(g1f, int(n*32))
 
 	if n < numWorker {
 		numWorker = n
@@ -41,8 +41,8 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		return nil, err
 	}
 
-	if uint64(len(buf)) < 64*n {
-		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(buf)/64, n)
+	if uint64(len(buf)) < 32*n {
+		log.Printf("Error. Insufficient G1 points from %s. Only contains %v. Requesting %v\n", filepath, len(buf)/32, n)
 		log.Println()
 		log.Println("ReadG1Points.ERR.1", err)
 		return nil, err
@@ -51,7 +51,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 	// measure reading time
 	t := time.Now()
 	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * 64), elapsed)
+	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * 32), elapsed)
 	startTimer = time.Now()
 
 	s1Outs := make([]bls.G1Point, n)
@@ -73,7 +73,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		}
 		//fmt.Printf("worker %v start %v end %v. size %v\n", i, start, end, end - start)
 		//todo: handle error?
-		go readG1Worker(buf, s1Outs, start, end, 64, &wg)
+		go readG1Worker(buf, s1Outs, start, end, 32, &wg)
 	}
 	wg.Wait()
 
@@ -101,9 +101,9 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	n := to - from
 
 	startTimer := time.Now()
-	g1r := bufio.NewReaderSize(g1f, int(to*64))
+	g1r := bufio.NewReaderSize(g1f, int(to*32))
 
-	_, err = g1f.Seek(int64(from*64), 0)
+	_, err = g1f.Seek(int64(from)*32, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	}
 
 	if uint64(len(buf)) < 32*n {
-		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(buf)/32, n)
+		log.Printf("Error. Insufficient G1 points from %s. Only contains %v. Requesting %v\n", filepath, len(buf)/32, n)
 		log.Println()
 		log.Println("ReadG1PointSection.ERR.1", err)
 		return nil, err
