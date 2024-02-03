@@ -156,9 +156,10 @@ func setup(t *testing.T) {
 
 	blobHeader = &core.BlobHeader{
 		BlobCommitments: core.BlobCommitments{
-			Commitment:  commitments.Commitment,
-			LengthProof: commitments.LengthProof,
-			Length:      commitments.Length,
+			Commitment:       commitments.Commitment,
+			LengthCommitment: commitments.LengthCommitment,
+			LengthProof:      commitments.LengthProof,
+			Length:           commitments.Length,
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 	}

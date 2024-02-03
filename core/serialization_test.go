@@ -53,27 +53,44 @@ func TestBatchHeaderEncoding(t *testing.T) {
 
 func TestBlobHeaderEncoding(t *testing.T) {
 
-	var commitX, commitY, lengthX, lengthY fp.Element
+	var commitX, commitY fp.Element
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
-	lengthX = *lengthX.SetBigInt(big.NewInt(1))
-	lengthY = *lengthY.SetBigInt(big.NewInt(2))
 
 	commitment := &kzgbn254.G1Point{
 		X: commitX,
 		Y: commitY,
 	}
-	lengthProof := &kzgbn254.G1Point{
-		X: lengthX,
-		Y: lengthY,
-	}
+
+	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
+	_, err := lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
+	assert.NoError(t, err)
+	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
+	assert.NoError(t, err)
+	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
+	assert.NoError(t, err)
+	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
+	assert.NoError(t, err)
+
+
+	var lengthProof, lengthCommitment kzgbn254.G2Point
+	lengthProof.X.A0 = lengthXA0
+	lengthProof.X.A1 = lengthXA1
+	lengthProof.Y.A0 = lengthYA0
+	lengthProof.Y.A1 = lengthYA1
+
+	lengthCommitment = lengthProof
+
 	blobHeader := &core.BlobHeader{
 		BlobCommitments: core.BlobCommitments{
 			Commitment: &core.Commitment{
 				commitment,
 			},
-			LengthProof: &core.Commitment{
-				lengthProof,
+			LengthCommitment: &core.LengthCommitment{
+				&lengthCommitment,
+			},
+			LengthProof: &core.LengthProof{
+				&lengthProof,
 			},
 			Length: 10,
 		},
