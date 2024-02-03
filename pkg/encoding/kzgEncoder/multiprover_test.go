@@ -37,6 +37,8 @@ func TestProveAllCosetThreads(t *testing.T) {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		assert.True(t, f.Verify(enc.Ks, commit, &lc), "Proof %v failed\n", i)
+		g2Atn, err := kzgRs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		require.Nil(t, err)
+		assert.True(t, f.Verify(enc.Ks, commit, &lc, &g2Atn), "Proof %v failed\n", i)
 	}
 }

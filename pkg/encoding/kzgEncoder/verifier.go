@@ -73,7 +73,7 @@ func (g *KzgEncoderGroup) newKzgVerifier(params rs.EncodingParams) (*KzgVerifier
 // we leave it as a method of the KzgEncoderGroup
 func (v *KzgEncoderGroup) VerifyCommit(lengthCommit *wbls.G2Point, lowDegreeProof *wbls.G2Point, length uint64) error {
 
-	g1Challenge, err := v.ReadG1Point(v.SRSOrder - length)
+	g1Challenge, err := ReadG1Point(v.SRSOrder-length, v.KzgConfig)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,11 @@ func (v *KzgVerifier) VerifyFrame(commit *wbls.G1Point, f *Frame, index uint64) 
 		return err
 	}
 
-	if !f.Verify(v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j]) {
+	g2Atn, err := ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig)
+	if err != nil {
+		return err
+	}
+	if !f.Verify(v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn) {
 		return errors.New("multireveal proof fails")
 	}
 

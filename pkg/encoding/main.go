@@ -107,7 +107,12 @@ func TestKzgRs() {
 
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
-		ok := f.Verify(enc.Ks, commit, &lc)
+
+		g2Atn, err := kzgRs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		if err != nil {
+			log.Fatalf("Load g2 %v failed\n", err)
+		}
+		ok := f.Verify(enc.Ks, commit, &lc, &g2Atn)
 		if !ok {
 			log.Fatalf("Proof %v failed\n", i)
 		}

@@ -199,7 +199,7 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	lhsG1 := bls.LinCombG1(proofs, randomsFr)
 
 	// lhs g2
-	G2atD, err := group.ReadG2Point(D)
+	G2atD, err := ReadG2Point(D, group.KzgConfig)
 	if err != nil {
 		return err
 	}

@@ -125,12 +125,12 @@ func NewKzgEncoderGroup(config *KzgConfig, isEncoder bool) (*KzgEncoderGroup, er
 }
 
 // n is the power
-func (g *KzgEncoderGroup) ReadG1Point(n uint64) (bls.G1Point, error) {
+func ReadG1Point(n uint64, g *KzgConfig) (bls.G1Point, error) {
 	if n > g.SRSOrder {
 		return bls.G1Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
 
-	g1point, err := utils.ReadG1PointSection(g.KzgConfig.G1Path, n, n+1, 1)
+	g1point, err := utils.ReadG1PointSection(g.G1Path, n, n+1, 1)
 	if err != nil {
 		return bls.G1Point{}, err
 	}
@@ -139,12 +139,12 @@ func (g *KzgEncoderGroup) ReadG1Point(n uint64) (bls.G1Point, error) {
 }
 
 // n is the power
-func (g *KzgEncoderGroup) ReadG2Point(n uint64) (bls.G2Point, error) {
+func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
 	if n > g.SRSOrder {
 		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
 
-	g2point, err := utils.ReadG2PointSection(g.KzgConfig.G2Path, n, n+1, 1)
+	g2point, err := utils.ReadG2PointSection(g.G2Path, n, n+1, 1)
 	if err != nil {
 		return bls.G2Point{}, err
 	}
