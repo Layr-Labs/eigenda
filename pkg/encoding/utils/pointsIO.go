@@ -2,6 +2,8 @@ package utils
 
 import (
 	"bufio"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -13,6 +15,22 @@ import (
 type EncodeParams struct {
 	NumNodeE  uint64
 	ChunkLenE uint64
+}
+
+func ReadFile(reader *bufio.Reader) ([]byte, error) {
+	var buf []byte
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err == io.EOF {
+			buf = append(buf, line...)
+			break // Reached end of file
+		}
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, line...)
+	}
+	return buf, nil
 }
 
 func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, error) {
@@ -36,9 +54,12 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		numWorker = n
 	}
 
-	buf, _, err := g1r.ReadLine()
+	buf, err := ReadFile(g1r)
 	if err != nil {
 		return nil, err
+	}
+	if n == 3000 {
+		fmt.Println("XXX buflen:", len(buf), " file:", filepath)
 	}
 
 	if uint64(len(buf)) < 32*n {
@@ -112,7 +133,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		numWorker = n
 	}
 
-	buf, _, err := g1r.ReadLine()
+	buf, err := ReadFile(g1r)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +237,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		numWorker = n
 	}
 
-	buf, _, err := g1r.ReadLine()
+	buf, err := ReadFile(g1r)
 	if err != nil {
 		return nil, err
 	}
