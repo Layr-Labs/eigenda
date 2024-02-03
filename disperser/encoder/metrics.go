@@ -28,7 +28,6 @@ type Metrics struct {
 }
 
 func NewMetrics(httpPort string, logger common.Logger) *Metrics {
-  httpPort = "9111"
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
