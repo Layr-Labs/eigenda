@@ -29,13 +29,13 @@ var (
 
 var logger = &cmock.Logger{}
 
-func makeTestEncoder() (*encoding.Encoder, ServerConfig) {
+func makeTestEncoder(numPoint uint64) (*encoding.Encoder, ServerConfig) {
 	kzgConfig := kzgEncoder.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
 		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
+		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
@@ -51,7 +51,7 @@ func makeTestEncoder() (*encoding.Encoder, ServerConfig) {
 	return encoder, encoderServerConfig
 }
 
-var testEncoder, testServerConfig = makeTestEncoder()
+var testEncoder, testServerConfig = makeTestEncoder(3000)
 
 func getTestData() (core.Blob, core.EncodingParams) {
 	var quorumID core.QuorumID = 0
@@ -245,4 +245,65 @@ func TestThrottling(t *testing.T) {
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		}
 	}
+}
+
+func TestEncoderPointsLoading(t *testing.T) {
+	// encoder 1 only loads 1500 points
+	encoder1, config1 := makeTestEncoder(1500)
+	metrics := NewMetrics("9000", logger)
+	server1 := NewServer(config1, logger, encoder1, metrics)
+
+	testBlobData, testEncodingParams := getTestData()
+
+	testEncodingParamsProto := &pb.EncodingParams{
+		ChunkLength: uint32(testEncodingParams.ChunkLength),
+		NumChunks:   uint32(testEncodingParams.NumChunks),
+	}
+
+	encodeBlobRequestProto := &pb.EncodeBlobRequest{
+		Data:           []byte(testBlobData.Data),
+		EncodingParams: testEncodingParamsProto,
+	}
+
+	reply1, err := server1.EncodeBlob(context.Background(), encodeBlobRequestProto)
+	assert.NoError(t, err)
+	assert.NotNil(t, reply1.Chunks)
+
+	// Decode Server Data
+	var chunksData []*core.Chunk
+
+	for i := range reply1.Chunks {
+		chunkSerialized, _ := new(core.Chunk).Deserialize(reply1.GetChunks()[i])
+		// perform an operation
+		chunksData = append(chunksData, chunkSerialized)
+	}
+	assert.NotNil(t, chunksData)
+
+	// Indices obtained from Encoder_Test
+	indices := []core.ChunkNumber{
+		0, 1, 2, 3, 4, 5, 6, 7,
+	}
+
+	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
+	decoded, err := testEncoder.Decode(chunksData, indices, testEncodingParams, maxInputSize)
+	assert.Nil(t, err)
+	recovered := bytes.TrimRight(decoded, "\x00")
+	assert.Equal(t, recovered, gettysburgAddressBytes)
+
+	// encoder 2 only loads 2900 points
+	encoder2, config2 := makeTestEncoder(2900)
+	server2 := NewServer(config2, logger, encoder2, metrics)
+
+	reply2, err := server2.EncodeBlob(context.Background(), encodeBlobRequestProto)
+	assert.NoError(t, err)
+	assert.NotNil(t, reply2.Chunks)
+
+	for i := range reply2.Chunks {
+		chunkSerialized, _ := new(core.Chunk).Deserialize(reply2.GetChunks()[i])
+		// perform an operation
+		assert.Equal(t, len(chunkSerialized.Coeffs), len(chunksData[i].Coeffs))
+		assert.Equal(t, chunkSerialized.Coeffs, chunksData[i].Coeffs)
+		assert.Equal(t, chunkSerialized.Proof, chunksData[i].Proof)
+	}
+
 }

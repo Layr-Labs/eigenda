@@ -26,8 +26,6 @@ package kzg
 
 import bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 
-//bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
-
 type SRS struct {
 
 	// [b.multiply(b.G1, pow(s, i, MODULUS)) for i in range(WIDTH+1)],

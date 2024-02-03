@@ -26,8 +26,8 @@ type Encoder struct {
 
 var _ core.Encoder = &Encoder{}
 
-func NewEncoder(config EncoderConfig, isEncoder bool) (*Encoder, error) {
-	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(&config.KzgConfig, isEncoder)
+func NewEncoder(config EncoderConfig, loadG2Points bool) (*Encoder, error) {
+	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(&config.KzgConfig, loadG2Points)
 	if err != nil {
 		return nil, err
 	}

@@ -33,9 +33,10 @@ type KzgConfig struct {
 
 type KzgEncoderGroup struct {
 	*KzgConfig
-	Srs        *kzg.SRS
-	G2Trailing []bls.G2Point
-	mu         sync.Mutex
+	Srs          *kzg.SRS
+	G2Trailing   []bls.G2Point
+	mu           sync.Mutex
+	LoadG2Points bool
 
 	Encoders  map[rs.EncodingParams]*KzgEncoder
 	Verifiers map[rs.EncodingParams]*KzgVerifier
@@ -55,7 +56,7 @@ type KzgEncoder struct {
 	FFTPointsT [][]bls.G1Point // transpose of FFTPoints
 }
 
-func NewKzgEncoderGroup(config *KzgConfig, isEncoder bool) (*KzgEncoderGroup, error) {
+func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
@@ -72,7 +73,7 @@ func NewKzgEncoderGroup(config *KzgConfig, isEncoder bool) (*KzgEncoderGroup, er
 	g2Trailing := make([]bls.G2Point, 0)
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if isEncoder {
+	if loadG2Points {
 		s2, err = utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
@@ -99,11 +100,12 @@ func NewKzgEncoderGroup(config *KzgConfig, isEncoder bool) (*KzgEncoderGroup, er
 	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
 	encoderGroup := &KzgEncoderGroup{
-		KzgConfig:  config,
-		Srs:        srs,
-		G2Trailing: g2Trailing,
-		Encoders:   make(map[rs.EncodingParams]*KzgEncoder),
-		Verifiers:  make(map[rs.EncodingParams]*KzgVerifier),
+		KzgConfig:    config,
+		Srs:          srs,
+		G2Trailing:   g2Trailing,
+		Encoders:     make(map[rs.EncodingParams]*KzgEncoder),
+		Verifiers:    make(map[rs.EncodingParams]*KzgVerifier),
+		LoadG2Points: loadG2Points,
 	}
 
 	if config.PreloadEncoder {

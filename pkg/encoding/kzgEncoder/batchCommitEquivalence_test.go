@@ -50,4 +50,20 @@ func TestBatchEquivalence(t *testing.T) {
 	}
 
 	assert.False(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence negative test failed\n")
+
+	for z := 0; z < numBlob; z++ {
+		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+
+		commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+		require.Nil(t, err)
+
+		commitPairs[z] = kzgRs.CommitmentPair{
+			Commitment:       *commit,
+			LengthCommitment: *g2commit,
+		}
+	}
+
+	bn254.AddG1(&commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment)
+
+	assert.False(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence negative test failed in outer loop\n")
 }
