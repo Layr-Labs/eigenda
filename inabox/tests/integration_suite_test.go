@@ -167,7 +167,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 			Verbose:         true,
 			PreloadEncoder:  false,
 		},
-	})
+	}, false)
 	if err != nil {
 		return err
 	}

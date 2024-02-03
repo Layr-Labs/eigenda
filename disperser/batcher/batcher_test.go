@@ -43,15 +43,15 @@ type batcherComponents struct {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func makeTestEncoder() (core.Encoder, error) {
 	config := kzgEncoder.KzgConfig{
-		G1Path:    "../../inabox/resources/kzg/g1.point",
-		G2Path:    "../../inabox/resources/kzg/g2.point",
-		CacheDir:  "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:  3000,
+		G1Path:          "../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../inabox/resources/kzg/g2.point",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config})
+	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
 }
 
 func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {

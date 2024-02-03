@@ -34,7 +34,7 @@ func readpoints() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
 	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
 		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].MarshalText()))
@@ -66,7 +66,7 @@ func TestKzgRs() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.EncodingParams{NumChunks: 200, ChunkLen: 180}
 	enc, _ := kzgGroup.NewKzgEncoder(params)

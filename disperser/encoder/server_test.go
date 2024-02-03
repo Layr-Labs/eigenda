@@ -31,17 +31,17 @@ var logger = &cmock.Logger{}
 
 func makeTestEncoder() (*encoding.Encoder, ServerConfig) {
 	kzgConfig := kzgEncoder.KzgConfig{
-		G1Path:    "../../inabox/resources/kzg/g1.point",
-		G2Path:    "../../inabox/resources/kzg/g2.point",
-		CacheDir:  "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:  3000,
+		G1Path:          "../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../inabox/resources/kzg/g2.point",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	encodingConfig := encoding.EncoderConfig{KzgConfig: kzgConfig}
 
-	encoder, _ := encoding.NewEncoder(encodingConfig)
+	encoder, _ := encoding.NewEncoder(encodingConfig, true)
 	encoderServerConfig := ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: 16,

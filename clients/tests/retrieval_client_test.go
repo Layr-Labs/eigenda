@@ -34,7 +34,7 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(config)
+	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(config, true)
 	if err != nil {
 		return nil, err
 	}

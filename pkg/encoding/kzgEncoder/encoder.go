@@ -55,7 +55,7 @@ type KzgEncoder struct {
 	FFTPointsT [][]bls.G1Point // transpose of FFTPoints
 }
 
-func NewKzgEncoderGroup(config *KzgConfig) (*KzgEncoderGroup, error) {
+func NewKzgEncoderGroup(config *KzgConfig, isEncoder bool) (*KzgEncoderGroup, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
@@ -67,25 +67,32 @@ func NewKzgEncoderGroup(config *KzgConfig) (*KzgEncoderGroup, error) {
 		log.Println("failed to read G1 points", err)
 		return nil, err
 	}
-	s2, err := utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
-	if err != nil {
-		log.Println("failed to read G2 points", err)
-		return nil, err
+
+	s2 := make([]bls.G2Point, 0)
+	g2Trailing := make([]bls.G2Point, 0)
+
+	// PreloadEncoder is by default not used by operator node, PreloadEncoder
+	if isEncoder {
+		s2, err = utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
+		if err != nil {
+			log.Println("failed to read G2 points", err)
+			return nil, err
+		}
+
+		g2Trailing, err = utils.ReadG2PointSection(
+			config.G2Path,
+			config.SRSOrder-config.SRSNumberToLoad,
+			config.SRSOrder, // last exclusive
+			config.NumWorker,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
 		log.Println("Could not create srs", err)
-		return nil, err
-	}
-
-	g2Trailing, err := utils.ReadG2PointSection(
-		config.G2Path,
-		config.SRSOrder-config.SRSNumberToLoad,
-		config.SRSOrder, // last exclusive
-		config.NumWorker,
-	)
-	if err != nil {
 		return nil, err
 	}
 

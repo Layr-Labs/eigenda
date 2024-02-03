@@ -37,7 +37,7 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config})
+	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
 }
 
 func TestEncoder(t *testing.T) {

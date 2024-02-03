@@ -14,7 +14,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
