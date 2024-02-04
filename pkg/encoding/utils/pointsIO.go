@@ -23,6 +23,8 @@ type EncodeParams struct {
 	ChunkLenE uint64
 }
 
+// ReadDesiredBytes reads exactly numBytesToRead bytes from the reader and returns
+// the result.
 func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
 	buf := make([]byte, numBytesToRead)
 	_, err := io.ReadFull(reader, buf)
@@ -57,13 +59,6 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 
 	buf, err := ReadDesiredBytes(g1r, n*G1PointBytes)
 	if err != nil {
-		return nil, err
-	}
-
-	if uint64(len(buf)) < G1PointBytes*n {
-		log.Printf("Error. Insufficient G1 points from %s. Only contains %v. Requesting %v\n", filepath, len(buf)/G1PointBytes, n)
-		log.Println()
-		log.Println("ReadG1Points.ERR.1", err)
 		return nil, err
 	}
 
@@ -133,13 +128,6 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 
 	buf, err := ReadDesiredBytes(g1r, n*G1PointBytes)
 	if err != nil {
-		return nil, err
-	}
-
-	if uint64(len(buf)) < G1PointBytes*n {
-		log.Printf("Error. Insufficient G1 points from %s. Only contains %v. Requesting %v\n", filepath, len(buf)/G1PointBytes, n)
-		log.Println()
-		log.Println("ReadG1PointSection.ERR.1", err)
 		return nil, err
 	}
 
@@ -237,13 +225,6 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 
 	buf, err := ReadDesiredBytes(g1r, n*G2PointBytes)
 	if err != nil {
-		return nil, err
-	}
-
-	if uint64(len(buf)) < G2PointBytes*n {
-		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(buf)/G2PointBytes, n)
-		log.Println()
-		log.Println("ReadG2Points.ERR.1", err)
 		return nil, err
 	}
 
