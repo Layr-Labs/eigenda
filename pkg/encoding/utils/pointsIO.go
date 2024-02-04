@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	// Num of bytes per G1 point.
+	// Num of bytes per G1 point in serialized format in file.
 	G1PointBytes = 32
-	// Num of bytes per G2 point.
+	// Num of bytes per G2 point in serialized format in file.
 	G2PointBytes = 64
 )
 
@@ -23,9 +23,11 @@ type EncodeParams struct {
 	ChunkLenE uint64
 }
 
-func ReadFile(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
+func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
 	buf := make([]byte, numBytesToRead)
 	_, err := io.ReadFull(reader, buf)
+	// Note that ReadFull() guarantees the bytes read is len(buf) IFF err is nil.
+	// See https://pkg.go.dev/io#ReadFull.
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +55,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		numWorker = n
 	}
 
-	buf, err := ReadFile(g1r, n*G1PointBytes)
+	buf, err := ReadDesiredBytes(g1r, n*G1PointBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +131,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		numWorker = n
 	}
 
-	buf, err := ReadFile(g1r, n*G1PointBytes)
+	buf, err := ReadDesiredBytes(g1r, n*G1PointBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +235,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		numWorker = n
 	}
 
-	buf, err := ReadFile(g1r, n*G2PointBytes)
+	buf, err := ReadDesiredBytes(g1r, n*G2PointBytes)
 	if err != nil {
 		return nil, err
 	}
