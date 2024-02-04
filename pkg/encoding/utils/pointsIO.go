@@ -16,20 +16,26 @@ type EncodeParams struct {
 	ChunkLenE uint64
 }
 
-func ReadFile(reader *bufio.Reader) ([]byte, error) {
-	var buf []byte
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err == io.EOF {
-			buf = append(buf, line...)
-			break // Reached end of file
-		}
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, line...)
+func ReadFile(reader *bufio.Reader, num uint64) ([]byte, error) {
+	buf := make([]byte, num)
+	_, err := io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, err
 	}
 	return buf, nil
+	// var buf []byte
+	// for {
+	// 	line, err := reader.ReadBytes('\n')
+	// 	if err == io.EOF {
+	// 		buf = append(buf, line...)
+	// 		break // Reached end of file
+	// 	}
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	buf = append(buf, line...)
+	// }
+	// return buf, nil
 }
 
 func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, error) {
@@ -53,7 +59,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		numWorker = n
 	}
 
-	buf, err := ReadFile(g1r)
+	buf, err := ReadFile(g1r, n*32)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +135,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		numWorker = n
 	}
 
-	buf, err := ReadFile(g1r)
+	buf, err := ReadFile(g1r, n*32)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +239,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		numWorker = n
 	}
 
-	buf, err := ReadFile(g1r)
+	buf, err := ReadFile(g1r, n*64)
 	if err != nil {
 		return nil, err
 	}

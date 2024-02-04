@@ -226,7 +226,7 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 	}()
 
 	// 2 due to circular FFT  mul
-	subTableSize := dimE * 2 * 64
+	subTableSize := dimE * 2 * 32
 	totalSubTableSize := subTableSize * l
 
 	if numWorker > l {
@@ -236,7 +236,7 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 	reader := bufio.NewReaderSize(g1f, int(totalSubTableSize+l))
 	buf := make([]byte, totalSubTableSize+l)
 	if _, err := io.ReadFull(reader, buf); err != nil {
-		log.Println("TableReaderThreads.ERR.1", err)
+		log.Println("TableReaderThreads.ERR.1", err, "file path:", filePath)
 		return nil, err
 	}
 
@@ -280,7 +280,7 @@ func (p *SRSTable) readWorker(
 	for b := range jobChan {
 		slicePoints := make([]bls.G1Point, dimE*2)
 		for i := uint64(0); i < dimE*2; i++ {
-			g1 := buf[b.start+i*64 : b.start+(i+1)*64]
+			g1 := buf[b.start+i*32 : b.start+(i+1)*32]
 			err := slicePoints[i].UnmarshalText(g1[:])
 			if err != nil {
 				log.Printf("Error. From %v to %v. %v", b.start, b.end, err)
