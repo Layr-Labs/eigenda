@@ -14,6 +14,16 @@ type Commitment struct {
 	*bn254.G1Point
 }
 
+// Commitment is a polynomial commitment (e.g. a kzg commitment)
+type LengthCommitment struct {
+	*bn254.G2Point
+}
+
+// LengthProof is a polynomial commitment on G2 (e.g. a kzg commitment) used for low degree proof
+type LengthProof struct {
+	*bn254.G2Point
+}
+
 // The proof used to open a commitment. In the case of Kzg, this is also a kzg commitment, and is different from a Commitment only semantically.
 type Proof = bn254.G1Point
 
@@ -43,6 +53,9 @@ type Encoder interface {
 
 	// VerifyBlobLength takes in the commitments and returns an error if the blob length is invalid.
 	VerifyBlobLength(commitments BlobCommitments) error
+
+	// VerifyCommitEquivalence takes in a list of commitments and returns an error if the commitment of G1 and G2 are inconsistent
+	VerifyCommitEquivalenceBatch(commitments []BlobCommitments) error
 
 	// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 	Decode(chunks []*Chunk, indices []ChunkNumber, params EncodingParams, inputSize uint64) ([]byte, error)

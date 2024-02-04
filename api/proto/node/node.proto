@@ -108,16 +108,19 @@ message Bundle {
 message BlobHeader {
 	// The KZG commitment to the polynomial representing the blob.
 	bytes commitment = 1;
+  // The KZG commitment to the polynomial representing the blob on G2, it is uesd 
+  // for proving the degree of the polynomial
+  bytes length_commitment = 2;
 	// The low degree proof. It's the KZG commitment to the polynomial shifted to
 	// the largest SRS degree.
-	bytes length_proof = 2;
+	bytes length_proof = 3;
 	// The length of the original blob in number of symbols (in the field where
 	// the polynomial is defined).
-	uint32 length = 3;
+	uint32 length = 4;
 	// The params of the quorums that this blob participates in.
-	repeated BlobQuorumInfo quorum_headers = 4;
+	repeated BlobQuorumInfo quorum_headers = 5;
 	// The ID of the user who is dispersing this blob to EigenDA.
-	string account_id = 5;
+	string account_id = 6;
 }
 
 // See BlobQuorumParam as defined in

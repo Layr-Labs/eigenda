@@ -2,8 +2,10 @@ package indexer_test
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -49,12 +52,17 @@ func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
 		keyPair, err := core.MakeKeyPairFromString(op.NODE_TEST_PRIVATE_BLS)
 		Expect(err).To(BeNil())
 
-		err = tx.RegisterBLSPublicKey(context.Background(), keyPair)
-		Expect(err).To(BeNil())
-
 		socket := fmt.Sprintf("%v:%v", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT)
 
-		err = tx.RegisterOperator(context.Background(), keyPair.GetPubKeyG1(), socket, quorums)
+		salt := [32]byte{}
+		_, err = rand.Read(salt[:])
+		Expect(err).To(BeNil())
+
+		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
+		privKey, err := crypto.HexToECDSA(op.NODE_PRIVATE_KEY)
+		Expect(err).To(BeNil())
+
+		err = tx.RegisterOperator(context.Background(), keyPair, socket, quorums, privKey, salt, expiry)
 		Expect(err).To(BeNil())
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 
 	"github.com/Layr-Labs/eigenda/common"
-	blsregcoord "github.com/Layr-Labs/eigenda/contracts/bindings/BLSRegistryCoordinatorWithIndices"
+	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
 )
@@ -40,7 +40,7 @@ func (a *OperatorSocketsAccumulator) UpdateObject(object indexer.AccumulatorObje
 		return object, ErrIncorrectEvent
 	}
 
-	payload, ok := event.Payload.(*blsregcoord.ContractBLSRegistryCoordinatorWithIndicesOperatorSocketUpdate)
+	payload, ok := event.Payload.(*regcoord.ContractRegistryCoordinatorOperatorSocketUpdate)
 	if !ok {
 		return object, ErrIncorrectEvent
 	}

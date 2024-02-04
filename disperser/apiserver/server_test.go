@@ -389,7 +389,7 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 	tx := &mock.MockTransactor{}
 	tx.On("GetCurrentBlockNumber").Return(uint32(100), nil)
-	tx.On("GetQuorumCount").Return(uint16(2), nil)
+	tx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort: "51001",

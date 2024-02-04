@@ -1,0 +1,607 @@
+[
+    {
+        "type": "constructor",
+        "inputs": [
+            {
+                "name": "_registryCoordinator",
+                "type": "address",
+                "internalType": "contract IRegistryCoordinator"
+            }
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "apkHistory",
+        "inputs": [
+            {
+                "name": "",
+                "type": "uint8",
+                "internalType": "uint8"
+            },
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "apkHash",
+                "type": "bytes24",
+                "internalType": "bytes24"
+            },
+            {
+                "name": "updateBlockNumber",
+                "type": "uint32",
+                "internalType": "uint32"
+            },
+            {
+                "name": "nextUpdateBlockNumber",
+                "type": "uint32",
+                "internalType": "uint32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "currentApk",
+        "inputs": [
+            {
+                "name": "",
+                "type": "uint8",
+                "internalType": "uint8"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "deregisterOperator",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "quorumNumbers",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "getApk",
+        "inputs": [
+            {
+                "name": "quorumNumber",
+                "type": "uint8",
+                "internalType": "uint8"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct BN254.G1Point",
+                "components": [
+                    {
+                        "name": "X",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "Y",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getApkHashAtBlockNumberAndIndex",
+        "inputs": [
+            {
+                "name": "quorumNumber",
+                "type": "uint8",
+                "internalType": "uint8"
+            },
+            {
+                "name": "blockNumber",
+                "type": "uint32",
+                "internalType": "uint32"
+            },
+            {
+                "name": "index",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes24",
+                "internalType": "bytes24"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getApkHistoryLength",
+        "inputs": [
+            {
+                "name": "quorumNumber",
+                "type": "uint8",
+                "internalType": "uint8"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint32",
+                "internalType": "uint32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getApkIndicesAtBlockNumber",
+        "inputs": [
+            {
+                "name": "quorumNumbers",
+                "type": "bytes",
+                "internalType": "bytes"
+            },
+            {
+                "name": "blockNumber",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint32[]",
+                "internalType": "uint32[]"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getApkUpdateAtIndex",
+        "inputs": [
+            {
+                "name": "quorumNumber",
+                "type": "uint8",
+                "internalType": "uint8"
+            },
+            {
+                "name": "index",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct IBLSApkRegistry.ApkUpdate",
+                "components": [
+                    {
+                        "name": "apkHash",
+                        "type": "bytes24",
+                        "internalType": "bytes24"
+                    },
+                    {
+                        "name": "updateBlockNumber",
+                        "type": "uint32",
+                        "internalType": "uint32"
+                    },
+                    {
+                        "name": "nextUpdateBlockNumber",
+                        "type": "uint32",
+                        "internalType": "uint32"
+                    }
+                ]
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getOperatorFromPubkeyHash",
+        "inputs": [
+            {
+                "name": "pubkeyHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getOperatorId",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getRegisteredPubkey",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct BN254.G1Point",
+                "components": [
+                    {
+                        "name": "X",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "Y",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            },
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "initializeQuorum",
+        "inputs": [
+            {
+                "name": "quorumNumber",
+                "type": "uint8",
+                "internalType": "uint8"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "operatorToPubkey",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "operatorToPubkeyHash",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "pubkeyHashToOperator",
+        "inputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "registerBLSPublicKey",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "params",
+                "type": "tuple",
+                "internalType": "struct IBLSApkRegistry.PubkeyRegistrationParams",
+                "components": [
+                    {
+                        "name": "pubkeyRegistrationSignature",
+                        "type": "tuple",
+                        "internalType": "struct BN254.G1Point",
+                        "components": [
+                            {
+                                "name": "X",
+                                "type": "uint256",
+                                "internalType": "uint256"
+                            },
+                            {
+                                "name": "Y",
+                                "type": "uint256",
+                                "internalType": "uint256"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "pubkeyG1",
+                        "type": "tuple",
+                        "internalType": "struct BN254.G1Point",
+                        "components": [
+                            {
+                                "name": "X",
+                                "type": "uint256",
+                                "internalType": "uint256"
+                            },
+                            {
+                                "name": "Y",
+                                "type": "uint256",
+                                "internalType": "uint256"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "pubkeyG2",
+                        "type": "tuple",
+                        "internalType": "struct BN254.G2Point",
+                        "components": [
+                            {
+                                "name": "X",
+                                "type": "uint256[2]",
+                                "internalType": "uint256[2]"
+                            },
+                            {
+                                "name": "Y",
+                                "type": "uint256[2]",
+                                "internalType": "uint256[2]"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "pubkeyRegistrationMessageHash",
+                "type": "tuple",
+                "internalType": "struct BN254.G1Point",
+                "components": [
+                    {
+                        "name": "X",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "Y",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            }
+        ],
+        "outputs": [
+            {
+                "name": "operatorId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "registerOperator",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "quorumNumbers",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "registryCoordinator",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "event",
+        "name": "Initialized",
+        "inputs": [
+            {
+                "name": "version",
+                "type": "uint8",
+                "indexed": false,
+                "internalType": "uint8"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "NewPubkeyRegistration",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "pubkeyG1",
+                "type": "tuple",
+                "indexed": false,
+                "internalType": "struct BN254.G1Point",
+                "components": [
+                    {
+                        "name": "X",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "Y",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            },
+            {
+                "name": "pubkeyG2",
+                "type": "tuple",
+                "indexed": false,
+                "internalType": "struct BN254.G2Point",
+                "components": [
+                    {
+                        "name": "X",
+                        "type": "uint256[2]",
+                        "internalType": "uint256[2]"
+                    },
+                    {
+                        "name": "Y",
+                        "type": "uint256[2]",
+                        "internalType": "uint256[2]"
+                    }
+                ]
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "OperatorAddedToQuorums",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "quorumNumbers",
+                "type": "bytes",
+                "indexed": false,
+                "internalType": "bytes"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "OperatorRemovedFromQuorums",
+        "inputs": [
+            {
+                "name": "operator",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "quorumNumbers",
+                "type": "bytes",
+                "indexed": false,
+                "internalType": "bytes"
+            }
+        ],
+        "anonymous": false
+    }
+]

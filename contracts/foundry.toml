@@ -4,15 +4,6 @@ out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read-write", path = "./"}]
 
-remappings = [
-    "@eigenlayer-middleware/=lib/eigenlayer-middleware/src/",
-    "@eigenlayer-core/=lib/eigenlayer-contracts/src/",
-    "@eigenlayer-scripts/=lib/eigenlayer-contracts/script/",
-    "@openzeppelin/=lib/openzeppelin-contracts/",
-    "@openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/",
-    "forge-std/=lib/forge-std/src/"
-]
-
 gas_reports = ["*"]
 
 # A list of ignored solc error codes

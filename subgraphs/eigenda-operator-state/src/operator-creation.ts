@@ -1,15 +1,15 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
-import { NewPubkeyRegistration as NewPubkeyRegistrationEvent } from "../generated/BLSPubkeyCompendium_Operator/BLSPubkeyCompendium"
+import { NewPubkeyRegistration as NewPubkeyRegistrationEvent } from "../generated/BLSApkRegistry_Operator/BLSApkRegistry"
 import { Operator } from "../generated/schema"
-import { BLSPubkeyCompendium } from "../generated/BLSPubkeyCompendium/BLSPubkeyCompendium"
+import { BLSApkRegistry } from "../generated/BLSApkRegistry/BLSApkRegistry"
 
 export function handleNewPubkeyRegistration(
   event: NewPubkeyRegistrationEvent
 ): void {
-  let pubkeyCompendium = BLSPubkeyCompendium.bind(event.address)
+  let apkRegistry = BLSApkRegistry.bind(event.address)
 
   let entity = new Operator(
-    pubkeyCompendium.operatorToPubkeyHash(event.params.operator) // this is the operator id
+    apkRegistry.operatorToPubkeyHash(event.params.operator) // this is the operator id
   )
 
   entity.operator = event.params.operator

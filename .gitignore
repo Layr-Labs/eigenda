@@ -6,3 +6,5 @@ inabox/resources/kzg/SRSTables/*
 
 **/bin/*
 coverage.*
+
+contracts/broadcast

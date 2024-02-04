@@ -30,13 +30,28 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	_, err = lengthY.SetString("15356431458378126778840641829778151778222945686256112821552210070627093656047")
 	assert.NoError(t, err)
 
+	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
+	_, err = lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
+	assert.NoError(t, err)
+	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
+	assert.NoError(t, err)
+	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
+	assert.NoError(t, err)
+	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
+	assert.NoError(t, err)
+
+
+	var lengthProof, lengthCommitment bn254.G2Point
+	lengthProof.X.A0 = lengthXA0
+	lengthProof.X.A1 = lengthXA1
+	lengthProof.Y.A0 = lengthYA0
+	lengthProof.Y.A1 = lengthYA1
+
+	lengthCommitment = lengthProof
+
 	commitment := bn254.G1Point{
 		X: commitX,
 		Y: commitY,
-	}
-	lengthProof := bn254.G1Point{
-		X: lengthX,
-		Y: lengthY,
 	}
 
 	adversaryThreshold := uint8(90)
@@ -59,9 +74,10 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		{
 			BlobHeader: &core.BlobHeader{
 				BlobCommitments: core.BlobCommitments{
-					Commitment:  &core.Commitment{G1Point: &commitment},
-					LengthProof: &core.Commitment{G1Point: &lengthProof},
-					Length:      48,
+					Commitment:       &core.Commitment{G1Point: &commitment},
+					LengthCommitment: &core.LengthCommitment{G2Point: &lengthCommitment},
+					LengthProof:      &core.LengthProof{G2Point: &lengthProof},
+					Length:           48,
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
@@ -74,8 +90,10 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		{
 			BlobHeader: &core.BlobHeader{
 				BlobCommitments: core.BlobCommitments{
-					Commitment: &core.Commitment{G1Point: &commitment},
-					Length:     50,
+					Commitment:       &core.Commitment{G1Point: &commitment},
+					LengthCommitment: &core.LengthCommitment{G2Point: &lengthCommitment},
+					LengthProof:      &core.LengthProof{G2Point: &lengthProof},
+					Length:           50,
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
@@ -94,7 +112,9 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 
 	serializedCommitment0, err := core.Commitment{G1Point: &commitment}.Serialize()
 	assert.NoError(t, err)
-	serializedLengthProof0, err := core.Commitment{G1Point: &lengthProof}.Serialize()
+	serializedLengthCommitment0, err := core.LengthCommitment{G2Point: &lengthCommitment}.Serialize()
+	assert.NoError(t, err)
+	serializedLengthProof0, err := core.LengthProof{G2Point: &lengthProof}.Serialize()
 	assert.NoError(t, err)
 
 	quorumHeaderProto := &pb.BlobQuorumInfo{
@@ -105,17 +125,19 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	}
 
 	blobHeaderProto0 := &pb.BlobHeader{
-		Commitment:    serializedCommitment0,
-		LengthProof:   serializedLengthProof0,
-		Length:        uint32(48),
-		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeaderProto},
+		Commitment:       serializedCommitment0,
+		LengthCommitment: serializedLengthCommitment0,
+		LengthProof:      serializedLengthProof0,
+		Length:           uint32(48),
+		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeaderProto},
 	}
 
 	blobHeaderProto1 := &pb.BlobHeader{
-		Commitment:    serializedCommitment0,
-		LengthProof:   serializedLengthProof0,
-		Length:        uint32(50),
-		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeaderProto},
+		Commitment:       serializedCommitment0,
+		LengthCommitment: serializedLengthCommitment0,
+		LengthProof:      serializedLengthProof0,
+		Length:           uint32(50),
+		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeaderProto},
 	}
 	blobs := []*pb.Blob{
 		{

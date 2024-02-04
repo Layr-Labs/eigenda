@@ -79,7 +79,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		c.logger.Error("Disperser cannot connect to operator dispersal socket", "dispersal_socket", core.OperatorSocket(op.Socket).GetDispersalSocket(), "err", err)
+		c.logger.Warn("Disperser cannot connect to operator dispersal socket", "dispersal_socket", core.OperatorSocket(op.Socket).GetDispersalSocket(), "err", err)
 		return nil, err
 	}
 	defer conn.Close()
@@ -132,6 +132,11 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		return nil, err
 	}
 
+	lengthCommitData, err := blob.BlobHeader.LengthCommitment.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
 	lengthProofData, err := blob.BlobHeader.LengthProof.Serialize()
 	if err != nil {
 		return nil, err
@@ -164,10 +169,11 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 
 	return &node.Blob{
 		Header: &node.BlobHeader{
-			Commitment:    commitData,
-			LengthProof:   lengthProofData,
-			Length:        uint32(blob.BlobHeader.Length),
-			QuorumHeaders: quorumHeaders,
+			Commitment:       commitData,
+			LengthCommitment: lengthCommitData,
+			LengthProof:      lengthProofData,
+			Length:           uint32(blob.BlobHeader.Length),
+			QuorumHeaders:    quorumHeaders,
 		},
 		Bundles: bundles,
 	}, nil

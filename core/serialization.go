@@ -201,8 +201,8 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 			Type: "uint8",
 		},
 		{
-			Name: "quantizationParameter",
-			Type: "uint8",
+			Name: "chunkLength",
+			Type: "uint32",
 		},
 	})
 
@@ -220,7 +220,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 		QuorumNumber                 uint8
 		AdversaryThresholdPercentage uint8
 		QuorumThresholdPercentage    uint8
-		QuantizationParameter        uint8
+		ChunkLength                  uint32
 	}
 
 	qbp := make([]quorumBlobParams, len(h.QuorumInfos))
@@ -229,7 +229,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
 			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
-			QuantizationParameter:        0,
+			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
 
@@ -288,8 +288,8 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 					Type: "uint8",
 				},
 				{
-					Name: "quantizationParameter",
-					Type: "uint8",
+					Name: "chunkLength",
+					Type: "uint32",
 				},
 			},
 		},
@@ -308,7 +308,7 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 		QuorumNumber                 uint8
 		AdversaryThresholdPercentage uint8
 		QuorumThresholdPercentage    uint8
-		QuantizationParameter        uint8
+		ChunkLength                  uint32
 	}
 
 	type commitment struct {
@@ -322,7 +322,7 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
 			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
-			QuantizationParameter:        0,
+			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
 	slices.SortStableFunc[[]quorumBlobParams](qbp, func(a, b quorumBlobParams) int {
@@ -395,6 +395,52 @@ func (c *Commitment) UnmarshalJSON(data []byte) error {
 	c.G1Point = &bn254.G1Point{
 		X: g1Point.X,
 		Y: g1Point.Y,
+	}
+
+	return nil
+}
+
+func (c LengthCommitment) Serialize() ([]byte, error) {
+	return encode(c)
+}
+
+func (c *LengthCommitment) Deserialize(data []byte) (*LengthCommitment, error) {
+	err := decode(data, c)
+	return c, err
+}
+
+func (c *LengthCommitment) UnmarshalJSON(data []byte) error {
+	var g2Point bn.G2Affine
+	err := json.Unmarshal(data, &g2Point)
+	if err != nil {
+		return err
+	}
+	c.G2Point = &bn254.G2Point{
+		X: g2Point.X,
+		Y: g2Point.Y,
+	}
+
+	return nil
+}
+
+func (c LengthProof) Serialize() ([]byte, error) {
+	return encode(c)
+}
+
+func (c *LengthProof) Deserialize(data []byte) (*LengthProof, error) {
+	err := decode(data, c)
+	return c, err
+}
+
+func (c *LengthProof) UnmarshalJSON(data []byte) error {
+	var g2Point bn.G2Affine
+	err := json.Unmarshal(data, &g2Point)
+	if err != nil {
+		return err
+	}
+	c.G2Point = &bn254.G2Point{
+		X: g2Point.X,
+		Y: g2Point.Y,
 	}
 
 	return nil
