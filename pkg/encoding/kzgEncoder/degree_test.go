@@ -30,9 +30,7 @@ func TestLengthProof(t *testing.T) {
 		length := len(inputFr)
 		assert.True(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)) == nil, "low degree verification failed\n")
 
-    length = len(inputFr) - 10
+		length = len(inputFr) - 10
 		assert.False(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)) == nil, "low degree verification failed\n")
 	}
 }
-
-
