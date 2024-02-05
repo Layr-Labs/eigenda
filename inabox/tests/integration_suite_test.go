@@ -158,15 +158,16 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	}
 	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
 		KzgConfig: kzgEncoder.KzgConfig{
-			G1Path:         testConfig.Retriever.RETRIEVER_G1_PATH,
-			G2Path:         testConfig.Retriever.RETRIEVER_G2_PATH,
-			CacheDir:       testConfig.Retriever.RETRIEVER_CACHE_PATH,
-			NumWorker:      1,
-			SRSOrder:       uint64(srsOrder),
-			Verbose:        true,
-			PreloadEncoder: false,
+			G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
+			G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
+			CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
+			NumWorker:       1,
+			SRSOrder:        uint64(srsOrder),
+			SRSNumberToLoad: uint64(srsOrder),
+			Verbose:         true,
+			PreloadEncoder:  false,
 		},
-	})
+	}, false)
 	if err != nil {
 		return err
 	}

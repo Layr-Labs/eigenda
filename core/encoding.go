@@ -10,19 +10,13 @@ import (
 // Commitments
 
 // Commitment is a polynomial commitment (e.g. a kzg commitment)
-type Commitment struct {
-	*bn254.G1Point
-}
+type G1Commitment bn254.G1Point
 
 // Commitment is a polynomial commitment (e.g. a kzg commitment)
-type LengthCommitment struct {
-	*bn254.G2Point
-}
+type G2Commitment bn254.G2Point
 
 // LengthProof is a polynomial commitment on G2 (e.g. a kzg commitment) used for low degree proof
-type LengthProof struct {
-	*bn254.G2Point
-}
+type LengthProof = G2Commitment
 
 // The proof used to open a commitment. In the case of Kzg, this is also a kzg commitment, and is different from a Commitment only semantically.
 type Proof = bn254.G1Point

@@ -12,7 +12,6 @@ import (
 	"slices"
 
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	bn "github.com/consensys/gnark-crypto/ecc/bn254"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -247,7 +246,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 }
 
 func (h *BlobHeader) Encode() ([]byte, error) {
-	if h.Commitment == nil || h.Commitment.G1Point == nil {
+	if h.Commitment == nil {
 		return nil, ErrInvalidCommitment
 	}
 
@@ -377,72 +376,43 @@ func (c *Chunk) Deserialize(data []byte) (*Chunk, error) {
 	return c, err
 }
 
-func (c Commitment) Serialize() ([]byte, error) {
+func (c *G1Commitment) Serialize() ([]byte, error) {
 	return encode(c)
 }
 
-func (c *Commitment) Deserialize(data []byte) (*Commitment, error) {
+func (c *G1Commitment) Deserialize(data []byte) (*G1Commitment, error) {
 	err := decode(data, c)
 	return c, err
 }
 
-func (c *Commitment) UnmarshalJSON(data []byte) error {
+func (c *G1Commitment) UnmarshalJSON(data []byte) error {
 	var g1Point bn.G1Affine
 	err := json.Unmarshal(data, &g1Point)
 	if err != nil {
 		return err
 	}
-	c.G1Point = &bn254.G1Point{
-		X: g1Point.X,
-		Y: g1Point.Y,
-	}
-
+	c.X = g1Point.X
+	c.Y = g1Point.Y
 	return nil
 }
 
-func (c LengthCommitment) Serialize() ([]byte, error) {
+func (c *G2Commitment) Serialize() ([]byte, error) {
 	return encode(c)
 }
 
-func (c *LengthCommitment) Deserialize(data []byte) (*LengthCommitment, error) {
+func (c *G2Commitment) Deserialize(data []byte) (*G2Commitment, error) {
 	err := decode(data, c)
 	return c, err
 }
 
-func (c *LengthCommitment) UnmarshalJSON(data []byte) error {
+func (c *G2Commitment) UnmarshalJSON(data []byte) error {
 	var g2Point bn.G2Affine
 	err := json.Unmarshal(data, &g2Point)
 	if err != nil {
 		return err
 	}
-	c.G2Point = &bn254.G2Point{
-		X: g2Point.X,
-		Y: g2Point.Y,
-	}
-
-	return nil
-}
-
-func (c LengthProof) Serialize() ([]byte, error) {
-	return encode(c)
-}
-
-func (c *LengthProof) Deserialize(data []byte) (*LengthProof, error) {
-	err := decode(data, c)
-	return c, err
-}
-
-func (c *LengthProof) UnmarshalJSON(data []byte) error {
-	var g2Point bn.G2Affine
-	err := json.Unmarshal(data, &g2Point)
-	if err != nil {
-		return err
-	}
-	c.G2Point = &bn254.G2Point{
-		X: g2Point.X,
-		Y: g2Point.Y,
-	}
-
+	c.X = g2Point.X
+	c.Y = g2Point.Y
 	return nil
 }
 

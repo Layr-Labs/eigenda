@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -449,11 +450,6 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	s.logger.Debug("isConfirmed", "metadata", metadata, "isConfirmed", isConfirmed)
 	if isConfirmed {
 		confirmationInfo := metadata.ConfirmationInfo
-		commit, err := confirmationInfo.BlobCommitment.Commitment.Serialize()
-		if err != nil {
-			return nil, err
-		}
-
 		dataLength := uint32(confirmationInfo.BlobCommitment.Length)
 		quorumInfos := confirmationInfo.BlobQuorumInfos
 		slices.SortStableFunc[[]*core.BlobQuorumInfo](quorumInfos, func(a, b *core.BlobQuorumInfo) int {
@@ -479,7 +475,10 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 			Status: getResponseStatus(metadata.BlobStatus),
 			Info: &pb.BlobInfo{
 				BlobHeader: &pb.BlobHeader{
-					Commitment:       commit,
+					Commitment: &commonpb.G1Commitment{
+						X: confirmationInfo.BlobCommitment.Commitment.X.Marshal(),
+						Y: confirmationInfo.BlobCommitment.Commitment.Y.Marshal(),
+					},
 					DataLength:       dataLength,
 					BlobQuorumParams: blobQuorumParams,
 				},
