@@ -84,7 +84,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 			end = (i + 1) * size
 		}
 		//fmt.Printf("worker %v start %v end %v. size %v\n", i, start, end, end - start)
-		//todo: handle error?
+
 		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, results)
 	}
 
@@ -113,7 +113,6 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		return nil, err
 	}
 
-	//todo: how to handle?
 	defer func() {
 		if err := g1f.Close(); err != nil {
 			log.Printf("g1 close error %v\n", err)
@@ -225,7 +224,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		log.Println("ReadG2Points.ERR.0", err)
 		return nil, err
 	}
-	//todo: resolve panic
+
 	defer func() {
 		if err := g1f.Close(); err != nil {
 			log.Printf("g2 close error %v\n", err)
