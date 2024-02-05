@@ -54,10 +54,7 @@ func (f *Frame) Verify(ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, 
 	// [s^n - x^n]_2
 	var xnMinusYn bls.G2Point
 
-	
-	//bls.SubG2(&xnMinusYn, &ks.Srs.G2[len(f.Coeffs)], &xn2)
 	bls.SubG2(&xnMinusYn, g2Atn, &xn2)
-	
 
 	// [interpolation_polynomial(s)]_1
 	is1 := bls.LinCombG1(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs)

@@ -19,14 +19,13 @@ func TestBatchEquivalence(t *testing.T) {
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
 
+	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+	require.Nil(t, err)
+
 	numBlob := 5
 	commitPairs := make([]kzgRs.CommitmentPair, numBlob)
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
-
-		commit, g2commit, _, _, _, err := enc.Encode(inputFr)
-		require.Nil(t, err)
-
 		commitPairs[z] = kzgRs.CommitmentPair{
 			Commitment:       *commit,
 			LengthCommitment: *g2commit,
@@ -35,14 +34,9 @@ func TestBatchEquivalence(t *testing.T) {
 
 	assert.True(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence test failed\n")
 
+	var modifiedCommit bn254.G1Point
+	bn254.AddG1(&modifiedCommit, commit, commit)
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
-
-		commit, g2commit, _, _, _, err := enc.Encode(inputFr)
-		require.Nil(t, err)
-
-		var modifiedCommit bn254.G1Point
-		bn254.AddG1(&modifiedCommit, commit, commit)
 		commitPairs[z] = kzgRs.CommitmentPair{
 			Commitment:       modifiedCommit,
 			LengthCommitment: *g2commit,
@@ -52,11 +46,6 @@ func TestBatchEquivalence(t *testing.T) {
 	assert.False(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence negative test failed\n")
 
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
-
-		commit, g2commit, _, _, _, err := enc.Encode(inputFr)
-		require.Nil(t, err)
-
 		commitPairs[z] = kzgRs.CommitmentPair{
 			Commitment:       *commit,
 			LengthCommitment: *g2commit,

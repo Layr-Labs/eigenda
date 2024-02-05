@@ -77,7 +77,6 @@ func (v *KzgEncoderGroup) VerifyCommit(lengthCommit *wbls.G2Point, lowDegreeProo
 	if err != nil {
 		return err
 	}
-	//fmt.Printf("claimed length is %v the challeng point is %v\n", length, string(g1Challenge.MarshalText()))
 
 	if !VerifyLowDegreeProof(lengthCommit, lowDegreeProof, &g1Challenge) {
 		return errors.New("low degree proof fails")
