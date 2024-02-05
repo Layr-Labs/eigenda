@@ -11,15 +11,36 @@ import (
 
 	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
 	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
 func main() {
 	// TestKzgRs()
-	err := kzg.WriteGeneratorPoints(30000)
-	if err != nil {
-		log.Println("WriteGeneratorPoints failed:", err)
+	//err := kzg.WriteGeneratorPoints(30000)
+	//if err != nil {
+	//	log.Println("WriteGeneratorPoints failed:", err)
+	//}
+	readpoints()
+}
+
+func readpoints() {
+	kzgConfig := &kzgRs.KzgConfig{
+		G1Path:          "../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../inabox/resources/kzg/g2.point",
+		CacheDir:        "SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
+
+	// create encoding object
+	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
+	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
+	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
+		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].MarshalText()))
+	}
+	if kzgGroup.Srs.G1[0].X == bls.GenG1.X && kzgGroup.Srs.G1[0].Y == bls.GenG1.Y {
+		fmt.Println("start with gen")
 	}
 }
 
@@ -36,15 +57,16 @@ func TestKzgRs() {
 	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
 
 	kzgConfig := &kzgRs.KzgConfig{
-		G1Path:    "g1.point",
-		G2Path:    "g2.point",
-		CacheDir:  "SRSTables",
-		SRSOrder:  3000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "g1.point",
+		G2Path:          "g2.point",
+		CacheDir:        "SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.EncodingParams{NumChunks: 200, ChunkLen: 180}
 	enc, _ := kzgGroup.NewKzgEncoder(params)
@@ -85,7 +107,12 @@ func TestKzgRs() {
 
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
-		ok := f.Verify(enc.Ks, commit, &lc)
+
+		g2Atn, err := kzgRs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		if err != nil {
+			log.Fatalf("Load g2 %v failed\n", err)
+		}
+		ok := f.Verify(enc.Ks, commit, &lc, &g2Atn)
 		if !ok {
 			log.Fatalf("Proof %v failed\n", i)
 		}

@@ -16,7 +16,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
@@ -44,7 +44,7 @@ func TestVerify(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
@@ -64,5 +64,7 @@ func TestVerify(t *testing.T) {
 	lc := enc.Fs.ExpandedRootsOfUnity[uint64(0)]
 	require.NotNil(t, lc)
 
-	assert.True(t, frames[0].Verify(enc.Ks, commit, &lc))
+	g2Atn, err := kzgRs.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
+	require.Nil(t, err)
+	assert.True(t, frames[0].Verify(enc.Ks, commit, &lc, &g2Atn))
 }

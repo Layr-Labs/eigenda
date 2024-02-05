@@ -44,14 +44,15 @@ func TestMain(m *testing.M) {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func makeTestEncoder() (core.Encoder, error) {
 	config := kzgEncoder.KzgConfig{
-		G1Path:    "../../inabox/resources/kzg/g1.point.300000",
-		G2Path:    "../../inabox/resources/kzg/g2.point.300000",
-		CacheDir:  "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:  300000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
+		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        300000,
+		SRSNumberToLoad: 300000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config})
+	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
 }
 
 func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
@@ -149,7 +150,6 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	assert.NoError(t, err)
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
-
 
 	var lengthProof, lengthCommitment bn254.G2Point
 	lengthProof.X.A0 = lengthXA0

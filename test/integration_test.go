@@ -76,15 +76,17 @@ func init() {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func mustMakeTestEncoder() core.Encoder {
 	config := kzgEncoder.KzgConfig{
-		G1Path:    "../inabox/resources/kzg/g1.point",
-		G2Path:    "../inabox/resources/kzg/g2.point",
-		CacheDir:  "../inabox/resources/kzg/SRSTables",
-		SRSOrder:  3000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "../inabox/resources/kzg/g1.point",
+		G2Path:          "../inabox/resources/kzg/g2.point",
+		CacheDir:        "../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	encoder, err := encoding.NewEncoder(
 		encoding.EncoderConfig{KzgConfig: config},
+		true,
 	)
 	if err != nil {
 		log.Fatalln("failed to initialize new encoder")

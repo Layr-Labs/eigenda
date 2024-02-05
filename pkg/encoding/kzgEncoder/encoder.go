@@ -1,6 +1,7 @@
 package kzgEncoder
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -20,19 +21,22 @@ import (
 )
 
 type KzgConfig struct {
-	G1Path         string
-	G2Path         string
-	CacheDir       string
-	NumWorker      uint64
-	SRSOrder       uint64 // Order is the total size of SRS
-	Verbose        bool
-	PreloadEncoder bool
+	G1Path          string
+	G2Path          string
+	CacheDir        string
+	NumWorker       uint64
+	SRSOrder        uint64 // Order is the total size of SRS
+	SRSNumberToLoad uint64 // Number of points to be loaded from the begining
+	Verbose         bool
+	PreloadEncoder  bool
 }
 
 type KzgEncoderGroup struct {
 	*KzgConfig
-	Srs *kzg.SRS
-	mu  sync.Mutex
+	Srs          *kzg.SRS
+	G2Trailing   []bls.G2Point
+	mu           sync.Mutex
+	LoadG2Points bool
 
 	Encoders  map[rs.EncodingParams]*KzgEncoder
 	Verifiers map[rs.EncodingParams]*KzgVerifier
@@ -42,7 +46,8 @@ type KzgEncoder struct {
 	*rs.Encoder
 
 	*KzgConfig
-	Srs *kzg.SRS
+	Srs        *kzg.SRS
+	G2Trailing []bls.G2Point
 
 	Fs         *kzg.FFTSettings
 	Ks         *kzg.KZGSettings
@@ -51,17 +56,39 @@ type KzgEncoder struct {
 	FFTPointsT [][]bls.G1Point // transpose of FFTPoints
 }
 
-func NewKzgEncoderGroup(config *KzgConfig) (*KzgEncoderGroup, error) {
+func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup, error) {
+
+	if config.SRSNumberToLoad > config.SRSOrder {
+		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
+	}
+
 	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := utils.ReadG1Points(config.G1Path, config.SRSOrder, config.NumWorker)
+	s1, err := utils.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
 		log.Println("failed to read G1 points", err)
 		return nil, err
 	}
-	s2, err := utils.ReadG2Points(config.G2Path, config.SRSOrder, config.NumWorker)
-	if err != nil {
-		log.Println("failed to read G2 points", err)
-		return nil, err
+
+	s2 := make([]bls.G2Point, 0)
+	g2Trailing := make([]bls.G2Point, 0)
+
+	// PreloadEncoder is by default not used by operator node, PreloadEncoder
+	if loadG2Points {
+		s2, err = utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
+		if err != nil {
+			log.Println("failed to read G2 points", err)
+			return nil, err
+		}
+
+		g2Trailing, err = utils.ReadG2PointSection(
+			config.G2Path,
+			config.SRSOrder-config.SRSNumberToLoad,
+			config.SRSOrder, // last exclusive
+			config.NumWorker,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	srs, err := kzg.NewSrs(s1, s2)
@@ -73,10 +100,12 @@ func NewKzgEncoderGroup(config *KzgConfig) (*KzgEncoderGroup, error) {
 	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
 	encoderGroup := &KzgEncoderGroup{
-		KzgConfig: config,
-		Srs:       srs,
-		Encoders:  make(map[rs.EncodingParams]*KzgEncoder),
-		Verifiers: make(map[rs.EncodingParams]*KzgVerifier),
+		KzgConfig:    config,
+		Srs:          srs,
+		G2Trailing:   g2Trailing,
+		Encoders:     make(map[rs.EncodingParams]*KzgEncoder),
+		Verifiers:    make(map[rs.EncodingParams]*KzgVerifier),
+		LoadG2Points: loadG2Points,
 	}
 
 	if config.PreloadEncoder {
@@ -95,6 +124,33 @@ func NewKzgEncoderGroup(config *KzgConfig) (*KzgEncoderGroup, error) {
 
 	return encoderGroup, nil
 
+}
+
+// Read the n-th G1 point from SRS.
+func ReadG1Point(n uint64, g *KzgConfig) (bls.G1Point, error) {
+	if n > g.SRSOrder {
+		return bls.G1Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+	}
+
+	g1point, err := utils.ReadG1PointSection(g.G1Path, n, n+1, 1)
+	if err != nil {
+		return bls.G1Point{}, err
+	}
+
+	return g1point[0], nil
+}
+
+// Read the n-th G2 point from SRS.
+func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
+	if n > g.SRSOrder {
+		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+	}
+
+	g2point, err := utils.ReadG2PointSection(g.G2Path, n, n+1, 1)
+	if err != nil {
+		return bls.G2Point{}, err
+	}
+	return g2point[0], nil
 }
 
 func (g *KzgEncoderGroup) PreloadAllEncoders() error {
@@ -196,6 +252,7 @@ func (g *KzgEncoderGroup) newKzgEncoder(params rs.EncodingParams) (*KzgEncoder, 
 		Encoder:    encoder,
 		KzgConfig:  g.KzgConfig,
 		Srs:        g.Srs,
+		G2Trailing: g.G2Trailing,
 		Fs:         fs,
 		Ks:         ks,
 		SFs:        sfs,
@@ -218,6 +275,10 @@ func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.
 		return nil, nil, nil, nil, nil, err
 	}
 
+	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
+		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
+	}
+
 	// compute commit for the full poly
 	commit := g.Commit(poly.Coeffs)
 	lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
@@ -235,10 +296,11 @@ func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.
 		log.Println("low degree verification info")
 	}
 
-	shiftedSecret := g.Srs.G2[g.SRSOrder-polyDegreePlus1:]
+	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyDegreePlus1:]
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
 	lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
+
 	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
 	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
 	//if !ok {
@@ -291,8 +353,8 @@ func (g *KzgEncoder) Commit(polyFr []bls.Fr) bls.G1Point {
 // proof = commit(shiftedPoly) on G1
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLowDegreeProof(lengthCommit *bls.G2Point, proof *bls.G2Point, claimedDegree uint64, SRSOrder uint64, srsG1 []bls.G1Point) bool {
-	return bls.PairingsVerify(&srsG1[SRSOrder-1-claimedDegree], lengthCommit, &bls.GenG1, proof)
+func VerifyLowDegreeProof(lengthCommit *bls.G2Point, proof *bls.G2Point, g1Challenge *bls.G1Point) bool {
+	return bls.PairingsVerify(g1Challenge, lengthCommit, &bls.GenG1, proof)
 }
 
 // get Fiat-Shamir challenge

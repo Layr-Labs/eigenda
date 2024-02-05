@@ -113,7 +113,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
 
 	// Make validator
-	enc, err := encoding.NewEncoder(config.EncoderConfig)
+	enc, err := encoding.NewEncoder(config.EncoderConfig, false)
 	if err != nil {
 		return nil, err
 	}
