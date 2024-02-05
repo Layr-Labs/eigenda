@@ -28,9 +28,9 @@ func TestLengthProof(t *testing.T) {
 		require.Nil(t, err)
 
 		length := len(inputFr)
-		assert.True(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)) == nil, "low degree verification failed\n")
+		assert.NoError(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
 
 		length = len(inputFr) - 10
-		assert.False(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)) == nil, "low degree verification failed\n")
+		assert.Error(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
 	}
 }

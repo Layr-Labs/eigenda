@@ -48,7 +48,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.Uint64Flag{
 			Name:     SRSLoadingNumberFlagName,
-			Usage:    "Number of the SRS to load into memory",
+			Usage:    "Number of SRS points to load into memory",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_LOAD"),
 		},

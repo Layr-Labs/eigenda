@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
@@ -71,12 +70,11 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 
 	s1Outs := make([]bls.G1Point, n)
 
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
-
 	start := uint64(0)
 	end := uint64(0)
 	size := n / numWorker
+
+	results := make(chan error, numWorker)
 
 	for i := uint64(0); i < numWorker; i++ {
 		start = i * size
@@ -88,9 +86,15 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		}
 		//fmt.Printf("worker %v start %v end %v. size %v\n", i, start, end, end - start)
 		//todo: handle error?
-		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, &wg)
+		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, results)
 	}
-	wg.Wait()
+
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// measure parsing time
 	t = time.Now()
@@ -144,12 +148,11 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 
 	s1Outs := make([]bls.G1Point, n)
 
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
-
 	start := uint64(0)
 	end := uint64(0)
 	size := n / numWorker
+
+	results := make(chan error, numWorker)
 
 	for i := uint64(0); i < numWorker; i++ {
 		start = i * size
@@ -159,10 +162,16 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		} else {
 			end = (i + 1) * size
 		}
-		//todo: handle error?
-		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, &wg)
+
+		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, results)
 	}
-	wg.Wait()
+
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// measure parsing time
 	t = time.Now()
@@ -177,16 +186,17 @@ func readG1Worker(
 	start uint64, // in element, not in byte
 	end uint64,
 	step uint64,
-	wg *sync.WaitGroup,
+	results chan<- error,
 ) {
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
 		err := outs[i].UnmarshalText(g1[:])
 		if err != nil {
+			results <- err
 			panic(err)
 		}
 	}
-	wg.Done()
+	results <- nil
 }
 
 func readG2Worker(
@@ -195,16 +205,18 @@ func readG2Worker(
 	start uint64, // in element, not in byte
 	end uint64,
 	step uint64,
-	wg *sync.WaitGroup,
+	results chan<- error,
 ) {
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
 		err := outs[i].UnmarshalText(g1[:])
 		if err != nil {
+			results <- err
 			log.Println("Unmarshalling error:", err)
+			panic(err)
 		}
 	}
-	wg.Done()
+	results <- nil
 }
 
 func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, error) {
@@ -242,8 +254,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 
 	s2Outs := make([]bls.G2Point, n)
 
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
+	results := make(chan error, numWorker)
 
 	start := uint64(0)
 	end := uint64(0)
@@ -256,11 +267,16 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		} else {
 			end = (i + 1) * size
 		}
-		//todo: handle error?
 
-		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, &wg)
+		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, results)
 	}
-	wg.Wait()
+
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// measure parsing time
 	t = time.Now()
@@ -314,8 +330,7 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 
 	s2Outs := make([]bls.G2Point, n)
 
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
+	results := make(chan error, numWorker)
 
 	start := uint64(0)
 	end := uint64(0)
@@ -330,9 +345,14 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 			end = (i + 1) * size
 		}
 		//todo: handle error?
-		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, &wg)
+		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, results)
 	}
-	wg.Wait()
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// measure parsing time
 	t = time.Now()

@@ -32,7 +32,7 @@ func TestBatchEquivalence(t *testing.T) {
 		}
 	}
 
-	assert.True(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence test failed\n")
+	assert.Error(t, group.BatchVerifyCommitEquivalence(commitPairs), "batch equivalence negative test failed\n")
 
 	var modifiedCommit bn254.G1Point
 	bn254.AddG1(&modifiedCommit, commit, commit)
@@ -54,5 +54,5 @@ func TestBatchEquivalence(t *testing.T) {
 
 	bn254.AddG1(&commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment)
 
-	assert.False(t, group.BatchVerifyCommitEquivalence(commitPairs) == nil, "batch equivalence negative test failed in outer loop\n")
+	assert.Error(t, group.BatchVerifyCommitEquivalence(commitPairs), "batch equivalence negative test failed in outer loo\n")
 }
