@@ -43,10 +43,9 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		return nil, err
 	}
 
-	//todo: resolve panic
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			panic(err)
+			log.Printf("G1 close error %v\n", err)
 		}
 	}()
 
@@ -117,7 +116,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	//todo: how to handle?
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			panic(err)
+			log.Printf("g1 close error %v\n", err)
 		}
 	}()
 
@@ -229,7 +228,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 	//todo: resolve panic
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			panic(err)
+			log.Printf("g2 close error", err)
 		}
 	}()
 
@@ -296,10 +295,9 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		return nil, err
 	}
 
-	//todo: how to handle?
 	defer func() {
 		if err := g2f.Close(); err != nil {
-			panic(err)
+			log.Printf("error %v\n", err)
 		}
 	}()
 
