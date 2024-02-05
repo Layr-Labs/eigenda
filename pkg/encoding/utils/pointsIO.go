@@ -228,7 +228,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 	//todo: resolve panic
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			log.Printf("g2 close error", err)
+			log.Printf("g2 close error %v\n", err)
 		}
 	}()
 
