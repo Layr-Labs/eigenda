@@ -173,8 +173,8 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	}))
 	defer timer.ObserveDuration()
 
-	if in.GetQuorumId() > 255 {
-		return nil, fmt.Errorf("invalid request: quorum ID must be in range [0, 255], but found %d", in.GetQuorumId())
+	if in.GetQuorumId() > core.MaxQuorumID {
+		return nil, fmt.Errorf("invalid request: quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, in.GetQuorumId())
 	}
 
 	var batchHeaderHash [32]byte

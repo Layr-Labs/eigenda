@@ -47,7 +47,7 @@ message RetrieveChunksRequest {
 	uint32 blob_index = 2;
 	// Which quorum of the blob to retrieve for (note: a blob can have multiple
 	// quorums and the chunks for different quorums at a Node can be different).
-	// The ID must be in range [0, 255].
+	// The ID must be in range [0, 254].
 	uint32 quorum_id = 3;
 }
 
@@ -108,7 +108,7 @@ message Bundle {
 message BlobHeader {
 	// The KZG commitment to the polynomial representing the blob.
 	bytes commitment = 1;
-  // The KZG commitment to the polynomial representing the blob on G2, it is uesd 
+  // The KZG commitment to the polynomial representing the blob on G2, it is uesd
   // for proving the degree of the polynomial
   bytes length_commitment = 2;
 	// The low degree proof. It's the KZG commitment to the polynomial shifted to
