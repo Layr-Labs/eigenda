@@ -24,7 +24,7 @@ message ChurnRequest {
 	bytes operator_to_register_pubkey_g1 = 2;
 	bytes operator_to_register_pubkey_g2 = 3;
 	// The operator's BLS signature signed on the keccak256 hash of
-	// concat("ChurnRequest", g1, g2, salt).
+	// concat("ChurnRequest", operator address, g1, g2, salt).
 	bytes operator_request_signature = 4;
 	// The salt used as part of the message to sign on for operator_request_signature.
 	bytes salt = 5;
