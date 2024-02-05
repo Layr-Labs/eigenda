@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
@@ -501,15 +502,23 @@ func TestDispersalAndRetrieval(t *testing.T) {
 			QuorumId:        uint32(0),
 		})
 		assert.NoError(t, err)
-		actualCommitment, err := new(core.Commitment).Deserialize(headerReply.GetBlobHeader().GetCommitment())
-		assert.NoError(t, err)
-		actualLengthCommitment, err := new(core.LengthCommitment).Deserialize(headerReply.GetBlobHeader().GetLengthCommitment())
-		assert.NoError(t, err)
-		actualLengthProof, err := new(core.LengthProof).Deserialize(headerReply.GetBlobHeader().GetLengthProof())
-		assert.NoError(t, err)
+		actualCommitment := &core.G1Commitment{
+			X: *new(fp.Element).SetBytes(headerReply.GetBlobHeader().GetCommitment().GetX()),
+			Y: *new(fp.Element).SetBytes(headerReply.GetBlobHeader().GetCommitment().GetY()),
+		}
+		var actualLengthCommitment, actualLengthProof core.G2Commitment
+		actualLengthCommitment.X.A0.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetXA0())
+		actualLengthCommitment.X.A1.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetXA1())
+		actualLengthCommitment.Y.A0.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetYA0())
+		actualLengthCommitment.Y.A1.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetYA1())
+		actualLengthProof.X.A0.SetBytes(headerReply.GetBlobHeader().GetLengthProof().GetXA0())
+		actualLengthProof.X.A1.SetBytes(headerReply.GetBlobHeader().GetLengthProof().GetXA1())
+		actualLengthProof.Y.A0.SetBytes(headerReply.GetBlobHeader().GetLengthProof().GetYA0())
+		actualLengthProof.Y.A1.SetBytes(headerReply.GetBlobHeader().GetLengthProof().GetYA1())
+
 		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.Commitment, actualCommitment)
-		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthCommitment, actualLengthCommitment)
-		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthProof, actualLengthProof)
+		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthCommitment, &actualLengthCommitment)
+		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthProof, &actualLengthProof)
 		assert.Equal(t, uint32(metadata.ConfirmationInfo.BlobCommitment.Length), headerReply.GetBlobHeader().GetLength())
 		assert.Len(t, headerReply.GetBlobHeader().GetQuorumHeaders(), 1)
 		assert.Equal(t, uint32(0), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumId())

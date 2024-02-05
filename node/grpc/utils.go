@@ -8,6 +8,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
 	"google.golang.org/protobuf/proto"
@@ -57,18 +58,24 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 
 // Constructs a core.BlobHeader from a proto of pb.BlobHeader.
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
-	commitment, err := new(core.Commitment).Deserialize(h.GetCommitment())
-	if err != nil {
-		return nil, err
+	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
+	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
+	commitment := &core.G1Commitment{
+		X: *commitX,
+		Y: *commitY,
 	}
-	lengthCommitment, err := new(core.LengthCommitment).Deserialize(h.GetLengthCommitment())
-	if err != nil {
-		return nil, err
+	var lengthCommitment, lengthProof core.G2Commitment
+	if h.GetLengthCommitment() != nil {
+		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
+		lengthCommitment.X.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA1())
+		lengthCommitment.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA0())
+		lengthCommitment.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA1())
 	}
-
-	lenProof, err := new(core.LengthProof).Deserialize(h.GetLengthProof())
-	if err != nil {
-		return nil, err
+	if h.GetLengthProof() != nil {
+		lengthProof.X.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA0())
+		lengthProof.X.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA1())
+		lengthProof.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA0())
+		lengthProof.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA1())
 	}
 
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))
@@ -87,8 +94,8 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	return &core.BlobHeader{
 		BlobCommitments: core.BlobCommitments{
 			Commitment:       commitment,
-			LengthCommitment: lengthCommitment,
-			LengthProof:      lenProof,
+			LengthCommitment: &lengthCommitment,
+			LengthProof:      &lengthProof,
 			Length:           uint(h.GetLength()),
 		},
 		QuorumInfos: quorumHeaders,

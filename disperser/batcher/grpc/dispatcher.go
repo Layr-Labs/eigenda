@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -127,19 +128,22 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchH
 }
 
 func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
-	commitData, err := blob.BlobHeader.Commitment.Serialize()
-	if err != nil {
-		return nil, err
+	commitData := &commonpb.G1Commitment{
+		X: blob.BlobHeader.Commitment.X.Marshal(),
+		Y: blob.BlobHeader.Commitment.Y.Marshal(),
 	}
-
-	lengthCommitData, err := blob.BlobHeader.LengthCommitment.Serialize()
-	if err != nil {
-		return nil, err
+	var lengthCommitData, lengthProofData node.G2Commitment
+	if blob.BlobHeader.LengthCommitment != nil {
+		lengthCommitData.XA0 = blob.BlobHeader.LengthCommitment.X.A0.Marshal()
+		lengthCommitData.XA1 = blob.BlobHeader.LengthCommitment.X.A1.Marshal()
+		lengthCommitData.YA0 = blob.BlobHeader.LengthCommitment.Y.A0.Marshal()
+		lengthCommitData.YA1 = blob.BlobHeader.LengthCommitment.Y.A1.Marshal()
 	}
-
-	lengthProofData, err := blob.BlobHeader.LengthProof.Serialize()
-	if err != nil {
-		return nil, err
+	if blob.BlobHeader.LengthProof != nil {
+		lengthProofData.XA0 = blob.BlobHeader.LengthProof.X.A0.Marshal()
+		lengthProofData.XA1 = blob.BlobHeader.LengthProof.X.A1.Marshal()
+		lengthProofData.YA0 = blob.BlobHeader.LengthProof.Y.A0.Marshal()
+		lengthProofData.YA1 = blob.BlobHeader.LengthProof.Y.A1.Marshal()
 	}
 
 	quorumHeaders := make([]*node.BlobQuorumInfo, len(blob.BlobHeader.QuorumInfos))
@@ -170,8 +174,8 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 	return &node.Blob{
 		Header: &node.BlobHeader{
 			Commitment:       commitData,
-			LengthCommitment: lengthCommitData,
-			LengthProof:      lengthProofData,
+			LengthCommitment: &lengthCommitData,
+			LengthProof:      &lengthProofData,
 			Length:           uint32(blob.BlobHeader.Length),
 			QuorumHeaders:    quorumHeaders,
 		},
