@@ -44,8 +44,8 @@ func makeTestEncoder() (core.Encoder, error) {
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
+		SRSOrder:        2048,
+		SRSNumberToLoad: 2048,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
@@ -192,7 +192,7 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 func TestCoreLibrary(t *testing.T) {
 
 	numBlob := 1 // must be greater than 0
-	blobLengths := []int{1, 64, 1000}
+	blobLengths := []int{1, 64, 1000, 2000}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
 	securityParams := []*core.SecurityParam{

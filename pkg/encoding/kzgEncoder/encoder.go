@@ -205,7 +205,7 @@ func (g *KzgEncoderGroup) NewKzgEncoder(params rs.EncodingParams) (*KzgEncoder, 
 func (g *KzgEncoderGroup) newKzgEncoder(params rs.EncodingParams) (*KzgEncoder, error) {
 
 	// Check that the parameters are valid with respect to the SRS.
-	if params.ChunkLen*params.NumChunks >= g.SRSOrder {
+	if params.ChunkLen*params.NumChunks > g.SRSOrder {
 		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLen, params.NumChunks, g.SRSOrder)
 	}
 
