@@ -31,7 +31,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:     G2PathFlagName,
-			Usage:    "Path to G2 SRS",
+			Usage:    "Path to G2 SRS. Either this flag or G2_POWER_OF_2_PATH needs to be specified. If both are specified, DA node uses G2_POWER_OF_2_PATH, Disperser and Encoder use the this flag",
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_PATH"),
 		},
@@ -80,7 +80,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:     G2PowerOf2PathFlagName,
-			Usage:    "Path to G2 SRS points that are on power of 2",
+			Usage:    "Path to G2 SRS points that are on power of 2. Either this flag or G2_PATH needs to be specified. If both are specified, DA node uses this flag, Disperser and Encoder use the G2_PATH flag",
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_POWER_OF_2_PATH"),
 		},

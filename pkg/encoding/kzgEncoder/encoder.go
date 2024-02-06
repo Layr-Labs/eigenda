@@ -167,9 +167,22 @@ func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
 // Read g2 points from power of 2 file
 func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bls.G2Point, error) {
 
-	power := uint64(math.Pow(2, float64(exponent)))
-	if power > g.SRSOrder {
-		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", power, g.SRSOrder)
+	// the powerOf2 file, only [tau^exp] are stored.
+	// exponent    0,    1,       2,    , ..
+	// actual pow [tau],[tau^2],[tau^4],.. (stored in the file)
+	// In our convention SRSOrder contains the total number of series of g1, g2 starting with generator
+	// i.e. [1] [tau] [tau^2]..
+	// So the actual power of tau is SRSOrder - 1
+	// The mainnet SRS, the max power is 2^28-1, so the last power in powerOf2 file is [tau^(2^27)]
+	// For test case of 3000 SRS, the max power is 2999, so last power in powerOf2 file is [tau^2048]
+	// if a actual SRS order is 15, the file will contain four symbols (1,2,4,8) with indices [0,1,2,3]
+	// if a actual SRS order is 16, the file will contain five symbols (1,2,4,8,16) with indices [0,1,2,3,4]
+
+	actualPowerOfTau := g.SRSOrder - 1
+	largestPowerofSRS := uint64(math.Log2(float64(actualPowerOfTau)))
+	if exponent > largestPowerofSRS {
+		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
+			uint64(math.Pow(2, float64(exponent))), largestPowerofSRS)
 	}
 
 	if len(g.G2PowerOf2Path) == 0 {
