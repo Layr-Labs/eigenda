@@ -316,6 +316,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
+  v.NODE_G2_PATH = ""
 	return v
 
 }
