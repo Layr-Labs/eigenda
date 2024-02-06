@@ -23,6 +23,8 @@ import (
 type KzgConfig struct {
 	G1Path          string
 	G2Path          string
+	G1PowerOf2Path  string
+	G2PowerOf2Path  string
 	CacheDir        string
 	NumWorker       uint64
 	SRSOrder        uint64 // Order is the total size of SRS
@@ -74,6 +76,10 @@ func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup,
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if loadG2Points {
+		if len(config.G2Path) == 0 {
+			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
+		}
+
 		s2, err = utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
@@ -88,6 +94,11 @@ func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup,
 		)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		// todo, there are better ways to handle it
+		if len(config.G2PowerOf2Path) == 0 {
+			return nil, fmt.Errorf("G2PowerOf2Path is empty. However, object needs to load G2Points")
 		}
 	}
 
@@ -147,6 +158,38 @@ func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
 	}
 
 	g2point, err := utils.ReadG2PointSection(g.G2Path, n, n+1, 1)
+	if err != nil {
+		return bls.G2Point{}, err
+	}
+	return g2point[0], nil
+}
+
+// Read g2 points from power of 2 file
+func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bls.G2Point, error) {
+
+	// the powerOf2 file, only [tau^exp] are stored.
+	// exponent    0,    1,       2,    , ..
+	// actual pow [tau],[tau^2],[tau^4],.. (stored in the file)
+	// In our convention SRSOrder contains the total number of series of g1, g2 starting with generator
+	// i.e. [1] [tau] [tau^2]..
+	// So the actual power of tau is SRSOrder - 1
+	// The mainnet SRS, the max power is 2^28-1, so the last power in powerOf2 file is [tau^(2^27)]
+	// For test case of 3000 SRS, the max power is 2999, so last power in powerOf2 file is [tau^2048]
+	// if a actual SRS order is 15, the file will contain four symbols (1,2,4,8) with indices [0,1,2,3]
+	// if a actual SRS order is 16, the file will contain five symbols (1,2,4,8,16) with indices [0,1,2,3,4]
+
+	actualPowerOfTau := g.SRSOrder - 1
+	largestPowerofSRS := uint64(math.Log2(float64(actualPowerOfTau)))
+	if exponent > largestPowerofSRS {
+		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
+			uint64(math.Pow(2, float64(exponent))), largestPowerofSRS)
+	}
+
+	if len(g.G2PowerOf2Path) == 0 {
+		return bls.G2Point{}, fmt.Errorf("G2PathPowerOf2 path is empty")
+	}
+
+	g2point, err := utils.ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
 	if err != nil {
 		return bls.G2Point{}, err
 	}

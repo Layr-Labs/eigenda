@@ -18,6 +18,7 @@ const (
 	PreloadEncoderFlagName    = "kzg.preload-encoder"
 	CacheEncodedBlobsFlagName = "cache-encoded-blobs"
 	SRSLoadingNumberFlagName  = "kzg.srs-load"
+	G2PowerOf2PathFlagName    = "kzg.g2-power-of-2-path"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -30,8 +31,8 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:     G2PathFlagName,
-			Usage:    "Path to G2 SRS",
-			Required: true,
+			Usage:    "Path to G2 SRS. Either this flag or G2_POWER_OF_2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
+			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_PATH"),
 		},
 		cli.StringFlag{
@@ -77,6 +78,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRELOAD_ENCODER"),
 		},
+		cli.StringFlag{
+			Name:     G2PowerOf2PathFlagName,
+			Usage:    "Path to G2 SRS points that are on power of 2. Either this flag or G2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_POWER_OF_2_PATH"),
+		},
 	}
 }
 
@@ -90,6 +97,8 @@ func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
 	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
+	cfg.G2PowerOf2Path = ctx.GlobalString(G2PowerOf2PathFlagName)
+
 	return EncoderConfig{
 		KzgConfig:         cfg,
 		CacheEncodedBlobs: ctx.GlobalBoolT(CacheEncodedBlobsFlagName),

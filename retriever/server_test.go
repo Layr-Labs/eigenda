@@ -34,6 +34,7 @@ func makeTestEncoder() (core.Encoder, error) {
 	config := &kzgEncoder.KzgConfig{
 		G1Path:          "../inabox/resources/kzg/g1.point",
 		G2Path:          "../inabox/resources/kzg/g2.point",
+		G2PowerOf2Path:  "../inabox/resources/kzg/g2.point.powerOf2",
 		CacheDir:        "../inabox/resources/kzg/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,

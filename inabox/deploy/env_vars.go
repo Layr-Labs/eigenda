@@ -264,6 +264,8 @@ type OperatorVars struct {
 
 	NODE_G2_PATH string
 
+	NODE_G2_POWER_OF_2_PATH string
+
 	NODE_CACHE_PATH string
 
 	NODE_SRS_ORDER string
@@ -324,6 +326,8 @@ type RetrieverVars struct {
 	RETRIEVER_G1_PATH string
 
 	RETRIEVER_G2_PATH string
+
+	RETRIEVER_G2_POWER_OF_2_PATH string
 
 	RETRIEVER_CACHE_PATH string
 
