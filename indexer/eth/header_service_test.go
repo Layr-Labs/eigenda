@@ -28,7 +28,7 @@ func TestHeaderService_PullNewHeaders(t *testing.T) {
 
 	pullNewHeaders := func(
 		input indexer.Header,
-		expeced []indexer.Header,
+		expected []indexer.Header,
 		expecIsHead bool,
 		expecErr error,
 		prepare func() indexer.HeaderService) func(t *testing.T) {
@@ -42,9 +42,9 @@ func TestHeaderService_PullNewHeaders(t *testing.T) {
 			}
 			require.Nil(t, err, "Error should be nil")
 			require.NotNil(t, got, "Got should not be nil")
-			assert.Equal(t, len(expeced), len(got), "Length of expected and got should be equal")
-			assert.Equal(t, expeced[0].Number, got[0].Number, "Number not equal to expected")
-			assert.Equal(t, expeced[0].Finalized, got[0].Finalized, "Finalized not equal to expected")
+			assert.Equal(t, len(expected), len(got), "Length of expected and got should be equal")
+			assert.Equal(t, expected[0].Number, got[0].Number, "Number not equal to expected")
+			assert.Equal(t, expected[0].Finalized, got[0].Finalized, "Finalized not equal to expected")
 			assert.Equal(t, expecIsHead, isHead, "isHead not equal to expected")
 		}
 	}
@@ -184,7 +184,7 @@ func TestHeaderService_PullLatestHeader(t *testing.T) {
 
 	pullLatestHeader := func(
 		input bool,
-		expeced indexer.Header,
+		expected indexer.Header,
 		expecErr error,
 		prepare func() indexer.HeaderService) func(t *testing.T) {
 		return func(t *testing.T) {
@@ -197,8 +197,8 @@ func TestHeaderService_PullLatestHeader(t *testing.T) {
 			}
 			require.Nil(t, err, "Error should be nil")
 			require.NotNil(t, got, "Got should not be nil")
-			assert.Equal(t, expeced.Number, got.Number, "Number not equal to expected")
-			assert.Equal(t, expeced.Finalized, got.Finalized, "Finalized not equal to expected")
+			assert.Equal(t, expected.Number, got.Number, "Number not equal to expected")
+			assert.Equal(t, expected.Finalized, got.Finalized, "Finalized not equal to expected")
 		}
 	}
 
