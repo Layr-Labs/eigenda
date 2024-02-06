@@ -33,7 +33,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		cli.StringFlag{
 			Name:     G2PathFlagName,
 			Usage:    "Path to G2 SRS",
-			Required: true,
+			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_PATH"),
 		},
 		cli.StringFlag{
