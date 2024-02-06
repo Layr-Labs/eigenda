@@ -44,7 +44,7 @@ var (
 	logger            common.Logger
 	ethClient         common.EthClient
 	rpcClient         common.RPCEthClient
-	mockRollup        *rollupbindings.Contractmockrollup
+	mockRollup        *rollupbindings.ContractMockRollup
 	retrievalClient   clients.RetrievalClient
 	numConfirmations  int = 3
 
@@ -124,7 +124,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).To(BeNil())
 	rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 	Expect(err).To(BeNil())
-	mockRollup, err = rollupbindings.NewContractmockrollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
+	mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
 	Expect(err).To(BeNil())
 	err = setupRetrievalClient(testConfig)
 	Expect(err).To(BeNil())
@@ -158,15 +158,16 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	}
 	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
 		KzgConfig: kzgEncoder.KzgConfig{
-			G1Path:         testConfig.Retriever.RETRIEVER_G1_PATH,
-			G2Path:         testConfig.Retriever.RETRIEVER_G2_PATH,
-			CacheDir:       testConfig.Retriever.RETRIEVER_CACHE_PATH,
-			NumWorker:      1,
-			SRSOrder:       uint64(srsOrder),
-			Verbose:        true,
-			PreloadEncoder: false,
+			G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
+			G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
+			CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
+			NumWorker:       1,
+			SRSOrder:        uint64(srsOrder),
+			SRSNumberToLoad: uint64(srsOrder),
+			Verbose:         true,
+			PreloadEncoder:  false,
 		},
-	})
+	}, false)
 	if err != nil {
 		return err
 	}

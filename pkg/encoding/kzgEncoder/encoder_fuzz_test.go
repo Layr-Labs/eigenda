@@ -13,7 +13,7 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(GETTYSBURG_ADDRESS_BYTES)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+		group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
 		enc, err := group.NewKzgEncoder(params)
@@ -22,7 +22,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		}
 
 		//encode the data
-		_, _, frames, _, err := enc.EncodeBytes(input)
+		_, _, _, frames, _, err := enc.EncodeBytes(input)
 
 		for _, frame := range frames {
 			assert.NotEqual(t, len(frame.Coeffs), 0)

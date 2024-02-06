@@ -235,8 +235,11 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		return err
 	}
 
-	retrievalClient = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
-	return indexer.Index(context.Background())
+	retrievalClient, err = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
+	if err != nil {
+		return err
+	}
+	return indexedChainStateClient.Start(context.Background())
 }
 
 // TODO: This file contains some code that can be refactored and shared across some other tests ex:Integration Test.
@@ -490,19 +493,13 @@ func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IE
 		logger.Printf("failed to deserialize commitment: %s", err)
 		return rollupbindings.IEigenDAServiceManagerBlobHeader{}
 	}
-	type IEigenDAServiceManagerQuorumBlobParam struct {
-		QuorumNumber                 uint8
-		AdversaryThresholdPercentage uint8
-		QuorumThresholdPercentage    uint8
-		QuantizationParameter        uint8
-	}
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
 			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
 			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			QuantizationParameter:        uint8(quorum.GetQuantizationParam()),
+			ChunkLength:                  quorum.GetChunkLength(),
 		}
 	}
 
@@ -582,11 +579,12 @@ func TestEncodeBlob(t *testing.T) {
 
 	// Test Assumes below params set for Encoder
 	kzgConfig := kzgEncoder.KzgConfig{
-		G1Path:    "/data/kzg/g1.point",
-		G2Path:    "/data/kzg/g2.point",
-		CacheDir:  "/data/kzg/SRSTables",
-		SRSOrder:  300000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "/data/kzg/g1.point",
+		G2Path:          "/data/kzg/g2.point",
+		CacheDir:        "/data/kzg/SRSTables",
+		SRSOrder:        300000,
+		SRSNumberToLoad: 300000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	encodingConfig := encoding.EncoderConfig{KzgConfig: kzgConfig}
@@ -601,7 +599,6 @@ func TestEncodeBlob(t *testing.T) {
 
 func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *core.EncodingParams, error) {
 	logger := testSuite.Logger
-	var quantizationFactor uint = 2
 	var adversaryThreshold uint8 = 80
 	var quorumThreshold uint8 = 90
 
@@ -611,45 +608,44 @@ func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *core.EncodingParams
 
 	var quorumID core.QuorumID = 0
 
-	securityParams := []*core.SecurityParam{
-		{
-			QuorumID:           quorumID,
-			AdversaryThreshold: adversaryThreshold,
-		},
+	param := &core.SecurityParam{
+		QuorumID:           quorumID,
+		QuorumThreshold:    quorumThreshold,
+		AdversaryThreshold: adversaryThreshold,
 	}
 
 	testBlob := core.Blob{
 		RequestHeader: core.BlobRequestHeader{
-			SecurityParams: securityParams,
+			SecurityParams: []*core.SecurityParam{param},
 		},
 		Data: data,
 	}
 	// TODO: Refactor this code using indexed chain state by using retrieval client
 	// Issue: https://github.com/Layr-Labs/eigenda-internal/issues/220
-	indexedChainState, _ := coremock.NewChainDataMock(core.OperatorIndex(10))
+	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
 	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
 	if err != nil {
 		logger.Printf("failed to get operator state: %s", err)
 	}
 	coordinator := &core.StdAssignmentCoordinator{}
-	_, info, err := coordinator.GetAssignments(operatorState, quorumID, quantizationFactor)
+
+	blobSize := uint(len(testBlob.Data))
+	blobLength := core.GetBlobLength(uint(blobSize))
+
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, param)
+	if err != nil {
+		logger.Printf("failed to calculate chunk length: %s", err)
+	}
+
+	quorumInfo := &core.BlobQuorumInfo{
+		SecurityParam: *param,
+		ChunkLength:   chunkLength,
+	}
+
+	_, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
 	if err != nil {
 		logger.Printf("failed to get assignments: %s", err)
 	}
-
-	testBlob = core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			SecurityParams: securityParams,
-		},
-		Data: data,
-	}
-
-	blobSize := uint(len(testBlob.Data))
-
-	blobLength := core.GetBlobLength(uint(blobSize))
-
-	chunkLength, _ := coordinator.GetMinimumChunkLength(4, blobLength, 1, quorumThreshold, adversaryThreshold)
-
 	testEncodingParams, _ := core.GetEncodingParams(chunkLength, info.TotalChunks)
 
 	testEncodingParamsProto := &encoder_rpc.EncodingParams{

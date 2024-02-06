@@ -21,10 +21,10 @@ import (
 var (
 	bipMultiplier     = big.NewInt(10000)
 	secondsTillExpiry = 90 * time.Second
-	zeroAddressString = "0x0000000000000000000000000000000000000000"
 )
 
 type ChurnRequest struct {
+	OperatorAddress            gethcommon.Address
 	OperatorToRegisterPubkeyG1 *core.G1Point
 	OperatorToRegisterPubkeyG2 *core.G2Point
 	OperatorRequestSignature   *core.Signature
@@ -47,7 +47,7 @@ type churner struct {
 	mu          sync.Mutex
 	Indexer     thegraph.IndexedChainState
 	Transactor  core.Transactor
-	QuorumCount uint16
+	QuorumCount uint8
 
 	privateKey *ecdsa.PrivateKey
 	logger     common.Logger
@@ -78,14 +78,7 @@ func NewChurner(
 }
 
 func (c *churner) VerifyRequestSignature(ctx context.Context, churnRequest *ChurnRequest) (gethcommon.Address, error) {
-	operatorToRegisterAddress, err := c.Transactor.OperatorIDToAddress(ctx, churnRequest.OperatorToRegisterPubkeyG1.GetOperatorID())
-	if err != nil {
-		return gethcommon.Address{}, err
-	}
-	if operatorToRegisterAddress == gethcommon.HexToAddress(zeroAddressString) {
-		return gethcommon.Address{}, errors.New("operatorToRegisterPubkey is not registered with bls pubkey compendium")
-	}
-
+	operatorToRegisterAddress := churnRequest.OperatorAddress
 	isEqual, err := churnRequest.OperatorToRegisterPubkeyG1.VerifyEquivalence(churnRequest.OperatorToRegisterPubkeyG2)
 	if err != nil {
 		return gethcommon.Address{}, err
@@ -121,7 +114,7 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 		}
 	}
 
-	return c.createChurnResponse(ctx, operatorToRegisterId, operatorToRegisterAddress, churnRequest.QuorumIDs)
+	return c.createChurnResponse(ctx, operatorToRegisterAddress, operatorToRegisterId, churnRequest.QuorumIDs)
 }
 
 func (c *churner) UpdateQuorumCount(ctx context.Context) error {
@@ -142,8 +135,8 @@ func (c *churner) UpdateQuorumCount(ctx context.Context) error {
 
 func (c *churner) createChurnResponse(
 	ctx context.Context,
-	operatorToRegisterId core.OperatorID,
 	operatorToRegisterAddress gethcommon.Address,
+	operatorToRegisterId core.OperatorID,
 	quorumIDs []core.QuorumID,
 ) (*ChurnResponse, error) {
 	currentBlockNumber, err := c.Transactor.GetCurrentBlockNumber(ctx)
@@ -163,7 +156,7 @@ func (c *churner) createChurnResponse(
 		return nil, err
 	}
 
-	signatureWithSaltAndExpiry, err := c.sign(ctx, operatorToRegisterId, operatorsToChurn)
+	signatureWithSaltAndExpiry, err := c.sign(ctx, operatorToRegisterAddress, operatorToRegisterId, operatorsToChurn)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +203,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		churnBIPsOfOperatorStake := big.NewInt(int64(operatorSetParams.ChurnBIPsOfOperatorStake))
 		churnBIPsOfTotalStake := big.NewInt(int64(operatorSetParams.ChurnBIPsOfTotalStake))
 
-		c.logger.Info("lowestStake", "lowestStake", lowestStake.String(), "operatorToRegisterStake", operatorToRegisterStake.String(), "totalStake", totalStake.String())
+		c.logger.Info("lowestStake", "lowestStake", lowestStake.String(), "operatorToRegisterStake", operatorToRegisterStake.String(), "totalStake", totalStake.String(), "operatorToRegisterAddress", operatorToRegisterAddress.Hex())
 
 		// verify the lowest stake against the registering operator's stake
 		// make sure that: lowestStake * churnBIPsOfOperatorStake < operatorToRegisterStake * bipMultiplier
@@ -256,7 +249,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 	return operatorsToChurn, nil
 }
 
-func (c *churner) sign(ctx context.Context, operatorToRegisterId core.OperatorID, operatorsToChurn []core.OperatorToChurn) (*SignatureWithSaltAndExpiry, error) {
+func (c *churner) sign(ctx context.Context, operatorToRegisterAddress gethcommon.Address, operatorToRegisterId core.OperatorID, operatorsToChurn []core.OperatorToChurn) (*SignatureWithSaltAndExpiry, error) {
 	now := time.Now()
 	privateKeyBytes := crypto.FromECDSA(c.privateKey)
 	saltKeccak256 := crypto.Keccak256([]byte("churn"), []byte(now.String()), operatorToRegisterId[:], privateKeyBytes)
@@ -268,7 +261,7 @@ func (c *churner) sign(ctx context.Context, operatorToRegisterId core.OperatorID
 	expiry := big.NewInt(now.Add(secondsTillExpiry).Unix())
 
 	// sign and return signature
-	hashToSign, err := c.Transactor.CalculateOperatorChurnApprovalDigestHash(ctx, operatorToRegisterId, operatorsToChurn, salt, expiry)
+	hashToSign, err := c.Transactor.CalculateOperatorChurnApprovalDigestHash(ctx, operatorToRegisterAddress, operatorToRegisterId, operatorsToChurn, salt, expiry)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +283,7 @@ func CalculateRequestHash(churnRequest *ChurnRequest) [32]byte {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
+		[]byte(churnRequest.OperatorAddress.Hex()),
 		churnRequest.OperatorToRegisterPubkeyG1.Serialize(),
 		churnRequest.OperatorToRegisterPubkeyG2.Serialize(),
 		churnRequest.Salt[:],

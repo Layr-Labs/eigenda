@@ -2,15 +2,18 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	grpcchurner "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -18,8 +21,10 @@ import (
 )
 
 type Operator struct {
+	Address    string
 	Socket     string
 	Timeout    time.Duration
+	PrivKey    *ecdsa.PrivateKey
 	KeyPair    *core.KeyPair
 	OperatorId core.OperatorID
 	QuorumIDs  []core.QuorumID
@@ -35,12 +40,6 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 	logger.Debug("Registered quorum ids", "registeredQuorumIds", registeredQuorumIds)
 	if len(registeredQuorumIds) != 0 {
 		return nil
-	}
-
-	// if the operator is not registered, we may need to register the BLSPublicKey
-	err = transactor.RegisterBLSPublicKey(ctx, operator.KeyPair)
-	if err != nil {
-		return fmt.Errorf("failed to register the nodes bls public key: %w", err)
 	}
 
 	logger.Info("Quorums to register for", "quorums", operator.QuorumIDs)
@@ -72,6 +71,15 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 
 	logger.Info("Should call churner", "shouldCallChurner", shouldCallChurner)
 
+	// Generate salt and expiry
+
+	privateKeyBytes := []byte(operator.KeyPair.PrivKey.String())
+	salt := [32]byte{}
+	copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), operator.QuorumIDs[:], privateKeyBytes))
+
+	// Get the current block number
+	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
+
 	// if we should call the churner, call it
 	if shouldCallChurner {
 		churnReply, err := requestChurnApproval(ctx, operator, churnerUrl, useSecureGrpc, logger)
@@ -79,10 +87,10 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
 
-		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair.PubKey, operator.Socket, operator.QuorumIDs, churnReply)
+		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, operator.PrivKey, salt, expiry, churnReply)
 	} else {
 		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.KeyPair.PubKey, operator.Socket, operator.QuorumIDs)
+		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, operator.PrivKey, salt, expiry)
 	}
 }
 
@@ -139,22 +147,27 @@ func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl st
 	ctx, cancel := context.WithTimeout(ctx, operator.Timeout)
 	defer cancel()
 
-	request := newChurnRequest(operator.KeyPair, operator.QuorumIDs)
+	request := newChurnRequest(operator.Address, operator.KeyPair, operator.QuorumIDs)
 	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 300)
 
 	return gc.Churn(ctx, request, opt)
 }
 
-func newChurnRequest(KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
-	churnRequest := &churner.ChurnRequest{
-		OperatorToRegisterPubkeyG1: KeyPair.PubKey,
-		OperatorToRegisterPubkeyG2: KeyPair.GetPubKeyG2(),
-		QuorumIDs:                  QuorumIDs,
-	}
+func newChurnRequest(address string, KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
+
 	// generate salt
 	privateKeyBytes := []byte(KeyPair.PrivKey.String())
 	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), QuorumIDs[:], privateKeyBytes)
-	copy(churnRequest.Salt[:], salt[:])
+
+	churnRequest := &churner.ChurnRequest{
+		OperatorAddress:            gethcommon.HexToAddress(address),
+		OperatorToRegisterPubkeyG1: KeyPair.PubKey,
+		OperatorToRegisterPubkeyG2: KeyPair.GetPubKeyG2(),
+		OperatorRequestSignature:   &core.Signature{},
+		QuorumIDs:                  QuorumIDs,
+	}
+
+	copy(churnRequest.Salt[:], salt)
 
 	// sign the request
 	churnRequest.OperatorRequestSignature = KeyPair.SignMessage(churner.CalculateRequestHash(churnRequest))
@@ -163,15 +176,15 @@ func newChurnRequest(KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchur
 	churnRequestPb := &grpcchurner.ChurnRequest{
 		OperatorToRegisterPubkeyG1: churnRequest.OperatorToRegisterPubkeyG1.Serialize(),
 		OperatorToRegisterPubkeyG2: churnRequest.OperatorToRegisterPubkeyG2.Serialize(),
+		OperatorRequestSignature:   churnRequest.OperatorRequestSignature.Serialize(),
+		Salt:                       salt[:],
+		OperatorAddress:            address,
 	}
 
 	churnRequestPb.QuorumIds = make([]uint32, len(QuorumIDs))
 	for i, quorumID := range QuorumIDs {
 		churnRequestPb.QuorumIds[i] = uint32(quorumID)
 	}
-
-	churnRequestPb.OperatorRequestSignature = churnRequest.OperatorRequestSignature.Serialize()
-	churnRequestPb.Salt = churnRequest.Salt[:]
 
 	return churnRequestPb
 }

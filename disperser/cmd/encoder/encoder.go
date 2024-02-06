@@ -15,7 +15,7 @@ type EncoderGRPCServer struct {
 
 func NewEncoderGRPCServer(config Config, logger common.Logger) (*EncoderGRPCServer, error) {
 
-	coreEncoder, err := encoding.NewEncoder(config.EncoderConfig)
+	coreEncoder, err := encoding.NewEncoder(config.EncoderConfig, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %w", err)
 	}

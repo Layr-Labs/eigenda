@@ -1,0 +1,65 @@
+{
+  "chainInfo": {
+    "chainId": 5
+  },
+
+  "permissions" : {
+    "owner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "upgrader": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "churner": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "ejector": "0xbCAc81D98ad3b9cAA48db35d20eDe91D2C59a0e1",
+    "batchConfirmer": "0x09983E7E97cF430c1dE8408Ccf67261FC8317EA6",
+    "pauser": "0x0000000000000000000000000000000000000000",
+    "initalPausedStatus": 0
+  },
+
+  "minimumStakes": [
+    0
+  ],
+
+  "strategyWeights": [
+    [
+      {
+        "0_strategy": "0xB613E78E2068d7489bb66419fB1cfa11275d14da",
+        "1_multiplier": 1070136092289993178
+      },
+      {
+        "0_strategy": "0x879944A8cB437a5f8061361f82A6d4EED59070b5", 
+        "1_multiplier": 1071364636818145808
+      },
+      {
+        "0_strategy": "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0",
+        "1_multiplier": 1000000000000000000
+      },
+      {
+        "0_strategy": "0xD89dc4C40d901D4622C203Fb8808e6e7C7fcE164",
+        "1_multiplier": 1003448367695000000
+      },
+      {
+        "0_strategy": "0xa9DC3c93ae59B8d26AF17Ae63c96Be78793537A9", 
+        "1_multiplier": 1042906799399447651
+      },
+      {
+        "0_strategy": "0x98b47798B68b734af53c930495595729E96cdB8E",
+        "1_multiplier": 1003890047865077222
+      },
+      {
+        "0_strategy": "0x5d1E9DC056C906CBfe06205a39B0D965A6Df7C14",
+        "1_multiplier": 1010394246511034973
+      },
+      {
+        "0_strategy": "0x1755d34476BB4DaEd726ee4a81E8132dF00F9b14", 
+        "1_multiplier": 1002859280743792963
+      }
+    ]
+  ],
+
+  "operatorSetParams": [
+    {
+      "0_maxOperatorCount": 200,
+      "1_kickBIPsOfOperatorStake": 11000,
+      "2_kickBIPsOfTotalStake": 50
+    }
+  ]
+
+}

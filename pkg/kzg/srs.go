@@ -24,11 +24,7 @@
 
 package kzg
 
-import (
-	"errors"
-
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
-)
+import bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 
 type SRS struct {
 
@@ -40,9 +36,6 @@ type SRS struct {
 
 func NewSrs(G1 []bls.G1Point, G2 []bls.G2Point) (*SRS, error) {
 
-	if len(G1) != len(G2) {
-		return nil, errors.New("secret list lengths don't match")
-	}
 	return &SRS{
 		G1: G1,
 		G2: G2,

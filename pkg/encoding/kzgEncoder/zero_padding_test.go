@@ -13,7 +13,7 @@ func TestProveZeroPadding(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
@@ -21,7 +21,7 @@ func TestProveZeroPadding(t *testing.T) {
 
 	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
-	_, _, _, _, err = enc.Encode(inputFr)
+	_, _, _, _, _, err = enc.Encode(inputFr)
 	require.Nil(t, err)
 
 	assert.True(t, true, "Proof %v failed\n")

@@ -51,7 +51,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: nightly-293fad73670b7b59ca901c7f2105bf7a29165a90
 
       - name: Install graph cli
         run: |
@@ -83,7 +83,7 @@ jobs:
         run: make build && go test -v ./core/thegraph
 
       - name: Inabox E2E
-        run: make build && cd inabox && make run-e2e-nochurner
+        run: make build && cd inabox && make run-e2e
 
       - name: Save logs
         if: always()

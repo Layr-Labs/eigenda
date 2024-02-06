@@ -1,7 +1,7 @@
 syntax = "proto3";
-
-option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser";
 package disperser;
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser";
 
 // Disperser defines the public APIs for dispersing blobs.
 service Disperser {
@@ -16,8 +16,8 @@ service Disperser {
 	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
 	// 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
 	// 2. The Disperser sends back a BlobAuthHeader message containing information for the client to
-	//    verify and sign. 
-	// 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 
+	//    verify and sign.
+	// 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an
 	//	  AuthenticationData message.
 	// 4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	rpc DisperseBlobAuthenticated(stream AuthenticatedRequest) returns (stream AuthenticatedReply);
@@ -53,13 +53,13 @@ message AuthenticatedReply {
 }
 
 // BlobAuthHeader contains information about the blob for the client to verify and sign.
-// - Once payments are enabled, the BlobAuthHeader the KZG commitment to the blob, which the client 
+// - Once payments are enabled, the BlobAuthHeader the KZG commitment to the blob, which the client
  // will verify and sign. Having the client verify the KZG commitment instead of calculating it avoids
-// the need for the client to have the KZG structured reference string (SRS), which can be large. 
+// the need for the client to have the KZG structured reference string (SRS), which can be large.
 // The signed KZG commitment prevents the disperser from sending a different blob to the DA Nodes
 // than the one the client sent.
 // - In the meantime, the BlobAuthHeader contains a simple challenge parameter is used to prevent
-// replay attacks in the event that a signature is leaked. 
+// replay attacks in the event that a signature is leaked.
 message BlobAuthHeader {
 	uint32 challenge_parameter = 1;
 }
@@ -71,7 +71,7 @@ message AuthenticationData {
 
 message DisperseBlobRequest {
 	// The data to be dispersed.
-	// The size of data must be <= 512KiB.
+	// The size of data must be <= 2MiB.
 	bytes data = 1;
 	// Security parameters allowing clients to customize the safety (via adversary threshold)
 	// and liveness (via quorum threshold).
@@ -128,7 +128,7 @@ message RetrieveBlobReply {
 message SecurityParams {
 	// The ID of the quorum.
 	// The quorum must be already registered on EigenLayer. The ID must be
-	// in range [0, 255].
+	// in range [0, 254].
 	uint32 quorum_id = 1;
 	// The max percentage of stake within the quorum that can be held by or delegated
 	// to adversarial operators.
@@ -189,8 +189,8 @@ message BlobInfo {
 }
 
 message BlobHeader {
-	// KZG commitment to the blob.
-	bytes commitment = 1;
+	// KZG commitment of the blob.
+	common.G1Commitment commitment = 1;
 	// The length of the blob in symbols (each symbol is 31 bytes).
 	uint32 data_length = 2;
 	// The params of the quorums that this blob participates in.

@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@eigenlayer-middleware/interfaces/IServiceManager.sol";
-import "@eigenlayer-middleware/interfaces/IDelayedService.sol";
-import "@eigenlayer-middleware/BLSSignatureChecker.sol";
-import "@eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
+import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
+import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
-interface IEigenDAServiceManager is IServiceManager, IDelayedService {
+interface IEigenDAServiceManager is IServiceManager {
     // EVENTS
     
-    /**b
+    /**
      * @notice Emitted when a Batch is confirmed.
      * @param batchHeaderHash The hash of the batch header
      * @param batchId The ID for the Batch inside of the specified duration (i.e. *not* the globalBatchId)
      */
-    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId, uint96 fee);
+    event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
 
-    event FeePerBytePerTimeSet(uint256 previousValue, uint256 newValue);
-
-    event PaymentManagerSet(address previousAddress, address newAddress);
-
-    event FeeSetterChanged(address previousAddress, address newAddress);
+    /**
+     * @notice Emitted when the batch confirmer is changed.
+     * @param previousAddress The address of the previous batch confirmer
+     * @param newAddress The address of the new batch confirmer
+     */
+    event BatchConfirmerChanged(address previousAddress, address newAddress);
 
     // STRUCTS
 
@@ -29,8 +28,7 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
         uint8 quorumNumber;
         uint8 adversaryThresholdPercentage;
         uint8 quorumThresholdPercentage; 
-        uint8 quantizationParameter; // the quantization parameter used for determining
-                                    // the precision of the amount of data and the stake that nodes have
+        uint32 chunkLength; // the length of the chunks in the quorum
     }
 
     struct BlobHeader {
@@ -84,4 +82,16 @@ interface IEigenDAServiceManager is IServiceManager, IDelayedService {
         BatchHeader calldata batchHeader,
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external;
+
+    /// @notice This function is used for changing the batch confirmer
+    function setBatchConfirmer(address _batchConfirmer) external;
+
+    /// @notice Returns the current batchId
+    function taskNumber() external view returns (uint32);
+
+    /// @notice Returns the block until which operators must serve.
+    function latestServeUntilBlock() external view returns (uint32);
+
+    /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
+    function BLOCK_STALE_MEASURE() external view returns (uint32);
 }

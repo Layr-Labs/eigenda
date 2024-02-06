@@ -13,7 +13,7 @@ func TestUniversalVerify(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
@@ -23,7 +23,7 @@ func TestUniversalVerify(t *testing.T) {
 	for z := 0; z < numBlob; z++ {
 		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
-		commit, _, frames, fIndices, err := enc.Encode(inputFr)
+		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 		require.Nil(t, err)
 
 		// create samples

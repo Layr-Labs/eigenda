@@ -47,11 +47,15 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams core
 		return nil, nil, err
 	}
 
-	commitment, err := new(core.Commitment).Deserialize(reply.GetCommitment().GetCommitment())
+	commitment, err := new(core.G1Commitment).Deserialize(reply.GetCommitment().GetCommitment())
 	if err != nil {
 		return nil, nil, err
 	}
-	lengthProof, err := new(core.Commitment).Deserialize(reply.GetCommitment().GetLengthProof())
+	lengthCommitment, err := new(core.G2Commitment).Deserialize(reply.GetCommitment().GetLengthCommitment())
+	if err != nil {
+		return nil, nil, err
+	}
+	lengthProof, err := new(core.LengthProof).Deserialize(reply.GetCommitment().GetLengthProof())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -64,8 +68,9 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams core
 		chunks[i] = deserialized
 	}
 	return &core.BlobCommitments{
-		Commitment:  commitment,
-		LengthProof: lengthProof,
-		Length:      uint(reply.GetCommitment().GetLength()),
+		Commitment:       commitment,
+		LengthCommitment: lengthCommitment,
+		LengthProof:      lengthProof,
+		Length:           uint(reply.GetCommitment().GetLength()),
 	}, chunks, nil
 }

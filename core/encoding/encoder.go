@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
@@ -26,8 +27,8 @@ type Encoder struct {
 
 var _ core.Encoder = &Encoder{}
 
-func NewEncoder(config EncoderConfig) (*Encoder, error) {
-	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(&config.KzgConfig)
+func NewEncoder(config EncoderConfig, loadG2Points bool) (*Encoder, error) {
+	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(&config.KzgConfig, loadG2Points)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 		return core.BlobCommitments{}, nil, err
 	}
 
-	commit, lowDegreeProof, kzgFrames, _, err := enc.EncodeBytes(data)
+	commit, lowDegreeCommit, lowDegreeProof, kzgFrames, _, err := enc.EncodeBytes(data)
 	if err != nil {
 		return core.BlobCommitments{}, nil, err
 	}
@@ -82,9 +83,10 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 
 	length := uint(len(encoder.ToFrArray(data)))
 	commitments := core.BlobCommitments{
-		Commitment:  &core.Commitment{G1Point: commit},
-		LengthProof: &core.Commitment{G1Point: lowDegreeProof},
-		Length:      length,
+		Commitment:       (*core.G1Commitment)(commit),
+		LengthCommitment: (*core.G2Commitment)(lowDegreeCommit),
+		LengthProof:      (*core.G2Commitment)(lowDegreeProof),
+		Length:           length,
 	}
 
 	if e.Config.CacheEncodedBlobs {
@@ -98,8 +100,7 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 }
 
 func (e *Encoder) VerifyBlobLength(commitments core.BlobCommitments) error {
-
-	return e.EncoderGroup.VerifyCommit(commitments.Commitment.G1Point, commitments.LengthProof.G1Point, uint64(commitments.Length-1))
+	return e.EncoderGroup.VerifyCommit((*bn254.G2Point)(commitments.LengthCommitment), (*bn254.G2Point)(commitments.LengthProof), uint64(commitments.Length))
 
 }
 
@@ -114,7 +115,7 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 
 	for ind := range chunks {
 		err = verifier.VerifyFrame(
-			commitments.Commitment.G1Point,
+			(*bn254.G1Point)(commitments.Commitment),
 			&kzgEncoder.Frame{
 				Proof:  chunks[ind].Proof,
 				Coeffs: chunks[ind].Coeffs,
@@ -129,6 +130,18 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 
 	return nil
 
+}
+
+func (e *Encoder) VerifyCommitEquivalenceBatch(commitments []core.BlobCommitments) error {
+	commitmentsPair := make([]kzgEncoder.CommitmentPair, len(commitments))
+
+	for i, c := range commitments {
+		commitmentsPair[i] = kzgEncoder.CommitmentPair{
+			Commitment:       (bn254.G1Point)(*c.Commitment),
+			LengthCommitment: (bn254.G2Point)(*c.LengthCommitment),
+		}
+	}
+	return e.EncoderGroup.BatchVerifyCommitEquivalence(commitmentsPair)
 }
 
 // convert struct understandable by the crypto library
@@ -146,7 +159,7 @@ func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCor
 		}
 
 		sample := kzgEncoder.Sample{
-			Commitment: *sc.Commitment.G1Point,
+			Commitment: (bn254.G1Point)(*sc.Commitment),
 			Proof:      sc.Chunk.Proof,
 			RowIndex:   sc.BlobIndex,
 			Coeffs:     sc.Chunk.Coeffs,

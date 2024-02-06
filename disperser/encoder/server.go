@@ -94,6 +94,11 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		return nil, err
 	}
 
+	lengthCommitData, err := commits.LengthCommitment.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
 	lengthProofData, err := commits.LengthProof.Serialize()
 	if err != nil {
 		return nil, err
@@ -116,6 +121,7 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	return &pb.EncodeBlobReply{
 		Commitment: &pb.BlobCommitment{
 			Commitment:  commitData,
+			LengthCommitment: lengthCommitData,
 			LengthProof: lengthProofData,
 			Length:      uint32(commits.Length),
 		},

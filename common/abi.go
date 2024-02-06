@@ -9,4 +9,4 @@ import (
 //go:embed abis/EigenDAServiceManager.json
 var ServiceManagerAbi []byte
 
-var BatchConfirmedEventSigHash = crypto.Keccak256Hash([]byte("BatchConfirmed(bytes32,uint32,uint96)"))
+var BatchConfirmedEventSigHash = crypto.Keccak256Hash([]byte("BatchConfirmed(bytes32,uint32)"))

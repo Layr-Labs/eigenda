@@ -176,6 +176,10 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 
 	D := params.ChunkLen
 
+	if D > group.SRSNumberToLoad {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v.", D, group.SRSNumberToLoad)
+	}
+
 	n := len(samples)
 	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
 
@@ -195,7 +199,11 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	lhsG1 := bls.LinCombG1(proofs, randomsFr)
 
 	// lhs g2
-	lhsG2 := &ks.Srs.G2[D]
+	G2atD, err := ReadG2Point(D, group.KzgConfig)
+	if err != nil {
+		return err
+	}
+	lhsG2 := &G2atD
 
 	// rhs g2
 	rhsG2 := &bls.GenG2

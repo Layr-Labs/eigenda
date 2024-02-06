@@ -1,104 +1,88 @@
 {
   "devnet": {
-    "BLSRegistryCoordinatorWithIndices": {
+    "RegistryCoordinator": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSPubkeyRegistry": {
+    "BLSApkRegistry": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSPubkeyCompendium": {
+    "BLSApkRegistry_Operator": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSPubkeyCompendium_Operator": {
+    "RegistryCoordinator_Operator": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSRegistryCoordinatorWithIndices_Operator": {
-      "address": "0x0000000000000000000000000000000000000000",
-      "startBlock": 0
-    },
-    "BLSPubkeyRegistry_QuorumApkUpdates": {
+    "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     }
   },
   "anvil": {
-    "BLSRegistryCoordinatorWithIndices": {
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
+    "RegistryCoordinator": {
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSPubkeyRegistry": {
-      "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+    "BLSApkRegistry": {
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSPubkeyCompendium": {
-      "address": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933",
+    "BLSApkRegistry_Operator": {
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSPubkeyCompendium_Operator": {
-      "address": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933",
+    "RegistryCoordinator_Operator": {
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     },
-    "BLSRegistryCoordinatorWithIndices_Operator": {
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
-      "startBlock": 0
-    },
-    "BLSPubkeyRegistry_QuorumApkUpdates": {
-      "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     }
   },
   "preprod-goerli": {
-    "BLSRegistryCoordinatorWithIndices": {
-      "address": "0x376B46C69bf1eD9e6EF32115c644650517F1265B",
-      "startBlock": 10015410
+    "RegistryCoordinator": {
+      "address": "0x5d1d838C2952cbc7da3ee76E836312e889CabFB9",
+      "startBlock": 10470500
     },
-    "BLSPubkeyRegistry": {
-      "address": "0xB64F362EA5216c17cffE5964710c7C9E824af8aD",
-      "startBlock": 10015410
+    "BLSApkRegistry": {
+      "address": "0xe47b025ed3C54D391c4E0738c6EF050D40dd79b5",
+      "startBlock": 10470500
     },
-    "BLSPubkeyCompendium": {
-      "address": "0xE0de168E81C8f31A3b91cDC1C8eE033f6f1cC012",
-      "startBlock": 10015410
+    "BLSApkRegistry_Operator": {
+      "address": "0xe47b025ed3C54D391c4E0738c6EF050D40dd79b5",
+      "startBlock": 10470500
     },
-    "BLSPubkeyCompendium_Operator": {
-      "address": "0xE0de168E81C8f31A3b91cDC1C8eE033f6f1cC012",
-      "startBlock": 10015410
+    "RegistryCoordinator_Operator": {
+      "address": "0x5d1d838C2952cbc7da3ee76E836312e889CabFB9",
+      "startBlock": 10470500
     },
-    "BLSRegistryCoordinatorWithIndices_Operator": {
-      "address": "0x376B46C69bf1eD9e6EF32115c644650517F1265B",
-      "startBlock": 10015410
-    },
-    "BLSPubkeyRegistry_QuorumApkUpdates": {
-      "address": "0xB64F362EA5216c17cffE5964710c7C9E824af8aD",
-      "startBlock": 10015410
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0xe47b025ed3C54D391c4E0738c6EF050D40dd79b5",
+      "startBlock": 10470500
     }
   },
   "goerli": {
-    "BLSRegistryCoordinatorWithIndices": {
+    "RegistryCoordinator": {
       "address": "0x0b30a3427765f136754368a4500bAca8d2a54C0B",
       "startBlock": 10043972
     },
-    "BLSPubkeyRegistry": {
+    "BLSApkRegistry": {
       "address": "0xD8fCD5c9103962DE37E375EF9dB62cCf39D5BEcA",
       "startBlock": 10043972
     },
-    "BLSPubkeyCompendium": {
+    "BLSApkRegistry_Operator": {
       "address": "0xc81d3963087Fe09316cd1E032457989C7aC91b19",
       "startBlock": 10043972
     },
-    "BLSPubkeyCompendium_Operator": {
-      "address": "0xc81d3963087Fe09316cd1E032457989C7aC91b19",
-      "startBlock": 10043972
-    },
-    "BLSRegistryCoordinatorWithIndices_Operator": {
+    "RegistryCoordinator_Operator": {
       "address": "0x0b30a3427765f136754368a4500bAca8d2a54C0B",
       "startBlock": 10043972
     },
-    "BLSPubkeyRegistry_QuorumApkUpdates": {
+    "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0xD8fCD5c9103962DE37E375EF9dB62cCf39D5BEcA",
       "startBlock": 10043972
     }
