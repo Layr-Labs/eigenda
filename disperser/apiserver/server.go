@@ -192,8 +192,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 
 	seenQuorums := make(map[uint8]struct{})
-	// The quorum ID must be in range [0, 255]. It'll actually be converted
-	// to uint8, so it cannot be greater than 255.
+	// The quorum ID must be in range [0, 254]. It'll actually be converted
+	// to uint8, so it cannot be greater than 254.
 	for _, param := range securityParams {
 		if _, ok := seenQuorums[param.QuorumID]; ok {
 			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")

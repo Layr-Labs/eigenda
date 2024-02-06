@@ -28,6 +28,13 @@ type SecurityParam struct {
 	QuorumRate common.RateParam `json:"quorum_rate"`
 }
 
+const (
+	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
+	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
+	// different IDs).
+	MaxQuorumID = 254
+)
+
 func (s *SecurityParam) String() string {
 	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, QuorumThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.QuorumThreshold)
 }
