@@ -358,7 +358,7 @@ type DisperseBlobRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The data to be dispersed.
-	// The size of data must be <= 512KiB.
+	// The size of data must be <= 2MiB.
 	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	// Security parameters allowing clients to customize the safety (via adversary threshold)
 	// and liveness (via quorum threshold).

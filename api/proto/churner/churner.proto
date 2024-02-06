@@ -18,23 +18,23 @@ service Churner {
 }
 
 message ChurnRequest {
+	// The Ethereum address (in hex like "0x123abcdef...") of the operator.
+	string operator_address = 1;
 	// The operator making the churn request.
-	bytes operator_to_register_pubkey_g1 = 1;
-	bytes operator_to_register_pubkey_g2 = 2;
+	bytes operator_to_register_pubkey_g1 = 2;
+	bytes operator_to_register_pubkey_g2 = 3;
 	// The operator's BLS signature signed on the keccak256 hash of
-	// concat("ChurnRequest", g1, g2, salt).
-	bytes operator_request_signature = 3;
+	// concat("ChurnRequest", operator address, g1, g2, salt).
+	bytes operator_request_signature = 4;
 	// The salt used as part of the message to sign on for operator_request_signature.
-	bytes salt = 4;
+	bytes salt = 5;
 	// The quorums to register for.
 	// Note:
 	//   - If any of the quorum here has already been registered, this entire request
 	//     will fail to proceed.
 	//   - If any of the quorum fails to register, this entire request will fail.
-	// The IDs must be in range [0, 254].
-	repeated uint32 quorum_ids = 5;
-	// The Ethereum address (in hex like "0x123abcdef...") of the operator.
-	string operator_address = 6;
+	// The IDs must be in range [0, 255].
+	repeated uint32 quorum_ids = 6;
 }
 
 message ChurnReply {
