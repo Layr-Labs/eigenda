@@ -26,12 +26,13 @@ func setupSuite(t *testing.T) func(t *testing.T) {
 	log.Println("Setting up suite")
 
 	kzgConfig = &kzgRs.KzgConfig{
-		G1Path:    "../../../inabox/resources/kzg/g1.point",
-		G2Path:    "../../../inabox/resources/kzg/g2.point",
-		CacheDir:  "../../../inabox/resources/kzg/SRSTables",
-		SRSOrder:  3000,
-		SRSNumberToLoad:  2900,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "../../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../../inabox/resources/kzg/g2.point",
+		G2PowerOf2Path:  "../../../inabox/resources/kzg/g2.point.powerOf2",
+		CacheDir:        "../../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 2900,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
 	numNode = uint64(4)

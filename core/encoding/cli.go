@@ -18,6 +18,8 @@ const (
 	PreloadEncoderFlagName    = "kzg.preload-encoder"
 	CacheEncodedBlobsFlagName = "cache-encoded-blobs"
 	SRSLoadingNumberFlagName  = "kzg.srs-load"
+	G1PowerOf2PathFlagName    = "kzg.g1-power-of-2-path"
+	G2PowerOf2PathFlagName    = "kzg.g2-power-of-2-path"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -77,6 +79,18 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRELOAD_ENCODER"),
 		},
+		cli.StringFlag{
+			Name:     G1PowerOf2PathFlagName,
+			Usage:    "Path to G1 SRS points that are on power of 2",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "G1_POWER_OF_2_PATH"),
+		},
+		cli.StringFlag{
+			Name:     G2PowerOf2PathFlagName,
+			Usage:    "Path to G2 SRS points that are on power of 2",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_POWER_OF_2_PATH"),
+		},
 	}
 }
 
@@ -90,6 +104,9 @@ func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
 	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
+	cfg.G1PowerOf2Path = ctx.GlobalString(G1PowerOf2PathFlagName)
+	cfg.G2PowerOf2Path = ctx.GlobalString(G2PowerOf2PathFlagName)
+
 	return EncoderConfig{
 		KzgConfig:         cfg,
 		CacheEncodedBlobs: ctx.GlobalBoolT(CacheEncodedBlobsFlagName),

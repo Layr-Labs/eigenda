@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"math"
 
 	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -199,10 +200,18 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	lhsG1 := bls.LinCombG1(proofs, randomsFr)
 
 	// lhs g2
-	G2atD, err := ReadG2Point(D, group.KzgConfig)
+	exponent := uint64(math.Log2(float64(D)))
+	G2atD, err := ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
+
 	if err != nil {
-		return err
+		// then try to access if there is a full list of g2 srs
+		G2atD, err = ReadG2Point(D, group.KzgConfig)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Acessed the entire G2")
 	}
+
 	lhsG2 := &G2atD
 
 	// rhs g2

@@ -23,6 +23,8 @@ import (
 type KzgConfig struct {
 	G1Path          string
 	G2Path          string
+	G1PowerOf2Path  string
+	G2PowerOf2Path  string
 	CacheDir        string
 	NumWorker       uint64
 	SRSOrder        uint64 // Order is the total size of SRS
@@ -147,6 +149,25 @@ func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
 	}
 
 	g2point, err := utils.ReadG2PointSection(g.G2Path, n, n+1, 1)
+	if err != nil {
+		return bls.G2Point{}, err
+	}
+	return g2point[0], nil
+}
+
+// Read g2 points from power of 2 file
+func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bls.G2Point, error) {
+
+	power := uint64(math.Pow(2, float64(exponent)))
+	if power > g.SRSOrder {
+		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", power, g.SRSOrder)
+	}
+
+	if len(g.G2PowerOf2Path) == 0 {
+		return bls.G2Point{}, fmt.Errorf("G2PathPowerOf2 path is empty")
+	}
+
+	g2point, err := utils.ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
 	if err != nil {
 		return bls.G2Point{}, err
 	}

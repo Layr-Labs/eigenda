@@ -264,6 +264,10 @@ type OperatorVars struct {
 
 	NODE_G2_PATH string
 
+	NODE_G1_POWER_OF_2_PATH string
+
+	NODE_G2_POWER_OF_2_PATH string
+
 	NODE_CACHE_PATH string
 
 	NODE_SRS_ORDER string

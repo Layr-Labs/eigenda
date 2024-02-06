@@ -298,6 +298,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_EXPIRATION_POLL_INTERVAL:    "10",
 		NODE_G1_PATH:                     "",
 		NODE_G2_PATH:                     "",
+		NODE_G2_POWER_OF_2_PATH:          "",
 		NODE_CACHE_PATH:                  "",
 		NODE_SRS_ORDER:                   "",
 		NODE_SRS_LOAD:                    "",
@@ -315,7 +316,6 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
-
 	return v
 
 }
