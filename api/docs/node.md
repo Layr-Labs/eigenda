@@ -3,12 +3,16 @@
 
 ## Table of Contents
 
-- [node.proto](#node-proto)
+- [common/common.proto](#common_common-proto)
+    - [G1Commitment](#common-G1Commitment)
+  
+- [node/node.proto](#node_node-proto)
     - [BatchHeader](#node-BatchHeader)
     - [Blob](#node-Blob)
     - [BlobHeader](#node-BlobHeader)
     - [BlobQuorumInfo](#node-BlobQuorumInfo)
     - [Bundle](#node-Bundle)
+    - [G2Commitment](#node-G2Commitment)
     - [GetBlobHeaderReply](#node-GetBlobHeaderReply)
     - [GetBlobHeaderRequest](#node-GetBlobHeaderRequest)
     - [MerkleProof](#node-MerkleProof)
@@ -24,10 +28,42 @@
 
 
 
-<a name="node-proto"></a>
+<a name="common_common-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## node.proto
+## common/common.proto
+
+
+
+<a name="common-G1Commitment"></a>
+
+### G1Commitment
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="node_node-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## node/node.proto
 
 
 
@@ -51,7 +87,7 @@ BatchHeader (see core/data.go#BatchHeader)
 
 ### Blob
 In EigenDA, the original blob to disperse is encoded as a polynomial via taking
-different point evaluations (i.e. erasure coding). These points are split
+taking different point evaluations (i.e. erasure coding). These points are split
 into disjoint subsets which are assigned to different operator nodes in the EigenDA
 network.
 The data in this message is a subset of these points that are assigned to a
@@ -76,8 +112,9 @@ single operator node.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  | The KZG commitment to the polynomial representing the blob. |
-| length_proof | [bytes](#bytes) |  | The low degree proof. It&#39;s the KZG commitment to the polynomial shifted to the largest SRS degree. |
+| commitment | [common.G1Commitment](#common-G1Commitment) |  | The KZG commitment to the polynomial representing the blob. |
+| length_commitment | [G2Commitment](#node-G2Commitment) |  | The KZG commitment to the polynomial representing the blob on G2, it is used for proving the degree of the polynomial |
+| length_proof | [G2Commitment](#node-G2Commitment) |  | The low degree proof. It&#39;s the KZG commitment to the polynomial shifted to the largest SRS degree. |
 | length | [uint32](#uint32) |  | The length of the original blob in number of symbols (in the field where the polynomial is defined). |
 | quorum_headers | [BlobQuorumInfo](#node-BlobQuorumInfo) | repeated | The params of the quorums that this blob participates in. |
 | account_id | [string](#string) |  | The ID of the user who is dispersing this blob to EigenDA. |
@@ -98,9 +135,8 @@ api/proto/disperser/disperser.proto
 | ----- | ---- | ----- | ----------- |
 | quorum_id | [uint32](#uint32) |  |  |
 | adversary_threshold | [uint32](#uint32) |  |  |
-| quantization_factor | [uint32](#uint32) |  |  |
-| encoded_blob_length | [uint32](#uint32) |  |  |
 | quorum_threshold | [uint32](#uint32) |  |  |
+| chunk_length | [uint32](#uint32) |  |  |
 | ratelimit | [uint32](#uint32) |  |  |
 
 
@@ -118,6 +154,24 @@ operator and a single quorum.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | chunks | [bytes](#bytes) | repeated | Each chunk corresponds to a collection of points on the polynomial. Each chunk has same number of points. |
+
+
+
+
+
+
+<a name="node-G2Commitment"></a>
+
+### G2Commitment
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| x_a0 | [bytes](#bytes) |  | The A0 element of the X coordinate of G2 point. |
+| x_a1 | [bytes](#bytes) |  | The A1 element of the X coordinate of G2 point. |
+| y_a0 | [bytes](#bytes) |  | The A0 element of the Y coordinate of G2 point. |
+| y_a1 | [bytes](#bytes) |  | The A1 element of the Y coordinate of G2 point. |
 
 
 
@@ -198,7 +252,7 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 | ----- | ---- | ----- | ----------- |
 | batch_header_hash | [bytes](#bytes) |  | The hash of the ReducedBatchHeader defined onchain, see: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43 This identifies which batch to retrieve for. |
 | blob_index | [uint32](#uint32) |  | Which blob in the batch to retrieve for (note: a batch is logically an ordered list of blobs). |
-| quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 255]. |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
 
 
 

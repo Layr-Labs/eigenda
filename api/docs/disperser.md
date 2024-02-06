@@ -3,9 +3,16 @@
 
 ## Table of Contents
 
-- [disperser.proto](#disperser-proto)
+- [common/common.proto](#common_common-proto)
+    - [G1Commitment](#common-G1Commitment)
+  
+- [disperser/disperser.proto](#disperser_disperser-proto)
+    - [AuthenticatedReply](#disperser-AuthenticatedReply)
+    - [AuthenticatedRequest](#disperser-AuthenticatedRequest)
+    - [AuthenticationData](#disperser-AuthenticationData)
     - [BatchHeader](#disperser-BatchHeader)
     - [BatchMetadata](#disperser-BatchMetadata)
+    - [BlobAuthHeader](#disperser-BlobAuthHeader)
     - [BlobHeader](#disperser-BlobHeader)
     - [BlobInfo](#disperser-BlobInfo)
     - [BlobQuorumParam](#disperser-BlobQuorumParam)
@@ -26,10 +33,89 @@
 
 
 
-<a name="disperser-proto"></a>
+<a name="common_common-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## disperser.proto
+## common/common.proto
+
+
+
+<a name="common-G1Commitment"></a>
+
+### G1Commitment
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+
+
+<a name="disperser_disperser-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## disperser/disperser.proto
+
+
+
+<a name="disperser-AuthenticatedReply"></a>
+
+### AuthenticatedReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_auth_header | [BlobAuthHeader](#disperser-BlobAuthHeader) |  |  |
+| disperse_reply | [DisperseBlobReply](#disperser-DisperseBlobReply) |  |  |
+
+
+
+
+
+
+<a name="disperser-AuthenticatedRequest"></a>
+
+### AuthenticatedRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| disperse_request | [DisperseBlobRequest](#disperser-DisperseBlobRequest) |  |  |
+| authentication_data | [AuthenticationData](#disperser-AuthenticationData) |  |  |
+
+
+
+
+
+
+<a name="disperser-AuthenticationData"></a>
+
+### AuthenticationData
+AuthenticationData contains the signature of the BlobAuthHeader.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| authentication_data | [bytes](#bytes) |  |  |
+
+
+
 
 
 
@@ -42,7 +128,7 @@
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | batch_root | [bytes](#bytes) |  | The root of the merkle tree with the hashes of blob headers as leaves. |
-| quorum_numbers | [bytes](#bytes) |  | All quorums associated with blobs in this batch. |
+| quorum_numbers | [bytes](#bytes) |  | All quorums associated with blobs in this batch. Sorted in ascending order. Ex. [0, 2, 1] =&gt; 0x000102 |
 | quorum_signed_percentages | [bytes](#bytes) |  | The percentage of stake that has signed for this batch. The quorum_signed_percentages[i] is percentage for the quorum_numbers[i]. |
 | reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch was created. The Disperser will encode and disperse the blobs based on the onchain info (e.g. operator stakes) at this block number. |
 
@@ -61,9 +147,31 @@
 | ----- | ---- | ----- | ----------- |
 | batch_header | [BatchHeader](#disperser-BatchHeader) |  |  |
 | signatory_record_hash | [bytes](#bytes) |  | The hash of all public keys of the operators that did not sign the batch. |
-| fee | [bytes](#bytes) |  | The gas fee of confirming this batch. It&#39;s the bytes representation of a big.Int value. |
+| fee | [bytes](#bytes) |  | The fee payment paid by users for dispersing this batch. It&#39;s the bytes representation of a big.Int value. |
 | confirmation_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch is confirmed onchain. |
 | batch_header_hash | [bytes](#bytes) |  | This is the hash of the ReducedBatchHeader defined onchain, see: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43 The is the message that the operators will sign their signatures on. |
+
+
+
+
+
+
+<a name="disperser-BlobAuthHeader"></a>
+
+### BlobAuthHeader
+BlobAuthHeader contains information about the blob for the client to verify and sign.
+- Once payments are enabled, the BlobAuthHeader the KZG commitment to the blob, which the client
+will verify and sign. Having the client verify the KZG commitment instead of calculating it avoids
+the need for the client to have the KZG structured reference string (SRS), which can be large.
+The signed KZG commitment prevents the disperser from sending a different blob to the DA Nodes
+than the one the client sent.
+- In the meantime, the BlobAuthHeader contains a simple challenge parameter is used to prevent
+replay attacks in the event that a signature is leaked.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| challenge_parameter | [uint32](#uint32) |  |  |
 
 
 
@@ -78,7 +186,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  | KZG commitment to the blob. |
+| commitment | [common.G1Commitment](#common-G1Commitment) |  | KZG commitment of the blob. |
 | data_length | [uint32](#uint32) |  | The length of the blob in symbols (each symbol is 31 bytes). |
 | blob_quorum_params | [BlobQuorumParam](#disperser-BlobQuorumParam) | repeated | The params of the quorums that this blob participates in. |
 
@@ -114,8 +222,7 @@ BlobInfo contains information needed to confirm the blob against the EigenDA con
 | quorum_number | [uint32](#uint32) |  | The ID of the quorum. |
 | adversary_threshold_percentage | [uint32](#uint32) |  | Same as SecurityParams.adversary_threshold. |
 | quorum_threshold_percentage | [uint32](#uint32) |  | Same as SecurityParams.quorum_threshold. |
-| quantization_param | [uint32](#uint32) |  | This determines the nominal number of chunks for the blob, which is nominal_num_chunks = quantization_param * num_operators. A chunk is the smallest unit that&#39;s distributed to DA Nodes, corresponding to a set of evaluations of the polynomial (representing the blob) and a KZG multiproof. See more details in data model of EigenDA: https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/data-model.md |
-| encoded_length | [uint64](#uint64) |  | The length of the blob after encoding (in number of symbols). |
+| chunk_length | [uint32](#uint32) |  | The length of each chunk. |
 
 
 
@@ -196,8 +303,9 @@ BlobStatusRequest is used to query the status of a blob.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 512KiB. |
+| data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 2MiB. |
 | security_params | [SecurityParams](#disperser-SecurityParams) | repeated | Security parameters allowing clients to customize the safety (via adversary threshold) and liveness (via quorum threshold). Clients can define one SecurityParams per quorum, and specify multiple quorums. The disperser will ensure that the encoded blobs for each quorum are all processed within the same batch. |
+| account_id | [string](#string) |  | The account ID of the client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobAuthHeader. |
 
 
 
@@ -243,7 +351,7 @@ SecurityParams contains the security parameters for a given quorum.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| quorum_id | [uint32](#uint32) |  | The ID of the quorum. The quorum must be already registered on EigenLayer. The ID must be in range [0, 255]. |
+| quorum_id | [uint32](#uint32) |  | The ID of the quorum. The quorum must be already registered on EigenLayer. The ID must be in range [0, 254]. |
 | adversary_threshold | [uint32](#uint32) |  | The max percentage of stake within the quorum that can be held by or delegated to adversarial operators.
 
 Clients use this to customize the trust assumption (safety).
@@ -253,9 +361,9 @@ Requires: 1 &lt;= adversary_threshold &lt; 100 |
 
 Clients use this to customize liveness requirement. The higher this number, the more operators may need to be up for attesting the blob, so the chance the dispersal request to fail may be higher (liveness for dispersal).
 
-Requires: 1 &lt;= quorum_threshld &lt;= 100 quorum_threshld &gt; adversary_threshold.
+Requires: 1 &lt;= quorum_threshld &lt;= 100 quorum_threshld &gt; adversary_threshold &#43; 10.
 
-Note: The adversary_threshold and quorum_threshold will directly influence the cost of encoding for the blob to be dispersed, roughly by a factor of 100 / (quorum_threshold - adversary_threshold). See the spec for more details: https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/protocol-modules/storage/overview.md |
+Note: The adversary_threshold and quorum_threshold will directly influence the cost of encoding for the blob to be dispersed, roughly by a factor of 100 / (quorum_threshold - adversary_threshold). See the spec for more details: https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/protocol-modules/storage/overview.md Currently it&#39;s required that the difference must be at least 10. |
 
 
 
@@ -292,6 +400,7 @@ Disperser defines the public APIs for dispersing blobs.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | DisperseBlob | [DisperseBlobRequest](#disperser-DisperseBlobRequest) | [DisperseBlobReply](#disperser-DisperseBlobReply) | This API accepts blob to disperse from clients. This executes the dispersal async, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the the processing status of the blob. |
+| DisperseBlobAuthenticated | [AuthenticatedRequest](#disperser-AuthenticatedRequest) stream | [AuthenticatedReply](#disperser-AuthenticatedReply) stream | DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the client to authenticate itself via the AuthenticationData message. The protoco is as follows: 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message 2. The Disperser sends back a BlobAuthHeader message containing information for the client to verify and sign. 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 	 AuthenticationData message. 4. The Disperser verifies the signature and returns a DisperseBlobReply message. |
 | GetBlobStatus | [BlobStatusRequest](#disperser-BlobStatusRequest) | [BlobStatusReply](#disperser-BlobStatusReply) | This API is meant to be polled for the blob status. |
 | RetrieveBlob | [RetrieveBlobRequest](#disperser-RetrieveBlobRequest) | [RetrieveBlobReply](#disperser-RetrieveBlobReply) | This retrieves the requested blob from the Disperser&#39;s backend. This is a more efficient way to retrieve blobs than directly retrieving from the DA Nodes (see detail about this approach in api/proto/retriever/retriever.proto). The blob should have been initially dispersed via this Disperser service for this API to work. |
 
