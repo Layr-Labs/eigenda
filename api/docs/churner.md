@@ -46,9 +46,10 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
+| operator_address | [string](#string) |  | The Ethereum address (in hex like &#34;0x123abcdef...&#34;) of the operator. |
 | operator_to_register_pubkey_g1 | [bytes](#bytes) |  | The operator making the churn request. |
 | operator_to_register_pubkey_g2 | [bytes](#bytes) |  |  |
-| operator_request_signature | [bytes](#bytes) |  | The operator&#39;s BLS signature signed on the keccak256 hash of concat(&#34;ChurnRequest&#34;, g1, g2, salt). |
+| operator_request_signature | [bytes](#bytes) |  | The operator&#39;s BLS signature signed on the keccak256 hash of concat(&#34;ChurnRequest&#34;, operator address, g1, g2, salt). |
 | salt | [bytes](#bytes) |  | The salt used as part of the message to sign on for operator_request_signature. |
 | quorum_ids | [uint32](#uint32) | repeated | The quorums to register for. Note: - If any of the quorum here has already been registered, this entire request will fail to proceed. - If any of the quorum fails to register, this entire request will fail. The IDs must be in range [0, 255]. |
 
