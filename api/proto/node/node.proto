@@ -1,7 +1,7 @@
 syntax = "proto3";
-
-option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node";
 package node;
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node";
 
 // The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
 // for better security and separation of concerns.
@@ -47,7 +47,7 @@ message RetrieveChunksRequest {
 	uint32 blob_index = 2;
 	// Which quorum of the blob to retrieve for (note: a blob can have multiple
 	// quorums and the chunks for different quorums at a Node can be different).
-	// The ID must be in range [0, 255].
+	// The ID must be in range [0, 254].
 	uint32 quorum_id = 3;
 }
 
@@ -105,15 +105,26 @@ message Bundle {
 	repeated bytes chunks = 1;
 }
 
+message G2Commitment {
+	// The A0 element of the X coordinate of G2 point.
+	bytes x_a0 = 1;
+	// The A1 element of the X coordinate of G2 point.
+	bytes x_a1 = 2;
+	// The A0 element of the Y coordinate of G2 point.
+	bytes y_a0 = 3;
+	// The A1 element of the Y coordinate of G2 point.
+	bytes y_a1 = 4;
+}
+
 message BlobHeader {
 	// The KZG commitment to the polynomial representing the blob.
-	bytes commitment = 1;
-  // The KZG commitment to the polynomial representing the blob on G2, it is uesd 
-  // for proving the degree of the polynomial
-  bytes length_commitment = 2;
+	common.G1Commitment commitment = 1;
+	// The KZG commitment to the polynomial representing the blob on G2, it is used
+	// for proving the degree of the polynomial
+	G2Commitment length_commitment = 2;
 	// The low degree proof. It's the KZG commitment to the polynomial shifted to
 	// the largest SRS degree.
-	bytes length_proof = 3;
+	G2Commitment length_proof = 3;
 	// The length of the original blob in number of symbols (in the field where
 	// the polynomial is defined).
 	uint32 length = 4;

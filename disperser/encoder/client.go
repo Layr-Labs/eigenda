@@ -47,11 +47,11 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams core
 		return nil, nil, err
 	}
 
-	commitment, err := new(core.Commitment).Deserialize(reply.GetCommitment().GetCommitment())
+	commitment, err := new(core.G1Commitment).Deserialize(reply.GetCommitment().GetCommitment())
 	if err != nil {
 		return nil, nil, err
 	}
-	lengthCommitment, err := new(core.LengthCommitment).Deserialize(reply.GetCommitment().GetLengthCommitment())
+	lengthCommitment, err := new(core.G2Commitment).Deserialize(reply.GetCommitment().GetLengthCommitment())
 	if err != nil {
 		return nil, nil, err
 	}

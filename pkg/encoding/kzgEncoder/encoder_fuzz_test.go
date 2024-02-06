@@ -13,7 +13,7 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(GETTYSBURG_ADDRESS_BYTES)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+		group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
 		enc, err := group.NewKzgEncoder(params)

@@ -32,14 +32,15 @@ var (
 
 func makeTestEncoder() (core.Encoder, error) {
 	config := &kzgEncoder.KzgConfig{
-		G1Path:    "../inabox/resources/kzg/g1.point",
-		G2Path:    "../inabox/resources/kzg/g2.point",
-		CacheDir:  "../inabox/resources/kzg/SRSTables",
-		SRSOrder:  3000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "../inabox/resources/kzg/g1.point",
+		G2Path:          "../inabox/resources/kzg/g2.point",
+		CacheDir:        "../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(config)
+	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(config, false)
 	if err != nil {
 		return nil, err
 	}

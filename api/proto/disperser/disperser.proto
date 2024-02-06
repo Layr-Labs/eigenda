@@ -1,7 +1,7 @@
 syntax = "proto3";
-
-option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser";
 package disperser;
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser";
 
 // Disperser defines the public APIs for dispersing blobs.
 service Disperser {
@@ -128,7 +128,7 @@ message RetrieveBlobReply {
 message SecurityParams {
 	// The ID of the quorum.
 	// The quorum must be already registered on EigenLayer. The ID must be
-	// in range [0, 255].
+	// in range [0, 254].
 	uint32 quorum_id = 1;
 	// The max percentage of stake within the quorum that can be held by or delegated
 	// to adversarial operators.
@@ -189,8 +189,8 @@ message BlobInfo {
 }
 
 message BlobHeader {
-	// KZG commitment to the blob.
-	bytes commitment = 1;
+	// KZG commitment of the blob.
+	common.G1Commitment commitment = 1;
 	// The length of the blob in symbols (each symbol is 31 bytes).
 	uint32 data_length = 2;
 	// The params of the quorums that this blob participates in.

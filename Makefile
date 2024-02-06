@@ -25,7 +25,7 @@ protoc: clean
 	--go-grpc_opt=paths=source_relative \
 	$(PROTOS)/**/*.proto
 	# Generate Protobuf for sub directories of ./api/proto/disperser
-	protoc -I $(PROTOS_DISPERSER) \
+	protoc -I $(PROTOS_DISPERSER) -I $(PROTOS) \
 	--go_out=$(PROTO_GEN_DISPERSER_PATH) \
 	--go_opt=paths=source_relative \
 	--go-grpc_out=$(PROTO_GEN_DISPERSER_PATH) \

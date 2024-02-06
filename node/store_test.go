@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
@@ -40,7 +41,6 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-
 	var lengthProof, lengthCommitment bn254.G2Point
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
@@ -74,9 +74,9 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		{
 			BlobHeader: &core.BlobHeader{
 				BlobCommitments: core.BlobCommitments{
-					Commitment:       &core.Commitment{G1Point: &commitment},
-					LengthCommitment: &core.LengthCommitment{G2Point: &lengthCommitment},
-					LengthProof:      &core.LengthProof{G2Point: &lengthProof},
+					Commitment:       (*core.G1Commitment)(&commitment),
+					LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
+					LengthProof:      (*core.LengthProof)(&lengthProof),
 					Length:           48,
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
@@ -90,9 +90,9 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		{
 			BlobHeader: &core.BlobHeader{
 				BlobCommitments: core.BlobCommitments{
-					Commitment:       &core.Commitment{G1Point: &commitment},
-					LengthCommitment: &core.LengthCommitment{G2Point: &lengthCommitment},
-					LengthProof:      &core.LengthProof{G2Point: &lengthProof},
+					Commitment:       (*core.G1Commitment)(&commitment),
+					LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
+					LengthProof:      (*core.G2Commitment)(&lengthProof),
 					Length:           50,
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
@@ -110,13 +110,6 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		ReferenceBlockNumber: 0,
 	}
 
-	serializedCommitment0, err := core.Commitment{G1Point: &commitment}.Serialize()
-	assert.NoError(t, err)
-	serializedLengthCommitment0, err := core.LengthCommitment{G2Point: &lengthCommitment}.Serialize()
-	assert.NoError(t, err)
-	serializedLengthProof0, err := core.LengthProof{G2Point: &lengthProof}.Serialize()
-	assert.NoError(t, err)
-
 	quorumHeaderProto := &pb.BlobQuorumInfo{
 		QuorumId:           uint32(quorumHeader.QuorumID),
 		AdversaryThreshold: uint32(quorumHeader.AdversaryThreshold),
@@ -125,19 +118,45 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	}
 
 	blobHeaderProto0 := &pb.BlobHeader{
-		Commitment:       serializedCommitment0,
-		LengthCommitment: serializedLengthCommitment0,
-		LengthProof:      serializedLengthProof0,
-		Length:           uint32(48),
-		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeaderProto},
+		Commitment: &commonpb.G1Commitment{
+			X: commitment.X.Marshal(),
+			Y: commitment.Y.Marshal(),
+		},
+		LengthCommitment: &pb.G2Commitment{
+			XA0: lengthCommitment.X.A0.Marshal(),
+			XA1: lengthCommitment.X.A1.Marshal(),
+			YA0: lengthCommitment.Y.A0.Marshal(),
+			YA1: lengthCommitment.Y.A1.Marshal(),
+		},
+		LengthProof: &pb.G2Commitment{
+			XA0: lengthProof.X.A0.Marshal(),
+			XA1: lengthProof.X.A1.Marshal(),
+			YA0: lengthProof.Y.A0.Marshal(),
+			YA1: lengthProof.Y.A1.Marshal(),
+		},
+		Length:        uint32(48),
+		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeaderProto},
 	}
 
 	blobHeaderProto1 := &pb.BlobHeader{
-		Commitment:       serializedCommitment0,
-		LengthCommitment: serializedLengthCommitment0,
-		LengthProof:      serializedLengthProof0,
-		Length:           uint32(50),
-		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeaderProto},
+		Commitment: &commonpb.G1Commitment{
+			X: commitment.X.Marshal(),
+			Y: commitment.Y.Marshal(),
+		},
+		LengthCommitment: &pb.G2Commitment{
+			XA0: lengthCommitment.X.A0.Marshal(),
+			XA1: lengthCommitment.X.A1.Marshal(),
+			YA0: lengthCommitment.Y.A0.Marshal(),
+			YA1: lengthCommitment.Y.A1.Marshal(),
+		},
+		LengthProof: &pb.G2Commitment{
+			XA0: lengthProof.X.A0.Marshal(),
+			XA1: lengthProof.X.A1.Marshal(),
+			YA0: lengthProof.Y.A0.Marshal(),
+			YA1: lengthProof.Y.A1.Marshal(),
+		},
+		Length:        uint32(50),
+		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeaderProto},
 	}
 	blobs := []*pb.Blob{
 		{
