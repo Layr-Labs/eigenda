@@ -122,7 +122,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	n := to - from
 
 	startTimer := time.Now()
-	g1r := bufio.NewReaderSize(g1f, int(to*G1PointBytes))
+	g1r := bufio.NewReaderSize(g1f, int(n*G1PointBytes))
 
 	_, err = g1f.Seek(int64(from)*G1PointBytes, 0)
 	if err != nil {
@@ -303,7 +303,7 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	n := to - from
 
 	startTimer := time.Now()
-	g2r := bufio.NewReaderSize(g2f, int(to*G2PointBytes))
+	g2r := bufio.NewReaderSize(g2f, int(n*G2PointBytes))
 
 	_, err = g2f.Seek(int64(from*G2PointBytes), 0)
 	if err != nil {
