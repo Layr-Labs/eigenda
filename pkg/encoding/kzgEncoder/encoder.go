@@ -76,6 +76,10 @@ func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup,
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if loadG2Points {
+		if len(config.G2Path) == 0 {
+			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
+		}
+
 		s2, err = utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
@@ -90,6 +94,11 @@ func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup,
 		)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		// todo, there are better ways to handle it
+		if len(config.G2PowerOf2Path) == 0 {
+			return nil, fmt.Errorf("G2PowerOf2Path is empty. However, object needs to load G2Points")
 		}
 	}
 

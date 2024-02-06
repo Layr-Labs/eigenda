@@ -316,7 +316,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
-  v.NODE_G2_PATH = ""
+	v.NODE_G2_PATH = ""
 	return v
 
 }
@@ -336,6 +336,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 
 		RETRIEVER_G1_PATH:             "",
 		RETRIEVER_G2_PATH:             "",
+		RETRIEVER_G2_POWER_OF_2_PATH:  "",
 		RETRIEVER_CACHE_PATH:          "",
 		RETRIEVER_SRS_ORDER:           "",
 		RETRIEVER_SRS_LOAD:            "",
@@ -349,6 +350,8 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_FILE_LOG_LEVEL: "trace",
 		RETRIEVER_LOG_PATH:       logPath,
 	}
+
+	v.RETRIEVER_G2_PATH = ""
 
 	env.applyDefaults(&v, "RETRIEVER", "retriever", ind)
 
