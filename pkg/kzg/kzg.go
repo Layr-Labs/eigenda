@@ -28,8 +28,6 @@
 package kzg
 
 import (
-	"errors"
-
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -41,10 +39,6 @@ type KZGSettings struct {
 }
 
 func NewKZGSettings(fs *FFTSettings, srs *SRS) (*KZGSettings, error) {
-
-	if uint64(len(srs.G1)) < fs.MaxWidth {
-		return nil, errors.New("srs length is not sufficient")
-	}
 
 	ks := &KZGSettings{
 		FFTSettings: fs,
