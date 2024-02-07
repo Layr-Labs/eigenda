@@ -81,6 +81,18 @@ type (
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
+	DeregisteredOperatorMetadata struct {
+		OperatorId  string `json:"operator_id"`
+		BlockNumber uint   `json:"block_number"`
+		Socket      string `json:"socket"`
+		IsOnline    bool   `json:"is_online"`
+	}
+
+	DeregisteredOperatorsResponse struct {
+		Meta Meta                            `json:"meta"`
+		Data []*DeregisteredOperatorMetadata `json:"data"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -142,12 +154,17 @@ func (s *server) Start() error {
 			feed.GET("/blobs", s.FetchBlobsHandler)
 			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
 		}
+		operatorsInfo := v1.Group("/operators-info")
+		{
+			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+		}
 		metrics := v1.Group("/metrics")
 		{
 			metrics.GET("/", s.FetchMetricsHandler)
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
 			metrics.GET("/non_signers", s.FetchNonSigners)
 			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
+			metrics.GET("/deregistered_operators", s.FetchDeregisteredOperators)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -401,6 +418,54 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
 	c.JSON(http.StatusOK, metric)
+}
+
+// FetchDeregisteredOperators godoc
+//
+//	@Summary	Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200	{object}	DeregisteredOperatorsResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/deregistered-operators [get]
+func (s *server) FetchDeregisteredOperators(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Get query parameters
+	// Default Value 14 days
+	days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+
+	// Convert days to integer
+	daysInt, err := strconv.Atoi(days)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+
+	if daysInt > 30 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
+		return
+	}
+
+	operatorMetadatas, err := s.getDeregisteredOperatorForDays(c.Request.Context(), int32(daysInt))
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
+	c.JSON(http.StatusOK, DeregisteredOperatorsResponse{
+		Meta: Meta{
+			Size: len(operatorMetadatas),
+		},
+		Data: operatorMetadatas,
+	})
 }
 
 func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {

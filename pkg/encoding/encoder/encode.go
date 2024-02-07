@@ -54,10 +54,8 @@ func (g *Encoder) Encode(inputFr []bls.Fr) (*GlobalPoly, []Frame, []uint32, erro
 		return nil, nil, nil, err
 	}
 
-	if g.verbose {
-		log.Printf("  SUMMARY: Encode %v byte among %v numNode takes %v\n",
-			len(inputFr)*bls.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
-	}
+	log.Printf("  SUMMARY: Encode %v byte among %v numNode takes %v\n",
+		len(inputFr)*bls.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
 
 	return poly, frames, indices, nil
 }

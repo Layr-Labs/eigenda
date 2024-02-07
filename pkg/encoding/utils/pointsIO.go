@@ -121,7 +121,6 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 
 	n := to - from
 
-	startTimer := time.Now()
 	g1r := bufio.NewReaderSize(g1f, int(n*G1PointBytes))
 
 	_, err = g1f.Seek(int64(from)*G1PointBytes, 0)
@@ -137,12 +136,6 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	if err != nil {
 		return nil, err
 	}
-
-	// measure reading time
-	t := time.Now()
-	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * G1PointBytes), elapsed)
-	startTimer = time.Now()
 
 	s1Outs := make([]bls.G1Point, n)
 
@@ -171,10 +164,6 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		}
 	}
 
-	// measure parsing time
-	t = time.Now()
-	elapsed = t.Sub(startTimer)
-	log.Println("    Parsing takes", elapsed)
 	return s1Outs, nil
 }
 
@@ -301,8 +290,7 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	}()
 
 	n := to - from
-
-	startTimer := time.Now()
+	
 	g2r := bufio.NewReaderSize(g2f, int(n*G2PointBytes))
 
 	_, err = g2f.Seek(int64(from*G2PointBytes), 0)
@@ -318,12 +306,6 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	if err != nil {
 		return nil, err
 	}
-
-	// measure reading time
-	t := time.Now()
-	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G2 points (%v bytes) takes %v\n", (n * G2PointBytes), elapsed)
-	startTimer = time.Now()
 
 	s2Outs := make([]bls.G2Point, n)
 
@@ -351,9 +333,5 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		}
 	}
 
-	// measure parsing time
-	t = time.Now()
-	elapsed = t.Sub(startTimer)
-	log.Println("    Parsing takes", elapsed)
 	return s2Outs, nil
 }

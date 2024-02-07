@@ -1,6 +1,7 @@
 package subgraph
 
 import (
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/shurcooL/graphql"
 )
 
@@ -47,6 +48,16 @@ type (
 		// Socket is the socket address of the operator, in the form "host:port"
 		SocketUpdates []SocketUpdates `graphql:"socketUpdates(first: 1, orderBy: blockNumber, orderDirection: desc)"`
 	}
+	DeregisteredOperatorInfo struct {
+		IndexedOperatorInfo *IndexedOperatorInfo
+		// BlockNumber is the block number at which the operator was deregistered.
+		BlockNumber uint
+		Metadata    *Operator
+	}
+	IndexedDeregisteredOperatorState struct {
+		Operators map[core.OperatorID]*DeregisteredOperatorInfo
+	}
+
 	queryBatches struct {
 		Batches []*Batches `graphql:"batches(orderDirection: $orderDirection, orderBy: $orderBy, first: $first, skip: $skip)"`
 	}
