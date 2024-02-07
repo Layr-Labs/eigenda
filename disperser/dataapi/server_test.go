@@ -318,10 +318,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=14", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=14", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -371,10 +371,10 @@ func TestFetchDeregisteredOperatorWithoutDaysQueryParam(t *testing.T) {
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -429,10 +429,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorInvalidDaysQueryParam(t *testi
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=ten", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=ten", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -471,10 +471,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorQueryDaysGreaterThan30(t *test
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=31", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=31", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -517,10 +517,10 @@ func TestFetchDeregisteredOperatorsHandlerMultiplerOperatorsOffline(t *testing.T
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=14", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=14", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -582,10 +582,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOnline(t *testing.T) {
 	}
 	defer closeServer() // Ensure the server is closed after the test
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=14", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=14", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -636,10 +636,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOn
 	}
 	defer closeServer()
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=14", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=14", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -710,10 +710,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t 
 	}
 	defer closeServer2() // Ensure the server is closed after the test
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=14", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=14", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -771,10 +771,10 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineSameB
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
-	r.GET("/v1/operatorsInfo/deregistered_operators/", testDataApiServer.FetchDeregisteredOperators)
+	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/operatorsInfo/deregistered_operators/?days=14", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/operators-info/deregistered-operators/?days=14", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()

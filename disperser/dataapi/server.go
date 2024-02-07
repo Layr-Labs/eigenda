@@ -153,9 +153,9 @@ func (s *server) Start() error {
 			feed.GET("/blobs", s.FetchBlobsHandler)
 			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
 		}
-		operatorsInfo := v1.Group("/operatorsInfo")
+		operatorsInfo := v1.Group("/operators-info")
 		{
-			operatorsInfo.GET("/deregistered_operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -428,7 +428,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/operatorsInfo/deregistered_operators [get]
+//	@Router		/operators-info/deregistered-operators [get]
 func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
