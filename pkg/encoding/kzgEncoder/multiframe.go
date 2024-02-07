@@ -172,7 +172,10 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		}
 	}
 
-	verifier, _ := group.GetKzgVerifier(params)
+	verifier, err := group.GetKzgVerifier(params)
+	if err != nil {
+		return err
+	}
 	ks := verifier.Ks
 
 	D := params.ChunkLen
