@@ -19,7 +19,7 @@
   },
   "goerli": {
     "EigenDAServiceManager": {
-      "address": "0xa3b1689Ab85409B15e07d2ED50A6EA9905074Ee50",
+      "address": "0xa3b1689Ab85409B15e07d2ED50A6EA9905074Ee5",
       "startBlock": 10497644
     }
   }
