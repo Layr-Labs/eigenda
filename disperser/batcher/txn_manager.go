@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	gcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -18,6 +17,7 @@ import (
 var (
 	gasPricePercentageMultiplier = big.NewInt(10)
 	hundred                      = big.NewInt(100)
+	maxSpeedUpRetry              = 3
 )
 
 // TxnManager receives transactions from the caller, sends them to the chain, and monitors their status.
@@ -161,14 +161,15 @@ func (t *txnManager) ReceiptChan() chan *ReceiptOrErr {
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
 func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
 	numSpeedUps := 0
+	retryFromFailure := 0
 	for {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
 
 		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
-		receipt, err := t.ethClient.EnsureTransactionEvaled(
+		receipt, err := t.ethClient.EnsureAnyTransactionEvaled(
 			ctxWithTimeout,
-			req.Tx,
+			req.txAttempts,
 			req.Tag,
 		)
 		if err == nil {
@@ -191,20 +192,13 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			}
 			err = t.ethClient.SendTransaction(ctx, newTx)
 			if err != nil {
-				if errors.Is(err, gcore.ErrNonceTooLow) {
-					// try to get the receipt again to see if any of the transaction attempts have been mined
-					for _, tx := range req.txAttempts {
-						_, receiptErr := t.ethClient.TransactionReceipt(ctx, tx.Hash())
-						if receiptErr == nil {
-							// tx has been mined, update the request with the mined tx and continue
-							req.Tx = tx
-							continue
-						}
-					}
-				}
-				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
+				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 				t.metrics.IncrementTxnCount("failure")
-				return nil, err
+				if retryFromFailure >= maxSpeedUpRetry {
+					return nil, err
+				}
+				retryFromFailure++
+				continue
 			}
 
 			t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", newTx.Hash().Hex())

@@ -220,3 +220,13 @@ func (mock *MockEthClient) EnsureTransactionEvaled(ctx context.Context, tx *type
 
 	return result, args.Error(1)
 }
+
+func (mock *MockEthClient) EnsureAnyTransactionEvaled(ctx context.Context, txs []*types.Transaction, tag string) (*types.Receipt, error) {
+	args := mock.Called()
+	var result *types.Receipt
+	if args.Get(0) != nil {
+		result = args.Get(0).(*types.Receipt)
+	}
+
+	return result, args.Error(1)
+}
