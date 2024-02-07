@@ -10,6 +10,8 @@
 [submodule "contracts/lib/eigenlayer-contracts"]
 	path = contracts/lib/eigenlayer-contracts
 	url = https://github.com/Layr-Labs/eigenlayer-contracts
+	branch = m2-mainnet-fixes
 [submodule "contracts/lib/eigenlayer-middleware"]
 	path = contracts/lib/eigenlayer-middleware
 	url = https://github.com/Layr-Labs/eigenlayer-middleware
+	branch = m2-mainnet-fixes
