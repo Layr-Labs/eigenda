@@ -221,6 +221,9 @@ func TestCoreLibrary(t *testing.T) {
 			ReferenceBlockNumber: bn,
 			BatchRoot:            [32]byte{},
 		}
+
+		batchChan := make(chan core.EncodedBlob, numBlob*len(blobLengths)*len(securityParams))
+
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
 		for _, blobLength := range blobLengths {
 
@@ -234,13 +237,22 @@ func TestCoreLibrary(t *testing.T) {
 					}
 
 					batch, header := prepareBatch(t, cst, blobs, quorumIndex, bn)
-					batches = append(batches, batch...)
+
+					for _, encodedBlob := range batch {
+						batchChan <- encodedBlob
+					}
 
 					checkBatch(t, cst, batch[0], header)
 				})
 			}
 
 		}
+
+		for i := 0; i < numBlob*len(blobLengths)*len(securityParams); i++ {
+			fmt.Println("waiting for batch", i)
+			batches = append(batches, <-batchChan)
+		}
+
 		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(batches)), func(t *testing.T) {
 			checkBatchByUniversalVerifier(t, cst, batches, batchHeader, pool)
 		})

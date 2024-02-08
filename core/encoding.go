@@ -83,10 +83,19 @@ func GetEncodingParams(minChunkLength, minNumChunks uint) (EncodingParams, error
 // ValidateEncodingParams takes in the encoding parameters and returns an error if they are invalid.
 func ValidateEncodingParams(params EncodingParams, blobLength, SRSOrder int) error {
 
+	// Check that the parameters are valid with respect to the SRS. The precomputed terms of the amortized KZG
+	// prover use up to order params.ChunkLen*params.NumChunks-1 for the SRS, so we must have
+	// params.ChunkLen*params.NumChunks-1 <= g.SRSOrder. The condition below could technically
+	// be relaxed to params.ChunkLen*params.NumChunks > g.SRSOrder+1, but because all of the paramters are
+	// powers of 2, the stricter condition is equivalent.
+
 	if int(params.ChunkLength*params.NumChunks) > SRSOrder {
 		return fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, SRSOrder)
 	}
 
+	// Check that the parameters are valid with respect to the size of the data input. The encoding parameters must equate to
+	// a size that is at least as large as the size of the data input. Otherwise, the input data will not fit within the
+	// encoded chunks.
 	if int(params.ChunkLength*params.NumChunks) < blobLength {
 		return fmt.Errorf("the supplied encoding parameters are not sufficient for the size of the data input")
 	}
