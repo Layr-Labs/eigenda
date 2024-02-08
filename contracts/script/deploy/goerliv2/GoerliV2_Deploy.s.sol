@@ -25,11 +25,11 @@ import "forge-std/StdJson.sol";
 //forge script script/deploy/goerliv2/GoerliV2_Deploy.s.sol:Deployer_GV2 --rpc-url $RPC_URL  --private-key $PRIVATE_KEY -vvvv //--broadcast 
 contract Deployer_GV2 is ExistingDeploymentParser {
 
-    //string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/M1_deployment_goerli_2023_3_23.json"));
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_preprod_deployment_2024_30_1.json"));
-    //string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/prod.config.json"));
-    string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/preprod.config.json"));
-    string public outputPath = string.concat("script/deploy/goerliv2/output/GV2_preprod_deployment_data.json");
+    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_deployment_2024_6_2.json"));
+    //string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_preprod_deployment_2024_30_1.json"));
+    string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/prod.config.json"));
+    //string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/preprod.config.json"));
+    string public outputPath = string.concat("script/deploy/goerliv2/output/GV2_prod_deployment_data.json");
 
     ProxyAdmin public eigenDAProxyAdmin;
     address public eigenDAOwner;
