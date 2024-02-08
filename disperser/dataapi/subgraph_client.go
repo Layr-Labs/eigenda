@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	_14Days           = 14 * 24 * time.Hour
 	maxWorkerPoolSize = 10
 )
 
@@ -24,7 +23,7 @@ type (
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
-		QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error)
+		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error)
 		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonsigers map[string]int) (map[string]int, error)
 	}
 	Batch struct {
@@ -51,9 +50,10 @@ type (
 		TransactionHash []byte
 	}
 	DeregisteredOperatorInfo struct {
-		*core.IndexedOperatorInfo
+		IndexedOperatorInfo *core.IndexedOperatorInfo
 		// BlockNumber is the block number at which the operator was deregistered.
 		BlockNumber uint
+		Metadata    *Operator
 	}
 	IndexedDeregisteredOperatorState struct {
 		Operators map[core.OperatorID]*DeregisteredOperatorInfo
@@ -197,9 +197,10 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 	return numBatchesByOperator, nil
 }
 
-func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error) {
-	last14Days := uint64(time.Now().Add(-_14Days).Unix())
-	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, last14Days)
+func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error) {
+	// Query all deregistered operators in the last N days.
+	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
+	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 	if err != nil {
 		return nil, err
 	}
@@ -227,6 +228,7 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx c
 		operators[operatorId] = &DeregisteredOperatorInfo{
 			IndexedOperatorInfo: indexedOperatorInfo,
 			BlockNumber:         uint(operator.BlockNumber),
+			Metadata:            operator,
 		}
 	}
 
@@ -472,6 +474,7 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Operator{
 		Id:              []byte(operator.Id),
 		OperatorId:      []byte(operator.OperatorId),
