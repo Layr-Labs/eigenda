@@ -10,8 +10,9 @@ service Encoder {
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree
 message BlobCommitment {
   bytes commitment = 1;
-  bytes length_proof = 2;
-  uint32 length = 3;
+  bytes length_commitment = 2;
+  bytes length_proof = 3;
+  uint32 length = 4;
 }
 
 // Parameters needed by Encoder for encoding

@@ -12,6 +12,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
@@ -21,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigensdk-go/chainio/constructor"
+	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/Layr-Labs/eigensdk-go/metrics/collectors/economic"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
@@ -62,12 +65,16 @@ type Node struct {
 // NewNode creates a new Node with the provided config.
 func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger) (*Node, error) {
 	// Setup metrics
-	sdkClients, err := buildSdkClients(config, logger)
-	if err != nil {
-		return nil, err
-	}
-	metrics := NewMetrics(sdkClients.Metrics, sdkClients.PrometheusRegistry, logger, ":"+config.MetricsPort)
-	rpcCallsCollector := rpccalls.NewCollector(AppName, sdkClients.PrometheusRegistry)
+	// sdkClients, err := buildSdkClients(config, logger)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	promReg := prometheus.NewRegistry()
+	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger)
+
+	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort)
+	rpcCallsCollector := rpccalls.NewCollector(AppName, promReg)
 
 	// Generate BLS keys
 	keyPair, err := core.MakeKeyPairFromString(config.PrivateBls)
@@ -106,7 +113,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
 
 	// Make validator
-	enc, err := encoding.NewEncoder(config.EncoderConfig)
+	enc, err := encoding.NewEncoder(config.EncoderConfig, false)
 	if err != nil {
 		return nil, err
 	}
@@ -183,14 +190,20 @@ func (n *Node) Start(ctx context.Context) error {
 			n.Config.ID, "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
 			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", n.Config.QuorumIDList)
 		socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
+		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
+		}
 		operator := &Operator{
+			Address:    crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
 			Socket:     socket,
 			Timeout:    10 * time.Second,
+			PrivKey:    privateKey,
 			KeyPair:    n.KeyPair,
 			OperatorId: n.Config.ID,
 			QuorumIDs:  n.Config.QuorumIDList,
 		}
-		err := RegisterOperator(ctx, operator, n.Transactor, n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Logger)
+		err = RegisterOperator(ctx, operator, n.Transactor, n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
@@ -276,8 +289,12 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		err error
 
 		// The keys that are stored to database for a single batch.
-		// Undefined if the err is not nil or err is ErrBatchAlreadyExist.
+		// Defined only if the batch not already exists and gets stored to database successfully.
 		keys *[][]byte
+
+		// Latency (in ms) to store the batch.
+		// Defined only if the batch not already exists and gets stored to database successfully.
+		latency float64
 	}
 	storeChan := make(chan storeResult)
 	go func(n *Node) {
@@ -287,16 +304,13 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 			// If batch already exists, we don't store it again, but we should not
 			// error out in such case.
 			if err == ErrBatchAlreadyExist {
-				storeChan <- storeResult{err: nil, keys: nil}
+				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
 			} else {
-				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil}
+				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil, latency: 0}
 			}
 			return
 		}
-		n.Metrics.AcceptBatches("stored", batchSize)
-		n.Metrics.ObserveLatency("StoreChunks", "stored", float64(time.Since(start).Milliseconds()))
-		n.Logger.Debug("Store batch took", "duration:", time.Since(start))
-		storeChan <- storeResult{err: nil, keys: keys}
+		storeChan <- storeResult{err: nil, keys: keys, latency: float64(time.Since(start).Milliseconds())}
 	}(n)
 
 	// Validate batch.
@@ -321,6 +335,11 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	result := <-storeChan
 	if result.err != nil {
 		return nil, err
+	}
+	if result.keys != nil {
+		n.Metrics.AcceptBatches("stored", batchSize)
+		n.Metrics.ObserveLatency("StoreChunks", "stored", result.latency)
+		n.Logger.Debug("Store batch took", "duration:", time.Duration(result.latency*float64(time.Millisecond)))
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
@@ -408,6 +427,8 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 
 // we only need to build the sdk clients for eigenmetrics right now,
 // but we might eventually want to move as much as possible to the sdk
+//
+//lint:ignore U1000 this function will be used once we move to the sdk
 func buildSdkClients(config *Config, logger common.Logger) (*constructor.Clients, error) {
 	// we need to make a transactor just so we can get the registryCoordinatorAddr
 	// to pass to the sdk config

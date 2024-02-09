@@ -98,6 +98,8 @@ type BatcherVars struct {
 
 	BATCHER_SRS_ORDER string
 
+	BATCHER_SRS_LOAD string
+
 	BATCHER_METRICS_HTTP_PORT string
 
 	BATCHER_INDEXER_DATA_DIR string
@@ -170,6 +172,8 @@ type EncoderVars struct {
 	DISPERSER_ENCODER_CACHE_PATH string
 
 	DISPERSER_ENCODER_SRS_ORDER string
+
+	DISPERSER_ENCODER_SRS_LOAD string
 
 	DISPERSER_ENCODER_NUM_WORKERS string
 
@@ -260,9 +264,13 @@ type OperatorVars struct {
 
 	NODE_G2_PATH string
 
+	NODE_G2_POWER_OF_2_PATH string
+
 	NODE_CACHE_PATH string
 
 	NODE_SRS_ORDER string
+
+	NODE_SRS_LOAD string
 
 	NODE_NUM_WORKERS string
 
@@ -319,9 +327,13 @@ type RetrieverVars struct {
 
 	RETRIEVER_G2_PATH string
 
+	RETRIEVER_G2_POWER_OF_2_PATH string
+
 	RETRIEVER_CACHE_PATH string
 
 	RETRIEVER_SRS_ORDER string
+
+	RETRIEVER_SRS_LOAD string
 
 	RETRIEVER_NUM_WORKERS string
 

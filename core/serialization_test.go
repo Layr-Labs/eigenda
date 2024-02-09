@@ -20,8 +20,8 @@ const (
 	encodedBatchHeader     = "0x31000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"
 	reducedBatchHeaderHash = "0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2"
 	batchHeaderHash        = "0xa48219ff51a67bf779c6f7858e3bf9760ef10a766e5dc5d461318c8e9d5607b6"
-	encodedBlobHeader      = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000000"
-	blobHeaderHash         = "0x648856d9629063f27823e52fbe94530d2e896ae25a6d2b6ad3059d09574828cf"
+	encodedBlobHeader      = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000000a"
+	blobHeaderHash         = "0xd14b018fcb05ce94b21782c5d3a9c469cb8fcf66926139fee11ceaf0ab7d7c11"
 )
 
 func TestBatchHeaderEncoding(t *testing.T) {
@@ -53,29 +53,39 @@ func TestBatchHeaderEncoding(t *testing.T) {
 
 func TestBlobHeaderEncoding(t *testing.T) {
 
-	var commitX, commitY, lengthX, lengthY fp.Element
+	var commitX, commitY fp.Element
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
-	lengthX = *lengthX.SetBigInt(big.NewInt(1))
-	lengthY = *lengthY.SetBigInt(big.NewInt(2))
 
-	commitment := &kzgbn254.G1Point{
+	commitment := &core.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
-	lengthProof := &kzgbn254.G1Point{
-		X: lengthX,
-		Y: lengthY,
-	}
+
+	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
+	_, err := lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
+	assert.NoError(t, err)
+	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
+	assert.NoError(t, err)
+	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
+	assert.NoError(t, err)
+	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
+	assert.NoError(t, err)
+
+	var lengthProof, lengthCommitment kzgbn254.G2Point
+	lengthProof.X.A0 = lengthXA0
+	lengthProof.X.A1 = lengthXA1
+	lengthProof.Y.A0 = lengthYA0
+	lengthProof.Y.A1 = lengthYA1
+
+	lengthCommitment = lengthProof
+
 	blobHeader := &core.BlobHeader{
 		BlobCommitments: core.BlobCommitments{
-			Commitment: &core.Commitment{
-				commitment,
-			},
-			LengthProof: &core.Commitment{
-				lengthProof,
-			},
-			Length: 10,
+			Commitment:       commitment,
+			LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
+			LengthProof:      (*core.G2Commitment)(&lengthProof),
+			Length:           10,
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{
 			{
@@ -84,6 +94,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
+				ChunkLength: 10,
 			},
 		},
 	}
@@ -135,17 +146,15 @@ func TestCommitmentMarshaling(t *testing.T) {
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
 
-	commitment := &core.Commitment{
-		G1Point: &kzgbn254.G1Point{
-			X: commitX,
-			Y: commitY,
-		},
+	commitment := &core.G1Commitment{
+		X: commitX,
+		Y: commitY,
 	}
 
 	marshalled, err := json.Marshal(commitment)
 	assert.NoError(t, err)
 
-	recovered := new(core.Commitment)
+	recovered := new(core.G1Commitment)
 	err = json.Unmarshal(marshalled, recovered)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, commitment)
@@ -160,12 +169,13 @@ func TestQuorumParamsHash(t *testing.T) {
 					AdversaryThreshold: 80,
 					QuorumThreshold:    100,
 				},
+				ChunkLength: 10,
 			},
 		},
 	}
 	hash, err := blobHeader.GetQuorumBlobParamsHash()
 	assert.NoError(t, err)
-	expected := "36f393792966bd0cf716ae071bd6e5f8d9e5d5d79024e0a6177f98c61fcb7baf"
+	expected := "89b336cf7ea7dcd13e275b541843175165a1f7dd94ddfa82282be3d7ab402ba2"
 	assert.Equal(t, common.Bytes2Hex(hash[:]), expected)
 }
 

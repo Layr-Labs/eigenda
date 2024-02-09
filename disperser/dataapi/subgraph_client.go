@@ -2,6 +2,7 @@ package dataapi
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 	"sync"
@@ -14,7 +15,6 @@ import (
 )
 
 const (
-	_14Days           = 14 * 24 * time.Hour
 	maxWorkerPoolSize = 10
 )
 
@@ -23,8 +23,8 @@ type (
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
-		QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error)
-		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64) (map[string]int, error)
+		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error)
+		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonsigers map[string]int) (map[string]int, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -50,16 +50,31 @@ type (
 		TransactionHash []byte
 	}
 	DeregisteredOperatorInfo struct {
-		*core.IndexedOperatorInfo
+		IndexedOperatorInfo *core.IndexedOperatorInfo
 		// BlockNumber is the block number at which the operator was deregistered.
 		BlockNumber uint
+		Metadata    *Operator
 	}
 	IndexedDeregisteredOperatorState struct {
 		Operators map[core.OperatorID]*DeregisteredOperatorInfo
 	}
-	OperatorEvents struct {
+	// OperatorInterval describes a time interval where the operator is live in
+	// EigenDA.
+	OperatorInterval struct {
 		OperatorId string
-		Events     []uint64
+
+		// The operator is live from start to end.
+		start uint64
+		// If the operator is still live now in EigenDA netowrk, end is set to 0.
+		end uint64
+	}
+	// OperatorEvents describes all the registration and deregistration events associated
+	// with an operator.
+	OperatorEvents struct {
+		// Timestamps of operator's registration, in ascending order.
+		RegistrationEvents []uint64
+		// Timestamps of operator's deregistration, in ascending order.
+		DeregistrationEvents []uint64
 	}
 	NonSigner struct {
 		OperatorId string
@@ -119,7 +134,7 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return batchNonSigningOperatorIds, nil
 }
 
-func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64) (map[string]int, error) {
+func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonSigners map[string]int) (map[string]int, error) {
 	var (
 		registeredOperators   []*subgraph.Operator
 		deregisteredOperators []*subgraph.Operator
@@ -148,7 +163,7 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 		return nil, err
 	}
 
-	intervalEvents, err := getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators)
+	intervalEvents, err := sc.getOperatorsWithRegisteredDeregisteredIntervalEvents(ctx, registeredOperators, deregisteredOperators, blockTimestamp, nonSigners)
 	if err != nil {
 		return nil, err
 	}
@@ -159,16 +174,16 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 		intervalEventsPool   = workerpool.New(maxWorkerPoolSize)
 		currentTs            = uint64(time.Now().Unix())
 	)
-	for ie := range intervalEvents {
+	for _, ie := range intervalEvents {
 		interval := ie
 		intervalEventsPool.Submit(func() {
-			end := interval.Events[1]
+			end := interval.end
 			if end == 0 {
 				end = currentTs
 			}
-			batches, err := sc.api.QueryBatchesByBlockTimestampRange(ctx, interval.Events[0], end)
+			batches, err := sc.api.QueryBatchesByBlockTimestampRange(ctx, interval.start, end)
 			if err != nil {
-				sc.logger.Error("failed to query batches by block timestamp range", "start", interval.Events[0], "end", end, "err", err)
+				sc.logger.Error("failed to query batches by block timestamp range", "start", interval.start, "end", end, "err", err)
 				return
 			}
 			if len(batches) > 0 {
@@ -182,9 +197,10 @@ func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx 
 	return numBatchesByOperator, nil
 }
 
-func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx context.Context) (*IndexedDeregisteredOperatorState, error) {
-	last14Days := uint64(time.Now().Add(-_14Days).Unix())
-	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, last14Days)
+func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error) {
+	// Query all deregistered operators in the last N days.
+	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
+	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 	if err != nil {
 		return nil, err
 	}
@@ -212,6 +228,7 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx c
 		operators[operatorId] = &DeregisteredOperatorInfo{
 			IndexedOperatorInfo: indexedOperatorInfo,
 			BlockNumber:         uint(operator.BlockNumber),
+			Metadata:            operator,
 		}
 	}
 
@@ -220,11 +237,13 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsInTheLast14Days(ctx c
 	}, nil
 }
 
-func getOperatorsWithRegisteredDeregisteredIntervalEvents(
+func (sc *subgraphClient) getOperatorsWithRegisteredDeregisteredIntervalEvents(
 	ctx context.Context,
 	registeredOperators []*subgraph.Operator,
 	deregisteredOperators []*subgraph.Operator,
-) (chan OperatorEvents, error) {
+	blockTimestamp uint64,
+	nonSigners map[string]int,
+) ([]OperatorInterval, error) {
 	sort.SliceStable(registeredOperators, func(i, j int) bool {
 		return registeredOperators[i].BlockTimestamp < registeredOperators[j].BlockTimestamp
 	})
@@ -233,71 +252,163 @@ func getOperatorsWithRegisteredDeregisteredIntervalEvents(
 		return deregisteredOperators[i].BlockTimestamp < deregisteredOperators[j].BlockTimestamp
 	})
 
-	// First position is for registered events and second position is for deregistered events
-	operators := make(map[string][][]uint64, 0)
+	operators := make(map[string]OperatorEvents)
+	for operatorId := range nonSigners {
+		operators[operatorId] = OperatorEvents{
+			RegistrationEvents:   []uint64{},
+			DeregistrationEvents: []uint64{},
+		}
+	}
 	for i := range registeredOperators {
-		operator := registeredOperators[i]
-		operatorId := string(operator.OperatorId)
+		reg := registeredOperators[i]
+		operatorId := string(reg.OperatorId)
 
 		if _, ok := operators[operatorId]; !ok {
-			operators[operatorId] = make([][]uint64, 2)
+			operators[operatorId] = OperatorEvents{
+				RegistrationEvents:   []uint64{},
+				DeregistrationEvents: []uint64{},
+			}
 		}
-		timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
+		operator := operators[operatorId]
+		timestamp, err := strconv.ParseUint(string(reg.BlockTimestamp), 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		operators[operatorId][0] = append(operators[operatorId][0], timestamp)
+		operator.RegistrationEvents = append(operator.RegistrationEvents, timestamp)
+		operators[operatorId] = operator
 	}
 
 	for i := range deregisteredOperators {
-		operator := deregisteredOperators[i]
-		operatorId := string(operator.OperatorId)
+		dereg := deregisteredOperators[i]
+		operatorId := string(dereg.OperatorId)
 
-		timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
+		timestamp, err := strconv.ParseUint(string(dereg.BlockTimestamp), 10, 64)
 		if err != nil || timestamp == 0 {
 			return nil, err
 		}
+		operator := operators[operatorId]
 		if _, ok := operators[operatorId]; ok {
-			operators[operatorId][1] = append(operators[operatorId][1], timestamp)
+			operator.DeregistrationEvents = append(operator.DeregistrationEvents, timestamp)
+			operators[operatorId] = operator
 		}
 	}
 
-	operatorEventsChan := make(chan OperatorEvents, 1)
-	go func() {
-		defer close(operatorEventsChan)
-		pool := workerpool.New(10)
-		for o, e := range operators {
-			operatorId, events := o, e
-			pool.Submit(func() {
-				var lastDeregistered uint64
-				for i := 0; i < len(events[0]); i++ {
-					var (
-						// we start with the assumption that the operator is still registered
-						// a 0 value means that the operator is still registered
-						deregistered uint64
-						registered   = events[0][i]
-					)
+	events, err := getOperatorInterval(ctx, operators, blockTimestamp, nonSigners)
+	if err != nil {
+		return nil, err
+	}
 
-					// if there is a deregistered event that macthes in same position of registered event, we use it
-					if i < len(events[1]) {
-						deregistered = events[1][i]
-					}
+	return events, nil
+}
 
-					// if there is no deregistered event that matches in same position of registered event, we use the last one
-					if i == 0 || registered > lastDeregistered {
-						lastDeregistered = deregistered
-						operatorEventsChan <- OperatorEvents{
+func getOperatorInterval(
+	ctx context.Context,
+	operators map[string]OperatorEvents,
+	blockTimestamp uint64,
+	nonSigners map[string]int,
+) ([]OperatorInterval, error) {
+	currentTs := uint64(time.Now().Unix())
+	intervals := make([]OperatorInterval, 0)
+
+	// For the time window [blockTimestamp, now], compute the sub intervals during
+	// which the operator is live in EigenDA network for validating batches.
+	for operatorId := range nonSigners {
+		reg := operators[operatorId].RegistrationEvents
+		dereg := operators[operatorId].DeregistrationEvents
+
+		// In EigenDA, the registration and deregistration events on timeline for an
+		// operator will be like reg-dereg-reg-dereg...
+		//
+		// The reason is that registering an operator that's already registered will fail
+		// and deregistering an operator that's already deregistered will also fail. So
+		// the registeration and deregistration will alternate.
+		if len(reg)-len(dereg) > 1 || len(dereg)-len(reg) > 1 {
+			return nil, fmt.Errorf("The number of registration and deregistration events cannot differ by more than one, num registration events: %d, num deregistration events: %d, operatorId: %s", len(reg), len(dereg), operatorId)
+		}
+
+		if len(reg) == 0 && len(dereg) == 0 {
+			// The operator has no registration/deregistration events: it's live
+			// for the entire time window.
+			intervals = append(intervals, OperatorInterval{
+				OperatorId: operatorId,
+				start:      blockTimestamp,
+				end:        currentTs,
+			})
+		} else if len(reg) == 0 {
+			// The operator has only deregistration event: it's live from the beginning
+			// of the time window until the deregistration.
+			intervals = append(intervals, OperatorInterval{
+				OperatorId: operatorId,
+				start:      blockTimestamp,
+				end:        dereg[0],
+			})
+		} else if len(dereg) == 0 {
+			// The operator has only registration event: it's live from registration to
+			// the end of the time window.
+			intervals = append(intervals, OperatorInterval{
+				OperatorId: operatorId,
+				start:      reg[0],
+				end:        currentTs,
+			})
+		} else {
+			// The operator has both registration and deregistration events in the time
+			// window.
+			if reg[0] < dereg[0] {
+				// The first event in the time window is registration. This means at
+				// the beginning (i.e. blockTimestamp) it's not live.
+				for i := 0; i < len(reg); i++ {
+					if i < len(dereg) {
+						intervals = append(intervals, OperatorInterval{
 							OperatorId: operatorId,
-							Events:     []uint64{registered, deregistered},
-						}
+							start:      reg[i],
+							end:        dereg[i],
+						})
+					} else {
+						intervals = append(intervals, OperatorInterval{
+							OperatorId: operatorId,
+							start:      reg[i],
+							end:        currentTs,
+						})
 					}
 				}
-			})
+			} else {
+				// The first event in the time window is deregistration. This means at
+				// the beginning (i.e. blockTimestamp) it's live already.
+				intervals = append(intervals, OperatorInterval{
+					OperatorId: operatorId,
+					start:      blockTimestamp,
+					end:        dereg[0],
+				})
+				for i := 0; i < len(reg); i++ {
+					if i+1 < len(dereg) {
+						intervals = append(intervals, OperatorInterval{
+							OperatorId: operatorId,
+							start:      reg[i],
+							end:        dereg[i+1],
+						})
+					} else {
+						intervals = append(intervals, OperatorInterval{
+							OperatorId: operatorId,
+							start:      reg[i],
+							end:        currentTs,
+						})
+					}
+				}
+			}
 		}
-		pool.StopWait()
-	}()
+	}
 
-	return operatorEventsChan, nil
+	// Validate the registration and deregistration events are in timeline order.
+	for i := 0; i < len(intervals); i++ {
+		if intervals[i].start > intervals[i].end {
+			return nil, fmt.Errorf("Start timestamp should not be greater than end or current timestamp for operatorId %s, start timestamp: %d, end or current timestamp: %d", intervals[i].OperatorId, intervals[i].start, intervals[i].end)
+		}
+		if i > 0 && intervals[i-1].OperatorId == intervals[i].OperatorId && intervals[i-1].end > intervals[i].start {
+			return nil, fmt.Errorf("the operator live intervals should never overlap, but found two overlapping intervals [%d, %d] and [%d, %d] for operatorId %s", intervals[i-1].start, intervals[i-1].end, intervals[i].start, intervals[i].end, intervals[i].OperatorId)
+		}
+	}
+
+	return intervals, nil
 }
 
 func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
@@ -324,7 +435,7 @@ func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
 			Id:              []byte(batch.Id),
 			BatchId:         batchId,
 			BatchHeaderHash: []byte(batch.BatchHeaderHash),
-			BlockTimestamp:  ConvertNanosecondToSecond(timestamp),
+			BlockTimestamp:  timestamp,
 			BlockNumber:     blockNum,
 			TxHash:          []byte(batch.TxHash),
 			GasFees:         gasFees,
@@ -363,11 +474,12 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Operator{
 		Id:              []byte(operator.Id),
 		OperatorId:      []byte(operator.OperatorId),
 		Operator:        []byte(operator.Operator),
-		BlockTimestamp:  ConvertNanosecondToSecond(timestamp),
+		BlockTimestamp:  timestamp,
 		BlockNumber:     blockNum,
 		TransactionHash: []byte(operator.TransactionHash),
 	}, nil

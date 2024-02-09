@@ -60,13 +60,35 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, 0, 100, 80)
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []*core.SecurityParam{
+			{
+				QuorumID:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumID:           1,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+		})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, 0, 100, 80)
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []*core.SecurityParam{
+			{
+				QuorumID:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			{
+				QuorumID:           1,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+		})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -117,7 +139,17 @@ var _ = Describe("Inabox Integration", func() {
 			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0,
+			0, // retrieve from quorum 0
+		)
+		Expect(err).To(BeNil())
+		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+
+		retrieved, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			1, // retrieve from quorum 1
 		)
 		Expect(err).To(BeNil())
 		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
@@ -125,30 +157,26 @@ var _ = Describe("Inabox Integration", func() {
 })
 
 func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEigenDAServiceManagerBlobHeader {
-	commitmentBytes := blobHeader.GetCommitment()
-	commitment, err := new(core.Commitment).Deserialize(commitmentBytes)
-	Expect(err).To(BeNil())
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
 			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
 			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			QuantizationParameter:        0,
+			ChunkLength:                  quorum.ChunkLength,
 		}
 	}
-
 	return rollupbindings.IEigenDAServiceManagerBlobHeader{
 		Commitment: rollupbindings.BN254G1Point{
-			X: commitment.X.BigInt(new(big.Int)),
-			Y: commitment.Y.BigInt(new(big.Int)),
+			X: new(big.Int).SetBytes(blobHeader.GetCommitment().X),
+			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().Y),
 		},
 		DataLength:       blobHeader.GetDataLength(),
 		QuorumBlobParams: quorums,
 	}
 }
 
-func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDABlobUtilsBlobVerificationProof {
+func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDARollupUtilsBlobVerificationProof {
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
@@ -168,7 +196,7 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
-	return rollupbindings.EigenDABlobUtilsBlobVerificationProof{
+	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
 		BatchId:                verificationProof.GetBatchId(),
 		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
 		BatchMetadata:          batchMetadata,

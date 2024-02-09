@@ -2,17 +2,38 @@ package utils
 
 import (
 	"bufio"
+	"fmt"
+	"io"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
+const (
+	// Num of bytes per G1 point in serialized format in file.
+	G1PointBytes = 32
+	// Num of bytes per G2 point in serialized format in file.
+	G2PointBytes = 64
+)
+
 type EncodeParams struct {
 	NumNodeE  uint64
 	ChunkLenE uint64
+}
+
+// ReadDesiredBytes reads exactly numBytesToRead bytes from the reader and returns
+// the result.
+func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
+	buf := make([]byte, numBytesToRead)
+	_, err := io.ReadFull(reader, buf)
+	// Note that ReadFull() guarantees the bytes read is len(buf) IFF err is nil.
+	// See https://pkg.go.dev/io#ReadFull.
+	if err != nil {
+		return nil, err
+	}
+	return buf, nil
 }
 
 func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, error) {
@@ -22,46 +43,37 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 		return nil, err
 	}
 
-	//todo: resolve panic
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			panic(err)
+			log.Printf("G1 close error %v\n", err)
 		}
 	}()
 
 	startTimer := time.Now()
-	g1r := bufio.NewReaderSize(g1f, int(n*64))
+	g1r := bufio.NewReaderSize(g1f, int(n*G1PointBytes))
 
 	if n < numWorker {
 		numWorker = n
 	}
 
-	buf, _, err := g1r.ReadLine()
+	buf, err := ReadDesiredBytes(g1r, n*G1PointBytes)
 	if err != nil {
-		return nil, err
-	}
-
-	if uint64(len(buf)) < 64*n {
-		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(buf)/64, n)
-		log.Println()
-		log.Println("ReadG1Points.ERR.1", err)
 		return nil, err
 	}
 
 	// measure reading time
 	t := time.Now()
 	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * 64), elapsed)
+	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * G1PointBytes), elapsed)
 	startTimer = time.Now()
 
 	s1Outs := make([]bls.G1Point, n)
 
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
-
 	start := uint64(0)
 	end := uint64(0)
 	size := n / numWorker
+
+	results := make(chan error, numWorker)
 
 	for i := uint64(0); i < numWorker; i++ {
 		start = i * size
@@ -72,10 +84,16 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 			end = (i + 1) * size
 		}
 		//fmt.Printf("worker %v start %v end %v. size %v\n", i, start, end, end - start)
-		//todo: handle error?
-		go readG1Worker(buf, s1Outs, start, end, 64, &wg)
+
+		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, results)
 	}
-	wg.Wait()
+
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// measure parsing time
 	t = time.Now()
@@ -84,26 +102,28 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 	return s1Outs, nil
 }
 
+// from is inclusive, to is exclusive
 func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bls.G1Point, error) {
+	if to <= from {
+		return nil, fmt.Errorf("The range to read is invalid, from: %v, to: %v", from, to)
+	}
 	g1f, err := os.Open(filepath)
 	if err != nil {
 		log.Println("ReadG1PointSection.ERR.0", err)
 		return nil, err
 	}
 
-	//todo: how to handle?
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			panic(err)
+			log.Printf("g1 close error %v\n", err)
 		}
 	}()
 
 	n := to - from
 
-	startTimer := time.Now()
-	g1r := bufio.NewReaderSize(g1f, int(to*64))
+	g1r := bufio.NewReaderSize(g1f, int(n*G1PointBytes))
 
-	_, err = g1f.Seek(int64(from*64), 0)
+	_, err = g1f.Seek(int64(from)*G1PointBytes, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -112,32 +132,18 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		numWorker = n
 	}
 
-	buf, _, err := g1r.ReadLine()
+	buf, err := ReadDesiredBytes(g1r, n*G1PointBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	if uint64(len(buf)) < 64*n {
-		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(buf)/64, n)
-		log.Println()
-		log.Println("ReadG1PointSection.ERR.1", err)
-		return nil, err
-	}
-
-	// measure reading time
-	t := time.Now()
-	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * 64), elapsed)
-	startTimer = time.Now()
-
 	s1Outs := make([]bls.G1Point, n)
-
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
 
 	start := uint64(0)
 	end := uint64(0)
 	size := n / numWorker
+
+	results := make(chan error, numWorker)
 
 	for i := uint64(0); i < numWorker; i++ {
 		start = i * size
@@ -147,15 +153,17 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		} else {
 			end = (i + 1) * size
 		}
-		//todo: handle error?
-		go readG1Worker(buf, s1Outs, start, end, 64, &wg)
-	}
-	wg.Wait()
 
-	// measure parsing time
-	t = time.Now()
-	elapsed = t.Sub(startTimer)
-	log.Println("    Parsing takes", elapsed)
+		go readG1Worker(buf, s1Outs, start, end, G1PointBytes, results)
+	}
+
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return s1Outs, nil
 }
 
@@ -165,16 +173,17 @@ func readG1Worker(
 	start uint64, // in element, not in byte
 	end uint64,
 	step uint64,
-	wg *sync.WaitGroup,
+	results chan<- error,
 ) {
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
 		err := outs[i].UnmarshalText(g1[:])
 		if err != nil {
+			results <- err
 			panic(err)
 		}
 	}
-	wg.Done()
+	results <- nil
 }
 
 func readG2Worker(
@@ -183,16 +192,18 @@ func readG2Worker(
 	start uint64, // in element, not in byte
 	end uint64,
 	step uint64,
-	wg *sync.WaitGroup,
+	results chan<- error,
 ) {
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
 		err := outs[i].UnmarshalText(g1[:])
 		if err != nil {
+			results <- err
 			log.Println("Unmarshalling error:", err)
+			panic(err)
 		}
 	}
-	wg.Done()
+	results <- nil
 }
 
 func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, error) {
@@ -202,43 +213,35 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		log.Println("ReadG2Points.ERR.0", err)
 		return nil, err
 	}
-	//todo: resolve panic
+
 	defer func() {
 		if err := g1f.Close(); err != nil {
-			panic(err)
+			log.Printf("g2 close error %v\n", err)
 		}
 	}()
 
 	startTimer := time.Now()
-	g1r := bufio.NewReaderSize(g1f, int(n*128))
+	g1r := bufio.NewReaderSize(g1f, int(n*G2PointBytes))
 
 	if n < numWorker {
 		numWorker = n
 	}
 
-	buf, _, err := g1r.ReadLine()
+	buf, err := ReadDesiredBytes(g1r, n*G2PointBytes)
 	if err != nil {
-		return nil, err
-	}
-
-	if uint64(len(buf)) < 128*n {
-		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(buf)/128, n)
-		log.Println()
-		log.Println("ReadG2Points.ERR.1", err)
 		return nil, err
 	}
 
 	// measure reading time
 	t := time.Now()
 	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G2 points (%v bytes) takes %v\n", (n * 128), elapsed)
+	log.Printf("    Reading G2 points (%v bytes) takes %v\n", (n * G2PointBytes), elapsed)
 
 	startTimer = time.Now()
 
 	s2Outs := make([]bls.G2Point, n)
 
-	var wg sync.WaitGroup
-	wg.Add(int(numWorker))
+	results := make(chan error, numWorker)
 
 	start := uint64(0)
 	end := uint64(0)
@@ -251,14 +254,84 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 		} else {
 			end = (i + 1) * size
 		}
-		//todo: handle error?
-		go readG2Worker(buf, s2Outs, start, end, 128, &wg)
+
+		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, results)
 	}
-	wg.Wait()
+
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// measure parsing time
 	t = time.Now()
 	elapsed = t.Sub(startTimer)
 	log.Println("    Parsing takes", elapsed)
+	return s2Outs, nil
+}
+
+// from is inclusive, to is exclusive
+func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bls.G2Point, error) {
+	if to <= from {
+		return nil, fmt.Errorf("The range to read is invalid, from: %v, to: %v", from, to)
+	}
+	g2f, err := os.Open(filepath)
+	if err != nil {
+		log.Println("ReadG2PointSection.ERR.0", err)
+		return nil, err
+	}
+
+	defer func() {
+		if err := g2f.Close(); err != nil {
+			log.Printf("error %v\n", err)
+		}
+	}()
+
+	n := to - from
+	
+	g2r := bufio.NewReaderSize(g2f, int(n*G2PointBytes))
+
+	_, err = g2f.Seek(int64(from*G2PointBytes), 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if n < numWorker {
+		numWorker = n
+	}
+
+	buf, err := ReadDesiredBytes(g2r, n*G2PointBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	s2Outs := make([]bls.G2Point, n)
+
+	results := make(chan error, numWorker)
+
+	start := uint64(0)
+	end := uint64(0)
+	size := n / numWorker
+
+	for i := uint64(0); i < numWorker; i++ {
+		start = i * size
+
+		if i == numWorker-1 {
+			end = n
+		} else {
+			end = (i + 1) * size
+		}
+		//todo: handle error?
+		go readG2Worker(buf, s2Outs, start, end, G2PointBytes, results)
+	}
+	for w := uint64(0); w < numWorker; w++ {
+		err := <-results
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return s2Outs, nil
 }

@@ -233,9 +233,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		values = append(values, blobHeaderBytes)
 
 		// blob chunks
-		for quorumIdx, bundle := range blob.Bundles {
-			quorumInfo := blob.BlobHeader.QuorumInfos[quorumIdx]
-			key, err := EncodeBlobKey(batchHeaderHash, idx, quorumInfo.QuorumID)
+		for quorumID, bundle := range blob.Bundles {
+			key, err := EncodeBlobKey(batchHeaderHash, idx, quorumID)
 			if err != nil {
 				log.Error("Cannot generate the key for storing blob:", "err", err)
 				return nil, err

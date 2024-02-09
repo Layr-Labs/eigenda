@@ -63,7 +63,7 @@ func setup() {
 }
 
 func teardown() {
-	fmt.Println("Stoping anvil")
+	fmt.Println("Stopping anvil")
 	testConfig.StopAnvil()
 
 	fmt.Println("Stop graph node")
@@ -81,8 +81,10 @@ func TestIndexerIntegration(t *testing.T) {
 	defer teardown()
 
 	logger, err := logging.GetLogger(logging.Config{
-		StdLevel:  "debug",
-		FileLevel: "debug",
+		StdFormat:  "terminal",
+		StdLevel:   "debug",
+		FileFormat: "logfmt",
+		FileLevel:  "debug",
 	})
 	assert.NoError(t, err)
 

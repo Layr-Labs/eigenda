@@ -14,7 +14,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig)
+	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
@@ -22,7 +22,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 
 	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
-	commit, _, frames, fIndices, err := enc.Encode(inputFr)
+	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 
 	for i := 0; i < len(frames); i++ {
@@ -37,6 +37,8 @@ func TestProveAllCosetThreads(t *testing.T) {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		assert.True(t, f.Verify(enc.Ks, commit, &lc), "Proof %v failed\n", i)
+		g2Atn, err := kzgRs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		require.Nil(t, err)
+		assert.True(t, f.Verify(enc.Ks, commit, &lc, &g2Atn), "Proof %v failed\n", i)
 	}
 }

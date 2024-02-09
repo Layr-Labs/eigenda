@@ -1,9 +1,9 @@
 import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts"
 import {
-    BLSPubkeyRegistry,
+    BLSApkRegistry,
     OperatorAddedToQuorums as OperatorAddedToQuorumsEvent,
     OperatorRemovedFromQuorums as OperatorRemovedFromQuorumsEvent
-  } from "../generated/BLSPubkeyRegistry_QuorumApkUpdates/BLSPubkeyRegistry"
+  } from "../generated/BLSApkRegistry_QuorumApkUpdates/BLSApkRegistry"
 import {
     QuorumApk
 } from "../generated/schema"
@@ -20,9 +20,9 @@ export function handleOperatorRemovedFromQuorums(
     updateApks(event.address, event.transaction.hash.concatI32(event.logIndex.toI32()), event.params.quorumNumbers, event.block.number, event.block.timestamp);
 }
 
-function updateApks(blsPubkeyRegistryAddress: Address, quorumApkIdPrefix: Bytes, quorumNumbers: Bytes, blockNumber: BigInt, blockTimestamp: BigInt): void {
+function updateApks(blsApkRegistryAddress: Address, quorumApkIdPrefix: Bytes, quorumNumbers: Bytes, blockNumber: BigInt, blockTimestamp: BigInt): void {
     // create a binding for blspubkeyregistry
-    let blsPubkeyRegistry = BLSPubkeyRegistry.bind(blsPubkeyRegistryAddress)
+    let blsApkRegistry = BLSApkRegistry.bind(blsApkRegistryAddress)
     // for each quorum, get the apk from the contract and store it as an entity
     for (let i = 0; i < quorumNumbers.length; i++) {
         let quorumNumber = quorumNumbers[i]
@@ -31,7 +31,7 @@ function updateApks(blsPubkeyRegistryAddress: Address, quorumApkIdPrefix: Bytes,
         )
         quorumApk.quorumNumber = quorumNumber
         // get the apk from the contract
-        let apk = blsPubkeyRegistry.getApkForQuorum(quorumNumber)
+        let apk = blsApkRegistry.getApk(quorumNumber)
         quorumApk.apk_X = apk.X
         quorumApk.apk_Y = apk.Y
 

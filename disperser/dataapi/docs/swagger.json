@@ -305,6 +305,43 @@
                     }
                 }
             }
+        },
+        "/operators-info/deregistered-operators": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.DeregisteredOperatorsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -420,6 +457,37 @@
                 }
             }
         },
+        "dataapi.DeregisteredOperatorMetadata": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "is_online": {
+                    "type": "boolean"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "socket": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.DeregisteredOperatorsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.DeregisteredOperatorMetadata"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
         "dataapi.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -464,6 +532,9 @@
         "dataapi.OperatorNonsigningPercentageMetrics": {
             "type": "object",
             "properties": {
+                "operator_id": {
+                    "type": "string"
+                },
                 "percentage": {
                     "type": "number"
                 },
@@ -478,14 +549,14 @@
         "dataapi.OperatorsNonsigningPercentage": {
             "type": "object",
             "properties": {
-                "operators": {
-                    "type": "object",
-                    "additionalProperties": {
+                "data": {
+                    "type": "array",
+                    "items": {
                         "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
                     }
                 },
-                "total_non_signers": {
-                    "type": "integer"
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
                 }
             }
         },

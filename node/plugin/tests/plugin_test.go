@@ -66,7 +66,7 @@ func setup(m *testing.M) {
 
 func teardown() {
 	if testConfig != nil {
-		fmt.Println("Stoping anvil")
+		fmt.Println("Stopping anvil")
 		testConfig.StopAnvil()
 	}
 }
@@ -92,7 +92,7 @@ func TestPluginOptIn(t *testing.T) {
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(registeredQuorumIds))
+	assert.Equal(t, 2, len(registeredQuorumIds))
 
 	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
 	assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 	testConfig.RunNodePluginBinary("opt-in", operator)
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(registeredQuorumIds))
+	assert.Equal(t, 2, len(registeredQuorumIds))
 
 	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
 	assert.NoError(t, err)
@@ -130,7 +130,7 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 
 func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 	operator := testConfig.Operators[0]
-	assert.Equal(t, "0", operator.NODE_QUORUM_ID_LIST)
+	assert.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 
@@ -141,7 +141,7 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(registeredQuorumIds))
+	assert.Equal(t, 2, len(registeredQuorumIds))
 	assert.Equal(t, uint8(0), registeredQuorumIds[0])
 
 	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
@@ -167,7 +167,7 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 
 func TestPluginInvalidOperation(t *testing.T) {
 	operator := testConfig.Operators[0]
-	assert.Equal(t, "0", operator.NODE_QUORUM_ID_LIST)
+	assert.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 

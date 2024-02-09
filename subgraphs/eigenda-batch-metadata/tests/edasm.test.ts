@@ -97,12 +97,6 @@ describe("EigenDASM", () => {
       BATCH_PREFIX_BYTES.concat(confirmBatchCall.transaction.hash).toHexString()
     )
 
-    assert.fieldEquals(
-      "NonSigning",
-      nonSigningEntityId.toHexString(),
-      "batch",
-      confirmBatchCall.transaction.hash.toHexString()
-    )
 
     assert.fieldEquals(
       "NonSigning",

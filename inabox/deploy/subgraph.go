@@ -73,35 +73,30 @@ type eigenDAOperatorStateSubgraphUpdater struct {
 }
 
 func (u eigenDAOperatorStateSubgraphUpdater) UpdateSubgraph(s *Subgraph, startBlock int) {
-	s.DataSources[0].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinatorWithIndices, "0x")
+	s.DataSources[0].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinator, "0x")
 	s.DataSources[0].Source.StartBlock = startBlock
-	s.DataSources[1].Source.Address = strings.TrimPrefix(u.c.EigenDA.PubkeyRegistry, "0x")
+	s.DataSources[1].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
 	s.DataSources[1].Source.StartBlock = startBlock
-	s.DataSources[2].Source.Address = strings.TrimPrefix(u.c.EigenDA.PubkeyCompendium, "0x")
+	s.DataSources[2].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
 	s.DataSources[2].Source.StartBlock = startBlock
-	s.DataSources[3].Source.Address = strings.TrimPrefix(u.c.EigenDA.PubkeyCompendium, "0x")
+	s.DataSources[3].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinator, "0x")
 	s.DataSources[3].Source.StartBlock = startBlock
-	s.DataSources[4].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinatorWithIndices, "0x")
+	s.DataSources[4].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
 	s.DataSources[4].Source.StartBlock = startBlock
-	s.DataSources[5].Source.Address = strings.TrimPrefix(u.c.EigenDA.PubkeyRegistry, "0x")
-	s.DataSources[5].Source.StartBlock = startBlock
 }
 
 func (u eigenDAOperatorStateSubgraphUpdater) UpdateNetworks(n Networks, startBlock int) {
-	n["devnet"]["BLSRegistryCoordinatorWithIndices"]["address"] = u.c.EigenDA.RegistryCoordinatorWithIndices
-	n["devnet"]["BLSRegistryCoordinatorWithIndices"]["startBlock"] = startBlock
-	n["devnet"]["BLSRegistryCoordinatorWithIndices_Operator"]["address"] = u.c.EigenDA.RegistryCoordinatorWithIndices
-	n["devnet"]["BLSRegistryCoordinatorWithIndices_Operator"]["startBlock"] = startBlock
+	n["devnet"]["RegistryCoordinator"]["address"] = u.c.EigenDA.RegistryCoordinator
+	n["devnet"]["RegistryCoordinator"]["startBlock"] = startBlock
+	n["devnet"]["RegistryCoordinator_Operator"]["address"] = u.c.EigenDA.RegistryCoordinator
+	n["devnet"]["RegistryCoordinator_Operator"]["startBlock"] = startBlock
 
-	n["devnet"]["BLSPubkeyRegistry"]["address"] = u.c.EigenDA.PubkeyRegistry
-	n["devnet"]["BLSPubkeyRegistry"]["startBlock"] = startBlock
-	n["devnet"]["BLSPubkeyRegistry_QuorumApkUpdates"]["address"] = u.c.EigenDA.PubkeyRegistry
-	n["devnet"]["BLSPubkeyRegistry_QuorumApkUpdates"]["startBlock"] = startBlock
-
-	n["devnet"]["BLSPubkeyCompendium"]["address"] = u.c.EigenDA.PubkeyCompendium
-	n["devnet"]["BLSPubkeyCompendium"]["startBlock"] = startBlock
-	n["devnet"]["BLSPubkeyCompendium_Operator"]["address"] = u.c.EigenDA.PubkeyCompendium
-	n["devnet"]["BLSPubkeyCompendium_Operator"]["startBlock"] = startBlock
+	n["devnet"]["BLSApkRegistry"]["address"] = u.c.EigenDA.BlsApkRegistry
+	n["devnet"]["BLSApkRegistry"]["startBlock"] = startBlock
+	n["devnet"]["BLSApkRegistry_Operator"]["address"] = u.c.EigenDA.BlsApkRegistry
+	n["devnet"]["BLSApkRegistry_Operator"]["startBlock"] = startBlock
+	n["devnet"]["BLSApkRegistry_QuorumApkUpdates"]["address"] = u.c.EigenDA.BlsApkRegistry
+	n["devnet"]["BLSApkRegistry_QuorumApkUpdates"]["startBlock"] = startBlock
 }
 
 type eigenDAUIMonitoringUpdater struct {

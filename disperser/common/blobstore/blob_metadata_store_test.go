@@ -8,7 +8,6 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
@@ -211,11 +210,9 @@ func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperse
 	assert.NoError(t, err)
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
-	commitment := &core.Commitment{
-		G1Point: &bn254.G1Point{
-			X: commitX,
-			Y: commitY,
-		},
+	commitment := &core.G1Commitment{
+		X: commitX,
+		Y: commitY,
 	}
 	dataLength := 32
 	batchID := uint32(99)

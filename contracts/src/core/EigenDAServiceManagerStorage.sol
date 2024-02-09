@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@eigenlayer-core/contracts/interfaces/IDelegationManager.sol";
-import "@eigenlayer-core/contracts/interfaces/IStrategyManager.sol";
-
-import "../interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
@@ -39,4 +35,12 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
 
     /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
     mapping(uint32 => bytes32) public batchIdToBatchMetadataHash;
+
+    /// @notice address that is permissioned to confirm batches
+    address public batchConfirmer;
+
+     // storage gap for upgradeability
+     // slither-disable-next-line shadowing-state
+     uint256[47] private __GAP;
+
 }

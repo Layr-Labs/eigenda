@@ -40,6 +40,7 @@ func TestChurn(t *testing.T) {
 
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{
+		OperatorAddress:            operatorAddr.Hex(),
 		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
 		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
 		Salt:                       salt,
@@ -49,6 +50,7 @@ func TestChurn(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
+		[]byte(request.OperatorAddress),
 		request.OperatorToRegisterPubkeyG1,
 		request.OperatorToRegisterPubkeyG2,
 		request.Salt,
@@ -118,7 +120,7 @@ func setupMockTransactor() {
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
 	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(2), nil)
 	transactorMock.On("GetCurrentBlockNumber").Return(uint32(2), nil)
-	transactorMock.On("GetQuorumCount").Return(uint16(1), nil)
+	transactorMock.On("GetQuorumCount").Return(uint8(1), nil)
 	transactorMock.On("GetOperatorStakesForQuorums").Return(dacore.OperatorStakes{
 		0: {
 			0: {

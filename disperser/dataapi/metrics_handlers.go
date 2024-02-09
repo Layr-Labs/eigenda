@@ -155,7 +155,7 @@ func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSe
 	}
 
 	pastBlockTimestamp := uint64(time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix())
-	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp)
+	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp, nonSigners)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +164,7 @@ func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSe
 		return &OperatorsNonsigningPercentage{}, nil
 	}
 
-	operators := make(map[string]OperatorNonsigningPercentageMetrics, 0)
-
+	operators := make([]*OperatorNonsigningPercentageMetrics, 0)
 	for operatorId, totalUnsignedBatches := range nonSigners {
 		if totalUnsignedBatches > 0 {
 			numBatches := numBatchesByOperators[operatorId]
@@ -177,17 +176,20 @@ func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSe
 			if err != nil {
 				return nil, err
 			}
-
-			operators[operatorId] = OperatorNonsigningPercentageMetrics{
+			operatorMetric := OperatorNonsigningPercentageMetrics{
+				OperatorId:           operatorId,
 				TotalUnsignedBatches: totalUnsignedBatches,
 				TotalBatches:         numBatches,
 				Percentage:           pf,
 			}
+			operators = append(operators, &operatorMetric)
 		}
 	}
 
 	return &OperatorsNonsigningPercentage{
-		TotalNonSigners: len(operators),
-		Operators:       operators,
+		Meta: Meta{
+			Size: len(operators),
+		},
+		Data: operators,
 	}, nil
 }

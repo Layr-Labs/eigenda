@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -40,7 +42,7 @@ type DispersalServer struct {
 
 	blobStore   disperser.BlobStore
 	tx          core.Transactor
-	quorumCount uint16
+	quorumCount uint8
 
 	rateConfig    RateConfig
 	ratelimiter   common.RateLimiter
@@ -147,6 +149,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Disperse the blob
 	reply, err := s.disperseBlob(stream.Context(), blob, authenticatedAddress)
 	if err != nil {
+		s.logger.Info("failed to disperse blob", "err", err)
 		return err
 	}
 
@@ -155,6 +158,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		DisperseReply: reply,
 	}})
 	if err != nil {
+		s.logger.Error("failed to stream back DisperseReply", "err", err)
 		return err
 	}
 
@@ -166,8 +170,11 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	blob := getBlobFromRequest(req)
 
-	return s.disperseBlob(ctx, blob, "")
-
+	reply, err := s.disperseBlob(ctx, blob, "")
+	if err != nil {
+		s.logger.Info("failed to disperse blob", "err", err)
+	}
+	return reply, err
 }
 
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
@@ -185,21 +192,21 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 
 	seenQuorums := make(map[uint8]struct{})
-	// The quorum ID must be in range [0, 255]. It'll actually be converted
-	// to uint8, so it cannot be greater than 255.
+	// The quorum ID must be in range [0, 254]. It'll actually be converted
+	// to uint8, so it cannot be greater than 254.
 	for _, param := range securityParams {
 		if _, ok := seenQuorums[param.QuorumID]; ok {
 			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
 		}
 		seenQuorums[param.QuorumID] = struct{}{}
 
-		if uint16(param.QuorumID) >= s.quorumCount {
+		if param.QuorumID >= s.quorumCount {
 			err := s.updateQuorumCount(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
 			}
 
-			if uint16(param.QuorumID) >= s.quorumCount {
+			if param.QuorumID >= s.quorumCount {
 				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
 			}
 		}
@@ -223,7 +230,11 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, err
 	}
 
-	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", securityParams)
+	securityParamsStrings := make([]string, len(securityParams))
+	for i, sp := range securityParams {
+		securityParamsStrings[i] = sp.String()
+	}
+	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if err := blob.RequestHeader.Validate(); err != nil {
 		s.logger.Warn("invalid header", "err", err)
@@ -256,9 +267,10 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
+			s.metrics.HandleBlobStoreFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
-		return nil, err
+		s.logger.Error("failed to store blob", "err", err)
+		return nil, fmt.Errorf("failed to store blob, please try again later")
 	}
 
 	for _, param := range securityParams {
@@ -266,7 +278,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		s.metrics.HandleSuccessfulRequest(quorumId, blobSize, "DisperseBlob")
 	}
 
-	s.logger.Info("received a new blob: ", "key", metadataKey.String())
+	s.logger.Info("successfully received a new blob: ", "key", metadataKey.String())
 	return &pb.DisperseBlobReply{
 		Result:    pb.BlobStatus_PROCESSING,
 		RequestId: []byte(metadataKey.String()),
@@ -438,13 +450,11 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	s.logger.Debug("isConfirmed", "metadata", metadata, "isConfirmed", isConfirmed)
 	if isConfirmed {
 		confirmationInfo := metadata.ConfirmationInfo
-		commit, err := confirmationInfo.BlobCommitment.Commitment.Serialize()
-		if err != nil {
-			return nil, err
-		}
-
 		dataLength := uint32(confirmationInfo.BlobCommitment.Length)
 		quorumInfos := confirmationInfo.BlobQuorumInfos
+		slices.SortStableFunc[[]*core.BlobQuorumInfo](quorumInfos, func(a, b *core.BlobQuorumInfo) int {
+			return int(a.QuorumID) - int(b.QuorumID)
+		})
 		blobQuorumParams := make([]*pb.BlobQuorumParam, len(quorumInfos))
 		quorumNumbers := make([]byte, len(quorumInfos))
 		quorumPercentSigned := make([]byte, len(quorumInfos))
@@ -465,7 +475,10 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 			Status: getResponseStatus(metadata.BlobStatus),
 			Info: &pb.BlobInfo{
 				BlobHeader: &pb.BlobHeader{
-					Commitment:       commit,
+					Commitment: &commonpb.G1Commitment{
+						X: confirmationInfo.BlobCommitment.Commitment.X.Marshal(),
+						Y: confirmationInfo.BlobCommitment.Commitment.Y.Marshal(),
+					},
 					DataLength:       dataLength,
 					BlobQuorumParams: blobQuorumParams,
 				},

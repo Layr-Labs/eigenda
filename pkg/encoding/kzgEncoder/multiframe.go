@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"math"
 
 	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -171,10 +172,17 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 		}
 	}
 
-	verifier, _ := group.GetKzgVerifier(params)
+	verifier, err := group.GetKzgVerifier(params)
+	if err != nil {
+		return err
+	}
 	ks := verifier.Ks
 
 	D := params.ChunkLen
+
+	if D > group.SRSNumberToLoad {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v.", D, group.SRSNumberToLoad)
+	}
 
 	n := len(samples)
 	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
@@ -195,7 +203,19 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 	lhsG1 := bls.LinCombG1(proofs, randomsFr)
 
 	// lhs g2
-	lhsG2 := &ks.Srs.G2[D]
+	exponent := uint64(math.Log2(float64(D)))
+	G2atD, err := ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
+
+	if err != nil {
+		// then try to access if there is a full list of g2 srs
+		G2atD, err = ReadG2Point(D, group.KzgConfig)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Acessed the entire G2")
+	}
+
+	lhsG2 := &G2atD
 
 	// rhs g2
 	rhsG2 := &bls.GenG2

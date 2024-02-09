@@ -2,11 +2,10 @@
 
 pragma solidity ^0.8.9;
 
-import {EigenDAKZGUtils} from "../../src/libraries/EigenDAKZGUtils.sol";
-import {EigenDABlobUtils} from "../../src/libraries/EigenDABlobUtils.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager, BN254} from "../../src/core/EigenDAServiceManager.sol";
-//import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
-
+import {EigenDARollupUtils} from "../libraries/EigenDARollupUtils.sol";
+import {EigenDAServiceManager} from "../core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 struct Commitment {
     address validator; // validator who posted the commitment
@@ -24,7 +23,6 @@ contract MockRollup {
     IEigenDAServiceManager public eigenDAServiceManager; // EigenDASM contract
     BN254.G1Point public tau; //power of tau
     uint256 public illegalValue; // special "illegal" value that should not be included in blob
-    bytes32 public quorumBlobParamsHash; // hash of the security parameters
     uint256 public stakeRequired; // amount of stake required to register as a validator
 
     ///@notice mapping of validators who have registered
@@ -34,11 +32,10 @@ contract MockRollup {
     ///@notice mapping of timestamps to commitments
     mapping(uint256 => Commitment) public commitments;
 
-    constructor(IEigenDAServiceManager _eigenDAServiceManager, BN254.G1Point memory _tau, uint256 _illegalValue, bytes32 _quorumBlobParamsHash, uint256 _stakeRequired) {
+    constructor(IEigenDAServiceManager _eigenDAServiceManager, BN254.G1Point memory _tau, uint256 _illegalValue, uint256 _stakeRequired) {
         eigenDAServiceManager = _eigenDAServiceManager;
         tau = _tau;
         illegalValue = _illegalValue;
-        quorumBlobParamsHash = _quorumBlobParamsHash;
         stakeRequired = _stakeRequired;
     }
 
@@ -57,16 +54,13 @@ contract MockRollup {
      */
     function postCommitment(
         IEigenDAServiceManager.BlobHeader memory blobHeader, 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof
     ) external { 
         require(validators[msg.sender], "MockRollup.postCommitment: Validator not registered");
         require(commitments[block.timestamp].validator == address(0), "MockRollup.postCommitment: Commitment already posted");
 
-        // verify that the blob header contains the correct quorumBlobParams
-        require(keccak256(abi.encode(blobHeader.quorumBlobParams)) == quorumBlobParamsHash, "MockRollup.postCommitment: QuorumBlobParams do not match quorumBlobParamsHash");
-
         // verify that the blob was included in the batch
-        EigenDABlobUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
+        EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
 
         commitments[block.timestamp] = Commitment(msg.sender, blobHeader.dataLength, blobHeader.commitment);
     }
@@ -85,7 +79,7 @@ contract MockRollup {
         require(point < commitment.dataLength, "MockRollup.challengeCommitment: Point must be less than data length");
 
         // verify that the commitment contains the illegal value
-        require(EigenDAKZGUtils.openCommitment(point, illegalValue, tau, commitment.polynomialCommitment, proof), "MockRollup.challengeCommitment: Does not evaluate to illegal value");
+        require(EigenDARollupUtils.openCommitment(point, illegalValue, tau, commitment.polynomialCommitment, proof), "MockRollup.challengeCommitment: Does not evaluate to illegal value");
             
         // blacklist the validator
         validators[commitment.validator] = false;

@@ -80,6 +80,26 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
+  dataapi.DeregisteredOperatorMetadata:
+    properties:
+      block_number:
+        type: integer
+      is_online:
+        type: boolean
+      operator_id:
+        type: string
+      socket:
+        type: string
+    type: object
+  dataapi.DeregisteredOperatorsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dataapi.DeregisteredOperatorMetadata'
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
+    type: object
   dataapi.ErrorResponse:
     properties:
       error:
@@ -108,6 +128,8 @@ definitions:
     type: object
   dataapi.OperatorNonsigningPercentageMetrics:
     properties:
+      operator_id:
+        type: string
       percentage:
         type: number
       total_batches:
@@ -117,12 +139,12 @@ definitions:
     type: object
   dataapi.OperatorsNonsigningPercentage:
     properties:
-      operators:
-        additionalProperties:
+      data:
+        items:
           $ref: '#/definitions/dataapi.OperatorNonsigningPercentageMetrics'
-        type: object
-      total_non_signers:
-        type: integer
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
     type: object
   dataapi.Throughput:
     properties:
@@ -343,6 +365,31 @@ paths:
       summary: Fetch throughput time series
       tags:
       - Metrics
+  /operators-info/deregistered-operators:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.DeregisteredOperatorsResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch list of operators that have been deregistered for days. Days
+        is a query parameter with a default value of 14 and max value of 30.
+      tags:
+      - OperatorsInfo
 schemes:
 - https
 - http

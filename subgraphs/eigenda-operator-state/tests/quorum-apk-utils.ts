@@ -1,6 +1,6 @@
 import { newMockEvent } from "matchstick-as"
 import { ethereum, BigInt, Bytes, Address } from "@graphprotocol/graph-ts"
-import { OperatorAddedToQuorums as OperatorAddedToQuorumsEvent, OperatorRemovedFromQuorums as OperatorRemovedFromQuorumsEvent } from "../generated/BLSPubkeyRegistry_QuorumApkUpdates/BLSPubkeyRegistry"
+import { OperatorAddedToQuorums as OperatorAddedToQuorumsEvent, OperatorRemovedFromQuorums as OperatorRemovedFromQuorumsEvent } from "../generated/BLSApkRegistry_QuorumApkUpdates/BLSApkRegistry"
 
 export function createNewOperatorAddedToQuorumsEvent(
   operator: Address,

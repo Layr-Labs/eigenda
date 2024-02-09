@@ -173,12 +173,13 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 		DISPERSER_SERVER_PRIVATE_KEY:            "123",
 		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
 
-		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0",
-		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000",
-		DISPERSER_SERVER_PER_USER_UNAUTH_BYTE_RATE: "32000",
-		DISPERSER_SERVER_TOTAL_UNAUTH_BLOB_RATE:    "10",
-		DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE: "2",
+		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
+		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
+		DISPERSER_SERVER_PER_USER_UNAUTH_BYTE_RATE: "32000,32000",
+		DISPERSER_SERVER_TOTAL_UNAUTH_BLOB_RATE:    "10,10",
+		DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE: "2,2",
 		DISPERSER_SERVER_ENABLE_RATELIMITER:        "true",
+		DISPERSER_SERVER_ALLOWLIST:                 "3.221.120.68/0/1000/10485760,18.214.113.214/0/1000/10485760",
 
 		DISPERSER_SERVER_BUCKET_SIZES:       "5s",
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
@@ -205,6 +206,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetreiver,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
 		BATCHER_SRS_ORDER:                     "300000",
+		BATCHER_SRS_LOAD:                      "300000",
 		BATCHER_CHAIN_RPC:                     "",
 		BATCHER_PRIVATE_KEY:                   key[2:],
 		BATCHER_STD_LOG_LEVEL:                 "debug",
@@ -236,6 +238,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 		DISPERSER_ENCODER_G1_PATH:                 "",
 		DISPERSER_ENCODER_G2_PATH:                 "",
 		DISPERSER_ENCODER_SRS_ORDER:               "",
+		DISPERSER_ENCODER_SRS_LOAD:                "",
 		DISPERSER_ENCODER_CACHE_PATH:              "",
 		DISPERSER_ENCODER_VERBOSE:                 "",
 		DISPERSER_ENCODER_NUM_WORKERS:             fmt.Sprint(runtime.GOMAXPROCS(0)),
@@ -279,7 +282,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_ENABLE_NODE_API:             "true",
 		NODE_API_PORT:                    nodeApiPort,
 		NODE_TIMEOUT:                     "10",
-		NODE_QUORUM_ID_LIST:              "0",
+		NODE_QUORUM_ID_LIST:              "0,1",
 		NODE_DB_PATH:                     dbPath,
 		NODE_ENABLE_TEST_MODE:            "false", // using encrypted key in inabox
 		NODE_TEST_PRIVATE_BLS:            blsKey,
@@ -295,8 +298,10 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_EXPIRATION_POLL_INTERVAL:    "10",
 		NODE_G1_PATH:                     "",
 		NODE_G2_PATH:                     "",
+		NODE_G2_POWER_OF_2_PATH:          "",
 		NODE_CACHE_PATH:                  "",
 		NODE_SRS_ORDER:                   "",
+		NODE_SRS_LOAD:                    "",
 		NODE_NUM_WORKERS:                 fmt.Sprint(runtime.GOMAXPROCS(0)),
 		NODE_VERBOSE:                     "true",
 		NODE_CHAIN_RPC:                   "",
@@ -311,7 +316,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
-
+	v.NODE_G2_PATH = ""
 	return v
 
 }
@@ -331,8 +336,10 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 
 		RETRIEVER_G1_PATH:             "",
 		RETRIEVER_G2_PATH:             "",
+		RETRIEVER_G2_POWER_OF_2_PATH:  "",
 		RETRIEVER_CACHE_PATH:          "",
 		RETRIEVER_SRS_ORDER:           "",
+		RETRIEVER_SRS_LOAD:            "",
 		RETRIEVER_NUM_WORKERS:         fmt.Sprint(runtime.GOMAXPROCS(0)),
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
@@ -343,6 +350,8 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_FILE_LOG_LEVEL: "trace",
 		RETRIEVER_LOG_PATH:       logPath,
 	}
+
+	v.RETRIEVER_G2_PATH = ""
 
 	env.applyDefaults(&v, "RETRIEVER", "retriever", ind)
 

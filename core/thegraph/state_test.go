@@ -42,8 +42,10 @@ func (m *mockChainState) GetOperatorStateByOperator(ctx context.Context, blockNu
 
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	logger, err := logging.GetLogger(logging.Config{
-		StdLevel:  "debug",
-		FileLevel: "debug",
+		StdFormat:  "terminal",
+		StdLevel:   "debug",
+		FileFormat: "logfmt",
+		FileLevel:  "debug",
 	})
 	assert.NoError(t, err)
 
@@ -104,8 +106,10 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 
 func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	logger, err := logging.GetLogger(logging.Config{
-		StdLevel:  "debug",
-		FileLevel: "debug",
+		StdFormat:  "terminal",
+		StdLevel:   "debug",
+		FileFormat: "logfmt",
+		FileLevel:  "debug",
 	})
 	assert.NoError(t, err)
 

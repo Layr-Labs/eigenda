@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
@@ -25,6 +26,17 @@ type SecurityParam struct {
 	// for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
 	// data was posted to the DA node.
 	QuorumRate common.RateParam `json:"quorum_rate"`
+}
+
+const (
+	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
+	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
+	// different IDs).
+	MaxQuorumID = 254
+)
+
+func (s *SecurityParam) String() string {
+	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, QuorumThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.QuorumThreshold)
 }
 
 // QuorumResult contains the quorum ID and the amount signed for the quorum
@@ -116,9 +128,10 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
 type BlobCommitments struct {
-	Commitment  *Commitment `json:"commitment"`
-	LengthProof *Commitment `json:"length_proof"`
-	Length      uint        `json:"length"`
+	Commitment       *G1Commitment `json:"commitment"`
+	LengthCommitment *G2Commitment `json:"length_commitment"`
+	LengthProof      *LengthProof  `json:"length_proof"`
+	Length           uint          `json:"length"`
 }
 
 // Batch
@@ -168,15 +181,15 @@ type BlobMessage struct {
 }
 
 // Serialize encodes a batch of chunks into a byte array
-func (cb Bundles) Serialize() ([][][]byte, error) {
-	data := make([][][]byte, len(cb))
-	for i, bundle := range cb {
+func (cb Bundles) Serialize() (map[uint32][][]byte, error) {
+	data := make(map[uint32][][]byte, len(cb))
+	for quorumID, bundle := range cb {
 		for _, chunk := range bundle {
 			chunkData, err := chunk.Serialize()
 			if err != nil {
 				return nil, err
 			}
-			data[i] = append(data[i], chunkData)
+			data[uint32(quorumID)] = append(data[uint32(quorumID)], chunkData)
 		}
 	}
 	return data, nil
@@ -195,7 +208,7 @@ func (cb Bundles) Size() int64 {
 
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier
 type Sample struct {
-	Commitment      *Commitment
+	Commitment      *G1Commitment
 	Chunk           *Chunk
 	AssignmentIndex ChunkNumber
 	BlobIndex       int

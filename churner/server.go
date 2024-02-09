@@ -8,6 +8,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -161,6 +162,8 @@ func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest)
 func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
 	signature := &core.Signature{G1Point: new(core.G1Point).Deserialize(req.GetOperatorRequestSignature())}
 
+	address := gethcommon.HexToAddress(req.GetOperatorAddress())
+
 	salt := [32]byte{}
 	copy(salt[:], req.GetSalt())
 
@@ -170,6 +173,7 @@ func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
 	}
 
 	return &ChurnRequest{
+		OperatorAddress:            address,
 		OperatorToRegisterPubkeyG1: new(core.G1Point).Deserialize(req.GetOperatorToRegisterPubkeyG1()),
 		OperatorToRegisterPubkeyG2: new(core.G2Point).Deserialize(req.GetOperatorToRegisterPubkeyG2()),
 		OperatorRequestSignature:   signature,

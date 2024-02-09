@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
@@ -18,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -44,14 +44,15 @@ func TestMain(m *testing.M) {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func makeTestEncoder() (core.Encoder, error) {
 	config := kzgEncoder.KzgConfig{
-		G1Path:    "../../inabox/resources/kzg/g1.point.300000",
-		G2Path:    "../../inabox/resources/kzg/g2.point.300000",
-		CacheDir:  "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:  300000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
+		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        300000,
+		SRSNumberToLoad: 300000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config})
+	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
 }
 
 func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
@@ -126,24 +127,33 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 }
 
 func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
-	var commitX, commitY, lengthX, lengthY fp.Element
+	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
 	assert.NoError(t, err)
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
-	_, err = lengthX.SetString("18730744272503541936633286178165146673834730535090946570310418711896464442549")
-	assert.NoError(t, err)
-	_, err = lengthY.SetString("15356431458378126778840641829778151778222945686256112821552210070627093656047")
-	assert.NoError(t, err)
 
-	commitment := bn254.G1Point{
+	commitment := &core.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
-	lengthProof := bn254.G1Point{
-		X: lengthX,
-		Y: lengthY,
-	}
+	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
+	_, err = lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
+	assert.NoError(t, err)
+	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
+	assert.NoError(t, err)
+	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
+	assert.NoError(t, err)
+	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
+	assert.NoError(t, err)
+
+	var lengthProof, lengthCommitment core.G2Commitment
+	lengthProof.X.A0 = lengthXA0
+	lengthProof.X.A1 = lengthXA1
+	lengthProof.Y.A0 = lengthYA0
+	lengthProof.Y.A1 = lengthYA1
+
+	lengthCommitment = lengthProof
 
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
@@ -157,17 +167,19 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	blobHeaders := []*core.BlobHeader{
 		{
 			BlobCommitments: core.BlobCommitments{
-				Commitment:  &core.Commitment{G1Point: &commitment},
-				LengthProof: &core.Commitment{G1Point: &lengthProof},
-				Length:      48,
+				Commitment:       commitment,
+				LengthCommitment: &lengthCommitment,
+				LengthProof:      &lengthProof,
+				Length:           48,
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
 		{
 			BlobCommitments: core.BlobCommitments{
-				Commitment:  &core.Commitment{G1Point: &commitment},
-				LengthProof: &core.Commitment{G1Point: &lengthProof},
-				Length:      50,
+				Commitment:       commitment,
+				LengthCommitment: &lengthCommitment,
+				LengthProof:      &lengthProof,
+				Length:           50,
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
@@ -301,10 +313,19 @@ func TestGetBlobHeader(t *testing.T) {
 }
 
 func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader {
-	serializedCommitment, err := blobHeader.Commitment.Serialize()
-	assert.NoError(t, err)
-	serializedLengthProof, err := blobHeader.LengthProof.Serialize()
-	assert.NoError(t, err)
+	var lengthCommitment, lengthProof pb.G2Commitment
+	if blobHeader.LengthCommitment != nil {
+		lengthCommitment.XA0 = blobHeader.LengthCommitment.X.A0.Marshal()
+		lengthCommitment.XA1 = blobHeader.LengthCommitment.X.A1.Marshal()
+		lengthCommitment.YA0 = blobHeader.LengthCommitment.Y.A0.Marshal()
+		lengthCommitment.YA1 = blobHeader.LengthCommitment.Y.A1.Marshal()
+	}
+	if blobHeader.LengthProof != nil {
+		lengthProof.XA0 = blobHeader.LengthProof.X.A0.Marshal()
+		lengthProof.XA1 = blobHeader.LengthProof.X.A1.Marshal()
+		lengthProof.YA0 = blobHeader.LengthProof.Y.A0.Marshal()
+		lengthProof.YA1 = blobHeader.LengthProof.Y.A1.Marshal()
+	}
 	quorumHeader := &pb.BlobQuorumInfo{
 		QuorumId:           uint32(blobHeader.QuorumInfos[0].QuorumID),
 		QuorumThreshold:    uint32(blobHeader.QuorumInfos[0].QuorumThreshold),
@@ -313,9 +334,13 @@ func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader
 	}
 
 	return &pb.BlobHeader{
-		Commitment:    serializedCommitment,
-		LengthProof:   serializedLengthProof,
-		Length:        uint32(blobHeader.Length),
-		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeader},
+		Commitment: &commonpb.G1Commitment{
+			X: blobHeader.Commitment.X.Marshal(),
+			Y: blobHeader.Commitment.Y.Marshal(),
+		},
+		LengthCommitment: &lengthCommitment,
+		LengthProof:      &lengthProof,
+		Length:           uint32(blobHeader.Length),
+		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeader},
 	}
 }

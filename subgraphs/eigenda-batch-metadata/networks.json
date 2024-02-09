@@ -13,14 +13,14 @@
   },
   "preprod-goerli": {
     "EigenDAServiceManager": {
-      "address": "0x25425d315Ae31897a8e7F47B1077Bf5ED3894Ca1",
-      "startBlock": 10015410
+      "address": "0x5f2b48682F0854b7F33e44124D92AC77768143b5",
+      "startBlock": 10470500
     }
   },
   "goerli": {
     "EigenDAServiceManager": {
-      "address": "0x9FcE30E01a740660189bD8CbEaA48Abd36040010",
-      "startBlock": 10043972
+      "address": "0xa3b1689Ab85409B15e07d2ED50A6EA9905074Ee5",
+      "startBlock": 10497644
     }
   }
 }

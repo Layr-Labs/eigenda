@@ -134,6 +134,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZER_INTERVAL"),
 		Value:    6 * time.Minute,
 	}
+	FinalizerPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "finalizer-pool-size"),
+		Usage:    "Size of the finalizer workerpool",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZER_POOL_SIZE"),
+		Value:    4,
+	}
 	EncodingRequestQueueSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-request-queue-size"),
 		Usage:    "Size of the encoding request queue",
@@ -196,6 +203,7 @@ var optionalFlags = []cli.Flag{
 	ChainWriteTimeoutFlag,
 	NumConnectionsFlag,
 	FinalizerIntervalFlag,
+	FinalizerPoolSizeFlag,
 	EncodingRequestQueueSizeFlag,
 	MaxNumRetriesPerBlobFlag,
 	TargetNumChunksFlag,

@@ -4,12 +4,13 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {BLSMockAVSDeployer} from "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {MockRollup, BN254} from "./mocks/MockRollup.sol";
-import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IEigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
-import {EigenDABlobUtils} from "../src/libraries/EigenDABlobUtils.sol";
-//import {BN254} from "../lib/eigenlayer-middleware/src/libraries/BN254.sol";
+import {BLSMockAVSDeployer} from "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
+import {MockRollup} from "../../src/rollup/MockRollup.sol";
+import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
+import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 
 import "forge-std/StdStorage.sol";
 
@@ -48,16 +49,14 @@ contract MockRollupTest is BLSMockAVSDeployer {
     uint256 illegalPoint = 6;
     uint256 illegalValue = 1555;
     BN254.G2Point illegalProof;
-    bytes32 quorumBlobParamsHash = keccak256(abi.encodePacked("quorumBlobParamsHash"));
 
     function setUp() public {
         _setUpBLSMockAVSDeployer();
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
+            avsDirectory,
             registryCoordinator,
-            strategyManagerMock,
-            delegationMock,
-            slasher
+            stakeRegistry
         );
 
         eigenDAServiceManager = EigenDAServiceManager(
@@ -68,15 +67,15 @@ contract MockRollupTest is BLSMockAVSDeployer {
                     abi.encodeWithSelector(
                         EigenDAServiceManager.initialize.selector,
                         pauserRegistry,
-                        serviceManagerOwner,
-                        feePerBytePerTime,
-                        serviceManagerOwner
+                        0,
+                        registryCoordinatorOwner,
+                        registryCoordinatorOwner
                     )
                 )
             )
         );
 
-        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, quorumBlobParamsHash, defaultStakeRequired);
+        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, defaultStakeRequired);
 
         //hardcode g2 proof
         illegalProof.X[1] = 11151623676041303181597631684634074376466382703418354161831688442589830350329;
@@ -93,12 +92,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         mockRollup.registerValidator{value: 1 ether}();
 
         //get commitment with illegal value
-        (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
-
-        stdstore
-            .target(address(mockRollup))
-            .sig("quorumBlobParamsHash()")
-            .checked_write(keccak256(abi.encode(blobHeader.quorumBlobParams)));
+        (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
         //post commitment
         vm.prank(alice);
@@ -118,7 +112,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         illegalCommitment = s0.scalar_mul(1).plus(s1.scalar_mul(1)).plus(s2.scalar_mul(1)).plus(s3.scalar_mul(1)).plus(s4.scalar_mul(1));
     }
 
-    function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDABlobUtils.BlobVerificationProof memory){
+    function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDARollupUtils.BlobVerificationProof memory){
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
         blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
@@ -149,7 +143,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDABlobUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -187,7 +181,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
                 blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", j)))) % 100;
                 j++;
             }
-            blobHeader.quorumBlobParams[i].quantizationParameter = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quantizationParameter", i))));
+            blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }
         // mark all quorum numbers as unused

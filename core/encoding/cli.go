@@ -17,6 +17,8 @@ const (
 	VerboseFlagName           = "kzg.verbose"
 	PreloadEncoderFlagName    = "kzg.preload-encoder"
 	CacheEncodedBlobsFlagName = "cache-encoded-blobs"
+	SRSLoadingNumberFlagName  = "kzg.srs-load"
+	G2PowerOf2PathFlagName    = "kzg.g2-power-of-2-path"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -29,8 +31,8 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:     G2PathFlagName,
-			Usage:    "Path to G2 SRS",
-			Required: true,
+			Usage:    "Path to G2 SRS. Either this flag or G2_POWER_OF_2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
+			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_PATH"),
 		},
 		cli.StringFlag{
@@ -44,6 +46,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "Order of the SRS",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_ORDER"),
+		},
+		cli.Uint64Flag{
+			Name:     SRSLoadingNumberFlagName,
+			Usage:    "Number of SRS points to load into memory",
+			Required: true,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_LOAD"),
 		},
 		cli.Uint64Flag{
 			Name:     NumWorkerFlagName,
@@ -70,6 +78,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRELOAD_ENCODER"),
 		},
+		cli.StringFlag{
+			Name:     G2PowerOf2PathFlagName,
+			Usage:    "Path to G2 SRS points that are on power of 2. Either this flag or G2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_POWER_OF_2_PATH"),
+		},
 	}
 }
 
@@ -79,9 +93,12 @@ func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
 	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
 	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)
 	cfg.SRSOrder = ctx.GlobalUint64(SRSOrderFlagName)
+	cfg.SRSNumberToLoad = ctx.GlobalUint64(SRSLoadingNumberFlagName)
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
 	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
+	cfg.G2PowerOf2Path = ctx.GlobalString(G2PowerOf2PathFlagName)
+
 	return EncoderConfig{
 		KzgConfig:         cfg,
 		CacheEncodedBlobs: ctx.GlobalBoolT(CacheEncodedBlobsFlagName),

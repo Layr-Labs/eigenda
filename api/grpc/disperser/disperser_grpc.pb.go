@@ -27,6 +27,14 @@ type DisperserClient interface {
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
+	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
+	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
+	//  1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
+	//  2. The Disperser sends back a BlobAuthHeader message containing information for the client to
+	//     verify and sign.
+	//  3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an
+	//     AuthenticationData message.
+	//  4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	DisperseBlobAuthenticated(ctx context.Context, opts ...grpc.CallOption) (Disperser_DisperseBlobAuthenticatedClient, error)
 	// This API is meant to be polled for the blob status.
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
@@ -114,6 +122,14 @@ type DisperserServer interface {
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
+	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
+	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
+	//  1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
+	//  2. The Disperser sends back a BlobAuthHeader message containing information for the client to
+	//     verify and sign.
+	//  3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an
+	//     AuthenticationData message.
+	//  4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error
 	// This API is meant to be polled for the blob status.
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)

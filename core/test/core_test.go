@@ -41,14 +41,15 @@ func setup(m *testing.M) {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func makeTestEncoder() (core.Encoder, error) {
 	config := kzgEncoder.KzgConfig{
-		G1Path:    "../../inabox/resources/kzg/g1.point",
-		G2Path:    "../../inabox/resources/kzg/g2.point",
-		CacheDir:  "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:  3000,
-		NumWorker: uint64(runtime.GOMAXPROCS(0)),
+		G1Path:          "../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../inabox/resources/kzg/g2.point",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config})
+	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
 
 }
 
@@ -124,9 +125,10 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 
 		blobHeader := &core.BlobHeader{
 			BlobCommitments: core.BlobCommitments{
-				Commitment:  commitments.Commitment,
-				LengthProof: commitments.LengthProof,
-				Length:      commitments.Length,
+				Commitment:       commitments.Commitment,
+				LengthCommitment: commitments.LengthCommitment,
+				LengthProof:      commitments.LengthProof,
+				Length:           commitments.Length,
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		}
@@ -181,7 +183,6 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 		for z, encodedBlob := range encodedBlobs {
 			blobMessages[z] = encodedBlob[id]
 		}
-
 		err := val.ValidateBatch(blobMessages, state.OperatorState, pool)
 		assert.NoError(t, err)
 	}
