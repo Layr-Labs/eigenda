@@ -75,9 +75,10 @@ type Batcher struct {
 	TransactionManager    TxnManager
 	Metrics               *Metrics
 
-	ethClient common.EthClient
-	finalizer Finalizer
-	logger    common.Logger
+	ethClient     common.EthClient
+	finalizer     Finalizer
+	logger        common.Logger
+	HeartbeatChan chan time.Time
 }
 
 func NewBatcher(
@@ -95,6 +96,7 @@ func NewBatcher(
 	txnManager TxnManager,
 	logger common.Logger,
 	metrics *Metrics,
+	heartbeatChan chan time.Time,
 ) (*Batcher, error) {
 	batchTrigger := NewEncodedSizeNotifier(
 		make(chan struct{}, 1),
@@ -129,9 +131,10 @@ func NewBatcher(
 		TransactionManager:    txnManager,
 		Metrics:               metrics,
 
-		ethClient: ethClient,
-		finalizer: finalizer,
-		logger:    logger,
+		ethClient:     ethClient,
+		finalizer:     finalizer,
+		logger:        logger,
+		HeartbeatChan: heartbeatChan,
 	}, nil
 }
 
@@ -461,6 +464,9 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		}
 	}
 
+	// Signal Liveness
+	sendHeartbeat(b.HeartbeatChan, log)
+
 	return nil
 }
 
@@ -574,4 +580,15 @@ func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *
 		}
 	}
 	return true
+}
+
+func sendHeartbeat(heartbeatChan chan time.Time, logger common.Logger) {
+	// Send heartbeat signal
+	select {
+	case heartbeatChan <- time.Now():
+		// Log for debugging purposes; remove or adjust log level in production
+		logger.Info("Heartbeat Sent")
+	default:
+		// Prevent blocking if no receiver is ready
+	}
 }

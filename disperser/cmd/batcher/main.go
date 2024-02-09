@@ -33,16 +33,14 @@ var (
 	gitCommit string
 	gitDate   string
 	// Note: Changing these paths will require updating the k8s deployment
-	readinessProbePath string        = "/tmp/ready"
-	healthProbePath    string        = "/tmp/health"
-	maxStallDuration   time.Duration = 240 * time.Second
+	readinessProbePath      string        = "/tmp/ready"
+	healthProbePath         string        = "/tmp/health"
+	maxStallDuration        time.Duration = 240 * time.Second
+	handleBatchLivenessChan               = make(chan time.Time, 1)
 )
 
 func main() {
-	probeChan := make(chan time.Time, 1)
 	// Channel for signaling errors from the app goroutine
-	errorChan := make(chan error)
-
 	app := cli.NewApp()
 	app.Flags = flags.Flags
 	app.Version = fmt.Sprintf("%s-%s-%s", version, gitCommit, gitDate)
@@ -51,34 +49,19 @@ func main() {
 	app.Description = "Service for creating a batch from queued blobs, distributing coded chunks to nodes, and confirming onchain"
 
 	app.Action = RunBatcher
-	// Run the CLI app in a separate goroutine
-	go func() {
-		if err := app.Run(os.Args); err != nil {
-			errorChan <- err
-		}
-	}()
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatalf("application failed: %v", err)
+	}
 
 	if _, err := os.Create(healthProbePath); err != nil {
-		log.Printf("Failed to create readiness file: %v", err)
+		log.Printf("Failed to create healthProbe file: %v", err)
 	}
-	// Start File based liveness probe
-	go heartBeatMonitor(healthProbePath, probeChan, maxStallDuration)
 
-	ticker := time.NewTicker(118 * time.Second)
-	defer ticker.Stop()
+	// Start HeartBeat Monitor
+	go heartBeatMonitor(healthProbePath, maxStallDuration)
 
-	for {
-		select {
-		case <-ticker.C:
-			// Signal the health probe to update the file
-			probeChan <- time.Now()
-			log.Printf("File Probe Timer Ticked: time %v Sent\n", time.Now())
-		case err := <-errorChan:
-			log.Printf("Batcher exited with error: %v\n", err)
-			close(probeChan) // Signal the health probe to stop
-			return
-		}
-	}
+	select {}
 }
 
 func RunBatcher(ctx *cli.Context) error {
@@ -178,7 +161,7 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, logger)
 	txnManager := batcher.NewTxnManager(client, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
-	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics)
+	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
 	if err != nil {
 		return err
 	}
@@ -205,15 +188,16 @@ func RunBatcher(ctx *cli.Context) error {
 }
 
 // process signal from main to signal liveness
-func heartBeatMonitor(filePath string, probeChan <-chan time.Time, maxStallDuration time.Duration) {
+func heartBeatMonitor(filePath string, maxStallDuration time.Duration) {
 	var lastHeartbeat time.Time
 	stallTimer := time.NewTimer(maxStallDuration)
 
 	for {
 		select {
-		case heartbeat, ok := <-probeChan:
+		// HeartBeat from Goroutine on Batcher Pull Interval
+		case heartbeat, ok := <-handleBatchLivenessChan:
 			if !ok {
-				log.Println("probeChan closed, stopping health probe")
+				log.Println("handleBatchLivenessChan closed, stopping health probe")
 				return
 			}
 			log.Printf("Received heartbeat: %v\n", heartbeat)
