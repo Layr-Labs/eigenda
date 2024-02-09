@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	gcore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -18,6 +17,7 @@ import (
 var (
 	gasPricePercentageMultiplier = big.NewInt(10)
 	hundred                      = big.NewInt(100)
+	maxSpeedUpRetry              = 3
 )
 
 // TxnManager receives transactions from the caller, sends them to the chain, and monitors their status.
@@ -37,6 +37,10 @@ type TxnRequest struct {
 	Metadata interface{}
 
 	requestedAt time.Time
+	// txAttempts are the transactions that have been attempted to be mined for this request.
+	// If a transaction hasn't been confirmed within the timeout and a replacement transaction is sent,
+	// the original transaction hash will be kept in this slice
+	txAttempts []*types.Transaction
 }
 
 // ReceiptOrErr is a wrapper for a transaction receipt or an error.
@@ -83,6 +87,7 @@ func NewTxnRequest(tx *types.Transaction, tag string, value *big.Int, metadata i
 		Metadata: metadata,
 
 		requestedAt: time.Now(),
+		txAttempts:  make([]*types.Transaction, 0),
 	}
 }
 
@@ -140,6 +145,7 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 		t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", txn.Hash().Hex())
 	}
 	req.Tx = txn
+	req.txAttempts = append(req.txAttempts, txn)
 
 	t.requestChan <- req
 	t.metrics.UpdateTxQueue(len(t.requestChan))
@@ -155,14 +161,15 @@ func (t *txnManager) ReceiptChan() chan *ReceiptOrErr {
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
 func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
 	numSpeedUps := 0
+	retryFromFailure := 0
 	for {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
 
 		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
-		receipt, err := t.ethClient.EnsureTransactionEvaled(
+		receipt, err := t.ethClient.EnsureAnyTransactionEvaled(
 			ctxWithTimeout,
-			req.Tx,
+			req.txAttempts,
 			req.Tag,
 		)
 		if err == nil {
@@ -185,20 +192,18 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			}
 			err = t.ethClient.SendTransaction(ctx, newTx)
 			if err != nil {
-				if errors.Is(err, gcore.ErrNonceTooLow) {
-					// try to get the receipt again to see if the transaction has been mined
-					_, receiptErr := t.ethClient.TransactionReceipt(ctx, req.Tx.Hash())
-					if receiptErr == nil {
-						continue
-					}
-				}
-				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "err", err)
+				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 				t.metrics.IncrementTxnCount("failure")
-				return nil, err
-			} else {
-				t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", newTx.Hash().Hex())
+				if retryFromFailure >= maxSpeedUpRetry {
+					return nil, err
+				}
+				retryFromFailure++
+				continue
 			}
+
+			t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", newTx.Hash().Hex())
 			req.Tx = newTx
+			req.txAttempts = append(req.txAttempts, newTx)
 			numSpeedUps++
 		} else {
 			t.logger.Error("[TxnManager] transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
