@@ -189,6 +189,7 @@ func (b *Batcher) Start(ctx context.Context) error {
 				}
 			case <-batchTrigger.Notify:
 				ticker.Stop()
+
 				if err := b.HandleSingleBatch(ctx); err != nil {
 					if errors.Is(err, errNoEncodedResults) {
 						b.logger.Warn("no encoded results to make a batch with")
@@ -381,6 +382,10 @@ type confirmationMetadata struct {
 
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
+
+	// Signal Liveness to indicate no stall
+	b.signalLiveness()
+
 	// start a timer
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		b.Metrics.ObserveLatency("total", f*1000) // make milliseconds
@@ -463,9 +468,6 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 			}
 		}
 	}
-
-	// Signal Liveness
-	sendHeartbeat(b.HeartbeatChan, log)
 
 	return nil
 }
@@ -582,13 +584,13 @@ func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *
 	return true
 }
 
-func sendHeartbeat(heartbeatChan chan time.Time, logger common.Logger) {
-	// Send heartbeat signal
+func (b *Batcher) signalLiveness() {
 	select {
-	case heartbeatChan <- time.Now():
-		// Log for debugging purposes; remove or adjust log level in production
-		logger.Info("Heartbeat Sent")
+	case b.HeartbeatChan <- time.Now():
+		b.logger.Info("Heartbeat signal sent")
 	default:
-		// Prevent blocking if no receiver is ready
+		// This case happens if there's no receiver ready to consume the heartbeat signal.
+		// It prevents the goroutine from blocking if the channel is full or not being listened to.
+		b.logger.Warn("Heartbeat signal skipped, no receiver on the channel")
 	}
 }
