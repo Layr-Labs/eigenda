@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/gammazero/workerpool"
 
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -31,10 +32,24 @@ type finalizer struct {
 	ethClient            common.EthClient
 	rpcClient            common.RPCEthClient
 	maxNumRetriesPerBlob uint
+	numBlobsPerFetch     int32
+	numWorkers           int
 	logger               common.Logger
+	metrics              *FinalizerMetrics
 }
 
-func NewFinalizer(timeout time.Duration, loopInterval time.Duration, blobStore disperser.BlobStore, ethClient common.EthClient, rpcClient common.RPCEthClient, maxNumRetriesPerBlob uint, logger common.Logger) Finalizer {
+func NewFinalizer(
+	timeout time.Duration,
+	loopInterval time.Duration,
+	blobStore disperser.BlobStore,
+	ethClient common.EthClient,
+	rpcClient common.RPCEthClient,
+	maxNumRetriesPerBlob uint,
+	numBlobsPerFetch int32,
+	numWorkers int,
+	logger common.Logger,
+	metrics *FinalizerMetrics,
+) Finalizer {
 	return &finalizer{
 		timeout:              timeout,
 		loopInterval:         loopInterval,
@@ -42,7 +57,10 @@ func NewFinalizer(timeout time.Duration, loopInterval time.Duration, blobStore d
 		ethClient:            ethClient,
 		rpcClient:            rpcClient,
 		maxNumRetriesPerBlob: maxNumRetriesPerBlob,
+		numBlobsPerFetch:     numBlobsPerFetch,
+		numWorkers:           numWorkers,
 		logger:               logger,
+		metrics:              metrics,
 	}
 }
 
@@ -68,19 +86,43 @@ func (f *finalizer) Start(ctx context.Context) {
 // block number is less than or equal to the latest finalized block number.
 // If it failes to process some blobs, it will log the error, skip the failed blobs, and will not return an error. The function should be invoked again to retry.
 func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
+	startTime := time.Now()
+	pool := workerpool.New(f.numWorkers)
 	finalizedHeader, err := f.getLatestFinalizedBlock(ctx)
 	if err != nil {
 		return fmt.Errorf("FinalizeBlobs: error getting latest finalized block: %w", err)
 	}
+	lastFinalBlock := finalizedHeader.Number.Uint64()
 
-	metadatas, err := f.blobStore.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
-	if err != nil {
-		return fmt.Errorf("FinalizeBlobs: error getting blob headers: %w", err)
+	totalProcessed := 0
+	metadatas, exclusiveStartKey, err := f.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, f.numBlobsPerFetch, nil)
+	for len(metadatas) > 0 {
+		if err != nil {
+			return fmt.Errorf("FinalizeBlobs: error getting blob headers: %w", err)
+		}
+		metadatas := metadatas
+		f.logger.Info("FinalizeBlobs: finalizing blobs", "numBlobs", len(metadatas), "finalizedBlockNumber", lastFinalBlock)
+		pool.Submit(func() {
+			f.updateBlobs(ctx, metadatas, lastFinalBlock)
+		})
+		totalProcessed += len(metadatas)
+
+		if exclusiveStartKey == nil {
+			break
+		}
+		metadatas, exclusiveStartKey, err = f.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, f.numBlobsPerFetch, exclusiveStartKey)
 	}
+	pool.StopWait()
+	f.logger.Info("FinalizeBlobs: successfully processed all finalized blobs", "finalizedBlockNumber", lastFinalBlock, "totalProcessed", totalProcessed, "elapsedTime", time.Since(startTime))
+	f.metrics.UpdateLastSeenFinalizedBlock(lastFinalBlock)
+	f.metrics.UpdateNumBlobs("processed", totalProcessed)
+	f.metrics.ObserveLatency("total", float64(time.Since(startTime).Milliseconds()))
+	return nil
+}
 
-	f.logger.Info("FinalizeBlobs: finalizing blobs", "numBlobs", len(metadatas), "finalizedBlockNumber", finalizedHeader.Number)
-
+func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.BlobMetadata, lastFinalBlock uint64) {
 	for _, m := range metadatas {
+		stageTimer := time.Now()
 		blobKey := m.GetBlobKey()
 		confirmationMetadata, err := f.blobStore.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
@@ -89,7 +131,7 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 		}
 
 		// Leave as confirmed if the confirmation block is after the latest finalized block (not yet finalized)
-		if uint64(confirmationMetadata.ConfirmationInfo.ConfirmationBlockNumber) > finalizedHeader.Number.Uint64() {
+		if uint64(confirmationMetadata.ConfirmationInfo.ConfirmationBlockNumber) > lastFinalBlock {
 			continue
 		}
 
@@ -101,15 +143,17 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 			if err != nil {
 				f.logger.Error("FinalizeBlobs: error marking blob as failed", "blobKey", blobKey.String(), "err", err)
 			}
+			f.metrics.IncrementNumBlobs("failed")
 			continue
 		}
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error getting transaction block number", "err", err)
+			f.metrics.IncrementNumBlobs("failed")
 			continue
 		}
 
 		// Leave as confirmed if the reorged confirmation block is after the latest finalized block (not yet finalized)
-		if uint64(confirmationBlockNumber) > finalizedHeader.Number.Uint64() {
+		if uint64(confirmationBlockNumber) > lastFinalBlock {
 			continue
 		}
 
@@ -117,11 +161,12 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 		err = f.blobStore.MarkBlobFinalized(ctx, blobKey)
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error marking blob as finalized", "blobKey", blobKey.String(), "err", err)
+			f.metrics.IncrementNumBlobs("failed")
 			continue
 		}
+		f.metrics.IncrementNumBlobs("finalized")
+		f.metrics.ObserveLatency("round", float64(time.Since(stageTimer).Milliseconds()))
 	}
-	f.logger.Info("FinalizeBlobs: successfully processed all finalized blobs")
-	return nil
 }
 
 func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.Hash) (uint64, error) {
