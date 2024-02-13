@@ -44,8 +44,8 @@ func makeTestEncoder() (core.Encoder, error) {
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
+		SRSOrder:        2048,
+		SRSNumberToLoad: 2048,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
@@ -192,7 +192,7 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 func TestCoreLibrary(t *testing.T) {
 
 	numBlob := 1 // must be greater than 0
-	blobLengths := []int{1, 64, 1000}
+	blobLengths := []int{1, 64, 1000, 2000}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
 	securityParams := []*core.SecurityParam{
@@ -221,6 +221,9 @@ func TestCoreLibrary(t *testing.T) {
 			ReferenceBlockNumber: bn,
 			BatchRoot:            [32]byte{},
 		}
+
+		batchChan := make(chan core.EncodedBlob, numBlob*len(blobLengths)*len(securityParams))
+
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
 		for _, blobLength := range blobLengths {
 
@@ -234,13 +237,22 @@ func TestCoreLibrary(t *testing.T) {
 					}
 
 					batch, header := prepareBatch(t, cst, blobs, quorumIndex, bn)
-					batches = append(batches, batch...)
+
+					for _, encodedBlob := range batch {
+						batchChan <- encodedBlob
+					}
 
 					checkBatch(t, cst, batch[0], header)
 				})
 			}
 
 		}
+
+		for i := 0; i < numBlob*len(blobLengths)*len(securityParams); i++ {
+			fmt.Println("waiting for batch", i)
+			batches = append(batches, <-batchChan)
+		}
+
 		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(batches)), func(t *testing.T) {
 			checkBatchByUniversalVerifier(t, cst, batches, batchHeader, pool)
 		})
