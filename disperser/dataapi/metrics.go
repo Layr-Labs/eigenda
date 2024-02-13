@@ -2,8 +2,11 @@ package dataapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -101,18 +104,102 @@ type DynamoDBCollector struct {
 	blobMetadataStore *blobstore.BlobMetadataStore
 	blobStatusMetric  *prometheus.Desc
 	logger            common.Logger
+	metricsCache      map[disperser.BlobStatus]int
+	cacheMutex        sync.RWMutex
 }
 
 func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger common.Logger) *DynamoDBCollector {
-	return &DynamoDBCollector{
+	collector := &DynamoDBCollector{
 		blobMetadataStore: blobMetadataStore,
 		blobStatusMetric: prometheus.NewDesc("dynamodb_blob_metadata_status_count",
 			"Number of blobs with specific status in DynamoDB",
 			[]string{"status"},
 			nil,
 		),
-		logger: logger,
+		logger:       logger,
+		metricsCache: make(map[disperser.BlobStatus]int),
 	}
+
+	go collector.periodicFetch()
+
+	return collector
+}
+
+func (collector *DynamoDBCollector) periodicFetch() {
+	statuses := []disperser.BlobStatus{disperser.Processing, disperser.Confirmed, disperser.InsufficientSignatures, disperser.Failed}
+
+	startFetch := func(status disperser.BlobStatus) {
+		go func() {
+			collector.updateMetricsCache(status)
+		}()
+	}
+
+	// Start the first fetch for each status immediately.
+	for _, status := range statuses {
+		collector.logger.Info("Fetching blob metadata by status", "status", status)
+		startFetch(status)
+	}
+
+	// Then start the ticker for subsequent fetches.
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		for _, status := range statuses {
+			collector.logger.Info("Fetching blob metadata by status", "status", status)
+			startFetch(status)
+		}
+	}
+}
+
+// updateMetricsCache fetches the count of blob metadata by status and updates the
+// metricsCache with the new counts.
+func (collector *DynamoDBCollector) updateMetricsCache(status disperser.BlobStatus) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// Fetch the count of blob metadata by status.
+	count, err := collector.getBlobMetadataByStatus(ctx, status)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			collector.logger.Warn("Fetching blob metadata by status timed out", "status", status)
+		} else {
+			collector.logger.Error("Failed to get count of blob metadata by status", "status", status, "err", err)
+		}
+
+		return
+	}
+
+	// Update the metrics cache with the new count.
+	collector.cacheMutex.Lock()
+	collector.metricsCache[status] = count
+	collector.cacheMutex.Unlock()
+
+	collector.logger.Info("Updated cache", "status", status, "count", count)
+}
+
+func (collector *DynamoDBCollector) getBlobMetadataByStatus(ctx context.Context, status disperser.BlobStatus) (int, error) {
+	totalMetadata := 0
+
+	// Initial call before the loop to avoid duplicating the addition to totalMetadata
+	metadatas, exclusiveStartKey, err := collector.blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, status, 1000, nil)
+	if err != nil {
+		collector.logger.Error("failed to get blob metadata by status with pagination", "status", status.String(), "err", err)
+		return 0, err
+	}
+	totalMetadata += len(metadatas) // Count the first batch of metadata
+
+	for exclusiveStartKey != nil {
+		metadatas, exclusiveStartKey, err = collector.blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, status, 1000, exclusiveStartKey)
+		if err != nil {
+			collector.logger.Error("failed to get blob metadata by status with pagination in loop", "status", status.String(), "err", err)
+			return totalMetadata, err
+		}
+
+		totalMetadata += len(metadatas)
+	}
+
+	return totalMetadata, nil
 }
 
 func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -120,16 +207,15 @@ func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
-	count, err := collector.blobMetadataStore.GetBlobMetadataByStatusCount(context.Background(), disperser.Processing)
-	if err != nil {
-		collector.logger.Error("failed to get count of blob metadata by status", "err", err)
-		return
-	}
+	collector.cacheMutex.RLock()
+	defer collector.cacheMutex.RUnlock()
 
-	ch <- prometheus.MustNewConstMetric(
-		collector.blobStatusMetric,
-		prometheus.GaugeValue,
-		float64(count),
-		disperser.Processing.String(),
-	)
+	for status, count := range collector.metricsCache {
+		ch <- prometheus.MustNewConstMetric(
+			collector.blobStatusMetric,
+			prometheus.GaugeValue,
+			float64(count),
+			status.String(),
+		)
+	}
 }
