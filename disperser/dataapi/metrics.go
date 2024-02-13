@@ -120,7 +120,11 @@ func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger
 		metricsCache: make(map[disperser.BlobStatus]int),
 	}
 
-	go collector.periodicFetch()
+	if blobMetadataStore != nil {
+		go collector.periodicFetch()
+	} else {
+		logger.Warn("BlobMetadataStore is nil, metrics will not be collected")
+	}
 
 	return collector
 }
