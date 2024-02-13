@@ -126,6 +126,7 @@ func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger
 }
 
 func (collector *DynamoDBCollector) periodicFetch() {
+	// We don't want to fetch finalized status because the amount is large
 	statuses := []disperser.BlobStatus{disperser.Processing, disperser.Confirmed, disperser.InsufficientSignatures, disperser.Failed}
 
 	startFetch := func(status disperser.BlobStatus) {
@@ -152,8 +153,8 @@ func (collector *DynamoDBCollector) periodicFetch() {
 	}
 }
 
-// updateMetricsCache fetches the count of blob metadata by status and updates the
-// metricsCache with the new counts.
+// updateMetricsCache calls getBlobMetadataByStatus to fetch the count of blob
+// metadata by status, and then updates the metricsCache with the new counts.
 func (collector *DynamoDBCollector) updateMetricsCache(status disperser.BlobStatus) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -178,10 +179,11 @@ func (collector *DynamoDBCollector) updateMetricsCache(status disperser.BlobStat
 	collector.logger.Info("Updated cache", "status", status, "count", count)
 }
 
+// getBlobMetadataByStatus fetches the count of blob metadata by status from DynamoDB.
+// It uses pagination to fetch all the metadata by status and returns the total count.
 func (collector *DynamoDBCollector) getBlobMetadataByStatus(ctx context.Context, status disperser.BlobStatus) (int, error) {
 	totalMetadata := 0
 
-	// Initial call before the loop to avoid duplicating the addition to totalMetadata
 	metadatas, exclusiveStartKey, err := collector.blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, status, 1000, nil)
 	if err != nil {
 		collector.logger.Error("failed to get blob metadata by status with pagination", "status", status.String(), "err", err)
