@@ -168,7 +168,18 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         assertEq(eigenDAServiceManager.batchId(), batchIdToConfirm + 1);
     }
 
+    function testConfirmBatch_Revert_LengthMismatch(uint256 pseudoRandomNumber) public {
+        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+            = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
+        batchHeader.quorumThresholdPercentages = new bytes(0);
 
+        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: quorumNumbers and quorumThresholdPercentages must be of the same length"));
+        cheats.prank(confirmer, confirmer);
+        eigenDAServiceManager.confirmBatch(
+            batchHeader,
+            nonSignerStakesAndSignature
+        );
+    }
 
     function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (IEigenDAServiceManager.BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
         // register a bunch of operators
