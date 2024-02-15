@@ -33,14 +33,13 @@ var (
 	gitCommit string
 	gitDate   string
 	// Note: Changing these paths will require updating the k8s deployment
-	readinessProbePath      string        = "/tmp/ready"
-	healthProbePath         string        = "/tmp/health"
-	maxStallDuration        time.Duration = 240 * time.Second
-	handleBatchLivenessChan               = make(chan time.Time, 1)
+	readinessProbePath string        = "/tmp/ready"
+	healthProbePath    string        = "/tmp/health"
+	maxStallDuration   time.Duration = 240 * time.Second
 )
 
 func main() {
-	// Channel for signaling errors from the app goroutine
+	handleBatchLivenessChan = make(chan time.Time, 1)
 	app := cli.NewApp()
 	app.Flags = flags.Flags
 	app.Version = fmt.Sprintf("%s-%s-%s", version, gitCommit, gitDate)
@@ -59,7 +58,7 @@ func main() {
 	}
 
 	// Start HeartBeat Monitor
-	go heartBeatMonitor(healthProbePath, maxStallDuration)
+	go heartbeatMonitor(healthProbePath, handleBatchLivenessChan, maxStallDuration)
 
 	select {}
 }
@@ -67,7 +66,7 @@ func main() {
 func RunBatcher(ctx *cli.Context) error {
 
 	// Clean up readiness file
-	if err := os.Remove(readinessProbePath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(readinessProbePath); err != nil {
 		log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
 	}
 
@@ -180,15 +179,15 @@ func RunBatcher(ctx *cli.Context) error {
 
 	// Signal readiness
 	if _, err := os.Create(readinessProbePath); err != nil {
-		log.Printf("Failed to create readiness file: %v", err)
+		log.Printf("Failed to create readiness file: %v at path %v \n", err, readinessProbePath)
 	}
 
 	return nil
 
 }
 
-// process signal from main to signal liveness
-func heartBeatMonitor(filePath string, maxStallDuration time.Duration) {
+// process liveness signal from handleBatch Go Routine
+func heartbeatMonitor(filePath string, handleBatchLivenessChan chan time.Time, maxStallDuration time.Duration) {
 	var lastHeartbeat time.Time
 	stallTimer := time.NewTimer(maxStallDuration)
 
@@ -200,7 +199,7 @@ func heartBeatMonitor(filePath string, maxStallDuration time.Duration) {
 				log.Println("handleBatchLivenessChan closed, stopping health probe")
 				return
 			}
-			log.Printf("Received heartbeat: %v\n", heartbeat)
+			log.Printf("Received heartbeat from HandleBatch GoRoutine: %v\n", heartbeat)
 			lastHeartbeat = heartbeat
 			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
 				log.Printf("Failed to update heartbeat file: %v", err)
