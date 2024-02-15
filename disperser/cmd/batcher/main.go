@@ -33,13 +33,13 @@ var (
 	gitCommit string
 	gitDate   string
 	// Note: Changing these paths will require updating the k8s deployment
-	readinessProbePath string        = "/tmp/ready"
-	healthProbePath    string        = "/tmp/health"
-	maxStallDuration   time.Duration = 240 * time.Second
+	readinessProbePath      string        = "/tmp/ready"
+	healthProbePath         string        = "/tmp/health"
+	maxStallDuration        time.Duration = 240 * time.Second
+	handleBatchLivenessChan               = make(chan time.Time, 1)
 )
 
 func main() {
-	handleBatchLivenessChan = make(chan time.Time, 1)
 	app := cli.NewApp()
 	app.Flags = flags.Flags
 	app.Version = fmt.Sprintf("%s-%s-%s", version, gitCommit, gitDate)
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	// Start HeartBeat Monitor
-	go heartbeatMonitor(healthProbePath, handleBatchLivenessChan, maxStallDuration)
+	go heartbeatMonitor(healthProbePath, maxStallDuration)
 
 	select {}
 }
@@ -187,7 +187,7 @@ func RunBatcher(ctx *cli.Context) error {
 }
 
 // process liveness signal from handleBatch Go Routine
-func heartbeatMonitor(filePath string, handleBatchLivenessChan chan time.Time, maxStallDuration time.Duration) {
+func heartbeatMonitor(filePath string, maxStallDuration time.Duration) {
 	var lastHeartbeat time.Time
 	stallTimer := time.NewTimer(maxStallDuration)
 
