@@ -124,6 +124,10 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 	for _, m := range metadatas {
 		stageTimer := time.Now()
 		blobKey := m.GetBlobKey()
+		if m.BlobStatus != disperser.Confirmed {
+			f.logger.Error("FinalizeBlobs: the blob retrieved by status Confirmed is not actually confirmed", "blobKey", blobKey.String())
+			continue
+		}
 		confirmationMetadata, err := f.blobStore.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error getting confirmed metadata", "blobKey", blobKey.String(), "err", err)
