@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+
 	"github.com/gammazero/workerpool"
 )
 
@@ -52,8 +53,9 @@ type (
 	DeregisteredOperatorInfo struct {
 		IndexedOperatorInfo *core.IndexedOperatorInfo
 		// BlockNumber is the block number at which the operator was deregistered.
-		BlockNumber uint
-		Metadata    *Operator
+		BlockNumber          uint
+		Metadata             *Operator
+		OperatorProcessError string
 	}
 	IndexedDeregisteredOperatorState struct {
 		Operators map[core.OperatorID]*DeregisteredOperatorInfo
@@ -209,26 +211,34 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx con
 	for i := range deregisteredOperators {
 		deregisteredOperator := deregisteredOperators[i]
 		operator, err := convertOperator(deregisteredOperator)
-		if err != nil {
-			return nil, err
+		var operatorId [32]byte
+
+		if err != nil && operator == nil {
+			sc.logger.Error("failed to convert", "err", err, "operator", deregisteredOperator)
+			continue
 		}
 
-		var operatorId [32]byte
+		// Copy the operator id to a 32 byte array.
 		copy(operatorId[:], operator.OperatorId)
 
 		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
 		if err != nil {
-			return nil, err
+			addOperatorWithErrorDetail(operators, operator, operatorId, "query operator info by operator id at block number failed")
+			sc.logger.Error("failed to query operator info by operator id at block number", "err", err)
+			continue
 		}
 		indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
 		if err != nil {
-			return nil, err
+			addOperatorWithErrorDetail(operators, operator, operatorId, "failed to convert operator info gql to indexed operator info")
+			sc.logger.Error("failed to convert operator info gql to indexed operator info", "err", err)
+			continue
 		}
 
 		operators[operatorId] = &DeregisteredOperatorInfo{
-			IndexedOperatorInfo: indexedOperatorInfo,
-			BlockNumber:         uint(operator.BlockNumber),
-			Metadata:            operator,
+			IndexedOperatorInfo:  indexedOperatorInfo,
+			BlockNumber:          uint(operator.BlockNumber),
+			Metadata:             operator,
+			OperatorProcessError: "",
 		}
 	}
 
@@ -483,4 +493,25 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 		BlockNumber:     blockNum,
 		TransactionHash: []byte(operator.TransactionHash),
 	}, nil
+}
+
+// This helper function adds an operator with an error message to the operators map.
+func addOperatorWithErrorDetail(operators map[core.OperatorID]*DeregisteredOperatorInfo, operator *Operator, operatorId [32]byte, errorMessage string) {
+	// Initialize the DeregisteredOperatorInfo with the error message in OperatorProcessError
+
+	if operator == nil {
+		operators[operatorId] = &DeregisteredOperatorInfo{
+			IndexedOperatorInfo:  nil,
+			BlockNumber:          uint(operator.BlockNumber),
+			Metadata:             operator,
+			OperatorProcessError: errorMessage,
+		}
+	}
+
+	operators[operatorId] = &DeregisteredOperatorInfo{
+		IndexedOperatorInfo:  nil,
+		BlockNumber:          uint(operator.BlockNumber),
+		Metadata:             operator,
+		OperatorProcessError: errorMessage,
+	}
 }
