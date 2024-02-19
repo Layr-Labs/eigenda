@@ -100,6 +100,25 @@ var (
 		},
 	}
 
+	subgraphOperatorDeregisteredInvalidTimeStampTwoOperator = []*subgraph.Operator{
+		{
+			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
+			OperatorId:      "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+			Operator:        "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
+			BlockTimestamp:  "abc",
+			BlockNumber:     "22",
+			TransactionHash: "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
+		},
+		{
+			Id:              "0x000763bb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f224",
+			OperatorId:      "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312",
+			Operator:        "0x000224cb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f213",
+			BlockTimestamp:  "1702666070",
+			BlockNumber:     "24",
+			TransactionHash: "0x000224fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f213",
+		},
+	}
+
 	nonSigners = map[string]int{
 		"0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
 		"0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310": 1,
