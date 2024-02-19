@@ -353,17 +353,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "commitment": {
-                    "$ref": "#/definitions/core.Commitment"
+                    "$ref": "#/definitions/core.G1Commitment"
                 },
                 "length": {
                     "type": "integer"
                 },
+                "length_commitment": {
+                    "$ref": "#/definitions/core.G2Commitment"
+                },
                 "length_proof": {
-                    "$ref": "#/definitions/core.Commitment"
+                    "$ref": "#/definitions/core.LengthProof"
                 }
             }
         },
-        "core.Commitment": {
+        "core.G1Commitment": {
             "type": "object",
             "properties": {
                 "x": {
@@ -371,6 +374,22 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "core.G2Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "core.LengthProof": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -471,6 +490,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "operator_id": {
+                    "type": "string"
+                },
+                "operator_process_error": {
                     "type": "string"
                 },
                 "socket": {
@@ -591,6 +613,17 @@ const docTemplate = `{
                 "Finalized",
                 "InsufficientSignatures"
             ]
+        },
+        "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
+            "type": "object",
+            "properties": {
+                "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
         }
     }
 }`

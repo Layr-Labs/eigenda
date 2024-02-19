@@ -2,18 +2,30 @@ definitions:
   core.BlobCommitments:
     properties:
       commitment:
-        $ref: '#/definitions/core.Commitment'
+        $ref: '#/definitions/core.G1Commitment'
       length:
         type: integer
+      length_commitment:
+        $ref: '#/definitions/core.G2Commitment'
       length_proof:
-        $ref: '#/definitions/core.Commitment'
+        $ref: '#/definitions/core.LengthProof'
     type: object
-  core.Commitment:
+  core.G1Commitment:
     properties:
       x:
         items:
           type: integer
         type: array
+    type: object
+  core.G2Commitment:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  core.LengthProof:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.SecurityParam:
     properties:
@@ -87,6 +99,8 @@ definitions:
       is_online:
         type: boolean
       operator_id:
+        type: string
+      operator_process_error:
         type: string
       socket:
         type: string
@@ -167,6 +181,13 @@ definitions:
     - Failed
     - Finalized
     - InsufficientSignatures
+  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
+    properties:
+      a0:
+        items:
+          type: integer
+        type: array
+    type: object
 info:
   contact: {}
   description: This is the EigenDA Data Access API server.
