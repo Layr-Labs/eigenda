@@ -3,3 +3,9 @@
 **/tests/.bin
 **/tests/*.json
 **/build
+
+eigenda-operator-state/networks.json
+eigenda-operator-state/subgraph.yaml
+
+eigenda-batch-metadata/networks.json
+eigenda-batch-metadata/subgraph.yaml
