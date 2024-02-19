@@ -214,6 +214,16 @@ func TestBatcherIterations(t *testing.T) {
 	count, size = components.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, 0, count)
 	assert.Equal(t, uint64(0), size)
+
+	// confirmed metadata should be immutable and not be updated
+	existingBlobIndex := meta1.ConfirmationInfo.BlobIndex
+	meta1, err = blobStore.MarkBlobConfirmed(ctx, meta1, &disperser.ConfirmationInfo{
+		BlobIndex: existingBlobIndex + 1,
+	})
+	assert.NoError(t, err)
+	// check confirmation info isn't updated
+	assert.Equal(t, existingBlobIndex, meta1.ConfirmationInfo.BlobIndex)
+	assert.Equal(t, disperser.Confirmed, meta1.BlobStatus)
 }
 
 func TestBlobFailures(t *testing.T) {

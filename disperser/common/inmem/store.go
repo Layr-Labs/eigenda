@@ -71,6 +71,15 @@ func (q *BlobStore) GetBlobContent(ctx context.Context, blobHash disperser.BlobH
 }
 
 func (q *BlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {
+	// TODO (ian-shim): remove this check once we are sure that the metadata is never overwritten
+	refreshedMetadata, err := q.GetBlobMetadata(ctx, existingMetadata.GetBlobKey())
+	if err != nil {
+		return nil, err
+	}
+	alreadyConfirmed, _ := refreshedMetadata.IsConfirmed()
+	if alreadyConfirmed {
+		return refreshedMetadata, nil
+	}
 	blobKey := existingMetadata.GetBlobKey()
 	if _, ok := q.Metadata[blobKey]; !ok {
 		return nil, disperser.ErrBlobNotFound
