@@ -77,7 +77,7 @@ func TestFetchBlobHandler(t *testing.T) {
 	key := queueBlob(t, &blob, blobstore)
 	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, blobstore)
 	blobKey := key.String()
-	r.GET("/v1/feed/blobs/:blob_key", testDataApiServer.FetchBlobHandler)
+	r.GET("/v1/feed/blobs/:blob-key", testDataApiServer.FetchBlobHandler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/"+blobKey, nil)

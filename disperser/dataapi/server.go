@@ -32,7 +32,7 @@ var errNotFound = errors.New("not found")
 
 type (
 	BlobMetadataResponse struct {
-		BlobKey                 string                `json:"blob_key"`
+		BlobKey                 string                `json:"blob-key"`
 		BatchHeaderHash         string                `json:"batch_header_hash"`
 		BlobIndex               uint32                `json:"blob_index"`
 		SignatoryRecordHash     string                `json:"signatory_record_hash"`
@@ -152,7 +152,7 @@ func (s *server) Start() error {
 		feed := v1.Group("/feed")
 		{
 			feed.GET("/blobs", s.FetchBlobsHandler)
-			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
+			feed.GET("/blobs/:blob-key", s.FetchBlobHandler)
 		}
 		operatorsInfo := v1.Group("/operators-info")
 		{
@@ -162,9 +162,9 @@ func (s *server) Start() error {
 		{
 			metrics.GET("/", s.FetchMetricsHandler)
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
-			metrics.GET("/non_signers", s.FetchNonSigners)
-			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			metrics.GET("/deregistered_operators", s.FetchDeregisteredOperators)
+			metrics.GET("/non-signers", s.FetchNonSigners)
+			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
+			metrics.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -208,19 +208,19 @@ func (s *server) Start() error {
 //	@Summary	Fetch blob metadata by blob key
 //	@Tags		Feed
 //	@Produce	json
-//	@Param		blob_key	path		string	true	"Blob Key"
+//	@Param		blob-key	path		string	true	"Blob Key"
 //	@Success	200			{object}	BlobMetadataResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/feed/blobs/{blob_key} [get]
+//	@Router		/feed/blobs/{blob-key} [get]
 func (s *server) FetchBlobHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchBlob", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
-	blobKey := c.Param("blob_key")
+	blobKey := c.Param("blob-key")
 
 	metadata, err := s.getBlob(c.Request.Context(), blobKey)
 	if err != nil {
@@ -366,7 +366,7 @@ func (s *server) FetchMetricsTroughputHandler(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/non_signers  [get]
+//	@Router		/metrics/non-signers  [get]
 func (s *server) FetchNonSigners(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchNonSigners", f*1000) // make milliseconds
@@ -398,7 +398,7 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/operator_nonsigning_percentage  [get]
+//	@Router		/metrics/operator-nonsigning-percentage  [get]
 func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds

@@ -2,18 +2,30 @@ definitions:
   core.BlobCommitments:
     properties:
       commitment:
-        $ref: '#/definitions/core.Commitment'
+        $ref: '#/definitions/core.G1Commitment'
       length:
         type: integer
+      length_commitment:
+        $ref: '#/definitions/core.G2Commitment'
       length_proof:
-        $ref: '#/definitions/core.Commitment'
+        $ref: '#/definitions/core.LengthProof'
     type: object
-  core.Commitment:
+  core.G1Commitment:
     properties:
       x:
         items:
           type: integer
         type: array
+    type: object
+  core.G2Commitment:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  core.LengthProof:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.SecurityParam:
     properties:
@@ -44,14 +56,14 @@ definitions:
         type: integer
       batch_root:
         type: string
+      blob-key:
+        type: string
       blob_commitment:
         $ref: '#/definitions/core.BlobCommitments'
       blob_inclusion_proof:
         type: string
       blob_index:
         type: integer
-      blob_key:
-        type: string
       blob_status:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser.BlobStatus'
       confirmation_block_number:
@@ -167,6 +179,13 @@ definitions:
     - Failed
     - Finalized
     - InsufficientSignatures
+  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
+    properties:
+      a0:
+        items:
+          type: integer
+        type: array
+    type: object
 info:
   contact: {}
   description: This is the EigenDA Data Access API server.
@@ -202,12 +221,12 @@ paths:
       summary: Fetch blobs metadata list
       tags:
       - Feed
-  /feed/blobs/{blob_key}:
+  /feed/blobs/{blob-key}:
     get:
       parameters:
       - description: Blob Key
         in: path
-        name: blob_key
+        name: blob-key
         required: true
         type: string
       produces:
@@ -269,7 +288,7 @@ paths:
       summary: Fetch metrics
       tags:
       - Metrics
-  /metrics/non_signers:
+  /metrics/non-signers:
     get:
       parameters:
       - description: 'Interval to query for non signers in seconds [default: 3600]'
@@ -300,7 +319,7 @@ paths:
       summary: Fetch non signers
       tags:
       - Metrics
-  /metrics/operator_nonsigning_percentage:
+  /metrics/operator-nonsigning-percentage:
     get:
       parameters:
       - description: 'Interval to query for operators nonsigning percentage [default:
