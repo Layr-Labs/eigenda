@@ -14,6 +14,8 @@ import (
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
@@ -34,13 +36,19 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	kzgEncoderGroup, err := kzgrs.NewKzgEncoderGroup(config, true)
+	kzgEncoderGroup, err := prover.NewProver(config, true)
+	if err != nil {
+		return nil, err
+	}
+
+	kzgVerifierGroup, err := verifier.NewVerifier(config, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return &encoding.Encoder{
-		EncoderGroup: kzgEncoderGroup,
+		EncoderGroup:  kzgEncoderGroup,
+		VerifierGroup: kzgVerifierGroup,
 	}, nil
 }
 

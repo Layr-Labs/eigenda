@@ -14,6 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/stretchr/testify/assert"
@@ -41,13 +43,19 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	kzgEncoderGroup, err := kzgrs.NewKzgEncoderGroup(config, false)
+	kzgEncoderGroup, err := prover.NewProver(config, true)
+	if err != nil {
+		return nil, err
+	}
+
+	kzgVerifierGroup, err := verifier.NewVerifier(config, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return &encoding.Encoder{
-		EncoderGroup: kzgEncoderGroup,
+		EncoderGroup:  kzgEncoderGroup,
+		VerifierGroup: kzgVerifierGroup,
 	}, nil
 }
 func newTestServer(t *testing.T) *retriever.Server {
