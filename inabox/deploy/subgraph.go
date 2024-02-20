@@ -118,30 +118,26 @@ func (env *Config) deploySubgraphs(startBlock int) {
 		return
 	}
 
-	currDir, _ := os.Getwd()
-	changeDirectory("../subgraphs")
-	defer changeDirectory(currDir)
-
 	fmt.Println("Deploying Subgraph")
 	env.deploySubgraph(eigenDAOperatorStateSubgraphUpdater{c: env}, "eigenda-operator-state", startBlock)
 	env.deploySubgraph(eigenDAUIMonitoringUpdater{c: env}, "eigenda-batch-metadata", startBlock)
 }
 
 func (env *Config) deploySubgraph(updater subgraphUpdater, path string, startBlock int) {
-	execBashCmd(fmt.Sprintf(`cp -r "%s" "%s"`, path, env.Path))
 
-	currDir, _ := os.Getwd()
-	changeDirectory(filepath.Join(env.Path, path))
-	defer changeDirectory(currDir)
+	subgraphPath := filepath.Join(env.rootPath, "subgraphs", path)
+	changeDirectory(subgraphPath)
 
-	subgraphPath := filepath.Join(env.Path, path)
+	execBashCmd(`cp "./templates/subgraph.yaml" "./"`)
+	execBashCmd(`cp "./templates/networks.json" "./"`)
+
 	env.updateSubgraph(updater, subgraphPath, startBlock)
 
 	execYarnCmd("install")
 	execYarnCmd("codegen")
 	execYarnCmd("remove-local")
 	execYarnCmd("create-local")
-	execBashCmd("yarn deploy-local --version-label=v0.0.1")
+	execYarnCmd("deploy-local", "--version-label", "v0.0.1")
 }
 
 func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlock int) {

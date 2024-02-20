@@ -98,10 +98,11 @@ func changeDirectory(path string) {
 }
 
 // Execute yarn command
-func execYarnCmd(command string) {
+func execYarnCmd(command string, args ...string) {
 	log.Printf("Executing yarn with command: %s", command)
 
-	cmd := exec.Command("yarn", command)
+	args = append([]string{command}, args...)
+	cmd := exec.Command("yarn", args...)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
