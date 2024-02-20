@@ -9,8 +9,12 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/utils"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -34,7 +38,7 @@ func readpoints() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
+	kzgGroup, _ := prover.NewProver(kzgConfig, true)
 	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
 	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
 		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].MarshalText()))
@@ -66,7 +70,7 @@ func TestKzgRs() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
+	kzgGroup, _ := prover.NewProver(kzgConfig, true)
 
 	params := rs.EncodingParams{NumChunks: 200, ChunkLen: 180}
 	enc, _ := kzgGroup.NewKzgEncoder(params)
@@ -108,11 +112,11 @@ func TestKzgRs() {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzgrs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := utils.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}
-		ok := f.Verify(enc.Ks, commit, &lc, &g2Atn)
+		ok := verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
 		if !ok {
 			log.Fatalf("Proof %v failed\n", i)
 		}
@@ -232,8 +236,8 @@ func printFr(d []bls.Fr) {
 // 	fmt.Printf("\n")
 // }
 
-func SampleFrames(frames []kzgrs.Frame, num uint64) ([]kzgrs.Frame, []uint64) {
-	samples := make([]kzgrs.Frame, num)
+func SampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
+	samples := make([]encoding.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 

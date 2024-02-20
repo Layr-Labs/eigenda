@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	enc "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -39,7 +39,7 @@ func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, erro
 }
 
 // Read the n-th G1 point from SRS.
-func ReadG1Point(n uint64, g *enc.KzgConfig) (bls.G1Point, error) {
+func ReadG1Point(n uint64, g *kzgrs.KzgConfig) (bls.G1Point, error) {
 	if n > g.SRSOrder {
 		return bls.G1Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
@@ -53,7 +53,7 @@ func ReadG1Point(n uint64, g *enc.KzgConfig) (bls.G1Point, error) {
 }
 
 // Read the n-th G2 point from SRS.
-func ReadG2Point(n uint64, g *enc.KzgConfig) (bls.G2Point, error) {
+func ReadG2Point(n uint64, g *kzgrs.KzgConfig) (bls.G2Point, error) {
 	if n > g.SRSOrder {
 		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
@@ -66,7 +66,7 @@ func ReadG2Point(n uint64, g *enc.KzgConfig) (bls.G2Point, error) {
 }
 
 // Read g2 points from power of 2 file
-func ReadG2PointOnPowerOf2(exponent uint64, g *enc.KzgConfig) (bls.G2Point, error) {
+func ReadG2PointOnPowerOf2(exponent uint64, g *kzgrs.KzgConfig) (bls.G2Point, error) {
 
 	// the powerOf2 file, only [tau^exp] are stored.
 	// exponent    0,    1,       2,    , ..
