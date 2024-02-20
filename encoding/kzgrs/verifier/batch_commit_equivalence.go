@@ -1,4 +1,4 @@
-package kzgrs
+package verifier
 
 import (
 	"bytes"
@@ -66,7 +66,7 @@ func CreateRandomnessVector(g1commits []bn254.G1Point, g2commits []bn254.G2Point
 	return randomsFr, nil
 }
 
-func (group *KzgEncoderGroup) BatchVerifyCommitEquivalence(commitmentsPair []CommitmentPair) error {
+func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []CommitmentPair) error {
 
 	g1commits := make([]bn254.G1Point, len(commitmentsPair))
 	g2commits := make([]bn254.G2Point, len(commitmentsPair))

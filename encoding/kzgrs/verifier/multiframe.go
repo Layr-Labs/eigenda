@@ -1,4 +1,4 @@
-package kzgrs
+package verifier
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
@@ -163,7 +164,7 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 //
 // The order of samples do not matter.
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
-func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
+func (group *Verifier) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
 	// precheck
 	for i, s := range samples {
 		if s.RowIndex >= m {
@@ -204,11 +205,11 @@ func (group *KzgEncoderGroup) UniversalVerify(params rs.EncodingParams, samples 
 
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
+	G2atD, err := utils.ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
 
 	if err != nil {
 		// then try to access if there is a full list of g2 srs
-		G2atD, err = ReadG2Point(D, group.KzgConfig)
+		G2atD, err = utils.ReadG2Point(D, group.KzgConfig)
 		if err != nil {
 			return err
 		}

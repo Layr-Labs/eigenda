@@ -1,9 +1,10 @@
-package kzgrs_test
+package verifier_test
 
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +14,8 @@ func TestLengthProof(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
+	group, _ := prover.NewProver(kzgConfig, true)
+	v, _ := verifier.NewVerifier(kzgConfig, true)
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
@@ -28,9 +30,9 @@ func TestLengthProof(t *testing.T) {
 		require.Nil(t, err)
 
 		length := len(inputFr)
-		assert.NoError(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
+		assert.NoError(t, v.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
 
 		length = len(inputFr) - 10
-		assert.Error(t, group.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
+		assert.Error(t, v.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
 	}
 }

@@ -1,43 +1,13 @@
-package kzgrs
+package verifier
 
 import (
-	"bytes"
-	"encoding/gob"
-
+	enc "github.com/Layr-Labs/eigenda/encoding"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
-// Proof is the multireveal proof
-// Coeffs is identical to input data converted into Fr element
-type Frame struct {
-	Proof  bls.G1Point
-	Coeffs []bls.Fr
-}
-
-func (f *Frame) Encode() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(f)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func Decode(b []byte) (Frame, error) {
-	var f Frame
-	buf := bytes.NewBuffer(b)
-	dec := gob.NewDecoder(buf)
-	err := dec.Decode(&f)
-	if err != nil {
-		return Frame{}, err
-	}
-	return f, nil
-}
-
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
-func (f *Frame) Verify(ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, g2Atn *bls.G2Point) bool {
+func (f *enc.Frame) Verify(ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, g2Atn *bls.G2Point) bool {
 	var xPow bls.Fr
 	bls.CopyFr(&xPow, &bls.ONE)
 

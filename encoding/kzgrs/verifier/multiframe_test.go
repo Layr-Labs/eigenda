@@ -1,9 +1,10 @@
-package kzgrs_test
+package verifier_test
 
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,13 +14,14 @@ func TestUniversalVerify(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
+	group, _ := prover.NewProver(kzgConfig, true)
+	v, _ := verifier.NewVerifier(kzgConfig, true)
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
-	samples := make([]kzgrs.Sample, 0)
+	samples := make([]verifier.Sample, 0)
 	for z := 0; z < numBlob; z++ {
 		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
@@ -36,7 +38,7 @@ func TestUniversalVerify(t *testing.T) {
 
 			assert.Equal(t, j, q, "leading coset inconsistency")
 
-			sample := kzgrs.Sample{
+			sample := verifier.Sample{
 				Commitment: *commit,
 				Proof:      f.Proof,
 				RowIndex:   z,
@@ -47,21 +49,22 @@ func TestUniversalVerify(t *testing.T) {
 		}
 	}
 
-	assert.True(t, group.UniversalVerify(params, samples, numBlob) == nil, "universal batch verification failed\n")
+	assert.True(t, v.UniversalVerify(params, samples, numBlob) == nil, "universal batch verification failed\n")
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
+	group, _ := prover.NewProver(kzgConfig, true)
 	group.KzgConfig.G2Path = ""
+	v, _ := verifier.NewVerifier(kzgConfig, true)
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
-	samples := make([]kzgrs.Sample, 0)
+	samples := make([]verifier.Sample, 0)
 	for z := 0; z < numBlob; z++ {
 		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
@@ -78,7 +81,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 			assert.Equal(t, j, q, "leading coset inconsistency")
 
-			sample := kzgrs.Sample{
+			sample := verifier.Sample{
 				Commitment: *commit,
 				Proof:      f.Proof,
 				RowIndex:   z,
@@ -89,5 +92,5 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 		}
 	}
 
-	assert.True(t, group.UniversalVerify(params, samples, numBlob) == nil, "universal batch verification failed\n")
+	assert.True(t, v.UniversalVerify(params, samples, numBlob) == nil, "universal batch verification failed\n")
 }
