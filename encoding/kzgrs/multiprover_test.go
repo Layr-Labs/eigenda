@@ -1,11 +1,11 @@
-package kzgEncoder_test
+package kzgrs_test
 
 import (
 	"fmt"
 	"testing"
 
-	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
+	group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
@@ -37,7 +37,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzgRs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzgrs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		require.Nil(t, err)
 		assert.True(t, f.Verify(enc.Ks, commit, &lc, &g2Atn), "Proof %v failed\n", i)
 	}

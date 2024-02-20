@@ -1,4 +1,4 @@
-package kzgEncoder
+package kzgrs
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package encoder_test
+package rs_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 func TestGetEncodingParams(t *testing.T) {

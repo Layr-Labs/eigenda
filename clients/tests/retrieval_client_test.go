@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ import (
 const numOperators = 10
 
 func makeTestEncoder() (core.Encoder, error) {
-	config := &kzgEncoder.KzgConfig{
+	config := &kzgrs.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
@@ -34,7 +34,7 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(config, true)
+	kzgEncoderGroup, err := kzgrs.NewKzgEncoderGroup(config, true)
 	if err != nil {
 		return nil, err
 	}

@@ -1,10 +1,10 @@
-package kzgEncoder_test
+package kzgrs_test
 
 import (
 	"testing"
 
-	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,13 +13,13 @@ func TestUniversalVerify(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
+	group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
-	samples := make([]kzgRs.Sample, 0)
+	samples := make([]kzgrs.Sample, 0)
 	for z := 0; z < numBlob; z++ {
 		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
@@ -36,7 +36,7 @@ func TestUniversalVerify(t *testing.T) {
 
 			assert.Equal(t, j, q, "leading coset inconsistency")
 
-			sample := kzgRs.Sample{
+			sample := kzgrs.Sample{
 				Commitment: *commit,
 				Proof:      f.Proof,
 				RowIndex:   z,
@@ -54,14 +54,14 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
+	group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
 	group.KzgConfig.G2Path = ""
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
-	samples := make([]kzgRs.Sample, 0)
+	samples := make([]kzgrs.Sample, 0)
 	for z := 0; z < numBlob; z++ {
 		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 
@@ -78,7 +78,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 
 			assert.Equal(t, j, q, "leading coset inconsistency")
 
-			sample := kzgRs.Sample{
+			sample := kzgrs.Sample{
 				Commitment: *commit,
 				Proof:      f.Proof,
 				RowIndex:   z,

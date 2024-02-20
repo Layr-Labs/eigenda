@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -24,7 +24,7 @@ func main() {
 }
 
 func readpoints() {
-	kzgConfig := &kzgRs.KzgConfig{
+	kzgConfig := &kzgrs.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "SRSTables",
@@ -34,7 +34,7 @@ func readpoints() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
+	kzgGroup, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
 	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
 	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
 		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].MarshalText()))
@@ -56,7 +56,7 @@ func TestKzgRs() {
 	fmt.Printf("    Num Par: %v\n", numPar)
 	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
 
-	kzgConfig := &kzgRs.KzgConfig{
+	kzgConfig := &kzgrs.KzgConfig{
 		G1Path:          "g1.point",
 		G2Path:          "g2.point",
 		CacheDir:        "SRSTables",
@@ -66,12 +66,12 @@ func TestKzgRs() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
+	kzgGroup, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
 
 	params := rs.EncodingParams{NumChunks: 200, ChunkLen: 180}
 	enc, _ := kzgGroup.NewKzgEncoder(params)
 
-	//inputFr := kzgRs.ToFrArray(inputBytes)
+	//inputFr := kzgrs.ToFrArray(inputBytes)
 	inputSize := uint64(numSymbols)
 	inputFr := make([]bls.Fr, inputSize)
 	for i := uint64(0); i < inputSize; i++ {
@@ -108,7 +108,7 @@ func TestKzgRs() {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzgRs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzgrs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}
@@ -131,14 +131,14 @@ func TestKzgRs() {
 	}
 
 	//printFr(dataFr)
-	//dataFr, err := kzgRs.DecodeSys(samples, indices, inputSize)
+	//dataFr, err := kzgrs.DecodeSys(samples, indices, inputSize)
 	//if err != nil {
 	//log.Fatalf("%v", err)
 	//}
 
 	fmt.Println(dataFr)
 	// printFr(dataFr)
-	//deData := kzgRs.ToByteArray(dataFr, inputByteSize)
+	//deData := kzgrs.ToByteArray(dataFr, inputByteSize)
 	//fmt.Println("dataFr")
 	// printFr(dataFr)
 	//fmt.Println(deData)
@@ -201,7 +201,7 @@ func TestKzgRs() {
 // 		v[i] = uint64(i + 1)
 // 	}
 // 	dataFr := makeFr(v)
-// 	order := kzgRs.CeilIntPowerOf2Num(size)
+// 	order := kzgrs.CeilIntPowerOf2Num(size)
 // 	fs := kzg.NewFFTSettings(uint8(order))
 // 	polyFr, err := fs.FFT(dataFr, true)
 // 	if err != nil {
@@ -232,8 +232,8 @@ func printFr(d []bls.Fr) {
 // 	fmt.Printf("\n")
 // }
 
-func SampleFrames(frames []kzgRs.Frame, num uint64) ([]kzgRs.Frame, []uint64) {
-	samples := make([]kzgRs.Frame, num)
+func SampleFrames(frames []kzgrs.Frame, num uint64) ([]kzgrs.Frame, []uint64) {
+	samples := make([]kzgrs.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 

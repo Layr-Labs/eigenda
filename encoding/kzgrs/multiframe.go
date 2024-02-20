@@ -1,4 +1,4 @@
-package kzgEncoder
+package kzgrs
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )

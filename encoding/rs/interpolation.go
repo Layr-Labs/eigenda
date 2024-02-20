@@ -1,4 +1,4 @@
-package encoder
+package rs
 
 import (
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"

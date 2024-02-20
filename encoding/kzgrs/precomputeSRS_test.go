@@ -1,4 +1,4 @@
-package kzgEncoder_test
+package kzgrs_test
 
 import (
 	"testing"
@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils"
 )
 
@@ -26,7 +26,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	_, err = utils.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
 	require.Nil(t, err)
 
-	subTable1, err := kzgRs.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
+	subTable1, err := kzgrs.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, subTable1)
 
@@ -34,7 +34,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, fftPoints1)
 
-	subTable2, err := kzgRs.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
+	subTable2, err := kzgrs.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, subTable2)
 

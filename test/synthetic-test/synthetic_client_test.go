@@ -34,7 +34,7 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
-	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -221,7 +221,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		return err
 	}
 	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
-		KzgConfig: kzgEncoder.KzgConfig{
+		KzgConfig: kzgrs.KzgConfig{
 			G1Path:         retrievalClientConfig.RetrieverG1Path,
 			G2Path:         retrievalClientConfig.RetrieverG2Path,
 			CacheDir:       retrievalClientConfig.RetrieverCachePath,
@@ -578,7 +578,7 @@ func TestEncodeBlob(t *testing.T) {
 	}
 
 	// Test Assumes below params set for Encoder
-	kzgConfig := kzgEncoder.KzgConfig{
+	kzgConfig := kzgrs.KzgConfig{
 		G1Path:          "/data/kzg/g1.point",
 		G2Path:          "/data/kzg/g2.point",
 		CacheDir:        "/data/kzg/SRSTables",

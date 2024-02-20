@@ -1,4 +1,4 @@
-package encoder_test
+package rs_test
 
 import (
 	"log"
@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 const (

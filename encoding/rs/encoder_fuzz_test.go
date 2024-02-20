@@ -1,9 +1,9 @@
-package encoder_test
+package rs_test
 
 import (
 	"testing"
 
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 )
 

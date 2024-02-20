@@ -1,4 +1,4 @@
-package encoder
+package rs
 
 import (
 	"math"

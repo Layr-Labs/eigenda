@@ -1,4 +1,4 @@
-package kzgEncoder
+package kzgrs
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 
