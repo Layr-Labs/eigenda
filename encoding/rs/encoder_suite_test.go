@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 const (

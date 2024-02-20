@@ -3,7 +3,7 @@ package toeplitz_test
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/pkg/encoding/utils/toeplitz"
+	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/stretchr/testify/assert"

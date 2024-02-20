@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 

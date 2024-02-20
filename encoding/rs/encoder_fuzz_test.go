@@ -1,10 +1,9 @@
-package kzgEncoder_test
+package encoder_test
 
 import (
 	"testing"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,21 +12,14 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(GETTYSBURG_ADDRESS_BYTES)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		group, _ := kzgRs.NewKzgEncoderGroup(kzgConfig, true)
-
 		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
-		enc, err := group.NewKzgEncoder(params)
+		enc, err := rs.NewEncoder(params, true)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)
 		}
 
 		//encode the data
-		_, _, _, frames, _, err := enc.EncodeBytes(input)
-
-		for _, frame := range frames {
-			assert.NotEqual(t, len(frame.Coeffs), 0)
-		}
-
+		_, frames, _, err := enc.EncodeBytes(input)
 		if err != nil {
 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
 		}

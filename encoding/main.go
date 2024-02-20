@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 

@@ -21,7 +21,7 @@ import (
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"

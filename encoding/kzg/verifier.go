@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	wbls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )

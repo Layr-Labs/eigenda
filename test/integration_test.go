@@ -38,9 +38,9 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 
 	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"

@@ -34,7 +34,7 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"

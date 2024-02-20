@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
 )
 
 const (

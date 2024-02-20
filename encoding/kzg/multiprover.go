@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/pkg/encoding/utils/toeplitz"
+	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 

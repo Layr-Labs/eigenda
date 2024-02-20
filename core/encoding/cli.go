@@ -4,7 +4,7 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
 

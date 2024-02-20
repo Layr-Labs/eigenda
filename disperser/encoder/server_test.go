@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 

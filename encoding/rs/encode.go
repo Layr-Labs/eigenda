@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	rb "github.com/Layr-Labs/eigenda/pkg/encoding/utils/reverseBits"
+	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 

@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	kzgRs "github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/utils"
+	kzgRs "github.com/Layr-Labs/eigenda/encoding/kzg"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/utils"
 )
 
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {

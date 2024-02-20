@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/pkg/encoding/utils"
+	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )

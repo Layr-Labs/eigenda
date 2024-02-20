@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/stretchr/testify/assert"
 )
 

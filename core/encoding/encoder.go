@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
+	encoder "github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	lru "github.com/hashicorp/golang-lru/v2"
 )

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/utils"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"

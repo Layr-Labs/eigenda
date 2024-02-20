@@ -1,7 +1,7 @@
 package kzgEncoder
 
 import (
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 func (g *KzgEncoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {

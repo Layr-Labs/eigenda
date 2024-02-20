@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
+	encoder "github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 

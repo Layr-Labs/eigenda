@@ -3,7 +3,7 @@ package encoder_test
 import (
 	"testing"
 
-	rs "github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
+	rs "github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

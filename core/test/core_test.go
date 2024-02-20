@@ -15,7 +15,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	kzgEncoder "github.com/Layr-Labs/eigenda/encoding/kzg"
 )
 
 var (
