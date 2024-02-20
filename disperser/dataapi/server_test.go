@@ -302,7 +302,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, 2, len(response.Data))
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorOffline(t *testing.T) {
+func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -412,7 +412,7 @@ func TestFetchDeregisteredOperatorWithoutDaysQueryParam(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorInvalidDaysQueryParam(t *testing.T) {
+func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -455,7 +455,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorInvalidDaysQueryParam(t *testi
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorQueryDaysGreaterThan30(t *testing.T) {
+func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -497,7 +497,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorQueryDaysGreaterThan30(t *test
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerMultiplerOperatorsOffline(t *testing.T) {
+func TestFetchDeregisteredOperatorMultipleOffline(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -559,7 +559,7 @@ func TestFetchDeregisteredOperatorsHandlerMultiplerOperatorsOffline(t *testing.T
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorOnline(t *testing.T) {
+func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -609,7 +609,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorOnline(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOneOnline(t *testing.T) {
+func TestFetchDeregisteredOperatorMultipleOfflineOnline(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -678,7 +678,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOneOfflineOn
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t *testing.T) {
+func TestFetchDeregisteredOperatorMultipleOnline(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
@@ -749,7 +749,7 @@ func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsAllOnline(t 
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchDeregisteredOperatorsHandlerOperatorMultiplerOperatorsOfflineSameBlock(t *testing.T) {
+func TestFetchDeregisteredOperatorMultipleOfflineSameBlock(t *testing.T) {
 
 	defer goleak.VerifyNone(t)
 
