@@ -1,9 +1,9 @@
-package kzgrs_test
+package prover_test
 
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,7 +13,7 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(GETTYSBURG_ADDRESS_BYTES)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		group, _ := kzgrs.NewKzgEncoderGroup(kzgConfig, true)
+		group, _ := prover.NewProver(kzgConfig, true)
 
 		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
 		enc, err := group.NewKzgEncoder(params)

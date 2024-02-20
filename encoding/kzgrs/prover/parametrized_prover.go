@@ -1,21 +1,125 @@
-package kzgrs
+package prover
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"sync"
 	"time"
 
+	enc "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
+	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
+
+type ParametrizedProver struct {
+	*rs.Encoder
+
+	*enc.KzgConfig
+	Srs        *kzg.SRS
+	G2Trailing []bls.G2Point
+
+	Fs         *kzg.FFTSettings
+	Ks         *kzg.KZGSettings
+	SFs        *kzg.FFTSettings // fft used for submatrix product helper
+	FFTPoints  [][]bls.G1Point
+	FFTPointsT [][]bls.G1Point // transpose of FFTPoints
+}
 
 type WorkerResult struct {
 	points []bls.G1Point
 	err    error
 }
 
-func (p *KzgEncoder) ProveAllCosetThreads(polyFr []bls.Fr, numChunks, chunkLen, numWorker uint64) ([]bls.G1Point, error) {
+// just a wrapper to take bytes not Fr Element
+func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []enc.Frame, []uint32, error) {
+	inputFr := rs.ToFrArray(inputBytes)
+	return g.Encode(inputFr)
+}
+
+func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []enc.Frame, []uint32, error) {
+
+	startTime := time.Now()
+	poly, frames, indices, err := g.Encoder.Encode(inputFr)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
+		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
+	}
+
+	// compute commit for the full poly
+	commit := g.Commit(poly.Coeffs)
+	lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
+
+	intermediate := time.Now()
+
+	polyDegreePlus1 := uint64(len(inputFr))
+
+	if g.Verbose {
+		log.Printf("    Commiting takes  %v\n", time.Since(intermediate))
+		intermediate = time.Now()
+
+		log.Printf("shift %v\n", g.SRSOrder-polyDegreePlus1)
+		log.Printf("order %v\n", len(g.Srs.G2))
+		log.Println("low degree verification info")
+	}
+
+	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyDegreePlus1:]
+
+	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
+	lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
+
+	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
+	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
+	//if !ok {
+	//		log.Printf("Kzg FFT Cannot Verify low degree proof %v", lowDegreeProof)
+	//		return nil, nil, nil, nil, errors.New("cannot verify low degree proof")
+	//	} else {
+	//		log.Printf("Kzg FFT Verify low degree proof  PPPASSS %v", lowDegreeProof)
+	//	}
+
+	if g.Verbose {
+		log.Printf("    Generating Low Degree Proof takes  %v\n", time.Since(intermediate))
+		intermediate = time.Now()
+	}
+
+	// compute proofs
+	paddedCoeffs := make([]bls.Fr, g.NumEvaluations())
+	copy(paddedCoeffs, poly.Coeffs)
+
+	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLen, g.NumWorker)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
+	}
+
+	if g.Verbose {
+		log.Printf("    Proving takes    %v\n", time.Since(intermediate))
+	}
+
+	kzgFrames := make([]enc.Frame, len(frames))
+	for i, index := range indices {
+		kzgFrames[i] = enc.Frame{
+			Proof:  proofs[index],
+			Coeffs: frames[i].Coeffs,
+		}
+	}
+
+	if g.Verbose {
+		log.Printf("Total encoding took      %v\n", time.Since(startTime))
+	}
+	return &commit, lowDegreeCommitment, lowDegreeProof, kzgFrames, indices, nil
+}
+
+func (g *ParametrizedProver) Commit(polyFr []bls.Fr) bls.G1Point {
+	commit := g.Ks.CommitToPoly(polyFr)
+	return *commit
+}
+
+func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []bls.Fr, numChunks, chunkLen, numWorker uint64) ([]bls.G1Point, error) {
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
@@ -92,7 +196,7 @@ func (p *KzgEncoder) ProveAllCosetThreads(polyFr []bls.Fr, numChunks, chunkLen, 
 	return proofs, nil
 }
 
-func (p *KzgEncoder) proofWorker(
+func (p *ParametrizedProver) proofWorker(
 	polyFr []bls.Fr,
 	jobChan <-chan uint64,
 	l uint64,
@@ -125,7 +229,7 @@ func (p *KzgEncoder) proofWorker(
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-func (p *KzgEncoder) GetSlicesCoeff(polyFr []bls.Fr, dimE, j, l uint64) ([]bls.Fr, error) {
+func (p *ParametrizedProver) GetSlicesCoeff(polyFr []bls.Fr, dimE, j, l uint64) ([]bls.Fr, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l

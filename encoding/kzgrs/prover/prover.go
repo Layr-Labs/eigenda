@@ -1,4 +1,4 @@
-package kzgrs
+package prover
 
 import (
 	"errors"
@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
+	enc "github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -20,45 +20,17 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-type KzgConfig struct {
-	G1Path          string
-	G2Path          string
-	G1PowerOf2Path  string
-	G2PowerOf2Path  string
-	CacheDir        string
-	NumWorker       uint64
-	SRSOrder        uint64 // Order is the total size of SRS
-	SRSNumberToLoad uint64 // Number of points to be loaded from the begining
-	Verbose         bool
-	PreloadEncoder  bool
-}
-
-type KzgEncoderGroup struct {
-	*KzgConfig
+type Prover struct {
+	*enc.KzgConfig
 	Srs          *kzg.SRS
 	G2Trailing   []bls.G2Point
 	mu           sync.Mutex
 	LoadG2Points bool
 
-	Encoders  map[rs.EncodingParams]*KzgEncoder
-	Verifiers map[rs.EncodingParams]*KzgVerifier
+	ParametrizedProvers map[rs.EncodingParams]*ParametrizedProver
 }
 
-type KzgEncoder struct {
-	*rs.Encoder
-
-	*KzgConfig
-	Srs        *kzg.SRS
-	G2Trailing []bls.G2Point
-
-	Fs         *kzg.FFTSettings
-	Ks         *kzg.KZGSettings
-	SFs        *kzg.FFTSettings // fft used for submatrix product helper
-	FFTPoints  [][]bls.G1Point
-	FFTPointsT [][]bls.G1Point // transpose of FFTPoints
-}
-
-func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup, error) {
+func NewProver(config *enc.KzgConfig, loadG2Points bool) (*Prover, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
@@ -110,13 +82,12 @@ func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup,
 
 	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
-	encoderGroup := &KzgEncoderGroup{
-		KzgConfig:    config,
-		Srs:          srs,
-		G2Trailing:   g2Trailing,
-		Encoders:     make(map[rs.EncodingParams]*KzgEncoder),
-		Verifiers:    make(map[rs.EncodingParams]*KzgVerifier),
-		LoadG2Points: loadG2Points,
+	encoderGroup := &Prover{
+		KzgConfig:           config,
+		Srs:                 srs,
+		G2Trailing:          g2Trailing,
+		ParametrizedProvers: make(map[rs.EncodingParams]*ParametrizedProver),
+		LoadG2Points:        loadG2Points,
 	}
 
 	if config.PreloadEncoder {
@@ -137,66 +108,7 @@ func NewKzgEncoderGroup(config *KzgConfig, loadG2Points bool) (*KzgEncoderGroup,
 
 }
 
-// Read the n-th G1 point from SRS.
-func ReadG1Point(n uint64, g *KzgConfig) (bls.G1Point, error) {
-	if n > g.SRSOrder {
-		return bls.G1Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
-	}
-
-	g1point, err := utils.ReadG1PointSection(g.G1Path, n, n+1, 1)
-	if err != nil {
-		return bls.G1Point{}, err
-	}
-
-	return g1point[0], nil
-}
-
-// Read the n-th G2 point from SRS.
-func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
-	if n > g.SRSOrder {
-		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
-	}
-
-	g2point, err := utils.ReadG2PointSection(g.G2Path, n, n+1, 1)
-	if err != nil {
-		return bls.G2Point{}, err
-	}
-	return g2point[0], nil
-}
-
-// Read g2 points from power of 2 file
-func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bls.G2Point, error) {
-
-	// the powerOf2 file, only [tau^exp] are stored.
-	// exponent    0,    1,       2,    , ..
-	// actual pow [tau],[tau^2],[tau^4],.. (stored in the file)
-	// In our convention SRSOrder contains the total number of series of g1, g2 starting with generator
-	// i.e. [1] [tau] [tau^2]..
-	// So the actual power of tau is SRSOrder - 1
-	// The mainnet SRS, the max power is 2^28-1, so the last power in powerOf2 file is [tau^(2^27)]
-	// For test case of 3000 SRS, the max power is 2999, so last power in powerOf2 file is [tau^2048]
-	// if a actual SRS order is 15, the file will contain four symbols (1,2,4,8) with indices [0,1,2,3]
-	// if a actual SRS order is 16, the file will contain five symbols (1,2,4,8,16) with indices [0,1,2,3,4]
-
-	actualPowerOfTau := g.SRSOrder - 1
-	largestPowerofSRS := uint64(math.Log2(float64(actualPowerOfTau)))
-	if exponent > largestPowerofSRS {
-		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
-			uint64(math.Pow(2, float64(exponent))), largestPowerofSRS)
-	}
-
-	if len(g.G2PowerOf2Path) == 0 {
-		return bls.G2Point{}, fmt.Errorf("G2PathPowerOf2 path is empty")
-	}
-
-	g2point, err := utils.ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
-	if err != nil {
-		return bls.G2Point{}, err
-	}
-	return g2point[0], nil
-}
-
-func (g *KzgEncoderGroup) PreloadAllEncoders() error {
+func (g *Prover) PreloadAllEncoders() error {
 	paramsAll, err := GetAllPrecomputedSrsMap(g.CacheDir)
 	if err != nil {
 		return nil
@@ -216,36 +128,36 @@ func (g *KzgEncoderGroup) PreloadAllEncoders() error {
 		if err != nil {
 			return err
 		}
-		g.Encoders[params] = enc
+		g.ParametrizedProvers[params] = enc
 	}
 
 	return nil
 }
 
-func (g *KzgEncoderGroup) GetKzgEncoder(params rs.EncodingParams) (*KzgEncoder, error) {
+func (g *Prover) GetKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	enc, ok := g.Encoders[params]
+	enc, ok := g.ParametrizedProvers[params]
 	if ok {
 		return enc, nil
 	}
 
 	enc, err := g.newKzgEncoder(params)
 	if err == nil {
-		g.Encoders[params] = enc
+		g.ParametrizedProvers[params] = enc
 	}
 
 	return enc, err
 }
 
-func (g *KzgEncoderGroup) NewKzgEncoder(params rs.EncodingParams) (*KzgEncoder, error) {
+func (g *Prover) NewKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	return g.newKzgEncoder(params)
 }
 
-func (g *KzgEncoderGroup) newKzgEncoder(params rs.EncodingParams) (*KzgEncoder, error) {
+func (g *Prover) newKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, error) {
 
 	// Check that the parameters are valid with respect to the SRS.
 	if params.ChunkLen*params.NumChunks >= g.SRSOrder {
@@ -291,7 +203,7 @@ func (g *KzgEncoderGroup) newKzgEncoder(params rs.EncodingParams) (*KzgEncoder, 
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	sfs := kzg.NewFFTSettings(t)
 
-	return &KzgEncoder{
+	return &ParametrizedProver{
 		Encoder:    encoder,
 		KzgConfig:  g.KzgConfig,
 		Srs:        g.Srs,
@@ -302,92 +214,6 @@ func (g *KzgEncoderGroup) newKzgEncoder(params rs.EncodingParams) (*KzgEncoder, 
 		FFTPoints:  fftPoints,
 		FFTPointsT: fftPointsT,
 	}, nil
-}
-
-// just a wrapper to take bytes not Fr Element
-func (g *KzgEncoder) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []Frame, []uint32, error) {
-	inputFr := rs.ToFrArray(inputBytes)
-	return g.Encode(inputFr)
-}
-
-func (g *KzgEncoder) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []Frame, []uint32, error) {
-
-	startTime := time.Now()
-	poly, frames, indices, err := g.Encoder.Encode(inputFr)
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
-
-	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
-	}
-
-	// compute commit for the full poly
-	commit := g.Commit(poly.Coeffs)
-	lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
-
-	intermediate := time.Now()
-
-	polyDegreePlus1 := uint64(len(inputFr))
-
-	if g.Verbose {
-		log.Printf("    Commiting takes  %v\n", time.Since(intermediate))
-		intermediate = time.Now()
-
-		log.Printf("shift %v\n", g.SRSOrder-polyDegreePlus1)
-		log.Printf("order %v\n", len(g.Srs.G2))
-		log.Println("low degree verification info")
-	}
-
-	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyDegreePlus1:]
-
-	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
-	lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
-
-	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
-	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
-	//if !ok {
-	//		log.Printf("Kzg FFT Cannot Verify low degree proof %v", lowDegreeProof)
-	//		return nil, nil, nil, nil, errors.New("cannot verify low degree proof")
-	//	} else {
-	//		log.Printf("Kzg FFT Verify low degree proof  PPPASSS %v", lowDegreeProof)
-	//	}
-
-	if g.Verbose {
-		log.Printf("    Generating Low Degree Proof takes  %v\n", time.Since(intermediate))
-		intermediate = time.Now()
-	}
-
-	// compute proofs
-	paddedCoeffs := make([]bls.Fr, g.NumEvaluations())
-	copy(paddedCoeffs, poly.Coeffs)
-
-	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLen, g.NumWorker)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
-	}
-
-	if g.Verbose {
-		log.Printf("    Proving takes    %v\n", time.Since(intermediate))
-	}
-
-	kzgFrames := make([]Frame, len(frames))
-	for i, index := range indices {
-		kzgFrames[i] = Frame{
-			Proof:  proofs[index],
-			Coeffs: frames[i].Coeffs,
-		}
-	}
-
-	if g.Verbose {
-		log.Printf("Total encoding took      %v\n", time.Since(startTime))
-	}
-	return &commit, lowDegreeCommitment, lowDegreeProof, kzgFrames, indices, nil
-}
-
-func (g *KzgEncoder) Commit(polyFr []bls.Fr) bls.G1Point {
-	commit := g.Ks.CommitToPoly(polyFr)
-	return *commit
 }
 
 // The function verify low degree proof against a poly commitment
