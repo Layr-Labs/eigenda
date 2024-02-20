@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
@@ -205,11 +205,11 @@ func (group *Verifier) UniversalVerify(params rs.EncodingParams, samples []Sampl
 
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := utils.ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
+	G2atD, err := kzgrs.ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
 
 	if err != nil {
 		// then try to access if there is a full list of g2 srs
-		G2atD, err = utils.ReadG2Point(D, group.KzgConfig)
+		G2atD, err = kzgrs.ReadG2Point(D, group.KzgConfig)
 		if err != nil {
 			return err
 		}

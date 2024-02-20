@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -112,7 +111,7 @@ func TestKzgRs() {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := utils.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzgrs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}

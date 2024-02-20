@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/encoding/utils"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
@@ -227,7 +227,7 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 	}()
 
 	// 2 due to circular FFT  mul
-	subTableSize := dimE * 2 * utils.G1PointBytes
+	subTableSize := dimE * 2 * kzgrs.G1PointBytes
 	totalSubTableSize := subTableSize * l
 
 	if numWorker > l {
@@ -281,7 +281,7 @@ func (p *SRSTable) readWorker(
 	for b := range jobChan {
 		slicePoints := make([]bls.G1Point, dimE*2)
 		for i := uint64(0); i < dimE*2; i++ {
-			g1 := buf[b.start+i*utils.G1PointBytes : b.start+(i+1)*utils.G1PointBytes]
+			g1 := buf[b.start+i*kzgrs.G1PointBytes : b.start+(i+1)*kzgrs.G1PointBytes]
 			err := slicePoints[i].UnmarshalText(g1[:])
 			if err != nil {
 				log.Printf("Error. From %v to %v. %v", b.start, b.end, err)

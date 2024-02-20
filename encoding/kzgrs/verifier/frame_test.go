@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 
@@ -38,7 +38,7 @@ func TestVerify(t *testing.T) {
 	lc := enc.Fs.ExpandedRootsOfUnity[uint64(0)]
 	require.NotNil(t, lc)
 
-	g2Atn, err := utils.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
+	g2Atn, err := kzgrs.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
 	require.Nil(t, err)
 	assert.True(t, verifier.VerifyFrame(&frames[0], enc.Ks, commit, &lc, &g2Atn))
 }

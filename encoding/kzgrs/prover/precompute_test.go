@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils"
 )
 
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {
@@ -19,11 +19,11 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	require.NotNil(t, params)
 
-	s1, err := utils.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
+	s1, err := kzgrs.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, s1)
 
-	_, err = utils.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
+	_, err = kzgrs.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
 	require.Nil(t, err)
 
 	subTable1, err := prover.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)

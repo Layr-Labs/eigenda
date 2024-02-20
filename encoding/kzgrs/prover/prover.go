@@ -13,7 +13,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
@@ -37,7 +36,7 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 	}
 
 	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := utils.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
+	s1, err := kzgrs.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
 		log.Println("failed to read G1 points", err)
 		return nil, err
@@ -52,13 +51,13 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
 		}
 
-		s2, err = utils.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
+		s2, err = kzgrs.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
 			return nil, err
 		}
 
-		g2Trailing, err = utils.ReadG2PointSection(
+		g2Trailing, err = kzgrs.ReadG2PointSection(
 			config.G2Path,
 			config.SRSOrder-config.SRSNumberToLoad,
 			config.SRSOrder, // last exclusive
