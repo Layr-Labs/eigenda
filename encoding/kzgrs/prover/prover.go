@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	enc "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -21,7 +21,7 @@ import (
 )
 
 type Prover struct {
-	*enc.KzgConfig
+	*kzgrs.KzgConfig
 	Srs          *kzg.SRS
 	G2Trailing   []bls.G2Point
 	mu           sync.Mutex
@@ -30,7 +30,7 @@ type Prover struct {
 	ParametrizedProvers map[rs.EncodingParams]*ParametrizedProver
 }
 
-func NewProver(config *enc.KzgConfig, loadG2Points bool) (*Prover, error) {
+func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
@@ -214,16 +214,6 @@ func (g *Prover) newKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, e
 		FFTPoints:  fftPoints,
 		FFTPointsT: fftPointsT,
 	}, nil
-}
-
-// The function verify low degree proof against a poly commitment
-// We wish to show x^shift poly = shiftedPoly, with
-// With shift = SRSOrder-1 - claimedDegree and
-// proof = commit(shiftedPoly) on G1
-// so we can verify by checking
-// e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLowDegreeProof(lengthCommit *bls.G2Point, proof *bls.G2Point, g1Challenge *bls.G1Point) bool {
-	return bls.PairingsVerify(g1Challenge, lengthCommit, &bls.GenG1, proof)
 }
 
 // get Fiat-Shamir challenge

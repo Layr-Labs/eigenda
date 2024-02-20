@@ -8,6 +8,7 @@ import (
 	"time"
 
 	enc "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -17,7 +18,7 @@ import (
 type ParametrizedProver struct {
 	*rs.Encoder
 
-	*enc.KzgConfig
+	*kzgrs.KzgConfig
 	Srs        *kzg.SRS
 	G2Trailing []bls.G2Point
 

@@ -16,6 +16,7 @@ func TestUniversalVerify(t *testing.T) {
 
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
+
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
 	require.Nil(t, err)
@@ -56,12 +57,17 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	group, _ := prover.NewProver(kzgConfig, true)
+	kzgConfigCopy := *kzgConfig
+	group, err := prover.NewProver(&kzgConfigCopy, true)
+	assert.NoError(t, err)
 	group.KzgConfig.G2Path = ""
-	v, _ := verifier.NewVerifier(kzgConfig, true)
+
+	v, err := verifier.NewVerifier(kzgConfig, true)
+	assert.NoError(t, err)
+
 	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.NewKzgEncoder(params)
-	require.Nil(t, err)
+	assert.NoError(t, err)
 
 	numBlob := 5
 	samples := make([]verifier.Sample, 0)

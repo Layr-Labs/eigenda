@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	enc "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -17,7 +18,7 @@ import (
 )
 
 type Verifier struct {
-	*enc.KzgConfig
+	*kzgrs.KzgConfig
 	Srs          *kzg.SRS
 	G2Trailing   []bls.G2Point
 	mu           sync.Mutex
@@ -26,7 +27,7 @@ type Verifier struct {
 	ParametrizedVerifiers map[rs.EncodingParams]*ParametrizedVerifier
 }
 
-func NewVerifier(config *enc.KzgConfig, loadG2Points bool) (*Verifier, error) {
+func NewVerifier(config *kzgrs.KzgConfig, loadG2Points bool) (*Verifier, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
@@ -91,7 +92,7 @@ func NewVerifier(config *enc.KzgConfig, loadG2Points bool) (*Verifier, error) {
 }
 
 type ParametrizedVerifier struct {
-	*enc.KzgConfig
+	*kzgrs.KzgConfig
 	Srs *kzg.SRS
 
 	rs.EncodingParams
@@ -190,10 +191,48 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *wbls.G1Point, f *enc.Frame, i
 	if err != nil {
 		return err
 	}
-	if !f.Verify(v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn) {
+
+	if !VerifyFrame(f, v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn) {
 		return errors.New("multireveal proof fails")
 	}
 
 	return nil
 
+}
+
+// Verify function assumes the Data stored is coefficients of coset's interpolating poly
+func VerifyFrame(f *enc.Frame, ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, g2Atn *bls.G2Point) bool {
+	var xPow bls.Fr
+	bls.CopyFr(&xPow, &bls.ONE)
+
+	var tmp bls.Fr
+	for i := 0; i < len(f.Coeffs); i++ {
+		bls.MulModFr(&tmp, &xPow, x)
+		bls.CopyFr(&xPow, &tmp)
+	}
+
+	// [x^n]_2
+	var xn2 bls.G2Point
+	bls.MulG2(&xn2, &bls.GenG2, &xPow)
+
+	// [s^n - x^n]_2
+	var xnMinusYn bls.G2Point
+
+	bls.SubG2(&xnMinusYn, g2Atn, &xn2)
+
+	// [interpolation_polynomial(s)]_1
+	is1 := bls.LinCombG1(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs)
+
+	// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
+	var commitMinusInterpolation bls.G1Point
+	bls.SubG1(&commitMinusInterpolation, commitment, is1)
+
+	// Verify the pairing equation
+	//
+	// e([commitment - interpolation_polynomial(s)], [1]) = e([proof],  [s^n - x^n])
+	//    equivalent to
+	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
+	//
+
+	return bls.PairingsVerify(&commitMinusInterpolation, &bls.GenG2, &f.Proof, &xnMinusYn)
 }

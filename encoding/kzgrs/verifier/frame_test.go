@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -39,5 +40,5 @@ func TestVerify(t *testing.T) {
 
 	g2Atn, err := utils.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
 	require.Nil(t, err)
-	assert.True(t, frames[0].Verify(enc.Ks, commit, &lc, &g2Atn))
+	assert.True(t, verifier.VerifyFrame(&frames[0], enc.Ks, commit, &lc, &g2Atn))
 }
