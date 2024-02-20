@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"time"
 
+	enc "github.com/Layr-Labs/eigenda/encoding"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -34,6 +36,65 @@ func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, erro
 		return nil, err
 	}
 	return buf, nil
+}
+
+// Read the n-th G1 point from SRS.
+func ReadG1Point(n uint64, g *enc.KzgConfig) (bls.G1Point, error) {
+	if n > g.SRSOrder {
+		return bls.G1Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+	}
+
+	g1point, err := ReadG1PointSection(g.G1Path, n, n+1, 1)
+	if err != nil {
+		return bls.G1Point{}, err
+	}
+
+	return g1point[0], nil
+}
+
+// Read the n-th G2 point from SRS.
+func ReadG2Point(n uint64, g *enc.KzgConfig) (bls.G2Point, error) {
+	if n > g.SRSOrder {
+		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+	}
+
+	g2point, err := ReadG2PointSection(g.G2Path, n, n+1, 1)
+	if err != nil {
+		return bls.G2Point{}, err
+	}
+	return g2point[0], nil
+}
+
+// Read g2 points from power of 2 file
+func ReadG2PointOnPowerOf2(exponent uint64, g *enc.KzgConfig) (bls.G2Point, error) {
+
+	// the powerOf2 file, only [tau^exp] are stored.
+	// exponent    0,    1,       2,    , ..
+	// actual pow [tau],[tau^2],[tau^4],.. (stored in the file)
+	// In our convention SRSOrder contains the total number of series of g1, g2 starting with generator
+	// i.e. [1] [tau] [tau^2]..
+	// So the actual power of tau is SRSOrder - 1
+	// The mainnet SRS, the max power is 2^28-1, so the last power in powerOf2 file is [tau^(2^27)]
+	// For test case of 3000 SRS, the max power is 2999, so last power in powerOf2 file is [tau^2048]
+	// if a actual SRS order is 15, the file will contain four symbols (1,2,4,8) with indices [0,1,2,3]
+	// if a actual SRS order is 16, the file will contain five symbols (1,2,4,8,16) with indices [0,1,2,3,4]
+
+	actualPowerOfTau := g.SRSOrder - 1
+	largestPowerofSRS := uint64(math.Log2(float64(actualPowerOfTau)))
+	if exponent > largestPowerofSRS {
+		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
+			uint64(math.Pow(2, float64(exponent))), largestPowerofSRS)
+	}
+
+	if len(g.G2PowerOf2Path) == 0 {
+		return bls.G2Point{}, fmt.Errorf("G2PathPowerOf2 path is empty")
+	}
+
+	g2point, err := ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
+	if err != nil {
+		return bls.G2Point{}, err
+	}
+	return g2point[0], nil
 }
 
 func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, error) {
@@ -290,7 +351,7 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	}()
 
 	n := to - from
-	
+
 	g2r := bufio.NewReaderSize(g2f, int(n*G2PointBytes))
 
 	_, err = g2f.Seek(int64(from*G2PointBytes), 0)
