@@ -80,6 +80,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"
         );
 
+        //make sure that the quorumNumbers and quorumThresholdPercentages are of the same length
+        require(
+            batchHeader.quorumNumbers.length == batchHeader.quorumThresholdPercentages.length,
+            "EigenDAServiceManager.confirmBatch: quorumNumbers and quorumThresholdPercentages must be of the same length"
+        );
+
         // calculate reducedBatchHeaderHash which nodes signed
         bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
 

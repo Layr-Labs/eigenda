@@ -193,8 +193,8 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			err = t.ethClient.SendTransaction(ctx, newTx)
 			if err != nil {
 				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
-				t.metrics.IncrementTxnCount("failure")
 				if retryFromFailure >= maxSpeedUpRetry {
+					t.metrics.IncrementTxnCount("failure")
 					return nil, err
 				}
 				retryFromFailure++
