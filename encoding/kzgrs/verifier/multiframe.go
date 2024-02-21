@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -69,7 +71,7 @@ func GenRandomnessVector(samples []Sample) ([]bls.Fr, error) {
 }
 
 // the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
-func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingParams, ks *kzg.KZGSettings, proofs []bls.G1Point) (*bls.G1Point, error) {
+func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bls.G1Point) (*bls.G1Point, error) {
 	n := len(samples)
 	commits := make([]bls.G1Point, m)
 	D := params.ChunkLen
@@ -156,6 +158,33 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 	return &rhsG1, nil
 }
 
+// TODO(mooselumph): Cleanup this function
+func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, samplesCore []encoding.Sample, numBlobs int) error {
+
+	samples := make([]Sample, len(samplesCore))
+
+	for i, sc := range samplesCore {
+		x, err := rs.GetLeadingCosetIndex(
+			uint64(sc.AssignmentIndex),
+			params.NumChunks,
+		)
+		if err != nil {
+			return err
+		}
+
+		sample := Sample{
+			Commitment: (bn254.G1Point)(*sc.Commitment),
+			Proof:      sc.Chunk.Proof,
+			RowIndex:   sc.BlobIndex,
+			Coeffs:     sc.Chunk.Coeffs,
+			X:          uint(x),
+		}
+		samples[i] = sample
+	}
+
+	return v.UniversalVerify(params, samples, numBlobs)
+}
+
 // UniversalVerify implements batch verification on a set of chunks given the same chunk dimension (chunkLen, numChunk).
 // The details is given in Ethereum Research post whose authors are George Kadianakis, Ansgar Dietrichs, Dankrad Feist
 // https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
@@ -164,7 +193,7 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 //
 // The order of samples do not matter.
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
-func (group *Verifier) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
+func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
 	// precheck
 	for i, s := range samples {
 		if s.RowIndex >= m {

@@ -13,8 +13,8 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
-func toEncParams(params core.EncodingParams) encoder.EncodingParams {
-	return encoder.ParamsFromMins(uint64(params.NumChunks), uint64(params.ChunkLength))
+func toEncParams(params core.EncodingParams) encoding.EncodingParams {
+	return encoding.ParamsFromMins(uint64(params.NumChunks), uint64(params.ChunkLength))
 }
 
 type EncoderConfig struct {

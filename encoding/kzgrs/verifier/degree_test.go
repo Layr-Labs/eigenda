@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -16,8 +17,8 @@ func TestLengthProof(t *testing.T) {
 
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, err := group.NewKzgEncoder(params)
+	params := encoding.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5

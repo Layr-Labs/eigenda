@@ -3,9 +3,9 @@ package prover_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	enc "github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,9 +16,9 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 
 	group, _ := prover.NewProver(kzgConfig, true)
 
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
-	p, err := group.NewKzgEncoder(params)
+	p, err := group.GetKzgEncoder(params)
 
 	require.Nil(t, err)
 	require.NotNil(t, p)

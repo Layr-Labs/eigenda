@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -64,6 +65,18 @@ func CreateRandomnessVector(g1commits []bn254.G1Point, g2commits []bn254.G2Point
 	}
 
 	return randomsFr, nil
+}
+
+func (v *Verifier) VerifyCommitEquivalenceBatch(commitments []encoding.BlobCommitments) error {
+	commitmentsPair := make([]CommitmentPair, len(commitments))
+
+	for i, c := range commitments {
+		commitmentsPair[i] = CommitmentPair{
+			Commitment:       (bn254.G1Point)(*c.Commitment),
+			LengthCommitment: (bn254.G2Point)(*c.LengthCommitment),
+		}
+	}
+	return v.BatchVerifyCommitEquivalence(commitmentsPair)
 }
 
 func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []CommitmentPair) error {
