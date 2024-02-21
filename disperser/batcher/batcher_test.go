@@ -28,12 +28,13 @@ import (
 )
 
 var (
-	gettysburgAddressBytes = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	handleBatchLivenessChan = make(chan time.Time, 1)
 )
 
 type batcherComponents struct {
 	transactor       *coremock.MockTransactor
-	txnManager       *mock.MockTxnManager
+	txnManager       *batchermock.MockTxnManager
 	blobStore        disperser.BlobStore
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
@@ -64,7 +65,7 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 	return blob
 }
 
-func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
+func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.Time) {
 	// Common Components
 	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
 	assert.NoError(t, err)
@@ -110,18 +111,35 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher) {
 	ethClient := &cmock.MockEthClient{}
 	txnManager := mock.NewTxnManager()
 
-	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics)
+	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics, handleBatchLivenessChan)
 	assert.NoError(t, err)
+
+	var heartbeatsReceived []time.Time
+	doneListening := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case hb := <-b.HeartbeatChan:
+				heartbeatsReceived = append(heartbeatsReceived, hb)
+			case <-doneListening:
+				return
+			}
+		}
+	}()
 
 	// Make the batcher
 	return &batcherComponents{
-		transactor:       transactor,
-		txnManager:       txnManager,
-		blobStore:        blobStore,
-		encoderClient:    encoderClient,
-		encodingStreamer: b.EncodingStreamer,
-		ethClient:        ethClient,
-	}, b
+			transactor:       transactor,
+			txnManager:       txnManager,
+			blobStore:        blobStore,
+			encoderClient:    encoderClient,
+			encodingStreamer: b.EncodingStreamer,
+			ethClient:        ethClient,
+		}, b, func() []time.Time {
+			close(doneListening) // Stop the goroutine listening to heartbeats
+			return heartbeatsReceived
+		}
 }
 
 func queueBlob(t *testing.T, ctx context.Context, blob *core.Blob, blobStore disperser.BlobStore) (uint64, disperser.BlobKey) {
@@ -143,7 +161,15 @@ func TestBatcherIterations(t *testing.T) {
 		AdversaryThreshold: 70,
 		QuorumThreshold:    100,
 	}})
-	components, batcher := makeBatcher(t)
+	components, batcher, getHeartbeats := makeBatcher(t)
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		assert.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Further assertions can be made here, such as checking the number of heartbeats
+		// or validating the time intervals between them if needed.
+	}()
 	// should be encoding 3 and 0
 	logData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000")
 	assert.NoError(t, err)
@@ -233,7 +259,13 @@ func TestBlobFailures(t *testing.T) {
 		QuorumThreshold:    100,
 	}})
 
-	components, batcher := makeBatcher(t)
+	components, batcher, getHeartbeats := makeBatcher(t)
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		assert.Equal(t, 3, len(heartbeats), "Expected heartbeats, but none were received")
+	}()
+
 	confirmationErr := fmt.Errorf("error")
 	blobStore := components.blobStore
 	ctx := context.Background()
@@ -333,7 +365,13 @@ func TestBlobRetry(t *testing.T) {
 		QuorumThreshold:    100,
 	}})
 
-	components, batcher := makeBatcher(t)
+	components, batcher, getHeartbeats := makeBatcher(t)
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		assert.Equal(t, 1, len(heartbeats), "Expected heartbeats, but none were received")
+	}()
+
 	blobStore := components.blobStore
 	ctx := context.Background()
 	_, blobKey := queueBlob(t, ctx, &blob, blobStore)
@@ -430,8 +468,15 @@ func TestRetryTxnReceipt(t *testing.T) {
 		AdversaryThreshold: 80,
 		QuorumThreshold:    100,
 	}})
-	components, batcher := makeBatcher(t)
+	components, batcher, getHeartbeats := makeBatcher(t)
 
+	defer func() {
+		heartbeats := getHeartbeats()
+		assert.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Further assertions can be made here, such as checking the number of heartbeats
+		// or validating the time intervals between them if needed.
+	}()
 	invalidReceipt := &types.Receipt{
 		Logs: []*types.Log{
 			{
