@@ -125,9 +125,10 @@ func pluginOps(ctx *cli.Context) {
 		OperatorId: keyPair.GetPubKeyG1().GetOperatorID(),
 		QuorumIDs:  config.QuorumIDList,
 	}
+	churnerClient := node.NewChurnerClient(config.ChurnerUrl, true, operator.Timeout, logger)
 	if config.Operation == "opt-in" {
 		log.Printf("Info: Operator with Operator Address: %x is opting in to EigenDA", sk.Address)
-		err = node.RegisterOperator(context.Background(), operator, tx, config.ChurnerUrl, true, logger)
+		err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger)
 		if err != nil {
 			log.Printf("Error: failed to opt-in EigenDA Node Network for operator ID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
 			return
