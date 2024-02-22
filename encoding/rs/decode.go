@@ -3,6 +3,7 @@ package rs
 import (
 	"errors"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -16,7 +17,7 @@ import (
 // the frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
 func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
-	numSys := GetNumSys(maxInputSize, g.ChunkLength)
+	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
 
 	if uint64(len(frames)) < numSys {
 		return nil, errors.New("number of frame must be sufficient")

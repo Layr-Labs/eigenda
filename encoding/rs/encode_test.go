@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
@@ -14,7 +15,7 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	params := rs.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
@@ -37,7 +38,7 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	params := rs.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 
@@ -59,7 +60,7 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	params := rs.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 

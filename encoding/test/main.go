@@ -69,10 +69,10 @@ func TestKzgRs() {
 	}
 
 	// create encoding object
-	kzgGroup, _ := prover.NewProver(kzgConfig, true)
+	p, _ := prover.NewProver(kzgConfig, true)
 
-	params := rs.EncodingParams{NumChunks: 200, ChunkLength: 180}
-	enc, _ := kzgGroup.NewKzgEncoder(params)
+	params := encoding.EncodingParams{NumChunks: 200, ChunkLength: 180}
+	enc, _ := p.GetKzgEncoder(params)
 
 	//inputFr := kzgrs.ToFrArray(inputBytes)
 	inputSize := uint64(numSymbols)

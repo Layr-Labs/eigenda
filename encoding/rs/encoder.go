@@ -3,11 +3,12 @@ package rs
 import (
 	"math"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 
 type Encoder struct {
-	EncodingParams
+	encoding.EncodingParams
 
 	Fs *kzg.FFTSettings
 
@@ -22,7 +23,7 @@ type Encoder struct {
 // original data. When some systematic chunks are missing but identical parity chunk are
 // available, the receive can go through a Reed Solomon decoding to reconstruct the
 // original data.
-func NewEncoder(params EncodingParams, verbose bool) (*Encoder, error) {
+func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) {
 
 	err := params.Validate()
 	if err != nil {

@@ -191,7 +191,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, g.SRSOrder)
 	}
 
-	encoder, err := rs.NewEncoder(rs.EncodingParams(params), g.Verbose)
+	encoder, err := rs.NewEncoder(params, g.Verbose)
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err

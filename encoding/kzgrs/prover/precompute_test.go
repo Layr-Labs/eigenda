@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {
@@ -16,7 +16,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	defer teardownSuite(t)
 
 	kzgConfig.CacheDir = "./data/SRSTable"
-	params := rs.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	require.NotNil(t, params)
 
 	s1, err := kzgrs.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
