@@ -81,11 +81,11 @@ func init() {
 func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 
 	config := &kzgrs.KzgConfig{
-		G1Path:          "../inabox/resources/kzg/g1.point.300000",
-		G2Path:          "../inabox/resources/kzg/g2.point.300000",
+		G1Path:          "../inabox/resources/kzg/g1.point",
+		G2Path:          "../inabox/resources/kzg/g2.point",
 		CacheDir:        "../inabox/resources/kzg/SRSTables",
-		SRSOrder:        300000,
-		SRSNumberToLoad: 300000,
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
@@ -500,6 +500,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	var chunks []*encoding.Frame
 	var blobHeader *core.BlobHeader
 	for _, op := range ops {
+
+		fmt.Println("Processing operator: ", hexutil.Encode(op.Node.Config.ID[:]))
 
 		// check that blob headers can be retrieved from operators
 		headerReply, err := op.Server.GetBlobHeader(ctx, &nodepb.GetBlobHeaderRequest{

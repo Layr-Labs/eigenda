@@ -188,7 +188,7 @@ func TestThrottling(t *testing.T) {
 		Length:           10,
 	}
 
-	encoder.On("Encode", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
+	encoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
 	encoderServerConfig := ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: concurrentRequests,
