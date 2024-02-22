@@ -25,10 +25,11 @@ type BlobCommitments struct {
 	Length           uint          `json:"length"`
 }
 
-// Proof is the multireveal proof
-// Coeffs is identical to input data converted into Fr element
+// Frame is a chunk of data with the associated multi-reveal proof
 type Frame struct {
-	Proof  Proof
+	// Proof is the multireveal proof corresponding to the chunk
+	Proof Proof
+	// Coeffs contains the coefficience of the interpolating polynomial of the chunk
 	Coeffs []Symbol
 }
 
