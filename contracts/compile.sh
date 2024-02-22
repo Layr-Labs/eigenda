@@ -1,35 +1,33 @@
 #!/bin/bash
 
 function create_binding {
-    contract_dir=$1
-    contract=$2
-    binding_dir=$3
-    echo $contract
-    mkdir -p $binding_dir/${contract}
-    contract_json="$contract_dir/out/${contract}.sol/${contract}.json"
-    solc_abi=$(cat ${contract_json} | jq -r '.abi')
-    solc_bin=$(cat ${contract_json} | jq -r '.bytecode.object')
+    local contract_dir="$1"
+    local contract="$2"
+    local binding_dir="$3"
+    echo "$contract"
+    mkdir -p "$binding_dir/${contract}"
+    local contract_json="$contract_dir/out/${contract}.sol/${contract}.json"
+    local solc_abi
+    local solc_bin
+    solc_abi=$(jq -r '.abi' "$contract_json")
+    solc_bin=$(jq -r '.bytecode.object' "$contract_json")
 
     mkdir -p data
-    echo ${solc_abi} > data/tmp.abi
-    echo ${solc_bin} > data/tmp.bin
+    echo "$solc_abi" > data/tmp.abi
+    echo "$solc_bin" > data/tmp.bin
 
-    rm -f $binding_dir/${contract}/binding.go
-    abigen --bin=data/tmp.bin --abi=data/tmp.abi --pkg=contract${contract} --out=$binding_dir/${contract}/binding.go
+    rm -f "$binding_dir/${contract}/binding.go"
+    abigen --bin <(echo "$solc_bin") --abi <(echo "$solc_abi") --pkg "contract${contract}" --out "$binding_dir/${contract}/binding.go"
 }
 
+# Clean and build contracts
 forge clean
 forge build
 
+# List of contracts
 contracts="AVSDirectory DelegationManager BitmapUtils OperatorStateRetriever RegistryCoordinator BLSApkRegistry IndexRegistry StakeRegistry BN254 EigenDAServiceManager IEigenDAServiceManager MockRollup"
-for contract in $contracts; do
-    create_binding ./ $contract ./bindings
-done
 
-# ./compile.sh ./ BitmapUtils ./bindings 
-# ./compile.sh ./ BLSOperatorStateRetriever ./bindings
-# ./compile.sh ./ BN254 ./bindings
-# ./compile.sh ./ BLSRegistryCoordinatorWithIndices ./bindings
-# ./compile.sh ./ IBLSPubkeyRegistry ./bindings
-# ./compile.sh ./ IIndexRegistry ./bindings
-# ./compile.sh ./ IStakeRegistry ./bindings
+# Create bindings for each contract
+for contract in $contracts; do
+    create_binding ./ "$contract" ./bindings
+done
