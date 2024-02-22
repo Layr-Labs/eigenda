@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	enc "github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
@@ -52,8 +51,8 @@ func setupSuite(t *testing.T) func(t *testing.T) {
 	}
 }
 
-func sampleFrames(frames []enc.Frame, num uint64) ([]enc.Frame, []uint64) {
-	samples := make([]enc.Frame, num)
+func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
+	samples := make([]encoding.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 

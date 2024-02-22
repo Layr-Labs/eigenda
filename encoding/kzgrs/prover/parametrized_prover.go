@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	enc "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
@@ -35,12 +35,12 @@ type WorkerResult struct {
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []enc.Frame, []uint32, error) {
+func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []encoding.Frame, []uint32, error) {
 	inputFr := rs.ToFrArray(inputBytes)
 	return g.Encode(inputFr)
 }
 
-func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []enc.Frame, []uint32, error) {
+func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []encoding.Frame, []uint32, error) {
 
 	startTime := time.Now()
 	poly, frames, indices, err := g.Encoder.Encode(inputFr)
@@ -101,9 +101,9 @@ func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Poin
 		log.Printf("    Proving takes    %v\n", time.Since(intermediate))
 	}
 
-	kzgFrames := make([]enc.Frame, len(frames))
+	kzgFrames := make([]encoding.Frame, len(frames))
 	for i, index := range indices {
-		kzgFrames[i] = enc.Frame{
+		kzgFrames[i] = encoding.Frame{
 			Proof:  proofs[index],
 			Coeffs: frames[i].Coeffs,
 		}
