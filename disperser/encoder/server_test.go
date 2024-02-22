@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -30,7 +30,7 @@ var (
 var logger = &cmock.Logger{}
 
 func makeTestEncoder(numPoint uint64) (*encoding.Encoder, ServerConfig) {
-	kzgConfig := kzgEncoder.KzgConfig{
+	kzgConfig := kzgrs.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",

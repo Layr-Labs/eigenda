@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
@@ -40,7 +41,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 
 	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -77,7 +77,7 @@ func init() {
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func mustMakeTestEncoder() core.Encoder {
-	config := kzgEncoder.KzgConfig{
+	config := kzgrs.KzgConfig{
 		G1Path:          "../inabox/resources/kzg/g1.point",
 		G2Path:          "../inabox/resources/kzg/g2.point",
 		CacheDir:        "../inabox/resources/kzg/SRSTables",

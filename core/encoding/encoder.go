@@ -4,8 +4,11 @@ import (
 	"crypto/sha256"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/encoder"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	encoder "github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
@@ -15,20 +18,26 @@ func toEncParams(params core.EncodingParams) encoder.EncodingParams {
 }
 
 type EncoderConfig struct {
-	KzgConfig         kzgEncoder.KzgConfig
+	KzgConfig         kzgrs.KzgConfig
 	CacheEncodedBlobs bool
 }
 
 type Encoder struct {
-	Config       EncoderConfig
-	EncoderGroup *kzgEncoder.KzgEncoderGroup
-	Cache        *lru.Cache[string, encodedValue]
+	Config        EncoderConfig
+	EncoderGroup  *prover.Prover
+	VerifierGroup *verifier.Verifier
+	Cache         *lru.Cache[string, encodedValue]
 }
 
 var _ core.Encoder = &Encoder{}
 
 func NewEncoder(config EncoderConfig, loadG2Points bool) (*Encoder, error) {
-	kzgEncoderGroup, err := kzgEncoder.NewKzgEncoderGroup(&config.KzgConfig, loadG2Points)
+	kzgEncoderGroup, err := prover.NewProver(&config.KzgConfig, loadG2Points)
+	if err != nil {
+		return nil, err
+	}
+
+	kzgVerifierGroup, err := verifier.NewVerifier(&config.KzgConfig, loadG2Points)
 	if err != nil {
 		return nil, err
 	}
@@ -39,9 +48,10 @@ func NewEncoder(config EncoderConfig, loadG2Points bool) (*Encoder, error) {
 	}
 
 	return &Encoder{
-		EncoderGroup: kzgEncoderGroup,
-		Cache:        cache,
-		Config:       config,
+		EncoderGroup:  kzgEncoderGroup,
+		VerifierGroup: kzgVerifierGroup,
+		Cache:         cache,
+		Config:        config,
 	}, nil
 }
 
@@ -100,7 +110,7 @@ func (e *Encoder) Encode(data []byte, params core.EncodingParams) (core.BlobComm
 }
 
 func (e *Encoder) VerifyBlobLength(commitments core.BlobCommitments) error {
-	return e.EncoderGroup.VerifyCommit((*bn254.G2Point)(commitments.LengthCommitment), (*bn254.G2Point)(commitments.LengthProof), uint64(commitments.Length))
+	return e.VerifierGroup.VerifyCommit((*bn254.G2Point)(commitments.LengthCommitment), (*bn254.G2Point)(commitments.LengthProof), uint64(commitments.Length))
 
 }
 
@@ -108,7 +118,7 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 
 	encParams := toEncParams(params)
 
-	verifier, err := e.EncoderGroup.GetKzgVerifier(encParams)
+	verifier, err := e.VerifierGroup.GetKzgVerifier(encParams)
 	if err != nil {
 		return err
 	}
@@ -116,7 +126,7 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 	for ind := range chunks {
 		err = verifier.VerifyFrame(
 			(*bn254.G1Point)(commitments.Commitment),
-			&kzgEncoder.Frame{
+			&encoding.Frame{
 				Proof:  chunks[ind].Proof,
 				Coeffs: chunks[ind].Coeffs,
 			},
@@ -133,21 +143,21 @@ func (e *Encoder) VerifyChunks(chunks []*core.Chunk, indices []core.ChunkNumber,
 }
 
 func (e *Encoder) VerifyCommitEquivalenceBatch(commitments []core.BlobCommitments) error {
-	commitmentsPair := make([]kzgEncoder.CommitmentPair, len(commitments))
+	commitmentsPair := make([]verifier.CommitmentPair, len(commitments))
 
 	for i, c := range commitments {
-		commitmentsPair[i] = kzgEncoder.CommitmentPair{
+		commitmentsPair[i] = verifier.CommitmentPair{
 			Commitment:       (bn254.G1Point)(*c.Commitment),
 			LengthCommitment: (bn254.G2Point)(*c.LengthCommitment),
 		}
 	}
-	return e.EncoderGroup.BatchVerifyCommitEquivalence(commitmentsPair)
+	return e.VerifierGroup.BatchVerifyCommitEquivalence(commitmentsPair)
 }
 
 // convert struct understandable by the crypto library
 func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCore []core.Sample, numBlobs int) error {
 	encParams := toEncParams(params)
-	samples := make([]kzgEncoder.Sample, len(samplesCore))
+	samples := make([]verifier.Sample, len(samplesCore))
 
 	for i, sc := range samplesCore {
 		x, err := encoder.GetLeadingCosetIndex(
@@ -158,7 +168,7 @@ func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCor
 			return err
 		}
 
-		sample := kzgEncoder.Sample{
+		sample := verifier.Sample{
 			Commitment: (bn254.G1Point)(*sc.Commitment),
 			Proof:      sc.Chunk.Proof,
 			RowIndex:   sc.BlobIndex,
@@ -168,15 +178,15 @@ func (e *Encoder) UniversalVerifySubBatch(params core.EncodingParams, samplesCor
 		samples[i] = sample
 	}
 
-	return e.EncoderGroup.UniversalVerify(encParams, samples, numBlobs)
+	return e.VerifierGroup.UniversalVerify(encParams, samples, numBlobs)
 }
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
 func (e *Encoder) Decode(chunks []*core.Chunk, indices []core.ChunkNumber, params core.EncodingParams, maxInputSize uint64) ([]byte, error) {
-	frames := make([]kzgEncoder.Frame, len(chunks))
+	frames := make([]encoding.Frame, len(chunks))
 	for i := range chunks {
-		frames[i] = kzgEncoder.Frame{
+		frames[i] = encoding.Frame{
 			Proof:  chunks[i].Proof,
 			Coeffs: chunks[i].Coeffs,
 		}

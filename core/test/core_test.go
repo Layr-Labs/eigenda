@@ -12,10 +12,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 )
 
 var (
@@ -40,7 +39,7 @@ func setup(m *testing.M) {
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func makeTestEncoder() (core.Encoder, error) {
-	config := kzgEncoder.KzgConfig{
+	config := kzgrs.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",

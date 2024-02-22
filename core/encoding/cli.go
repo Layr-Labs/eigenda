@@ -4,7 +4,7 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/urfave/cli"
 )
 
@@ -88,7 +88,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 }
 
 func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
-	cfg := kzgEncoder.KzgConfig{}
+	cfg := kzgrs.KzgConfig{}
 	cfg.G1Path = ctx.GlobalString(G1PathFlagName)
 	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
 	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)

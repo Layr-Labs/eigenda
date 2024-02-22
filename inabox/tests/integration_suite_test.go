@@ -19,9 +19,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/indexer"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
@@ -157,7 +157,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
-		KzgConfig: kzgEncoder.KzgConfig{
+		KzgConfig: kzgrs.KzgConfig{
 			G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 			G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
 			G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
