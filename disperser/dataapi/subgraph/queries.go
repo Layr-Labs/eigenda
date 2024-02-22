@@ -62,7 +62,7 @@ type (
 		Batches []*Batches `graphql:"batches(orderDirection: $orderDirection, orderBy: $orderBy, first: $first, skip: $skip)"`
 	}
 	queryBatchesByBlockTimestampRange struct {
-		Batches []*Batches `graphql:"batches(first: $first, orderBy: blockTimestamp, where: {and: [{ blockTimestamp_gte: $blockTimestamp_gte}, {blockTimestamp_lte: $blockTimestamp_lte}]})"`
+		Batches []*Batches `graphql:"batches(first: $first, skip: $skip, orderBy: blockTimestamp, where: {and: [{ blockTimestamp_gte: $blockTimestamp_gte}, {blockTimestamp_lte: $blockTimestamp_lte}]})"`
 	}
 	queryOperatorRegistereds struct {
 		OperatorRegistereds []*Operator `graphql:"operatorRegistereds(first: $first)"`
