@@ -1,6 +1,7 @@
 package prover_test
 
 import (
+	cryptorand "crypto/rand"
 	"log"
 	"math/rand"
 	"os"
@@ -124,7 +125,7 @@ func BenchmarkEncode(b *testing.B) {
 	blobs := make([][]byte, numSamples)
 	for i := 0; i < numSamples; i++ {
 		blob := make([]byte, blobSize)
-		_, _ = rand.Read(blob)
+		_, _ = cryptorand.Read(blob)
 		blobs[i] = blob
 	}
 
