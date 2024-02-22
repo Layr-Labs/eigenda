@@ -92,7 +92,7 @@ func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Poin
 	paddedCoeffs := make([]bls.Fr, g.NumEvaluations())
 	copy(paddedCoeffs, poly.Coeffs)
 
-	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLen, g.NumWorker)
+	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
 	}

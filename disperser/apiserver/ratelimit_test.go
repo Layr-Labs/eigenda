@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/peer"
 )
@@ -222,7 +223,7 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	assert.True(t, ok)
 
 	authHeader := core.BlobAuthHeader{
-		BlobCommitments: core.BlobCommitments{},
+		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}

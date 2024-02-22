@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -24,7 +24,7 @@ func NewEncoderClient(addr string, timeout time.Duration) (disperser.EncoderClie
 	}, nil
 }
 
-func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams core.EncodingParams) (*core.BlobCommitments, []*core.Chunk, error) {
+func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams encoding.EncodingParams) (*encoding.BlobCommitments, []*encoding.Frame, error) {
 	conn, err := grpc.Dial(
 		c.addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -47,27 +47,27 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams core
 		return nil, nil, err
 	}
 
-	commitment, err := new(core.G1Commitment).Deserialize(reply.GetCommitment().GetCommitment())
+	commitment, err := new(encoding.G1Commitment).Deserialize(reply.GetCommitment().GetCommitment())
 	if err != nil {
 		return nil, nil, err
 	}
-	lengthCommitment, err := new(core.G2Commitment).Deserialize(reply.GetCommitment().GetLengthCommitment())
+	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.GetCommitment().GetLengthCommitment())
 	if err != nil {
 		return nil, nil, err
 	}
-	lengthProof, err := new(core.LengthProof).Deserialize(reply.GetCommitment().GetLengthProof())
+	lengthProof, err := new(encoding.LengthProof).Deserialize(reply.GetCommitment().GetLengthProof())
 	if err != nil {
 		return nil, nil, err
 	}
-	chunks := make([]*core.Chunk, len(reply.GetChunks()))
+	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
 	for i, chunk := range reply.GetChunks() {
-		deserialized, err := new(core.Chunk).Deserialize(chunk)
+		deserialized, err := new(encoding.Frame).Deserialize(chunk)
 		if err != nil {
 			return nil, nil, err
 		}
 		chunks[i] = deserialized
 	}
-	return &core.BlobCommitments{
+	return &encoding.BlobCommitments{
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,

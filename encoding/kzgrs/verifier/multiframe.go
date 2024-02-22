@@ -74,7 +74,7 @@ func GenRandomnessVector(samples []Sample) ([]bls.Fr, error) {
 func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bls.G1Point) (*bls.G1Point, error) {
 	n := len(samples)
 	commits := make([]bls.G1Point, m)
-	D := params.ChunkLen
+	D := params.ChunkLength
 
 	var tmp bls.Fr
 
@@ -111,7 +111,7 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params encoding.Encod
 
 		rk := randomsFr[k]
 		// for each monomial in a given polynomial, multiply its coefficient with the corresponding random field,
-		// then sum it with others. Given ChunkLen (D) is identical for all samples in a subBatch.
+		// then sum it with others. Given ChunkLength (D) is identical for all samples in a subBatch.
 		// The operation is always valid.
 		for j := uint64(0); j < D; j++ {
 			bls.MulModFr(&tmp, &coeffs[j], &rk)
@@ -208,14 +208,14 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	}
 	ks := verifier.Ks
 
-	D := params.ChunkLen
+	D := params.ChunkLength
 
 	if D > group.SRSNumberToLoad {
 		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v.", D, group.SRSNumberToLoad)
 	}
 
 	n := len(samples)
-	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
+	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
 
 	// generate random field elements to aggregate equality check
 	randomsFr, err := GenRandomnessVector(samples)

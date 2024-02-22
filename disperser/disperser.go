@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -114,7 +115,7 @@ type ConfirmationInfo struct {
 	ReferenceBlockNumber    uint32                               `json:"reference_block_number"`
 	BatchRoot               []byte                               `json:"batch_root"`
 	BlobInclusionProof      []byte                               `json:"blob_inclusion_proof"`
-	BlobCommitment          *core.BlobCommitments                `json:"blob_commitment"`
+	BlobCommitment          *encoding.BlobCommitments            `json:"blob_commitment"`
 	BatchID                 uint32                               `json:"batch_id"`
 	ConfirmationTxnHash     gcommon.Hash                         `json:"confirmation_txn_hash"`
 	ConfirmationBlockNumber uint32                               `json:"confirmation_block_number"`

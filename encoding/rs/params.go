@@ -14,11 +14,11 @@ var (
 type EncodingParams encoding.EncodingParams
 
 func (p EncodingParams) ChunkDegree() uint64 {
-	return p.ChunkLen - 1
+	return p.ChunkLength - 1
 }
 
 func (p EncodingParams) NumEvaluations() uint64 {
-	return p.NumChunks * p.ChunkLen
+	return p.NumChunks * p.ChunkLength
 }
 
 func (p EncodingParams) Validate() error {
@@ -27,7 +27,7 @@ func (p EncodingParams) Validate() error {
 		return ErrInvalidParams
 	}
 
-	if NextPowerOf2(p.ChunkLen) != p.ChunkLen {
+	if NextPowerOf2(p.ChunkLength) != p.ChunkLength {
 		return ErrInvalidParams
 	}
 
@@ -46,13 +46,13 @@ func ParamsFromMins(numChunks, chunkLen uint64) EncodingParams {
 	numChunks = NextPowerOf2(numChunks)
 
 	return EncodingParams{
-		NumChunks: numChunks,
-		ChunkLen:  chunkLen,
+		NumChunks:   numChunks,
+		ChunkLength: chunkLen,
 	}
 
 }
 
-func GetEncodingParams(numSys, numPar, dataSize uint64) EncodingParams {
+func ParamsFromSysPar(numSys, numPar, dataSize uint64) EncodingParams {
 
 	numNodes := numSys + numPar
 	dataLen := RoundUpDivision(dataSize, bls.BYTES_PER_COEFFICIENT)

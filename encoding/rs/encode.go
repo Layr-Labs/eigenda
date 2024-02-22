@@ -84,7 +84,7 @@ func (g *Encoder) MakeFrames(
 		frame := Frame{}
 		indices = append(indices, j)
 
-		ys := polyEvals[g.ChunkLen*i : g.ChunkLen*(i+1)]
+		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
 		err := rb.ReverseBitOrderFr(ys)
 		if err != nil {
 			return nil, nil, err

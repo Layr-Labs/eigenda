@@ -18,7 +18,7 @@ func TestUniversalVerify(t *testing.T) {
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
 
-	params := encoding.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
@@ -66,7 +66,7 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	v, err := verifier.NewVerifier(kzgConfig, true)
 	assert.NoError(t, err)
 
-	params := encoding.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, err := group.GetKzgEncoder(params)
 	assert.NoError(t, err)
 

@@ -12,7 +12,7 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(GETTYSBURG_ADDRESS_BYTES)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
+		params := rs.ParamsFromSysPar(10, 3, uint64(len(input)))
 		enc, err := rs.NewEncoder(params, true)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)

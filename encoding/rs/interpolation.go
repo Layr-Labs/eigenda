@@ -20,7 +20,7 @@ func (g *Encoder) GetInterpolationPolyEval(
 	interpolationPoly []bls.Fr,
 	j uint32,
 ) ([]bls.Fr, error) {
-	evals := make([]bls.Fr, g.ChunkLen)
+	evals := make([]bls.Fr, g.ChunkLength)
 	w := g.Fs.ExpandedRootsOfUnity[uint64(j)]
 	shiftedInterpolationPoly := make([]bls.Fr, len(interpolationPoly))
 
@@ -65,7 +65,7 @@ func (g *Encoder) GetInterpolationPolyEval(
 
 // Since both F W are invertible, c = W^-1 F^-1 d, convert it back. F W W^-1 F^-1 d = c
 func (g *Encoder) GetInterpolationPolyCoeff(chunk []bls.Fr, k uint32) ([]bls.Fr, error) {
-	coeffs := make([]bls.Fr, g.ChunkLen)
+	coeffs := make([]bls.Fr, g.ChunkLength)
 	w := g.Fs.ExpandedRootsOfUnity[uint64(k)]
 	shiftedInterpolationPoly := make([]bls.Fr, len(chunk))
 	err := g.Fs.InplaceFFT(chunk, shiftedInterpolationPoly, true)

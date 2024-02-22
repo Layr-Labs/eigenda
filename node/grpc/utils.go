@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/wealdtech/go-merkletree"
@@ -38,9 +39,9 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 		bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
 		for i, chunks := range blob.GetBundles() {
 			quorumID := blob.GetHeader().GetQuorumHeaders()[i].QuorumId
-			bundles[uint8(quorumID)] = make([]*core.Chunk, len(chunks.GetChunks()))
+			bundles[uint8(quorumID)] = make([]*encoding.Frame, len(chunks.GetChunks()))
 			for j, data := range chunks.GetChunks() {
-				chunk, err := new(core.Chunk).Deserialize(data)
+				chunk, err := new(encoding.Frame).Deserialize(data)
 				if err != nil {
 					return nil, err
 				}
@@ -60,11 +61,11 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
 	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
-	commitment := &core.G1Commitment{
+	commitment := &encoding.G1Commitment{
 		X: *commitX,
 		Y: *commitY,
 	}
-	var lengthCommitment, lengthProof core.G2Commitment
+	var lengthCommitment, lengthProof encoding.G2Commitment
 	if h.GetLengthCommitment() != nil {
 		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
 		lengthCommitment.X.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA1())
@@ -92,7 +93,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	}
 
 	return &core.BlobHeader{
-		BlobCommitments: core.BlobCommitments{
+		BlobCommitments: encoding.BlobCommitments{
 			Commitment:       commitment,
 			LengthCommitment: &lengthCommitment,
 			LengthProof:      &lengthProof,

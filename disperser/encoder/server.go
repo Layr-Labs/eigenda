@@ -9,9 +9,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -20,22 +20,22 @@ import (
 type Server struct {
 	pb.UnimplementedEncoderServer
 
-	config      ServerConfig
-	logger      common.Logger
-	coreEncoder core.Encoder
-	metrics     *Metrics
-	close       func()
+	config  ServerConfig
+	logger  common.Logger
+	prover  encoding.Prover
+	metrics *Metrics
+	close   func()
 
 	runningRequests chan struct{}
 	requestPool     chan struct{}
 }
 
-func NewServer(config ServerConfig, logger common.Logger, coreEncoder core.Encoder, metrics *Metrics) *Server {
+func NewServer(config ServerConfig, logger common.Logger, prover encoding.Prover, metrics *Metrics) *Server {
 	return &Server{
-		config:      config,
-		logger:      logger,
-		coreEncoder: coreEncoder,
-		metrics:     metrics,
+		config:  config,
+		logger:  logger,
+		prover:  prover,
+		metrics: metrics,
 
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan struct{}, config.RequestPoolSize),
@@ -76,12 +76,12 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	begin := time.Now()
 
 	// Convert to core EncodingParams
-	var encodingParams = core.EncodingParams{
-		ChunkLength: uint(req.EncodingParams.ChunkLength),
-		NumChunks:   uint(req.EncodingParams.NumChunks),
+	var encodingParams = encoding.EncodingParams{
+		ChunkLength: uint64(req.EncodingParams.ChunkLength),
+		NumChunks:   uint64(req.EncodingParams.NumChunks),
 	}
 
-	commits, chunks, err := s.coreEncoder.Encode(req.Data, encodingParams)
+	commits, chunks, err := s.prover.EncodeAndProve(req.Data, encodingParams)
 
 	if err != nil {
 		return nil, err
@@ -120,10 +120,10 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	return &pb.EncodeBlobReply{
 		Commitment: &pb.BlobCommitment{
-			Commitment:  commitData,
+			Commitment:       commitData,
 			LengthCommitment: lengthCommitData,
-			LengthProof: lengthProofData,
-			Length:      uint32(commits.Length),
+			LengthProof:      lengthProofData,
+			Length:           uint32(commits.Length),
 		},
 		Chunks: chunksData,
 	}, nil

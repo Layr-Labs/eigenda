@@ -15,7 +15,7 @@ func FuzzOnlySystematic(f *testing.F) {
 
 		group, _ := prover.NewProver(kzgConfig, true)
 
-		params := encoding.GetEncodingParams(10, 3, uint64(len(input)))
+		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
 		enc, err := group.GetKzgEncoder(params)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)

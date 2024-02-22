@@ -16,7 +16,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	defer teardownSuite(t)
 
 	kzgConfig.CacheDir = "./data/SRSTable"
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := rs.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	require.NotNil(t, params)
 
 	s1, err := kzgrs.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
@@ -30,7 +30,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, subTable1)
 
-	fftPoints1, err := subTable1.GetSubTables(params.NumChunks, params.ChunkLen)
+	fftPoints1, err := subTable1.GetSubTables(params.NumChunks, params.ChunkLength)
 	require.Nil(t, err)
 	require.NotNil(t, fftPoints1)
 
@@ -38,7 +38,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, subTable2)
 
-	fftPoints2, err := subTable2.GetSubTables(params.NumChunks, params.ChunkLen)
+	fftPoints2, err := subTable2.GetSubTables(params.NumChunks, params.ChunkLength)
 	require.Nil(t, err)
 	require.NotNil(t, fftPoints2)
 

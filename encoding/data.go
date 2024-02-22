@@ -32,6 +32,15 @@ type Frame struct {
 	Coeffs []Symbol
 }
 
+func (f *Frame) Length() int {
+	return len(f.Coeffs)
+}
+
+// Returns the size of chunk in bytes.
+func (f *Frame) Size() int {
+	return f.Length() * bn254.BYTES_PER_COEFFICIENT
+}
+
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier
 type Sample struct {
 	Commitment      *G1Commitment
@@ -40,7 +49,7 @@ type Sample struct {
 	BlobIndex       int
 }
 
-// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
+// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLength, NumChunk)
 // Blobs with the same encoding parameters are collected in a single subBatch
 type SubBatch struct {
 	Samples  []Sample

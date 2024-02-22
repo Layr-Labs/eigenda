@@ -96,7 +96,7 @@ type ParametrizedVerifier struct {
 	*kzgrs.KzgConfig
 	Srs *kzg.SRS
 
-	encoding.EncodingParams
+	*rs.Encoder
 
 	Fs *kzg.FFTSettings
 	Ks *kzg.KZGSettings
@@ -143,12 +143,18 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 		return nil, err
 	}
 
+	encoder, err := rs.NewEncoder(rs.EncodingParams(params), g.Verbose)
+	if err != nil {
+		log.Println("Could not create encoder: ", err)
+		return nil, err
+	}
+
 	return &ParametrizedVerifier{
-		KzgConfig:      g.KzgConfig,
-		Srs:            g.Srs,
-		EncodingParams: params,
-		Fs:             fs,
-		Ks:             ks,
+		KzgConfig: g.KzgConfig,
+		Srs:       g.Srs,
+		Encoder:   encoder,
+		Fs:        fs,
+		Ks:        ks,
 	}, nil
 }
 
@@ -264,4 +270,29 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bls.G1Point
 	//
 
 	return bls.PairingsVerify(&commitMinusInterpolation, &bls.GenG2, &f.Proof, &xnMinusYn)
+}
+
+// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
+// The result is trimmed to the given maxInputSize.
+func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+	frames := make([]rs.Frame, len(chunks))
+	for i := range chunks {
+		frames[i] = rs.Frame{
+			Coeffs: chunks[i].Coeffs,
+		}
+	}
+	encoder, err := v.GetKzgVerifier(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+}
+
+func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
+	res := make([]uint64, len(chunkIndices))
+	for i, d := range chunkIndices {
+		res[i] = uint64(d)
+	}
+	return res
 }

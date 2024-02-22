@@ -563,17 +563,17 @@ func TestEncodeBlob(t *testing.T) {
 	assert.NotNil(t, encoderReply.Chunks)
 
 	// Decode Server Data
-	var chunksData []*core.Chunk
+	var chunksData []*encoding.Frame
 
 	for i := range encoderReply.Chunks {
-		chunkSerialized, _ := new(core.Chunk).Deserialize(encoderReply.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).Deserialize(encoderReply.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
 	}
 	assert.NotNil(t, chunksData)
 
 	// Indices obtained from Encoder_Test
-	indices := []core.ChunkNumber{
+	indices := []encoding.ChunkNumber{
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
 
@@ -597,7 +597,7 @@ func TestEncodeBlob(t *testing.T) {
 	assert.Equal(t, decoded, gettysburgAddressBytes)
 }
 
-func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *core.EncodingParams, error) {
+func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingParams, error) {
 	logger := testSuite.Logger
 	var adversaryThreshold uint8 = 80
 	var quorumThreshold uint8 = 90
@@ -630,7 +630,7 @@ func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *core.EncodingParams
 	coordinator := &core.StdAssignmentCoordinator{}
 
 	blobSize := uint(len(testBlob.Data))
-	blobLength := core.GetBlobLength(uint(blobSize))
+	blobLength := encoding.GetBlobLength(uint(blobSize))
 
 	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, param)
 	if err != nil {
@@ -646,7 +646,7 @@ func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *core.EncodingParams
 	if err != nil {
 		logger.Printf("failed to get assignments: %s", err)
 	}
-	testEncodingParams, _ := core.GetEncodingParams(chunkLength, info.TotalChunks)
+	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
 	testEncodingParamsProto := &encoder_rpc.EncodingParams{
 		ChunkLength: uint32(testEncodingParams.ChunkLength),
