@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	enc "github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, b)
 
-	frame, err := enc.Decode(b)
+	frame, err := encoding.Decode(b)
 	require.Nil(t, err)
 	require.NotNil(t, frame)
 

@@ -76,9 +76,10 @@ type Batcher struct {
 	TransactionManager    TxnManager
 	Metrics               *Metrics
 
-	ethClient common.EthClient
-	finalizer Finalizer
-	logger    common.Logger
+	ethClient     common.EthClient
+	finalizer     Finalizer
+	logger        common.Logger
+	HeartbeatChan chan time.Time
 }
 
 func NewBatcher(
@@ -96,6 +97,7 @@ func NewBatcher(
 	txnManager TxnManager,
 	logger common.Logger,
 	metrics *Metrics,
+	heartbeatChan chan time.Time,
 ) (*Batcher, error) {
 	batchTrigger := NewEncodedSizeNotifier(
 		make(chan struct{}, 1),
@@ -130,9 +132,10 @@ func NewBatcher(
 		TransactionManager:    txnManager,
 		Metrics:               metrics,
 
-		ethClient: ethClient,
-		finalizer: finalizer,
-		logger:    logger,
+		ethClient:     ethClient,
+		finalizer:     finalizer,
+		logger:        logger,
+		HeartbeatChan: heartbeatChan,
 	}, nil
 }
 
@@ -187,6 +190,7 @@ func (b *Batcher) Start(ctx context.Context) error {
 				}
 			case <-batchTrigger.Notify:
 				ticker.Stop()
+
 				if err := b.HandleSingleBatch(ctx); err != nil {
 					if errors.Is(err, errNoEncodedResults) {
 						b.logger.Warn("no encoded results to make a batch with")
@@ -379,6 +383,10 @@ type confirmationMetadata struct {
 
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
+
+	// Signal Liveness to indicate no stall
+	b.signalLiveness()
+
 	// start a timer
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		b.Metrics.ObserveLatency("total", f*1000) // make milliseconds
@@ -575,4 +583,15 @@ func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *
 		}
 	}
 	return true
+}
+
+func (b *Batcher) signalLiveness() {
+	select {
+	case b.HeartbeatChan <- time.Now():
+		b.logger.Info("Heartbeat signal sent")
+	default:
+		// This case happens if there's no receiver ready to consume the heartbeat signal.
+		// It prevents the goroutine from blocking if the channel is full or not being listened to.
+		b.logger.Warn("Heartbeat signal skipped, no receiver on the channel")
+	}
 }

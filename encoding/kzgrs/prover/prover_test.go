@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+
 	"github.com/stretchr/testify/assert"
 )
 
