@@ -16,7 +16,7 @@ func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 	defer teardownSuite(t)
 
 	kzgConfig.CacheDir = "./data/SRSTable"
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	require.NotNil(t, params)
 
 	s1, err := kzgrs.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)

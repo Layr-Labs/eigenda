@@ -19,11 +19,11 @@ func TestProveAllCosetThreads(t *testing.T) {
 
 	group, _ := prover.NewProver(kzgConfig, true)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
-	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	inputFr := rs.ToFrArray(gettysburgAddressBytes)
 
 	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 	require.Nil(t, err)

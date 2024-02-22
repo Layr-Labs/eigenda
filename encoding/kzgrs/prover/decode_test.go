@@ -16,14 +16,14 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 
 	group, _ := prover.NewProver(kzgConfig, true)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 
 	p, err := group.GetKzgEncoder(params)
 
 	require.Nil(t, err)
 	require.NotNil(t, p)
 
-	_, _, _, frames, _, err := p.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	_, _, _, frames, _, err := p.EncodeBytes(gettysburgAddressBytes)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 

@@ -10,7 +10,7 @@ import (
 
 func FuzzOnlySystematic(f *testing.F) {
 
-	f.Add(GETTYSBURG_ADDRESS_BYTES)
+	f.Add(gettysburgAddressBytes)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
 		group, _ := prover.NewProver(kzgConfig, true)
