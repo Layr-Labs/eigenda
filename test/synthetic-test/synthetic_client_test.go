@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 	"github.com/shurcooL/graphql"
 
@@ -29,12 +30,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/logging"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -220,22 +222,20 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	if err != nil {
 		return err
 	}
-	encoder, err := encoding.NewEncoder(encoding.EncoderConfig{
-		KzgConfig: kzgrs.KzgConfig{
-			G1Path:         retrievalClientConfig.RetrieverG1Path,
-			G2Path:         retrievalClientConfig.RetrieverG2Path,
-			CacheDir:       retrievalClientConfig.RetrieverCachePath,
-			NumWorker:      1,
-			SRSOrder:       uint64(srsOrder),
-			Verbose:        true,
-			PreloadEncoder: true,
-		},
-	})
+	v, err := verifier.NewVerifier(&kzgrs.KzgConfig{
+		G1Path:         retrievalClientConfig.RetrieverG1Path,
+		G2Path:         retrievalClientConfig.RetrieverG2Path,
+		CacheDir:       retrievalClientConfig.RetrieverCachePath,
+		NumWorker:      1,
+		SRSOrder:       uint64(srsOrder),
+		Verbose:        true,
+		PreloadEncoder: true,
+	}, true)
 	if err != nil {
 		return err
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, encoder, 10)
+	retrievalClient, err = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, v, 10)
 	if err != nil {
 		return err
 	}
@@ -486,13 +486,13 @@ func retrieverClientBlobRetrieve(blobStatusReply *disperser_rpc.BlobStatusReply,
 }
 
 func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IEigenDAServiceManagerBlobHeader {
-	logger := testSuite.Logger
-	commitmentBytes := blobHeader.GetCommitment()
-	commitment, err := new(core.Commitment).Deserialize(commitmentBytes)
-	if err != nil {
-		logger.Printf("failed to deserialize commitment: %s", err)
-		return rollupbindings.IEigenDAServiceManagerBlobHeader{}
+	commitX := new(fp.Element).SetBytes(blobHeader.GetCommitment().GetX())
+	commitY := new(fp.Element).SetBytes(blobHeader.GetCommitment().GetY())
+	commitment := &encoding.G1Commitment{
+		X: *commitX,
+		Y: *commitY,
 	}
+
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
@@ -513,7 +513,7 @@ func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IE
 	}
 }
 
-func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerificationProof) rollupbindings.EigenDABlobUtilsBlobVerificationProof {
+func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerificationProof) rollupbindings.EigenDARollupUtilsBlobVerificationProof {
 	logger := testSuite.Logger
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
@@ -543,7 +543,7 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	logger.Printf("VerificationProof:InclusionProof: %v\n", verificationProof.GetInclusionProof())
 	logger.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
 
-	return rollupbindings.EigenDABlobUtilsBlobVerificationProof{
+	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
 		BatchId:                verificationProof.GetBatchId(),
 		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
 		BatchMetadata:          batchMetadata,
@@ -587,12 +587,10 @@ func TestEncodeBlob(t *testing.T) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	encodingConfig := encoding.EncoderConfig{KzgConfig: kzgConfig}
-
-	encoder, _ := encoding.NewEncoder(encodingConfig)
+	v, _ := verifier.NewVerifier(&kzgConfig, false)
 
 	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
-	decoded, err := encoder.Decode(chunksData, indices, *encodingParams, maxInputSize)
+	decoded, err := v.Decode(chunksData, indices, *encodingParams, maxInputSize)
 	assert.Nil(t, err)
 	assert.Equal(t, decoded, gettysburgAddressBytes)
 }
