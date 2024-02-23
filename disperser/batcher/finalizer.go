@@ -100,10 +100,10 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("FinalizeBlobs: error getting blob headers: %w", err)
 		}
-		metadatas := metadatas
-		f.logger.Info("FinalizeBlobs: finalizing blobs", "numBlobs", len(metadatas), "finalizedBlockNumber", lastFinalBlock)
+		metas := metadatas
+		f.logger.Info("FinalizeBlobs: finalizing blobs", "numBlobs", len(metas), "finalizedBlockNumber", lastFinalBlock)
 		pool.Submit(func() {
-			f.updateBlobs(ctx, metadatas, lastFinalBlock)
+			f.updateBlobs(ctx, metas, lastFinalBlock)
 		})
 		totalProcessed += len(metadatas)
 
