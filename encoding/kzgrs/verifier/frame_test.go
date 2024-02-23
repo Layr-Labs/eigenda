@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 
@@ -20,9 +20,9 @@ func TestVerify(t *testing.T) {
 
 	group, _ := prover.NewProver(kzgConfig, true)
 
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
-	enc, err := group.NewKzgEncoder(params)
+	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 	require.NotNil(t, enc)
 

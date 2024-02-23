@@ -3,20 +3,20 @@ package prover_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 )
 
 func FuzzOnlySystematic(f *testing.F) {
 
-	f.Add(GETTYSBURG_ADDRESS_BYTES)
+	f.Add(gettysburgAddressBytes)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
 		group, _ := prover.NewProver(kzgConfig, true)
 
-		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
-		enc, err := group.NewKzgEncoder(params)
+		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
+		enc, err := group.GetKzgEncoder(params)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)
 		}

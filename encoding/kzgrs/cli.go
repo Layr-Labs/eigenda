@@ -1,10 +1,9 @@
-package encoding
+package kzgrs
 
 import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/urfave/cli"
 )
 
@@ -87,8 +86,8 @@ func CLIFlags(envPrefix string) []cli.Flag {
 	}
 }
 
-func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
-	cfg := kzgrs.KzgConfig{}
+func ReadCLIConfig(ctx *cli.Context) KzgConfig {
+	cfg := KzgConfig{}
 	cfg.G1Path = ctx.GlobalString(G1PathFlagName)
 	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
 	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)
@@ -99,8 +98,5 @@ func ReadCLIConfig(ctx *cli.Context) EncoderConfig {
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
 	cfg.G2PowerOf2Path = ctx.GlobalString(G2PowerOf2PathFlagName)
 
-	return EncoderConfig{
-		KzgConfig:         cfg,
-		CacheEncodedBlobs: ctx.GlobalBoolT(CacheEncodedBlobsFlagName),
-	}
+	return cfg
 }

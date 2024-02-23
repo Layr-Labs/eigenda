@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
@@ -26,8 +27,10 @@ type Prover struct {
 	mu           sync.Mutex
 	LoadG2Points bool
 
-	ParametrizedProvers map[rs.EncodingParams]*ParametrizedProver
+	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
+
+var _ encoding.Prover = &Prover{}
 
 func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 
@@ -85,7 +88,7 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 		KzgConfig:           config,
 		Srs:                 srs,
 		G2Trailing:          g2Trailing,
-		ParametrizedProvers: make(map[rs.EncodingParams]*ParametrizedProver),
+		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
 		LoadG2Points:        loadG2Points,
 	}
 
@@ -114,7 +117,7 @@ func (g *Prover) PreloadAllEncoders() error {
 	}
 	fmt.Printf("detect %v srs maps\n", len(paramsAll))
 	for i := 0; i < len(paramsAll); i++ {
-		fmt.Printf(" %v. NumChunks: %v   ChunkLen: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLen)
+		fmt.Printf(" %v. NumChunks: %v   ChunkLength: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLength)
 	}
 
 	if len(paramsAll) == 0 {
@@ -133,7 +136,39 @@ func (g *Prover) PreloadAllEncoders() error {
 	return nil
 }
 
-func (g *Prover) GetKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, error) {
+func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+
+	enc, err := e.GetKzgEncoder(params)
+	if err != nil {
+		return encoding.BlobCommitments{}, nil, err
+	}
+
+	commit, lowDegreeCommit, lowDegreeProof, kzgFrames, _, err := enc.EncodeBytes(data)
+	if err != nil {
+		return encoding.BlobCommitments{}, nil, err
+	}
+
+	chunks := make([]*encoding.Frame, len(kzgFrames))
+	for ind, frame := range kzgFrames {
+
+		chunks[ind] = &encoding.Frame{
+			Coeffs: frame.Coeffs,
+			Proof:  frame.Proof,
+		}
+	}
+
+	length := uint(len(rs.ToFrArray(data)))
+	commitments := encoding.BlobCommitments{
+		Commitment:       (*encoding.G1Commitment)(commit),
+		LengthCommitment: (*encoding.G2Commitment)(lowDegreeCommit),
+		LengthProof:      (*encoding.G2Commitment)(lowDegreeProof),
+		Length:           length,
+	}
+
+	return commitments, chunks, nil
+}
+
+func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	enc, ok := g.ParametrizedProvers[params]
@@ -141,7 +176,7 @@ func (g *Prover) GetKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, e
 		return enc, nil
 	}
 
-	enc, err := g.newKzgEncoder(params)
+	enc, err := g.newProver(params)
 	if err == nil {
 		g.ParametrizedProvers[params] = enc
 	}
@@ -149,18 +184,11 @@ func (g *Prover) GetKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, e
 	return enc, err
 }
 
-func (g *Prover) NewKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	return g.newKzgEncoder(params)
-}
-
-func (g *Prover) newKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, error) {
+func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
 
 	// Check that the parameters are valid with respect to the SRS.
-	if params.ChunkLen*params.NumChunks >= g.SRSOrder {
-		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLen, params.NumChunks, g.SRSOrder)
+	if params.ChunkLength*params.NumChunks >= g.SRSOrder {
+		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, g.SRSOrder)
 	}
 
 	encoder, err := rs.NewEncoder(params, g.Verbose)
@@ -175,7 +203,7 @@ func (g *Prover) newKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, e
 		return nil, err
 	}
 
-	fftPoints, err := subTable.GetSubTables(encoder.NumChunks, encoder.ChunkLen)
+	fftPoints, err := subTable.GetSubTables(encoder.NumChunks, encoder.ChunkLength)
 	if err != nil {
 		log.Println("could not get sub tables", err)
 		return nil, err
@@ -184,12 +212,12 @@ func (g *Prover) newKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, e
 	fftPointsT := make([][]bls.G1Point, len(fftPoints[0]))
 	for i := range fftPointsT {
 		fftPointsT[i] = make([]bls.G1Point, len(fftPoints))
-		for j := uint64(0); j < encoder.ChunkLen; j++ {
+		for j := uint64(0); j < encoder.ChunkLength; j++ {
 			fftPointsT[i][j] = fftPoints[j][i]
 		}
 	}
 	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
-	if encoder.ChunkLen == 1 {
+	if encoder.ChunkLength == 1 {
 		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	}
 	fs := kzg.NewFFTSettings(n)
@@ -246,14 +274,14 @@ func (g *Prover) newKzgEncoder(params rs.EncodingParams) (*ParametrizedProver, e
 // where the first * specifies the dimension of the matrix which
 // equals to the number of chunks
 // where the second & specifies the length of each chunk
-func GetAllPrecomputedSrsMap(tableDir string) ([]rs.EncodingParams, error) {
+func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
 	files, err := os.ReadDir(tableDir)
 	if err != nil {
 		log.Println("Error to list SRS Table directory", err)
 		return nil, err
 	}
 
-	tables := make([]rs.EncodingParams, 0)
+	tables := make([]encoding.EncodingParams, 0)
 	for _, file := range files {
 		filename := file.Name()
 
@@ -270,11 +298,37 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]rs.EncodingParams, error) {
 			return nil, err
 		}
 
-		params := rs.EncodingParams{
-			NumChunks: uint64(cosetSizeValue),
-			ChunkLen:  uint64(dimEValue),
+		params := encoding.EncodingParams{
+			NumChunks:   uint64(cosetSizeValue),
+			ChunkLength: uint64(dimEValue),
 		}
 		tables = append(tables, params)
 	}
 	return tables, nil
+}
+
+// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
+// The result is trimmed to the given maxInputSize.
+func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+	frames := make([]encoding.Frame, len(chunks))
+	for i := range chunks {
+		frames[i] = encoding.Frame{
+			Proof:  chunks[i].Proof,
+			Coeffs: chunks[i].Coeffs,
+		}
+	}
+	encoder, err := p.GetKzgEncoder(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+}
+
+func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
+	res := make([]uint64, len(chunkIndices))
+	for i, d := range chunkIndices {
+		res[i] = uint64(d)
+	}
+	return res
 }

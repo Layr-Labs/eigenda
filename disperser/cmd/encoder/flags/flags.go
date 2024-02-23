@@ -3,7 +3,7 @@ package flags
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/logging"
-	"github.com/Layr-Labs/eigenda/core/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/urfave/cli"
 )
 
@@ -66,6 +66,6 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, encoding.CLIFlags(envVarPrefix)...)
+	Flags = append(Flags, kzgrs.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, logging.CLIFlags(envVarPrefix, FlagPrefix)...)
 }

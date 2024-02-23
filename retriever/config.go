@@ -5,14 +5,14 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
-	"github.com/Layr-Labs/eigenda/core/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"github.com/urfave/cli"
 )
 
 type Config struct {
-	EncoderConfig   encoding.EncoderConfig
+	EncoderConfig   kzgrs.KzgConfig
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    logging.Config
 	IndexerConfig   indexer.Config
@@ -29,7 +29,7 @@ type Config struct {
 
 func NewConfig(ctx *cli.Context) *Config {
 	return &Config{
-		EncoderConfig:   encoding.ReadCLIConfig(ctx),
+		EncoderConfig:   kzgrs.ReadCLIConfig(ctx),
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
 		LoggerConfig:    logging.ReadCLIConfig(ctx, flags.FlagPrefix),
 		IndexerConfig:   indexer.ReadIndexerConfig(ctx),

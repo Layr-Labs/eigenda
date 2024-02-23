@@ -6,14 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 func TestGetEncodingParams(t *testing.T) {
-	params := rs.GetEncodingParams(1, 4, 1000)
+	params := encoding.ParamsFromSysPar(1, 4, 1000)
 
 	require.NotNil(t, params)
-	assert.Equal(t, params.ChunkLen, uint64(64))
+	assert.Equal(t, params.ChunkLength, uint64(64))
 	// assert.Equal(t, params.DataLen, uint64(1000))
 	assert.Equal(t, params.NumChunks, uint64(8))
 	assert.Equal(t, params.NumEvaluations(), uint64(512))
@@ -37,7 +38,7 @@ func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	numEle := rs.GetNumElement(1000, BYTES_PER_COEFFICIENT)
 	assert.Equal(t, numEle, uint64(33))
 
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 

@@ -3,6 +3,7 @@ package rs
 import (
 	"errors"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -16,7 +17,7 @@ import (
 // the frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
 func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
-	numSys := GetNumSys(maxInputSize, g.ChunkLen)
+	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
 
 	if uint64(len(frames)) < numSys {
 		return nil, errors.New("number of frame must be sufficient")
@@ -37,7 +38,7 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		}
 
 		// Some pattern i butterfly swap. Find the leading coset, then increment by number of coset
-		for j := uint64(0); j < g.ChunkLen; j++ {
+		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
 			samples[p] = new(bls.Fr)
 			bls.CopyFr(samples[p], &evals[j])

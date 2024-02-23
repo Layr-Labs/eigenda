@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -17,8 +18,8 @@ func TestUniversalVerify(t *testing.T) {
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
 
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, err := group.NewKzgEncoder(params)
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
@@ -65,8 +66,8 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	v, err := verifier.NewVerifier(kzgConfig, true)
 	assert.NoError(t, err)
 
-	params := rs.GetEncodingParams(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, err := group.NewKzgEncoder(params)
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	enc, err := group.GetKzgEncoder(params)
 	assert.NoError(t, err)
 
 	numBlob := 5

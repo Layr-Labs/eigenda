@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/logging"
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
@@ -21,7 +20,9 @@ import (
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -42,8 +43,9 @@ type batcherComponents struct {
 }
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
-func makeTestEncoder() (core.Encoder, error) {
-	config := kzgrs.KzgConfig{
+func makeTestProver() (encoding.Prover, error) {
+
+	config := &kzgrs.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
@@ -52,7 +54,7 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
+	return prover.NewProver(config, true)
 }
 
 func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
@@ -79,7 +81,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err := core.NewStdSignatureAggregator(logger, transactor)
 	assert.NoError(t, err)
-	enc, err := makeTestEncoder()
+	p, err := makeTestProver()
 	assert.NoError(t, err)
 
 	state := cst.GetTotalOperatorState(context.Background(), 0)
@@ -106,7 +108,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 
 	metrics := bat.NewMetrics("9100", logger)
 
-	encoderClient := disperser.NewLocalEncoderClient(enc)
+	encoderClient := disperser.NewLocalEncoderClient(p)
 	finalizer := batchermock.NewFinalizer()
 	ethClient := &cmock.MockEthClient{}
 	txnManager := mock.NewTxnManager()

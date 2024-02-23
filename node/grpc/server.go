@@ -10,6 +10,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -194,7 +195,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	if quorumInfo == nil {
 		return nil, fmt.Errorf("invalid request: quorum ID %d not found in blob header", in.GetQuorumId())
 	}
-	encodedBlobSize := core.GetBlobSize(core.GetEncodedBlobLength(blobHeader.Length, quorumInfo.QuorumThreshold, quorumInfo.AdversaryThreshold))
+	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.QuorumThreshold, quorumInfo.AdversaryThreshold))
 	rate := quorumInfo.QuorumRate
 
 	s.mu.Lock()

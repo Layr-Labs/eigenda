@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
@@ -69,10 +71,10 @@ func GenRandomnessVector(samples []Sample) ([]bls.Fr, error) {
 }
 
 // the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
-func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingParams, ks *kzg.KZGSettings, proofs []bls.G1Point) (*bls.G1Point, error) {
+func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bls.G1Point) (*bls.G1Point, error) {
 	n := len(samples)
 	commits := make([]bls.G1Point, m)
-	D := params.ChunkLen
+	D := params.ChunkLength
 
 	var tmp bls.Fr
 
@@ -109,7 +111,7 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 
 		rk := randomsFr[k]
 		// for each monomial in a given polynomial, multiply its coefficient with the corresponding random field,
-		// then sum it with others. Given ChunkLen (D) is identical for all samples in a subBatch.
+		// then sum it with others. Given ChunkLength (D) is identical for all samples in a subBatch.
 		// The operation is always valid.
 		for j := uint64(0); j < D; j++ {
 			bls.MulModFr(&tmp, &coeffs[j], &rk)
@@ -156,6 +158,33 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 	return &rhsG1, nil
 }
 
+// TODO(mooselumph): Cleanup this function
+func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, samplesCore []encoding.Sample, numBlobs int) error {
+
+	samples := make([]Sample, len(samplesCore))
+
+	for i, sc := range samplesCore {
+		x, err := rs.GetLeadingCosetIndex(
+			uint64(sc.AssignmentIndex),
+			params.NumChunks,
+		)
+		if err != nil {
+			return err
+		}
+
+		sample := Sample{
+			Commitment: (bn254.G1Point)(*sc.Commitment),
+			Proof:      sc.Chunk.Proof,
+			RowIndex:   sc.BlobIndex,
+			Coeffs:     sc.Chunk.Coeffs,
+			X:          uint(x),
+		}
+		samples[i] = sample
+	}
+
+	return v.UniversalVerify(params, samples, numBlobs)
+}
+
 // UniversalVerify implements batch verification on a set of chunks given the same chunk dimension (chunkLen, numChunk).
 // The details is given in Ethereum Research post whose authors are George Kadianakis, Ansgar Dietrichs, Dankrad Feist
 // https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240
@@ -164,7 +193,7 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params rs.EncodingPar
 //
 // The order of samples do not matter.
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
-func (group *Verifier) UniversalVerify(params rs.EncodingParams, samples []Sample, m int) error {
+func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
 	// precheck
 	for i, s := range samples {
 		if s.RowIndex >= m {
@@ -179,14 +208,14 @@ func (group *Verifier) UniversalVerify(params rs.EncodingParams, samples []Sampl
 	}
 	ks := verifier.Ks
 
-	D := params.ChunkLen
+	D := params.ChunkLength
 
 	if D > group.SRSNumberToLoad {
 		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v.", D, group.SRSNumberToLoad)
 	}
 
 	n := len(samples)
-	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLen, m)
+	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
 
 	// generate random field elements to aggregate equality check
 	randomsFr, err := GenRandomnessVector(samples)

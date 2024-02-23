@@ -3,6 +3,7 @@ package rs_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,7 +13,7 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(GETTYSBURG_ADDRESS_BYTES)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		params := rs.GetEncodingParams(10, 3, uint64(len(input)))
+		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
 		enc, err := rs.NewEncoder(params, true)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)

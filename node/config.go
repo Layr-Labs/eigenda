@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -70,7 +70,7 @@ type Config struct {
 
 	EthClientConfig geth.EthClientConfig
 	LoggingConfig   logging.Config
-	EncoderConfig   encoding.EncoderConfig
+	EncoderConfig   kzgrs.KzgConfig
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -156,7 +156,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DbPath:                        ctx.GlobalString(flags.DbPathFlag.Name),
 		PrivateBls:                    privateBls,
 		EthClientConfig:               ethClientConfig,
-		EncoderConfig:                 encoding.ReadCLIConfig(ctx),
+		EncoderConfig:                 kzgrs.ReadCLIConfig(ctx),
 		LoggingConfig:                 logging.ReadCLIConfig(ctx, flags.FlagPrefix),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
