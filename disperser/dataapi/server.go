@@ -164,7 +164,11 @@ func (s *server) Start() error {
 		// optimize performance and disable debug features.
 		gin.SetMode(gin.ReleaseMode)
 	}
-	s.InitGRPCClientPools(maxGRPCClientPoolSize)
+	err := s.InitGRPCClientPools(maxGRPCClientPoolSize)
+
+	if err != nil {
+		return err
+	}
 
 	router := gin.New()
 	basePath := "/api/v1"

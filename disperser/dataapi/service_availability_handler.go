@@ -23,8 +23,8 @@ func (s *server) getServiceAvailability(ctx context.Context, hosts []string) ([]
 	availaiblityStatuses := make([]*ServiceAvailability, len(hosts))
 
 	for i, host := range hosts {
-		pool := s.getClientPool(host)
-		if pool == nil {
+		pool, ok := s.getClientPool(host)
+		if !ok {
 			return nil, fmt.Errorf("Invalid hostname: %s", host)
 		}
 		conn, err := getClientConn(pool)
@@ -87,12 +87,12 @@ func newClientPool(size int, serverAddr string) (*ClientPool, error) {
 }
 
 // getClientPool retrieves a client pool for a given service hostname
-func (s *server) getClientPool(serviceHostName string) *ClientPool {
+func (s *server) getClientPool(serviceHostName string) (*ClientPool, bool) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	pool, _ := s.clientPools[serviceHostName]
-	return pool
+	pool, ok := s.clientPools[serviceHostName]
+	return pool, ok
 }
 
 // Get retrieves a gRPC client connection from the pool.
