@@ -58,3 +58,6 @@ run_encoder: build_encoder
   --kzg.num-workers 12 \
   --disperser-encoder.log.level-std trace \
   --disperser-encoder.log.level-file trace
+
+run_dataapi_tests:
+	go test -v disperser/dataapi

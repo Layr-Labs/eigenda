@@ -41,9 +41,9 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
-	enc, err := makeTestEncoder()
+	p, err := makeTestProver()
 	assert.Nil(t, err)
-	encoderClient := disperser.NewLocalEncoderClient(enc)
+	encoderClient := disperser.NewLocalEncoderClient(p)
 	asgn := &core.StdAssignmentCoordinator{}
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), batchThreshold)
 	workerpool := workerpool.New(5)

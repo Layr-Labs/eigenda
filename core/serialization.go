@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,7 +11,6 @@ import (
 	"slices"
 
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	bn "github.com/consensys/gnark-crypto/ecc/bn254"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/wealdtech/go-merkletree"
@@ -365,55 +363,6 @@ func (h *BlobHeader) Serialize() ([]byte, error) {
 func (h *BlobHeader) Deserialize(data []byte) (*BlobHeader, error) {
 	err := decode(data, h)
 	return h, err
-}
-
-func (c *Chunk) Serialize() ([]byte, error) {
-	return encode(c)
-}
-
-func (c *Chunk) Deserialize(data []byte) (*Chunk, error) {
-	err := decode(data, c)
-	return c, err
-}
-
-func (c *G1Commitment) Serialize() ([]byte, error) {
-	return encode(c)
-}
-
-func (c *G1Commitment) Deserialize(data []byte) (*G1Commitment, error) {
-	err := decode(data, c)
-	return c, err
-}
-
-func (c *G1Commitment) UnmarshalJSON(data []byte) error {
-	var g1Point bn.G1Affine
-	err := json.Unmarshal(data, &g1Point)
-	if err != nil {
-		return err
-	}
-	c.X = g1Point.X
-	c.Y = g1Point.Y
-	return nil
-}
-
-func (c *G2Commitment) Serialize() ([]byte, error) {
-	return encode(c)
-}
-
-func (c *G2Commitment) Deserialize(data []byte) (*G2Commitment, error) {
-	err := decode(data, c)
-	return c, err
-}
-
-func (c *G2Commitment) UnmarshalJSON(data []byte) error {
-	var g2Point bn.G2Affine
-	err := json.Unmarshal(data, &g2Point)
-	if err != nil {
-		return err
-	}
-	c.X = g2Point.X
-	c.Y = g2Point.Y
-	return nil
 }
 
 func encode(obj any) ([]byte, error) {

@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -71,7 +72,7 @@ func TestBlobStore(t *testing.T) {
 		ReferenceBlockNumber:    132,
 		BatchRoot:               []byte("hello"),
 		BlobInclusionProof:      inclusionProof,
-		BlobCommitment:          &core.BlobCommitments{},
+		BlobCommitment:          &encoding.BlobCommitments{},
 		BatchID:                 99,
 		ConfirmationTxnHash:     common.HexToHash("0x123"),
 		ConfirmationBlockNumber: uint32(150),

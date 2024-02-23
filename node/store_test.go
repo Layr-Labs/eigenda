@@ -10,6 +10,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -65,40 +66,40 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		},
 		ChunkLength: 10,
 	}
-	chunk1 := &core.Chunk{
+	chunk1 := &encoding.Frame{
 		Proof:  commitment,
-		Coeffs: []core.Symbol{bn254.ONE},
+		Coeffs: []encoding.Symbol{bn254.ONE},
 	}
 
 	blobMessage := []*core.BlobMessage{
 		{
 			BlobHeader: &core.BlobHeader{
-				BlobCommitments: core.BlobCommitments{
-					Commitment:       (*core.G1Commitment)(&commitment),
-					LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
-					LengthProof:      (*core.LengthProof)(&lengthProof),
+				BlobCommitments: encoding.BlobCommitments{
+					Commitment:       (*encoding.G1Commitment)(&commitment),
+					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+					LengthProof:      (*encoding.LengthProof)(&lengthProof),
 					Length:           48,
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
 			Bundles: core.Bundles{
-				core.QuorumID(0): []*core.Chunk{
+				core.QuorumID(0): []*encoding.Frame{
 					chunk1,
 				},
 			},
 		},
 		{
 			BlobHeader: &core.BlobHeader{
-				BlobCommitments: core.BlobCommitments{
-					Commitment:       (*core.G1Commitment)(&commitment),
-					LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
-					LengthProof:      (*core.G2Commitment)(&lengthProof),
+				BlobCommitments: encoding.BlobCommitments{
+					Commitment:       (*encoding.G1Commitment)(&commitment),
+					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+					LengthProof:      (*encoding.G2Commitment)(&lengthProof),
 					Length:           50,
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
 			Bundles: core.Bundles{
-				core.QuorumID(0): []*core.Chunk{
+				core.QuorumID(0): []*encoding.Frame{
 					chunk1,
 				},
 			},
