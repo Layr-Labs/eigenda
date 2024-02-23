@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/grpc/mock"
 	"github.com/Layr-Labs/eigenda/core"
@@ -219,7 +218,7 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	reply, err := stream.RecvToClient()
 	assert.NoError(t, err)
 
-	authHeaderReply, ok := reply.Payload.(*disperser.AuthenticatedReply_BlobAuthHeader)
+	authHeaderReply, ok := reply.Payload.(*pb.AuthenticatedReply_BlobAuthHeader)
 	assert.True(t, ok)
 
 	authHeader := core.BlobAuthHeader{
@@ -232,8 +231,8 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	assert.NoError(t, err)
 
 	// Process challenge and send back challenge_reply
-	err = stream.SendFromClient(&disperser.AuthenticatedRequest{Payload: &disperser.AuthenticatedRequest_AuthenticationData{
-		AuthenticationData: &disperser.AuthenticationData{
+	err = stream.SendFromClient(&pb.AuthenticatedRequest{Payload: &pb.AuthenticatedRequest_AuthenticationData{
+		AuthenticationData: &pb.AuthenticationData{
 			AuthenticationData: authData,
 		},
 	}})
@@ -244,10 +243,10 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 		reply, err = stream.RecvToClient()
 		assert.NoError(t, err)
 
-		disperseReply, ok := reply.Payload.(*disperser.AuthenticatedReply_DisperseReply)
+		disperseReply, ok := reply.Payload.(*pb.AuthenticatedReply_DisperseReply)
 		assert.True(t, ok)
 
-		assert.Equal(t, disperseReply.DisperseReply.Result, disperser.BlobStatus_PROCESSING)
+		assert.Equal(t, disperseReply.DisperseReply.Result, pb.BlobStatus_PROCESSING)
 
 	}
 
