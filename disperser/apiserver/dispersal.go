@@ -183,64 +183,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}, nil
 }
 
-func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
-	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
-	if !ok {
-		return nil, "", fmt.Errorf("no configured rate exists for quorum %d", quorumID)
-	}
-
-	rates := &PerUserRateInfo{
-		Throughput: unauthRates.PerUserUnauthThroughput,
-		BlobRate:   unauthRates.PerUserUnauthBlobRate,
-	}
-
-	// Check if the address is in the allowlist
-	if len(authenticatedAddress) > 0 {
-		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
-		if ok {
-			rateInfo, ok := quorumRates[quorumID]
-			if ok {
-				key := "address:" + authenticatedAddress
-				if rateInfo.Throughput > 0 {
-					rates.Throughput = rateInfo.Throughput
-				}
-				if rateInfo.BlobRate > 0 {
-					rates.BlobRate = rateInfo.BlobRate
-				}
-				return rates, key, nil
-			}
-		}
-	}
-
-	// Check if the origin is in the allowlist
-
-	key := "ip:" + origin
-
-	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
-		if !strings.Contains(origin, account) {
-			continue
-		}
-
-		rateInfo, ok := rateInfoByQuorum[quorumID]
-		if !ok {
-			break
-		}
-
-		if rateInfo.Throughput > 0 {
-			rates.Throughput = rateInfo.Throughput
-		}
-
-		if rateInfo.BlobRate > 0 {
-			rates.BlobRate = rateInfo.BlobRate
-		}
-
-		break
-	}
-
-	return rates, key, nil
-
-}
-
 func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusRequest) (*pb.BlobStatusReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("GetBlobStatus", f*1000) // make milliseconds
