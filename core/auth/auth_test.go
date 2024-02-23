@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +20,7 @@ func TestAuthentication(t *testing.T) {
 	signer := auth.NewSigner(privateKeyHex)
 
 	testHeader := core.BlobAuthHeader{
-		BlobCommitments:    core.BlobCommitments{},
+		BlobCommitments:    encoding.BlobCommitments{},
 		AccountID:          signer.GetAccountID(),
 		Nonce:              rand.Uint32(),
 		AuthenticationData: []byte{},
@@ -46,7 +47,7 @@ func TestAuthenticationFail(t *testing.T) {
 	signer := auth.NewSigner(privateKeyHex)
 
 	testHeader := core.BlobAuthHeader{
-		BlobCommitments:    core.BlobCommitments{},
+		BlobCommitments:    encoding.BlobCommitments{},
 		AccountID:          signer.GetAccountID(),
 		Nonce:              rand.Uint32(),
 		AuthenticationData: []byte{},

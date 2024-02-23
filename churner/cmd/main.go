@@ -73,7 +73,7 @@ func run(ctx *cli.Context) error {
 
 	tx, err := eth.NewTransactor(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
-		log.Fatalln("could create new transactor", err)
+		log.Fatalln("could not create new transactor", err)
 	}
 
 	cs := coreeth.NewChainState(tx, gethClient)

@@ -41,7 +41,7 @@ type ChurnRequest struct {
 	//     will fail to proceed.
 	//   - If any of the quorum fails to register, this entire request will fail.
 	//
-	// The IDs must be in range [0, 255].
+	// The IDs must be in range [0, 254].
 	QuorumIds []uint32 `protobuf:"varint,6,rep,packed,name=quorum_ids,json=quorumIds,proto3" json:"quorum_ids,omitempty"`
 }
 

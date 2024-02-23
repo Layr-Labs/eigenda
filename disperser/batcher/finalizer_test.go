@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -63,7 +64,7 @@ func TestFinalizedBlob(t *testing.T) {
 		ReferenceBlockNumber:    132,
 		BatchRoot:               []byte("hello"),
 		BlobInclusionProof:      inclusionProof,
-		BlobCommitment:          &core.BlobCommitments{},
+		BlobCommitment:          &encoding.BlobCommitments{},
 		BatchID:                 99,
 		ConfirmationTxnHash:     common.HexToHash("0x123"),
 		ConfirmationBlockNumber: uint32(150),
@@ -159,7 +160,7 @@ func TestUnfinalizedBlob(t *testing.T) {
 		ReferenceBlockNumber:    132,
 		BatchRoot:               []byte("hello"),
 		BlobInclusionProof:      inclusionProof,
-		BlobCommitment:          &core.BlobCommitments{},
+		BlobCommitment:          &encoding.BlobCommitments{},
 		BatchID:                 99,
 		ConfirmationTxnHash:     common.HexToHash("0x123"),
 		ConfirmationBlockNumber: uint32(150),
@@ -230,7 +231,7 @@ func TestNoReceipt(t *testing.T) {
 		ReferenceBlockNumber:    132,
 		BatchRoot:               []byte("hello"),
 		BlobInclusionProof:      inclusionProof,
-		BlobCommitment:          &core.BlobCommitments{},
+		BlobCommitment:          &encoding.BlobCommitments{},
 		BatchID:                 99,
 		ConfirmationTxnHash:     common.HexToHash("0x123"),
 		ConfirmationBlockNumber: uint32(150),

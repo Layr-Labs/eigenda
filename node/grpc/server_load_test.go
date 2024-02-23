@@ -9,16 +9,17 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 )
 
 func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThreshold int, refBlockNumber uint) (*core.BatchHeader, map[core.OperatorID][]*core.BlobMessage) {
-	encoder, err := makeTestEncoder()
+	p, _, err := makeTestComponents()
 	assert.NoError(t, err)
 	asn := &core.StdAssignmentCoordinator{}
 
 	blobHeaders := make([]*core.BlobHeader, numBlobs)
-	blobChunks := make([][]*core.Chunk, numBlobs)
+	blobChunks := make([][]*encoding.Frame, numBlobs)
 	blobMessagesByOp := make(map[core.OperatorID][]*core.BlobMessage)
 	for i := 0; i < numBlobs; i++ {
 		// create data
@@ -29,7 +30,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		operatorState, err := chainState.GetOperatorState(context.Background(), 0, []core.QuorumID{0})
 		assert.NoError(t, err)
 
-		chunkLength, err := asn.CalculateChunkLength(operatorState, core.GetBlobLength(uint(blobSize)), 0, &core.SecurityParam{
+		chunkLength, err := asn.CalculateChunkLength(operatorState, encoding.GetBlobLength(uint(blobSize)), 0, &core.SecurityParam{
 			QuorumID:           0,
 			AdversaryThreshold: uint8(advThreshold),
 			QuorumThreshold:    uint8(quorumThreshold),
@@ -47,7 +48,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		// encode data
 
-		assignments, info, err := asn.GetAssignments(operatorState, core.GetBlobLength(uint(blobSize)), blobQuorumInfo)
+		assignments, info, err := asn.GetAssignments(operatorState, encoding.GetBlobLength(uint(blobSize)), blobQuorumInfo)
 		assert.NoError(t, err)
 		quorumInfo := batcher.QuorumInfo{
 			Assignments:        assignments,
@@ -55,10 +56,9 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 			QuantizationFactor: batcher.QuantizationFactor,
 		}
 
-		params, err := core.GetEncodingParams(chunkLength, quorumInfo.Info.TotalChunks)
-		assert.NoError(t, err)
+		params := encoding.ParamsFromMins(chunkLength, quorumInfo.Info.TotalChunks)
 		t.Logf("Encoding params: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
-		commits, chunks, err := encoder.Encode(data, params)
+		commits, chunks, err := p.EncodeAndProve(data, params)
 		assert.NoError(t, err)
 		blobChunks[i] = chunks
 

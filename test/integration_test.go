@@ -16,6 +16,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
@@ -32,15 +35,14 @@ import (
 	"github.com/Layr-Labs/eigenda/common/logging"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 
 	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -54,7 +56,8 @@ import (
 )
 
 var (
-	enc core.Encoder
+	p   encoding.Prover
+	v   encoding.Verifier
 	asn core.AssignmentCoordinator
 
 	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
@@ -71,13 +74,14 @@ const (
 )
 
 func init() {
-	enc = mustMakeTestEncoder()
+	p, v = mustMakeTestComponents()
 	asn = &core.StdAssignmentCoordinator{}
 }
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
-func mustMakeTestEncoder() core.Encoder {
-	config := kzgEncoder.KzgConfig{
+func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
+
+	config := &kzgrs.KzgConfig{
 		G1Path:          "../inabox/resources/kzg/g1.point",
 		G2Path:          "../inabox/resources/kzg/g2.point",
 		CacheDir:        "../inabox/resources/kzg/SRSTables",
@@ -86,15 +90,17 @@ func mustMakeTestEncoder() core.Encoder {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	encoder, err := encoding.NewEncoder(
-		encoding.EncoderConfig{KzgConfig: config},
-		true,
-	)
+	p, err := prover.NewProver(config, true)
 	if err != nil {
-		log.Fatalln("failed to initialize new encoder")
+		log.Fatal(err)
 	}
 
-	return encoder
+	v, err := verifier.NewVerifier(config, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return p, v
 }
 
 func mustMakeTestBlob() core.Blob {
@@ -146,13 +152,13 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		ChainWriteTimeout:  10 * time.Second,
 	}
 
-	enc0 := mustMakeTestEncoder()
+	p0, _ := mustMakeTestComponents()
 	metrics := encoder.NewMetrics("9000", logger)
 	grpcEncoder := encoder.NewServer(encoder.ServerConfig{
 		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
-	}, logger, enc0, metrics)
+	}, logger, p0, metrics)
 
 	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket, 10*time.Second)
 	if err != nil {
@@ -256,8 +262,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger common.
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
-		encoder := mustMakeTestEncoder()
-		val := core.NewChunkValidator(encoder, asn, cst, id)
+		_, v0 := mustMakeTestComponents()
+		val := core.NewChunkValidator(v0, asn, cst, id)
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()
@@ -327,7 +333,7 @@ func mustMakeRetriever(cst core.IndexedChainState, logger common.Logger) (*commo
 	gethClient := &commonmock.MockEthClient{}
 	retrievalClient := &clientsmock.MockRetrievalClient{}
 	chainClient := retrievermock.NewMockChainClient()
-	server := retriever.NewServer(config, logger, retrievalClient, enc, cst, chainClient)
+	server := retriever.NewServer(config, logger, retrievalClient, v, cst, chainClient)
 
 	return gethClient, TestRetriever{
 		Server: server,
@@ -475,7 +481,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	assert.NoError(t, err)
 
-	blobLength := core.GetBlobLength(uint(len(blob.Data)))
+	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
 	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
 	assert.NoError(t, err)
 
@@ -491,10 +497,12 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
 	assert.NoError(t, err)
 
-	var indices []core.ChunkNumber
-	var chunks []*core.Chunk
+	var indices []encoding.ChunkNumber
+	var chunks []*encoding.Frame
 	var blobHeader *core.BlobHeader
 	for _, op := range ops {
+
+		fmt.Println("Processing operator: ", hexutil.Encode(op.Node.Config.ID[:]))
 
 		// check that blob headers can be retrieved from operators
 		headerReply, err := op.Server.GetBlobHeader(ctx, &nodepb.GetBlobHeaderRequest{
@@ -503,11 +511,11 @@ func TestDispersalAndRetrieval(t *testing.T) {
 			QuorumId:        uint32(0),
 		})
 		assert.NoError(t, err)
-		actualCommitment := &core.G1Commitment{
+		actualCommitment := &encoding.G1Commitment{
 			X: *new(fp.Element).SetBytes(headerReply.GetBlobHeader().GetCommitment().GetX()),
 			Y: *new(fp.Element).SetBytes(headerReply.GetBlobHeader().GetCommitment().GetY()),
 		}
-		var actualLengthCommitment, actualLengthProof core.G2Commitment
+		var actualLengthCommitment, actualLengthProof encoding.G2Commitment
 		actualLengthCommitment.X.A0.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetXA0())
 		actualLengthCommitment.X.A1.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetXA1())
 		actualLengthCommitment.Y.A0.SetBytes(headerReply.GetBlobHeader().GetLengthCommitment().GetYA0())
@@ -543,7 +551,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assignment, ok := assignments[op.Node.Config.ID]
 		assert.True(t, ok)
 		for _, data := range chunksReply.GetChunks() {
-			chunk, err := new(core.Chunk).Deserialize(data)
+			chunk, err := new(encoding.Frame).Deserialize(data)
 			assert.NoError(t, err)
 			chunks = append(chunks, chunk)
 		}
@@ -551,9 +559,9 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	encodingParams, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
+	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
-	recovered, err := enc.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
+	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
 	assert.NoError(t, err)
 	recovered = bytes.TrimRight(recovered, "\x00")
 	assert.Equal(t, gettysburgAddressBytes, recovered)

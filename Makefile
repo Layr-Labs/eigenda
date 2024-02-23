@@ -44,6 +44,9 @@ build:
 	cd retriever && make build
 	cd tools/traffic && make build
 
+dataapi-build: 
+	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
+
 unit-tests:
 	./test.sh
 
@@ -67,3 +70,7 @@ integration-tests-inabox-nochurner:
 integration-tests-graph-indexer:
 	make build 
 	go test -v ./core/thegraph
+
+integration-tests-dataapi:
+	make dataapi-build 
+	go test -v ./disperser/dataapi

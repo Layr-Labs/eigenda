@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,7 +89,7 @@ func TestOperatorAssignments(t *testing.T) {
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
 		header := &core.BlobHeader{
-			BlobCommitments: core.BlobCommitments{
+			BlobCommitments: encoding.BlobCommitments{
 				Length: blobLength,
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumInfo},
