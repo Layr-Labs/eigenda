@@ -3,8 +3,8 @@ package mock
 import (
 	"context"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -18,15 +18,15 @@ func NewMockEncoderClient() *MockEncoderClient {
 	return &MockEncoderClient{}
 }
 
-func (m *MockEncoderClient) EncodeBlob(ctx context.Context, data []byte, encodingParams core.EncodingParams) (*core.BlobCommitments, []*core.Chunk, error) {
+func (m *MockEncoderClient) EncodeBlob(ctx context.Context, data []byte, encodingParams encoding.EncodingParams) (*encoding.BlobCommitments, []*encoding.Frame, error) {
 	args := m.Called(ctx, data, encodingParams)
-	var commitments *core.BlobCommitments
+	var commitments *encoding.BlobCommitments
 	if args.Get(0) != nil {
-		commitments = args.Get(0).(*core.BlobCommitments)
+		commitments = args.Get(0).(*encoding.BlobCommitments)
 	}
-	var chunks []*core.Chunk
+	var chunks []*encoding.Frame
 	if args.Get(1) != nil {
-		chunks = args.Get(1).([]*core.Chunk)
+		chunks = args.Get(1).([]*encoding.Frame)
 	}
 	return commitments, chunks, args.Error(2)
 }

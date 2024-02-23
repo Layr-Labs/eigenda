@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -73,7 +74,7 @@ func TestSharedBlobStore(t *testing.T) {
 		SignatoryRecordHash:     [32]byte{0},
 		ReferenceBlockNumber:    132,
 		BatchRoot:               []byte("hello"),
-		BlobCommitment:          &core.BlobCommitments{},
+		BlobCommitment:          &encoding.BlobCommitments{},
 		BatchID:                 99,
 		ConfirmationTxnHash:     common.HexToHash("0x123"),
 		ConfirmationBlockNumber: 150,
@@ -126,7 +127,7 @@ func TestSharedBlobStore(t *testing.T) {
 		SignatoryRecordHash:     [32]byte{0},
 		ReferenceBlockNumber:    132,
 		BatchRoot:               []byte("hello"),
-		BlobCommitment:          &core.BlobCommitments{},
+		BlobCommitment:          &encoding.BlobCommitments{},
 		BatchID:                 99,
 		ConfirmationBlockNumber: 150,
 		Fee:                     []byte{0},

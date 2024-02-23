@@ -30,6 +30,7 @@ require (
 	github.com/wealdtech/go-merkletree v1.0.1-0.20230205101955-ec7a95ea11ca
 	go.uber.org/automaxprocs v1.5.2
 	go.uber.org/goleak v1.2.0
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	google.golang.org/grpc v1.59.0
 )
 
@@ -130,7 +131,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect

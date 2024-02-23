@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	node_utils "github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/wealdtech/go-merkletree"
 	"google.golang.org/grpc"
@@ -14,7 +15,7 @@ import (
 
 type RetrievedChunks struct {
 	OperatorID core.OperatorID
-	Chunks     []*core.Chunk
+	Chunks     []*encoding.Frame
 	Err        error
 }
 
@@ -117,9 +118,9 @@ func (c client) GetChunks(
 		return
 	}
 
-	chunks := make([]*core.Chunk, len(reply.GetChunks()))
+	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
 	for i, data := range reply.GetChunks() {
-		chunk, err := new(core.Chunk).Deserialize(data)
+		chunk, err := new(encoding.Frame).Deserialize(data)
 		if err != nil {
 			chunksChan <- RetrievedChunks{
 				OperatorID: opID,

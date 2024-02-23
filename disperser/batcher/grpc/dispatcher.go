@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -128,6 +129,12 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchH
 }
 
 func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
+	if blob.BlobHeader == nil {
+		return nil, fmt.Errorf("blob header is nil")
+	}
+	if blob.BlobHeader.Commitment == nil {
+		return nil, fmt.Errorf("blob header commitment is nil")
+	}
 	commitData := &commonpb.G1Commitment{
 		X: blob.BlobHeader.Commitment.X.Marshal(),
 		Y: blob.BlobHeader.Commitment.Y.Marshal(),
