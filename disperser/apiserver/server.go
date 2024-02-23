@@ -452,13 +452,24 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	if isConfirmed {
 		confirmationInfo := metadata.ConfirmationInfo
 		dataLength := uint32(confirmationInfo.BlobCommitment.Length)
+		quorumResults := confirmationInfo.QuorumResults
+		batchQuorumIDs := make([]uint8, 0, len(quorumResults))
+		for quorumID := range quorumResults {
+			batchQuorumIDs = append(batchQuorumIDs, quorumID)
+		}
+		slices.Sort(batchQuorumIDs)
+		quorumNumbers := make([]byte, len(batchQuorumIDs))
+		quorumPercentSigned := make([]byte, len(batchQuorumIDs))
+		for i, quorumID := range batchQuorumIDs {
+			quorumNumbers[i] = quorumID
+			quorumPercentSigned[i] = confirmationInfo.QuorumResults[quorumID].PercentSigned
+		}
+
 		quorumInfos := confirmationInfo.BlobQuorumInfos
 		slices.SortStableFunc[[]*core.BlobQuorumInfo](quorumInfos, func(a, b *core.BlobQuorumInfo) int {
 			return int(a.QuorumID) - int(b.QuorumID)
 		})
 		blobQuorumParams := make([]*pb.BlobQuorumParam, len(quorumInfos))
-		quorumNumbers := make([]byte, len(quorumInfos))
-		quorumPercentSigned := make([]byte, len(quorumInfos))
 		quorumIndexes := make([]byte, len(quorumInfos))
 		for i, quorumInfo := range quorumInfos {
 			blobQuorumParams[i] = &pb.BlobQuorumParam{
@@ -467,9 +478,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 				QuorumThresholdPercentage:    uint32(quorumInfo.QuorumThreshold),
 				ChunkLength:                  uint32(quorumInfo.ChunkLength),
 			}
-			quorumNumbers[i] = quorumInfo.QuorumID
-			quorumPercentSigned[i] = confirmationInfo.QuorumResults[quorumInfo.QuorumID].PercentSigned
-			quorumIndexes[i] = byte(i)
+			quorumIndexes[i] = byte(slices.Index(quorumNumbers, quorumInfo.QuorumID))
 		}
 
 		return &pb.BlobStatusReply{
