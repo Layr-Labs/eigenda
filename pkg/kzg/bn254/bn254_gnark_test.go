@@ -162,13 +162,13 @@ func TestLinCombG1(t *testing.T) {
 	}
 	lin := LinCombG1(val, poly)
 
-	var scalar Fr
-	AsFr(&scalar, uint64(15))
-	var product G1Point
-	MulG1(&product, &one, &scalar)
-	if *lin != product {
-		t.Fatal("Linear combination != product!")
-	}
+    var scalar Fr
+    AsFr(&scalar, uint64(sum))
+    var product G1Point
+    MulG1(&product, &one, &scalar)
+    if *lin != product {
+        t.Fatal("Linear combination != product!")
+    }
 }
 
 func TestZeroG2(t *testing.T) {
