@@ -1,21 +1,25 @@
 package encoding
 
-import "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+import (
+	"github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+)
 
 // Commitment is a polynomial commitment (e.g. a kzg commitment)
-type G1Commitment bn254.G1Point
+type G1Commitment bn254.G1Affine
 
 // Commitment is a polynomial commitment (e.g. a kzg commitment)
-type G2Commitment bn254.G2Point
+type G2Commitment bn254.G2Affine
 
 // LengthProof is a polynomial commitment on G2 (e.g. a kzg commitment) used for low degree proof
 type LengthProof = G2Commitment
 
 // The proof used to open a commitment. In the case of Kzg, this is also a kzg commitment, and is different from a Commitment only semantically.
-type Proof = bn254.G1Point
+type Proof = bn254.G1Affine
 
 // Symbol is a symbol in the field used for polynomial commitments
-type Symbol = bn254.Fr
+type Symbol = fr.Element
 
 // BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
 type BlobCommitments struct {
@@ -39,7 +43,7 @@ func (f *Frame) Length() int {
 
 // Returns the size of chunk in bytes.
 func (f *Frame) Size() int {
-	return f.Length() * bn254.BYTES_PER_COEFFICIENT
+	return f.Length() * kzg.BYTES_PER_COEFFICIENT
 }
 
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier

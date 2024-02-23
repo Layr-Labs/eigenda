@@ -28,7 +28,10 @@
 package kzg
 
 import (
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"math/big"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 
 	"bufio"
 	"fmt"
@@ -39,26 +42,28 @@ import (
 )
 
 // GenerateTestingSetup creates a setup of n values from the given secret. **for testing purposes only**
-func GenerateTestingSetup(secret string, n uint64) ([]bls.G1Point, []bls.G2Point) {
-	var s bls.Fr
-	bls.SetFr(&s, secret)
+func GenerateTestingSetup(secret string, n uint64) ([]bn254.G1Affine, []bn254.G2Affine) {
+	var s fr.Element
+	s.SetString(secret)
 
-	var sPow bls.Fr
-	bls.CopyFr(&sPow, &bls.ONE)
+	var sPow fr.Element
+	sPow.SetOne()
 
-	s1Out := make([]bls.G1Point, n)
-	s2Out := make([]bls.G2Point, n)
+	s1Out := make([]bn254.G1Affine, n)
+	s2Out := make([]bn254.G2Affine, n)
 	for i := uint64(0); i < n; i++ {
-		bls.MulG1(&s1Out[i], &bls.GenG1, &sPow)
-		bls.MulG2(&s2Out[i], &bls.GenG2, &sPow)
-		var tmp bls.Fr
-		bls.CopyFr(&tmp, &sPow)
-		bls.MulModFr(&sPow, &tmp, &s)
+		//bls.MulG1(&s1Out[i], &GenG1, &sPow)
+		s1Out[i].ScalarMultiplication(&GenG1, sPow.BigInt(new(big.Int)))
+
+		//bls.MulG2(&s2Out[i], &GenG2, &sPow)
+		s2Out[i].ScalarMultiplication(&GenG2, sPow.BigInt(new(big.Int)))
+
+		sPow.Mul(&sPow, &s)
 	}
 	return s1Out, s2Out
 }
 
-// func ReadGeneatorPoints(n uint64, g1FilePath, g2FilePath string) ([]bls.G1Point, []bls.G2Point, error) {
+// func ReadGeneatorPoints(n uint64, g1FilePath, g2FilePath string) ([]bn254.G1Affine, []bn254.G2Affine, error) {
 // 	g1f, err := os.Open(g1FilePath)
 // 	if err != nil {
 // 		log.Println("ReadGeneatorPoints.ERR.0", err)
@@ -114,8 +119,8 @@ func GenerateTestingSetup(secret string, n uint64) ([]bls.G1Point, []bls.G2Point
 // 	fmt.Println("    Reading G1 G2 raw points takes", elapsed)
 // 	start = time.Now()
 
-// 	s1Outs := make([]bls.G1Point, n, n)
-// 	s2Outs := make([]bls.G2Point, n, n)
+// 	s1Outs := make([]bn254.G1Affine, n, n)
+// 	s2Outs := make([]bn254.G2Affine, n, n)
 // 	for i := uint64(0); i < n; i++ {
 // 		g1 := g1Bytes[i*64 : (i+1)*128]
 // 		err := s1Outs[i].UnmarshalText(g1[:])
@@ -143,11 +148,13 @@ func WriteGeneratorPoints(n uint64) error {
 	secret := "1927409816240961209460912649125"
 	ns := strconv.Itoa(int(n))
 
-	var s bls.Fr
-	bls.SetFr(&s, secret)
+	var s fr.Element
+	s.SetString(secret)
+	//bls.SetFr(&s, secret)
 
-	var sPow bls.Fr
-	bls.CopyFr(&sPow, &bls.ONE)
+	var sPow fr.Element
+	sPow.SetOne()
+	//bls.CopyFr(&sPow, &bls.ONE)
 
 	g1f, err := os.Create("g1.point." + ns)
 	if err != nil {
@@ -167,26 +174,29 @@ func WriteGeneratorPoints(n uint64) error {
 
 	start := time.Now()
 	for i := uint64(0); i < n; i++ {
-		var s1Out bls.G1Point
-		var s2Out bls.G2Point
-		bls.MulG1(&s1Out, &bls.GenG1, &sPow)
-		bls.MulG2(&s2Out, &bls.GenG2, &sPow)
+		var s1Out bn254.G1Affine
+		var s2Out bn254.G2Affine
+		s1Out.ScalarMultiplication(&GenG1, sPow.BigInt(new(big.Int)))
+		//bls.MulG1(&s1Out, &bls.GenG1, &sPow)
+		//bls.MulG2(&s2Out, &bls.GenG2, &sPow)
+		s2Out.ScalarMultiplication(&GenG2, sPow.BigInt(new(big.Int)))
 
-		g1Byte := s1Out.MarshalText()
-		if _, err := g1w.Write(g1Byte); err != nil {
+		g1Byte := s1Out.Bytes()
+		if _, err := g1w.Write(g1Byte[:]); err != nil {
 			log.Println("WriteGeneratorPoints.ERR.3", err)
 			return err
 		}
 
-		g2Byte := s2Out.MarshalText()
-		if _, err := g2w.Write(g2Byte); err != nil {
+		g2Byte := s2Out.Bytes()
+		if _, err := g2w.Write(g2Byte[:]); err != nil {
 			log.Println("WriteGeneratorPoints.ERR.5", err)
 			return err
 		}
 
-		var tmp bls.Fr
-		bls.CopyFr(&tmp, &sPow)
-		bls.MulModFr(&sPow, &tmp, &s)
+		//var tmp fr.Element
+		sPow.Mul(&sPow, &s)
+		//bls.CopyFr(&tmp, &sPow)
+		//bls.MulModFr(&sPow, &tmp, &s)
 	}
 
 	if err = g1w.Flush(); err != nil {

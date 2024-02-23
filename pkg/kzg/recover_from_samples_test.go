@@ -29,7 +29,7 @@ import (
 	"math/rand"
 	"testing"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,19 +37,19 @@ import (
 func TestFFTSettings_RecoverPolyFromSamples_Simple(t *testing.T) {
 	// Create some random data, with padding...
 	fs := NewFFTSettings(2)
-	poly := make([]bls.Fr, fs.MaxWidth)
+	poly := make([]fr.Element, fs.MaxWidth)
 	for i := uint64(0); i < fs.MaxWidth/2; i++ {
-		bls.AsFr(&poly[i], i)
+		poly[i].SetInt64(int64(i))
 	}
 	for i := fs.MaxWidth / 2; i < fs.MaxWidth; i++ {
-		poly[i] = bls.ZERO
+		poly[i].SetZero()
 	}
 
 	// Get data for polynomial SLOW_INDICES
 	data, err := fs.FFT(poly, false)
 	require.Nil(t, err)
 
-	subset := make([]*bls.Fr, fs.MaxWidth)
+	subset := make([]*fr.Element, fs.MaxWidth)
 	subset[0] = &data[0]
 	subset[3] = &data[3]
 
@@ -57,8 +57,8 @@ func TestFFTSettings_RecoverPolyFromSamples_Simple(t *testing.T) {
 	require.Nil(t, err)
 
 	for i := range recovered {
-		assert.True(t, bls.EqualFr(&recovered[i], &data[i]),
-			"recovery at index %d got %s but expected %s", i, bls.FrStr(&recovered[i]), bls.FrStr(&data[i]))
+		assert.True(t, recovered[i].Equal(&data[i]),
+			"recovery at index %d got %s but expected %s", i, recovered[i].String(), data[i].String())
 	}
 
 	// And recover the original coeffs for good measure
@@ -66,12 +66,12 @@ func TestFFTSettings_RecoverPolyFromSamples_Simple(t *testing.T) {
 	require.Nil(t, err)
 
 	for i := uint64(0); i < fs.MaxWidth/2; i++ {
-		assert.True(t, bls.EqualFr(&back[i], &poly[i]),
-			"coeff at index %d got %s but expected %s", i, bls.FrStr(&back[i]), bls.FrStr(&poly[i]))
+		assert.True(t, back[i].Equal(&poly[i]),
+			"coeff at index %d got %s but expected %s", i, back[i].String(), poly[i].String())
 	}
 
 	for i := fs.MaxWidth / 2; i < fs.MaxWidth; i++ {
-		assert.True(t, bls.EqualZero(&back[i]),
+		assert.True(t, back[i].IsZero(),
 			"expected zero padding in index %d", i)
 	}
 }
@@ -79,12 +79,12 @@ func TestFFTSettings_RecoverPolyFromSamples_Simple(t *testing.T) {
 func TestFFTSettings_RecoverPolyFromSamples(t *testing.T) {
 	// Create some random poly, with padding so we get redundant data
 	fs := NewFFTSettings(10)
-	poly := make([]bls.Fr, fs.MaxWidth)
+	poly := make([]fr.Element, fs.MaxWidth)
 	for i := uint64(0); i < fs.MaxWidth/2; i++ {
-		bls.AsFr(&poly[i], i)
+		poly[i].SetInt64(int64(i))
 	}
 	for i := fs.MaxWidth / 2; i < fs.MaxWidth; i++ {
-		poly[i] = bls.ZERO
+		poly[i].SetZero()
 	}
 
 	// Get coefficients for polynomial SLOW_INDICES
@@ -92,8 +92,8 @@ func TestFFTSettings_RecoverPolyFromSamples(t *testing.T) {
 	require.Nil(t, err)
 
 	// Util to pick a random subnet of the values
-	randomSubset := func(known uint64, rngSeed uint64) []*bls.Fr {
-		withMissingValues := make([]*bls.Fr, fs.MaxWidth)
+	randomSubset := func(known uint64, rngSeed uint64) []*fr.Element {
+		withMissingValues := make([]*fr.Element, fs.MaxWidth)
 		for i := range data {
 			withMissingValues[i] = &data[i]
 		}
@@ -122,8 +122,8 @@ func TestFFTSettings_RecoverPolyFromSamples(t *testing.T) {
 				require.Nil(t, err)
 
 				for i := range recovered {
-					assert.True(t, bls.EqualFr(&recovered[i], &data[i]),
-						"recovery at index %d got %s but expected %s", i, bls.FrStr(&recovered[i]), bls.FrStr(&data[i]))
+					assert.True(t, recovered[i].Equal(&data[i]),
+						"recovery at index %d got %s but expected %s", i, recovered[i].String(), data[i].String())
 				}
 
 				// And recover the original coeffs for good measure
@@ -132,11 +132,11 @@ func TestFFTSettings_RecoverPolyFromSamples(t *testing.T) {
 
 				half := uint64(len(back)) / 2
 				for i := uint64(0); i < half; i++ {
-					assert.True(t, bls.EqualFr(&back[i], &poly[i]),
-						"coeff at index %d got %s but expected %s", i, bls.FrStr(&back[i]), bls.FrStr(&poly[i]))
+					assert.True(t, back[i].Equal(&poly[i]),
+						"coeff at index %d got %s but expected %s", i, back[i].String(), poly[i].String())
 				}
 				for i := half; i < fs.MaxWidth; i++ {
-					assert.True(t, bls.EqualZero(&back[i]),
+					assert.True(t, back[i].IsZero(),
 						"expected zero padding in index %d", i)
 				}
 			})

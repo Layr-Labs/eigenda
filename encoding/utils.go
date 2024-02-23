@@ -1,22 +1,21 @@
 package encoding
 
 import (
+	"github.com/Layr-Labs/eigenda/pkg/kzg"
 	"golang.org/x/exp/constraints"
 
 	"math"
-
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetBlobLength(blobSize uint) uint {
-	symSize := uint(bn254.BYTES_PER_COEFFICIENT)
+	symSize := uint(kzg.BYTES_PER_COEFFICIENT)
 	return (blobSize + symSize - 1) / symSize
 }
 
 // GetBlobSize converts from blob length in symbols to blob size in bytes. This is not an exact conversion.
 func GetBlobSize(blobLength uint) uint {
-	return blobLength * bn254.BYTES_PER_COEFFICIENT
+	return blobLength * kzg.BYTES_PER_COEFFICIENT
 }
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols

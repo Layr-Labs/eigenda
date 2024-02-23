@@ -7,7 +7,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,8 +38,9 @@ func TestBatchEquivalence(t *testing.T) {
 
 	assert.NoError(t, v.BatchVerifyCommitEquivalence(commitPairs), "batch equivalence negative test failed\n")
 
-	var modifiedCommit bn254.G1Point
-	bn254.AddG1(&modifiedCommit, commit, commit)
+	var modifiedCommit bn254.G1Affine
+	modifiedCommit.Add(commit, commit)
+	
 	for z := 0; z < numBlob; z++ {
 		commitPairs[z] = verifier.CommitmentPair{
 			Commitment:       modifiedCommit,
@@ -55,7 +57,8 @@ func TestBatchEquivalence(t *testing.T) {
 		}
 	}
 
-	bn254.AddG1(&commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment)
+
+	commitPairs[numBlob/2].Commitment.Add(&commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment)
 
 	assert.Error(t, v.BatchVerifyCommitEquivalence(commitPairs), "batch equivalence negative test failed in outer loop\n")
 }

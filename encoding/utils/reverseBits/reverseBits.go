@@ -5,7 +5,8 @@ package reverseBits
 import (
 	"errors"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 const (
@@ -116,21 +117,24 @@ func ReverseBitOrder(length uint32, swap func(i, j uint32)) error {
 }
 
 // rearrange Fr elements in reverse bit order. Supports 2**31 max element count.
-func ReverseBitOrderFr(values []bls.Fr) error {
+func ReverseBitOrderFr(values []fr.Element) error {
 	if len(values) > (1 << 31) {
 		return ErrFrRBOListTooLarge
 	}
-	var tmp bls.Fr
+	var tmp fr.Element
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
-		bls.CopyFr(&tmp, &values[i])
-		bls.CopyFr(&values[i], &values[j])
-		bls.CopyFr(&values[j], &tmp)
+		tmp.Set(&values[i])
+		//bls.CopyFr(&tmp, &values[i])
+		values[i].Set(&values[j])
+		//bls.CopyFr(&values[i], &values[j])
+		values[j].Set(&tmp)
+		//bls.CopyFr(&values[j], &tmp)
 	})
 	return err
 }
 
 // rearrange Fr ptr elements in reverse bit order. Supports 2**31 max element count.
-func ReverseBitOrderFrPtr(values []*bls.Fr) error {
+func ReverseBitOrderFrPtr(values []*fr.Element) error {
 	if len(values) > (1 << 31) {
 		return ErrFrRBOListTooLarge
 	}
@@ -140,15 +144,19 @@ func ReverseBitOrderFrPtr(values []*bls.Fr) error {
 	return err
 }
 
-func ReverseBitOrderG1Point(values []bls.G1Point) error {
+func ReverseBitOrderG1Point(values []bn254.G1Affine) error {
 	if len(values) > (1 << 31) {
 		return ErrG1RBOListTooLarge
 	}
-	var tmp bls.G1Point
+	var tmp bn254.G1Affine
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
-		bls.CopyG1(&tmp, &values[i])
-		bls.CopyG1(&values[i], &values[j])
-		bls.CopyG1(&values[j], &tmp)
+		tmp.Set(&values[i])
+		values[i].Set(&values[j])
+		values[j].Set(&tmp)
+
+		//bls.CopyG1(&tmp, &values[i])
+		//bls.CopyG1(&values[i], &values[j])
+		//bls.CopyG1(&values[j], &tmp)
 	})
 	return err
 }

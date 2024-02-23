@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,7 +24,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 )
 
 var (
@@ -163,7 +163,7 @@ func TestThrottling(t *testing.T) {
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-	var lengthProof, lengthCommitment bn254.G2Point
+	var lengthProof, lengthCommitment bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
 	lengthProof.Y.A0 = lengthYA0

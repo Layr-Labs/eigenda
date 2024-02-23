@@ -29,25 +29,26 @@ import (
 	"math/rand"
 	"testing"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFFTSettings_reduceLeaves(t *testing.T) {
 	fs := NewFFTSettings(4)
 
-	var fromTreeReduction []bls.Fr
+	var fromTreeReduction []fr.Element
 	{
 		// prepare some leaves
-		leaves := [][]bls.Fr{make([]bls.Fr, 3), make([]bls.Fr, 3), make([]bls.Fr, 3), make([]bls.Fr, 3)}
+		leaves := [][]fr.Element{make([]fr.Element, 3), make([]fr.Element, 3), make([]fr.Element, 3), make([]fr.Element, 3)}
 		leafIndices := [][]uint64{{1, 3}, {7, 8}, {9, 10}, {12, 13}}
 		for i := 0; i < 4; i++ {
 			err := fs.makeZeroPolyMulLeaf(leaves[i], leafIndices[i], 1)
 			assert.Nil(t, err)
 		}
 
-		dst := make([]bls.Fr, 16)
-		scratch := make([]bls.Fr, 16*3)
+		dst := make([]fr.Element, 16)
+		scratch := make([]fr.Element, 16*3)
 		_, err := fs.reduceLeaves(scratch, dst, leaves)
 		if err != nil {
 			assert.Nil(t, err)
@@ -55,9 +56,9 @@ func TestFFTSettings_reduceLeaves(t *testing.T) {
 		fromTreeReduction = dst[:2*4+1]
 	}
 
-	var fromDirect []bls.Fr
+	var fromDirect []fr.Element
 	{
-		dst := make([]bls.Fr, 9)
+		dst := make([]fr.Element, 9)
 		indices := []uint64{1, 3, 7, 8, 9, 10, 12, 13}
 		err := fs.makeZeroPolyMulLeaf(dst, indices, 1)
 		if err != nil {
@@ -69,11 +70,11 @@ func TestFFTSettings_reduceLeaves(t *testing.T) {
 
 	for i := 0; i < len(fromDirect); i++ {
 		a, b := &fromDirect[i], &fromTreeReduction[i]
-		if !bls.EqualFr(a, b) {
-			t.Errorf("zero poly coeff %d is different. direct: %s, tree: %s", i, bls.FrStr(a), bls.FrStr(b))
+		if !a.Equal(b) {
+			t.Errorf("zero poly coeff %d is different. direct: %s, tree: %s", i, a.String(), b.String())
 		}
-		assert.True(t, bls.EqualFr(a, b),
-			"zero poly coeff %d is different. direct: %s, tree: %s", i, bls.FrStr(a), bls.FrStr(b))
+		assert.True(t, a.Equal(b),
+			"zero poly coeff %d is different. direct: %s, tree: %s", i, a.String(), b.String())
 	}
 }
 
@@ -113,7 +114,7 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 	// build the leaves
 	pointsPerLeaf := uint64(63)
 	leafCount := (missingCount + pointsPerLeaf - 1) / pointsPerLeaf
-	leaves := make([][]bls.Fr, leafCount)
+	leaves := make([][]fr.Element, leafCount)
 	for i := uint64(0); i < leafCount; i++ {
 		start := i * pointsPerLeaf
 		end := start + pointsPerLeaf
@@ -121,7 +122,7 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 			end = missingCount
 		}
 		leafSize := end - start
-		leaf := make([]bls.Fr, leafSize+1)
+		leaf := make([]fr.Element, leafSize+1)
 		indices := make([]uint64, leafSize)
 		for j := uint64(0); j < leafSize; j++ {
 			indices[j] = missing[i*pointsPerLeaf+j]
@@ -131,10 +132,10 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 		leaves[i] = leaf
 	}
 
-	var fromTreeReduction []bls.Fr
+	var fromTreeReduction []fr.Element
 	{
-		dst := make([]bls.Fr, pointCount)
-		scratch := make([]bls.Fr, pointCount*3)
+		dst := make([]fr.Element, pointCount)
+		scratch := make([]fr.Element, pointCount*3)
 		_, err := fs.reduceLeaves(scratch, dst, leaves)
 		if err != nil {
 			assert.Nil(t, err)
@@ -142,9 +143,9 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 		fromTreeReduction = dst[:missingCount+1]
 	}
 
-	var fromDirect []bls.Fr
+	var fromDirect []fr.Element
 	{
-		dst := make([]bls.Fr, missingCount+1)
+		dst := make([]fr.Element, missingCount+1)
 		err := fs.makeZeroPolyMulLeaf(dst, missing, fs.MaxWidth/pointCount)
 		assert.Nil(t, err)
 		fromDirect = dst
@@ -153,8 +154,8 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 
 	for i := 0; i < len(fromDirect); i++ {
 		a, b := &fromDirect[i], &fromTreeReduction[i]
-		assert.True(t, bls.EqualFr(a, b),
-			"zero poly coeff %d is different. direct: %s, tree: %s", i, bls.FrStr(a), bls.FrStr(b))
+		assert.True(t, a.Equal(b),
+			"zero poly coeff %d is different. direct: %s, tree: %s", i, a.String(), b.String())
 	}
 }
 
@@ -178,7 +179,7 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 // 	zeroEval, zeroPoly, _ := fs.ZeroPolyViaMultiplication(missingIndices, uint64(len(exists)))
 
 // 	// produced from python implementation, check it's exactly correct.
-// 	expectedEval := []bls.Fr{
+// 	expectedEval := []fr.Element{
 // 		bls.ToFr("40868503138626303263713448452028063093974861640573380501185290423282553381059"),
 // 		bls.ToFr("0"),
 // 		bls.ToFr("0"),
@@ -200,10 +201,10 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 // 	for i := range zeroEval {
 // 		fmt.Println(expectedEval[i])
 // 		assert.True(t, bls.EqualFr(&expectedEval[i], &zeroEval[i]),
-// 			"at eval %d, expected: %s, got: %s", i, bls.FrStr(&expectedEval[i]), bls.FrStr(&zeroEval[i]))
+// 			"at eval %d, expected: %s, got: %s", i, fr.ElementStr(&expectedEval[i]), fr.ElementStr(&zeroEval[i]))
 // 	}
 
-// 	expectedPoly := []bls.Fr{
+// 	expectedPoly := []fr.Element{
 // 		bls.ToFr("37647706414300369857238608619982937390838535937985112215973498325246987289395"),
 // 		bls.ToFr("2249310547870908874251949653552971443359134481191188461034956129255788965773"),
 // 		bls.ToFr("14214218681578879810156974734536988864583938194339599855352132142401756507144"),
@@ -224,7 +225,7 @@ func testReduceLeaves(scale uint8, missingRatio float64, seed int64, t *testing.
 
 // 	for i := range zeroPoly {
 // 		assert.True(t, bls.EqualFr(&expectedPoly[i], &zeroPoly[i]),
-// 			"at poly %d, expected: %s, got: %s", i, bls.FrStr(&expectedPoly[i]), bls.FrStr(&zeroPoly[i]))
+// 			"at poly %d, expected: %s, got: %s", i, fr.ElementStr(&expectedPoly[i]), fr.ElementStr(&zeroPoly[i]))
 // 	}
 // }
 
@@ -249,12 +250,13 @@ func testZeroPoly(t *testing.T, scale uint8, seed int64) {
 
 	for i, v := range exists {
 		if !v {
-			var at bls.Fr
-			bls.CopyFr(&at, &fs.ExpandedRootsOfUnity[i])
-			var out bls.Fr
-			bls.EvalPolyAt(&out, zeroPoly, &at)
-			if !bls.EqualZero(&out) {
-				t.Errorf("expected zero at %d, but got: %s", i, bls.FrStr(&out))
+			var at fr.Element
+			//xbls.CopyFr(&at, &fs.ExpandedRootsOfUnity[i])
+			at.Set(&fs.ExpandedRootsOfUnity[i])
+			var out fr.Element
+			EvalPolyAt(&out, zeroPoly, &at)
+			if !out.IsZero() {
+				t.Errorf("expected zero at %d, but got: %s", i, out.String())
 			}
 		}
 	}
@@ -264,13 +266,13 @@ func testZeroPoly(t *testing.T, scale uint8, seed int64) {
 		t.Fatal(err)
 	}
 	for i := 0; i < len(zeroPoly); i++ {
-		if !bls.EqualFr(&p[i], &zeroPoly[i]) {
-			t.Errorf("fft not correct, i: %v, a: %s, b: %s", i, bls.FrStr(&p[i]), bls.FrStr(&zeroPoly[i]))
+		if !p[i].Equal(&zeroPoly[i]) {
+			t.Errorf("fft not correct, i: %v, a: %s, b: %s", i, p[i].String(), zeroPoly[i].String())
 		}
 	}
 	for i := len(zeroPoly); i < len(p); i++ {
-		if !bls.EqualZero(&p[i]) {
-			t.Errorf("fft not correct, i: %v, a: %s, b: 0", i, bls.FrStr(&p[i]))
+		if !p[i].IsZero() {
+			t.Errorf("fft not correct, i: %v, a: %s, b: 0", i, p[i].String())
 		}
 	}
 }

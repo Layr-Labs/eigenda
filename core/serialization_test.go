@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding"
-	kzgbn254 "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
@@ -73,7 +72,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-	var lengthProof, lengthCommitment kzgbn254.G2Point
+	var lengthProof, lengthCommitment bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
 	lengthProof.Y.A0 = lengthYA0

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/big"
 	"runtime"
 	"sync"
 
@@ -12,14 +13,16 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type Verifier struct {
 	*kzgrs.KzgConfig
 	Srs          *kzg.SRS
-	G2Trailing   []bls.G2Point
+	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
 	LoadG2Points bool
 
@@ -41,8 +44,8 @@ func NewVerifier(config *kzgrs.KzgConfig, loadG2Points bool) (*Verifier, error) 
 		return nil, err
 	}
 
-	s2 := make([]bls.G2Point, 0)
-	g2Trailing := make([]bls.G2Point, 0)
+	s2 := make([]bn254.G2Affine, 0)
+	g2Trailing := make([]bn254.G2Affine, 0)
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if loadG2Points {
@@ -159,13 +162,13 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 }
 
 func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error {
-	return v.VerifyCommit((*bn254.G2Point)(commitments.LengthCommitment), (*bn254.G2Point)(commitments.LengthProof), uint64(commitments.Length))
+	return v.VerifyCommit((*bn254.G2Affine)(commitments.LengthCommitment), (*bn254.G2Affine)(commitments.LengthProof), uint64(commitments.Length))
 
 }
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
-func (v *Verifier) VerifyCommit(lengthCommit *bls.G2Point, lowDegreeProof *bls.G2Point, length uint64) error {
+func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn254.G2Affine, length uint64) error {
 
 	g1Challenge, err := kzgrs.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
 	if err != nil {
@@ -185,8 +188,8 @@ func (v *Verifier) VerifyCommit(lengthCommit *bls.G2Point, lowDegreeProof *bls.G
 // proof = commit(shiftedPoly) on G1
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLowDegreeProof(lengthCommit *bls.G2Point, proof *bls.G2Point, g1Challenge *bls.G1Point) bool {
-	return bls.PairingsVerify(g1Challenge, lengthCommit, &bls.GenG1, proof)
+func VerifyLowDegreeProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) bool {
+	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof) == nil
 }
 
 func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
@@ -198,7 +201,7 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 
 	for ind := range frames {
 		err = verifier.VerifyFrame(
-			(*bn254.G1Point)(commitments.Commitment),
+			(*bn254.G1Affine)(commitments.Commitment),
 			frames[ind],
 			uint64(indices[ind]),
 		)
@@ -212,7 +215,7 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 
 }
 
-func (v *ParametrizedVerifier) VerifyFrame(commit *bls.G1Point, f *encoding.Frame, index uint64) error {
+func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64) error {
 
 	j, err := rs.GetLeadingCosetIndex(
 		uint64(index),
@@ -236,31 +239,39 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bls.G1Point, f *encoding.Fram
 }
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
-func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bls.G1Point, x *bls.Fr, g2Atn *bls.G2Point) bool {
-	var xPow bls.Fr
-	bls.CopyFr(&xPow, &bls.ONE)
+func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine) bool {
+	var xPow fr.Element
+	xPow.SetOne()
 
-	var tmp bls.Fr
 	for i := 0; i < len(f.Coeffs); i++ {
-		bls.MulModFr(&tmp, &xPow, x)
-		bls.CopyFr(&xPow, &tmp)
+		xPow.Mul(&xPow, x)
 	}
 
+	var xPowBigInt big.Int
+
 	// [x^n]_2
-	var xn2 bls.G2Point
-	bls.MulG2(&xn2, &bls.GenG2, &xPow)
+	var xn2 bn254.G2Affine
+
+	xn2.ScalarMultiplication(&kzg.GenG2, xPow.BigInt(&xPowBigInt))
 
 	// [s^n - x^n]_2
-	var xnMinusYn bls.G2Point
-
-	bls.SubG2(&xnMinusYn, g2Atn, &xn2)
+	var xnMinusYn bn254.G2Affine
+	xnMinusYn.Sub(g2Atn, &xn2)
 
 	// [interpolation_polynomial(s)]_1
-	is1 := bls.LinCombG1(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs)
+	//is1 := bls.LinCombG1(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs)
+
+	var is1 bn254.G1Affine
+	config := ecc.MultiExpConfig{}
+	_, err := is1.MultiExp(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs, config)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
-	var commitMinusInterpolation bls.G1Point
-	bls.SubG1(&commitMinusInterpolation, commitment, is1)
+	var commitMinusInterpolation bn254.G1Affine
+	commitMinusInterpolation.Sub(commitment, &is1)
+	//bls.SubG1(&commitMinusInterpolation, commitment, is1)
 
 	// Verify the pairing equation
 	//
@@ -269,7 +280,9 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bls.G1Point
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	return bls.PairingsVerify(&commitMinusInterpolation, &bls.GenG2, &f.Proof, &xnMinusYn)
+	err = PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &f.Proof, &xnMinusYn)
+
+	return err == nil
 }
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob

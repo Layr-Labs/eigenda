@@ -14,7 +14,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/Layr-Labs/eigenda/pkg/kzg"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 func main() {
@@ -40,9 +42,10 @@ func readpoints() {
 	kzgGroup, _ := prover.NewProver(kzgConfig, true)
 	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
 	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
-		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].MarshalText()))
+
+		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].String()))
 	}
-	if kzgGroup.Srs.G1[0].X == bls.GenG1.X && kzgGroup.Srs.G1[0].Y == bls.GenG1.Y {
+	if kzgGroup.Srs.G1[0].X == kzg.GenG1.X && kzgGroup.Srs.G1[0].Y == kzg.GenG1.Y {
 		fmt.Println("start with gen")
 	}
 }
@@ -76,9 +79,9 @@ func TestKzgRs() {
 
 	//inputFr := kzgrs.ToFrArray(inputBytes)
 	inputSize := uint64(numSymbols)
-	inputFr := make([]bls.Fr, inputSize)
+	inputFr := make([]fr.Element, inputSize)
 	for i := uint64(0); i < inputSize; i++ {
-		bls.AsFr(&inputFr[i], i+1)
+		inputFr[i].SetInt64(int64(i + 1))
 	}
 
 	fmt.Printf("Input \n")
@@ -153,15 +156,15 @@ func TestKzgRs() {
 	//_ = deData
 }
 
-// func getData(inputSize uint64) []bls.Fr {
-// 	inputFr := make([]bls.Fr, inputSize)
+// func getData(inputSize uint64) []fr.Element {
+// 	inputFr := make([]fr.Element, inputSize)
 // 	for i := uint64(0); i < inputSize; i++ {
 // 		bls.AsFr(&inputFr[i], i+1)
 // 	}
 // 	return inputFr
 // }
 //
-// func compareData(inputFr, dataFr []bls.Fr) {
+// func compareData(inputFr, dataFr []fr.Element) {
 // 	if len(inputFr) != len(dataFr) {
 // 		log.Fatalf("Error. Diff length. input %v, data %v\n", len(inputFr), len(dataFr))
 // 	}
@@ -187,7 +190,7 @@ func TestKzgRs() {
 // 	}
 // }
 //
-// func initPoly(size int) ([]bls.Fr, []bls.Fr) {
+// func initPoly(size int) ([]fr.Element, []fr.Element) {
 // 	v := make([]uint64, size)
 // 	for i := 0; i < size; i++ {
 // 		v[i] = uint64(i + 1)
@@ -198,7 +201,7 @@ func TestKzgRs() {
 // 	return polyFr, dataFr
 // }
 //
-// func initData(size uint64) ([]bls.Fr, []bls.Fr) {
+// func initData(size uint64) ([]fr.Element, []fr.Element) {
 // 	v := make([]uint64, size)
 // 	for i := uint64(0); i < size; i++ {
 // 		v[i] = uint64(i + 1)
@@ -213,22 +216,22 @@ func TestKzgRs() {
 // 	return polyFr, dataFr
 // }
 //
-// func makeFr(input []uint64) []bls.Fr {
-// 	inputFr := make([]bls.Fr, len(input))
+// func makeFr(input []uint64) []fr.Element {
+// 	inputFr := make([]fr.Element, len(input))
 // 	for i := 0; i < len(input); i++ {
 // 		bls.AsFr(&inputFr[i], input[i])
 // 	}
 // 	return inputFr
 // }
 
-func printFr(d []bls.Fr) {
+func printFr(d []fr.Element) {
 	for _, e := range d {
 		fmt.Printf("%v ", e.String())
 	}
 	fmt.Printf("\n")
 }
 
-// func printG1(d []bls.G1Point) {
+// func printG1(d []bn254.G1Affine) {
 // 	for i, e := range d {
 // 		fmt.Printf("%v: %v \n", i, e.String())
 // 	}

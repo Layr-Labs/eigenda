@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
@@ -43,7 +44,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 
 	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
 
@@ -561,7 +561,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
-	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
+	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*kzg.BYTES_PER_COEFFICIENT)
 	assert.NoError(t, err)
 	recovered = bytes.TrimRight(recovered, "\x00")
 	assert.Equal(t, gettysburgAddressBytes, recovered)

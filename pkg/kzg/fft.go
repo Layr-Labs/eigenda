@@ -27,7 +27,7 @@
 package kzg
 
 import (
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 
 	"math/bits"
 )
@@ -43,15 +43,17 @@ func nextPowOf2(v uint64) uint64 {
 // Expands the power circle for a given root of unity to WIDTH+1 values.
 // The first entry will be 1, the last entry will also be 1,
 // for convenience when reversing the array (useful for inverses)
-func expandRootOfUnity(rootOfUnity *bls.Fr) []bls.Fr {
-	rootz := make([]bls.Fr, 2)
-	rootz[0] = bls.ONE // some unused number in py code
+func expandRootOfUnity(rootOfUnity *fr.Element) []fr.Element {
+	rootz := make([]fr.Element, 2)
+	rootz[0].SetOne() // some unused number in py code
 	rootz[1] = *rootOfUnity
-	for i := 1; !bls.EqualOne(&rootz[i]); {
-		rootz = append(rootz, bls.Fr{})
+
+	for i := 1; !rootz[i].IsOne(); {
+		rootz = append(rootz, fr.Element{})
 		this := &rootz[i]
 		i++
-		bls.MulModFr(&rootz[i], this, rootOfUnity)
+		rootz[i].Mul(this, rootOfUnity)
+		//bls.MulModFr(&rootz[i], this, rootOfUnity)
 	}
 	return rootz
 }
@@ -59,19 +61,20 @@ func expandRootOfUnity(rootOfUnity *bls.Fr) []bls.Fr {
 type FFTSettings struct {
 	MaxWidth uint64
 	// the generator used to get all roots of unity
-	RootOfUnity *bls.Fr
+	RootOfUnity *fr.Element
 	// domain, starting and ending with 1 (duplicate!)
-	ExpandedRootsOfUnity []bls.Fr
+	ExpandedRootsOfUnity []fr.Element
 	// reverse domain, same as inverse values of domain. Also starting and ending with 1.
-	ReverseRootsOfUnity []bls.Fr
+	ReverseRootsOfUnity []fr.Element
 }
 
 func NewFFTSettings(maxScale uint8) *FFTSettings {
 	width := uint64(1) << maxScale
-	root := &bls.Scale2RootOfUnity[maxScale]
-	rootz := expandRootOfUnity(&bls.Scale2RootOfUnity[maxScale])
+	root := &Scale2RootOfUnity[maxScale]
+	rootz := expandRootOfUnity(&Scale2RootOfUnity[maxScale])
+
 	// reverse roots of unity
-	rootzReverse := make([]bls.Fr, len(rootz))
+	rootzReverse := make([]fr.Element, len(rootz))
 	copy(rootzReverse, rootz)
 	for i, j := uint64(0), uint64(len(rootz)-1); i < j; i, j = i+1, j-1 {
 		rootzReverse[i], rootzReverse[j] = rootzReverse[j], rootzReverse[i]

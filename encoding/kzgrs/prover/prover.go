@@ -15,15 +15,15 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	_ "go.uber.org/automaxprocs"
 )
 
 type Prover struct {
 	*kzgrs.KzgConfig
 	Srs          *kzg.SRS
-	G2Trailing   []bls.G2Point
+	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
 	LoadG2Points bool
 
@@ -45,8 +45,8 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 		return nil, err
 	}
 
-	s2 := make([]bls.G2Point, 0)
-	g2Trailing := make([]bls.G2Point, 0)
+	s2 := make([]bn254.G2Affine, 0)
+	g2Trailing := make([]bn254.G2Affine, 0)
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if loadG2Points {
@@ -209,9 +209,9 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, err
 	}
 
-	fftPointsT := make([][]bls.G1Point, len(fftPoints[0]))
+	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
 	for i := range fftPointsT {
-		fftPointsT[i] = make([]bls.G1Point, len(fftPoints))
+		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))
 		for j := uint64(0); j < encoder.ChunkLength; j++ {
 			fftPointsT[i][j] = fftPoints[j][i]
 		}
@@ -244,7 +244,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 }
 
 // get Fiat-Shamir challenge
-// func createFiatShamirChallenge(byteArray [][32]byte) *bls.Fr {
+// func createFiatShamirChallenge(byteArray [][32]byte) *fr.Element {
 // 	alphaBytesTmp := make([]byte, 0)
 // 	for i := 0; i < len(byteArray); i++ {
 // 		for j := 0; j < len(byteArray[i]); j++ {
@@ -252,16 +252,16 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 // 		}
 // 	}
 // 	alphaBytes := crypto.Keccak256(alphaBytesTmp)
-// 	alpha := new(bls.Fr)
-// 	bls.FrSetBytes(alpha, alphaBytes)
+// 	alpha := new(fr.Element)
+// 	fr.ElementSetBytes(alpha, alphaBytes)
 //
 // 	return alpha
 // }
 
 // invert the divisor, then multiply
-// func polyFactorDiv(dst *bls.Fr, a *bls.Fr, b *bls.Fr) {
+// func polyFactorDiv(dst *fr.Element, a *fr.Element, b *fr.Element) {
 // 	// TODO: use divmod instead.
-// 	var tmp bls.Fr
+// 	var tmp fr.Element
 // 	bls.InvModFr(&tmp, b)
 // 	bls.MulModFr(dst, &tmp, a)
 // }

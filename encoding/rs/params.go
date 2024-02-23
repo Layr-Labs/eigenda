@@ -3,7 +3,7 @@ package rs
 import (
 	"errors"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 
 var (
@@ -37,7 +37,7 @@ func (p EncodingParams) Validate() error {
 }
 
 func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
-	dataLen := RoundUpDivision(dataSize, bls.BYTES_PER_COEFFICIENT)
+	dataLen := RoundUpDivision(dataSize, kzg.BYTES_PER_COEFFICIENT)
 	numSys := dataLen / chunkLen
 	return numSys
 }
@@ -57,7 +57,7 @@ func ParamsFromMins(numChunks, chunkLen uint64) EncodingParams {
 func GetEncodingParams(numSys, numPar, dataSize uint64) EncodingParams {
 
 	numNodes := numSys + numPar
-	dataLen := RoundUpDivision(dataSize, bls.BYTES_PER_COEFFICIENT)
+	dataLen := RoundUpDivision(dataSize, kzg.BYTES_PER_COEFFICIENT)
 	chunkLen := RoundUpDivision(dataLen, numSys)
 	return ParamsFromMins(numNodes, chunkLen)
 

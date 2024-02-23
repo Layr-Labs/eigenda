@@ -11,39 +11,40 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 // Sample is the basic unit for a verification
 // A blob may contain multiple Samples
 type Sample struct {
-	Commitment bls.G1Point
-	Proof      bls.G1Point
+	Commitment bn254.G1Affine
+	Proof      bn254.G1Affine
 	RowIndex   int // corresponds to a row in the verification matrix
-	Coeffs     []bls.Fr
+	Coeffs     []fr.Element
 	X          uint // X is the evaluating index which corresponds to the leading coset
 }
 
 // generate a random value using Fiat Shamir transform
 // we can also pseudo randomness generated locally, but we have to ensure no adversary can manipulate it
 // Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
-func GenRandomFactor(samples []Sample) (bls.Fr, error) {
+func GenRandomFactor(samples []Sample) (fr.Element, error) {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 
 	for _, sample := range samples {
 		err := enc.Encode(sample.Commitment)
 		if err != nil {
-			return bls.ZERO, err
+			return kzg.ZERO, err
 		}
 	}
 
-	var randomFr bls.Fr
+	var randomFr fr.Element
 
-	err := bls.HashToSingleField(&randomFr, buffer.Bytes())
+	err := kzg.HashToSingleField(&randomFr, buffer.Bytes())
 	if err != nil {
-		return bls.ZERO, err
+		return kzg.ZERO, err
 	}
 
 	return randomFr, nil
@@ -51,7 +52,7 @@ func GenRandomFactor(samples []Sample) (bls.Fr, error) {
 
 // Every sample has its own randomness, even though multiple samples can come from identical blob
 // Randomnesss for each sample is computed by repeatedly raising the power of the root randomness
-func GenRandomnessVector(samples []Sample) ([]bls.Fr, error) {
+func GenRandomnessVector(samples []Sample) ([]fr.Element, error) {
 	// root randomness
 	r, err := GenRandomFactor(samples)
 	if err != nil {
@@ -60,50 +61,54 @@ func GenRandomnessVector(samples []Sample) ([]bls.Fr, error) {
 
 	n := len(samples)
 
-	randomsFr := make([]bls.Fr, n)
-	bls.CopyFr(&randomsFr[0], &r)
+	randomsFr := make([]fr.Element, n)
+	randomsFr[0].Set(&r)
 
 	// power of r
 	for j := 0; j < n-1; j++ {
-		bls.MulModFr(&randomsFr[j+1], &randomsFr[j], &r)
+		randomsFr[j+1].Mul(&randomsFr[j], &r)
 	}
 	return randomsFr, nil
 }
 
 // the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
-func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bls.G1Point) (*bls.G1Point, error) {
+func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bn254.G1Affine) (*bn254.G1Affine, error) {
 	n := len(samples)
-	commits := make([]bls.G1Point, m)
+	commits := make([]bn254.G1Affine, m)
 	D := params.ChunkLength
 
-	var tmp bls.Fr
+	var tmp fr.Element
 
 	// first term
 	// get coeffs to compute the aggregated commitment
 	// note the coeff is affected by how many chunks are validated per blob
 	// if x chunks are sampled from one blob, we need to compute the sum of all x random field element corresponding to each sample
-	aggCommitCoeffs := make([]bls.Fr, m)
+	aggCommitCoeffs := make([]fr.Element, m)
 	setCommit := make([]bool, m)
 	for k := 0; k < n; k++ {
 		s := samples[k]
 		row := s.RowIndex
-		bls.AddModFr(&aggCommitCoeffs[row], &aggCommitCoeffs[row], &randomsFr[k])
+		//bls.AddModFr(&aggCommitCoeffs[row], &aggCommitCoeffs[row], &randomsFr[k])
+		aggCommitCoeffs[row].Add(&aggCommitCoeffs[row], &randomsFr[k])
 
 		if !setCommit[row] {
-			bls.CopyG1(&commits[row], &s.Commitment)
+			commits[row].Set(&s.Commitment)
+			//bls.CopyG1(&commits[row], &s.Commitment)
 			setCommit[row] = true
 		} else {
-			if !bls.EqualG1(&commits[row], &s.Commitment) {
+			//bls.EqualG1(&commits[row], &s.Commitment)
+			if !commits[row].Equal(&s.Commitment) {
 				return nil, errors.New("Samples of the same row has different commitments")
 			}
 		}
 	}
 
-	aggCommit := bls.LinCombG1(commits, aggCommitCoeffs)
+	var aggCommit bn254.G1Affine
+	aggCommit.MultiExp(commits, aggCommitCoeffs, ecc.MultiExpConfig{})
 
 	// second term
 	// compute the aggregated interpolation polynomial
-	aggPolyCoeffs := make([]bls.Fr, D)
+	aggPolyCoeffs := make([]fr.Element, D)
 
 	// we sum over the weighted coefficients (by the random field element) over all D monomial in all n samples
 	for k := 0; k < n; k++ {
@@ -111,50 +116,63 @@ func genRhsG1(samples []Sample, randomsFr []bls.Fr, m int, params encoding.Encod
 
 		rk := randomsFr[k]
 		// for each monomial in a given polynomial, multiply its coefficient with the corresponding random field,
-		// then sum it with others. Given ChunkLength (D) is identical for all samples in a subBatch.
+		// then sum it with others. Given ChunkLen (D) is identical for all samples in a subBatch.
 		// The operation is always valid.
 		for j := uint64(0); j < D; j++ {
-			bls.MulModFr(&tmp, &coeffs[j], &rk)
-			bls.AddModFr(&aggPolyCoeffs[j], &aggPolyCoeffs[j], &tmp)
+			tmp.Mul(&coeffs[j], &rk)
+			//bls.MulModFr(&tmp, &coeffs[j], &rk)
+			//bls.AddModFr(&aggPolyCoeffs[j], &aggPolyCoeffs[j], &tmp)
+			aggPolyCoeffs[j].Add(&aggPolyCoeffs[j], &tmp)
 		}
 	}
 
 	// All samples in a subBatch has identical chunkLen
-	aggPolyG1 := bls.LinCombG1(ks.Srs.G1[:D], aggPolyCoeffs)
+	var aggPolyG1 bn254.G1Affine
+	aggPolyG1.MultiExp(ks.Srs.G1[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
+	//aggPolyG1 := bls.LinCombG1(ks.Srs.G1[:D], aggPolyCoeffs)
 
 	// third term
 	// leading coset is an evaluation index, here we compute the weighted leading coset evaluation by random fields
-	lcCoeffs := make([]bls.Fr, n)
+	lcCoeffs := make([]fr.Element, n)
 
 	// get leading coset powers
-	leadingDs := make([]bls.Fr, n)
+	leadingDs := make([]fr.Element, n)
 
 	for k := 0; k < n; k++ {
 
 		// got the leading coset field element
 		h := ks.ExpandedRootsOfUnity[samples[k].X]
-		var hPow bls.Fr
-		bls.CopyFr(&hPow, &bls.ONE)
+		var hPow fr.Element
+		hPow.SetOne()
+		//bls.CopyFr(&hPow, &bls.ONE)
 
 		// raising the power for each leading coset
 		for j := uint64(0); j < D; j++ {
-			bls.MulModFr(&tmp, &hPow, &h)
-			bls.CopyFr(&hPow, &tmp)
+			hPow.Mul(&hPow, &h)
+			//bls.MulModFr(&tmp, &hPow, &h)
+			//bls.CopyFr(&hPow, &tmp)
 		}
-		bls.CopyFr(&leadingDs[k], &hPow)
+		//bls.CopyFr(&leadingDs[k], &hPow)
+		leadingDs[k].Set(&hPow)
 	}
 
 	// applying the random weights to leading coset elements
 	for k := 0; k < n; k++ {
 		rk := randomsFr[k]
-		bls.MulModFr(&lcCoeffs[k], &rk, &leadingDs[k])
+		//bls.MulModFr(&lcCoeffs[k], &rk, &leadingDs[k])
+		lcCoeffs[k].Mul(&rk, &leadingDs[k])
 	}
 
-	offsetG1 := bls.LinCombG1(proofs, lcCoeffs)
+	var offsetG1 bn254.G1Affine
+	offsetG1.MultiExp(proofs, lcCoeffs, ecc.MultiExpConfig{})
 
-	var rhsG1 bls.G1Point
-	bls.SubG1(&rhsG1, aggCommit, aggPolyG1)
-	bls.AddG1(&rhsG1, &rhsG1, offsetG1)
+	//offsetG1 := bls.LinCombG1(proofs, lcCoeffs)
+
+	var rhsG1 bn254.G1Affine
+	//bls.SubG1(&rhsG1, aggCommit, aggPolyG1)
+	rhsG1.Sub(&aggCommit, &aggPolyG1)
+	//bls.AddG1(&rhsG1, &rhsG1, offsetG1)
+	rhsG1.Add(&rhsG1, &offsetG1)
 	return &rhsG1, nil
 }
 
@@ -173,7 +191,7 @@ func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, sampl
 		}
 
 		sample := Sample{
-			Commitment: (bn254.G1Point)(*sc.Commitment),
+			Commitment: (bn254.G1Affine)(*sc.Commitment),
 			Proof:      sc.Chunk.Proof,
 			RowIndex:   sc.BlobIndex,
 			Coeffs:     sc.Chunk.Coeffs,
@@ -224,13 +242,16 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	}
 
 	// array of proofs
-	proofs := make([]bls.G1Point, n)
+	proofs := make([]bn254.G1Affine, n)
 	for i := 0; i < n; i++ {
-		bls.CopyG1(&proofs[i], &samples[i].Proof)
+		//bls.CopyG1(&proofs[i], &samples[i].Proof)
+		proofs[i].Set(&samples[i].Proof)
 	}
 
 	// lhs g1
-	lhsG1 := bls.LinCombG1(proofs, randomsFr)
+	//lhsG1 := bls.LinCombG1(proofs, randomsFr)
+	var lhsG1 bn254.G1Affine
+	lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
 
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
@@ -248,7 +269,7 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	lhsG2 := &G2atD
 
 	// rhs g2
-	rhsG2 := &bls.GenG2
+	rhsG2 := &kzg.GenG2
 
 	// rhs g1
 	rhsG1, err := genRhsG1(
@@ -263,9 +284,23 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 		return err
 	}
 
-	if bls.PairingsVerify(lhsG1, lhsG2, rhsG1, rhsG2) {
-		return nil
-	} else {
-		return errors.New("Universal Verify Incorrect paring")
+	return PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
+}
+
+func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
+	var negB1 bn254.G1Affine
+	negB1.Neg((*bn254.G1Affine)(b1))
+
+	P := [2]bn254.G1Affine{*(*bn254.G1Affine)(a1), negB1}
+	Q := [2]bn254.G2Affine{*(*bn254.G2Affine)(a2), *(*bn254.G2Affine)(b2)}
+
+	ok, err := bn254.PairingCheck(P[:], Q[:])
+	if err != nil {
+		return err
 	}
+	if !ok {
+		return fmt.Errorf("PairingCheck pairing not ok. SRS is invalid")
+	}
+
+	return nil
 }

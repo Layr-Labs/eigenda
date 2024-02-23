@@ -6,7 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 
 type AccountID = string
@@ -122,7 +122,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*bn254.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
+		size += int64(roundUpDivide(b.Length*percentMultiplier*kzg.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }

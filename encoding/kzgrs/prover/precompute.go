@@ -15,7 +15,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 type SubTable struct {
@@ -33,10 +33,10 @@ type SRSTable struct {
 	Tables    map[TableParam]SubTable
 	TableDir  string
 	NumWorker uint64
-	s1        []bls.G1Point
+	s1        []bn254.G1Affine
 }
 
-func NewSRSTable(tableDir string, s1 []bls.G1Point, numWorker uint64) (*SRSTable, error) {
+func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTable, error) {
 
 	err := os.MkdirAll(tableDir, os.ModePerm)
 	if err != nil {
@@ -87,7 +87,7 @@ func NewSRSTable(tableDir string, s1 []bls.G1Point, numWorker uint64) (*SRSTable
 func (p *SRSTable) GetSubTables(
 	numChunks uint64,
 	chunkLen uint64,
-) ([][]bls.G1Point, error) {
+) ([][]bn254.G1Affine, error) {
 	cosetSize := chunkLen
 	dimE := numChunks
 	m := numChunks*chunkLen - 1
@@ -128,12 +128,12 @@ func (p *SRSTable) GetSubTables(
 }
 
 type DispatchReturn struct {
-	points []bls.G1Point
+	points []bn254.G1Affine
 	j      uint64
 }
 
 // m = len(poly) - 1, which is deg
-func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) [][]bls.G1Point {
+func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker uint64) [][]bn254.G1Affine {
 	order := dimE * l
 	if l == 1 {
 		order = dimE * 2
@@ -143,7 +143,7 @@ func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker
 	n := uint8(math.Log2(float64(order)))
 	fs := kzg.NewFFTSettings(n)
 
-	fftPoints := make([][]bls.G1Point, l)
+	fftPoints := make([][]bn254.G1Affine, l)
 
 	numJob := l
 	jobChan := make(chan uint64, numJob)
@@ -183,15 +183,17 @@ func (p *SRSTable) precomputeWorker(fs *kzg.FFTSettings, m, dim, dimE uint64, jo
 
 func (p *SRSTable) PrecomputeSubTable(fs *kzg.FFTSettings, m, dim, dimE, j, l uint64) (DispatchReturn, error) {
 	// there is a constant term
-	points := make([]bls.G1Point, 2*dimE)
+	points := make([]bn254.G1Affine, 2*dimE)
 	k := m - l - j
 
 	for i := uint64(0); i < dim; i++ {
-		bls.CopyG1(&points[i], &p.s1[k])
+		//bls.CopyG1(&points[i], &p.s1[k])
+		points[i].Set(&p.s1[k])
 		k -= l
 	}
 	for i := dim; i < 2*dimE; i++ {
-		bls.CopyG1(&points[i], &bls.ZeroG1)
+		points[i].Set(&kzg.ZERO_G1)
+		//bls.CopyG1(&points[i], &bls.ZeroG1)
 	}
 
 	y, err := fs.FFTG1(points, false)
@@ -213,7 +215,7 @@ type Boundary struct {
 	sliceAt uint64
 }
 
-func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker uint64) ([][]bls.G1Point, error) {
+func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker uint64) ([][]bn254.G1Affine, error) {
 	g1f, err := os.Open(filePath)
 	if err != nil {
 		log.Println("TableReaderThreads.ERR.0", err)
@@ -253,7 +255,7 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 		boundaries[i] = boundary
 	}
 
-	fftPoints := make([][]bls.G1Point, l)
+	fftPoints := make([][]bn254.G1Affine, l)
 
 	jobChan := make(chan Boundary, l)
 
@@ -273,16 +275,16 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 
 func (p *SRSTable) readWorker(
 	buf []byte,
-	fftPoints [][]bls.G1Point,
+	fftPoints [][]bn254.G1Affine,
 	jobChan <-chan Boundary,
 	dimE uint64,
 	wg *sync.WaitGroup,
 ) {
 	for b := range jobChan {
-		slicePoints := make([]bls.G1Point, dimE*2)
+		slicePoints := make([]bn254.G1Affine, dimE*2)
 		for i := uint64(0); i < dimE*2; i++ {
 			g1 := buf[b.start+i*kzgrs.G1PointBytes : b.start+(i+1)*kzgrs.G1PointBytes]
-			err := slicePoints[i].UnmarshalText(g1[:])
+			_, err := slicePoints[i].SetBytes(g1[:]) //UnmarshalText(g1[:])
 			if err != nil {
 				log.Printf("Error. From %v to %v. %v", b.start, b.end, err)
 				log.Println()
@@ -295,7 +297,7 @@ func (p *SRSTable) readWorker(
 	wg.Done()
 }
 
-func (p *SRSTable) TableWriter(fftPoints [][]bls.G1Point, dimE uint64, filePath string) error {
+func (p *SRSTable) TableWriter(fftPoints [][]bn254.G1Affine, dimE uint64, filePath string) error {
 	wf, err := os.Create(filePath)
 	if err != nil {
 		log.Println("TableWriter.ERR.0", err)
@@ -310,8 +312,8 @@ func (p *SRSTable) TableWriter(fftPoints [][]bls.G1Point, dimE uint64, filePath 
 	for j := uint64(0); j < l; j++ {
 		for i := uint64(0); i < dimE*2; i++ {
 
-			g1Bytes := fftPoints[j][i].MarshalText()
-			if _, err := writer.Write(g1Bytes); err != nil {
+			g1Bytes := fftPoints[j][i].Bytes()
+			if _, err := writer.Write(g1Bytes[:]); err != nil {
 				log.Println("TableWriter.ERR.2", err)
 				return err
 			}

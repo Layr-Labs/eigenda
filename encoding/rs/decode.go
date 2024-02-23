@@ -4,7 +4,8 @@ import (
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 // Decode data when some chunks from systematic nodes are lost. It first uses FFT to recover
@@ -23,7 +24,7 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		return nil, errors.New("number of frame must be sufficient")
 	}
 
-	samples := make([]*bls.Fr, g.NumEvaluations())
+	samples := make([]*fr.Element, g.NumEvaluations())
 	// copy evals based on frame coeffs into samples
 	for i, d := range indices {
 		f := frames[i]
@@ -40,12 +41,13 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		// Some pattern i butterfly swap. Find the leading coset, then increment by number of coset
 		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
-			samples[p] = new(bls.Fr)
-			bls.CopyFr(samples[p], &evals[j])
+			samples[p] = new(fr.Element)
+			//bls.CopyFr(samples[p], &evals[j])
+			samples[p].Set(&evals[j])
 		}
 	}
 
-	reconstructedData := make([]bls.Fr, g.NumEvaluations())
+	reconstructedData := make([]fr.Element, g.NumEvaluations())
 	missingIndices := false
 	for i, s := range samples {
 		if s == nil {

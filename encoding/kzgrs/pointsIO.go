@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 const (
@@ -38,34 +38,34 @@ func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, erro
 }
 
 // Read the n-th G1 point from SRS.
-func ReadG1Point(n uint64, g *KzgConfig) (bls.G1Point, error) {
+func ReadG1Point(n uint64, g *KzgConfig) (bn254.G1Affine, error) {
 	if n > g.SRSOrder {
-		return bls.G1Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+		return bn254.G1Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
 
 	g1point, err := ReadG1PointSection(g.G1Path, n, n+1, 1)
 	if err != nil {
-		return bls.G1Point{}, err
+		return bn254.G1Affine{}, err
 	}
 
 	return g1point[0], nil
 }
 
 // Read the n-th G2 point from SRS.
-func ReadG2Point(n uint64, g *KzgConfig) (bls.G2Point, error) {
+func ReadG2Point(n uint64, g *KzgConfig) (bn254.G2Affine, error) {
 	if n > g.SRSOrder {
-		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
 
 	g2point, err := ReadG2PointSection(g.G2Path, n, n+1, 1)
 	if err != nil {
-		return bls.G2Point{}, err
+		return bn254.G2Affine{}, err
 	}
 	return g2point[0], nil
 }
 
 // Read g2 points from power of 2 file
-func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bls.G2Point, error) {
+func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bn254.G2Affine, error) {
 
 	// the powerOf2 file, only [tau^exp] are stored.
 	// exponent    0,    1,       2,    , ..
@@ -81,22 +81,22 @@ func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bls.G2Point, error) {
 	actualPowerOfTau := g.SRSOrder - 1
 	largestPowerofSRS := uint64(math.Log2(float64(actualPowerOfTau)))
 	if exponent > largestPowerofSRS {
-		return bls.G2Point{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
+		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
 			uint64(math.Pow(2, float64(exponent))), largestPowerofSRS)
 	}
 
 	if len(g.G2PowerOf2Path) == 0 {
-		return bls.G2Point{}, fmt.Errorf("G2PathPowerOf2 path is empty")
+		return bn254.G2Affine{}, fmt.Errorf("G2PathPowerOf2 path is empty")
 	}
 
 	g2point, err := ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
 	if err != nil {
-		return bls.G2Point{}, err
+		return bn254.G2Affine{}, err
 	}
 	return g2point[0], nil
 }
 
-func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, error) {
+func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	g1f, err := os.Open(filepath)
 	if err != nil {
 		log.Println("Cannot ReadG1Points", filepath, err)
@@ -127,7 +127,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * G1PointBytes), elapsed)
 	startTimer = time.Now()
 
-	s1Outs := make([]bls.G1Point, n)
+	s1Outs := make([]bn254.G1Affine, n)
 
 	start := uint64(0)
 	end := uint64(0)
@@ -163,7 +163,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bls.G1Point, e
 }
 
 // from is inclusive, to is exclusive
-func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bls.G1Point, error) {
+func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	if to <= from {
 		return nil, fmt.Errorf("The range to read is invalid, from: %v, to: %v", from, to)
 	}
@@ -197,7 +197,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		return nil, err
 	}
 
-	s1Outs := make([]bls.G1Point, n)
+	s1Outs := make([]bn254.G1Affine, n)
 
 	start := uint64(0)
 	end := uint64(0)
@@ -229,7 +229,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 
 func readG1Worker(
 	buf []byte,
-	outs []bls.G1Point,
+	outs []bn254.G1Affine,
 	start uint64, // in element, not in byte
 	end uint64,
 	step uint64,
@@ -237,7 +237,7 @@ func readG1Worker(
 ) {
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
-		err := outs[i].UnmarshalText(g1[:])
+		_, err := outs[i].SetBytes(g1[:])
 		if err != nil {
 			results <- err
 			panic(err)
@@ -248,7 +248,7 @@ func readG1Worker(
 
 func readG2Worker(
 	buf []byte,
-	outs []bls.G2Point,
+	outs []bn254.G2Affine,
 	start uint64, // in element, not in byte
 	end uint64,
 	step uint64,
@@ -256,7 +256,7 @@ func readG2Worker(
 ) {
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
-		err := outs[i].UnmarshalText(g1[:])
+		_, err := outs[i].SetBytes(g1[:])
 		if err != nil {
 			results <- err
 			log.Println("Unmarshalling error:", err)
@@ -266,7 +266,7 @@ func readG2Worker(
 	results <- nil
 }
 
-func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, error) {
+func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	g1f, err := os.Open(filepath)
 	if err != nil {
 		log.Println("Cannot ReadG2Points", filepath)
@@ -299,7 +299,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 
 	startTimer = time.Now()
 
-	s2Outs := make([]bls.G2Point, n)
+	s2Outs := make([]bn254.G2Affine, n)
 
 	results := make(chan error, numWorker)
 
@@ -333,7 +333,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bls.G2Point, e
 }
 
 // from is inclusive, to is exclusive
-func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bls.G2Point, error) {
+func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	if to <= from {
 		return nil, fmt.Errorf("The range to read is invalid, from: %v, to: %v", from, to)
 	}
@@ -367,7 +367,7 @@ func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 		return nil, err
 	}
 
-	s2Outs := make([]bls.G2Point, n)
+	s2Outs := make([]bn254.G2Affine, n)
 
 	results := make(chan error, numWorker)
 

@@ -12,7 +12,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type ParametrizedProver struct {
@@ -20,27 +22,27 @@ type ParametrizedProver struct {
 
 	*kzgrs.KzgConfig
 	Srs        *kzg.SRS
-	G2Trailing []bls.G2Point
+	G2Trailing []bn254.G2Affine
 
 	Fs         *kzg.FFTSettings
 	Ks         *kzg.KZGSettings
 	SFs        *kzg.FFTSettings // fft used for submatrix product helper
-	FFTPoints  [][]bls.G1Point
-	FFTPointsT [][]bls.G1Point // transpose of FFTPoints
+	FFTPoints  [][]bn254.G1Affine
+	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 }
 
 type WorkerResult struct {
-	points []bls.G1Point
+	points []bn254.G1Affine
 	err    error
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []encoding.Frame, []uint32, error) {
+func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
 	inputFr := rs.ToFrArray(inputBytes)
 	return g.Encode(inputFr)
 }
 
-func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Point, *bls.G2Point, []encoding.Frame, []uint32, error) {
+func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
 
 	startTime := time.Now()
 	poly, frames, indices, err := g.Encoder.Encode(inputFr)
@@ -54,7 +56,12 @@ func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Poin
 
 	// compute commit for the full poly
 	commit := g.Commit(poly.Coeffs)
-	lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
+	//lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
+
+	config := ecc.MultiExpConfig{}
+
+	var lowDegreeCommitment bn254.G2Affine
+	_, err = lowDegreeCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
 
 	intermediate := time.Now()
 
@@ -72,7 +79,9 @@ func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Poin
 	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyDegreePlus1:]
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
-	lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
+	//lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
+	var lowDegreeProof bn254.G2Affine
+	_, err = lowDegreeProof.MultiExp(shiftedSecret, poly.Coeffs, config)
 
 	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
 	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
@@ -89,7 +98,7 @@ func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Poin
 	}
 
 	// compute proofs
-	paddedCoeffs := make([]bls.Fr, g.NumEvaluations())
+	paddedCoeffs := make([]fr.Element, g.NumEvaluations())
 	copy(paddedCoeffs, poly.Coeffs)
 
 	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
@@ -112,29 +121,29 @@ func (g *ParametrizedProver) Encode(inputFr []bls.Fr) (*bls.G1Point, *bls.G2Poin
 	if g.Verbose {
 		log.Printf("Total encoding took      %v\n", time.Since(startTime))
 	}
-	return &commit, lowDegreeCommitment, lowDegreeProof, kzgFrames, indices, nil
+	return &commit, &lowDegreeCommitment, &lowDegreeProof, kzgFrames, indices, nil
 }
 
-func (g *ParametrizedProver) Commit(polyFr []bls.Fr) bls.G1Point {
+func (g *ParametrizedProver) Commit(polyFr []fr.Element) bn254.G1Affine {
 	commit := g.Ks.CommitToPoly(polyFr)
 	return *commit
 }
 
-func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []bls.Fr, numChunks, chunkLen, numWorker uint64) ([]bls.G1Point, error) {
+func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
 	l := chunkLen
 
-	sumVec := make([]bls.G1Point, dimE*2)
+	sumVec := make([]bn254.G1Affine, dimE*2)
 
 	jobChan := make(chan uint64, numWorker)
 	results := make(chan WorkerResult, numWorker)
 
 	// create storage for intermediate fft outputs
-	coeffStore := make([][]bls.Fr, dimE*2)
+	coeffStore := make([][]fr.Element, dimE*2)
 	for i := range coeffStore {
-		coeffStore[i] = make([]bls.Fr, l)
+		coeffStore[i] = make([]fr.Element, l)
 	}
 
 	for w := uint64(0); w < numWorker; w++ {
@@ -167,7 +176,8 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []bls.Fr, numChunks, ch
 		wg.Add(1)
 		go func(k uint64) {
 			defer wg.Done()
-			sumVec[k] = *bls.LinCombG1(p.FFTPointsT[k], coeffStore[k])
+			//sumVec[k] = *bls.LinCombG1(p.FFTPointsT[k], coeffStore[k])
+			sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
 		}(i)
 	}
 
@@ -198,11 +208,11 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []bls.Fr, numChunks, ch
 }
 
 func (p *ParametrizedProver) proofWorker(
-	polyFr []bls.Fr,
+	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
 	dimE uint64,
-	coeffStore [][]bls.Fr,
+	coeffStore [][]fr.Element,
 	results chan<- WorkerResult,
 ) {
 
@@ -230,14 +240,15 @@ func (p *ParametrizedProver) proofWorker(
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-func (p *ParametrizedProver) GetSlicesCoeff(polyFr []bls.Fr, dimE, j, l uint64) ([]bls.Fr, error) {
+func (p *ParametrizedProver) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l
 
-	toeV := make([]bls.Fr, 2*dimE-1)
+	toeV := make([]fr.Element, 2*dimE-1)
 	for i := uint64(0); i < dim; i++ {
-		bls.CopyFr(&toeV[i], &polyFr[m-(j+i*l)])
+		//bls.CopyFr(&toeV[i], &polyFr[m-(j+i*l)])
+		toeV[i].Set(&polyFr[m-(j+i*l)])
 	}
 
 	// use precompute table
