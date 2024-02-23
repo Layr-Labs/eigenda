@@ -50,7 +50,7 @@ func (s *server) getServiceAvailability(ctx context.Context, hosts []string) ([]
 	return availaiblityStatuses, nil
 }
 
-// InitClientPools initializes the client pools for the server
+// Initializes the client pools for the server
 func (s *server) InitGRPCClientPools(poolSize int) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -71,7 +71,7 @@ func (s *server) InitGRPCClientPools(poolSize int) error {
 	return nil
 }
 
-// newClientPool creates a new client pool with prewarmed connections
+// newClientPool creates a client pool with prewarmed connections
 func newClientPool(size int, serverAddr string) (*ClientPool, error) {
 	pool := &ClientPool{
 		clients: make(chan *grpc.ClientConn, size),
@@ -86,7 +86,7 @@ func newClientPool(size int, serverAddr string) (*ClientPool, error) {
 	return pool, nil
 }
 
-// GetClientPool retrieves a client pool for a given service hostname
+// getClientPool retrieves a client pool for a given service hostname
 func (s *server) getClientPool(serviceHostName string) *ClientPool {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -102,14 +102,11 @@ func getClientConn(pool *ClientPool) (*grpc.ClientConn, error) {
 		return conn, nil
 	default:
 		// Handle the scenario when no connections are available in the pool.
-		// For simplicity, this example returns an error.
-		// Depending on your requirements, you might instead block until a connection is available,
-		// or dynamically create a new connection if the pool isn't at its max size.
 		return nil, fmt.Errorf("no available connections in the pool")
 	}
 }
 
-// Return puts a gRPC client connection back into the pool.
+// puts a gRPC client connection back into the pool.
 func putClientConn(conn *grpc.ClientConn, pool *ClientPool) {
 	pool.clients <- conn // It's a good idea to check if the connection is still healthy before returning.
 }
