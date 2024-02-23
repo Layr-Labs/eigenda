@@ -134,10 +134,28 @@ func TestNegG1(t *testing.T) {
 }
 
 func TestLinCombG1(t *testing.T) {
-	// TODO: use random poly and g1 points
-	poly := []Fr{
-		ToFr("1"), ToFr("2"), ToFr("3"), ToFr("4"), ToFr("5"),
-	}
+	// random numbers for interval [1, 50]
+    rand.Seed(time.Now().UnixNano())
+
+    // generate random numbers and convert them to Fr
+    nums := make([]int, 5)
+    sum := 0
+    for i := range nums {
+        nums[i] = rand.Intn(50) + 1
+        sum += nums[i]
+    }
+
+	// for testing purposes in the future
+	// t.Logf("Random numbers: %v", nums)
+    // t.Logf("Sum of random numbers: %d", sum)
+
+    poly := []Fr{
+        ToFr(strconv.Itoa(nums[0])),
+        ToFr(strconv.Itoa(nums[1])),
+        ToFr(strconv.Itoa(nums[2])),
+        ToFr(strconv.Itoa(nums[3])),
+        ToFr(strconv.Itoa(nums[4])),
+    }
 	one := GenG1
 	val := []G1Point{
 		one, one, one, one, one,
