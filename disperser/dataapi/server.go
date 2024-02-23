@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"google.golang.org/grpc"
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
@@ -24,8 +25,9 @@ import (
 )
 
 const (
-	maxWorkerPoolLimit   = 10
-	maxQueryBatchesLimit = 2
+	maxWorkerPoolLimit    = 10
+	maxQueryBatchesLimit  = 2
+	maxGRPCClientPoolSize = 10
 )
 
 var errNotFound = errors.New("not found")
@@ -93,8 +95,24 @@ type (
 		Data []*DeregisteredOperatorMetadata `json:"data"`
 	}
 
+	// TODO: Add ServiceMethods to the struct
+	ServiceAvailability struct {
+		ServiceName   string `json:"service_name"`
+		ServiceStatus string `json:"service_status"`
+	}
+
+	ServiceAvailabilityResponse struct {
+		Meta Meta                   `json:"meta"`
+		Data []*ServiceAvailability `json:"data"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
+	}
+
+	// ClientPool represents a pool of gRPC client connections
+	ClientPool struct {
+		clients chan *grpc.ClientConn
 	}
 
 	server struct {
@@ -108,7 +126,10 @@ type (
 		transactor     core.Transactor
 		chainState     core.ChainState
 
-		metrics *Metrics
+		metrics           *Metrics
+		disperserHostName string
+		churnerHostName   string
+		clientPools       map[string]*ClientPool
 	}
 )
 
@@ -123,16 +144,18 @@ func NewServer(
 	metrics *Metrics,
 ) *server {
 	return &server{
-		logger:         logger,
-		serverMode:     config.ServerMode,
-		socketAddr:     config.SocketAddr,
-		allowOrigins:   config.AllowOrigins,
-		blobstore:      blobstore,
-		promClient:     promClient,
-		subgraphClient: subgraphClient,
-		transactor:     transactor,
-		chainState:     chainState,
-		metrics:        metrics,
+		logger:            logger,
+		serverMode:        config.ServerMode,
+		socketAddr:        config.SocketAddr,
+		allowOrigins:      config.AllowOrigins,
+		blobstore:         blobstore,
+		promClient:        promClient,
+		subgraphClient:    subgraphClient,
+		transactor:        transactor,
+		chainState:        chainState,
+		metrics:           metrics,
+		disperserHostName: config.DisperserHostname,
+		churnerHostName:   config.ChurnerHostname,
 	}
 }
 
@@ -141,6 +164,7 @@ func (s *server) Start() error {
 		// optimize performance and disable debug features.
 		gin.SetMode(gin.ReleaseMode)
 	}
+	s.InitGRPCClientPools(maxGRPCClientPoolSize)
 
 	router := gin.New()
 	basePath := "/api/v1"
@@ -157,6 +181,10 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+		}
+		serviceAvailability := v1.Group("/service-availability")
+		{
+			serviceAvailability.GET("/eigenda-services", s.FetchDeregisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -465,6 +493,39 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
+	})
+}
+
+// GetEigenDAServiceAvailability godoc
+//
+//	@Summary	Get status of public EigenDA services.
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200	{object}	ServiceAvailabilityResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/eigenda-services/service-availability [get]
+func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("GetEigenDAServiceAvailability", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	hosts := []string{s.disperserHostName, s.churnerHostName}
+	availaiblityStatuses, err := s.getServiceAvailability(c.Request.Context(), hosts)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("GetEigenDAServiceAvailability")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
+	c.JSON(http.StatusOK, ServiceAvailabilityResponse{
+		Meta: Meta{
+			Size: len(availaiblityStatuses),
+		},
+		Data: availaiblityStatuses,
 	})
 }
 
