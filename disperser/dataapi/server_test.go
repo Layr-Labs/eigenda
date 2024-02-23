@@ -823,6 +823,57 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
+func TestGetServiceAvailability_ValidHosts(t *testing.T) {
+	// TODO: Identify which GoLeak is causing the test to fail
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
+
+	r := setUpRouter()
+
+	var wg sync.WaitGroup
+
+	hosts := []string{"localhost:32007", "localhost:32009"} // Example DNS names for different services
+	cleanupFuncs := make([]func(), 0, len(hosts))
+	for _, host := range hosts {
+		wg.Add(1)
+		cleanup := startGRPCServerWithHealthCheck(host, &wg)
+		cleanupFuncs = append(cleanupFuncs, cleanup)
+	}
+	wg.Wait() // Wait for servers to start
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger))
+
+	// Here's the critical part: Initialize the gRPC client pools
+	maxGRPCClientPoolSize := 5 // This should match your actual or test setup requirements
+	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
+		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
+	}
+	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.DeregisteredOperatorsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+
+	// At the end of your test, stop all servers
+	for _, cleanup := range cleanupFuncs {
+		cleanup() // Stops each gRPC server
+	}
+}
+
 func setUpRouter() *gin.Engine {
 	return gin.Default()
 }
@@ -880,57 +931,6 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 	updated, err := queue.MarkBlobConfirmed(context.Background(), metadata, confirmationInfo)
 	assert.NoError(t, err)
 	assert.Equal(t, disperser.Confirmed, updated.BlobStatus)
-}
-
-func TestGetServiceAvailability_ValidHosts(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
-	r := setUpRouter()
-
-	var wg sync.WaitGroup
-
-	hosts := []string{"localhost:32007", "localhost:32009"} // Example DNS names for different services
-	cleanupFuncs := make([]func(), 0, len(hosts))
-	for _, host := range hosts {
-		wg.Add(1)
-		cleanup := startGRPCServerWithHealthCheck(host, &wg)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
-	}
-	wg.Wait() // Wait for servers to start
-
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger))
-
-	// Here's the critical part: Initialize the gRPC client pools
-	maxGRPCClientPoolSize := 5 // This should match your actual or test setup requirements
-	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
-		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
-	}
-	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability", nil)
-	r.ServeHTTP(w, req)
-
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response dataapi.DeregisteredOperatorsResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, 2, response.Meta.Size)
-	assert.Equal(t, 2, len(response.Data))
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
-	}
 }
 
 func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8) core.Blob {
