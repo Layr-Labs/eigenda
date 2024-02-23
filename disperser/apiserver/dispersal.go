@@ -18,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -86,6 +85,34 @@ func NewDispersalServer(
 		rateConfig:    rateConfig,
 		mu:            &sync.Mutex{},
 	}
+}
+
+func (s *DispersalServer) Start(ctx context.Context) error {
+	s.logger.Trace("Entering Start function...")
+	defer s.logger.Trace("Exiting Start function...")
+
+	// Serve grpc requests
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not start tcp listener")
+	}
+
+	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	gs := grpc.NewServer(opt)
+	reflection.Register(gs)
+	pb.RegisterDisperserServer(gs, s)
+
+	// Register Server for Health Checks
+	name := pb.Disperser_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
+
+	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	if err := gs.Serve(listener); err != nil {
+		return fmt.Errorf("could not start GRPC server")
+	}
+
+	return nil
 }
 
 func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_DisperseBlobAuthenticatedServer) error {
@@ -185,42 +212,12 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	defer timer.ObserveDuration()
 
 	securityParams := blob.RequestHeader.SecurityParams
-	if len(securityParams) == 0 {
-		return nil, fmt.Errorf("invalid request: security_params must not be empty")
-	}
-	if len(securityParams) > 256 {
-		return nil, fmt.Errorf("invalid request: security_params must not exceed 256")
-	}
-
-	seenQuorums := make(map[uint8]struct{})
-	// The quorum ID must be in range [0, 254]. It'll actually be converted
-	// to uint8, so it cannot be greater than 254.
-	for _, param := range securityParams {
-		if _, ok := seenQuorums[param.QuorumID]; ok {
-			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
-		}
-		seenQuorums[param.QuorumID] = struct{}{}
-
-		if param.QuorumID >= s.quorumCount {
-			err := s.updateQuorumCount(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
-			}
-
-			if param.QuorumID >= s.quorumCount {
-				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
-			}
-		}
+	securityParamsStrings := make([]string, len(securityParams))
+	for i, sp := range securityParams {
+		securityParamsStrings[i] = sp.String()
 	}
 
 	blobSize := len(blob.Data)
-	// The blob size in bytes must be in range [1, maxBlobSize].
-	if blobSize > maxBlobSize {
-		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
-	}
-	if blobSize == 0 {
-		return nil, fmt.Errorf("blob size must be greater than 0")
-	}
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
@@ -231,14 +228,10 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, err
 	}
 
-	securityParamsStrings := make([]string, len(securityParams))
-	for i, sp := range securityParams {
-		securityParamsStrings[i] = sp.String()
-	}
 	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	if err := blob.RequestHeader.Validate(); err != nil {
-		s.logger.Warn("invalid header", "err", err)
+	err = s.validateBlobRequest(ctx, blob)
+	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
@@ -344,82 +337,6 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 }
 
-func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
-
-	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i, param := range blob.RequestHeader.SecurityParams {
-
-		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
-		if !ok {
-			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
-		}
-		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
-		if err != nil {
-			return err
-		}
-
-		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
-		blobSize := len(blob.Data)
-		length := encoding.GetBlobLength(uint(blobSize))
-		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
-		encodedSize := encoding.GetBlobSize(encodedLength)
-
-		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
-			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate, "accountKey", accountKey)
-
-		// Check System Ratelimit
-		systemQuorumKey := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
-		allowed, err := s.ratelimiter.AllowRequest(ctx, systemQuorumKey, encodedSize, rates.TotalUnauthThroughput)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
-			return errSystemThroughputRateLimit
-		}
-
-		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, systemQuorumKey, blobRateMultiplier, rates.TotalUnauthBlobRate)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
-			return errSystemBlobRateLimit
-		}
-
-		// Check Account Ratelimit
-
-		accountQuorumKey := fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, encodedSize, accountRates.Throughput)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("account byte ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", accountRates.Throughput)
-			return errAccountThroughputRateLimit
-		}
-
-		accountQuorumKey = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, blobRateMultiplier, accountRates.BlobRate)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("account blob ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
-			return errAccountBlobRateLimit
-		}
-
-		// Update the quorum rate
-		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
-	}
-	return nil
-
-}
-
 func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusRequest) (*pb.BlobStatusReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("GetBlobStatus", f*1000) // make milliseconds
@@ -510,130 +427,4 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 		Status: getResponseStatus(metadata.BlobStatus),
 		Info:   &pb.BlobInfo{},
 	}, nil
-}
-
-func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlobRequest) (*pb.RetrieveBlobReply, error) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("RetrieveBlob", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
-	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex)
-
-	batchHeaderHash := req.GetBatchHeaderHash()
-	// Convert to [32]byte
-	var batchHeaderHash32 [32]byte
-	copy(batchHeaderHash32[:], batchHeaderHash)
-
-	blobIndex := req.GetBlobIndex()
-
-	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
-	if err != nil {
-		s.logger.Error("Failed to retrieve blob metadata", "err", err)
-		s.metrics.IncrementFailedBlobRequestNum("", "RetrieveBlob")
-
-		return nil, err
-	}
-
-	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
-	if err != nil {
-		s.logger.Error("Failed to retrieve blob", "err", err)
-		s.metrics.HandleFailedRequest("", len(data), "RetrieveBlob")
-
-		return nil, err
-	}
-
-	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
-
-	return &pb.RetrieveBlobReply{
-		Data: data,
-	}, nil
-}
-
-func (s *DispersalServer) Start(ctx context.Context) error {
-	s.logger.Trace("Entering Start function...")
-	defer s.logger.Trace("Exiting Start function...")
-
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not start tcp listener")
-	}
-
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
-	reflection.Register(gs)
-	pb.RegisterDisperserServer(gs, s)
-
-	// Register Server for Health Checks
-	name := pb.Disperser_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
-
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
-	if err := gs.Serve(listener); err != nil {
-		return fmt.Errorf("could not start GRPC server")
-	}
-
-	return nil
-}
-
-func (s *DispersalServer) updateQuorumCount(ctx context.Context) error {
-	currentBlock, err := s.tx.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return err
-	}
-	count, err := s.tx.GetQuorumCount(ctx, currentBlock)
-	if err != nil {
-		return err
-	}
-
-	s.logger.Debug("updating quorum count", "currentBlock", currentBlock, "count", count)
-	s.mu.Lock()
-	s.quorumCount = count
-	s.mu.Unlock()
-	return nil
-}
-
-func getResponseStatus(status disperser.BlobStatus) pb.BlobStatus {
-	switch status {
-	case disperser.Processing:
-		return pb.BlobStatus_PROCESSING
-	case disperser.Confirmed:
-		return pb.BlobStatus_CONFIRMED
-	case disperser.Failed:
-		return pb.BlobStatus_FAILED
-	case disperser.Finalized:
-		return pb.BlobStatus_FINALIZED
-	case disperser.InsufficientSignatures:
-		return pb.BlobStatus_INSUFFICIENT_SIGNATURES
-	default:
-		return pb.BlobStatus_UNKNOWN
-	}
-}
-
-func getBlobFromRequest(req *pb.DisperseBlobRequest) *core.Blob {
-	params := make([]*core.SecurityParam, len(req.SecurityParams))
-
-	for i, param := range req.GetSecurityParams() {
-		params[i] = &core.SecurityParam{
-			QuorumID:           core.QuorumID(param.QuorumId),
-			AdversaryThreshold: uint8(param.AdversaryThreshold),
-			QuorumThreshold:    uint8(param.QuorumThreshold),
-		}
-	}
-
-	data := req.GetData()
-
-	blob := &core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			BlobAuthHeader: core.BlobAuthHeader{
-				AccountID: req.AccountId,
-			},
-			SecurityParams: params,
-		},
-		Data: data,
-	}
-
-	return blob
 }
