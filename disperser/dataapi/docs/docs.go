@@ -15,6 +15,43 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/eigenda-services/service-availability": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Get status of public EigenDA services.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -353,17 +390,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "commitment": {
-                    "$ref": "#/definitions/core.Commitment"
+                    "$ref": "#/definitions/core.G1Commitment"
                 },
                 "length": {
                     "type": "integer"
                 },
+                "length_commitment": {
+                    "$ref": "#/definitions/core.G2Commitment"
+                },
                 "length_proof": {
-                    "$ref": "#/definitions/core.Commitment"
+                    "$ref": "#/definitions/core.LengthProof"
                 }
             }
         },
-        "core.Commitment": {
+        "core.G1Commitment": {
             "type": "object",
             "properties": {
                 "x": {
@@ -371,6 +411,22 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "core.G2Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "core.LengthProof": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -564,6 +620,31 @@ const docTemplate = `{
                 }
             }
         },
+        "dataapi.ServiceAvailability": {
+            "type": "object",
+            "properties": {
+                "service_name": {
+                    "type": "string"
+                },
+                "service_status": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.ServiceAvailabilityResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.ServiceAvailability"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
         "dataapi.Throughput": {
             "type": "object",
             "properties": {
@@ -591,6 +672,17 @@ const docTemplate = `{
                 "Finalized",
                 "InsufficientSignatures"
             ]
+        },
+        "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
+            "type": "object",
+            "properties": {
+                "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
         }
     }
 }`

@@ -2,18 +2,30 @@ definitions:
   core.BlobCommitments:
     properties:
       commitment:
-        $ref: '#/definitions/core.Commitment'
+        $ref: '#/definitions/core.G1Commitment'
       length:
         type: integer
+      length_commitment:
+        $ref: '#/definitions/core.G2Commitment'
       length_proof:
-        $ref: '#/definitions/core.Commitment'
+        $ref: '#/definitions/core.LengthProof'
     type: object
-  core.Commitment:
+  core.G1Commitment:
     properties:
       x:
         items:
           type: integer
         type: array
+    type: object
+  core.G2Commitment:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  core.LengthProof:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.SecurityParam:
     properties:
@@ -146,6 +158,22 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
+  dataapi.ServiceAvailability:
+    properties:
+      service_name:
+        type: string
+      service_status:
+        type: string
+    type: object
+  dataapi.ServiceAvailabilityResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dataapi.ServiceAvailability'
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
+    type: object
   dataapi.Throughput:
     properties:
       throughput:
@@ -167,12 +195,43 @@ definitions:
     - Failed
     - Finalized
     - InsufficientSignatures
+  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
+    properties:
+      a0:
+        items:
+          type: integer
+        type: array
+    type: object
 info:
   contact: {}
   description: This is the EigenDA Data Access API server.
   title: EigenDA Data Access API
   version: "1"
 paths:
+  /eigenda-services/service-availability:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Get status of public EigenDA services.
+      tags:
+      - OperatorsInfo
   /feed/blobs:
     get:
       parameters:
