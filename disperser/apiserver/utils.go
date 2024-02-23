@@ -1,30 +1,11 @@
 package apiserver
 
 import (
-	"context"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 )
-
-func (s *DispersalServer) updateQuorumCount(ctx context.Context) error {
-	currentBlock, err := s.tx.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return err
-	}
-	count, err := s.tx.GetQuorumCount(ctx, currentBlock)
-	if err != nil {
-		return err
-	}
-
-	s.logger.Debug("updating quorum count", "currentBlock", currentBlock, "count", count)
-	s.mu.Lock()
-	s.quorumCount = count
-	s.mu.Unlock()
-	return nil
-}
 
 func getResponseStatus(status disperser.BlobStatus) pb.BlobStatus {
 	switch status {
