@@ -97,7 +97,7 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 
 	for i, s := range samples {
 		if (s == nil) != zeroEval[i].IsZero() {
-			panic("bad zero eval")
+			return nil, fmt.Errorf("bad zero eval")
 		}
 	}
 

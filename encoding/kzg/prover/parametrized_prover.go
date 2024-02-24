@@ -26,8 +26,7 @@ type ParametrizedProver struct {
 
 	Fs         *fft.FFTSettings
 	Ks         *kzg.KZGSettings
-	SFs        *fft.FFTSettings // fft used for submatrix product helper
-	FFTPoints  [][]bn254.G1Affine
+	SFs        *fft.FFTSettings   // fft used for submatrix product helper
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 }
 
@@ -85,21 +84,11 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyDegreePlus1:]
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
-	//lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
 	var lowDegreeProof bn254.G2Affine
 	_, err = lowDegreeProof.MultiExp(shiftedSecret, poly.Coeffs, config)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-
-	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
-	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
-	//if !ok {
-	//		log.Printf("Kzg FFT Cannot Verify low degree proof %v", lowDegreeProof)
-	//		return nil, nil, nil, nil, errors.New("cannot verify low degree proof")
-	//	} else {
-	//		log.Printf("Kzg FFT Verify low degree proof  PPPASSS %v", lowDegreeProof)
-	//	}
 
 	if g.Verbose {
 		log.Printf("    Generating Low Degree Proof takes  %v\n", time.Since(intermediate))
@@ -164,7 +153,7 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 	}
 	close(jobChan)
 
-	// return only first error
+	// return last error
 	var err error
 	for w := uint64(0); w < numWorker; w++ {
 		wr := <-results
@@ -179,15 +168,13 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 
 	t0 := time.Now()
 
-	msmErrors := make(chan error, dimE*2)
-
 	// compute proof by multi scaler mulplication
+	msmErrors := make(chan error, dimE*2)
 	for i := uint64(0); i < dimE*2; i++ {
 
 		go func(k uint64) {
-			//sumVec[k] = *bls.LinCombG1(p.FFTPointsT[k], coeffStore[k])
 			_, err := sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
-			// to do handle error
+			// handle error
 			msmErrors <- err
 		}(i)
 	}
@@ -195,7 +182,7 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 	for i := uint64(0); i < dimE*2; i++ {
 		err := <-msmErrors
 		if err != nil {
-			fmt.Println("MSM while adding points", err)
+			fmt.Println("Error. MSM while adding points", err)
 			return nil, err
 		}
 	}

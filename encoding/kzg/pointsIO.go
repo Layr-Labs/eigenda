@@ -240,7 +240,7 @@ func readG1Worker(
 		_, err := outs[i].SetBytes(g1[:])
 		if err != nil {
 			results <- err
-			panic(err)
+			return
 		}
 	}
 	results <- nil
@@ -260,7 +260,7 @@ func readG2Worker(
 		if err != nil {
 			results <- err
 			log.Println("Unmarshalling error:", err)
-			panic(err)
+			return
 		}
 	}
 	results <- nil

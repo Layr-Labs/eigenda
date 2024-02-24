@@ -34,9 +34,7 @@ package fft
 import (
 	"log"
 
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	//"github.com/protolambda/go-kzg/bls"
 )
 
 type ZeroPolyFn func(missingIndices []uint64, length uint64) ([]fr.Element, []fr.Element, error)
@@ -44,7 +42,7 @@ type ZeroPolyFn func(missingIndices []uint64, length uint64) ([]fr.Element, []fr
 func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, domainStride uint64) error {
 	if len(dst) < len(indices)+1 {
 		log.Printf("expected bigger destination length: %d, got: %d", len(indices)+1, len(dst))
-		return encoding.ErrInvalidDestinationLength
+		return ErrInvalidDestinationLength
 	}
 	// zero out the unused slots
 	for i := len(indices) + 1; i < len(dst); i++ {
@@ -102,28 +100,28 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 	n := uint64(len(dst))
 	if !IsPowerOfTwo(n) {
 		log.Println("destination must be a power of two")
-		return nil, encoding.ErrDestNotPowerOfTwo
+		return nil, ErrDestNotPowerOfTwo
 	}
 	if len(ps) == 0 {
 		log.Println("empty leaves")
-		return nil, encoding.ErrEmptyLeaves
+		return nil, ErrEmptyLeaves
 	}
 	// The degree of the output polynomial is the sum of the degrees of the input polynomials.
 	outDegree := uint64(0)
 	for _, p := range ps {
 		if len(p) == 0 {
 			log.Println("empty input poly")
-			return nil, encoding.ErrEmptyPoly
+			return nil, ErrEmptyPoly
 		}
 		outDegree += uint64(len(p)) - 1
 	}
 	if min := outDegree + 1; min > n {
 		log.Printf("expected larger destination length: %d, got: %d", min, n)
-		return nil, encoding.ErrInvalidDestinationLength
+		return nil, ErrInvalidDestinationLength
 	}
 	if uint64(len(scratch)) < 3*n {
 		log.Println("not enough scratch space")
-		return nil, encoding.ErrNotEnoughScratch
+		return nil, ErrNotEnoughScratch
 	}
 	// Split `scratch` up into three equally sized working arrays
 	pPadded := scratch[:n]
@@ -169,11 +167,11 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	}
 	if length > fs.MaxWidth {
 		log.Println("domain too small for requested length")
-		return nil, nil, encoding.ErrDomainTooSmall
+		return nil, nil, ErrDomainTooSmall
 	}
 	if !IsPowerOfTwo(length) {
 		log.Println("length not a power of two")
-		return nil, nil, encoding.ErrLengthNotPowerOfTwo
+		return nil, nil, ErrLengthNotPowerOfTwo
 	}
 	domainStride := fs.MaxWidth / length
 	perLeafPoly := uint64(64)
@@ -268,7 +266,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 		zeroPoly = append(zeroPoly, make([]fr.Element, length-zl)...)
 	} else if zl > length {
 		log.Println("expected output smaller or equal to input length")
-		return nil, nil, encoding.ErrZeroPolyTooLarge
+		return nil, nil, ErrZeroPolyTooLarge
 	}
 
 	zeroEval, err := fs.FFT(zeroPoly, false)

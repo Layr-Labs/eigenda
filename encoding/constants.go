@@ -1,8 +1,9 @@
 package encoding
 
 import (
-  "github.com/consensys/gnark-crypto/ecc/bn254/fr"
-  "fmt"
+	"fmt"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 const BYTES_PER_COEFFICIENT = 31
@@ -13,11 +14,11 @@ func init() {
 
 func ToFr(v string) fr.Element {
 	var out fr.Element
-  _, err := out.SetString(v)
-  if err != nil {
-    fmt.Println("Failed to init Root of Unity")
-    panic(err)
-  }
+	_, err := out.SetString(v)
+	if err != nil {
+		fmt.Println("Failed to initialize Root of Unity")
+		panic(err)
+	}
 	return out
 }
 

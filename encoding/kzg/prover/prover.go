@@ -216,6 +216,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 			fftPointsT[i][j] = fftPoints[j][i]
 		}
 	}
+	_ = fftPoints
 	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
 	if encoder.ChunkLength == 1 {
 		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
@@ -238,7 +239,6 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		Fs:         fs,
 		Ks:         ks,
 		SFs:        sfs,
-		FFTPoints:  fftPoints,
 		FFTPointsT: fftPointsT,
 	}, nil
 }

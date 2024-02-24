@@ -219,12 +219,6 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 		log.Println("TableReaderThreads.ERR.0", err)
 		return nil, err
 	}
-	//todo: resolve panic
-	defer func() {
-		if err := g1f.Close(); err != nil {
-			panic(err)
-		}
-	}()
 
 	// 2 due to circular FFT  mul
 	subTableSize := dimE * 2 * kzg.G1PointBytes
@@ -268,6 +262,11 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 	}
 	close(jobChan)
 	wg.Wait()
+
+	if err := g1f.Close(); err != nil {
+		return nil, err
+	}
+
 	return fftPoints, nil
 }
 
@@ -327,5 +326,8 @@ func (p *SRSTable) TableWriter(fftPoints [][]bn254.G1Affine, dimE uint64, filePa
 		log.Println("TableWriter.ERR.4", err)
 		return err
 	}
-	return nil
+
+	err = wf.Close()
+
+	return err
 }

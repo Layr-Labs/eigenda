@@ -297,21 +297,3 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 
 	return PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
 }
-
-func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
-	var negB1 bn254.G1Affine
-	negB1.Neg((*bn254.G1Affine)(b1))
-
-	P := [2]bn254.G1Affine{*(*bn254.G1Affine)(a1), negB1}
-	Q := [2]bn254.G2Affine{*(*bn254.G2Affine)(a2), *(*bn254.G2Affine)(b2)}
-
-	ok, err := bn254.PairingCheck(P[:], Q[:])
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("PairingCheck pairing not ok. SRS is invalid")
-	}
-
-	return nil
-}

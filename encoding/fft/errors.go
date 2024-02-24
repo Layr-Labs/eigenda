@@ -22,14 +22,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package encoding
+package fft
 
 import (
 	"errors"
 )
 
-var ErrFrListTooLarge = errors.New("ErrFrListTooLarge")
-var ErrG1ListTooLarge = errors.New("ErrG1ListTooLarge")
 var ErrZeroPolyTooLarge = errors.New("ErrZeroPolyTooLarge")
 var ErrDestNotPowerOfTwo = errors.New("ErrDestNotPowerOfTwo")
 var ErrEmptyLeaves = errors.New("ErrEmptyLeaves")

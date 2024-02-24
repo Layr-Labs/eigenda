@@ -149,17 +149,3 @@ func (fs *FFTSettings) FFTG1(vals []bn254.G1Affine, inv bool) ([]bn254.G1Affine,
 		return out, nil
 	}
 }
-
-// rearrange G1 elements in reverse bit order. Supports 2**31 max element count.
-//func reverseBitOrderG1(values []bn254.G1Affine) error {
-//	if len(values) > (1 << 31) {
-//		return ErrG1ListTooLarge
-//	}
-//	var tmp bn254.G1Affine
-//	reverseBitOrder(uint32(len(values)), func(i, j uint32) {
-//		tmp.Set(&values[i])
-//		values[i].Set(&values[j])
-//		values[j].Set(&tmp)
-//	})
-//	return nil
-//}

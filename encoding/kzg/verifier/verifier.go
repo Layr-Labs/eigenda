@@ -231,16 +231,12 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 		return err
 	}
 
-	if !VerifyFrame(f, v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn) {
-		return errors.New("multireveal proof fails")
-	}
-
-	return nil
+	return VerifyFrame(f, v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn)
 
 }
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
-func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine) bool {
+func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine) error {
 	var xPow fr.Element
 	xPow.SetOne()
 
@@ -266,7 +262,7 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 	config := ecc.MultiExpConfig{}
 	_, err := is1.MultiExp(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs, config)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
@@ -281,9 +277,7 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	err = PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &f.Proof, &xnMinusYn)
-
-	return err == nil
+	return PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &f.Proof, &xnMinusYn)
 }
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
@@ -309,4 +303,22 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 		res[i] = uint64(d)
 	}
 	return res
+}
+
+func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
+	var negB1 bn254.G1Affine
+	negB1.Neg((*bn254.G1Affine)(b1))
+
+	P := [2]bn254.G1Affine{*(*bn254.G1Affine)(a1), negB1}
+	Q := [2]bn254.G2Affine{*(*bn254.G2Affine)(a2), *(*bn254.G2Affine)(b2)}
+
+	ok, err := bn254.PairingCheck(P[:], Q[:])
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("PairingCheck pairing not ok. SRS is invalid")
+	}
+
+	return nil
 }

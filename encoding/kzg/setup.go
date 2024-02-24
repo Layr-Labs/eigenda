@@ -66,87 +66,6 @@ func GenerateTestingSetup(secret string, n uint64) ([]bn254.G1Affine, []bn254.G2
 	return s1Out, s2Out, nil
 }
 
-// func ReadGeneatorPoints(n uint64, g1FilePath, g2FilePath string) ([]bn254.G1Affine, []bn254.G2Affine, error) {
-// 	g1f, err := os.Open(g1FilePath)
-// 	if err != nil {
-// 		log.Println("ReadGeneatorPoints.ERR.0", err)
-// 		return nil, nil, err
-// 	}
-// 	g2f, err := os.Open(g2FilePath)
-// 	if err != nil {
-// 		log.Println("ReadGeneatorPoints.ERR.1", err)
-// 		return nil, nil, err
-// 	}
-// 	//todo: handle panic
-// 	defer func() {
-// 		if err := g1f.Close(); err != nil {
-// 			panic(err)
-// 		}
-// 		if err := g2f.Close(); err != nil {
-// 			panic(err)
-// 		}
-// 	}()
-
-// 	start := time.Now()
-// 	g1r := bufio.NewReaderSize(g1f, int(n*64))
-// 	g2r := bufio.NewReaderSize(g2f, int(n*128))
-
-// 	g1Bytes, _, err := g1r.ReadLine()
-// 	if err != nil {
-// 		log.Println("ReadGeneatorPoints.ERR.2", err)
-// 		return nil, nil, err
-// 	}
-
-// 	g2Bytes, _, err := g2r.ReadLine()
-// 	if err != nil {
-// 		log.Println("ReadGeneatorPoints.ERR.3", err)
-// 		return nil, nil, err
-// 	}
-
-// 	if uint64(len(g1Bytes)) < 64*n {
-// 		log.Printf("Error. Insufficient G1 points. Only contains %v. Requesting %v\n", len(g1Bytes)/64, n)
-// 		log.Println()
-// 		log.Println("ReadGeneatorPoints.ERR.4", err)
-// 		return nil, nil, err
-// 	}
-// 	if uint64(len(g2Bytes)) < 128*n {
-// 		log.Printf("Error. Insufficient G2 points. Only contains %v. Requesting %v\n", len(g1Bytes)/128, n)
-// 		log.Println()
-// 		log.Println("ReadGeneatorPoints.ERR.5", err)
-// 		return nil, nil, err
-// 	}
-
-// 	// measure reading time
-// 	t := time.Now()
-// 	elapsed := t.Sub(start)
-// 	fmt.Println("    Reading G1 G2 raw points takes", elapsed)
-// 	start = time.Now()
-
-// 	s1Outs := make([]bn254.G1Affine, n, n)
-// 	s2Outs := make([]bn254.G2Affine, n, n)
-// 	for i := uint64(0); i < n; i++ {
-// 		g1 := g1Bytes[i*64 : (i+1)*128]
-// 		err := s1Outs[i].UnmarshalText(g1[:])
-// 		if err != nil {
-// 			log.Println("ReadGeneatorPoints.ERR.6", err)
-// 			return nil, nil, err
-// 		}
-
-// 		g2 := g2Bytes[i*128 : (i+1)*128]
-// 		err = s2Outs[i].UnmarshalText(g2[:])
-// 		if err != nil {
-// 			log.Println("ReadGeneatorPoints.ERR.7", err)
-// 			return nil, nil, err
-// 		}
-// 	}
-
-// 	// measure parsing time
-// 	t = time.Now()
-// 	elapsed = t.Sub(start)
-// 	fmt.Println("    Parsing G1 G2 to crypto data struct takes", elapsed)
-// 	return s1Outs, s2Outs, nil
-// }
-
 func WriteGeneratorPoints(n uint64) error {
 	secret := "1927409816240961209460912649125"
 	ns := strconv.Itoa(int(n))
@@ -198,11 +117,7 @@ func WriteGeneratorPoints(n uint64) error {
 			log.Println("WriteGeneratorPoints.ERR.5", err)
 			return err
 		}
-
-		//var tmp fr.Element
 		sPow.Mul(&sPow, &s)
-		//bls.CopyFr(&tmp, &sPow)
-		//bls.MulModFr(&sPow, &tmp, &s)
 	}
 
 	if err = g1w.Flush(); err != nil {
