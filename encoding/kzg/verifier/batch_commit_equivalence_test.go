@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	
+
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +40,7 @@ func TestBatchEquivalence(t *testing.T) {
 
 	var modifiedCommit bn254.G1Affine
 	modifiedCommit.Add(commit, commit)
-	
+
 	for z := 0; z < numBlob; z++ {
 		commitPairs[z] = verifier.CommitmentPair{
 			Commitment:       modifiedCommit,
@@ -56,7 +56,6 @@ func TestBatchEquivalence(t *testing.T) {
 			LengthCommitment: *g2commit,
 		}
 	}
-
 
 	commitPairs[numBlob/2].Commitment.Add(&commitPairs[numBlob/2].Commitment, &commitPairs[numBlob/2].Commitment)
 

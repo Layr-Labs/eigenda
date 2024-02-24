@@ -22,47 +22,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:build !bignum_pure && !bignum_hol256
-// +build !bignum_pure,!bignum_hol256
-
-package kzgrs
+package kzg
 
 import (
-	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type KZGSettings struct {
-	*fft.FFTSettings
+type SRS struct {
 
-	Srs *SRS
-	// setup values
+	// [b.multiply(b.G1, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
+	G1 []bn254.G1Affine
+	// [b.multiply(b.G2, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
+	G2 []bn254.G2Affine
 }
 
-func NewKZGSettings(fs *fft.FFTSettings, srs *SRS) (*KZGSettings, error) {
+func NewSrs(G1 []bn254.G1Affine, G2 []bn254.G2Affine) (*SRS, error) {
 
-	ks := &KZGSettings{
-		FFTSettings: fs,
-		Srs:         srs,
-	}
-
-	return ks, nil
-}
-
-// KZG commitment to polynomial in coefficient form
-func (ks *KZGSettings) CommitToPoly(coeffs []fr.Element) (*bn254.G1Affine, error) {
-	var commit bn254.G1Affine
-	_, err := commit.MultiExp(ks.Srs.G1[:len(coeffs)], coeffs, ecc.MultiExpConfig{})
-	return &commit, err
-}
-
-func HashToSingleField(dst *fr.Element, msg []byte) error {
-	DST := []byte("-")
-	randomFr, err := fr.Hash(msg, DST, 1)
-	randomFrBytes := (randomFr[0]).Bytes()
-	//FrSetBytes(dst, randomFrBytes[:])
-	dst.SetBytes(randomFrBytes[:])
-	return err
+	return &SRS{
+		G1: G1,
+		G2: G2,
+	}, nil
 }

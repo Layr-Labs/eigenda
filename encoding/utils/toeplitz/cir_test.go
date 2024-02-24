@@ -62,6 +62,6 @@ func TestHadamard_InvalidDimension(t *testing.T) {
 
 	// c = make([]fr.Element, 1)
 	// fmt.Println(len(a), len(b), len(c))
-	// err = kzgRs.Hadamard(a, b, c)
+	// err = kzg.Hadamard(a, b, c)
 	// require.Nil(t, err)
 }

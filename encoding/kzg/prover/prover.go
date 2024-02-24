@@ -13,7 +13,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
@@ -21,8 +21,8 @@ import (
 )
 
 type Prover struct {
-	*kzgrs.KzgConfig
-	Srs          *kzgrs.SRS
+	*kzg.KzgConfig
+	Srs          *kzg.SRS
 	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
 	LoadG2Points bool
@@ -32,14 +32,14 @@ type Prover struct {
 
 var _ encoding.Prover = &Prover{}
 
-func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
+func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
 	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := kzgrs.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
+	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
 		log.Println("failed to read G1 points", err)
 		return nil, err
@@ -54,13 +54,13 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
 		}
 
-		s2, err = kzgrs.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
+		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
 			return nil, err
 		}
 
-		g2Trailing, err = kzgrs.ReadG2PointSection(
+		g2Trailing, err = kzg.ReadG2PointSection(
 			config.G2Path,
 			config.SRSOrder-config.SRSNumberToLoad,
 			config.SRSOrder, // last exclusive
@@ -76,7 +76,7 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 		}
 	}
 
-	srs, err := kzgrs.NewSrs(s1, s2)
+	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
 		log.Println("Could not create srs", err)
 		return nil, err
@@ -222,7 +222,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 	fs := fft.NewFFTSettings(n)
 
-	ks, err := kzgrs.NewKZGSettings(fs, g.Srs)
+	ks, err := kzg.NewKZGSettings(fs, g.Srs)
 	if err != nil {
 		return nil, err
 	}

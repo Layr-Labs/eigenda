@@ -1,4 +1,4 @@
-package kzgrs
+package kzg
 
 import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"

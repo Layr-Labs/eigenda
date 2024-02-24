@@ -1,4 +1,4 @@
-package kzgrs
+package kzg
 
 import (
 	"bufio"

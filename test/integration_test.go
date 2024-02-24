@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
@@ -80,7 +80,7 @@ func init() {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 
-	config := &kzgrs.KzgConfig{
+	config := &kzg.KzgConfig{
 		G1Path:          "../inabox/resources/kzg/g1.point",
 		G2Path:          "../inabox/resources/kzg/g2.point",
 		CacheDir:        "../inabox/resources/kzg/SRSTables",

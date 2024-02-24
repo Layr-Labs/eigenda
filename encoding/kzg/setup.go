@@ -25,7 +25,7 @@
 //go:build !bignum_pure && !bignum_hol256
 // +build !bignum_pure,!bignum_hol256
 
-package kzgrs
+package kzg
 
 import (
 	"math/big"

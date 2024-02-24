@@ -1,4 +1,4 @@
-package kzgrs
+package kzg
 
 type KzgConfig struct {
 	G1Path          string

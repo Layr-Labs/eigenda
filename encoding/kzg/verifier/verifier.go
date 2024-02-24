@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/consensys/gnark-crypto/ecc"
@@ -21,8 +21,8 @@ import (
 )
 
 type Verifier struct {
-	*kzgrs.KzgConfig
-	Srs          *kzgrs.SRS
+	*kzg.KzgConfig
+	Srs          *kzg.SRS
 	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
 	LoadG2Points bool
@@ -32,14 +32,14 @@ type Verifier struct {
 
 var _ encoding.Verifier = &Verifier{}
 
-func NewVerifier(config *kzgrs.KzgConfig, loadG2Points bool) (*Verifier, error) {
+func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
 	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := kzgrs.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
+	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
 		log.Println("failed to read G1 points", err)
 		return nil, err
@@ -54,13 +54,13 @@ func NewVerifier(config *kzgrs.KzgConfig, loadG2Points bool) (*Verifier, error) 
 			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
 		}
 
-		s2, err = kzgrs.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
+		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
 			return nil, err
 		}
 
-		g2Trailing, err = kzgrs.ReadG2PointSection(
+		g2Trailing, err = kzg.ReadG2PointSection(
 			config.G2Path,
 			config.SRSOrder-config.SRSNumberToLoad,
 			config.SRSOrder, // last exclusive
@@ -76,7 +76,7 @@ func NewVerifier(config *kzgrs.KzgConfig, loadG2Points bool) (*Verifier, error) 
 		}
 	}
 
-	srs, err := kzgrs.NewSrs(s1, s2)
+	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
 		log.Println("Could not create srs", err)
 		return nil, err
@@ -97,13 +97,13 @@ func NewVerifier(config *kzgrs.KzgConfig, loadG2Points bool) (*Verifier, error) 
 }
 
 type ParametrizedVerifier struct {
-	*kzgrs.KzgConfig
-	Srs *kzgrs.SRS
+	*kzg.KzgConfig
+	Srs *kzg.SRS
 
 	*rs.Encoder
 
 	Fs *fft.FFTSettings
-	Ks *kzgrs.KZGSettings
+	Ks *kzg.KZGSettings
 }
 
 func (g *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
@@ -141,7 +141,7 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
-	ks, err := kzgrs.NewKZGSettings(fs, g.Srs)
+	ks, err := kzg.NewKZGSettings(fs, g.Srs)
 
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 // we leave it as a method of the KzgEncoderGroup
 func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn254.G2Affine, length uint64) error {
 
-	g1Challenge, err := kzgrs.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
+	g1Challenge, err := kzg.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
 func VerifyLowDegreeProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) bool {
-	return PairingsVerify(g1Challenge, lengthCommit, &kzgrs.GenG1, proof) == nil
+	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof) == nil
 }
 
 func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
@@ -226,7 +226,7 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 		return err
 	}
 
-	g2Atn, err := kzgrs.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 }
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
-func VerifyFrame(f *encoding.Frame, ks *kzgrs.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine) bool {
+func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine) bool {
 	var xPow fr.Element
 	xPow.SetOne()
 
@@ -253,7 +253,7 @@ func VerifyFrame(f *encoding.Frame, ks *kzgrs.KZGSettings, commitment *bn254.G1A
 	// [x^n]_2
 	var xn2 bn254.G2Affine
 
-	xn2.ScalarMultiplication(&kzgrs.GenG2, xPow.BigInt(&xPowBigInt))
+	xn2.ScalarMultiplication(&kzg.GenG2, xPow.BigInt(&xPowBigInt))
 
 	// [s^n - x^n]_2
 	var xnMinusYn bn254.G2Affine
@@ -281,7 +281,7 @@ func VerifyFrame(f *encoding.Frame, ks *kzgrs.KZGSettings, commitment *bn254.G1A
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	err = PairingsVerify(&commitMinusInterpolation, &kzgrs.GenG2, &f.Proof, &xnMinusYn)
+	err = PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &f.Proof, &xnMinusYn)
 
 	return err == nil
 }
