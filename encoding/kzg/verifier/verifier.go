@@ -176,11 +176,12 @@ func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn
 		return err
 	}
 
-	if !VerifyLowDegreeProof(lengthCommit, lowDegreeProof, &g1Challenge) {
-		return errors.New("low degree proof fails")
+	err = VerifyLowDegreeProof(lengthCommit, lowDegreeProof, &g1Challenge)
+	if err != nil {
+		return fmt.Errorf("%v . %v ", "low degree proof fails", err)
+	} else {
+		return nil
 	}
-	return nil
-
 }
 
 // The function verify low degree proof against a poly commitment
@@ -189,8 +190,8 @@ func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn
 // proof = commit(shiftedPoly) on G1
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLowDegreeProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) bool {
-	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof) == nil
+func VerifyLowDegreeProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
+	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
 func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
@@ -231,8 +232,13 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 		return err
 	}
 
-	return VerifyFrame(f, v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn)
+	err = VerifyFrame(f, v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn)
 
+	if err != nil {
+		return fmt.Errorf("%v . %v ", "VerifyFrame Error", err)
+	} else {
+		return nil
+	}
 }
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly

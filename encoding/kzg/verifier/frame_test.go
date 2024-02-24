@@ -41,5 +41,5 @@ func TestVerify(t *testing.T) {
 
 	g2Atn, err := kzg.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
 	require.Nil(t, err)
-	assert.True(t, verifier.VerifyFrame(&frames[0], enc.Ks, commit, &lc, &g2Atn))
+	assert.Nil(t, verifier.VerifyFrame(&frames[0], enc.Ks, commit, &lc, &g2Atn))
 }

@@ -117,8 +117,8 @@ func TestKzgRs() {
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}
-		ok := verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
-		if !ok {
+		err = verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
+		if err != nil {
 			log.Fatalf("Proof %v failed\n", i)
 		}
 	}
