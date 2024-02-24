@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -21,12 +22,12 @@ type ParametrizedProver struct {
 	*rs.Encoder
 
 	*kzgrs.KzgConfig
-	Srs        *kzg.SRS
+	Srs        *kzgrs.SRS
 	G2Trailing []bn254.G2Affine
 
-	Fs         *kzg.FFTSettings
-	Ks         *kzg.KZGSettings
-	SFs        *kzg.FFTSettings // fft used for submatrix product helper
+	Fs         *fft.FFTSettings
+	Ks         *kzgrs.KZGSettings
+	SFs        *fft.FFTSettings // fft used for submatrix product helper
 	FFTPoints  [][]bn254.G1Affine
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 }

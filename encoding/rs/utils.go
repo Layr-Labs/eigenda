@@ -4,23 +4,20 @@ import (
 	"errors"
 	"math"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-const (
-	BYTES_PER_COEFFICIENT = 31
-)
-
 func ToFrArray(data []byte) []fr.Element {
 	//numEle := int(math.Ceil(float64(len(data)) / float64(BYTES_PER_COEFFICIENT)))
-	numEle := GetNumElement(uint64(len(data)), BYTES_PER_COEFFICIENT)
+	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
 	eles := make([]fr.Element, numEle)
 
 	for i := uint64(0); i < numEle; i++ {
-		start := i * uint64(BYTES_PER_COEFFICIENT)
-		end := (i + 1) * uint64(BYTES_PER_COEFFICIENT)
+		start := i * uint64(encoding.BYTES_PER_COEFFICIENT)
+		end := (i + 1) * uint64(encoding.BYTES_PER_COEFFICIENT)
 		if end >= uint64(len(data)) {
 			var padded [31]byte
 			copy(padded[:], data[start:])
@@ -38,15 +35,15 @@ func ToFrArray(data []byte) []fr.Element {
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)
 	dataSize := int(math.Min(
-		float64(n*BYTES_PER_COEFFICIENT),
+		float64(n*encoding.BYTES_PER_COEFFICIENT),
 		float64(maxDataSize),
 	))
 	data := make([]byte, dataSize)
 	for i := 0; i < n; i++ {
 		v := dataFr[i].Bytes()
 
-		start := i * BYTES_PER_COEFFICIENT
-		end := (i + 1) * BYTES_PER_COEFFICIENT
+		start := i * encoding.BYTES_PER_COEFFICIENT
+		end := (i + 1) * encoding.BYTES_PER_COEFFICIENT
 
 		if uint64(end) > maxDataSize {
 			copy(data[start:maxDataSize], v[1:])

@@ -25,7 +25,7 @@
 //go:build !bignum_pure && !bignum_hol256
 // +build !bignum_pure,!bignum_hol256
 
-package kzg
+package fft
 
 import (
 	"fmt"
@@ -104,10 +104,6 @@ func (fs *FFTSettings) _fftG1(vals []bn254.G1Affine, valsOffset uint64, valsStri
 	}
 }
 
-func IsPowerOfTwo(v uint64) bool {
-	return v&(v-1) == 0
-}
-
 func (fs *FFTSettings) FFTG1(vals []bn254.G1Affine, inv bool) ([]bn254.G1Affine, error) {
 	n := uint64(len(vals))
 	if n > fs.MaxWidth {
@@ -155,19 +151,15 @@ func (fs *FFTSettings) FFTG1(vals []bn254.G1Affine, inv bool) ([]bn254.G1Affine,
 }
 
 // rearrange G1 elements in reverse bit order. Supports 2**31 max element count.
-func reverseBitOrderG1(values []bn254.G1Affine) error {
-	if len(values) > (1 << 31) {
-		return ErrG1ListTooLarge
-	}
-	var tmp bn254.G1Affine
-	reverseBitOrder(uint32(len(values)), func(i, j uint32) {
-		tmp.Set(&values[i])
-		values[i].Set(&values[j])
-		values[j].Set(&tmp)
-
-		//bls.CopyG1(&tmp, &values[i])
-		//bls.CopyG1(&values[i], &values[j])
-		//bls.CopyG1(&values[j], &tmp)
-	})
-	return nil
-}
+//func reverseBitOrderG1(values []bn254.G1Affine) error {
+//	if len(values) > (1 << 31) {
+//		return ErrG1ListTooLarge
+//	}
+//	var tmp bn254.G1Affine
+//	reverseBitOrder(uint32(len(values)), func(i, j uint32) {
+//		tmp.Set(&values[i])
+//		values[i].Set(&values[j])
+//		values[j].Set(&tmp)
+//	})
+//	return nil
+//}

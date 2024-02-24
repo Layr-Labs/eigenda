@@ -1,17 +1,25 @@
-package kzg
+package encoding
 
 import (
-	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+  "github.com/consensys/gnark-crypto/ecc/bn254/fr"
+  "fmt"
 )
+
+const BYTES_PER_COEFFICIENT = 31
+
+func init() {
+	initGlobals()
+}
 
 func ToFr(v string) fr.Element {
 	var out fr.Element
-	out.SetString(v)
+  _, err := out.SetString(v)
+  if err != nil {
+    fmt.Println("Failed to init Root of Unity")
+    panic(err)
+  }
 	return out
 }
-
-const BYTES_PER_COEFFICIENT = 31
 
 var Scale2RootOfUnity []fr.Element
 var ZERO, ONE, TWO fr.Element
@@ -59,73 +67,4 @@ func initGlobals() {
 	MODULUS_MINUS1_DIV2.Div(&MODULUS_MINUS1, &TWO)
 	MODULUS_MINUS2.Sub(&ZERO, &TWO)
 	INVERSE_TWO.Inverse(&TWO)
-}
-
-func init() {
-	initGlobals()
-	initG1G2()
-}
-
-var ZERO_G1 bn254.G1Affine
-var ZERO_G2 bn254.G2Affine
-
-var GenG1 bn254.G1Affine
-var GenG2 bn254.G2Affine
-
-var ZeroG1 bn254.G1Affine
-var ZeroG2 bn254.G2Affine
-
-//var InfG1 G1Point
-//var InfG2 G2Point
-
-func initG1G2() {
-
-	_, _, genG1, genG2 := bn254.Generators()
-
-	GenG1 = *(*bn254.G1Affine)(&genG1)
-	GenG2 = *(*bn254.G2Affine)(&genG2)
-
-	var g1Jac bn254.G1Jac
-	g1Jac.X.SetZero()
-	g1Jac.Y.SetOne()
-	g1Jac.Z.SetZero()
-
-	var g1Aff bn254.G1Affine
-	g1Aff.FromJacobian(&g1Jac)
-	ZeroG1 = *(*bn254.G1Affine)(&g1Aff)
-
-	var g2Jac bn254.G2Jac
-	g2Jac.X.SetZero()
-	g2Jac.Y.SetOne()
-	g2Jac.Z.SetZero()
-	var g2Aff bn254.G2Affine
-	g2Aff.FromJacobian(&g2Jac)
-	ZeroG2 = *(*bn254.G2Affine)(&g2Aff)
-}
-
-func EvalPolyAt(dst *fr.Element, coeffs []fr.Element, x *fr.Element) {
-	if len(coeffs) == 0 {
-		//CopyFr(dst, &ZERO)
-		dst.SetZero()
-		return
-	}
-	if x.IsZero() {
-		//CopyFr(dst, &coeffs[0])
-		dst.Set(&coeffs[0])
-		return
-	}
-	// Horner's method: work backwards, avoid doing more than N multiplications
-	// https://en.wikipedia.org/wiki/Horner%27s_method
-	var last fr.Element
-	//CopyFr(&last, &coeffs[len(coeffs)-1])
-	last.Set(&coeffs[len(coeffs)-1])
-	var tmp fr.Element
-	for i := len(coeffs) - 2; i >= 0; i-- {
-		tmp.Mul(&last, x)
-		//MulModFr(&tmp, &last, x)
-		//AddModFr(&last, &tmp, &coeffs[i])
-		last.Add(&tmp, &coeffs[i])
-	}
-	//CopyFr(dst, &last)
-	dst.Set(&last)
 }

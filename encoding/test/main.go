@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/pkg/kzg"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -45,7 +44,7 @@ func readpoints() {
 
 		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].String()))
 	}
-	if kzgGroup.Srs.G1[0].X == kzg.GenG1.X && kzgGroup.Srs.G1[0].Y == kzg.GenG1.Y {
+	if kzgGroup.Srs.G1[0].X == kzgrs.GenG1.X && kzgGroup.Srs.G1[0].Y == kzgrs.GenG1.Y {
 		fmt.Println("start with gen")
 	}
 }

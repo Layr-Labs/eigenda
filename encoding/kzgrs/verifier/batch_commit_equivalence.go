@@ -6,7 +6,8 @@ import (
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -40,7 +41,7 @@ func GenRandomFactorForEquivalence(g1commits []bn254.G1Affine, g2commits []bn254
 
 	var randomFr fr.Element
 
-	err := kzg.HashToSingleField(&randomFr, buffer.Bytes())
+	err := kzgrs.HashToSingleField(&randomFr, buffer.Bytes())
 	if err != nil {
 		return fr.Element{}, err
 	}
@@ -102,12 +103,12 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 	lhsG1.MultiExp(g1commits, randomsFr, ecc.MultiExpConfig{})
 
 	//lhsG1 := bn254.LinCombG1(g1commits, randomsFr)
-	lhsG2 := &kzg.GenG2
+	lhsG2 := &kzgrs.GenG2
 
 	//rhsG2 := bn254.LinCombG2(g2commits, randomsFr)
 	var rhsG2 bn254.G2Affine
 	rhsG2.MultiExp(g2commits, randomsFr, ecc.MultiExpConfig{})
-	rhsG1 := &kzg.GenG1
+	rhsG1 := &kzgrs.GenG1
 
 	err = PairingsVerify(&lhsG1, lhsG2, rhsG1, &rhsG2)
 	if err == nil {

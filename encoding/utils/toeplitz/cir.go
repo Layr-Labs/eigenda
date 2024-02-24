@@ -3,16 +3,16 @@ package toeplitz
 import (
 	"errors"
 
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type Circular struct {
 	V  []fr.Element
-	Fs *kzg.FFTSettings
+	Fs *fft.FFTSettings
 }
 
-func NewCircular(v []fr.Element, fs *kzg.FFTSettings) *Circular {
+func NewCircular(v []fr.Element, fs *fft.FFTSettings) *Circular {
 	return &Circular{
 		V:  v,
 		Fs: fs,

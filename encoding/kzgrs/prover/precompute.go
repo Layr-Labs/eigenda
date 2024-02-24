@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -141,7 +141,7 @@ func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker
 	// TODO, create function only read g1 points
 	//s1 := ReadG1Points(p.SrsFilePath, order)
 	n := uint8(math.Log2(float64(order)))
-	fs := kzg.NewFFTSettings(n)
+	fs := fft.NewFFTSettings(n)
 
 	fftPoints := make([][]bn254.G1Affine, l)
 
@@ -170,7 +170,7 @@ func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker
 	return fftPoints
 }
 
-func (p *SRSTable) precomputeWorker(fs *kzg.FFTSettings, m, dim, dimE uint64, jobChan <-chan uint64, l uint64, results chan DispatchReturn) {
+func (p *SRSTable) precomputeWorker(fs *fft.FFTSettings, m, dim, dimE uint64, jobChan <-chan uint64, l uint64, results chan DispatchReturn) {
 	for j := range jobChan {
 		dr, err := p.PrecomputeSubTable(fs, m, dim, dimE, j, l)
 		if err != nil {
@@ -181,19 +181,17 @@ func (p *SRSTable) precomputeWorker(fs *kzg.FFTSettings, m, dim, dimE uint64, jo
 	}
 }
 
-func (p *SRSTable) PrecomputeSubTable(fs *kzg.FFTSettings, m, dim, dimE, j, l uint64) (DispatchReturn, error) {
+func (p *SRSTable) PrecomputeSubTable(fs *fft.FFTSettings, m, dim, dimE, j, l uint64) (DispatchReturn, error) {
 	// there is a constant term
 	points := make([]bn254.G1Affine, 2*dimE)
 	k := m - l - j
 
 	for i := uint64(0); i < dim; i++ {
-		//bls.CopyG1(&points[i], &p.s1[k])
 		points[i].Set(&p.s1[k])
 		k -= l
 	}
 	for i := dim; i < 2*dimE; i++ {
-		points[i].Set(&kzg.ZERO_G1)
-		//bls.CopyG1(&points[i], &bls.ZeroG1)
+		points[i].Set(&kzgrs.ZeroG1)
 	}
 
 	y, err := fs.FFTG1(points, false)

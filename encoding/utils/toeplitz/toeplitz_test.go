@@ -3,8 +3,9 @@ package toeplitz_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +27,7 @@ func TestNewToeplitz(t *testing.T) {
 	v[4].SetInt64(int64(3))
 	v[5].SetInt64(int64(8))
 	v[6].SetInt64(int64(1))
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 
 	toe, err := toeplitz.NewToeplitz(v, fs)
 	require.Nil(t, err)
@@ -43,7 +44,7 @@ func TestNewToeplitz_InvalidSize(t *testing.T) {
 	v := make([]fr.Element, 2)
 	v[0].SetInt64(int64(4))
 	v[1].SetInt64(int64(2))
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 
 	_, err := toeplitz.NewToeplitz(v, fs)
 	assert.EqualError(t, err, "num diagonal vector must be odd")
@@ -63,7 +64,7 @@ func TestExtendCircularVec(t *testing.T) {
 	v[5].SetInt64(int64(8))
 	v[6].SetInt64(int64(1))
 
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 	c, err := toeplitz.NewToeplitz(v, fs)
 	require.Nil(t, err)
 
@@ -72,7 +73,7 @@ func TestExtendCircularVec(t *testing.T) {
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
 	assert.Equal(t, cVec[3], v[4])
-	assert.Equal(t, cVec[4], kzg.ZERO)
+	assert.Equal(t, cVec[4], encoding.ZERO)
 	assert.Equal(t, cVec[5], v[3])
 	assert.Equal(t, cVec[6], v[2])
 	assert.Equal(t, cVec[7], v[1])
@@ -91,7 +92,7 @@ func TestFromColVToRowV(t *testing.T) {
 	v[5].SetInt64(int64(8))
 	v[6].SetInt64(int64(1))
 
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 	c, err := toeplitz.NewToeplitz(v, fs)
 	require.Nil(t, err)
 
@@ -102,7 +103,7 @@ func TestFromColVToRowV(t *testing.T) {
 	assert.Equal(t, rVec[1], v[1])
 	assert.Equal(t, rVec[2], v[2])
 	assert.Equal(t, rVec[3], v[3])
-	assert.Equal(t, rVec[4], kzg.ZERO)
+	assert.Equal(t, rVec[4], encoding.ZERO)
 	assert.Equal(t, rVec[5], v[4])
 	assert.Equal(t, rVec[6], v[5])
 	assert.Equal(t, rVec[7], v[6])
@@ -113,7 +114,7 @@ func TestFromColVToRowV(t *testing.T) {
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
 	assert.Equal(t, cVec[3], v[4])
-	assert.Equal(t, cVec[4], kzg.ZERO)
+	assert.Equal(t, cVec[4], encoding.ZERO)
 	assert.Equal(t, cVec[5], v[3])
 	assert.Equal(t, cVec[6], v[2])
 	assert.Equal(t, cVec[7], v[1])
@@ -129,7 +130,7 @@ func TestMultiplyToeplitz(t *testing.T) {
 	v[5].SetInt64(int64(8))
 	v[6].SetInt64(int64(1))
 
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 	toe, err := toeplitz.NewToeplitz(v, fs)
 
 	require.Nil(t, err)

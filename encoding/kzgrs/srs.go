@@ -22,7 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package kzg
+package kzgrs
 
 import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"

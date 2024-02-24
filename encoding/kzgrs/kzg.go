@@ -22,21 +22,47 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package kzg
+//go:build !bignum_pure && !bignum_hol256
+// +build !bignum_pure,!bignum_hol256
+
+package kzgrs
 
 import (
-	"errors"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-var ErrFrListTooLarge = errors.New("ErrFrListTooLarge")
-var ErrG1ListTooLarge = errors.New("ErrG1ListTooLarge")
-var ErrZeroPolyTooLarge = errors.New("ErrZeroPolyTooLarge")
-var ErrDestNotPowerOfTwo = errors.New("ErrDestNotPowerOfTwo")
-var ErrEmptyLeaves = errors.New("ErrEmptyLeaves")
-var ErrEmptyPoly = errors.New("ErrEmptyPoly")
-var ErrNotEnoughScratch = errors.New("ErrNotEnoughScratch")
-var ErrInvalidDestinationLength = errors.New("ErrInvalidDestinationLength")
-var ErrDomainTooSmall = errors.New("ErrDomainTooSmall")
-var ErrLengthNotPowerOfTwo = errors.New("ErrLengthNotPowerOfTwo")
-var ErrInvalidPolyLengthTooLarge = errors.New("ErrInvalidPolyLengthTooLarge")
-var ErrInvalidPolyLengthPowerOfTwo = errors.New("ErrInvalidPolyLengthPowerOfTwo")
+type KZGSettings struct {
+	*fft.FFTSettings
+
+	Srs *SRS
+	// setup values
+}
+
+func NewKZGSettings(fs *fft.FFTSettings, srs *SRS) (*KZGSettings, error) {
+
+	ks := &KZGSettings{
+		FFTSettings: fs,
+		Srs:         srs,
+	}
+
+	return ks, nil
+}
+
+// KZG commitment to polynomial in coefficient form
+func (ks *KZGSettings) CommitToPoly(coeffs []fr.Element) *bn254.G1Affine {
+	var commit bn254.G1Affine
+	commit.MultiExp(ks.Srs.G1[:len(coeffs)], coeffs, ecc.MultiExpConfig{})
+	return &commit
+}
+
+func HashToSingleField(dst *fr.Element, msg []byte) error {
+	DST := []byte("-")
+	randomFr, err := fr.Hash(msg, DST, 1)
+	randomFrBytes := (randomFr[0]).Bytes()
+	//FrSetBytes(dst, randomFrBytes[:])
+	dst.SetBytes(randomFrBytes[:])
+	return err
+}

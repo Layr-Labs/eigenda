@@ -8,9 +8,9 @@ import (
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -36,15 +36,15 @@ func GenRandomFactor(samples []Sample) (fr.Element, error) {
 	for _, sample := range samples {
 		err := enc.Encode(sample.Commitment)
 		if err != nil {
-			return kzg.ZERO, err
+			return fr.Element{}, err
 		}
 	}
 
 	var randomFr fr.Element
 
-	err := kzg.HashToSingleField(&randomFr, buffer.Bytes())
+	err := kzgrs.HashToSingleField(&randomFr, buffer.Bytes())
 	if err != nil {
-		return kzg.ZERO, err
+		return fr.Element{}, err
 	}
 
 	return randomFr, nil
@@ -72,7 +72,7 @@ func GenRandomnessVector(samples []Sample) ([]fr.Element, error) {
 }
 
 // the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
-func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bn254.G1Affine) (*bn254.G1Affine, error) {
+func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.EncodingParams, ks *kzgrs.KZGSettings, proofs []bn254.G1Affine) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)
 	D := params.ChunkLength
@@ -269,7 +269,7 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	lhsG2 := &G2atD
 
 	// rhs g2
-	rhsG2 := &kzg.GenG2
+	rhsG2 := &kzgrs.GenG2
 
 	// rhs g1
 	rhsG1, err := genRhsG1(

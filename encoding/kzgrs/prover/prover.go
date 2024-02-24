@@ -12,9 +12,9 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
 	_ "go.uber.org/automaxprocs"
@@ -22,7 +22,7 @@ import (
 
 type Prover struct {
 	*kzgrs.KzgConfig
-	Srs          *kzg.SRS
+	Srs          *kzgrs.SRS
 	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
 	LoadG2Points bool
@@ -76,7 +76,7 @@ func NewProver(config *kzgrs.KzgConfig, loadG2Points bool) (*Prover, error) {
 		}
 	}
 
-	srs, err := kzg.NewSrs(s1, s2)
+	srs, err := kzgrs.NewSrs(s1, s2)
 	if err != nil {
 		log.Println("Could not create srs", err)
 		return nil, err
@@ -220,15 +220,15 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	if encoder.ChunkLength == 1 {
 		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	}
-	fs := kzg.NewFFTSettings(n)
+	fs := fft.NewFFTSettings(n)
 
-	ks, err := kzg.NewKZGSettings(fs, g.Srs)
+	ks, err := kzgrs.NewKZGSettings(fs, g.Srs)
 	if err != nil {
 		return nil, err
 	}
 
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
-	sfs := kzg.NewFFTSettings(t)
+	sfs := fft.NewFFTSettings(t)
 
 	return &ParametrizedProver{
 		Encoder:    encoder,

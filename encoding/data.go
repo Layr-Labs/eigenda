@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -43,7 +42,7 @@ func (f *Frame) Length() int {
 
 // Returns the size of chunk in bytes.
 func (f *Frame) Size() int {
-	return f.Length() * kzg.BYTES_PER_COEFFICIENT
+	return f.Length() * BYTES_PER_COEFFICIENT
 }
 
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier

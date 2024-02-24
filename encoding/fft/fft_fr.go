@@ -21,11 +21,13 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-package kzg
+package fft
 
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/encoding"
+	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -149,10 +151,10 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 // rearrange Fr elements in reverse bit order. Supports 2**31 max element count.
 func reverseBitOrderFr(values []fr.Element) error {
 	if len(values) > (1 << 31) {
-		return ErrFrListTooLarge
+		return encoding.ErrFrListTooLarge
 	}
 	var tmp fr.Element
-	reverseBitOrder(uint32(len(values)), func(i, j uint32) {
+	rb.ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		tmp.Set(&values[i])
 		//bls.CopyFr(&tmp, &values[i])
 		values[i].Set(&values[j])
@@ -173,3 +175,7 @@ func reverseBitOrderFr(values []fr.Element) error {
 // 	})
 // 	return nil
 // }
+
+func IsPowerOfTwo(v uint64) bool {
+	return v&(v-1) == 0
+}

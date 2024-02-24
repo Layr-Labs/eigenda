@@ -4,7 +4,8 @@ import (
 	"errors"
 	"log"
 
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
+
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -16,10 +17,10 @@ import (
 // v_4 v_5 v_6 v_0
 type Toeplitz struct {
 	V  []fr.Element
-	Fs *kzg.FFTSettings
+	Fs *fft.FFTSettings
 }
 
-func NewToeplitz(v []fr.Element, fs *kzg.FFTSettings) (*Toeplitz, error) {
+func NewToeplitz(v []fr.Element, fs *fft.FFTSettings) (*Toeplitz, error) {
 	if len(v)%2 != 1 {
 		log.Println("num diagonal vector must be odd")
 		return nil, errors.New("num diagonal vector must be odd")

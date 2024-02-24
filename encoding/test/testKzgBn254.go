@@ -3,8 +3,8 @@ package main
 // "fmt"
 // "log"
 // "math"
-// bn "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
-// bnKzg "github.com/Layr-Labs/eigenda/pkg/kzgFFT/go-kzg-bn254"
+// bn "github.com/Layr-Labs/eigenda/encoding/kzg/bn254"
+// bnKzg "github.com/Layr-Labs/eigenda/encoding/kzgFFT/go-kzg-bn254"
 
 //func testLinComb() {
 //polyFr := GenPoly(1,2,3,4,5)

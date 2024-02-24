@@ -8,10 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 )
 
 func TestVerify(t *testing.T) {
@@ -32,7 +33,7 @@ func TestVerify(t *testing.T) {
 	require.NotNil(t, frames)
 
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
-	fs := kzg.NewFFTSettings(n)
+	fs := fft.NewFFTSettings(n)
 	require.NotNil(t, fs)
 
 	lc := enc.Fs.ExpandedRootsOfUnity[uint64(0)]

@@ -29,11 +29,12 @@
 // - simplified merges
 // - no heap allocations during reduction
 
-package kzg
+package fft
 
 import (
 	"log"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	//"github.com/protolambda/go-kzg/bls"
 )
@@ -43,7 +44,7 @@ type ZeroPolyFn func(missingIndices []uint64, length uint64) ([]fr.Element, []fr
 func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, domainStride uint64) error {
 	if len(dst) < len(indices)+1 {
 		log.Printf("expected bigger destination length: %d, got: %d", len(indices)+1, len(dst))
-		return ErrInvalidDestinationLength
+		return encoding.ErrInvalidDestinationLength
 	}
 	// zero out the unused slots
 	for i := len(indices) + 1; i < len(dst); i++ {
@@ -53,9 +54,13 @@ func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, d
 	//bls.CopyFr(&dst[len(indices)], &bls.ONE)
 	dst[len(indices)].SetOne()
 	var negDi fr.Element
+
+	var frZero fr.Element
+	frZero.SetZero()
+
 	for i, v := range indices {
 		//bls.SubModFr(&negDi, &bls.ZERO, &fs.ExpandedRootsOfUnity[v*domainStride])
-		negDi.Sub(&ZERO, &fs.ExpandedRootsOfUnity[v*domainStride])
+		negDi.Sub(&frZero, &fs.ExpandedRootsOfUnity[v*domainStride])
 		//bls.CopyFr(&dst[i], &negDi)
 		dst[i].Set(&negDi)
 		if i > 0 {
@@ -97,28 +102,28 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 	n := uint64(len(dst))
 	if !IsPowerOfTwo(n) {
 		log.Println("destination must be a power of two")
-		return nil, ErrDestNotPowerOfTwo
+		return nil, encoding.ErrDestNotPowerOfTwo
 	}
 	if len(ps) == 0 {
 		log.Println("empty leaves")
-		return nil, ErrEmptyLeaves
+		return nil, encoding.ErrEmptyLeaves
 	}
 	// The degree of the output polynomial is the sum of the degrees of the input polynomials.
 	outDegree := uint64(0)
 	for _, p := range ps {
 		if len(p) == 0 {
 			log.Println("empty input poly")
-			return nil, ErrEmptyPoly
+			return nil, encoding.ErrEmptyPoly
 		}
 		outDegree += uint64(len(p)) - 1
 	}
 	if min := outDegree + 1; min > n {
 		log.Printf("expected larger destination length: %d, got: %d", min, n)
-		return nil, ErrInvalidDestinationLength
+		return nil, encoding.ErrInvalidDestinationLength
 	}
 	if uint64(len(scratch)) < 3*n {
 		log.Println("not enough scratch space")
-		return nil, ErrNotEnoughScratch
+		return nil, encoding.ErrNotEnoughScratch
 	}
 	// Split `scratch` up into three equally sized working arrays
 	pPadded := scratch[:n]
@@ -164,11 +169,11 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	}
 	if length > fs.MaxWidth {
 		log.Println("domain too small for requested length")
-		return nil, nil, ErrDomainTooSmall
+		return nil, nil, encoding.ErrDomainTooSmall
 	}
 	if !IsPowerOfTwo(length) {
 		log.Println("length not a power of two")
-		return nil, nil, ErrLengthNotPowerOfTwo
+		return nil, nil, encoding.ErrLengthNotPowerOfTwo
 	}
 	domainStride := fs.MaxWidth / length
 	perLeafPoly := uint64(64)
@@ -263,7 +268,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 		zeroPoly = append(zeroPoly, make([]fr.Element, length-zl)...)
 	} else if zl > length {
 		log.Println("expected output smaller or equal to input length")
-		return nil, nil, ErrZeroPolyTooLarge
+		return nil, nil, encoding.ErrZeroPolyTooLarge
 	}
 
 	zeroEval, err := fs.FFT(zeroPoly, false)
@@ -272,4 +277,31 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	}
 
 	return zeroEval, zeroPoly, nil
+}
+
+func EvalPolyAt(dst *fr.Element, coeffs []fr.Element, x *fr.Element) {
+	if len(coeffs) == 0 {
+		//CopyFr(dst, &ZERO)
+		dst.SetZero()
+		return
+	}
+	if x.IsZero() {
+		//CopyFr(dst, &coeffs[0])
+		dst.Set(&coeffs[0])
+		return
+	}
+	// Horner's method: work backwards, avoid doing more than N multiplications
+	// https://en.wikipedia.org/wiki/Horner%27s_method
+	var last fr.Element
+	//CopyFr(&last, &coeffs[len(coeffs)-1])
+	last.Set(&coeffs[len(coeffs)-1])
+	var tmp fr.Element
+	for i := len(coeffs) - 2; i >= 0; i-- {
+		tmp.Mul(&last, x)
+		//MulModFr(&tmp, &last, x)
+		//AddModFr(&last, &tmp, &coeffs[i])
+		last.Add(&tmp, &coeffs[i])
+	}
+	//CopyFr(dst, &last)
+	dst.Set(&last)
 }

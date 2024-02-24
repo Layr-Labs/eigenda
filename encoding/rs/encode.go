@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -57,7 +57,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	}
 
 	log.Printf("  SUMMARY: Encode %v byte among %v numNode takes %v\n",
-		len(inputFr)*kzg.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
+		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
 
 	return poly, frames, indices, nil
 }

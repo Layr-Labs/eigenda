@@ -24,9 +24,10 @@
 
 // Original: https://github.com/ethereum/research/blob/master/mimc_stark/fft.py
 
-package kzg
+package fft
 
 import (
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 
 	"math/bits"
@@ -70,8 +71,8 @@ type FFTSettings struct {
 
 func NewFFTSettings(maxScale uint8) *FFTSettings {
 	width := uint64(1) << maxScale
-	root := &Scale2RootOfUnity[maxScale]
-	rootz := expandRootOfUnity(&Scale2RootOfUnity[maxScale])
+	root := &encoding.Scale2RootOfUnity[maxScale]
+	rootz := expandRootOfUnity(&encoding.Scale2RootOfUnity[maxScale])
 
 	// reverse roots of unity
 	rootzReverse := make([]fr.Element, len(rootz))

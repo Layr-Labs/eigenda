@@ -11,8 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	
 	"github.com/Layr-Labs/eigenda/node"
-	"github.com/Layr-Labs/eigenda/pkg/kzg"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -69,7 +69,7 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	}
 	chunk1 := &encoding.Frame{
 		Proof:  commitment,
-		Coeffs: []encoding.Symbol{kzg.ONE},
+		Coeffs: []encoding.Symbol{encoding.ONE},
 	}
 
 	blobMessage := []*core.BlobMessage{
