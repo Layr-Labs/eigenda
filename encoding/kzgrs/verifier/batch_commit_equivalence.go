@@ -100,14 +100,20 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 	}
 
 	var lhsG1 bn254.G1Affine
-	lhsG1.MultiExp(g1commits, randomsFr, ecc.MultiExpConfig{})
+	_, err = lhsG1.MultiExp(g1commits, randomsFr, ecc.MultiExpConfig{})
+	if err != nil {
+		return err
+	}
 
 	//lhsG1 := bn254.LinCombG1(g1commits, randomsFr)
 	lhsG2 := &kzgrs.GenG2
 
 	//rhsG2 := bn254.LinCombG2(g2commits, randomsFr)
 	var rhsG2 bn254.G2Affine
-	rhsG2.MultiExp(g2commits, randomsFr, ecc.MultiExpConfig{})
+	_, err = rhsG2.MultiExp(g2commits, randomsFr, ecc.MultiExpConfig{})
+	if err != nil {
+		return err
+	}
 	rhsG1 := &kzgrs.GenG1
 
 	err = PairingsVerify(&lhsG1, lhsG2, rhsG1, &rhsG2)

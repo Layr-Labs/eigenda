@@ -52,10 +52,10 @@ func NewKZGSettings(fs *fft.FFTSettings, srs *SRS) (*KZGSettings, error) {
 }
 
 // KZG commitment to polynomial in coefficient form
-func (ks *KZGSettings) CommitToPoly(coeffs []fr.Element) *bn254.G1Affine {
+func (ks *KZGSettings) CommitToPoly(coeffs []fr.Element) (*bn254.G1Affine, error) {
 	var commit bn254.G1Affine
-	commit.MultiExp(ks.Srs.G1[:len(coeffs)], coeffs, ecc.MultiExpConfig{})
-	return &commit
+	_, err := commit.MultiExp(ks.Srs.G1[:len(coeffs)], coeffs, ecc.MultiExpConfig{})
+	return &commit, err
 }
 
 func HashToSingleField(dst *fr.Element, msg []byte) error {

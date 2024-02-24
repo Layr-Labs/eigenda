@@ -104,7 +104,10 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 	}
 
 	var aggCommit bn254.G1Affine
-	aggCommit.MultiExp(commits, aggCommitCoeffs, ecc.MultiExpConfig{})
+	_, err := aggCommit.MultiExp(commits, aggCommitCoeffs, ecc.MultiExpConfig{})
+	if err != nil {
+		return nil, err
+	}
 
 	// second term
 	// compute the aggregated interpolation polynomial
@@ -128,7 +131,10 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 
 	// All samples in a subBatch has identical chunkLen
 	var aggPolyG1 bn254.G1Affine
-	aggPolyG1.MultiExp(ks.Srs.G1[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
+	_, err = aggPolyG1.MultiExp(ks.Srs.G1[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
+	if err != nil {
+		return nil, err
+	}
 	//aggPolyG1 := bls.LinCombG1(ks.Srs.G1[:D], aggPolyCoeffs)
 
 	// third term
@@ -164,7 +170,10 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 	}
 
 	var offsetG1 bn254.G1Affine
-	offsetG1.MultiExp(proofs, lcCoeffs, ecc.MultiExpConfig{})
+	_, err = offsetG1.MultiExp(proofs, lcCoeffs, ecc.MultiExpConfig{})
+	if err != nil {
+		return nil, err
+	}
 
 	//offsetG1 := bls.LinCombG1(proofs, lcCoeffs)
 
@@ -251,8 +260,10 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	// lhs g1
 	//lhsG1 := bls.LinCombG1(proofs, randomsFr)
 	var lhsG1 bn254.G1Affine
-	lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
-
+	_, err = lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
+	if err != nil {
+		return err
+	}
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
 	G2atD, err := kzgrs.ReadG2PointOnPowerOf2(exponent, group.KzgConfig)

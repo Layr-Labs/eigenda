@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -56,13 +55,19 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	}
 
 	// compute commit for the full poly
-	commit := g.Commit(poly.Coeffs)
+	commit, err := g.Commit(poly.Coeffs)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 	//lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
 
 	config := ecc.MultiExpConfig{}
 
 	var lowDegreeCommitment bn254.G2Affine
 	_, err = lowDegreeCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 
 	intermediate := time.Now()
 
@@ -83,6 +88,9 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	//lowDegreeProof := bls.LinCombG2(shiftedSecret, poly.Coeffs[:polyDegreePlus1])
 	var lowDegreeProof bn254.G2Affine
 	_, err = lowDegreeProof.MultiExp(shiftedSecret, poly.Coeffs, config)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
 
 	//fmt.Println("kzgFFT lowDegreeProof", lowDegreeProof, "poly len ", len(fullCoeffsPoly), "order", len(g.Ks.SecretG2) )
 	//ok := VerifyLowDegreeProof(&commit, lowDegreeProof, polyDegreePlus1-1, g.SRSOrder, g.Srs.G2)
@@ -125,9 +133,9 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	return &commit, &lowDegreeCommitment, &lowDegreeProof, kzgFrames, indices, nil
 }
 
-func (g *ParametrizedProver) Commit(polyFr []fr.Element) bn254.G1Affine {
-	commit := g.Ks.CommitToPoly(polyFr)
-	return *commit
+func (g *ParametrizedProver) Commit(polyFr []fr.Element) (bn254.G1Affine, error) {
+	commit, err := g.Ks.CommitToPoly(polyFr)
+	return *commit, err
 }
 
 func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
@@ -171,18 +179,26 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 
 	t0 := time.Now()
 
+	msmErrors := make(chan error, dimE*2)
+
 	// compute proof by multi scaler mulplication
-	var wg sync.WaitGroup
 	for i := uint64(0); i < dimE*2; i++ {
-		wg.Add(1)
+
 		go func(k uint64) {
-			defer wg.Done()
 			//sumVec[k] = *bls.LinCombG1(p.FFTPointsT[k], coeffStore[k])
-			sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
+			_, err := sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
+			// to do handle error
+			msmErrors <- err
 		}(i)
 	}
 
-	wg.Wait()
+	for i := uint64(0); i < dimE*2; i++ {
+		err := <-msmErrors
+		if err != nil {
+			fmt.Println("MSM while adding points", err)
+			return nil, err
+		}
+	}
 
 	t1 := time.Now()
 

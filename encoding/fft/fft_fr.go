@@ -26,8 +26,6 @@ package fft
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/encoding"
-	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -147,34 +145,6 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 		return nil
 	}
 }
-
-// rearrange Fr elements in reverse bit order. Supports 2**31 max element count.
-func reverseBitOrderFr(values []fr.Element) error {
-	if len(values) > (1 << 31) {
-		return encoding.ErrFrListTooLarge
-	}
-	var tmp fr.Element
-	rb.ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
-		tmp.Set(&values[i])
-		//bls.CopyFr(&tmp, &values[i])
-		values[i].Set(&values[j])
-		//bls.CopyFr(&values[i], &values[j])
-		values[j].Set(&tmp)
-		//bls.CopyFr(&values[j], &tmp)
-	})
-	return nil
-}
-
-// rearrange Fr ptr elements in reverse bit order. Supports 2**31 max element count.
-// func reverseBitOrderFrPtr(values []*fr.Element) error {
-// 	if len(values) > (1 << 31) {
-// 		return ErrFrListTooLarge
-// 	}
-// 	reverseBitOrder(uint32(len(values)), func(i, j uint32) {
-// 		values[i], values[j] = values[j], values[i]
-// 	})
-// 	return nil
-// }
 
 func IsPowerOfTwo(v uint64) bool {
 	return v&(v-1) == 0

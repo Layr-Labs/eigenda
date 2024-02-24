@@ -42,9 +42,12 @@ import (
 )
 
 // GenerateTestingSetup creates a setup of n values from the given secret. **for testing purposes only**
-func GenerateTestingSetup(secret string, n uint64) ([]bn254.G1Affine, []bn254.G2Affine) {
+func GenerateTestingSetup(secret string, n uint64) ([]bn254.G1Affine, []bn254.G2Affine, error) {
 	var s fr.Element
-	s.SetString(secret)
+	_, err := s.SetString(secret)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var sPow fr.Element
 	sPow.SetOne()
@@ -60,7 +63,7 @@ func GenerateTestingSetup(secret string, n uint64) ([]bn254.G1Affine, []bn254.G2
 
 		sPow.Mul(&sPow, &s)
 	}
-	return s1Out, s2Out
+	return s1Out, s2Out, nil
 }
 
 // func ReadGeneatorPoints(n uint64, g1FilePath, g2FilePath string) ([]bn254.G1Affine, []bn254.G2Affine, error) {
@@ -149,7 +152,10 @@ func WriteGeneratorPoints(n uint64) error {
 	ns := strconv.Itoa(int(n))
 
 	var s fr.Element
-	s.SetString(secret)
+	_, err := s.SetString(secret)
+	if err != nil {
+		return err
+	}
 	//bls.SetFr(&s, secret)
 
 	var sPow fr.Element
