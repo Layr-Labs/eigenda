@@ -57,17 +57,16 @@ func CreateRandomnessVector(g1commits []bn254.G1Affine, g2commits []bn254.G2Affi
 	n := len(g1commits)
 
 	if len(g1commits) != len(g2commits) {
-		return nil, errors.New("Inconsistent number of blobs for g1 and g2")
+		return nil, errors.New("inconsistent number of blobs for g1 and g2")
 	}
 
 	randomsFr := make([]fr.Element, n)
-	//bn254.CopyFr(&randomsFr[0], &r)
+
 	randomsFr[0].Set(&r)
 
 	// power of r
 	for j := 0; j < n-1; j++ {
 		randomsFr[j+1].Mul(&randomsFr[j], &r)
-		//bn254.MulModFr(&randomsFr[j+1], &randomsFr[j], &r)
 	}
 
 	return randomsFr, nil
@@ -105,10 +104,8 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 		return err
 	}
 
-	//lhsG1 := bn254.LinCombG1(g1commits, randomsFr)
 	lhsG2 := &kzg.GenG2
 
-	//rhsG2 := bn254.LinCombG2(g2commits, randomsFr)
 	var rhsG2 bn254.G2Affine
 	_, err = rhsG2.MultiExp(g2commits, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {

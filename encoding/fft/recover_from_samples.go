@@ -33,27 +33,24 @@ import (
 // unshift poly, in-place. Multiplies each coeff with 1/shift_factor**i
 func (fs *FFTSettings) ShiftPoly(poly []fr.Element) {
 	var shiftFactor fr.Element
-	//bls.AsFr(&shiftFactor, 5) // primitive root of unity
 	shiftFactor.SetInt64(int64(5))
 	var factorPower fr.Element
 	factorPower.SetOne()
-	//bls.CopyFr(&factorPower, &ONE)
 	var invFactor fr.Element
-	//bls.InvModFr(&invFactor, &shiftFactor)
 	invFactor.Inverse(&shiftFactor)
 	var tmp fr.Element
 	for i := 0; i < len(poly); i++ {
-		//bls.CopyFr(&tmp, &poly[i])
+		
 		tmp.Set(&poly[i])
 
-		//bls.MulModFr(&poly[i], &tmp, &factorPower)
+		
 		poly[i].Mul(&tmp, &factorPower)
 
 		// TODO: pre-compute all these shift scalars
-		//bls.CopyFr(&tmp, &factorPower)
+		
 		tmp.Set(&factorPower)
 
-		//bls.MulModFr(&factorPower, &tmp, &invFactor)
+		
 		factorPower.Mul(&tmp, &invFactor)
 	}
 }
@@ -61,21 +58,21 @@ func (fs *FFTSettings) ShiftPoly(poly []fr.Element) {
 // unshift poly, in-place. Multiplies each coeff with shift_factor**i
 func (fs *FFTSettings) UnshiftPoly(poly []fr.Element) {
 	var shiftFactor fr.Element
-	//bls.AsFr(&shiftFactor, 5) // primitive root of unity
+	
 	shiftFactor.SetInt64(int64(5))
 	var factorPower fr.Element
 	factorPower.SetOne()
-	//bls.CopyFr(&factorPower, &bls.ONE)
+	
 	var tmp fr.Element
 	for i := 0; i < len(poly); i++ {
 		tmp.Set(&poly[i])
-		//bls.CopyFr(&tmp, &poly[i])
+		
 		poly[i].Mul(&tmp, &factorPower)
-		//bls.MulModFr(&poly[i], &tmp, &factorPower)
+		
 		// TODO: pre-compute all these shift scalars
-		//bls.CopyFr(&tmp, &factorPower)
+		
 		tmp.Set(&factorPower)
-		//bls.MulModFr(&factorPower, &tmp, &shiftFactor)
+		
 		factorPower.Mul(&tmp, &shiftFactor)
 	}
 }
@@ -104,10 +101,10 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 	polyEvaluationsWithZero := make([]fr.Element, len(samples))
 	for i, s := range samples {
 		if s == nil {
-			//bls.CopyFr(&polyEvaluationsWithZero[i], &ZERO)
+			
 			polyEvaluationsWithZero[i].SetZero()
 		} else {
-			//bls.MulModFr(&polyEvaluationsWithZero[i], s, &zeroEval[i])
+			
 			polyEvaluationsWithZero[i].Mul(s, &zeroEval[i])
 		}
 	}
@@ -133,7 +130,7 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 
 	evalShiftedReconstructedPoly := evalShiftedPolyWithZero
 	for i := 0; i < len(evalShiftedReconstructedPoly); i++ {
-		//bls.DivModFr(&evalShiftedReconstructedPoly[i], &evalShiftedPolyWithZero[i], &evalShiftedZeroPoly[i])
+		
 		evalShiftedReconstructedPoly[i].Div(&evalShiftedPolyWithZero[i], &evalShiftedZeroPoly[i])
 	}
 	shiftedReconstructedPoly, err := fs.FFT(evalShiftedReconstructedPoly, true)

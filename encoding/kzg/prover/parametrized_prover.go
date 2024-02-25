@@ -58,7 +58,6 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	//lowDegreeCommitment := bls.LinCombG2(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs)
 
 	config := ecc.MultiExpConfig{}
 
@@ -207,7 +206,6 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 
 	fmt.Printf("mult-th %v, msm %v,fft1 %v, fft2 %v,\n", t0.Sub(begin), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2))
 
-	//rb.ReverseBitOrderG1Point(proofs)
 	return proofs, nil
 }
 
@@ -251,7 +249,7 @@ func (p *ParametrizedProver) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint
 
 	toeV := make([]fr.Element, 2*dimE-1)
 	for i := uint64(0); i < dim; i++ {
-		//bls.CopyFr(&toeV[i], &polyFr[m-(j+i*l)])
+		
 		toeV[i].Set(&polyFr[m-(j+i*l)])
 	}
 

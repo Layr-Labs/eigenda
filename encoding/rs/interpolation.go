@@ -54,11 +54,9 @@ func (g *Encoder) GetInterpolationPolyEval(
 	//var tmp, tmp2 fr.Element
 	for i := 0; i < len(interpolationPoly); i++ {
 		shiftedInterpolationPoly[i].Mul(&interpolationPoly[i], &wPow)
-		//bls.MulModFr(&tmp2, &interpolationPoly[i], &wPow)
-		//bls.CopyFr(&shiftedInterpolationPoly[i], &tmp2)
+		
 		wPow.Mul(&wPow, &w)
-		//bls.MulModFr(&tmp, &wPow, &w)
-		//bls.CopyFr(&wPow, &tmp)
+		
 	}
 
 	err := g.Fs.InplaceFFT(shiftedInterpolationPoly, evals, false)
@@ -76,18 +74,17 @@ func (g *Encoder) GetInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.
 	}
 	var wPow fr.Element
 	wPow.SetOne()
-	//bls.CopyFr(&wPow, &bls.ONE)
+	
 	var tmp, tmp2 fr.Element
 	for i := 0; i < len(chunk); i++ {
 		tmp.Inverse(&wPow)
-		//bls.InvModFr(&tmp, &wPow)
+		
 		tmp2.Mul(&shiftedInterpolationPoly[i], &tmp)
-		//bls.MulModFr(&tmp2, &shiftedInterpolationPoly[i], &tmp)
-		//bls.CopyFr(&coeffs[i], &tmp2)
+		
 		coeffs[i].Set(&tmp2)
-		//bls.MulModFr(&tmp, &wPow, &w)
+		
 		tmp.Mul(&wPow, &w)
-		//bls.CopyFr(&wPow, &tmp)
+		
 		wPow.Set(&tmp)
 	}
 	return coeffs, nil

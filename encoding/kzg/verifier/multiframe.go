@@ -88,17 +88,17 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 	for k := 0; k < n; k++ {
 		s := samples[k]
 		row := s.RowIndex
-		//bls.AddModFr(&aggCommitCoeffs[row], &aggCommitCoeffs[row], &randomsFr[k])
+
 		aggCommitCoeffs[row].Add(&aggCommitCoeffs[row], &randomsFr[k])
 
 		if !setCommit[row] {
 			commits[row].Set(&s.Commitment)
-			//bls.CopyG1(&commits[row], &s.Commitment)
+
 			setCommit[row] = true
 		} else {
-			//bls.EqualG1(&commits[row], &s.Commitment)
+
 			if !commits[row].Equal(&s.Commitment) {
-				return nil, errors.New("Samples of the same row has different commitments")
+				return nil, errors.New("samples of the same row has different commitments")
 			}
 		}
 	}
@@ -135,7 +135,6 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 	if err != nil {
 		return nil, err
 	}
-	//aggPolyG1 := bls.LinCombG1(ks.Srs.G1[:D], aggPolyCoeffs)
 
 	// third term
 	// leading coset is an evaluation index, here we compute the weighted leading coset evaluation by random fields
@@ -150,22 +149,19 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 		h := ks.ExpandedRootsOfUnity[samples[k].X]
 		var hPow fr.Element
 		hPow.SetOne()
-		//bls.CopyFr(&hPow, &bls.ONE)
 
 		// raising the power for each leading coset
 		for j := uint64(0); j < D; j++ {
 			hPow.Mul(&hPow, &h)
-			//bls.MulModFr(&tmp, &hPow, &h)
-			//bls.CopyFr(&hPow, &tmp)
 		}
-		//bls.CopyFr(&leadingDs[k], &hPow)
+
 		leadingDs[k].Set(&hPow)
 	}
 
 	// applying the random weights to leading coset elements
 	for k := 0; k < n; k++ {
 		rk := randomsFr[k]
-		//bls.MulModFr(&lcCoeffs[k], &rk, &leadingDs[k])
+
 		lcCoeffs[k].Mul(&rk, &leadingDs[k])
 	}
 
@@ -175,12 +171,10 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 		return nil, err
 	}
 
-	//offsetG1 := bls.LinCombG1(proofs, lcCoeffs)
-
 	var rhsG1 bn254.G1Affine
-	//bls.SubG1(&rhsG1, aggCommit, aggPolyG1)
+
 	rhsG1.Sub(&aggCommit, &aggPolyG1)
-	//bls.AddG1(&rhsG1, &rhsG1, offsetG1)
+
 	rhsG1.Add(&rhsG1, &offsetG1)
 	return &rhsG1, nil
 }
@@ -253,12 +247,12 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	// array of proofs
 	proofs := make([]bn254.G1Affine, n)
 	for i := 0; i < n; i++ {
-		//bls.CopyG1(&proofs[i], &samples[i].Proof)
+
 		proofs[i].Set(&samples[i].Proof)
 	}
 
 	// lhs g1
-	//lhsG1 := bls.LinCombG1(proofs, randomsFr)
+
 	var lhsG1 bn254.G1Affine
 	_, err = lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {

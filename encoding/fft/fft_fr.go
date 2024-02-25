@@ -46,13 +46,8 @@ func (fs *FFTSettings) simpleFT(vals []fr.Element, valsOffset uint64, valsStride
 			v.Mul(jv, r)
 			tmp.Set(&last)
 			last.Add(&tmp, &v)
-
-			//bls.MulModFr(&v, jv, r)
-			//bls.CopyFr(&tmp, &last)
-			//bls.AddModFr(&last, &tmp, &v)
 		}
 		out[i].Set(&last)
-		//bls.CopyFr(&out[i], &last)
 	}
 }
 
@@ -75,16 +70,10 @@ func (fs *FFTSettings) _fft(vals []fr.Element, valsOffset uint64, valsStride uin
 		x.Set(&out[i])
 		y.Set(&out[i+half])
 
-		//bls.CopyFr(&x, &out[i])
-		//bls.CopyFr(&y, &out[i+half])
 		root := &rootsOfUnity[i*rootsOfUnityStride]
 		yTimesRoot.Mul(&y, root)
 		out[i].Add(&x, &yTimesRoot)
 		out[i+half].Sub(&x, &yTimesRoot)
-
-		//bls.MulModFr(&yTimesRoot, &y, root)
-		//bls.AddModFr(&out[i], &x, &yTimesRoot)
-		//bls.SubModFr(&out[i+half], &x, &yTimesRoot)
 	}
 }
 
@@ -98,11 +87,10 @@ func (fs *FFTSettings) FFT(vals []fr.Element, inv bool) ([]fr.Element, error) {
 	valsCopy := make([]fr.Element, n)
 	for i := 0; i < len(vals); i++ {
 		valsCopy[i].Set(&vals[i])
-		//bls.CopyFr(&valsCopy[i], &vals[i])
+
 	}
 	for i := uint64(len(vals)); i < n; i++ {
 		valsCopy[i].SetZero()
-		//bls.CopyFr(&valsCopy[i], &bls.ZERO)
 	}
 	out := make([]fr.Element, n)
 	if err := fs.InplaceFFT(valsCopy, out, inv); err != nil {
@@ -121,9 +109,9 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 	}
 	if inv {
 		var invLen fr.Element
-		//bls.AsFr(&invLen, n)
+		
 		invLen.SetInt64(int64(n))
-		//bls.InvModFr(&invLen, &invLen)
+		
 		invLen.Inverse(&invLen)
 		rootz := fs.ReverseRootsOfUnity[:fs.MaxWidth]
 		stride := fs.MaxWidth / n
@@ -132,9 +120,7 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 		var tmp fr.Element
 		for i := 0; i < len(out); i++ {
 			tmp.Mul(&out[i], &invLen)
-			//bls.MulModFr(&tmp, &out[i], &invLen)
 			out[i].Set(&tmp)
-			//bls.CopyFr(&out[i], &tmp) // TODO: depending on Fr implementation, allow to directly write back to an input
 		}
 		return nil
 	} else {

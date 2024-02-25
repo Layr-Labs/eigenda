@@ -55,10 +55,10 @@ func GenerateTestingSetup(secret string, n uint64) ([]bn254.G1Affine, []bn254.G2
 	s1Out := make([]bn254.G1Affine, n)
 	s2Out := make([]bn254.G2Affine, n)
 	for i := uint64(0); i < n; i++ {
-		//bls.MulG1(&s1Out[i], &GenG1, &sPow)
+		
 		s1Out[i].ScalarMultiplication(&GenG1, sPow.BigInt(new(big.Int)))
 
-		//bls.MulG2(&s2Out[i], &GenG2, &sPow)
+		
 		s2Out[i].ScalarMultiplication(&GenG2, sPow.BigInt(new(big.Int)))
 
 		sPow.Mul(&sPow, &s)
@@ -75,11 +75,11 @@ func WriteGeneratorPoints(n uint64) error {
 	if err != nil {
 		return err
 	}
-	//bls.SetFr(&s, secret)
+	
 
 	var sPow fr.Element
 	sPow.SetOne()
-	//bls.CopyFr(&sPow, &bls.ONE)
+	
 
 	g1f, err := os.Create("g1.point." + ns)
 	if err != nil {
@@ -95,15 +95,14 @@ func WriteGeneratorPoints(n uint64) error {
 	}
 	g2w := bufio.NewWriter(g2f)
 
-	//delimiter := [1]byte{'\n'}
+	
 
 	start := time.Now()
 	for i := uint64(0); i < n; i++ {
 		var s1Out bn254.G1Affine
 		var s2Out bn254.G2Affine
 		s1Out.ScalarMultiplication(&GenG1, sPow.BigInt(new(big.Int)))
-		//bls.MulG1(&s1Out, &bls.GenG1, &sPow)
-		//bls.MulG2(&s2Out, &bls.GenG2, &sPow)
+		
 		s2Out.ScalarMultiplication(&GenG2, sPow.BigInt(new(big.Int)))
 
 		g1Byte := s1Out.Bytes()

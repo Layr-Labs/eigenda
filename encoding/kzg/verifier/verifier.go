@@ -262,8 +262,6 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 	xnMinusYn.Sub(g2Atn, &xn2)
 
 	// [interpolation_polynomial(s)]_1
-	//is1 := bls.LinCombG1(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs)
-
 	var is1 bn254.G1Affine
 	config := ecc.MultiExpConfig{}
 	_, err := is1.MultiExp(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs, config)
@@ -274,7 +272,6 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 	// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
 	var commitMinusInterpolation bn254.G1Affine
 	commitMinusInterpolation.Sub(commitment, &is1)
-	//bls.SubG1(&commitMinusInterpolation, commitment, is1)
 
 	// Verify the pairing equation
 	//
@@ -313,10 +310,10 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 
 func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
 	var negB1 bn254.G1Affine
-	negB1.Neg((*bn254.G1Affine)(b1))
+	negB1.Neg(b1)
 
-	P := [2]bn254.G1Affine{*(*bn254.G1Affine)(a1), negB1}
-	Q := [2]bn254.G2Affine{*(*bn254.G2Affine)(a2), *(*bn254.G2Affine)(b2)}
+	P := [2]bn254.G1Affine{*a1, negB1}
+	Q := [2]bn254.G2Affine{*a2, *b2}
 
 	ok, err := bn254.PairingCheck(P[:], Q[:])
 	if err != nil {

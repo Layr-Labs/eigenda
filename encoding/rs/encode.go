@@ -114,12 +114,10 @@ func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Elemen
 
 	pdCoeffs := make([]fr.Element, g.NumEvaluations())
 	for i := 0; i < len(coeffs); i++ {
-		//bls.CopyFr(&pdCoeffs[i], &coeffs[i])
 		pdCoeffs[i].Set(&coeffs[i])
 	}
 	for i := len(coeffs); i < len(pdCoeffs); i++ {
 		pdCoeffs[i].SetZero()
-		//bls.CopyFr(&pdCoeffs[i], &bls.ZERO)
 	}
 
 	evals, err := g.Fs.FFT(pdCoeffs, false)

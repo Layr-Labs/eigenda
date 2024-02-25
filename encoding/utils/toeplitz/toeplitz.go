@@ -97,7 +97,7 @@ func (t *Toeplitz) ExtendCircularVec() []fr.Element {
 	E[0].Set(&t.V[0])
 
 	for i := 1; i < numRow; i++ {
-		//bls.CopyFr(&E[i], &t.V[len(t.V)-i])
+
 		E[i].Set(&t.V[len(t.V)-i])
 	}
 
@@ -119,11 +119,11 @@ func (t *Toeplitz) ExtendCircularVec() []fr.Element {
 func (t *Toeplitz) FromColVToRowV(cv []fr.Element) []fr.Element {
 	n := len(cv)
 	rv := make([]fr.Element, n)
-	//bls.CopyFr(&rv[0], &cv[0])
+
 	rv[0].Set(&cv[0])
 
 	for i := 1; i < n; i++ {
-		//bls.CopyFr(&rv[i], &cv[n-i])
+
 		rv[i].Set(&cv[n-i])
 	}
 
@@ -144,16 +144,16 @@ func (t *Toeplitz) DirectMultiply(x []fr.Element) []fr.Element {
 	for i := 0; i < numCol; i++ {
 		var sum fr.Element
 		sum.SetZero()
-		//bls.CopyFr(&sum, &bls.ZERO)
+
 		for j := 0; j < numCol; j++ {
 			idx := (j - i + n) % n
 			var product fr.Element
 			product.Mul(&t.V[idx], &x[j])
-			//bls.MulModFr(&product, &t.V[idx], &x[j])
+
 			sum.Add(&product, &sum)
-			//bls.AddModFr(&sum, &product, &sum)
+
 		}
-		//bls.CopyFr(&out[i], &sum)
+
 		out[i].Set(&sum)
 	}
 

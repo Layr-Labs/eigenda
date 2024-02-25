@@ -124,11 +124,11 @@ func ReverseBitOrderFr(values []fr.Element) error {
 	var tmp fr.Element
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		tmp.Set(&values[i])
-		//bls.CopyFr(&tmp, &values[i])
+		
 		values[i].Set(&values[j])
-		//bls.CopyFr(&values[i], &values[j])
+		
 		values[j].Set(&tmp)
-		//bls.CopyFr(&values[j], &tmp)
+		
 	})
 	return err
 }
@@ -154,9 +154,6 @@ func ReverseBitOrderG1Point(values []bn254.G1Affine) error {
 		values[i].Set(&values[j])
 		values[j].Set(&tmp)
 
-		//bls.CopyG1(&tmp, &values[i])
-		//bls.CopyG1(&values[i], &values[j])
-		//bls.CopyG1(&values[j], &tmp)
 	})
 	return err
 }

@@ -42,7 +42,7 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
 			samples[p] = new(fr.Element)
-			//bls.CopyFr(samples[p], &evals[j])
+			
 			samples[p].Set(&evals[j])
 		}
 	}

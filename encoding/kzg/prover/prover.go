@@ -243,28 +243,6 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}, nil
 }
 
-// get Fiat-Shamir challenge
-// func createFiatShamirChallenge(byteArray [][32]byte) *fr.Element {
-// 	alphaBytesTmp := make([]byte, 0)
-// 	for i := 0; i < len(byteArray); i++ {
-// 		for j := 0; j < len(byteArray[i]); j++ {
-// 			alphaBytesTmp = append(alphaBytesTmp, byteArray[i][j])
-// 		}
-// 	}
-// 	alphaBytes := crypto.Keccak256(alphaBytesTmp)
-// 	alpha := new(fr.Element)
-// 	fr.ElementSetBytes(alpha, alphaBytes)
-//
-// 	return alpha
-// }
-
-// invert the divisor, then multiply
-// func polyFactorDiv(dst *fr.Element, a *fr.Element, b *fr.Element) {
-// 	// TODO: use divmod instead.
-// 	var tmp fr.Element
-// 	bls.InvModFr(&tmp, b)
-// 	bls.MulModFr(dst, &tmp, a)
-// }
 
 // Detect the precomputed table from the specified directory
 // the file name follow the name convention of
