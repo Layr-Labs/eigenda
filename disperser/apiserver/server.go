@@ -220,10 +220,6 @@ func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Bl
 
 	if err := blob.RequestHeader.Validate(); err != nil {
 		s.logger.Warn("invalid header", "err", err)
-		for _, param := range securityParams {
-			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
-		}
 		return err
 	}
 
