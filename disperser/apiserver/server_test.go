@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 
@@ -464,7 +465,7 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
 
-	commitment := &core.G1Commitment{
+	commitment := &encoding.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
@@ -496,7 +497,7 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		ReferenceBlockNumber: referenceBlockNumber,
 		BatchRoot:            batchRoot,
 		BlobInclusionProof:   inclusionProof,
-		BlobCommitment: &core.BlobCommitments{
+		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
 			Length:     uint(dataLength),
 		},

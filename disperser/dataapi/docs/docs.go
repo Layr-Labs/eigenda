@@ -386,50 +386,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "core.BlobCommitments": {
-            "type": "object",
-            "properties": {
-                "commitment": {
-                    "$ref": "#/definitions/core.G1Commitment"
-                },
-                "length": {
-                    "type": "integer"
-                },
-                "length_commitment": {
-                    "$ref": "#/definitions/core.G2Commitment"
-                },
-                "length_proof": {
-                    "$ref": "#/definitions/core.LengthProof"
-                }
-            }
-        },
-        "core.G1Commitment": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "core.G2Commitment": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                }
-            }
-        },
-        "core.LengthProof": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                }
-            }
-        },
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -463,7 +419,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "blob_commitment": {
-                    "$ref": "#/definitions/core.BlobCommitments"
+                    "$ref": "#/definitions/encoding.BlobCommitments"
                 },
                 "blob_inclusion_proof": {
                     "type": "string"
@@ -653,6 +609,50 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "integer"
+                }
+            }
+        },
+        "encoding.BlobCommitments": {
+            "type": "object",
+            "properties": {
+                "commitment": {
+                    "$ref": "#/definitions/encoding.G1Commitment"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "length_commitment": {
+                    "$ref": "#/definitions/encoding.G2Commitment"
+                },
+                "length_proof": {
+                    "$ref": "#/definitions/encoding.LengthProof"
+                }
+            }
+        },
+        "encoding.G1Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "encoding.G2Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "encoding.LengthProof": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },

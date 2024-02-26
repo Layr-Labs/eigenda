@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 	"time"
 
@@ -185,6 +186,14 @@ func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSe
 			operators = append(operators, &operatorMetric)
 		}
 	}
+
+	// Sort by descending order of nonsigning rate.
+	sort.Slice(operators, func(i, j int) bool {
+		if operators[i].Percentage == operators[j].Percentage {
+			return operators[i].OperatorId < operators[j].OperatorId
+		}
+		return operators[i].Percentage > operators[j].Percentage
+	})
 
 	return &OperatorsNonsigningPercentage{
 		Meta: Meta{

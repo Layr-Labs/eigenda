@@ -6,7 +6,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/Layr-Labs/eigenda/encoding"
+
 	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
@@ -27,7 +28,7 @@ type retrievalClient struct {
 	indexedChainState     core.IndexedChainState
 	assignmentCoordinator core.AssignmentCoordinator
 	nodeClient            NodeClient
-	encoder               core.Encoder
+	verifier              encoding.Verifier
 	numConnections        int
 }
 
@@ -38,7 +39,7 @@ func NewRetrievalClient(
 	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
-	encoder core.Encoder,
+	verifier encoding.Verifier,
 	numConnections int,
 ) (*retrievalClient, error) {
 
@@ -47,7 +48,7 @@ func NewRetrievalClient(
 		indexedChainState:     chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
-		encoder:               encoder,
+		verifier:              verifier,
 		numConnections:        numConnections,
 	}, nil
 }
@@ -115,14 +116,14 @@ func (r *retrievalClient) RetrieveBlob(
 	}
 
 	// Validate the blob length
-	err = r.encoder.VerifyBlobLength(blobHeader.BlobCommitments)
+	err = r.verifier.VerifyBlobLength(blobHeader.BlobCommitments)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the commitments are equivalent
-	commitmentBatch := []core.BlobCommitments{blobHeader.BlobCommitments}
-	err = r.encoder.VerifyCommitEquivalenceBatch(commitmentBatch)
+	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
+	err = r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}
@@ -143,13 +144,10 @@ func (r *retrievalClient) RetrieveBlob(
 		})
 	}
 
-	encodingParams, err := core.GetEncodingParams(quorumHeader.ChunkLength, info.TotalChunks)
-	if err != nil {
-		return nil, err
-	}
+	encodingParams := encoding.ParamsFromMins(quorumHeader.ChunkLength, info.TotalChunks)
 
-	var chunks []*core.Chunk
-	var indices []core.ChunkNumber
+	var chunks []*encoding.Frame
+	var indices []encoding.ChunkNumber
 	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
 	for i := 0; i < len(operators); i++ {
 		reply := <-chunksChan
@@ -162,7 +160,7 @@ func (r *retrievalClient) RetrieveBlob(
 			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
 		}
 
-		err = r.encoder.VerifyChunks(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
+		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID, "err", err)
 			continue
@@ -174,5 +172,5 @@ func (r *retrievalClient) RetrieveBlob(
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	return r.encoder.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
+	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
 }

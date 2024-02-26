@@ -24,6 +24,7 @@ import (
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -43,7 +44,7 @@ var (
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
-	expectedBlobCommitment *core.BlobCommitments
+	expectedBlobCommitment *encoding.BlobCommitments
 	mockLogger             = &commock.Logger{}
 	blobstore              = inmem.NewBlobStore()
 	mockPrometheusApi      = &prommock.MockPrometheusApi{}
@@ -1127,7 +1128,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 	assert.NoError(t, err)
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
-	commitment := &core.G1Commitment{
+	commitment := &encoding.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
@@ -1139,7 +1140,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 		ReferenceBlockNumber: expectedReferenceBlockNumber,
 		BatchRoot:            expectedBatchRoot,
 		BlobInclusionProof:   expectedInclusionProof,
-		BlobCommitment: &core.BlobCommitments{
+		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
 			Length:     uint(expectedDataLength),
 		},

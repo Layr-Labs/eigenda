@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"google.golang.org/grpc"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -34,21 +35,21 @@ var errNotFound = errors.New("not found")
 
 type (
 	BlobMetadataResponse struct {
-		BlobKey                 string                `json:"blob_key"`
-		BatchHeaderHash         string                `json:"batch_header_hash"`
-		BlobIndex               uint32                `json:"blob_index"`
-		SignatoryRecordHash     string                `json:"signatory_record_hash"`
-		ReferenceBlockNumber    uint32                `json:"reference_block_number"`
-		BatchRoot               string                `json:"batch_root"`
-		BlobInclusionProof      string                `json:"blob_inclusion_proof"`
-		BlobCommitment          *core.BlobCommitments `json:"blob_commitment"`
-		BatchId                 uint32                `json:"batch_id"`
-		ConfirmationBlockNumber uint32                `json:"confirmation_block_number"`
-		ConfirmationTxnHash     string                `json:"confirmation_txn_hash"`
-		Fee                     string                `json:"fee"`
-		SecurityParams          []*core.SecurityParam `json:"security_params"`
-		RequestAt               uint64                `json:"requested_at"`
-		BlobStatus              disperser.BlobStatus  `json:"blob_status"`
+		BlobKey                 string                    `json:"blob_key"`
+		BatchHeaderHash         string                    `json:"batch_header_hash"`
+		BlobIndex               uint32                    `json:"blob_index"`
+		SignatoryRecordHash     string                    `json:"signatory_record_hash"`
+		ReferenceBlockNumber    uint32                    `json:"reference_block_number"`
+		BatchRoot               string                    `json:"batch_root"`
+		BlobInclusionProof      string                    `json:"blob_inclusion_proof"`
+		BlobCommitment          *encoding.BlobCommitments `json:"blob_commitment"`
+		BatchId                 uint32                    `json:"batch_id"`
+		ConfirmationBlockNumber uint32                    `json:"confirmation_block_number"`
+		ConfirmationTxnHash     string                    `json:"confirmation_txn_hash"`
+		Fee                     string                    `json:"fee"`
+		SecurityParams          []*core.SecurityParam     `json:"security_params"`
+		RequestAt               uint64                    `json:"requested_at"`
+		BlobStatus              disperser.BlobStatus      `json:"blob_status"`
 	}
 
 	Metric struct {

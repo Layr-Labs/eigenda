@@ -10,15 +10,18 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	enc core.Encoder
+	p   encoding.Prover
+	v   encoding.Verifier
 	asn core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 )
 
@@ -31,15 +34,15 @@ func TestMain(m *testing.M) {
 func setup(m *testing.M) {
 
 	var err error
-	enc, err = makeTestEncoder()
+	p, v, err = makeTestComponents()
 	if err != nil {
 		panic("failed to start localstack container")
 	}
 }
 
-// makeTestEncoder makes an encoder currently using the only supported backend.
-func makeTestEncoder() (core.Encoder, error) {
-	config := kzgrs.KzgConfig{
+// makeTestComponents makes a prover and verifier currently using the only supported backend.
+func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+	config := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
@@ -48,8 +51,17 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
+	p, err := prover.NewProver(config, true)
+	if err != nil {
+		return nil, nil, err
+	}
 
+	v, err := verifier.NewVerifier(config, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return p, v, nil
 }
 
 func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam) core.Blob {
@@ -91,7 +103,7 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 		}
 
 		blobSize := uint(len(blob.Data))
-		blobLength := core.GetBlobLength(blobSize)
+		blobLength := encoding.GetBlobLength(blobSize)
 
 		chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, blob.RequestHeader.SecurityParams[quorumIndex])
 		if err != nil {
@@ -112,18 +124,15 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 			t.Fatal(err)
 		}
 
-		params, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
-		if err != nil {
-			t.Fatal(err)
-		}
+		params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-		commitments, chunks, err := enc.Encode(blob.Data, params)
+		commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		blobHeader := &core.BlobHeader{
-			BlobCommitments: core.BlobCommitments{
+			BlobCommitments: encoding.BlobCommitments{
 				Commitment:       commitments.Commitment,
 				LengthCommitment: commitments.LengthCommitment,
 				LengthProof:      commitments.LengthProof,
@@ -153,7 +162,7 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 // checkBatch runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
 func checkBatch(t *testing.T, cst core.IndexedChainState, encodedBlob core.EncodedBlob, header core.BatchHeader) {
-	val := core.NewChunkValidator(enc, asn, cst, [32]byte{})
+	val := core.NewChunkValidator(v, asn, cst, [32]byte{})
 
 	quorums := []core.QuorumID{0}
 	state, _ := cst.GetIndexedOperatorState(context.Background(), header.ReferenceBlockNumber, quorums)
@@ -170,7 +179,7 @@ func checkBatch(t *testing.T, cst core.IndexedChainState, encodedBlob core.Encod
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
 func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader, pool common.WorkerPool) {
-	val := core.NewChunkValidator(enc, asn, cst, [32]byte{})
+	val := core.NewChunkValidator(v, asn, cst, [32]byte{})
 
 	quorums := []core.QuorumID{0}
 	state, _ := cst.GetIndexedOperatorState(context.Background(), header.ReferenceBlockNumber, quorums)

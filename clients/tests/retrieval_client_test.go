@@ -10,12 +10,12 @@ import (
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
@@ -26,8 +26,8 @@ import (
 
 const numOperators = 10
 
-func makeTestEncoder() (core.Encoder, error) {
-	config := &kzgrs.KzgConfig{
+func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+	config := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
@@ -36,20 +36,17 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	kzgEncoderGroup, err := prover.NewProver(config, true)
+	p, err := prover.NewProver(config, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	kzgVerifierGroup, err := verifier.NewVerifier(config, true)
+	v, err := verifier.NewVerifier(config, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &encoding.Encoder{
-		EncoderGroup:  kzgEncoderGroup,
-		VerifierGroup: kzgVerifierGroup,
-	}, nil
+	return p, v, nil
 }
 
 var (
@@ -82,7 +79,7 @@ func setup(t *testing.T) {
 
 	nodeClient = clientsmock.NewNodeClient()
 	coordinator = &core.StdAssignmentCoordinator{}
-	encoder, err := makeTestEncoder()
+	p, v, err := makeTestComponents()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +96,7 @@ func setup(t *testing.T) {
 		panic("failed to create a new indexed chain state")
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, ics, coordinator, nodeClient, encoder, 2)
+	retrievalClient, err = clients.NewRetrievalClient(logger, ics, coordinator, nodeClient, v, 2)
 	if err != nil {
 		panic("failed to create a new retrieval client")
 	}
@@ -132,7 +129,7 @@ func setup(t *testing.T) {
 	}
 
 	blobSize := uint(len(blob.Data))
-	blobLength := core.GetBlobLength(uint(blobSize))
+	blobLength := encoding.GetBlobLength(uint(blobSize))
 
 	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
@@ -153,18 +150,15 @@ func setup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	params, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
-	if err != nil {
-		t.Fatal(err)
-	}
+	params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-	commitments, chunks, err := encoder.Encode(blob.Data, params)
+	commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	blobHeader = &core.BlobHeader{
-		BlobCommitments: core.BlobCommitments{
+		BlobCommitments: encoding.BlobCommitments{
 			Commitment:       commitments.Commitment,
 			LengthCommitment: commitments.LengthCommitment,
 			LengthProof:      commitments.LengthProof,

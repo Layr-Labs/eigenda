@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -177,18 +178,14 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	return reply, err
 }
 
-func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Blob) error {
 
 	securityParams := blob.RequestHeader.SecurityParams
 	if len(securityParams) == 0 {
-		return nil, fmt.Errorf("invalid request: security_params must not be empty")
+		return fmt.Errorf("invalid request: security_params must not be empty")
 	}
 	if len(securityParams) > 256 {
-		return nil, fmt.Errorf("invalid request: security_params must not exceed 256")
+		return fmt.Errorf("invalid request: security_params must not exceed 256")
 	}
 
 	seenQuorums := make(map[uint8]struct{})
@@ -196,18 +193,18 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	// to uint8, so it cannot be greater than 254.
 	for _, param := range securityParams {
 		if _, ok := seenQuorums[param.QuorumID]; ok {
-			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
+			return fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
 		}
 		seenQuorums[param.QuorumID] = struct{}{}
 
 		if param.QuorumID >= s.quorumCount {
 			err := s.updateQuorumCount(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
+				return fmt.Errorf("failed to get onchain quorum count: %w", err)
 			}
 
 			if param.QuorumID >= s.quorumCount {
-				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
+				return fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
 			}
 		}
 	}
@@ -215,11 +212,34 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	blobSize := len(blob.Data)
 	// The blob size in bytes must be in range [1, maxBlobSize].
 	if blobSize > maxBlobSize {
-		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
+		return fmt.Errorf("blob size cannot exceed 2 MiB")
 	}
 	if blobSize == 0 {
-		return nil, fmt.Errorf("blob size must be greater than 0")
+		return fmt.Errorf("blob size must be greater than 0")
 	}
+
+	if err := blob.RequestHeader.Validate(); err != nil {
+		s.logger.Warn("invalid header", "err", err)
+		return err
+	}
+
+	return nil
+
+}
+
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	securityParams := blob.RequestHeader.SecurityParams
+	securityParamsStrings := make([]string, len(securityParams))
+	for i, sp := range securityParams {
+		securityParamsStrings[i] = sp.String()
+	}
+
+	blobSize := len(blob.Data)
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
@@ -230,14 +250,10 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, err
 	}
 
-	securityParamsStrings := make([]string, len(securityParams))
-	for i, sp := range securityParams {
-		securityParamsStrings[i] = sp.String()
-	}
 	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	if err := blob.RequestHeader.Validate(); err != nil {
-		s.logger.Warn("invalid header", "err", err)
+	err = s.validateBlobRequest(ctx, blob)
+	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
@@ -362,9 +378,9 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		blobSize := len(blob.Data)
-		length := core.GetBlobLength(uint(blobSize))
-		encodedLength := core.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
-		encodedSize := core.GetBlobSize(encodedLength)
+		length := encoding.GetBlobLength(uint(blobSize))
+		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
+		encodedSize := encoding.GetBlobSize(encodedLength)
 
 		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
 			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate, "accountKey", accountKey)

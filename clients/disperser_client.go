@@ -9,6 +9,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -155,7 +156,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 
 	authHeader := core.BlobAuthHeader{
-		BlobCommitments: core.BlobCommitments{},
+		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}

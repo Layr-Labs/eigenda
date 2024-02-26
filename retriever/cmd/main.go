@@ -13,10 +13,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
@@ -75,7 +75,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	nodeClient := clients.NewNodeClient(config.Timeout)
-	encoder, err := encoding.NewEncoder(config.EncoderConfig, false)
+	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
@@ -126,13 +126,13 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, encoder, config.NumConnections)
+	retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, config.NumConnections)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
-	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, encoder, ics, chainClient)
+	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, v, ics, chainClient)
 	if err = retrieverServiceServer.Start(context.Background()); err != nil {
 		log.Fatalln("failed to start retriever service server", err)
 	}

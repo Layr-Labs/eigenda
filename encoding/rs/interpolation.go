@@ -1,7 +1,7 @@
 package rs
 
 import (
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 // Consider input data as the polynomial Coefficients, c
@@ -17,12 +17,12 @@ import (
 // Data. i.e. [o_1, o_2, o_3..] with coding ratio 0.5 becomes [o_1, p_1, o_2, p_2...]
 
 func (g *Encoder) GetInterpolationPolyEval(
-	interpolationPoly []bls.Fr,
+	interpolationPoly []fr.Element,
 	j uint32,
-) ([]bls.Fr, error) {
-	evals := make([]bls.Fr, g.ChunkLen)
+) ([]fr.Element, error) {
+	evals := make([]fr.Element, g.ChunkLength)
 	w := g.Fs.ExpandedRootsOfUnity[uint64(j)]
-	shiftedInterpolationPoly := make([]bls.Fr, len(interpolationPoly))
+	shiftedInterpolationPoly := make([]fr.Element, len(interpolationPoly))
 
 	//multiply each term of the polynomial by x^i so the fourier transform results in the desired evaluations
 	//The fourier matrix looks like
@@ -49,14 +49,14 @@ func (g *Encoder) GetInterpolationPolyEval(
 	//
 	// to get our desired evaluations
 	// cool idea protolambda :)
-	var wPow bls.Fr
-	bls.CopyFr(&wPow, &bls.ONE)
-	var tmp, tmp2 bls.Fr
+	var wPow fr.Element
+	wPow.SetOne()
+	//var tmp, tmp2 fr.Element
 	for i := 0; i < len(interpolationPoly); i++ {
-		bls.MulModFr(&tmp2, &interpolationPoly[i], &wPow)
-		bls.CopyFr(&shiftedInterpolationPoly[i], &tmp2)
-		bls.MulModFr(&tmp, &wPow, &w)
-		bls.CopyFr(&wPow, &tmp)
+		shiftedInterpolationPoly[i].Mul(&interpolationPoly[i], &wPow)
+		
+		wPow.Mul(&wPow, &w)
+		
 	}
 
 	err := g.Fs.InplaceFFT(shiftedInterpolationPoly, evals, false)
@@ -64,23 +64,28 @@ func (g *Encoder) GetInterpolationPolyEval(
 }
 
 // Since both F W are invertible, c = W^-1 F^-1 d, convert it back. F W W^-1 F^-1 d = c
-func (g *Encoder) GetInterpolationPolyCoeff(chunk []bls.Fr, k uint32) ([]bls.Fr, error) {
-	coeffs := make([]bls.Fr, g.ChunkLen)
+func (g *Encoder) GetInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.Element, error) {
+	coeffs := make([]fr.Element, g.ChunkLength)
 	w := g.Fs.ExpandedRootsOfUnity[uint64(k)]
-	shiftedInterpolationPoly := make([]bls.Fr, len(chunk))
+	shiftedInterpolationPoly := make([]fr.Element, len(chunk))
 	err := g.Fs.InplaceFFT(chunk, shiftedInterpolationPoly, true)
 	if err != nil {
 		return coeffs, err
 	}
-	var wPow bls.Fr
-	bls.CopyFr(&wPow, &bls.ONE)
-	var tmp, tmp2 bls.Fr
+	var wPow fr.Element
+	wPow.SetOne()
+	
+	var tmp, tmp2 fr.Element
 	for i := 0; i < len(chunk); i++ {
-		bls.InvModFr(&tmp, &wPow)
-		bls.MulModFr(&tmp2, &shiftedInterpolationPoly[i], &tmp)
-		bls.CopyFr(&coeffs[i], &tmp2)
-		bls.MulModFr(&tmp, &wPow, &w)
-		bls.CopyFr(&wPow, &tmp)
+		tmp.Inverse(&wPow)
+		
+		tmp2.Mul(&shiftedInterpolationPoly[i], &tmp)
+		
+		coeffs[i].Set(&tmp2)
+		
+		tmp.Mul(&wPow, &w)
+		
+		wPow.Set(&tmp)
 	}
 	return coeffs, nil
 }
