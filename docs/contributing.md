@@ -20,12 +20,12 @@ In general, the `core` project contains implementation of all the important busi
 ┌── <a href="./core">core</a>: Core logic of the EigenDA protocol
 ├── <a href="./disperser">disperser</a>: Disperser service
 ├── <a href="./docs">docs</a>: Documentation and specification
-├── <a href="./encoding">encoding</a>: Encoding libraries such as Reed-Solomon, KZG.
+├── <a href="./encoding">encoding</a>: Encoding libraries such as Reed-Solomon, KZG
 ├── <a href="./inabox">inabox</a>: Inabox test to run EigenDA system on a single machine
 |── <a href="./indexer">indexer</a>: A simple indexer for efficiently tracking chain state and maintaining accumulators
 ├── <a href="./node">node</a>: DA node service
 ├── <a href="./retriever">retriever</a>: Retriever service
 |── <a href="./subgraphs">subgraphs</a>: The subgraph indexer for onchain information
 ├── <a href="./test">test</a>: Tools for running integration tests
-├── <a href="./tools">tools</a>: General tools such as traffic generator.
+├── <a href="./tools">tools</a>: General tools such as traffic generator
 </pre>
