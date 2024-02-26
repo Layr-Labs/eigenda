@@ -8,7 +8,7 @@ import (
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	kzgbn254 "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
@@ -57,7 +57,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
 
-	commitment := &core.G1Commitment{
+	commitment := &encoding.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
@@ -72,7 +72,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-	var lengthProof, lengthCommitment kzgbn254.G2Point
+	var lengthProof, lengthCommitment bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
 	lengthProof.Y.A0 = lengthYA0
@@ -81,10 +81,10 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	lengthCommitment = lengthProof
 
 	blobHeader := &core.BlobHeader{
-		BlobCommitments: core.BlobCommitments{
+		BlobCommitments: encoding.BlobCommitments{
 			Commitment:       commitment,
-			LengthCommitment: (*core.G2Commitment)(&lengthCommitment),
-			LengthProof:      (*core.G2Commitment)(&lengthProof),
+			LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+			LengthProof:      (*encoding.G2Commitment)(&lengthProof),
 			Length:           10,
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{
@@ -146,7 +146,7 @@ func TestCommitmentMarshaling(t *testing.T) {
 	commitX = *commitX.SetBigInt(big.NewInt(1))
 	commitY = *commitY.SetBigInt(big.NewInt(2))
 
-	commitment := &core.G1Commitment{
+	commitment := &encoding.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
@@ -154,7 +154,7 @@ func TestCommitmentMarshaling(t *testing.T) {
 	marshalled, err := json.Marshal(commitment)
 	assert.NoError(t, err)
 
-	recovered := new(core.G1Commitment)
+	recovered := new(encoding.G1Commitment)
 	err = json.Unmarshal(marshalled, recovered)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, commitment)

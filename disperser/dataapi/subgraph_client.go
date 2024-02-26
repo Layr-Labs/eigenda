@@ -497,17 +497,6 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 
 // This helper function adds an operator with an error message to the operators map.
 func addOperatorWithErrorDetail(operators map[core.OperatorID]*DeregisteredOperatorInfo, operator *Operator, operatorId [32]byte, errorMessage string) {
-	// Initialize the DeregisteredOperatorInfo with the error message in OperatorProcessError
-
-	if operator == nil {
-		operators[operatorId] = &DeregisteredOperatorInfo{
-			IndexedOperatorInfo:  nil,
-			BlockNumber:          uint(operator.BlockNumber),
-			Metadata:             operator,
-			OperatorProcessError: errorMessage,
-		}
-	}
-
 	operators[operatorId] = &DeregisteredOperatorInfo{
 		IndexedOperatorInfo:  nil,
 		BlockNumber:          uint(operator.BlockNumber),

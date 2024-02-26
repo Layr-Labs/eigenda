@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 type requestID string
@@ -33,8 +34,8 @@ type EncodingResult struct {
 	BlobMetadata         *disperser.BlobMetadata
 	ReferenceBlockNumber uint
 	BlobQuorumInfo       *core.BlobQuorumInfo
-	Commitment           *core.BlobCommitments
-	Chunks               []*core.Chunk
+	Commitment           *encoding.BlobCommitments
+	Chunks               []*encoding.Frame
 	Assignments          map[core.OperatorID]core.Assignment
 	Status               status
 }

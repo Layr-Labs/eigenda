@@ -33,7 +33,7 @@ message ChurnRequest {
 	//   - If any of the quorum here has already been registered, this entire request
 	//     will fail to proceed.
 	//   - If any of the quorum fails to register, this entire request will fail.
-	// The IDs must be in range [0, 255].
+	// The IDs must be in range [0, 254].
 	repeated uint32 quorum_ids = 6;
 }
 

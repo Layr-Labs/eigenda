@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/wealdtech/go-merkletree"
 )
 
@@ -268,7 +269,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 
 type pendingRequestInfo struct {
 	BlobQuorumInfo *core.BlobQuorumInfo
-	EncodingParams core.EncodingParams
+	EncodingParams encoding.EncodingParams
 	Assignments    map[core.OperatorID]core.Assignment
 }
 
@@ -289,7 +290,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			continue
 		}
 
-		blobLength := core.GetBlobLength(metadata.RequestMetadata.BlobSize)
+		blobLength := encoding.GetBlobLength(metadata.RequestMetadata.BlobSize)
 
 		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, e.StreamerConfig.TargetNumChunks, quorum)
 		if err != nil {
@@ -313,13 +314,9 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			continue
 		}
 
-		params, err := core.GetEncodingParams(chunkLength, info.TotalChunks)
-		if err != nil {
-			e.logger.Error("[RequestEncodingForBlob] error getting encoding params", "err", err)
-			continue
-		}
+		params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-		err = core.ValidateEncodingParams(params, int(blobLength), e.SRSOrder)
+		err = encoding.ValidateEncodingParams(params, int(blobLength), e.SRSOrder)
 		if err != nil {
 			e.logger.Error("[RequestEncodingForBlob] invalid encoding params", "err", err)
 			// Cancel the blob

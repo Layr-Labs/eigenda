@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigensdk-go/chainio/constructor"
@@ -113,12 +113,12 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
 
 	// Make validator
-	enc, err := encoding.NewEncoder(config.EncoderConfig, false)
+	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
 	if err != nil {
 		return nil, err
 	}
 	asgn := &core.StdAssignmentCoordinator{}
-	validator := core.NewChunkValidator(enc, asgn, cst, config.ID)
+	validator := core.NewChunkValidator(v, asgn, cst, config.ID)
 
 	// Create new store
 

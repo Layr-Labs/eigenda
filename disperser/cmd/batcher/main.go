@@ -32,6 +32,11 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+	// Note: Changing these paths will require updating the k8s deployment
+	readinessProbePath      string        = "/tmp/ready"
+	healthProbePath         string        = "/tmp/health"
+	maxStallDuration        time.Duration = 240 * time.Second
+	handleBatchLivenessChan               = make(chan time.Time, 1)
 )
 
 func main() {
@@ -48,10 +53,23 @@ func main() {
 		log.Fatalf("application failed: %v", err)
 	}
 
+	if _, err := os.Create(healthProbePath); err != nil {
+		log.Printf("Failed to create healthProbe file: %v", err)
+	}
+
+	// Start HeartBeat Monitor
+	go heartbeatMonitor(healthProbePath, maxStallDuration)
+
 	select {}
 }
 
 func RunBatcher(ctx *cli.Context) error {
+
+	// Clean up readiness file
+	if err := os.Remove(readinessProbePath); err != nil {
+		log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
+	}
+
 	config := NewConfig(ctx)
 
 	logger, err := logging.GetLogger(config.LoggerConfig)
@@ -142,7 +160,7 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
 	txnManager := batcher.NewTxnManager(client, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
-	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics)
+	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
 	if err != nil {
 		return err
 	}
@@ -159,6 +177,40 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
+	// Signal readiness
+	if _, err := os.Create(readinessProbePath); err != nil {
+		log.Printf("Failed to create readiness file: %v at path %v \n", err, readinessProbePath)
+	}
+
 	return nil
 
+}
+
+// process liveness signal from handleBatch Go Routine
+func heartbeatMonitor(filePath string, maxStallDuration time.Duration) {
+	var lastHeartbeat time.Time
+	stallTimer := time.NewTimer(maxStallDuration)
+
+	for {
+		select {
+		// HeartBeat from Goroutine on Batcher Pull Interval
+		case heartbeat, ok := <-handleBatchLivenessChan:
+			if !ok {
+				log.Println("handleBatchLivenessChan closed, stopping health probe")
+				return
+			}
+			log.Printf("Received heartbeat from HandleBatch GoRoutine: %v\n", heartbeat)
+			lastHeartbeat = heartbeat
+			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
+				log.Printf("Failed to update heartbeat file: %v", err)
+			} else {
+				log.Printf("Updated heartbeat file: %v with time %v\n", filePath, lastHeartbeat)
+			}
+			stallTimer.Reset(maxStallDuration) // Reset timer on new heartbeat
+
+		case <-stallTimer.C:
+			log.Println("No heartbeat received within max stall duration, stopping health probe")
+			return
+		}
+	}
 }

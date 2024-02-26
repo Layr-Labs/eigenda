@@ -1,5 +1,5 @@
 definitions:
-  core.BlobCommitments:
+  encoding.BlobCommitments:
     properties:
       commitment:
         $ref: '#/definitions/core.G1Commitment'
@@ -57,7 +57,7 @@ definitions:
       batch_root:
         type: string
       blob_commitment:
-        $ref: '#/definitions/core.BlobCommitments'
+        $ref: '#/definitions/encoding.BlobCommitments'
       blob_inclusion_proof:
         type: string
       blob_index:

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 type AccountID = string
@@ -58,7 +58,7 @@ type Blob struct {
 // multiple times (Replay attack).
 type BlobAuthHeader struct {
 	// Commitments
-	BlobCommitments `json:"commitments"`
+	encoding.BlobCommitments `json:"commitments"`
 	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
 	AccountID AccountID `json:"account_id"`
 	// Nonce
@@ -99,7 +99,7 @@ type BlobQuorumInfo struct {
 
 // BlobHeader contains all metadata related to a blob including commitments and parameters for encoding
 type BlobHeader struct {
-	BlobCommitments
+	encoding.BlobCommitments
 	// QuorumInfos contains the quorum specific parameters for the blob
 	QuorumInfos []*BlobQuorumInfo
 
@@ -121,17 +121,9 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*bn254.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
+		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
-}
-
-// BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
-type BlobCommitments struct {
-	Commitment       *G1Commitment `json:"commitment"`
-	LengthCommitment *G2Commitment `json:"length_commitment"`
-	LengthProof      *LengthProof  `json:"length_proof"`
-	Length           uint          `json:"length"`
 }
 
 // Batch
@@ -148,28 +140,8 @@ type BatchHeader struct {
 // EncodedBlob contains the messages to be sent to a group of DA nodes corresponding to a single blob
 type EncodedBlob = map[OperatorID]*BlobMessage
 
-// Chunks
-
-// Chunk is the smallest unit that is distributed to DA nodes, including both data and the associated polynomial opening proofs.
-// A chunk corresponds to a set of evaluations of the global polynomial whose coefficients are used to construct the blob Commitment.
-type Chunk struct {
-	// The Coeffs field contains the coefficients of the polynomial which interolates these evaluations. This is the same as the
-	// interpolating polynomial, I(X), used in the KZG multi-reveal (https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html#multiproofs)
-	Coeffs []Symbol
-	Proof  Proof
-}
-
-func (c *Chunk) Length() int {
-	return len(c.Coeffs)
-}
-
-// Returns the size of chunk in bytes.
-func (c *Chunk) Size() int {
-	return c.Length() * bn254.BYTES_PER_COEFFICIENT
-}
-
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
-type Bundle = []*Chunk
+type Bundle = []*encoding.Frame
 
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
@@ -204,19 +176,4 @@ func (cb Bundles) Size() int64 {
 		}
 	}
 	return size
-}
-
-// Sample is a chunk with associated metadata used by the Universal Batch Verifier
-type Sample struct {
-	Commitment      *G1Commitment
-	Chunk           *Chunk
-	AssignmentIndex ChunkNumber
-	BlobIndex       int
-}
-
-// SubBatch is a part of the whole Batch with identical Encoding Parameters, i.e. (ChunkLen, NumChunk)
-// Blobs with the same encoding parameters are collected in a single subBatch
-type SubBatch struct {
-	Samples  []Sample
-	NumBlobs int
 }

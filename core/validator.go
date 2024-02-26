@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 var (
@@ -20,22 +21,22 @@ type ChunkValidator interface {
 
 // chunkValidator implements the validation logic that a DA node should apply to its received chunks
 type chunkValidator struct {
-	encoder    Encoder
+	verifier   encoding.Verifier
 	assignment AssignmentCoordinator
 	chainState ChainState
 	operatorID OperatorID
 }
 
-func NewChunkValidator(enc Encoder, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ChunkValidator {
+func NewChunkValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ChunkValidator {
 	return &chunkValidator{
-		encoder:    enc,
+		verifier:   v,
 		assignment: asgn,
 		chainState: cst,
 		operatorID: operatorID,
 	}
 }
 
-func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*Chunk, *Assignment, *EncodingParams, error) {
+func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
 	if quorumHeader.AdversaryThreshold >= quorumHeader.QuorumThreshold {
 		return nil, nil, nil, fmt.Errorf("invalid header: quorum threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
 	}
@@ -74,12 +75,8 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	// Check the received chunks against the commitment
-	params, err := GetEncodingParams(quorumHeader.ChunkLength, info.TotalChunks)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	if params.ChunkLength != quorumHeader.ChunkLength {
+	params := encoding.ParamsFromMins(quorumHeader.ChunkLength, info.TotalChunks)
+	if params.ChunkLength != uint64(quorumHeader.ChunkLength) {
 		return nil, nil, nil, fmt.Errorf("%w: chunk length from encoding parameters (%d) does not match quorum header (%d)", ErrChunkLengthMismatch, params.ChunkLength, quorumHeader.ChunkLength)
 	}
 
@@ -92,7 +89,7 @@ func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *Operator
 	}
 
 	// Validate the blob length
-	err := v.encoder.VerifyBlobLength(blob.BlobHeader.BlobCommitments)
+	err := v.verifier.VerifyBlobLength(blob.BlobHeader.BlobCommitments)
 	if err != nil {
 		return err
 	}
@@ -106,7 +103,7 @@ func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *Operator
 			return err
 		} else {
 			// Check the received chunks against the commitment
-			err = v.encoder.VerifyChunks(chunks, assignment.GetIndices(), blob.BlobHeader.BlobCommitments, *params)
+			err = v.verifier.VerifyFrames(chunks, assignment.GetIndices(), blob.BlobHeader.BlobCommitments, *params)
 			if err != nil {
 				return err
 			}
@@ -121,8 +118,8 @@ func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
 }
 
 func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
-	subBatchMap := make(map[EncodingParams]*SubBatch)
-	blobCommitmentList := make([]BlobCommitments, len(blobs))
+	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
+	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
 	for k, blob := range blobs {
 		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
@@ -148,9 +145,9 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 				}
 
 				indices := assignment.GetIndices()
-				samples := make([]Sample, len(chunks))
+				samples := make([]encoding.Sample, len(chunks))
 				for ind := range chunks {
-					samples[ind] = Sample{
+					samples[ind] = encoding.Sample{
 						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
 						Chunk:           chunks[ind],
 						AssignmentIndex: uint(indices[ind]),
@@ -160,7 +157,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 
 				// update subBatch
 				if !ok {
-					subBatchMap[*params] = &SubBatch{
+					subBatchMap[*params] = &encoding.SubBatch{
 						Samples:  samples,
 						NumBlobs: 1,
 					}
@@ -194,7 +191,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		})
 	}
 	// check if commitments are equivalent
-	err := v.encoder.VerifyCommitEquivalenceBatch(blobCommitmentList)
+	err := v.verifier.VerifyCommitEquivalenceBatch(blobCommitmentList)
 	if err != nil {
 		return err
 	}
@@ -209,9 +206,9 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 	return nil
 }
 
-func (v *chunkValidator) universalVerifyWorker(params EncodingParams, subBatch *SubBatch, out chan error) {
+func (v *chunkValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
 
-	err := v.encoder.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
+	err := v.verifier.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
 	if err != nil {
 		out <- err
 		return
@@ -220,8 +217,8 @@ func (v *chunkValidator) universalVerifyWorker(params EncodingParams, subBatch *
 	out <- nil
 }
 
-func (v *chunkValidator) VerifyBlobLengthWorker(blobCommitments BlobCommitments, out chan error) {
-	err := v.encoder.VerifyBlobLength(blobCommitments)
+func (v *chunkValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
+	err := v.verifier.VerifyBlobLength(blobCommitments)
 	if err != nil {
 		out <- err
 		return
