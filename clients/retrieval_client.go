@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+
 	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
@@ -172,5 +172,5 @@ func (r *retrievalClient) RetrieveBlob(
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*bn254.BYTES_PER_COEFFICIENT)
+	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
 }

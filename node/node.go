@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"

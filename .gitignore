@@ -3,8 +3,11 @@ inabox/anvil.pid
 
 test/testdata/*
 inabox/resources/kzg/SRSTables/*
+encoding/kzgrs/prover/data/SRSTable/*
 
 **/bin/*
 coverage.*
 
 contracts/broadcast
+
+

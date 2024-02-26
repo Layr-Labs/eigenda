@@ -3,18 +3,18 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 
 	"runtime"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 }
 
 func readpoints() {
-	kzgConfig := &kzgrs.KzgConfig{
+	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "SRSTables",
@@ -40,9 +40,10 @@ func readpoints() {
 	kzgGroup, _ := prover.NewProver(kzgConfig, true)
 	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
 	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
-		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].MarshalText()))
+
+		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].String()))
 	}
-	if kzgGroup.Srs.G1[0].X == bls.GenG1.X && kzgGroup.Srs.G1[0].Y == bls.GenG1.Y {
+	if kzgGroup.Srs.G1[0].X == kzg.GenG1.X && kzgGroup.Srs.G1[0].Y == kzg.GenG1.Y {
 		fmt.Println("start with gen")
 	}
 }
@@ -59,7 +60,7 @@ func TestKzgRs() {
 	fmt.Printf("    Num Par: %v\n", numPar)
 	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
 
-	kzgConfig := &kzgrs.KzgConfig{
+	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "g1.point",
 		G2Path:          "g2.point",
 		CacheDir:        "SRSTables",
@@ -74,11 +75,11 @@ func TestKzgRs() {
 	params := encoding.EncodingParams{NumChunks: 200, ChunkLength: 180}
 	enc, _ := p.GetKzgEncoder(params)
 
-	//inputFr := kzgrs.ToFrArray(inputBytes)
+	//inputFr := kzg.ToFrArray(inputBytes)
 	inputSize := uint64(numSymbols)
-	inputFr := make([]bls.Fr, inputSize)
+	inputFr := make([]fr.Element, inputSize)
 	for i := uint64(0); i < inputSize; i++ {
-		bls.AsFr(&inputFr[i], i+1)
+		inputFr[i].SetInt64(int64(i + 1))
 	}
 
 	fmt.Printf("Input \n")
@@ -111,12 +112,12 @@ func TestKzgRs() {
 		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzgrs.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}
-		ok := verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
-		if !ok {
+		err = verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
+		if err != nil {
 			log.Fatalf("Proof %v failed\n", i)
 		}
 	}
@@ -134,14 +135,14 @@ func TestKzgRs() {
 	}
 
 	//printFr(dataFr)
-	//dataFr, err := kzgrs.DecodeSys(samples, indices, inputSize)
+	//dataFr, err := kzg.DecodeSys(samples, indices, inputSize)
 	//if err != nil {
 	//log.Fatalf("%v", err)
 	//}
 
 	fmt.Println(dataFr)
 	// printFr(dataFr)
-	//deData := kzgrs.ToByteArray(dataFr, inputByteSize)
+	//deData := kzg.ToByteArray(dataFr, inputByteSize)
 	//fmt.Println("dataFr")
 	// printFr(dataFr)
 	//fmt.Println(deData)
@@ -153,15 +154,15 @@ func TestKzgRs() {
 	//_ = deData
 }
 
-// func getData(inputSize uint64) []bls.Fr {
-// 	inputFr := make([]bls.Fr, inputSize)
+// func getData(inputSize uint64) []fr.Element {
+// 	inputFr := make([]fr.Element, inputSize)
 // 	for i := uint64(0); i < inputSize; i++ {
 // 		bls.AsFr(&inputFr[i], i+1)
 // 	}
 // 	return inputFr
 // }
 //
-// func compareData(inputFr, dataFr []bls.Fr) {
+// func compareData(inputFr, dataFr []fr.Element) {
 // 	if len(inputFr) != len(dataFr) {
 // 		log.Fatalf("Error. Diff length. input %v, data %v\n", len(inputFr), len(dataFr))
 // 	}
@@ -187,7 +188,7 @@ func TestKzgRs() {
 // 	}
 // }
 //
-// func initPoly(size int) ([]bls.Fr, []bls.Fr) {
+// func initPoly(size int) ([]fr.Element, []fr.Element) {
 // 	v := make([]uint64, size)
 // 	for i := 0; i < size; i++ {
 // 		v[i] = uint64(i + 1)
@@ -198,13 +199,13 @@ func TestKzgRs() {
 // 	return polyFr, dataFr
 // }
 //
-// func initData(size uint64) ([]bls.Fr, []bls.Fr) {
+// func initData(size uint64) ([]fr.Element, []fr.Element) {
 // 	v := make([]uint64, size)
 // 	for i := uint64(0); i < size; i++ {
 // 		v[i] = uint64(i + 1)
 // 	}
 // 	dataFr := makeFr(v)
-// 	order := kzgrs.CeilIntPowerOf2Num(size)
+// 	order := kzg.CeilIntPowerOf2Num(size)
 // 	fs := kzg.NewFFTSettings(uint8(order))
 // 	polyFr, err := fs.FFT(dataFr, true)
 // 	if err != nil {
@@ -213,22 +214,22 @@ func TestKzgRs() {
 // 	return polyFr, dataFr
 // }
 //
-// func makeFr(input []uint64) []bls.Fr {
-// 	inputFr := make([]bls.Fr, len(input))
+// func makeFr(input []uint64) []fr.Element {
+// 	inputFr := make([]fr.Element, len(input))
 // 	for i := 0; i < len(input); i++ {
 // 		bls.AsFr(&inputFr[i], input[i])
 // 	}
 // 	return inputFr
 // }
 
-func printFr(d []bls.Fr) {
+func printFr(d []fr.Element) {
 	for _, e := range d {
 		fmt.Printf("%v ", e.String())
 	}
 	fmt.Printf("\n")
 }
 
-// func printG1(d []bls.G1Point) {
+// func printG1(d []bn254.G1Affine) {
 // 	for i, e := range d {
 // 		fmt.Printf("%v: %v \n", i, e.String())
 // 	}
@@ -247,20 +248,3 @@ func SampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint
 	}
 	return samples, frameIndices
 }
-
-func RoundUpDivision(a, b uint64) uint64 {
-	if b == 0 {
-		log.Fatal("Cannot divide 0")
-	}
-	return uint64(math.Ceil(float64(a) / float64(b)))
-}
-
-// func genText(M uint64) []byte {
-// 	signal := make([]byte, M)
-// 	rand.Seed(time.Now().UnixNano())
-// 	for i := uint64(0); i < M; i++ {
-// 		r := rand.Intn(128)
-// 		signal[i] = byte(r)
-// 	}
-// 	return signal
-// }

@@ -30,7 +30,6 @@ func setupSuite(t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
 		log.Println("Tearing down suite")
 
-		// Some test may want to create a new SRS table so this should clean it up.
 		os.RemoveAll("./data")
 	}
 }

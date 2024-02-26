@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"golang.org/x/exp/constraints"
 )
 
@@ -48,14 +47,14 @@ func ParamsFromMins[T constraints.Integer](minChunkLength, minNumChunks T) Encod
 func ParamsFromSysPar(numSys, numPar, dataSize uint64) EncodingParams {
 
 	numNodes := numSys + numPar
-	dataLen := roundUpDivide(dataSize, bls.BYTES_PER_COEFFICIENT)
+	dataLen := roundUpDivide(dataSize, BYTES_PER_COEFFICIENT)
 	chunkLen := roundUpDivide(dataLen, numSys)
 	return ParamsFromMins(chunkLen, numNodes)
 
 }
 
 func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
-	dataLen := roundUpDivide(dataSize, bls.BYTES_PER_COEFFICIENT)
+	dataLen := roundUpDivide(dataSize, BYTES_PER_COEFFICIENT)
 	numSys := dataLen / chunkLen
 	return numSys
 }

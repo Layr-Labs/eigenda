@@ -5,13 +5,15 @@ import (
 	"log"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type GlobalPoly struct {
-	Coeffs []bls.Fr
-	Values []bls.Fr
+	Coeffs []fr.Element
+	Values []fr.Element
 }
 
 // just a wrapper to take bytes not Fr Element
@@ -27,7 +29,7 @@ func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32
 // frame, the multireveal interpolating coefficients are identical to the part of input bytes
 // in the form of field element. The extra returned integer list corresponds to which leading
 // coset root of unity, the frame is proving against, which can be deduced from a frame's index
-func (g *Encoder) Encode(inputFr []bls.Fr) (*GlobalPoly, []Frame, []uint32, error) {
+func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
 
@@ -55,7 +57,7 @@ func (g *Encoder) Encode(inputFr []bls.Fr) (*GlobalPoly, []Frame, []uint32, erro
 	}
 
 	log.Printf("  SUMMARY: Encode %v byte among %v numNode takes %v\n",
-		len(inputFr)*bls.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
+		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
 
 	return poly, frames, indices, nil
 }
@@ -63,7 +65,7 @@ func (g *Encoder) Encode(inputFr []bls.Fr) (*GlobalPoly, []Frame, []uint32, erro
 // This Function takes extended evaluation data and bundles relevant information into Frame.
 // Every frame is verifiable to the commitment.
 func (g *Encoder) MakeFrames(
-	polyEvals []bls.Fr,
+	polyEvals []fr.Element,
 ) ([]Frame, []uint32, error) {
 	// reverse dataFr making easier to sample points
 	err := rb.ReverseBitOrderFr(polyEvals)
@@ -104,18 +106,18 @@ func (g *Encoder) MakeFrames(
 }
 
 // Encoding Reed Solomon using FFT
-func (g *Encoder) ExtendPolyEval(coeffs []bls.Fr) ([]bls.Fr, []bls.Fr, error) {
+func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Element, error) {
 
 	if len(coeffs) > int(g.NumEvaluations()) {
 		return nil, nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
 	}
 
-	pdCoeffs := make([]bls.Fr, g.NumEvaluations())
+	pdCoeffs := make([]fr.Element, g.NumEvaluations())
 	for i := 0; i < len(coeffs); i++ {
-		bls.CopyFr(&pdCoeffs[i], &coeffs[i])
+		pdCoeffs[i].Set(&coeffs[i])
 	}
 	for i := len(coeffs); i < len(pdCoeffs); i++ {
-		bls.CopyFr(&pdCoeffs[i], &bls.ZERO)
+		pdCoeffs[i].SetZero()
 	}
 
 	evals, err := g.Fs.FFT(pdCoeffs, false)

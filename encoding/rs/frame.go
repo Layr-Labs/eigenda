@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 // Proof is the multireveal proof
 // Coeffs is identical to input data converted into Fr element
 type Frame struct {
-	Coeffs []bls.Fr
+	Coeffs []fr.Element
 }
 
 func (f *Frame) Encode() ([]byte, error) {

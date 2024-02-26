@@ -11,9 +11,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	
 	"github.com/Layr-Labs/eigenda/node"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-	var lengthProof, lengthCommitment bn254.G2Point
+	var lengthProof, lengthCommitment bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
 	lengthProof.Y.A0 = lengthYA0
@@ -50,7 +51,7 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 
 	lengthCommitment = lengthProof
 
-	commitment := bn254.G1Point{
+	commitment := bn254.G1Affine{
 		X: commitX,
 		Y: commitY,
 	}
@@ -68,7 +69,7 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	}
 	chunk1 := &encoding.Frame{
 		Proof:  commitment,
-		Coeffs: []encoding.Symbol{bn254.ONE},
+		Coeffs: []encoding.Symbol{encoding.ONE},
 	}
 
 	blobMessage := []*core.BlobMessage{
