@@ -3,9 +3,11 @@ package toeplitz_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
-	bls "github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,15 +19,15 @@ import (
 // v_5 v_6 v_0 v_1
 // v_4 v_5 v_6 v_0
 func TestNewToeplitz(t *testing.T) {
-	v := make([]bls.Fr, 7)
-	v[0] = bls.ToFr("7")
-	v[1] = bls.ToFr("11")
-	v[2] = bls.ToFr("5")
-	v[3] = bls.ToFr("6")
-	v[4] = bls.ToFr("3")
-	v[5] = bls.ToFr("8")
-	v[6] = bls.ToFr("1")
-	fs := kzg.NewFFTSettings(4)
+	v := make([]fr.Element, 7)
+	v[0].SetInt64(int64(7))
+	v[1].SetInt64(int64(11))
+	v[2].SetInt64(int64(5))
+	v[3].SetInt64(int64(6))
+	v[4].SetInt64(int64(3))
+	v[5].SetInt64(int64(8))
+	v[6].SetInt64(int64(1))
+	fs := fft.NewFFTSettings(4)
 
 	toe, err := toeplitz.NewToeplitz(v, fs)
 	require.Nil(t, err)
@@ -39,10 +41,10 @@ func TestNewToeplitz(t *testing.T) {
 }
 
 func TestNewToeplitz_InvalidSize(t *testing.T) {
-	v := make([]bls.Fr, 2)
-	v[0] = bls.ToFr("4")
-	v[1] = bls.ToFr("2")
-	fs := kzg.NewFFTSettings(4)
+	v := make([]fr.Element, 2)
+	v[0].SetInt64(int64(4))
+	v[1].SetInt64(int64(2))
+	fs := fft.NewFFTSettings(4)
 
 	_, err := toeplitz.NewToeplitz(v, fs)
 	assert.EqualError(t, err, "num diagonal vector must be odd")
@@ -53,16 +55,16 @@ func TestNewToeplitz_InvalidSize(t *testing.T) {
 // if   V is (v_0, v_1, v_2, v_3, v_4, v_5, v_6)
 // then E is (v_0, v_6, v_5, v_4, 0,   v_3, v_2, v_1)
 func TestExtendCircularVec(t *testing.T) {
-	v := make([]bls.Fr, 7)
-	v[0] = bls.ToFr("7")
-	v[1] = bls.ToFr("11")
-	v[2] = bls.ToFr("5")
-	v[3] = bls.ToFr("6")
-	v[4] = bls.ToFr("3")
-	v[5] = bls.ToFr("8")
-	v[6] = bls.ToFr("1")
+	v := make([]fr.Element, 7)
+	v[0].SetInt64(int64(7))
+	v[1].SetInt64(int64(11))
+	v[2].SetInt64(int64(5))
+	v[3].SetInt64(int64(6))
+	v[4].SetInt64(int64(3))
+	v[5].SetInt64(int64(8))
+	v[6].SetInt64(int64(1))
 
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 	c, err := toeplitz.NewToeplitz(v, fs)
 	require.Nil(t, err)
 
@@ -71,7 +73,7 @@ func TestExtendCircularVec(t *testing.T) {
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
 	assert.Equal(t, cVec[3], v[4])
-	assert.Equal(t, cVec[4], bls.ZERO)
+	assert.Equal(t, cVec[4], encoding.ZERO)
 	assert.Equal(t, cVec[5], v[3])
 	assert.Equal(t, cVec[6], v[2])
 	assert.Equal(t, cVec[7], v[1])
@@ -81,16 +83,16 @@ func TestExtendCircularVec(t *testing.T) {
 // then row Vector is [v_0, v_6, v_5, v_4, 0, v_3, v_2, v_1]
 // this operation is involutory. i.e. f(f(v)) = v
 func TestFromColVToRowV(t *testing.T) {
-	v := make([]bls.Fr, 7)
-	v[0] = bls.ToFr("7")
-	v[1] = bls.ToFr("11")
-	v[2] = bls.ToFr("5")
-	v[3] = bls.ToFr("6")
-	v[4] = bls.ToFr("3")
-	v[5] = bls.ToFr("8")
-	v[6] = bls.ToFr("1")
+	v := make([]fr.Element, 7)
+	v[0].SetInt64(int64(7))
+	v[1].SetInt64(int64(11))
+	v[2].SetInt64(int64(5))
+	v[3].SetInt64(int64(6))
+	v[4].SetInt64(int64(3))
+	v[5].SetInt64(int64(8))
+	v[6].SetInt64(int64(1))
 
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 	c, err := toeplitz.NewToeplitz(v, fs)
 	require.Nil(t, err)
 
@@ -101,7 +103,7 @@ func TestFromColVToRowV(t *testing.T) {
 	assert.Equal(t, rVec[1], v[1])
 	assert.Equal(t, rVec[2], v[2])
 	assert.Equal(t, rVec[3], v[3])
-	assert.Equal(t, rVec[4], bls.ZERO)
+	assert.Equal(t, rVec[4], encoding.ZERO)
 	assert.Equal(t, rVec[5], v[4])
 	assert.Equal(t, rVec[6], v[5])
 	assert.Equal(t, rVec[7], v[6])
@@ -112,83 +114,48 @@ func TestFromColVToRowV(t *testing.T) {
 	assert.Equal(t, cVec[1], v[6])
 	assert.Equal(t, cVec[2], v[5])
 	assert.Equal(t, cVec[3], v[4])
-	assert.Equal(t, cVec[4], bls.ZERO)
+	assert.Equal(t, cVec[4], encoding.ZERO)
 	assert.Equal(t, cVec[5], v[3])
 	assert.Equal(t, cVec[6], v[2])
 	assert.Equal(t, cVec[7], v[1])
 }
 
 func TestMultiplyToeplitz(t *testing.T) {
-	v := make([]bls.Fr, 7)
-	v[0] = bls.ToFr("7")
-	v[1] = bls.ToFr("11")
-	v[2] = bls.ToFr("5")
-	v[3] = bls.ToFr("6")
-	v[4] = bls.ToFr("3")
-	v[5] = bls.ToFr("8")
-	v[6] = bls.ToFr("1")
+	v := make([]fr.Element, 7)
+	v[0].SetInt64(int64(7))
+	v[1].SetInt64(int64(11))
+	v[2].SetInt64(int64(5))
+	v[3].SetInt64(int64(6))
+	v[4].SetInt64(int64(3))
+	v[5].SetInt64(int64(8))
+	v[6].SetInt64(int64(1))
 
-	fs := kzg.NewFFTSettings(4)
+	fs := fft.NewFFTSettings(4)
 	toe, err := toeplitz.NewToeplitz(v, fs)
 
 	require.Nil(t, err)
 
-	x := make([]bls.Fr, 4)
-	x[0] = bls.ToFr("1")
-	x[1] = bls.ToFr("2")
-	x[2] = bls.ToFr("3")
-	x[3] = bls.ToFr("4")
+	x := make([]fr.Element, 4)
+	x[0].SetInt64(int64(1))
+	x[1].SetInt64(int64(2))
+	x[2].SetInt64(int64(3))
+	x[3].SetInt64(int64(4))
 
 	b, err := toe.Multiply(x)
 	require.Nil(t, err)
 
-	assert.Equal(t, b[0], bls.ToFr("68"))
-	assert.Equal(t, b[1], bls.ToFr("68"))
-	assert.Equal(t, b[2], bls.ToFr("75"))
-	assert.Equal(t, b[3], bls.ToFr("50"))
+	p := make([]fr.Element, 4)
+	p[0].SetInt64(int64(68))
+	p[1].SetInt64(int64(68))
+	p[2].SetInt64(int64(75))
+	p[3].SetInt64(int64(50))
+
+	assert.Equal(t, b[0], p[0])
+	assert.Equal(t, b[1], p[1])
+	assert.Equal(t, b[2], p[2])
+	assert.Equal(t, b[3], p[3])
 
 	// Assert with direct multiplication
 	b2 := toe.DirectMultiply(x)
 	assert.Equal(t, b, b2)
-}
-
-func TestMultiplyPointsToeplitz(t *testing.T) {
-	v := make([]bls.Fr, 7)
-	v[0] = bls.ToFr("7")
-	v[1] = bls.ToFr("11")
-	v[2] = bls.ToFr("5")
-	v[3] = bls.ToFr("6")
-	v[4] = bls.ToFr("3")
-	v[5] = bls.ToFr("8")
-	v[6] = bls.ToFr("1")
-	fs := kzg.NewFFTSettings(4)
-	toe, err := toeplitz.NewToeplitz(v, fs)
-	require.Nil(t, err)
-
-	x := make([]bls.G1Point, 8)
-	x[0] = bls.GenG1
-	x[1] = bls.GenG1
-	x[2] = bls.GenG1
-	x[3] = bls.GenG1
-	x[4] = bls.GenG1
-	x[5] = bls.GenG1
-	x[6] = bls.GenG1
-	x[7] = bls.GenG1
-
-	b1, err := toe.MultiplyPoints(x, false, true)
-	require.Nil(t, err)
-
-	//b2, err := toe.MultiplyPoints(x, false, false)
-	require.Nil(t, err)
-
-	sum := bls.LinCombG1(x[:7], toe.V)
-	assert.Equal(t, &b1[0], sum)
-
-	// TODO: Calculate inverse
-	// b2, err := toe.MultiplyPoints(x, true, true)
-	// require.Nil(t, err)
-
-	// res, err := toe.MultiplyPoints(b2, false, true)
-	// require.Nil(t, err)
-	// assert.Equal(t, res[0].X.String(), x[0].X.String())
 }

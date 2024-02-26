@@ -4,13 +4,13 @@ import (
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	kzg "github.com/Layr-Labs/eigenda/pkg/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 )
 
 type Encoder struct {
 	encoding.EncodingParams
 
-	Fs *kzg.FFTSettings
+	Fs *fft.FFTSettings
 
 	verbose bool
 }
@@ -31,7 +31,7 @@ func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) 
 	}
 
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
-	fs := kzg.NewFFTSettings(n)
+	fs := fft.NewFFTSettings(n)
 
 	return &Encoder{
 		EncodingParams: params,

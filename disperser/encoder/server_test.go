@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	encmock "github.com/Layr-Labs/eigenda/encoding/mock"
 
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
@@ -21,9 +23,7 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/pkg/kzg/bn254"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 )
 
 var (
@@ -33,7 +33,7 @@ var (
 var logger = &cmock.Logger{}
 
 func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
-	kzgConfig := &kzgrs.KzgConfig{
+	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
@@ -163,7 +163,7 @@ func TestThrottling(t *testing.T) {
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-	var lengthProof, lengthCommitment bn254.G2Point
+	var lengthProof, lengthCommitment bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
 	lengthProof.Y.A0 = lengthYA0

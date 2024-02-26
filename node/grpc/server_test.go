@@ -16,9 +16,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	core_mock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzgrs/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 // makeTestVerifier makes a verifier currently using the only supported backend.
 func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 
-	config := &kzgrs.KzgConfig{
+	config := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
 		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
