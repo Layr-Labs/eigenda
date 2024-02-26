@@ -538,7 +538,18 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
-	c.JSON(http.StatusOK, ServiceAvailabilityResponse{
+
+	// Set the status code to 503 if any of the services are not serving
+	availabilityStatus := http.StatusOK
+	for _, status := range availabilityStatuses {
+		if status.ServiceStatus == "NOT_SERVING" {
+			availabilityStatus = http.StatusServiceUnavailable
+			break
+		}
+
+	}
+
+	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
 		Meta: Meta{
 			Size: len(availabilityStatuses),
 		},

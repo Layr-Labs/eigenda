@@ -927,6 +927,8 @@ func TestGetServiceAvailability_QueryDisperser(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
+	fmt.Printf("Response: %v\n", response)
+
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 1, response.Meta.Size)
 	assert.Equal(t, 1, len(response.Data))
@@ -1035,7 +1037,7 @@ func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, http.StatusServiceUnavailable, res.StatusCode)
 	assert.Equal(t, 1, response.Meta.Size)
 	assert.Equal(t, 1, len(response.Data))
 
@@ -1092,7 +1094,7 @@ func TestGetServiceAvailability_HealthyUnHealthyService(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, http.StatusServiceUnavailable, res.StatusCode)
 	assert.Equal(t, 2, response.Meta.Size)
 	assert.Equal(t, 2, len(response.Data))
 
