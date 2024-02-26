@@ -29,7 +29,7 @@ type (
 	}
 
 	api struct {
-		uiMonitoringGgl  *graphql.Client
+		uiMonitoringGql  *graphql.Client
 		operatorStateGql *graphql.Client
 	}
 )
@@ -38,10 +38,10 @@ var _ Api = (*api)(nil)
 
 func NewApi(uiMonitoringSocketAddr string, operatorStateSocketAddr string) *api {
 	once.Do(func() {
-		uiMonitoringGgl := graphql.NewClient(uiMonitoringSocketAddr, nil)
+		uiMonitoringGql := graphql.NewClient(uiMonitoringSocketAddr, nil)
 		operatorStateGql := graphql.NewClient(operatorStateSocketAddr, nil)
 		instance = &api{
-			uiMonitoringGgl:  uiMonitoringGgl,
+			uiMonitoringGql:  uiMonitoringGql,
 			operatorStateGql: operatorStateGql,
 		}
 	})
@@ -60,7 +60,7 @@ func (a *api) QueryBatches(ctx context.Context, descending bool, orderByField st
 		"skip":           graphql.Int(skip),
 	}
 	result := new(queryBatches)
-	err := a.uiMonitoringGgl.Query(ctx, result, variables)
+	err := a.uiMonitoringGql.Query(ctx, result, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +74,26 @@ func (a *api) QueryBatchesByBlockTimestampRange(ctx context.Context, start, end 
 		"blockTimestamp_gte": graphql.Int(start),
 		"blockTimestamp_lte": graphql.Int(end),
 	}
+	skip := 0
 	query := new(queryBatchesByBlockTimestampRange)
-	err := a.uiMonitoringGgl.Query(ctx, query, variables)
-	if err != nil {
-		return nil, err
+	result := make([]*Batches, 0)
+	for {
+		variables["first"] = graphql.Int(maxEntriesPerQuery)
+		variables["skip"] = graphql.Int(skip)
+
+		err := a.uiMonitoringGql.Query(ctx, &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(query.Batches) == 0 {
+			break
+		}
+		result = append(result, query.Batches...)
+		skip += maxEntriesPerQuery
 	}
 
-	return query.Batches, nil
+	return result, nil
 }
 
 func (a *api) QueryOperators(ctx context.Context, first int) ([]*Operator, error) {
@@ -109,7 +122,7 @@ func (a *api) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, int
 		variables["first"] = graphql.Int(maxEntriesPerQuery)
 		variables["skip"] = graphql.Int(skip)
 
-		err := a.uiMonitoringGgl.Query(ctx, &result, variables)
+		err := a.uiMonitoringGql.Query(ctx, &result, variables)
 		if err != nil {
 			return nil, err
 		}
