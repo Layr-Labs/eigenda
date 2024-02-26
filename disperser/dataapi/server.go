@@ -96,7 +96,6 @@ type (
 		Data []*DeregisteredOperatorMetadata `json:"data"`
 	}
 
-	// TODO: Add ServiceMethods to the struct
 	ServiceAvailability struct {
 		ServiceName   string `json:"service_name"`
 		ServiceStatus string `json:"service_status"`
@@ -518,7 +517,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	// Get query parameters if
-	serviceName := c.DefaultQuery("service", "") // If not specified, default to return all services
+	serviceName := c.DefaultQuery("serviceName", "") // If not specified, default to return all services
 
 	// If service name is not specified, return all services
 	services := []string{}

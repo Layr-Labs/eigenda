@@ -913,7 +913,7 @@ func TestGetServiceAvailability_QueryDisperser(t *testing.T) {
 	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?service=disperser", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?serviceName=disperser", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -969,7 +969,7 @@ func TestGetServiceAvailability_QueryInvalidService(t *testing.T) {
 	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?service=encoder", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?serviceName=encoder", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -1021,7 +1021,7 @@ func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
 	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?service=disperser", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?serviceName=disperser", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
