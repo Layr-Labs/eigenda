@@ -48,7 +48,6 @@ func (fs *FFTSettings) simpleFTG1(vals []bn254.G1Affine, valsOffset uint64, vals
 		r.BigInt(&t)
 		v.ScalarMultiplication(jv, &t)
 
-		//bls.MulG1(&v, jv, r)
 		last.Set(&v)
 
 		for j := uint64(1); j < l; j++ {
@@ -60,13 +59,9 @@ func (fs *FFTSettings) simpleFTG1(vals []bn254.G1Affine, valsOffset uint64, vals
 			v.ScalarMultiplication(jv, &t)
 			tmp.Set(&last)
 			last.Add(&tmp, &v)
-
-			//bls.MulG1(&v, jv, r)
-			//bls.CopyG1(&tmp, &last)
-			//bls.AddG1(&last, &tmp, &v)
 		}
 		out[i].Set(&last)
-		//bls.CopyG1(&out[i], &last)
+
 	}
 }
 
@@ -89,18 +84,13 @@ func (fs *FFTSettings) _fftG1(vals []bn254.G1Affine, valsOffset uint64, valsStri
 		x.Set(&out[i])
 		y.Set(&out[i+half])
 
-		//bls.CopyG1(&x, &out[i])
-		//bls.CopyG1(&y, &out[i+half])
 		root := &rootsOfUnity[i*rootsOfUnityStride]
-		//bls.MulG1(&yTimesRoot, &y, root)
 
 		yTimesRoot.ScalarMultiplication(&y, root.BigInt(new(big.Int)))
 
 		out[i].Add(&x, &yTimesRoot)
 		out[i+half].Sub(&x, &yTimesRoot)
 
-		//bls.AddG1(&out[i], &x, &yTimesRoot)
-		//bls.SubG1(&out[i+half], &x, &yTimesRoot)
 	}
 }
 
@@ -116,14 +106,14 @@ func (fs *FFTSettings) FFTG1(vals []bn254.G1Affine, inv bool) ([]bn254.G1Affine,
 	// We make a copy so we can mutate it during the work.
 	valsCopy := make([]bn254.G1Affine, n)
 	for i := 0; i < len(vals); i++ { // TODO: maybe optimize this away, and write back to original input array?
-		//bls.CopyG1(&valsCopy[i], &vals[i])
+
 		valsCopy[i].Set(&vals[i])
 	}
 	if inv {
 		var invLen fr.Element
-		//bls.AsFr(&invLen, n)
+
 		invLen.SetUint64(n)
-		//bls.InvModFr(&invLen, &invLen)
+
 		invLen.Inverse(&invLen)
 
 		rootz := fs.ReverseRootsOfUnity[:fs.MaxWidth]
@@ -131,13 +121,9 @@ func (fs *FFTSettings) FFTG1(vals []bn254.G1Affine, inv bool) ([]bn254.G1Affine,
 
 		out := make([]bn254.G1Affine, n)
 		fs._fftG1(valsCopy, 0, 1, rootz, stride, out)
-		//var tmp bn254.G1Affine
+
 		for i := 0; i < len(out); i++ {
 			out[i].ScalarMultiplication(&out[i], invLen.BigInt(new(big.Int)))
-
-			//bls.MulG1(&tmp, &out[i], &invLen)
-
-			//bls.CopyG1(&out[i], &tmp)
 		}
 		return out, nil
 	} else {

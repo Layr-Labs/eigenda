@@ -62,7 +62,6 @@ func HashToSingleField(dst *fr.Element, msg []byte) error {
 	DST := []byte("-")
 	randomFr, err := fr.Hash(msg, DST, 1)
 	randomFrBytes := (randomFr[0]).Bytes()
-	//FrSetBytes(dst, randomFrBytes[:])
 	dst.SetBytes(randomFrBytes[:])
 	return err
 }

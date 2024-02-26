@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 
 	"runtime"
@@ -249,20 +248,3 @@ func SampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint
 	}
 	return samples, frameIndices
 }
-
-func RoundUpDivision(a, b uint64) uint64 {
-	if b == 0 {
-		log.Fatal("Cannot divide 0")
-	}
-	return uint64(math.Ceil(float64(a) / float64(b)))
-}
-
-// func genText(M uint64) []byte {
-// 	signal := make([]byte, M)
-// 	rand.Seed(time.Now().UnixNano())
-// 	for i := uint64(0); i < M; i++ {
-// 		r := rand.Intn(128)
-// 		signal[i] = byte(r)
-// 	}
-// 	return signal
-// }
