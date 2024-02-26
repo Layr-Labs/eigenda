@@ -19,7 +19,7 @@ Two important aspects of a DA system are
 
 EigenDA is implemented as an actively validated service on EigenLayer, which is a restaking protocol for Ethereum. 
 
-Beause of this, EigenDA makes use of the EigenLayer state, which is stored on Ethereum, for consensus about the state of operators and as a callback for consensus about the availability of data. This means that EigenDA can be simpler in implementation than many existing DA solutions: EigenDA doesn't need to build it's own chain; it rides on the back of Ethereum. 
+Because of this, EigenDA makes use of the EigenLayer state, which is stored on Ethereum, for consensus about the state of operators and as a callback for consensus about the availability of data. This means that EigenDA can be simpler in implementation than many existing DA solutions: EigenDA doesn't need to build it's own chain; it rides on the back of Ethereum. 
 
 ### A first of its kind, horizontally scalable DA solution
 
@@ -27,7 +27,7 @@ Among extant DA solutions, EigenDA takes an approach to scalability which is uni
 
 This property is achieved by using a Reed Solomon erasure encoding scheme to shard the blob data across the DA nodes. While other systems such as Celestia and Danksharding (planned) also make use of Reed Solomon encoding, they do so only for the purpose of supporting certain observability properties of Data Availability Sampling (DAS) by light nodes. On the other hand, all incentivized/full nodes of the system download, store, and serve the full system bandwidth. 
 
-Horizontal scalability provides the promise for the technological bottlnecks of DA capacity to continually track demand, which has enormous implications for Layer 2 ecosytems. 
+Horizontal scalability provides the promise for the technological bottlenecks of DA capacity to continually track demand, which has enormous implications for Layer 2 ecosystems. 
 
 ### Security Model
 
@@ -42,7 +42,7 @@ EigenDA defines two properties of each blob attestation which relate to its live
 - Liveness threshold: The liveness threshold defines the minimum percentage of stake which an attacker must control in order to mount a liveness attack on the system. 
 - Safety threshold: The safety threshold defines the total percentage of stake which an attacker must control in order to mount a first-order safety attack on the system. 
 
-The term "first-order attack" alludes to the fact that exceeding the safety threshold may represent only a contingency rather than an actual safety failure due to the presence of recovery mechanisms that would apply during suh a contingency. Discussion of such mechanisms is outside of the scope of the current documentation. 
+The term "first-order attack" alludes to the fact that exceeding the safety threshold may represent only a contingency rather than an actual safety failure due to the presence of recovery mechanisms that would apply during such a contingency. Discussion of such mechanisms is outside of the scope of the current documentation. 
 
 Safety thresholds can translate directly into cryptoeconomic safety properties for quorums consisting of tokens which experience toxicity in the event of publicly observable attacks by a large coalition of token holders. This an other discussions of cryptoeconomic security are also beyond the scope of this technical documentation. We restrict the discussion to illustrating how the protocol preserves the given safety and liveness thresholds. 
 
@@ -66,13 +66,13 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 
 **Bridging**. For a DA attestation to be consumed by the L2 end-user (e.g. a rollup), the it must be bridged to a chain from which the L2 can read. This might simply be the Ethereum L1 itself, but in many cases it is more economical to bridge directly into the L2 since this drastically decreases signature verification costs. For the time being all attestations are bridged to the L1 by the disperser. 
 
-**Retrieval**. Interested parties such as rollup challengers that want to obtain rollup blob data can retrieve a blob by downloading the encoded chunks from the DA nodes and decoding them. The blob loopup information contained in the request is obtained from the from the bridged attestation to the DA nodes.
+**Retrieval**. Interested parties such as rollup challengers that want to obtain rollup blob data can retrieve a blob by downloading the encoded chunks from the DA nodes and decoding them. The blob lookup information contained in the request is obtained from the from the bridged attestation to the DA nodes.
 
 
 ## Protocol Overview
 
 For expositional purposes, we will divide the protocol into two conceptual layers: 
-- Consensus Layer: Modules to ensure that whenever a DA attestation is accepted by an end-user (e.g. a rollup), then then the data is indeed available. More specifically, the consensus layer ensures that the system observes the safety and liveness tolerances defined in the [Security Model](#Security-Model) section.
+- Consensus Layer: Modules to ensure that whenever a DA attestation is accepted by an end-user (e.g. a rollup), then the data is indeed available. More specifically, the consensus layer ensures that the system observes the safety and liveness tolerances defined in the [Security Model](#Security-Model) section.
 - Network Layer: The communications protocol which ensures that the liveness and saftey of the protocol are robust against network-level events and threats. 
 
 ![image](../assets/consensus-layer.png)
@@ -91,12 +91,12 @@ Since EigenDA is an EigenLayer AVS it can piggy bank off of Ethereum for consens
 - **Consensus Logic**: The consensus logic allows us to answer the question of whether a given blob is available, given both a DA attestation and the validator state at the associated Ethereum block. The consensus logic can be understood as simply a function of these inputs which outputs yes or no, depending on whether these inputs imply that data is available. Naturally, this function is grounded upon assumptions about the behavior of honest nodes, which must perform certain validation actions as part of the consensus layer. The consensus logic further docomposes into two major modules: 
     - *Encoding*: The encoding module defines a procedure for blobs to be encoded in such a way that their successful reconstruction can be guaranteed given a large enough collection of unique encoded chunks. The procedure also allows for the chunks to be trustlessly verified against a blob commitment so that the disperser cannot violate the protocol.
     - *Assignment*: The assignment module provides a deterministic mapping from validator state to an allocation of encoded chunks to DA nodes. The mapping is designed to uphold safety and liveness properties with minimal data-inefficiency. 
-- **Bridging**: Bridging describes how the attestation is bridged to the consumer protocol, such as that of the rollup. In principle, bridging can be performed in one of several different ways in order to optimize efficiency and composability. At the moment, only bridging via the Ethereum L1 is direclty supported. 
+- **Bridging**: Bridging describes how the attestation is bridged to the consumer protocol, such as that of the rollup. In principle, bridging can be performed in one of several different ways in order to optimize efficiency and composability. At the moment, only bridging via the Ethereum L1 is directly supported. 
 
 ![image](../assets/consensus-layer-parts.png)
 
 
-The desired behavior of the consensus logic can be formally described as follows (Ignore this if you're happy with the migh level ideas): Let $\alpha$ denote the safety threshold, i.e. the maximum proportion of adversarial stake that the system is able to tolerate. Likewise, let $\beta$ represent the amount of stake that we require to be held by the signing operators in order to accept an attestation, i.e. one minus the liveness threshold. Also, let $O$ denote the set of EigenDA operators.
+The desired behavior of the consensus logic can be formally described as follows (Ignore this if you're happy with the high level ideas): Let $\alpha$ denote the safety threshold, i.e. the maximum proportion of adversarial stake that the system is able to tolerate. Likewise, let $\beta$ represent the amount of stake that we require to be held by the signing operators in order to accept an attestation, i.e. one minus the liveness threshold. Also, let $O$ denote the set of EigenDA operators.
 
 We need to guarantee that any set of signing operators $U_q \subseteq O$ such that
 

@@ -22,7 +22,7 @@ Basic RS encoding is used to achieve the first requirement of *Adversarial toler
 3. This polynomial is evaluated at `NumChunks`*`ChunkLength` distinct indices.
 4. Chunks are constructed, where each chunk consists of the polynomial evaluations at `ChunkLength` distinct indices.
 
-Notice that given any number of chunks $M$ such that $M \times$`ChunkLength` > `BlobLength`, via [polynomial interpolation](https://en.wikipedia.org/wiki/Polynomial_interpolation) it is possible to reconstruct the original polynomial, and therefore its coefficients which represent the original blob. 
+Notice that given any number of chunks $M$ such that $M \times$`ChunkLength` >= `BlobLength`, via [polynomial interpolation](https://en.wikipedia.org/wiki/Polynomial_interpolation) it is possible to reconstruct the original polynomial, and therefore its coefficients which represent the original blob. 
 
 ### Validation via KZG
 
@@ -35,7 +35,7 @@ To avoid the need for fraud proofs, EigenDA follows the trail blazed by the Ethe
 Blobs sent to EigenDA are identified by their KZG commitment (which can be calculated by the disperser and easily validated by the rollup sequencer). When the disperser generates the encoded blob chunks, it also generates a collection of opening proofs which the DA nodes can use to trustlessly verify that their chunks fall on the blob polynomial the correct indices (note: the indices are jointly derived by the disperser and DA nodes from the chain state using the logic in the Assignment module to ensure that the evaluation indices for each node are unique).
 
 **Blob Size Verification**
-KZG commitments also can be used to verify the degree of the original polynomial, which in turn corresponds to the size of the original blob. Having a trustlessly verifiable upper boun on the size of the blob is necessary for DA nodes to verify the correcments of the chunk assignment defined by the assignemnt module.
+KZG commitments also can be used to verify the degree of the original polynomial, which in turn corresponds to the size of the original blob. Having a trustlessly verifiable upper bound on the size of the blob is necessary for DA nodes to verify the correctness of the chunk assignment defined by the assignment module.
 
 The KZG commitment relies on a structured random string (SRS) containing a generator point $G$ multiplied by all of the powers of some secret field element $\tau$, up to some maximum power $n$. This means that it is not possible to use this SRS to commit to a polynomial of degree greater than $n$. A consequence of this is that if $p(x)$ is a polynomial of degree greater than $m$, it will not be possible to commit to the polynomial $x^{n-m}p(x)$.
 

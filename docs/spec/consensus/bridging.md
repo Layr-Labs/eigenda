@@ -28,5 +28,5 @@ These requirements result in the following design choices:
 
 The first and second decisions satisfy requirements 1 and 2. The three decisions together satisfy requirement 3.
 
-Whenever the `confirmBatch` method of the [ServiceMananger.sol](../contracts-service-manager.md) is called, the following checks are used to ensure that only finalized registration state is utilized:
+Whenever the `confirmBatch` method of the ServiceManager.sol is called, the following checks are used to ensure that only finalized registration state is utilized:
 - Stake staleness check. The `referenceBlockNumber` is verified to be within `BLOCK_STALE_MEASURE` blocks before the confirmation block.This is to make sure that batches using outdated stakes are not confirmed. It is assured that stakes from within `BLOCK_STALE_MEASURE` blocks before confirmation are valid by delaying removal of stakes by `BLOCK_STALE_MEASURE + MAX_DURATION_BLOCKS`.
