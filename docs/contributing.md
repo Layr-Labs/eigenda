@@ -25,7 +25,7 @@ In general, the `core` project contains implementation of all the important busi
 |── <a href="./indexer">indexer</a>: A simple indexer for efficiently tracking chain state and maintaining accumulators
 ├── <a href="./node">node</a>: DA node service
 ├── <a href="./retriever">retriever</a>: Retriever service
-|── <a href="./subgraphs">subgraphs</a>: The subgraph indexer for onchain information
+|── <a href="./subgraphs">subgraphs</a>: The subgraphs indexer for onchain information
 ├── <a href="./test">test</a>: Tools for running integration tests
 ├── <a href="./tools">tools</a>: General tools such as traffic generator
 </pre>
