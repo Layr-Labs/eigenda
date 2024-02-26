@@ -11,7 +11,7 @@ We will also highlight the additional constraints on the Encoding interface whic
 
 As described in the [Encoding Module Specification](../spec/protocol-modules/storage/encoding.md), given a blob of data, we convert the blob to a polynomial $p(X) = \sum_{i=0}^{m-1} c_iX^i$ by simply slicing the data into a string of symbols, and interpreting this list of symbols as the tuple $(c_i)_{i=0}^{m-1}$.
 
-In the case of the KZG-FFT encoder, the polynomial lives on the field associated with the BN-254 elliptic curve, which as order [TODO: fill in order].
+In the case of the KZG-FFT encoder, the polynomial lives on the field associated with the BN254 elliptic curve, which as order [TODO: fill in order].
 
 Given this polynomial representation, the KZG commitment can be calculated as in [KZG polynomial commitments](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html).
 
@@ -30,7 +30,7 @@ where $p_k$ gives the evaluation of the polynomial at $v^k \in S$. Letting $c$ d
 
 To evaluate the DFT programmatically, we want $m = n$. Notice that we can achieve this when $m > n$ by simply padding $c$ with zeros to be of length $m$.
 
-The use of the FFT can levy an additional requirement on the size of the group $S$. In our implementation, we require the size of $S$ to be a power of 2. For this, we can make use of the fact that the prime field associated with BN-254 contains a subgroup of order $2^{28}$, which in turn contains subgroups of orders spanning every power of 2 less than $2^{28}$.
+The use of the FFT can levy an additional requirement on the size of the group $S$. In our implementation, we require the size of $S$ to be a power of 2. For this, we can make use of the fact that the prime field associated with BN254 contains a subgroup of order $2^{28}$, which in turn contains subgroups of orders spanning every power of 2 less than $2^{28}$.
 
 
 As the encoding interface calls for the construction of `NumChunks` Chunks of length `ChunkLength`, our application requires that $S$ be of size `NumChunks*ChunkLength`, which in turn must be a power of 2.
