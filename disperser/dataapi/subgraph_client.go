@@ -344,7 +344,6 @@ func getOperatorInterval(
 		// Note: if an operator registered at block A and then deregistered
 		// at block B, the range of liveness will be [A, B), i.e. the operator
 		// will not be responsible for signing at block B.
-
 		if len(reg) == 0 && len(dereg) == 0 {
 			// The operator has no registration/deregistration events: it's live
 			// for the entire time window.
