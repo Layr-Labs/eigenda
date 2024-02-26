@@ -14,7 +14,7 @@ For the second stage, the EigenDA provides a utility contract with a `verifyBlob
 1. The rollup sequencer posts all lookup data needed to verify a blob against a batch to the rollup inbox contract. 
 2. To initiate a fraud proof, the challenger must call the `verifyBlob` method with the supplied lookup data. If the blob does not verify correctly, the blob is considered invalid. 
 
-#### Reorg behavior (needs to be rewritten)
+#### Reorg behavior (this section is outdated)
 
 One aspect of the chain behavior of which the attestation protocol must be aware is that of chain reorganization. The following requirements relate to chain reorganizations:
 1. Signed attestations should remain valid under reorgs so that a disperser never needs to resend the data and gather new signatures.

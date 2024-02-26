@@ -19,7 +19,7 @@ Two important aspects of a DA system are
 
 EigenDA is implemented as an actively validated service on EigenLayer, which is a restaking protocol for Ethereum. 
 
-Because of this, EigenDA makes use of the EigenLayer state, which is stored on Ethereum, for consensus about the state of operators and as a callback for consensus about the availability of data. This means that EigenDA can be simpler in implementation than many existing DA solutions: EigenDA doesn't need to build it's own chain; it rides on the back of Ethereum. 
+Because of this, EigenDA makes use of the EigenLayer state, which is stored on Ethereum, for consensus about the state of operators and as a callback for consensus about the availability of data. This means that EigenDA can be simpler in implementation than many existing DA solutions: EigenDA doesn't need to build it's own chain or consensus protocol; it rides on the back of Ethereum. 
 
 ### A first of its kind, horizontally scalable DA solution
 
@@ -72,31 +72,29 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 ## Protocol Overview
 
 For expositional purposes, we will divide the protocol into two conceptual layers: 
-- Consensus Layer: Modules to ensure that whenever a DA attestation is accepted by an end-user (e.g. a rollup), then the data is indeed available. More specifically, the consensus layer ensures that the system observes the safety and liveness tolerances defined in the [Security Model](#Security-Model) section.
+- Attestation Layer: Modules to ensure that whenever a DA attestation is accepted by an end-user (e.g. a rollup), then the data is indeed available. More specifically, the attestation layer ensures that the system observes the safety and liveness tolerances defined in the [Security Model](#Security-Model) section.
 - Network Layer: The communications protocol which ensures that the liveness and saftey of the protocol are robust against network-level events and threats. 
 
-![image](../assets/consensus-layer.png)
+![image](../assets/attestation-layer.png)
 
 
 ![image](../assets/network-layer.png)
 
 
-## Consensus Layer
+## Attestation Layer
 
-The consensus layer is responsible for ensuring that when the network-level assumptions and safety and liveness tolerances are observed, the system properly makes data available. 
+The attest layer is responsible for ensuring that when the network-level assumptions and safety and liveness tolerances are observed, the system properly makes data available. 
 
-The primary responsibility of the consensus layer is to enable consensus about whether a given blob of data is fully within the custody of a set of honest nodes. (Here, what can be taken to be a set of honest nodes is defined by the system safety tolerance and the assurance that these honest nodes will be able to transmit the data to honest retrievers is handled by the network layer.)
-
-Since EigenDA is an EigenLayer AVS it can piggy bank off of Ethereum for consensus on validator state. This allows us to decompose the consensus layer's function into two simple pieces: 
-- **Consensus Logic**: The consensus logic allows us to answer the question of whether a given blob is available, given both a DA attestation and the validator state at the associated Ethereum block. The consensus logic can be understood as simply a function of these inputs which outputs yes or no, depending on whether these inputs imply that data is available. Naturally, this function is grounded upon assumptions about the behavior of honest nodes, which must perform certain validation actions as part of the consensus layer. The consensus logic further docomposes into two major modules: 
+The primary responsibility of the attestation layer is to enable consensus about whether a given blob of data is fully within the custody of a set of honest nodes. (Here, what can be taken to be a set of honest nodes is defined by the system safety tolerance and the assurance that these honest nodes will be able to transmit the data to honest retrievers is handled by the network layer.) Since EigenDA is an EigenLayer AVS it does not need its own actual consensus protocol, but can instead piggy-back off of Ethereum's consensus. As a result, the attestation layer decomposes into two fairly straightforward pieces: 
+- **Attestation Logic**: The attestation logic allows us to answer the question of whether a given blob is available, given both a DA attestation and the validator state at the associated Ethereum block. The attestation logic can be understood as simply a function of these inputs which outputs yes or no, depending on whether these inputs imply that data is available. Naturally, this function is grounded upon assumptions about the behavior of honest nodes, which must perform certain validation actions as part of the attestation layer. The attestation logic further docomposes into two major modules: 
     - *Encoding*: The encoding module defines a procedure for blobs to be encoded in such a way that their successful reconstruction can be guaranteed given a large enough collection of unique encoded chunks. The procedure also allows for the chunks to be trustlessly verified against a blob commitment so that the disperser cannot violate the protocol.
     - *Assignment*: The assignment module provides a deterministic mapping from validator state to an allocation of encoded chunks to DA nodes. The mapping is designed to uphold safety and liveness properties with minimal data-inefficiency. 
 - **Bridging**: Bridging describes how the attestation is bridged to the consumer protocol, such as that of the rollup. In principle, bridging can be performed in one of several different ways in order to optimize efficiency and composability. At the moment, only bridging via the Ethereum L1 is directly supported. 
 
-![image](../assets/consensus-layer-parts.png)
+![image](../assets/attestation-layer-parts.png)
 
 
-The desired behavior of the consensus logic can be formally described as follows (Ignore this if you're happy with the high level ideas): Let $\alpha$ denote the safety threshold, i.e. the maximum proportion of adversarial stake that the system is able to tolerate. Likewise, let $\beta$ represent the amount of stake that we require to be held by the signing operators in order to accept an attestation, i.e. one minus the liveness threshold. Also, let $O$ denote the set of EigenDA operators.
+The desired behavior of the attestation logic can be formally described as follows (Ignore this if you're happy with the high level ideas): Let $\alpha$ denote the safety threshold, i.e. the maximum proportion of adversarial stake that the system is able to tolerate. Likewise, let $\beta$ represent the amount of stake that we require to be held by the signing operators in order to accept an attestation, i.e. one minus the liveness threshold. Also, let $O$ denote the set of EigenDA operators.
 
 We need to guarantee that any set of signing operators $U_q \subseteq O$ such that
 
@@ -112,17 +110,17 @@ we we can reconstruct the original data blob from the chunks held by $U_q \setmi
 
 The encoding module defines a procedure for blobs to be encoded in such a way that their successful reconstruction can be guaranteed given a large enough collection of unique encoded chunks. The procedure also allows for the chunks to be trustlessly verified against a blob commitment so that the disperser cannot violate the protocol.
 
-[Read more](./consensus/encoding.md)
+[Read more](./attestation/encoding.md)
 
 ### Assignment Module
 
 The assignment module is nothing more than a rule which takes in the Ethereum chain state and outputs an allocation of chunks to DA operators. 
 
-[Read more](./consensus/assignment.md)
+[Read more](./attestation/assignment.md)
 
 ### Signature verification and bridging
 
-[Read more](./consensus/bridging.md)
+[Read more](./attestation/bridging.md)
 
 ## Network Layer
 
