@@ -823,19 +823,20 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestGetServiceAvailability_ValidHosts(t *testing.T) {
+func TestGetServiceAvailability(t *testing.T) {
 	// TODO: Identify which GoLeak is causing the test to fail
 	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
 
 	r := setUpRouter()
 
 	var wg sync.WaitGroup
-
+	serviceNames := []string{"Disperser", "Churner"}
 	hosts := []string{"localhost:32007", "localhost:32009"} // Example DNS names for different services
 	cleanupFuncs := make([]func(), 0, len(hosts))
-	for _, host := range hosts {
+
+	for i, host := range hosts {
 		wg.Add(1)
-		cleanup := startGRPCServerWithHealthCheck(host, &wg)
+		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
 		cleanupFuncs = append(cleanupFuncs, cleanup)
 	}
 	wg.Wait() // Wait for servers to start
@@ -859,7 +860,7 @@ func TestGetServiceAvailability_ValidHosts(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.ServiceAvailabilityResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -867,6 +868,241 @@ func TestGetServiceAvailability_ValidHosts(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 2, response.Meta.Size)
 	assert.Equal(t, 2, len(response.Data))
+
+	service1Data := response.Data[0]
+	service2Data := response.Data[1]
+
+	assert.Equal(t, "Disperser", service1Data.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), service1Data.ServiceStatus)
+
+	assert.Equal(t, "Churner", service2Data.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), service2Data.ServiceStatus)
+
+	// At the end of your test, stop all servers
+	for _, cleanup := range cleanupFuncs {
+		cleanup() // Stops each gRPC server
+	}
+}
+
+func TestGetServiceAvailability_QueryDisperser(t *testing.T) {
+	// TODO: Identify which GoLeak is causing the test to fail
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
+
+	r := setUpRouter()
+
+	var wg sync.WaitGroup
+	serviceNames := []string{"Disperser", "Churner"}
+	hosts := []string{"localhost:32007", "localhost:32009"}
+
+	cleanupFuncs := make([]func(), 0, len(hosts))
+	for i, host := range hosts {
+		wg.Add(1)
+		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
+		cleanupFuncs = append(cleanupFuncs, cleanup)
+	}
+	wg.Wait() // Wait for servers to start
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger))
+
+	// Here's the critical part: Initialize the gRPC client pools
+	maxGRPCClientPoolSize := 5 // This should match your actual or test setup requirements
+	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
+		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
+	}
+	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?service=disperser", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+
+	serviceData := response.Data[0]
+	assert.Equal(t, "Disperser", serviceData.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
+
+	// At the end of your test, stop all servers
+	for _, cleanup := range cleanupFuncs {
+		cleanup() // Stops each gRPC server
+	}
+}
+
+func TestGetServiceAvailability_QueryInvalidService(t *testing.T) {
+	// TODO: Identify which GoLeak is causing the test to fail
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
+
+	r := setUpRouter()
+
+	var wg sync.WaitGroup
+	serviceNames := []string{"Disperser", "Churner"}
+	hosts := []string{"localhost:32007", "localhost:32009"}
+
+	cleanupFuncs := make([]func(), 0, len(hosts))
+	for i, host := range hosts {
+		wg.Add(1)
+		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
+		cleanupFuncs = append(cleanupFuncs, cleanup)
+	}
+	wg.Wait() // Wait for servers to start
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger))
+
+	// Here's the critical part: Initialize the gRPC client pools
+	maxGRPCClientPoolSize := 5 // This should match your actual or test setup requirements
+	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
+		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
+	}
+	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?service=encoder", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 0, response.Meta.Size)
+	assert.Equal(t, 0, len(response.Data))
+
+	// At the end of your test, stop all servers
+	for _, cleanup := range cleanupFuncs {
+		cleanup() // Stops each gRPC server
+	}
+}
+
+func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
+	// TODO: Identify which GoLeak is causing the test to fail
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
+
+	r := setUpRouter()
+
+	var wg sync.WaitGroup
+	serviceNames := []string{"Disperser", "Churner"}
+	hosts := []string{"localhost:32007", "localhost:32009"}
+
+	cleanupFuncs := make([]func(), 0, len(hosts))
+	for i, host := range hosts {
+		wg.Add(1)
+		cleanup := startGRPCServerWithError(host, serviceNames[i], &wg)
+		cleanupFuncs = append(cleanupFuncs, cleanup)
+	}
+	wg.Wait() // Wait for servers to start
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger))
+
+	// Here's the critical part: Initialize the gRPC client pools
+	maxGRPCClientPoolSize := 5 // This should match your actual or test setup requirements
+	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
+		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
+	}
+	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?service=disperser", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+
+	serviceData := response.Data[0]
+	assert.Equal(t, "Disperser", serviceData.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING.String(), serviceData.ServiceStatus)
+
+	// At the end of your test, stop all servers
+	for _, cleanup := range cleanupFuncs {
+		cleanup() // Stops each gRPC server
+	}
+}
+
+func TestGetServiceAvailability_HealthyUnHealthyService(t *testing.T) {
+	// TODO: Identify which GoLeak is causing the test to fail
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
+
+	r := setUpRouter()
+
+	var wg sync.WaitGroup
+	serviceNames := []string{"Disperser", "Churner"}
+	hosts := []string{"localhost:32007", "localhost:32009"}
+
+	cleanupFuncs := make([]func(), 0, len(hosts))
+	wg.Add(1)
+	cleanup1 := startGRPCServerWithHealthCheck(hosts[0], serviceNames[0], &wg)
+	cleanupFuncs = append(cleanupFuncs, cleanup1)
+	wg.Add(1)
+	cleanup2 := startGRPCServerWithError(hosts[1], serviceNames[1], &wg)
+	cleanupFuncs = append(cleanupFuncs, cleanup2)
+	wg.Wait() // Wait for servers to start
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger))
+
+	// Here's the critical part: Initialize the gRPC client pools
+	maxGRPCClientPoolSize := 5 // This should match your actual or test setup requirements
+	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
+		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
+	}
+	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+
+	service1Data := response.Data[0]
+	service2Data := response.Data[1]
+
+	assert.Equal(t, "Disperser", service1Data.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), service1Data.ServiceStatus)
+
+	assert.Equal(t, "Churner", service2Data.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING.String(), service2Data.ServiceStatus)
 
 	// At the end of your test, stop all servers
 	for _, cleanup := range cleanupFuncs {
@@ -984,7 +1220,7 @@ func getOperatorData(operatorMetadtas []*dataapi.DeregisteredOperatorMetadata, o
 
 }
 
-func startGRPCServerWithHealthCheck(host string, wg *sync.WaitGroup) func() {
+func startGRPCServerWithHealthCheck(host string, serviceName string, wg *sync.WaitGroup) func() {
 	defer wg.Done()
 
 	lis, err := net.Listen("tcp", host)
@@ -995,7 +1231,35 @@ func startGRPCServerWithHealthCheck(host string, wg *sync.WaitGroup) func() {
 	grpcServer := grpc.NewServer()
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
-	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus(serviceName, grpc_health_v1.HealthCheckResponse_SERVING)
+
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve gRPC on %s: %v", host, err)
+		}
+	}()
+
+	return func() { grpcServer.GracefulStop() }
+}
+
+type ErrorHealthServer struct {
+	grpc_health_v1.UnimplementedHealthServer
+}
+
+func (e *ErrorHealthServer) Check(ctx context.Context, in *grpc_health_v1.HealthCheckRequest) (*grpc_health_v1.HealthCheckResponse, error) {
+	return nil, fmt.Errorf("forced error")
+}
+
+func startGRPCServerWithError(host string, serviceName string, wg *sync.WaitGroup) func() {
+	defer wg.Done()
+
+	lis, err := net.Listen("tcp", host)
+	if err != nil {
+		log.Fatalf("Failed to listen on %s: %v", host, err)
+	}
+
+	grpcServer := grpc.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, &ErrorHealthServer{})
 
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {

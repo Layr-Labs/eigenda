@@ -21,7 +21,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsInfo"
+                    "ServiceAvailability"
                 ],
                 "summary": "Get status of public EigenDA services.",
                 "responses": {

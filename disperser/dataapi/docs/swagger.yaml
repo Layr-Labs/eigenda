@@ -231,7 +231,7 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of public EigenDA services.
       tags:
-      - OperatorsInfo
+      - ServiceAvailability
   /feed/blobs:
     get:
       parameters:

@@ -167,7 +167,7 @@ func (s *server) Start() error {
 	err := s.InitGRPCClientPools(maxGRPCClientPoolSize)
 
 	if err != nil {
-		return err
+		s.logger.Error("Failed to initialize gRPC client pools", "error", err)
 	}
 
 	router := gin.New()
@@ -503,7 +503,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 // GetEigenDAServiceAvailability godoc
 //
 //	@Summary	Get status of public EigenDA services.
-//	@Tags		OperatorsInfo
+//	@Tags		ServiceAvailability
 //	@Produce	json
 //	@Success	200	{object}	ServiceAvailabilityResponse
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
@@ -516,8 +516,21 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	hosts := []string{s.disperserHostName, s.churnerHostName}
-	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), hosts)
+	// Get query parameters if
+	serviceName := c.DefaultQuery("service", "") // If not specified, default to return all services
+
+	// If service name is not specified, return all services
+	services := []string{}
+
+	if serviceName == "disperser" {
+		services = append(services, "Disperser")
+	} else if serviceName == "churner" {
+		services = append(services, "Churner")
+	} else if serviceName == "" {
+		services = append(services, "Disperser", "Churner")
+	}
+
+	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("GetEigenDAServiceAvailability")
 		errorResponse(c, err)
