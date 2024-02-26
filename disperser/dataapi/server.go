@@ -188,7 +188,7 @@ func (s *server) Start() error {
 		}
 		serviceAvailability := v1.Group("/service-availability")
 		{
-			serviceAvailability.GET("/eigenda-services", s.FetchDeregisteredOperators)
+			serviceAvailability.GET("/eigenda-services", s.GetEigenDAServiceAvailability)
 		}
 		metrics := v1.Group("/metrics")
 		{
