@@ -104,8 +104,8 @@ var (
 	}
 	// EigenDA Disperser and Churner Hostnames to check Server Availability
 	// ex:
-	// disperser-goerli.eigenda-testnet.eigenops.xyz,
-	// churner-goerli.eigenda-testnet.eigenops.xyz
+	// disperser-goerli.eigenda.eigenops.xyz,
+	// churner-goerli.eigenda.eigenops.xyz
 	DisperserHostnameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-disperser-hostname"),
 		Usage:    "HostName of EigenDA Disperser",

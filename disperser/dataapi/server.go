@@ -517,7 +517,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	hosts := []string{s.disperserHostName, s.churnerHostName}
-	availaiblityStatuses, err := s.getServiceAvailability(c.Request.Context(), hosts)
+	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), hosts)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("GetEigenDAServiceAvailability")
 		errorResponse(c, err)
@@ -527,9 +527,9 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
 	c.JSON(http.StatusOK, ServiceAvailabilityResponse{
 		Meta: Meta{
-			Size: len(availaiblityStatuses),
+			Size: len(availabilityStatuses),
 		},
-		Data: availaiblityStatuses,
+		Data: availabilityStatuses,
 	})
 }
 

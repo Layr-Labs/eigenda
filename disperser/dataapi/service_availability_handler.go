@@ -20,7 +20,7 @@ func (s *server) getServiceAvailability(ctx context.Context, hosts []string) ([]
 		return nil, fmt.Errorf("hostnames cannot be nil")
 	}
 
-	availaiblityStatuses := make([]*ServiceAvailability, len(hosts))
+	availabilityStatuses := make([]*ServiceAvailability, len(hosts))
 
 	for i, host := range hosts {
 		pool, ok := s.getClientPool(host)
@@ -42,12 +42,12 @@ func (s *server) getServiceAvailability(ctx context.Context, hosts []string) ([]
 			ServiceName:   host,
 			ServiceStatus: response.Status.String(),
 		}
-		availaiblityStatuses[i] = availabilityStatus
+		availabilityStatuses[i] = availabilityStatus
 		// Return connection back to pool
 		putClientConn(conn, pool)
 
 	}
-	return availaiblityStatuses, nil
+	return availabilityStatuses, nil
 }
 
 // Initializes the client pools for the server
