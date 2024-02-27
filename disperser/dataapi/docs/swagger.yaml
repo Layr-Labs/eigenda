@@ -56,14 +56,14 @@ definitions:
         type: integer
       batch_root:
         type: string
-      blob-key:
-        type: string
       blob_commitment:
         $ref: '#/definitions/core.BlobCommitments'
       blob_inclusion_proof:
         type: string
       blob_index:
         type: integer
+      blob_key:
+        type: string
       blob_status:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser.BlobStatus'
       confirmation_block_number:
@@ -221,12 +221,12 @@ paths:
       summary: Fetch blobs metadata list
       tags:
       - Feed
-  /feed/blobs/{blob-key}:
+  /feed/blobs/{blob_key}:
     get:
       parameters:
       - description: Blob Key
         in: path
-        name: blob-key
+        name: blob_key
         required: true
         type: string
       produces:

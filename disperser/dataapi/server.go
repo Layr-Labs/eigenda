@@ -32,7 +32,7 @@ var errNotFound = errors.New("not found")
 
 type (
 	BlobMetadataResponse struct {
-		BlobKey                 string                `json:"blob-key"`
+		BlobKey                 string                `json:"blob_key"`
 		BatchHeaderHash         string                `json:"batch_header_hash"`
 		BlobIndex               uint32                `json:"blob_index"`
 		SignatoryRecordHash     string                `json:"signatory_record_hash"`
@@ -152,7 +152,7 @@ func (s *server) Start() error {
 		feed := v1.Group("/feed")
 		{
 			feed.GET("/blobs", s.FetchBlobsHandler)
-			feed.GET("/blobs/:blob-key", s.FetchBlobHandler)
+			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
 		}
 		operatorsInfo := v1.Group("/operators-info")
 		{
@@ -208,19 +208,19 @@ func (s *server) Start() error {
 //	@Summary	Fetch blob metadata by blob key
 //	@Tags		Feed
 //	@Produce	json
-//	@Param		blob-key	path		string	true	"Blob Key"
+//	@Param		blob_key	path		string	true	"Blob Key"
 //	@Success	200			{object}	BlobMetadataResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/feed/blobs/{blob-key} [get]
+//	@Router		/feed/blobs/{blob_key} [get]
 func (s *server) FetchBlobHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchBlob", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
-	blobKey := c.Param("blob-key")
+	blobKey := c.Param("blob_key")
 
 	metadata, err := s.getBlob(c.Request.Context(), blobKey)
 	if err != nil {

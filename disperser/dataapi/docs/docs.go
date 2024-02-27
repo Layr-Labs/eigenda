@@ -60,7 +60,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/feed/blobs/{blob-key}": {
+        "/feed/blobs/{blob_key}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -73,7 +73,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Blob Key",
-                        "name": "blob-key",
+                        "name": "blob_key",
                         "in": "path",
                         "required": true
                     }
@@ -425,9 +425,6 @@ const docTemplate = `{
                 "batch_root": {
                     "type": "string"
                 },
-                "blob-key": {
-                    "type": "string"
-                },
                 "blob_commitment": {
                     "$ref": "#/definitions/core.BlobCommitments"
                 },
@@ -436,6 +433,9 @@ const docTemplate = `{
                 },
                 "blob_index": {
                     "type": "integer"
+                },
+                "blob_key": {
+                    "type": "string"
                 },
                 "blob_status": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser.BlobStatus"
