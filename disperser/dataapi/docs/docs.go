@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/eigenda-services/service-availability": {
+        "/eigenda/service-availability": {
             "get": {
                 "produces": [
                     "application/json"

@@ -11,7 +11,7 @@
         "version": "1"
     },
     "paths": {
-        "/eigenda-services/service-availability": {
+        "/eigenda/service-availability": {
             "get": {
                 "produces": [
                     "application/json"

@@ -186,9 +186,9 @@ func (s *server) Start() error {
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 		}
-		serviceAvailability := v1.Group("/service-availability")
+		serviceAvailability := v1.Group("/eigenda")
 		{
-			serviceAvailability.GET("/eigenda-services", s.GetEigenDAServiceAvailability)
+			serviceAvailability.GET("/service-availability", s.GetEigenDAServiceAvailability)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -509,7 +509,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/eigenda-services/service-availability [get]
+//	@Router		/eigenda/service-availability [get]
 func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("GetEigenDAServiceAvailability", f*1000) // make milliseconds
@@ -517,7 +517,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	// Get query parameters if
-	serviceName := c.DefaultQuery("serviceName", "") // If not specified, default to return all services
+	serviceName := c.DefaultQuery("service-name", "") // If not specified, default to return all services
 
 	// If service name is not specified, return all services
 	services := []string{}

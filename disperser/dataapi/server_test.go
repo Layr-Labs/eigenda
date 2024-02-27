@@ -849,10 +849,10 @@ func TestGetServiceAvailability(t *testing.T) {
 	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
 		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
 	}
-	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda/service-availability", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -910,10 +910,10 @@ func TestGetServiceAvailability_QueryDisperser(t *testing.T) {
 	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
 		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
 	}
-	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?serviceName=disperser", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda/service-availability?service-name=disperser", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -968,10 +968,10 @@ func TestGetServiceAvailability_QueryInvalidService(t *testing.T) {
 	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
 		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
 	}
-	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?serviceName=encoder", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda/service-availability?service-name=encoder", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -1020,10 +1020,10 @@ func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
 	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
 		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
 	}
-	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability?serviceName=disperser", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda/service-availability?service-name=disperser", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -1077,10 +1077,10 @@ func TestGetServiceAvailability_HealthyUnHealthyService(t *testing.T) {
 	if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
 		t.Fatalf("Failed to initialize gRPC client pools: %v", err)
 	}
-	r.GET("/v1/eigenda-services/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
+	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda-services/service-availability", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/eigenda/service-availability", nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
