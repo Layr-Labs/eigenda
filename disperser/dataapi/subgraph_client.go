@@ -2,6 +2,7 @@ package dataapi
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strconv"
@@ -214,7 +215,7 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx con
 		var operatorId [32]byte
 
 		if err != nil && operator == nil {
-			sc.logger.Error("failed to convert", "err", err, "operator", deregisteredOperator)
+			sc.logger.Warn("failed to convert", "err", err, "operator", deregisteredOperator)
 			continue
 		}
 
@@ -223,14 +224,18 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx con
 
 		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
 		if err != nil {
-			addOperatorWithErrorDetail(operators, operator, operatorId, "query operator info by operator id at block number failed")
-			sc.logger.Error("failed to query operator info by operator id at block number", "err", err)
+			operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
+			errorMessage := fmt.Sprintf("query operator info by operator id at block number failed: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
+			addOperatorWithErrorDetail(operators, operator, operatorId, errorMessage)
+			sc.logger.Warn(errorMessage)
 			continue
 		}
 		indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
 		if err != nil {
-			addOperatorWithErrorDetail(operators, operator, operatorId, "failed to convert operator info gql to indexed operator info")
-			sc.logger.Error("failed to convert operator info gql to indexed operator info", "err", err)
+			operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
+			errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info at blocknumber: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
+			addOperatorWithErrorDetail(operators, operator, operatorId, errorMessage)
+			sc.logger.Warn(errorMessage)
 			continue
 		}
 

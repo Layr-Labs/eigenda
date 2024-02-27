@@ -343,7 +343,7 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 	assert.Equal(t, 1, len(response.Data))
 
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", response.Data[0].OperatorId)
-	assert.Equal(t, "failed to convert operator info gql to indexed operator info", response.Data[0].OperatorProcessError)
+	assert.Equal(t, "failed to convert operator info gql to indexed operator info at blocknumber: 22 for operator 0x3078653232646165313261303037346632306238666339366130343839333736", response.Data[0].OperatorProcessError)
 
 	// Reset the mock
 	mockSubgraphApi.ExpectedCalls = nil
@@ -408,7 +408,7 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 	assert.Equal(t, uint(22), operator1Data.BlockNumber)
 	assert.Equal(t, "", operator1Data.Socket)
 	assert.Equal(t, false, operator1Data.IsOnline)
-	assert.Equal(t, "failed to convert operator info gql to indexed operator info", operator1Data.OperatorProcessError)
+	assert.Equal(t, "failed to convert operator info gql to indexed operator info at blocknumber: 22 for operator 0x3078653232646165313261303037346632306238666339366130343839333736", operator1Data.OperatorProcessError)
 
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", operator2Data.OperatorId)
 	assert.Equal(t, uint(24), operator2Data.BlockNumber)
