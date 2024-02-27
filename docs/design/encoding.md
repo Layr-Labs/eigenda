@@ -58,6 +58,6 @@ As a simple illustrative example, suppose that  `AssignmentCoordinator` provides
 - `ChunkLength` = 3
 - `NumChunks` = 4
 
-Supplied with these parameters, `Encoder.GetEncodingParams` will upgrade `ChunkLength` to the next highest power of 2, i.e., `ChunkLength` = 4, and leave `NumChunks` unchanged. The following figure illustrates how the indices will be assigned across the chunks in this scenario.
+Supplied with these parameters, `Encoder.ParamsFromMins` will upgrade `ChunkLength` to the next highest power of 2, i.e., `ChunkLength` = 4, and leave `NumChunks` unchanged. The following figure illustrates how the indices will be assigned across the chunks in this scenario.
 
 ![Worked example of chunk indices for ChunkLength=4, NumChunks=4](../assets/encoding-groups.png)

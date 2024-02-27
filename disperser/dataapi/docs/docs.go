@@ -349,7 +349,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "core.BlobCommitments": {
+        "encoding.BlobCommitments": {
             "type": "object",
             "properties": {
                 "commitment": {
@@ -426,7 +426,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "blob_commitment": {
-                    "$ref": "#/definitions/core.BlobCommitments"
+                    "$ref": "#/definitions/encoding.BlobCommitments"
                 },
                 "blob_inclusion_proof": {
                     "type": "string"

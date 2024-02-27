@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -27,7 +28,7 @@ func NewServer(
 	config *Config,
 	logger common.Logger,
 	retrievalClient clients.RetrievalClient,
-	encoder core.Encoder,
+	verifier encoding.Verifier,
 	indexedState core.IndexedChainState,
 	chainClient eth.ChainClient,
 ) *Server {

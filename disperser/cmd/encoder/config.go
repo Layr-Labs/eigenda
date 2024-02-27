@@ -2,14 +2,14 @@ package main
 
 import (
 	"github.com/Layr-Labs/eigenda/common/logging"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
 
 type Config struct {
-	EncoderConfig encoding.EncoderConfig
+	EncoderConfig kzg.KzgConfig
 	LoggerConfig  logging.Config
 	ServerConfig  *encoder.ServerConfig
 	MetricsConfig encoder.MetrisConfig
@@ -17,7 +17,7 @@ type Config struct {
 
 func NewConfig(ctx *cli.Context) Config {
 	config := Config{
-		EncoderConfig: encoding.ReadCLIConfig(ctx),
+		EncoderConfig: kzg.ReadCLIConfig(ctx),
 		LoggerConfig:  logging.ReadCLIConfig(ctx, flags.FlagPrefix),
 		ServerConfig: &encoder.ServerConfig{
 			GrpcPort:              ctx.GlobalString(flags.GrpcPortFlag.Name),

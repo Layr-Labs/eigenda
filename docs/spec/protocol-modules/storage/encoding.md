@@ -24,10 +24,10 @@ type Encoder interface {
 	// may use different symbol sizes
 	GetBlobLength(blobSize uint) uint
 
-	// GetEncodingParams takes in the minimum chunk length and the minimum number of chunks and returns the encoding parameters given any
+	// ParamsFromMins takes in the minimum chunk length and the minimum number of chunks and returns the encoding parameters given any
 	// additional constraints from the encoder backend. For instance, both the ChunkLength and NumChunks must typically be powers of 2.
 	// The ChunkLength returned here should be used in constructing the BlobHeader.
-	GetEncodingParams(minChunkLength, minNumChunks uint) (EncodingParams, error)
+	ParamsFromMins(minChunkLength, minNumChunks uint) (EncodingParams, error)
 
 	// Encode takes in a blob and returns the commitments and encoded chunks. The encoding will satisfy the property that
 	// for any number M such that M*params.ChunkLength > BlobCommitments.Length, then any set of M chunks will be sufficient to

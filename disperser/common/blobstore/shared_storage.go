@@ -134,6 +134,17 @@ func (s *SharedBlobStore) getBlobContentParallel(ctx context.Context, blobKey di
 }
 
 func (s *SharedBlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {
+	// TODO (ian-shim): remove this check once we are sure that the metadata is never overwritten
+	refreshedMetadata, err := s.GetBlobMetadata(ctx, existingMetadata.GetBlobKey())
+	if err != nil {
+		s.logger.Error("[MarkBlobConfirmed] error getting blob metadata", "err", err)
+		return nil, err
+	}
+	alreadyConfirmed, _ := refreshedMetadata.IsConfirmed()
+	if alreadyConfirmed {
+		s.logger.Warn("[MarkBlobConfirmed] trying to confirm blob already marked as confirmed", "blobKey", existingMetadata.GetBlobKey().String())
+		return refreshedMetadata, nil
+	}
 	newMetadata := *existingMetadata
 	// Update the TTL if needed
 	ttlFromNow := time.Now().Add(s.blobMetadataStore.ttl)

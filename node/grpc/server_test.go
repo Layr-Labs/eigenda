@@ -14,11 +14,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/logging"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/encoding"
 	core_mock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/Layr-Labs/eigenda/pkg/encoding/kzgEncoder"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -41,9 +43,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// makeTestEncoder makes an encoder currently using the only supported backend.
-func makeTestEncoder() (core.Encoder, error) {
-	config := kzgEncoder.KzgConfig{
+// makeTestVerifier makes a verifier currently using the only supported backend.
+func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+
+	config := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
 		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
 		CacheDir:        "../../inabox/resources/kzg/SRSTables",
@@ -52,7 +55,17 @@ func makeTestEncoder() (core.Encoder, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	return encoding.NewEncoder(encoding.EncoderConfig{KzgConfig: config}, true)
+	p, err := prover.NewProver(config, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	v, err := verifier.NewVerifier(config, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return p, v, nil
 }
 
 func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
@@ -99,7 +112,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 		val = mockVal
 	} else {
 
-		enc, err := makeTestEncoder()
+		_, v, err := makeTestComponents()
 		if err != nil {
 			panic("failed to create test encoder")
 		}
@@ -111,7 +124,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 			panic("failed to create test encoder")
 		}
 
-		val = core.NewChunkValidator(enc, asn, cst, opID)
+		val = core.NewChunkValidator(v, asn, cst, opID)
 	}
 
 	node := &node.Node{
@@ -133,7 +146,7 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
 
-	commitment := &core.G1Commitment{
+	commitment := &encoding.G1Commitment{
 		X: commitX,
 		Y: commitY,
 	}
@@ -147,7 +160,7 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	assert.NoError(t, err)
 
-	var lengthProof, lengthCommitment core.G2Commitment
+	var lengthProof, lengthCommitment encoding.G2Commitment
 	lengthProof.X.A0 = lengthXA0
 	lengthProof.X.A1 = lengthXA1
 	lengthProof.Y.A0 = lengthYA0
@@ -166,7 +179,7 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 
 	blobHeaders := []*core.BlobHeader{
 		{
-			BlobCommitments: core.BlobCommitments{
+			BlobCommitments: encoding.BlobCommitments{
 				Commitment:       commitment,
 				LengthCommitment: &lengthCommitment,
 				LengthProof:      &lengthProof,
@@ -175,7 +188,7 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
 		{
-			BlobCommitments: core.BlobCommitments{
+			BlobCommitments: encoding.BlobCommitments{
 				Commitment:       commitment,
 				LengthCommitment: &lengthCommitment,
 				LengthProof:      &lengthProof,
@@ -257,9 +270,9 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	recovered, err := new(core.Chunk).Deserialize(retrievalReply.GetChunks()[0])
+	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
-	chunk, err := new(core.Chunk).Deserialize(encodedChunk)
+	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, chunk)
 }
