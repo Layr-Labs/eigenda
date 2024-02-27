@@ -200,7 +200,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/non_signers": {
+        "/metrics/non-signers": {
             "get": {
                 "produces": [
                     "application/json"
@@ -248,7 +248,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/operator_nonsigning_percentage": {
+        "/metrics/operator-nonsigning-percentage": {
             "get": {
                 "produces": [
                     "application/json"

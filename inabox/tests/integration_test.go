@@ -62,11 +62,6 @@ var _ = Describe("Inabox Integration", func() {
 
 		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []*core.SecurityParam{
 			{
-				QuorumID:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-			{
 				QuorumID:           1,
 				AdversaryThreshold: 80,
 				QuorumThreshold:    100,
@@ -97,58 +92,95 @@ var _ = Describe("Inabox Integration", func() {
 		ticker := time.NewTicker(time.Second * 1)
 		defer ticker.Stop()
 
-		var blobStatus *disperser.BlobStatus
-		var reply *disperserpb.BlobStatusReply
+		var reply1 *disperserpb.BlobStatusReply
+		var reply2 *disperserpb.BlobStatusReply
 	loop:
 		for {
 			select {
 			case <-ctx.Done():
 				Fail("timed out")
 			case <-ticker.C:
-				reply, err = disp.GetBlobStatus(context.Background(), key1)
+				reply1, err = disp.GetBlobStatus(context.Background(), key1)
 				Expect(err).To(BeNil())
-				Expect(reply).To(Not(BeNil()))
-				blobStatus, err = disperser.FromBlobStatusProto(reply.GetStatus())
+				Expect(reply1).To(Not(BeNil()))
+				blobStatus1, err = disperser.FromBlobStatusProto(reply1.GetStatus())
 				Expect(err).To(BeNil())
-				if *blobStatus == disperser.Confirmed {
-					blobHeader := blobHeaderFromProto(reply.GetInfo().GetBlobHeader())
-					verificationProof := blobVerificationProofFromProto(reply.GetInfo().GetBlobVerificationProof())
-					opts, err := ethClient.GetNoSendTransactOpts()
-					Expect(err).To(BeNil())
-					tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
-					Expect(err).To(BeNil())
-					tx, err = ethClient.UpdateGas(ctx, tx, nil, gasTipCap, gasFeeCap)
-					Expect(err).To(BeNil())
-					err = ethClient.SendTransaction(ctx, tx)
-					Expect(err).To(BeNil())
+
+				reply2, err = disp.GetBlobStatus(context.Background(), key2)
+				Expect(err).To(BeNil())
+				Expect(reply2).To(Not(BeNil()))
+				blobStatus2, err = disperser.FromBlobStatusProto(reply2.GetStatus())
+				Expect(err).To(BeNil())
+
+				if *blobStatus1 != disperser.Confirmed || *blobStatus2 != disperser.Confirmed {
 					mineAnvilBlocks(numConfirmations + 1)
-					_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
-					Expect(err).To(BeNil())
-					break loop
-				} else {
-					mineAnvilBlocks(numConfirmations + 1)
+					continue
 				}
+				blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
+				verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
+				opts, err := ethClient.GetNoSendTransactOpts()
+				Expect(err).To(BeNil())
+				tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
+				Expect(err).To(BeNil())
+				tx, err = ethClient.UpdateGas(ctx, tx, nil, gasTipCap, gasFeeCap)
+				Expect(err).To(BeNil())
+				err = ethClient.SendTransaction(ctx, tx)
+				Expect(err).To(BeNil())
+				mineAnvilBlocks(numConfirmations + 1)
+				_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
+				Expect(err).To(BeNil())
+
+				blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
+				verificationProof = blobVerificationProofFromProto(reply2.GetInfo().GetBlobVerificationProof())
+				tx, err = mockRollup.PostCommitment(opts, blobHeader, verificationProof)
+				Expect(err).To(BeNil())
+				tx, err = ethClient.UpdateGas(ctx, tx, nil, gasTipCap, gasFeeCap)
+				Expect(err).To(BeNil())
+				err = ethClient.SendTransaction(ctx, tx)
+				Expect(err).To(BeNil())
+				mineAnvilBlocks(numConfirmations + 1)
+				_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
+				Expect(err).To(BeNil())
+				break loop
 			}
 		}
-		Expect(*blobStatus).To(Equal(disperser.Confirmed))
+		Expect(*blobStatus1).To(Equal(disperser.Confirmed))
+		Expect(*blobStatus2).To(Equal(disperser.Confirmed))
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			0, // retrieve blob 1 from quorum 0, which should not be available
+		)
+		Expect(err).NotTo(BeNil())
 		retrieved, err := retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0, // retrieve from quorum 0
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			1, // retrieve blob 1 from quorum 1
 		)
 		Expect(err).To(BeNil())
 		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
-			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-			reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-			uint(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-			[32]byte(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			0, // retrieve from quorum 0
+		)
+		Expect(err).To(BeNil())
+		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+		retrieved, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve from quorum 1
 		)
 		Expect(err).To(BeNil())
