@@ -1,32 +1,4 @@
 definitions:
-  encoding.BlobCommitments:
-    properties:
-      commitment:
-        $ref: '#/definitions/core.G1Commitment'
-      length:
-        type: integer
-      length_commitment:
-        $ref: '#/definitions/core.G2Commitment'
-      length_proof:
-        $ref: '#/definitions/core.LengthProof'
-    type: object
-  core.G1Commitment:
-    properties:
-      x:
-        items:
-          type: integer
-        type: array
-    type: object
-  core.G2Commitment:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  core.LengthProof:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
   core.SecurityParam:
     properties:
       adversary_threshold:
@@ -166,6 +138,34 @@ definitions:
         type: number
       timestamp:
         type: integer
+    type: object
+  encoding.BlobCommitments:
+    properties:
+      commitment:
+        $ref: '#/definitions/encoding.G1Commitment'
+      length:
+        type: integer
+      length_commitment:
+        $ref: '#/definitions/encoding.G2Commitment'
+      length_proof:
+        $ref: '#/definitions/encoding.LengthProof'
+    type: object
+  encoding.G1Commitment:
+    properties:
+      x:
+        items:
+          type: integer
+        type: array
+    type: object
+  encoding.G2Commitment:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  encoding.LengthProof:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_disperser.BlobStatus:
     enum:
