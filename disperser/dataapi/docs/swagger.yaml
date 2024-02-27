@@ -290,7 +290,7 @@ paths:
       summary: Fetch metrics
       tags:
       - Metrics
-  /metrics/non_signers:
+  /metrics/non-signers:
     get:
       parameters:
       - description: 'Interval to query for non signers in seconds [default: 3600]'
@@ -321,7 +321,7 @@ paths:
       summary: Fetch non signers
       tags:
       - Metrics
-  /metrics/operator_nonsigning_percentage:
+  /metrics/operator-nonsigning-percentage:
     get:
       parameters:
       - description: 'Interval to query for operators nonsigning percentage [default:

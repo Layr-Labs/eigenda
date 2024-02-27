@@ -164,8 +164,8 @@ func (s *server) Start() error {
 		{
 			metrics.GET("/", s.FetchMetricsHandler)
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
-			metrics.GET("/non_signers", s.FetchNonSigners)
-			metrics.GET("/operator_nonsigning_percentage", s.FetchOperatorsNonsigningPercentageHandler)
+			metrics.GET("/non-signers", s.FetchNonSigners)
+			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -367,7 +367,7 @@ func (s *server) FetchMetricsTroughputHandler(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/non_signers  [get]
+//	@Router		/metrics/non-signers  [get]
 func (s *server) FetchNonSigners(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchNonSigners", f*1000) // make milliseconds
@@ -399,7 +399,7 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/operator_nonsigning_percentage  [get]
+//	@Router		/metrics/operator-nonsigning-percentage  [get]
 func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
