@@ -163,7 +163,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/non_signers": {
+        "/metrics/non-signers": {
             "get": {
                 "produces": [
                     "application/json"
@@ -211,7 +211,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/operator_nonsigning_percentage": {
+        "/metrics/operator-nonsigning-percentage": {
             "get": {
                 "produces": [
                     "application/json"
@@ -349,31 +349,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "encoding.BlobCommitments": {
-            "type": "object",
-            "properties": {
-                "commitment": {
-                    "$ref": "#/definitions/core.Commitment"
-                },
-                "length": {
-                    "type": "integer"
-                },
-                "length_proof": {
-                    "$ref": "#/definitions/core.Commitment"
-                }
-            }
-        },
-        "core.Commitment": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -575,6 +550,50 @@ const docTemplate = `{
                 }
             }
         },
+        "encoding.BlobCommitments": {
+            "type": "object",
+            "properties": {
+                "commitment": {
+                    "$ref": "#/definitions/encoding.G1Commitment"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "length_commitment": {
+                    "$ref": "#/definitions/encoding.G2Commitment"
+                },
+                "length_proof": {
+                    "$ref": "#/definitions/encoding.LengthProof"
+                }
+            }
+        },
+        "encoding.G1Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "encoding.G2Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "encoding.LengthProof": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_disperser.BlobStatus": {
             "type": "integer",
             "enum": [
@@ -591,6 +610,17 @@ const docTemplate = `{
                 "Finalized",
                 "InsufficientSignatures"
             ]
+        },
+        "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
+            "type": "object",
+            "properties": {
+                "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
         }
     }
 }`
