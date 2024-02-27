@@ -95,7 +95,7 @@ func newClientPool(size int, serverAddr string) (*ClientPool, error) {
 	}
 	for i := 0; i < size; i++ {
 		// Context with timeout for each dial attempt
-		// Attempt to create a connection to the server only for certain error codes
+		// Attempt to create connection with retries only for certain error code
 		conn, err := createConnWithRetry(serverAddr)
 		if err != nil {
 			return nil, err
