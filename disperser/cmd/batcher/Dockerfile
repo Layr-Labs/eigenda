@@ -9,7 +9,7 @@ COPY core /app/core
 COPY api /app/api
 COPY contracts /app/contracts
 COPY indexer /app/indexer
-COPY pkg /app/pkg
+COPY encoding /app/encoding
 COPY go.mod /app
 COPY go.sum /app
 
