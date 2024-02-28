@@ -448,6 +448,9 @@ const docTemplate = `{
                 "operator_id": {
                     "type": "string"
                 },
+                "operator_process_error": {
+                    "type": "string"
+                },
                 "socket": {
                     "type": "string"
                 }

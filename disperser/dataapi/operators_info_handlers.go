@@ -12,8 +12,9 @@ import (
 )
 
 type OperatorOnlineStatus struct {
-	OperatorInfo        *Operator
-	IndexedOperatorInfo *core.IndexedOperatorInfo
+	OperatorInfo         *Operator
+	IndexedOperatorInfo  *core.IndexedOperatorInfo
+	OperatorProcessError string
 }
 
 var (
@@ -60,8 +61,9 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 
 	for _, operatorInfo := range operators {
 		operatorStatus := OperatorOnlineStatus{
-			OperatorInfo:        operatorInfo.Metadata,
-			IndexedOperatorInfo: operatorInfo.IndexedOperatorInfo,
+			OperatorInfo:         operatorInfo.Metadata,
+			IndexedOperatorInfo:  operatorInfo.IndexedOperatorInfo,
+			OperatorProcessError: operatorInfo.OperatorProcessError,
 		}
 
 		// Submit each operator status check to the worker pool
@@ -74,8 +76,13 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 }
 
 func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
-	socket := core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
-	isOnline := checkIsOperatorOnline(socket)
+	var isOnline bool
+	var socket string
+	if operatorStatus.IndexedOperatorInfo != nil {
+		logger.Error("IndexedOperatorInfo is nil for operator %v", operatorStatus.OperatorInfo)
+		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
+		isOnline = checkIsOperatorOnline(socket)
+	}
 
 	// Log the online status
 	if isOnline {
@@ -86,10 +93,11 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 
 	// Create the metadata regardless of online status
 	metadata := &DeregisteredOperatorMetadata{
-		OperatorId:  string(operatorStatus.OperatorInfo.OperatorId[:]),
-		BlockNumber: uint(operatorStatus.OperatorInfo.BlockNumber),
-		Socket:      socket,
-		IsOnline:    isOnline,
+		OperatorId:           string(operatorStatus.OperatorInfo.OperatorId[:]),
+		BlockNumber:          uint(operatorStatus.OperatorInfo.BlockNumber),
+		Socket:               socket,
+		IsOnline:             isOnline,
+		OperatorProcessError: operatorStatus.OperatorProcessError,
 	}
 
 	// Send the metadata to the results channel

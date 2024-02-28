@@ -83,10 +83,11 @@ type (
 	}
 
 	DeregisteredOperatorMetadata struct {
-		OperatorId  string `json:"operator_id"`
-		BlockNumber uint   `json:"block_number"`
-		Socket      string `json:"socket"`
-		IsOnline    bool   `json:"is_online"`
+		OperatorId           string `json:"operator_id"`
+		BlockNumber          uint   `json:"block_number"`
+		Socket               string `json:"socket"`
+		IsOnline             bool   `json:"is_online"`
+		OperatorProcessError string `json:"operator_process_error"`
 	}
 
 	DeregisteredOperatorsResponse struct {
@@ -165,7 +166,6 @@ func (s *server) Start() error {
 			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
 			metrics.GET("/non-signers", s.FetchNonSigners)
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			metrics.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 		}
 		swagger := v1.Group("/swagger")
 		{
