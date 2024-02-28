@@ -127,6 +127,7 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 			f.logger.Error("FinalizeBlobs: encountered nil metadata in loop")
 			continue
 		}
+
 		stageTimer := time.Now()
 		blobKey := m.GetBlobKey()
 
