@@ -18,6 +18,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 )
@@ -92,7 +93,7 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
 		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
 		Salt:                       salt,
-		QuorumIds:                  []uint32{0, 1},
+		QuorumIds:                  []uint32{0, 1, 2},
 	}
 
 	var requestHash [32]byte
@@ -112,15 +113,15 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	}, nil)
 
 	_, err := s.Churn(ctx, request)
-	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 0], but found 1")
+	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
 }
 
 func setupMockTransactor() {
 	transactorMock.On("StakeRegistry").Return(gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"), nil).Once()
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
-	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(2), nil)
+	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(0), nil)
 	transactorMock.On("GetCurrentBlockNumber").Return(uint32(2), nil)
-	transactorMock.On("GetQuorumCount").Return(uint8(1), nil)
+	transactorMock.On("GetQuorumCount").Return(uint8(2), nil)
 	transactorMock.On("GetOperatorStakesForQuorums").Return(dacore.OperatorStakes{
 		0: {
 			0: {
@@ -128,8 +129,19 @@ func setupMockTransactor() {
 				Stake:      big.NewInt(2),
 			},
 		},
+		1: {
+			0: {
+				OperatorID: makeOperatorId(1),
+				Stake:      big.NewInt(2),
+			},
+		},
 	}, nil)
-	transactorMock.On("GetOperatorSetParams").Return(&dacore.OperatorSetParam{
+	transactorMock.On("GetOperatorSetParams", mock.Anything, uint8(0)).Return(&dacore.OperatorSetParam{
+		MaxOperatorCount:         2,
+		ChurnBIPsOfOperatorStake: 20,
+		ChurnBIPsOfTotalStake:    20000,
+	}, nil)
+	transactorMock.On("GetOperatorSetParams", mock.Anything, uint8(1)).Return(&dacore.OperatorSetParam{
 		MaxOperatorCount:         1,
 		ChurnBIPsOfOperatorStake: 20,
 		ChurnBIPsOfTotalStake:    20000,

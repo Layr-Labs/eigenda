@@ -33,6 +33,10 @@ message ChurnRequest {
 	//   - If any of the quorum here has already been registered, this entire request
 	//     will fail to proceed.
 	//   - If any of the quorum fails to register, this entire request will fail.
+	//   - Regardless of whether the specified quorums are full or not, the Churner
+	//     will return parameters for all quorums specified here. The smart contract will
+	//     determine whether to churn out existing operators based on whether the quorums
+	//     have available space.
 	// The IDs must be in range [0, 254].
 	repeated uint32 quorum_ids = 6;
 }

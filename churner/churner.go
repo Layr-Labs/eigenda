@@ -178,9 +178,8 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 			return nil, errors.New("maxOperatorCount is 0")
 		}
 
-		if uint32(len(operatorStakes[quorumID])) < operatorSetParams.MaxOperatorCount {
-			// quorum is not full, so we can continue
-			continue
+		if len(operatorStakes[quorumID]) == 0 {
+			return nil, fmt.Errorf("no operators in quorum %d", quorumID)
 		}
 
 		operatorToRegisterStake, err := c.Transactor.WeightOfOperatorForQuorum(ctx, quorumID, operatorToRegisterAddress)
