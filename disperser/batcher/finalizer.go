@@ -122,15 +122,29 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 
 func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.BlobMetadata, lastFinalBlock uint64) {
 	for _, m := range metadatas {
+		// Check if metadata is nil before proceeding
+		if m == nil {
+			f.logger.Error("FinalizeBlobs: encountered nil metadata in loop")
+			continue
+		}
+
 		stageTimer := time.Now()
 		blobKey := m.GetBlobKey()
+
 		if m.BlobStatus != disperser.Confirmed {
 			f.logger.Error("FinalizeBlobs: the blob retrieved by status Confirmed is actually", m.BlobStatus.String(), "blobKey", blobKey.String())
 			continue
 		}
+
 		confirmationMetadata, err := f.blobStore.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error getting confirmed metadata", "blobKey", blobKey.String(), "err", err)
+			continue
+		}
+
+		// Additional checks for confirmationMetadata and its nested fields
+		if confirmationMetadata == nil || confirmationMetadata.ConfirmationInfo == nil {
+			f.logger.Error("FinalizeBlobs: received nil confirmationMetadata or ConfirmationInfo", "blobKey", blobKey.String())
 			continue
 		}
 
