@@ -25,7 +25,6 @@ contract MockRollupTest is BLSMockAVSDeployer {
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
 
-    uint256 feePerBytePerTime = 0;
     uint8 defaultCodingRatioPercentage = 10;
     uint32 defaultReferenceBlockNumber = 100;
     uint32 defaultConfirmationBlockNumber = 1000;
@@ -115,9 +114,9 @@ contract MockRollupTest is BLSMockAVSDeployer {
     function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDARollupUtils.BlobVerificationProof memory){
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         IEigenDAServiceManager.BatchHeader memory batchHeader;
         bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
@@ -134,7 +133,6 @@ contract MockRollupTest is BLSMockAVSDeployer {
         IEigenDAServiceManager.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
-        batchMetadata.fee = 100;
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore
@@ -156,7 +154,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         return (blobHeader[1], blobVerificationProof);
     }
 
-    function _generateBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams, uint8 codingRatioPercentage) internal returns (IEigenDAServiceManager.BlobHeader memory) {
+    function _generateBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams) internal returns (IEigenDAServiceManager.BlobHeader memory) {
         if(pseudoRandomNumber == 0) {
             pseudoRandomNumber = 1;
         }
@@ -174,13 +172,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
             }
             quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", i)))) % 100;
-            // make the adversaryRatioPercentage at most 100 - codingRatioPercentage
-            uint256 j = uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage nonce", i)));
-            while(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage > 100 - codingRatioPercentage) {
-                blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", j)))) % 100;
-                j++;
-            }
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }
@@ -190,6 +182,11 @@ contract MockRollupTest is BLSMockAVSDeployer {
         }
 
         return blobHeader;
+    }
+
+    function testGetQuorumAdversaryThreshold () public {
+        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 0) == 50, "getQuorumAdversaryThreshold failed");
+        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 1) == 50, "getQuorumAdversaryThreshold failed");
     }
 
 }

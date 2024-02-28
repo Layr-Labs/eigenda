@@ -54,17 +54,7 @@ interface IEigenDAServiceManager is IServiceManager {
     struct BatchMetadata {
         BatchHeader batchHeader; // the header of the data store
         bytes32 signatoryRecordHash; // the hash of the signatory record
-        uint96 fee; // the amount of paymentToken paid for the datastore
         uint32 confirmationBlockNumber; // the block number at which the batch was confirmed
-    }
-
-    // Relevant metadata for a given datastore
-    struct BatchMetadataWithSignatoryRecord {
-        bytes32 batchHeaderHash; // the header hash of the data store
-        uint32 referenceBlockNumber; // the block number at which stakes 
-        bytes32[] nonSignerPubkeyHashes; // the pubkeyHashes of all of the nonSigners
-        uint96 fee; // the amount of paymentToken paid for the datastore
-        uint32 blockNumber; // the block number at which the datastore was confirmed
     }
 
     // FUNCTIONS
@@ -94,4 +84,7 @@ interface IEigenDAServiceManager is IServiceManager {
 
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
+
+    /// @notice Returns the bytes array of quotaAdversaryThresholdPercentages
+    function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
 }

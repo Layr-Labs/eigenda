@@ -16,10 +16,6 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice Unit of measure (in blocks) for which data will be stored for after confirmation.
     uint32 public constant STORE_DURATION_BLOCKS = 2 weeks / 12 seconds;
 
-    /// @notice Minimum Batch size, in bytes.
-    uint32 internal constant MIN_STORE_SIZE = 32;
-    /// @notice Maximum Batch size, in bytes.
-    uint32 internal constant MAX_STORE_SIZE = 4e9;
     /**
      * @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
      * @dev To clarify edge cases, the middleware can look `BLOCK_STALE_MEASURE` blocks into the past, i.e. it may trust stakes from the interval
@@ -29,6 +25,8 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * have to serve after they've deregistered.
      */
     uint32 public constant BLOCK_STALE_MEASURE = 150;
+
+    bytes public constant quorumAdversaryThresholdPercentages = hex"3232";
     
     /// @notice The current batchId
     uint32 public batchId;

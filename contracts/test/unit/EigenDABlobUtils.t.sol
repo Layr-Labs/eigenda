@@ -26,14 +26,12 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
 
     address confirmer = address(uint160(uint256(keccak256(abi.encodePacked("confirmer")))));
     address notConfirmer = address(uint160(uint256(keccak256(abi.encodePacked("notConfirmer")))));
-    address newFeeSetter = address(uint160(uint256(keccak256(abi.encodePacked("newFeeSetter")))));
 
     EigenDABlobUtilsHarness eigenDABlobUtilsHarness;
 
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
 
-    uint256 feePerBytePerTime = 0;
     uint8 defaultCodingRatioPercentage = 10;
     uint32 defaultReferenceBlockNumber = 100;
     uint32 defaultConfirmationBlockNumber = 1000;
@@ -73,9 +71,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     function testVerifyBlob_TwoQuorums(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         IEigenDAServiceManager.BatchHeader memory batchHeader;
         bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
@@ -92,7 +90,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         IEigenDAServiceManager.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
-        batchMetadata.fee = 100;
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore
@@ -120,9 +117,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     function testVerifyBlob_InvalidMetadataHash(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -134,9 +131,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     function testVerifyBlob_InvalidMerkleProof(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         // add dummy batch metadata
         IEigenDAServiceManager.BatchMetadata memory batchMetadata;
@@ -160,9 +157,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     function testVerifyBlob_RandomNumberOfQuorums(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         IEigenDAServiceManager.BatchHeader memory batchHeader;
         bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
@@ -179,7 +176,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         IEigenDAServiceManager.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
-        batchMetadata.fee = 100;
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore
@@ -207,9 +203,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     function testVerifyBlob_QuorumNumberMismatch(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         IEigenDAServiceManager.BatchHeader memory batchHeader;
         bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
@@ -226,7 +222,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         IEigenDAServiceManager.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
-        batchMetadata.fee = 100;
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore
@@ -253,9 +248,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     function testVerifyBlob_QuorumThresholdNotMet(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams, defaultCodingRatioPercentage);
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         IEigenDAServiceManager.BatchHeader memory batchHeader;
         bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
@@ -272,7 +267,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         IEigenDAServiceManager.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
-        batchMetadata.fee = 100;
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore
@@ -297,7 +291,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     }
 
     // generates a random blob header with the given coding ratio percentage as the ratio of original data to encoded data
-    function _generateRandomBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams, uint8 codingRatioPercentage) internal returns (IEigenDAServiceManager.BlobHeader memory) {
+    function _generateRandomBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams) internal returns (IEigenDAServiceManager.BlobHeader memory) {
         if(pseudoRandomNumber == 0) {
             pseudoRandomNumber = 1;
         }
@@ -317,13 +311,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
             }
             quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", i)))) % 100;
-            // make the adversaryRatioPercentage at most 100 - codingRatioPercentage
-            uint256 j = uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage nonce", i)));
-            while(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage > 100 - codingRatioPercentage) {
-                blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].adversaryThresholdPercentage", j)))) % 100;
-                j++;
-            }
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }

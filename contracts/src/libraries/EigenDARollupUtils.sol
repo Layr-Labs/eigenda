@@ -63,12 +63,28 @@ library EigenDARollupUtils {
                 "EigenDARollupUtils.verifyBlob: adversaryThresholdPercentage is not valid"
             );
 
+            uint8 _adversaryThresholdPercentage = getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
+            if(_adversaryThresholdPercentage > 0){
+                require(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage >= _adversaryThresholdPercentage, 
+                    "EigenDARollupUtils.verifyBlob: adversaryThresholdPercentage is not met"
+                );
+            }
+
             // make sure that the stake signed for is greater than the given quorumThresholdPercentage
             require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumThresholdPercentages[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
                 >= blobHeader.quorumBlobParams[i].quorumThresholdPercentage, 
                 "EigenDARollupUtils.verifyBlob: quorumThresholdPercentage is not met"
             );
 
+        }
+    }
+
+    function getQuorumAdversaryThreshold(
+        IEigenDAServiceManager eigenDAServiceManager,
+        uint256 quorumNumber
+    ) public view returns(uint8 adversaryThresholdPercentage) {
+        if(eigenDAServiceManager.quorumAdversaryThresholdPercentages().length > quorumNumber){
+            adversaryThresholdPercentage = uint8(eigenDAServiceManager.quorumAdversaryThresholdPercentages()[quorumNumber]);
         }
     }
 
