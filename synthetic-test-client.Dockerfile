@@ -14,7 +14,7 @@ COPY churner /app/churner
 COPY core /app/core
 COPY indexer /app/indexer
 COPY contracts /app/contracts
-COPY pkg /app/pkg
+COPY encoding /app/encoding
 # Set the working directory inside the container
 WORKDIR /app
 
