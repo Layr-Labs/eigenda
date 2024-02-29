@@ -118,10 +118,11 @@ func (s *server) getClientPool(serviceName string) (*ClientPool, bool) {
 func getClientConn(pool *ClientPool) (*grpc.ClientConn, error) {
 	select {
 	case conn := <-pool.clients:
+		// Successfully retrieved a connection from the pool.
 		return conn, nil
-	default:
-		// Handle the scenario when no connections are available in the pool.
-		return nil, fmt.Errorf("no available connections in the pool")
+	case <-time.After(time.Millisecond * 50):
+		// Timeout waiting for a connection
+		return nil, fmt.Errorf("timeout waiting for available connection")
 	}
 }
 
