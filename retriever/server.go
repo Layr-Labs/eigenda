@@ -2,7 +2,7 @@ package retriever
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/clients"
@@ -53,7 +53,7 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	s.logger.Info("Received request: ", "BatchHeaderHash", req.GetBatchHeaderHash(), "BlobIndex", req.GetBlobIndex())
 	s.metrics.IncrementRetrievalRequestCounter()
 	if len(req.GetBatchHeaderHash()) != 32 {
-		return nil, fmt.Errorf("got invalid batch header hash")
+		return nil, errors.New("got invalid batch header hash")
 	}
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], req.GetBatchHeaderHash())

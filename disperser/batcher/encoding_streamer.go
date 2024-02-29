@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/wealdtech/go-merkletree"
 )
 
 const encodingInterval = 2 * time.Second
@@ -99,7 +98,7 @@ func NewEncodingStreamer(
 	metrics *EncodingStreamerMetrics,
 	logger common.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
-		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
+		return nil, errors.New("EncodingQueueLimit should be greater than 0")
 	}
 	return &EncodingStreamer{
 		StreamerConfig:         config,

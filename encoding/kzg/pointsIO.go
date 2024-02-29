@@ -2,6 +2,7 @@ package kzg
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -86,7 +87,7 @@ func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bn254.G2Affine, error
 	}
 
 	if len(g.G2PowerOf2Path) == 0 {
-		return bn254.G2Affine{}, fmt.Errorf("G2PathPowerOf2 path is empty")
+		return bn254.G2Affine{}, errors.New("G2PathPowerOf2 path is empty")
 	}
 
 	g2point, err := ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
