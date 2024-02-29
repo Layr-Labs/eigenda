@@ -47,7 +47,7 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	}
 
 	// Log the time taken
-	s.logger.Info("Time taken to get deregistered operators for days: %v", time.Since(startTime))
+	s.logger.Info("Time taken to get deregistered operators for days", "duration", time.Since(startTime))
 	sort.Slice(DeregisteredOperatorMetadata, func(i, j int) bool {
 		return DeregisteredOperatorMetadata[i].BlockNumber < DeregisteredOperatorMetadata[j].BlockNumber
 	})
@@ -86,9 +86,9 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 
 	// Log the online status
 	if isOnline {
-		logger.Debug("Operator %v is online at %s", operatorStatus.IndexedOperatorInfo, socket)
+		logger.Debug("Operator is online", "operatorInfo", operatorStatus.IndexedOperatorInfo, "socket", socket)
 	} else {
-		logger.Debug("Operator %v is offline at %s", operatorStatus.IndexedOperatorInfo, socket)
+		logger.Debug("Operator is offline", "operatorInfo", operatorStatus.IndexedOperatorInfo, "socket", socket)
 	}
 
 	// Create the metadata regardless of online status
