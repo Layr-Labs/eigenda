@@ -25,7 +25,7 @@ import (
 
 var (
 	keyPair                        *dacore.KeyPair
-	quorumIds                      = []uint32{0}
+	quorumIds                      = []uint32{0, 1}
 	logger                         = &commock.Logger{}
 	transactorMock                 = &coremock.MockTransactor{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
@@ -71,13 +71,22 @@ func TestChurn(t *testing.T) {
 	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSalt())
 	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetExpiry())
 	assert.Equal(t, expectedReplySignature, reply.SignatureWithSaltAndExpiry.GetSignature())
-	assert.Equal(t, 1, len(reply.OperatorsToChurn))
-
+	assert.Equal(t, 2, len(reply.OperatorsToChurn))
+	actualQuorums := make([]uint32, 0)
 	for _, param := range reply.OperatorsToChurn {
-		assert.Equal(t, uint32(0), param.GetQuorumId())
-		assert.Equal(t, operatorAddr.Bytes(), param.GetOperator())
-		assert.Equal(t, keyPair.PubKey.Serialize(), param.GetPubkey())
+		actualQuorums = append(actualQuorums, param.GetQuorumId())
+		if param.GetQuorumId() == 0 {
+			// no churning for quorum 0
+			assert.Equal(t, gethcommon.HexToAddress("0x").Bytes(), param.GetOperator())
+			assert.Nil(t, param.GetPubkey())
+		}
+		if param.GetQuorumId() == 1 {
+			// churn the operator with quorum 1
+			assert.Equal(t, operatorAddr.Bytes(), param.GetOperator())
+			assert.Equal(t, keyPair.PubKey.Serialize(), param.GetPubkey())
+		}
 	}
+	assert.ElementsMatch(t, quorumIds, actualQuorums)
 
 	// retry prior to expiry should fail
 	_, err = s.Churn(ctx, request)
