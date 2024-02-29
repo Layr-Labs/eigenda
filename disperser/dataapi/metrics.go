@@ -144,7 +144,6 @@ func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
 		disperser.Confirmed,
 		disperser.Failed,
 		disperser.InsufficientSignatures,
-		disperser.Finalized,
 	} {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
