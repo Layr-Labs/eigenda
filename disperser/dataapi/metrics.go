@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -38,6 +37,7 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 	reg.MustRegister(NewDynamoDBCollector(blobMetadataStore, logger))
+
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
@@ -88,6 +88,7 @@ func (g *Metrics) IncrementFailedRequestNum(method string) {
 func (g *Metrics) Start(ctx context.Context) {
 	g.logger.Info("Starting metrics server at ", "port", g.httpPort)
 	addr := fmt.Sprintf(":%s", g.httpPort)
+
 	go func() {
 		log := g.logger
 		mux := http.NewServeMux()
@@ -101,14 +102,17 @@ func (g *Metrics) Start(ctx context.Context) {
 }
 
 type DynamoDBCollector struct {
-	blobMetadataStore *blobstore.BlobMetadataStore
-	blobStatusMetric  *prometheus.Desc
-	logger            common.Logger
-	metricsCache      map[disperser.BlobStatus]int
-	cacheMutex        sync.RWMutex
+	blobMetadataStore    *blobstore.BlobMetadataStore
+	blobStatusMetric     *prometheus.Desc
+	scrapeDurationMetric *prometheus.GaugeVec
+	logger               common.Logger
 }
 
 func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger common.Logger) *DynamoDBCollector {
+	if blobMetadataStore == nil {
+		logger.Error("BlobMetadataStore is nil, metrics will not be collected")
+	}
+
 	collector := &DynamoDBCollector{
 		blobMetadataStore: blobMetadataStore,
 		blobStatusMetric: prometheus.NewDesc("dynamodb_blob_metadata_status_count",
@@ -116,71 +120,57 @@ func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger
 			[]string{"status"},
 			nil,
 		),
-		logger:       logger,
-		metricsCache: make(map[disperser.BlobStatus]int),
-	}
-
-	if blobMetadataStore != nil {
-		go collector.periodicFetch()
-	} else {
-		logger.Warn("BlobMetadataStore is nil, metrics will not be collected")
+		scrapeDurationMetric: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "dynamodb_collector_scrape_duration_seconds",
+			Help: "Gauge of scrape duration for DynamoDB collector",
+		}, []string{}),
+		logger: logger,
 	}
 
 	return collector
 }
 
-func (collector *DynamoDBCollector) periodicFetch() {
-	// We don't want to fetch finalized status because the amount is large
-	statuses := []disperser.BlobStatus{disperser.Processing, disperser.Confirmed, disperser.InsufficientSignatures, disperser.Failed}
-
-	startFetch := func(status disperser.BlobStatus) {
-		go func() {
-			collector.updateMetricsCache(status)
-		}()
-	}
-
-	// Start the first fetch for each status immediately.
-	for _, status := range statuses {
-		collector.logger.Info("Fetching blob metadata by status", "status", status)
-		startFetch(status)
-	}
-
-	// Then start the ticker for subsequent fetches.
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		for _, status := range statuses {
-			collector.logger.Info("Fetching blob metadata by status", "status", status)
-			startFetch(status)
-		}
-	}
+func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- collector.blobStatusMetric
+	collector.scrapeDurationMetric.Describe(ch)
 }
 
-// updateMetricsCache calls getBlobMetadataByStatus to fetch the count of blob
-// metadata by status, and then updates the metricsCache with the new counts.
-func (collector *DynamoDBCollector) updateMetricsCache(status disperser.BlobStatus) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
+	// Record the start time of the scrape
+	startTime := time.Now()
 
-	// Fetch the count of blob metadata by status.
-	count, err := collector.getBlobMetadataByStatus(ctx, status)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			collector.logger.Warn("Fetching blob metadata by status timed out", "status", status)
-		} else {
-			collector.logger.Error("Failed to get count of blob metadata by status", "status", status, "err", err)
+	for _, status := range []disperser.BlobStatus{
+		disperser.Processing,
+		disperser.Confirmed,
+		disperser.Failed,
+		disperser.InsufficientSignatures,
+		disperser.Finalized,
+	} {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		count, err := collector.getBlobMetadataByStatus(ctx, status)
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				collector.logger.Error("Fetching blob metadata by status took longer than 60 seconds", "status", status)
+			} else {
+				collector.logger.Error("Failed to get count of blob metadata by status", "status", status, "err", err)
+			}
+			continue
 		}
 
-		return
+		ch <- prometheus.MustNewConstMetric(
+			collector.blobStatusMetric,
+			prometheus.GaugeValue,
+			float64(count),
+			status.String(),
+		)
 	}
 
-	// Update the metrics cache with the new count.
-	collector.cacheMutex.Lock()
-	collector.metricsCache[status] = count
-	collector.cacheMutex.Unlock()
-
-	collector.logger.Info("Updated cache", "status", status, "count", count)
+	// Record the scrape duration
+	duration := time.Since(startTime).Seconds()
+	collector.scrapeDurationMetric.WithLabelValues().Set(duration)
+	collector.scrapeDurationMetric.Collect(ch)
 }
 
 // getBlobMetadataByStatus fetches the count of blob metadata by status from DynamoDB.
@@ -206,22 +196,4 @@ func (collector *DynamoDBCollector) getBlobMetadataByStatus(ctx context.Context,
 	}
 
 	return totalMetadata, nil
-}
-
-func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- collector.blobStatusMetric
-}
-
-func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
-	collector.cacheMutex.RLock()
-	defer collector.cacheMutex.RUnlock()
-
-	for status, count := range collector.metricsCache {
-		ch <- prometheus.MustNewConstMetric(
-			collector.blobStatusMetric,
-			prometheus.GaugeValue,
-			float64(count),
-			status.String(),
-		)
-	}
 }
