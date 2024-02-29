@@ -87,4 +87,7 @@ interface IEigenDAServiceManager is IServiceManager {
 
     /// @notice Returns the bytes array of quotaAdversaryThresholdPercentages
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
+
+    /// @notice Returns the bytes array of quotaAdversaryThresholdPercentages
+    function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
 }
