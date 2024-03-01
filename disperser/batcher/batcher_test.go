@@ -127,7 +127,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 			case hb := <-b.HeartbeatChan:
 				mu.Lock() // Lock before modifying the slice
 				heartbeatsReceived = append(heartbeatsReceived, hb)
-				mu.Unlock() // Lock before modifying the slice
+				mu.Unlock()
 			case <-doneListening:
 				return
 			}
@@ -145,8 +145,8 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 		}, b, func() []time.Time {
 			close(doneListening) // Stop the goroutine listening to heartbeats
 
-			mu.Lock()         // Lock before reading the slice
-			defer mu.Unlock() // Ensure the mutex is unlocked after reading
+			mu.Lock() // Lock before reading the slice
+			defer mu.Unlock()
 			return heartbeatsReceived
 		}
 }
