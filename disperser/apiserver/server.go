@@ -35,17 +35,19 @@ const systemAccountKey = "system"
 
 const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
 
+const requiredQuorums = 2
+
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
 	mu *sync.Mutex
 
-	config disperser.ServerConfig
+	serverConfig disperser.ServerConfig
+	config       Config
 
 	blobStore   disperser.BlobStore
 	tx          core.Transactor
 	quorumCount uint8
 
-	rateConfig    RateConfig
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
@@ -58,15 +60,15 @@ type DispersalServer struct {
 //
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
 func NewDispersalServer(
-	config disperser.ServerConfig,
+	serverConfig disperser.ServerConfig,
 	store disperser.BlobStore,
 	tx core.Transactor,
 	logger common.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
-	rateConfig RateConfig,
+	config Config,
 ) *DispersalServer {
-	for ip, rateInfoByQuorum := range rateConfig.Allowlist {
+	for ip, rateInfoByQuorum := range config.Allowlist {
 		for quorumID, rateInfo := range rateInfoByQuorum {
 			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
 		}
@@ -75,6 +77,7 @@ func NewDispersalServer(
 	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
 
 	return &DispersalServer{
+		serverConfig:  serverConfig,
 		config:        config,
 		blobStore:     store,
 		tx:            tx,
@@ -83,7 +86,6 @@ func NewDispersalServer(
 		logger:        logger,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
-		rateConfig:    rateConfig,
 		mu:            &sync.Mutex{},
 	}
 }
@@ -206,7 +208,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	blobSize := len(blob.Data)
 
-	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
+	origin, err := common.GetClientAddress(ctx, s.config.ClientIPHeader, 2, true)
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
@@ -258,7 +260,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 }
 
 func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
-	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
+	unauthRates, ok := s.config.QuorumRateInfos[quorumID]
 	if !ok {
 		return nil, "", fmt.Errorf("no configured rate exists for quorum %d", quorumID)
 	}
@@ -270,7 +272,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	// Check if the address is in the allowlist
 	if len(authenticatedAddress) > 0 {
-		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
+		quorumRates, ok := s.config.Allowlist[authenticatedAddress]
 		if ok {
 			rateInfo, ok := quorumRates[quorumID]
 			if ok {
@@ -290,7 +292,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	key := "ip:" + origin
 
-	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
+	for account, rateInfoByQuorum := range s.config.Allowlist {
 		if !strings.Contains(origin, account) {
 			continue
 		}
@@ -323,7 +325,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 
 	for i, param := range blob.RequestHeader.SecurityParams {
 
-		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
+		rates, ok := s.config.QuorumRateInfos[param.QuorumID]
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
@@ -535,7 +537,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	defer s.logger.Trace("Exiting Start function...")
 
 	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not start tcp listener")
@@ -550,7 +552,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, gs)
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
 		return fmt.Errorf("could not start GRPC server")
 	}
@@ -631,16 +633,17 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	// Set first two quorums to be required
-	// requiredQuorums := uint8(2)
-	requiredQuorums := uint8(0)
-	if s.quorumCount < requiredQuorums {
-		s.updateQuorumCount(ctx)
-	}
-	if s.quorumCount < requiredQuorums {
-		requiredQuorums = s.quorumCount
-	}
-	for i := uint8(0); i < requiredQuorums; i++ {
-		seenQuorums[i] = struct{}{}
+	if !s.config.TestMode {
+		actualRequiredQuorums := uint8(requiredQuorums)
+		if s.quorumCount < requiredQuorums {
+			s.updateQuorumCount(ctx)
+		}
+		if s.quorumCount < requiredQuorums {
+			actualRequiredQuorums = s.quorumCount
+		}
+		for i := uint8(0); i < actualRequiredQuorums; i++ {
+			seenQuorums[i] = struct{}{}
+		}
 	}
 
 	params := make([]*core.SecurityParam, len(seenQuorums))

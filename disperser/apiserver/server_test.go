@@ -335,7 +335,7 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
 
-	rateConfig := apiserver.RateConfig{
+	rateConfig := apiserver.Config{
 		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
 			0: {
 				PerUserUnauthThroughput: 20 * 1024,
@@ -373,6 +373,7 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 				},
 			},
 		},
+		TestMode: true,
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)

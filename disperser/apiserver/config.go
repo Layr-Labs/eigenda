@@ -19,6 +19,7 @@ const (
 	PerUserUnauthBlobRateFlagName   = "auth.per-user-unauth-blob-rate"
 	ClientIPHeaderFlagName          = "auth.client-ip-header"
 	AllowlistFlagName               = "auth.allowlist"
+	TestModeFlagName                = "test-mode"
 
 	// We allow the user to specify the blob rate in blobs/sec, but internally we use blobs/sec * 1e6 (i.e. blobs/microsec).
 	// This is because the rate limiter takes an integer rate.
@@ -39,10 +40,11 @@ type PerUserRateInfo struct {
 
 type Allowlist = map[string]map[core.QuorumID]PerUserRateInfo
 
-type RateConfig struct {
+type Config struct {
 	QuorumRateInfos map[core.QuorumID]QuorumRateInfo
 	ClientIPHeader  string
 	Allowlist       Allowlist
+	TestMode        bool
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -91,23 +93,28 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Required: false,
 			Value:    &cli.StringSlice{},
 		},
+		cli.BoolFlag{
+			Name:     TestModeFlagName,
+			Usage:    "Enable test mode; in test mode, we do not force any quorum to be used",
+			Required: false,
+		},
 	}
 }
 
-func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
+func ReadCLIConfig(c *cli.Context) (Config, error) {
 
 	numQuorums := len(c.IntSlice(RegisteredQuorumFlagName))
 	if len(c.StringSlice(TotalUnauthBlobRateFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of total unauth blob rates does not match number of quorums")
+		return Config{}, fmt.Errorf("number of total unauth blob rates does not match number of quorums")
 	}
 	if len(c.StringSlice(PerUserUnauthBlobRateFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of per user unauth blob intervals does not match number of quorums")
+		return Config{}, fmt.Errorf("number of per user unauth blob intervals does not match number of quorums")
 	}
 	if len(c.IntSlice(TotalUnauthThroughputFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of total unauth throughput does not match number of quorums")
+		return Config{}, fmt.Errorf("number of total unauth throughput does not match number of quorums")
 	}
 	if len(c.IntSlice(PerUserUnauthThroughputFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of per user unauth throughput does not match number of quorums")
+		return Config{}, fmt.Errorf("number of per user unauth throughput does not match number of quorums")
 	}
 
 	quorumRateInfos := make(map[core.QuorumID]QuorumRateInfo)
@@ -115,11 +122,11 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 
 		totalBlobRate, err := strconv.ParseFloat(c.StringSlice(TotalUnauthBlobRateFlagName)[ind], 64)
 		if err != nil {
-			return RateConfig{}, err
+			return Config{}, err
 		}
 		accountBlobRate, err := strconv.ParseFloat(c.StringSlice(PerUserUnauthBlobRateFlagName)[ind], 64)
 		if err != nil {
-			return RateConfig{}, err
+			return Config{}, err
 		}
 
 		quorumRateInfos[core.QuorumID(quorumID)] = QuorumRateInfo{
@@ -162,9 +169,10 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		}
 	}
 
-	return RateConfig{
+	return Config{
 		QuorumRateInfos: quorumRateInfos,
 		ClientIPHeader:  c.String(ClientIPHeaderFlagName),
 		Allowlist:       allowlist,
+		TestMode:        c.Bool(TestModeFlagName),
 	}, nil
 }
