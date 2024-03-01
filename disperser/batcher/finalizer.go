@@ -113,7 +113,8 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 		}
 		metadatas, exclusiveStartKey, err = f.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, f.numBlobsPerFetch, exclusiveStartKey)
 		if err != nil {
-			return fmt.Errorf("FinalizeBlobs: error getting blob headers on subsequent call: %w", err)
+			f.logger.Error("FinalizeBlobs: error getting blob headers on subsequent call", "err", err)
+			break
 		}
 	}
 	pool.StopWait()
