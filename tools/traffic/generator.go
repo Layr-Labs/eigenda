@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/logging"
-	"github.com/Layr-Labs/eigenda/core"
 )
 
 type TrafficGenerator struct {
@@ -85,13 +84,7 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte, quorumID uint8) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
 	defer cancel()
-	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, []*core.SecurityParam{
-		{
-			QuorumID:           quorumID,
-			AdversaryThreshold: g.Config.AdversarialThreshold,
-			QuorumThreshold:    g.Config.QuorumThreshold,
-		},
-	})
+	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, []uint8{quorumID})
 	if err != nil {
 		return err
 	}
