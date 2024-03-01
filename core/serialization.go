@@ -225,7 +225,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 		qbp[i] = quorumBlobParams{
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
+			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
@@ -318,7 +318,7 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 		qbp[i] = quorumBlobParams{
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
+			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}

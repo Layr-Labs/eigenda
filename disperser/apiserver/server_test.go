@@ -80,8 +80,8 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	ctx := peer.NewContext(context.Background(), p)
 
 	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 50, QuorumThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 50, QuorumThreshold: 100},
+		{QuorumID: 0, AdversaryThreshold: 50, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
@@ -116,14 +116,14 @@ func TestGetBlobStatus(t *testing.T) {
 	// simulate blob confirmation
 	securityParams := []*core.SecurityParam{
 		{
-			QuorumID:           0,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
 		},
 		{
-			QuorumID:           1,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    100,
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
 		},
 	}
 	confirmedMetadata := simulateBlobConfirmation(t, requestID, blobSize, securityParams, 0)
@@ -147,7 +147,7 @@ func TestGetBlobStatus(t *testing.T) {
 		actualBlobQuorumParams[i] = &pb.BlobQuorumParam{
 			QuorumNumber:                 uint32(sp.QuorumID),
 			AdversaryThresholdPercentage: uint32(sp.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint32(sp.QuorumThreshold),
+			QuorumThresholdPercentage:    uint32(sp.ConfirmationThreshold),
 			ChunkLength:                  10,
 		}
 		quorumNumbers[i] = sp.QuorumID
@@ -194,14 +194,14 @@ func TestRetrieveBlob(t *testing.T) {
 	// Simulate blob confirmation so that we can retrieve the blob
 	securityParams := []*core.SecurityParam{
 		{
-			QuorumID:           0,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
 		},
 		{
-			QuorumID:           1,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    100,
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
 		},
 	}
 	_ = simulateBlobConfirmation(t, requestID, blobSize, securityParams, 1)
@@ -255,8 +255,8 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	ctx := peer.NewContext(context.Background(), p)
 
 	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 80, QuorumThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 80, QuorumThreshold: 100},
+		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
@@ -395,8 +395,8 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	ctx := peer.NewContext(context.Background(), p)
 
 	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 80, QuorumThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 80, QuorumThreshold: 100},
+		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 

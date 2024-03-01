@@ -107,9 +107,9 @@ func mustMakeTestBlob() core.Blob {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: []*core.SecurityParam{
 				{
-					QuorumID:           0,
-					AdversaryThreshold: q0AdversaryThreshold,
-					QuorumThreshold:    q0QuorumThreshold,
+					QuorumID:              0,
+					AdversaryThreshold:    q0AdversaryThreshold,
+					ConfirmationThreshold: q0QuorumThreshold,
 				},
 			},
 		},
@@ -486,9 +486,9 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	blobQuorumInfo := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: q0AdversaryThreshold,
-			QuorumThreshold:    q0QuorumThreshold,
+			QuorumID:              0,
+			AdversaryThreshold:    q0AdversaryThreshold,
+			ConfirmationThreshold: q0QuorumThreshold,
 		},
 		ChunkLength: chunkLength,
 	}

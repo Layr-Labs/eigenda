@@ -36,8 +36,8 @@ func TestRatelimit(t *testing.T) {
 	ctx := peer.NewContext(context.Background(), p)
 
 	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 50, QuorumThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 50, QuorumThreshold: 100},
+		{QuorumID: 0, AdversaryThreshold: 50, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 

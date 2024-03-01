@@ -627,8 +627,8 @@ func (t *Transactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.Secur
 
 	for i := range adversaryThresholdPercentegesBytes {
 		securityParams[i] = &core.SecurityParam{
-			AdversaryThreshold: adversaryThresholdPercentegesBytes[i],
-			QuorumThreshold:    confirmationThresholdPercentegesBytes[i],
+			AdversaryThreshold:    adversaryThresholdPercentegesBytes[i],
+			ConfirmationThreshold: confirmationThresholdPercentegesBytes[i],
 		}
 	}
 

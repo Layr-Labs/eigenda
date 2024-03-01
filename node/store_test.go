@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	
+
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -61,9 +61,9 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			QuorumThreshold:    quorumThreshold,
-			AdversaryThreshold: adversaryThreshold,
+			QuorumID:              0,
+			ConfirmationThreshold: quorumThreshold,
+			AdversaryThreshold:    adversaryThreshold,
 		},
 		ChunkLength: 10,
 	}
@@ -115,7 +115,7 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	quorumHeaderProto := &pb.BlobQuorumInfo{
 		QuorumId:           uint32(quorumHeader.QuorumID),
 		AdversaryThreshold: uint32(quorumHeader.AdversaryThreshold),
-		QuorumThreshold:    uint32(quorumHeader.QuorumThreshold),
+		QuorumThreshold:    uint32(quorumHeader.ConfirmationThreshold),
 		ChunkLength:        uint32(quorumHeader.ChunkLength),
 	}
 

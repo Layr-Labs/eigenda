@@ -90,9 +90,9 @@ func TestBlobHeaderEncoding(t *testing.T) {
 		QuorumInfos: []*core.BlobQuorumInfo{
 			{
 				SecurityParam: core.SecurityParam{
-					QuorumID:           1,
-					AdversaryThreshold: 80,
-					QuorumThreshold:    100,
+					QuorumID:              1,
+					AdversaryThreshold:    80,
+					ConfirmationThreshold: 100,
 				},
 				ChunkLength: 10,
 			},
@@ -165,9 +165,9 @@ func TestQuorumParamsHash(t *testing.T) {
 		QuorumInfos: []*core.BlobQuorumInfo{
 			{
 				SecurityParam: core.SecurityParam{
-					QuorumID:           0,
-					AdversaryThreshold: 80,
-					QuorumThreshold:    100,
+					QuorumID:              0,
+					AdversaryThreshold:    80,
+					ConfirmationThreshold: 100,
 				},
 				ChunkLength: 10,
 			},

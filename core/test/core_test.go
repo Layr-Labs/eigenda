@@ -112,9 +112,9 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 
 		quorumHeader := &core.BlobQuorumInfo{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           quorumID,
-				AdversaryThreshold: blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold,
-				QuorumThreshold:    blob.RequestHeader.SecurityParams[quorumIndex].QuorumThreshold,
+				QuorumID:              quorumID,
+				AdversaryThreshold:    blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold,
+				ConfirmationThreshold: blob.RequestHeader.SecurityParams[quorumIndex].ConfirmationThreshold,
 			},
 			ChunkLength: chunkLength,
 		}
@@ -205,14 +205,14 @@ func TestCoreLibrary(t *testing.T) {
 
 	securityParams := []*core.SecurityParam{
 		{
-			QuorumID:           0,
-			AdversaryThreshold: 50,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    50,
+			ConfirmationThreshold: 100,
 		},
 		{
-			QuorumID:           0,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    90,
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 90,
 		},
 	}
 

@@ -335,7 +335,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		blobSize := len(blob.Data)
 		length := encoding.GetBlobLength(uint(blobSize))
-		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
+		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
 		encodedSize := encoding.GetBlobSize(encodedLength)
 
 		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
@@ -446,7 +446,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 			blobQuorumParams[i] = &pb.BlobQuorumParam{
 				QuorumNumber:                 uint32(quorumInfo.QuorumID),
 				AdversaryThresholdPercentage: uint32(quorumInfo.AdversaryThreshold),
-				QuorumThresholdPercentage:    uint32(quorumInfo.QuorumThreshold),
+				QuorumThresholdPercentage:    uint32(quorumInfo.ConfirmationThreshold),
 				ChunkLength:                  uint32(quorumInfo.ChunkLength),
 			}
 			quorumIndexes[i] = byte(slices.Index(quorumNumbers, quorumInfo.QuorumID))
@@ -647,9 +647,9 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	i := 0
 	for quorumID := range seenQuorums {
 		params[i] = &core.SecurityParam{
-			QuorumID:           core.QuorumID(quorumID),
-			AdversaryThreshold: securityParams[i].AdversaryThreshold,
-			QuorumThreshold:    securityParams[i].QuorumThreshold,
+			QuorumID:              core.QuorumID(quorumID),
+			AdversaryThreshold:    securityParams[i].AdversaryThreshold,
+			ConfirmationThreshold: securityParams[i].ConfirmationThreshold,
 		}
 		i++
 	}

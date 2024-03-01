@@ -160,7 +160,7 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 			QuorumId:           uint32(header.QuorumID),
 			AdversaryThreshold: uint32(header.AdversaryThreshold),
 			ChunkLength:        uint32(header.ChunkLength),
-			QuorumThreshold:    uint32(header.QuorumThreshold),
+			QuorumThreshold:    uint32(header.ConfirmationThreshold),
 			Ratelimit:          header.QuorumRate,
 		}
 	}

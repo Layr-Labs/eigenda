@@ -197,9 +197,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             0,
 			blobSize:          500,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 
@@ -227,9 +227,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             0,
 			blobSize:          1000,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 
@@ -258,9 +258,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             20 * time.Second,
 			blobSize:          1000,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 
@@ -290,9 +290,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             0,
 			blobSize:          5,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 

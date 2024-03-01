@@ -26,9 +26,9 @@ func TestOperatorAssignments(t *testing.T) {
 
 	quorumInfo := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: 50,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    50,
+			ConfirmationThreshold: 100,
 		},
 		ChunkLength: 10,
 	}
@@ -135,9 +135,9 @@ func FuzzOperatorAssignments(f *testing.F) {
 		quorumThreshold := rand.Intn(100-advThreshold) + advThreshold + 1
 
 		param := &core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: uint8(advThreshold),
-			QuorumThreshold:    uint8(quorumThreshold),
+			QuorumID:              0,
+			AdversaryThreshold:    uint8(advThreshold),
+			ConfirmationThreshold: uint8(quorumThreshold),
 		}
 
 		dat, err := mock.NewChainDataMock(stakes)

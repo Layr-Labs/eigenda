@@ -300,10 +300,10 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		blobQuorumInfo := &core.BlobQuorumInfo{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           quorum.QuorumID,
-				AdversaryThreshold: quorum.AdversaryThreshold,
-				QuorumThreshold:    quorum.QuorumThreshold,
-				QuorumRate:         quorum.QuorumRate,
+				QuorumID:              quorum.QuorumID,
+				AdversaryThreshold:    quorum.AdversaryThreshold,
+				ConfirmationThreshold: quorum.ConfirmationThreshold,
+				QuorumRate:            quorum.QuorumRate,
 			},
 			ChunkLength: chunkLength,
 		}

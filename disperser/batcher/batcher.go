@@ -563,7 +563,7 @@ func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header
 	for _, blob := range headers {
 		thisPassed := true
 		for _, quorum := range blob.QuorumInfos {
-			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.QuorumThreshold {
+			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 				thisPassed = false
 				break
 			}
@@ -578,7 +578,7 @@ func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header
 
 func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {
 	for _, quorum := range header.QuorumInfos {
-		if signedQuorums[quorum.QuorumID].PercentSigned < quorum.QuorumThreshold {
+		if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 			return false
 		}
 	}
