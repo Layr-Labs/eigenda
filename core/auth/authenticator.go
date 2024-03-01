@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -56,7 +57,7 @@ func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error 
 	}
 
 	if !bytes.Equal(pubKey.X.Bytes(), sigPublicKeyECDSA.X.Bytes()) || !bytes.Equal(pubKey.Y.Bytes(), sigPublicKeyECDSA.Y.Bytes()) {
-		return fmt.Errorf("signature doesn't match with provided public key")
+		return errors.New("signature doesn't match with provided public key")
 	}
 
 	return nil

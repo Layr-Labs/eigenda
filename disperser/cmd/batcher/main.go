@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -152,7 +153,7 @@ func RunBatcher(ctx *cli.Context) error {
 	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
-		return fmt.Errorf("encoder socket must be specified")
+		return errors.New("encoder socket must be specified")
 	}
 	encoderClient, err := encoder.NewEncoderClient(config.BatcherConfig.EncoderSocket, config.TimeoutConfig.EncodingTimeout)
 	if err != nil {

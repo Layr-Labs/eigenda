@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"time"
 
@@ -152,7 +153,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 	authHeaderReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_BlobAuthHeader)
 	if !ok {
-		return nil, nil, fmt.Errorf("expected challenge")
+		return nil, nil, errors.New("expected challenge")
 	}
 
 	authHeader := core.BlobAuthHeader{
@@ -163,7 +164,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 
 	authData, err := c.signer.SignBlobRequest(authHeader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error signing blob request")
+		return nil, nil, errors.New("error signing blob request")
 	}
 
 	// Process challenge and send back challenge_reply
@@ -182,7 +183,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 	disperseReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_DisperseReply) // Process the final disperse_reply
 	if !ok {
-		return nil, nil, fmt.Errorf("expected DisperseReply")
+		return nil, nil, errors.New("expected DisperseReply")
 	}
 
 	blobStatus, err := disperser.FromBlobStatusProto(disperseReply.DisperseReply.GetResult())
