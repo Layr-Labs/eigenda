@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/stretchr/testify/assert"
 
 	dacore "github.com/Layr-Labs/eigenda/core"
