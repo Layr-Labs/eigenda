@@ -37,14 +37,14 @@ lint:
 	go tool fix ./..
 	golangci-lint run
 
-build: 
-	cd churner && make build
+build:
+	cd operators/churner && make build
 	cd disperser && make build
 	cd node && make build
 	cd retriever && make build
 	cd tools/traffic && make build
 
-dataapi-build: 
+dataapi-build:
 	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
 
 unit-tests:
@@ -60,7 +60,7 @@ integration-tests-node-plugin:
 	go test -v ./node/plugin/tests
 
 integration-tests-inabox:
-	make build 
+	make build
 	cd inabox && make run-e2e
 
 integration-tests-inabox-nochurner:
@@ -68,9 +68,9 @@ integration-tests-inabox-nochurner:
 	cd inabox && make run-e2e-nochurner
 
 integration-tests-graph-indexer:
-	make build 
+	make build
 	go test -v ./core/thegraph
 
 integration-tests-dataapi:
-	make dataapi-build 
+	make dataapi-build
 	go test -v ./disperser/dataapi

@@ -15,12 +15,12 @@ function start_trap {
     set -a
     source $testpath/envs/churner.env
     set +a
-    ../churner/bin/server & 
+    ../operators/churner/bin/server &
 
     pid="$!"
     pids="$pids $pid"
 
-    for FILE in $(ls $testpath/envs/dis*.env); do 
+    for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
         source $FILE
         set +a
@@ -30,7 +30,7 @@ function start_trap {
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/enc*.env); do 
+    for FILE in $(ls $testpath/envs/enc*.env); do
         set -a
         source $FILE
         set +a
@@ -40,7 +40,7 @@ function start_trap {
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/batcher*.env); do 
+    for FILE in $(ls $testpath/envs/batcher*.env); do
         set -a
         source $FILE
         set +a
@@ -49,11 +49,11 @@ function start_trap {
         pid="$!"
         pids="$pids $pid"
     done
-    
+
     files=($(ls $testpath/envs/opr*.env))
     last_index=$(( ${#files[@]} - 1 ))
 
-    for i in "${!files[@]}"; do 
+    for i in "${!files[@]}"; do
         if [ $i -eq $last_index ]; then
             sleep 5  # Sleep for 5 seconds before the last loop iteration
         fi
@@ -61,15 +61,15 @@ function start_trap {
         set -a
         source $FILE
         set +a
-        ../node/bin/node & 
+        ../node/bin/node &
 
         pid="$!"
         pids="$pids $pid"
     done
 
-    for pid in $pids; do 
+    for pid in $pids; do
         wait $pid
-    done 
+    done
 }
 
 function start_detached {
@@ -88,7 +88,7 @@ function start_detached {
     set -a
     source $testpath/envs/churner.env
     set +a
-    ../churner/bin/server > $testpath/logs/churner.log 2>&1 & 
+    ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
 
     pid="$!"
     pids="$pids $pid"
@@ -96,12 +96,12 @@ function start_detached {
     ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -- echo "Churner up" &
     waiters="$waiters $!"
 
-    for FILE in $(ls $testpath/envs/dis*.env); do 
+    for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
         source $FILE
         set +a
         id=$(basename $FILE | tr -d -c 0-9)
-        ../disperser/bin/server > $testpath/logs/dis${id}.log 2>&1 & 
+        ../disperser/bin/server > $testpath/logs/dis${id}.log 2>&1 &
 
         pid="$!"
         pids="$pids $pid"
@@ -110,7 +110,7 @@ function start_detached {
         waiters="$waiters $!"
     done
 
-    for FILE in $(ls $testpath/envs/enc*.env); do 
+    for FILE in $(ls $testpath/envs/enc*.env); do
         set -a
         source $FILE
         set +a
@@ -124,22 +124,22 @@ function start_detached {
         waiters="$waiters $!"
     done
 
-    for FILE in $(ls $testpath/envs/batcher*.env); do 
+    for FILE in $(ls $testpath/envs/batcher*.env); do
         set -a
         source $FILE
         set +a
         id=$(basename $FILE | tr -d -c 0-9)
-        ../disperser/bin/batcher > $testpath/logs/batcher${id}.log 2>&1 & 
+        ../disperser/bin/batcher > $testpath/logs/batcher${id}.log 2>&1 &
 
         pid="$!"
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/retriever*.env); do 
+    for FILE in $(ls $testpath/envs/retriever*.env); do
         set -a
         source $FILE
         set +a
-        ../retriever/bin/server > $testpath/logs/retriever.log 2>&1 & 
+        ../retriever/bin/server > $testpath/logs/retriever.log 2>&1 &
 
         pid="$!"
         pids="$pids $pid"
@@ -148,7 +148,7 @@ function start_detached {
     files=($(ls $testpath/envs/opr*.env))
     last_index=$(( ${#files[@]} - 1 ))
 
-    for i in "${!files[@]}"; do 
+    for i in "${!files[@]}"; do
         if [ $i -eq $last_index ]; then
             sleep 5  # Sleep for 5 seconds before the last loop iteration
         fi
@@ -168,14 +168,14 @@ function start_detached {
 
     echo $pids > $pid_file
 
-    for waiter in $waiters; do 
+    for waiter in $waiters; do
         wait $waiter
     done
 }
 
 
 function stop_detached {
-    
+
     pid_file="$testpath/pids"
     pids=$(cat $pid_file)
 
@@ -187,8 +187,8 @@ function stop_detached {
 function start_anvil {
 
     echo "Starting anvil server ....."
-    anvil --host 0.0.0.0 > /dev/null & 
-    anvil_pid=$! 
+    anvil --host 0.0.0.0 > /dev/null &
+    anvil_pid=$!
     echo "Anvil server started ....."
 
     echo $anvil_pid > ./anvil.pid
@@ -232,18 +232,18 @@ case "$1" in
 EOF
         ;;
     start)
-        start_trap ${@:2} ;;   
+        start_trap ${@:2} ;;
     start-detached)
-        start_detached ${@:2} ;;    
+        start_detached ${@:2} ;;
     stop)
         stop_detached ${@:2} ;;
     start-anvil)
-        start_anvil ${@:2} ;;   
+        start_anvil ${@:2} ;;
     stop-anvil)
-        stop_anvil ${@:2} ;;    
+        stop_anvil ${@:2} ;;
     start-graph)
-        start_graph ${@:2} ;;   
+        start_graph ${@:2} ;;
     stop-graph)
-        stop_graph ${@:2} ;;  
+        stop_graph ${@:2} ;;
     *)
 esac
