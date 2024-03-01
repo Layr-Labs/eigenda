@@ -197,7 +197,7 @@ func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlo
 	return query.OperatorAddedToQuorum, nil
 }
 
-// QueryOperatorAddedToQuorum finds operators' quorum opt-in history in range [startBlock, endBlock].
+// QueryOperatorRemovedFromQuorum finds operators' quorum opt-out history in range [startBlock, endBlock].
 func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*OperatorQuorum, error) {
 	if startBlock > endBlock {
 		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
