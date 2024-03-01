@@ -33,7 +33,6 @@ protoc: clean
 	$(PROTOS_DISPERSER)/**/*.proto
 
 lint:
-	golint -set_exit_status ./...
 	go tool fix ./..
 	golangci-lint run
 
