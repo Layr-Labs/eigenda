@@ -51,6 +51,19 @@ type (
 		BlockNumber     uint64
 		TransactionHash []byte
 	}
+	OperatorQuorum struct {
+		Operator      string
+		QuorumNumbers []byte
+		BlockNumber   uint64
+	}
+	OperatorQuorumEvents struct {
+		// Mapping from operator address to a list of sorted events (by BlockNumber)
+		// where the operator was added to quorums.
+		AddedToQuorum map[string][]*OperatorQuorum
+		// Mapping from operator address to a list of sorted events (by BlockNumber)
+		// where the operator was removed from quorums.
+		RemovedFromQuorum map[string][]*OperatorQuorum
+	}
 	DeregisteredOperatorInfo struct {
 		IndexedOperatorInfo *core.IndexedOperatorInfo
 		// BlockNumber is the block number at which the operator was deregistered.
@@ -135,6 +148,67 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 		}
 	}
 	return batchNonSigningOperatorIds, nil
+}
+
+func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint64) (*OperatorQuorumEvents, error) {
+	var (
+		operatorAddedQuorum   []*subgraph.OperatorQuorum
+		operatorRemovedQuorum []*subgraph.OperatorQuorum
+		err                   error
+		pool                  = workerpool.New(maxWorkerPoolSize)
+	)
+
+	pool.Submit(func() {
+		added, errQ := sc.api.QueryOperatorAddedToQuorum(ctx, startBlock, endBlock)
+		if errQ != nil {
+			err = errQ
+		}
+		operatorAddedQuorum = added
+	})
+
+	pool.Submit(func() {
+		removed, errQ := sc.api.QueryOperatorRemovedFromQuorum(ctx, startBlock, endBlock)
+
+		if errQ != nil {
+			err = errQ
+		}
+		operatorRemovedQuorum = removed
+	})
+	pool.StopWait()
+
+	if err != nil {
+		return nil, err
+	}
+
+	addedQuorum, err := parseOperatorQuorum(operatorAddedQuorum)
+	if err != nil {
+		return nil, err
+	}
+	removedQuorum, err := parseOperatorQuorum(operatorRemovedQuorum)
+	if err != nil {
+		return nil, err
+	}
+
+	addedQuorumMap := make(map[string][]*OperatorQuorum)
+	for _, opq := range addedQuorum {
+		if _, ok := addedQuorumMap[opq.Operator]; !ok {
+			addedQuorumMap[opq.Operator] = make([]*OperatorQuorum, 0)
+		}
+		addedQuorumMap[opq.Operator] = append(addedQuorumMap[opq.Operator], opq)
+	}
+
+	removedQuorumMap := make(map[string][]*OperatorQuorum)
+	for _, opq := range removedQuorum {
+		if _, ok := removedQuorumMap[opq.Operator]; !ok {
+			removedQuorumMap[opq.Operator] = make([]*OperatorQuorum, 0)
+		}
+		removedQuorumMap[opq.Operator] = append(removedQuorumMap[opq.Operator], opq)
+	}
+
+	return &OperatorQuorumEvents{
+		AddedToQuorum:     addedQuorumMap,
+		RemovedFromQuorum: removedQuorumMap,
+	}, nil
 }
 
 func (sc *subgraphClient) QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonSigners map[string]int) (map[string]int, error) {
@@ -526,4 +600,27 @@ func addOperatorWithErrorDetail(operators map[core.OperatorID]*DeregisteredOpera
 		Metadata:             operator,
 		OperatorProcessError: errorMessage,
 	}
+}
+
+func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*OperatorQuorum, error) {
+	parsed := make([]*OperatorQuorum, len(operatorQuorum))
+	for i, opq := range operatorQuorum {
+		blockNum, err := strconv.ParseUint(string(opq.BlockNumber), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		parsed[i] = &OperatorQuorum{
+			Operator:      string(opq.Operator),
+			QuorumNumbers: []byte(opq.QuorumNumbers),
+			BlockNumber:   blockNum,
+		}
+	}
+	// Sort the quorum events by ascending order of block number.
+	sort.SliceStable(parsed, func(i, j int) bool {
+		if parsed[i].BlockNumber == parsed[j].BlockNumber {
+			return parsed[i].Operator < parsed[j].Operator
+		}
+		return parsed[i].BlockNumber < parsed[j].BlockNumber
+	})
+	return parsed, nil
 }

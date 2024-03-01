@@ -114,3 +114,25 @@ func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context
 
 	return value, args.Error(1)
 }
+
+func (m *MockSubgraphApi) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*subgraph.OperatorQuorum, error) {
+	args := m.Called()
+
+	var value []*subgraph.OperatorQuorum
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.OperatorQuorum)
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*subgraph.OperatorQuorum, error) {
+	args := m.Called()
+
+	var value []*subgraph.OperatorQuorum
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.OperatorQuorum)
+	}
+
+	return value, args.Error(1)
+}

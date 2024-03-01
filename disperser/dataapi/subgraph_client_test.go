@@ -125,6 +125,41 @@ var (
 		"0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
 	}
 
+	operatorAddedToQuorum = []*subgraph.OperatorQuorum{
+		{
+			Operator:      "operator-2",
+			QuorumNumbers: "2",
+			BlockNumber:   "82",
+		},
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "2",
+			BlockNumber:   "82",
+		},
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "01",
+			BlockNumber:   "80",
+		},
+	}
+	operatorRemovedFromQuorum = []*subgraph.OperatorQuorum{
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "0",
+			BlockNumber:   "81",
+		},
+		{
+			Operator:      "operator-2",
+			QuorumNumbers: "2",
+			BlockNumber:   "83",
+		},
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "1",
+			BlockNumber:   "83",
+		},
+	}
+
 	subgraphBatches = []*subgraph.Batches{
 		{
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f207",
@@ -410,4 +445,60 @@ func assertGasFees(t *testing.T, gasFees *dataapi.GasFees) {
 	assert.Equal(t, uint64(249815), gasFees.GasUsed)
 	assert.Equal(t, uint64(1000045336), gasFees.GasPrice)
 	assert.Equal(t, uint64(249826325612840), gasFees.TxFee)
+}
+
+func TestQueryOperatorQuorumEvent(t *testing.T) {
+	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
+	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
+	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
+	result, err := subgraphClient.QueryOperatorQuorumEvent(context.Background(), uint64(78), uint64(88))
+	assert.NoError(t, err)
+
+	addedMap := result.AddedToQuorum
+	assert.Equal(t, 2, len(addedMap))
+	// Quorum events for operator-1.
+	added1, ok := addedMap["operator-1"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(added1))
+	assert.Equal(t, "operator-1", added1[0].Operator)
+	assert.Equal(t, uint64(80), added1[0].BlockNumber)
+	assert.Equal(t, 2, len(added1[0].QuorumNumbers))
+	assert.Equal(t, uint8(48), added1[0].QuorumNumbers[0])
+	assert.Equal(t, uint8(49), added1[0].QuorumNumbers[1])
+	assert.Equal(t, "operator-1", added1[1].Operator)
+	assert.Equal(t, uint64(82), added1[1].BlockNumber)
+	assert.Equal(t, 1, len(added1[1].QuorumNumbers))
+	assert.Equal(t, uint8(50), added1[1].QuorumNumbers[0])
+	// Quorum events for operator-2.
+	added2, ok := addedMap["operator-2"]
+	assert.True(t, ok)
+	assert.Equal(t, 1, len(added2))
+	assert.Equal(t, "operator-2", added2[0].Operator)
+	assert.Equal(t, uint64(82), added2[0].BlockNumber)
+	assert.Equal(t, 1, len(added2[0].QuorumNumbers))
+	assert.Equal(t, uint8(50), added2[0].QuorumNumbers[0])
+
+	removedMap := result.RemovedFromQuorum
+	assert.Equal(t, 2, len(removedMap))
+	// Quorum events for operator-1.
+	removed1, ok := removedMap["operator-1"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(removed1))
+	assert.Equal(t, "operator-1", removed1[0].Operator)
+	assert.Equal(t, uint64(81), removed1[0].BlockNumber)
+	assert.Equal(t, 1, len(removed1[0].QuorumNumbers))
+	assert.Equal(t, uint8(48), removed1[0].QuorumNumbers[0])
+	assert.Equal(t, "operator-1", removed1[1].Operator)
+	assert.Equal(t, uint64(83), removed1[1].BlockNumber)
+	assert.Equal(t, 1, len(removed1[1].QuorumNumbers))
+	assert.Equal(t, uint8(49), removed1[1].QuorumNumbers[0])
+	// Quorum events for operator-2.
+	removed2, ok := removedMap["operator-2"]
+	assert.True(t, ok)
+	assert.Equal(t, 1, len(removed2))
+	assert.Equal(t, "operator-2", removed2[0].Operator)
+	assert.Equal(t, uint64(83), removed2[0].BlockNumber)
+	assert.Equal(t, 1, len(removed2[0].QuorumNumbers))
+	assert.Equal(t, uint8(50), removed2[0].QuorumNumbers[0])
 }
