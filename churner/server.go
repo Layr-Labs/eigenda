@@ -185,10 +185,14 @@ func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
 func convertToOperatorsToChurnGrpc(operatorsToChurn []core.OperatorToChurn) []*pb.OperatorToChurn {
 	operatorsToChurnGRPC := make([]*pb.OperatorToChurn, len(operatorsToChurn))
 	for i, operator := range operatorsToChurn {
+		var pubkey []byte
+		if operator.Pubkey != nil {
+			pubkey = operator.Pubkey.Serialize()
+		}
 		operatorsToChurnGRPC[i] = &pb.OperatorToChurn{
-			Operator: operator.Operator[:],
+			Operator: operator.Operator.Bytes(),
 			QuorumId: uint32(operator.QuorumId),
-			Pubkey:   operator.Pubkey.Serialize(),
+			Pubkey:   pubkey,
 		}
 	}
 	return operatorsToChurnGRPC

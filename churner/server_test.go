@@ -18,13 +18,14 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 )
 
 var (
 	keyPair                        *dacore.KeyPair
-	quorumIds                      = []uint32{0}
+	quorumIds                      = []uint32{0, 1}
 	logger                         = &commock.Logger{}
 	transactorMock                 = &coremock.MockTransactor{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
@@ -70,13 +71,22 @@ func TestChurn(t *testing.T) {
 	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSalt())
 	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetExpiry())
 	assert.Equal(t, expectedReplySignature, reply.SignatureWithSaltAndExpiry.GetSignature())
-	assert.Equal(t, 1, len(reply.OperatorsToChurn))
-
+	assert.Equal(t, 2, len(reply.OperatorsToChurn))
+	actualQuorums := make([]uint32, 0)
 	for _, param := range reply.OperatorsToChurn {
-		assert.Equal(t, uint32(0), param.GetQuorumId())
-		assert.Equal(t, operatorAddr.Bytes(), param.GetOperator())
-		assert.Equal(t, keyPair.PubKey.Serialize(), param.GetPubkey())
+		actualQuorums = append(actualQuorums, param.GetQuorumId())
+		if param.GetQuorumId() == 0 {
+			// no churning for quorum 0
+			assert.Equal(t, gethcommon.HexToAddress("0x").Bytes(), param.GetOperator())
+			assert.Nil(t, param.GetPubkey())
+		}
+		if param.GetQuorumId() == 1 {
+			// churn the operator with quorum 1
+			assert.Equal(t, operatorAddr.Bytes(), param.GetOperator())
+			assert.Equal(t, keyPair.PubKey.Serialize(), param.GetPubkey())
+		}
 	}
+	assert.ElementsMatch(t, quorumIds, actualQuorums)
 
 	// retry prior to expiry should fail
 	_, err = s.Churn(ctx, request)
@@ -92,7 +102,7 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
 		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
 		Salt:                       salt,
-		QuorumIds:                  []uint32{0, 1},
+		QuorumIds:                  []uint32{0, 1, 2},
 	}
 
 	var requestHash [32]byte
@@ -112,15 +122,15 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	}, nil)
 
 	_, err := s.Churn(ctx, request)
-	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 0], but found 1")
+	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
 }
 
 func setupMockTransactor() {
 	transactorMock.On("StakeRegistry").Return(gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"), nil).Once()
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
-	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(2), nil)
+	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(0), nil)
 	transactorMock.On("GetCurrentBlockNumber").Return(uint32(2), nil)
-	transactorMock.On("GetQuorumCount").Return(uint8(1), nil)
+	transactorMock.On("GetQuorumCount").Return(uint8(2), nil)
 	transactorMock.On("GetOperatorStakesForQuorums").Return(dacore.OperatorStakes{
 		0: {
 			0: {
@@ -128,8 +138,19 @@ func setupMockTransactor() {
 				Stake:      big.NewInt(2),
 			},
 		},
+		1: {
+			0: {
+				OperatorID: makeOperatorId(1),
+				Stake:      big.NewInt(2),
+			},
+		},
 	}, nil)
-	transactorMock.On("GetOperatorSetParams").Return(&dacore.OperatorSetParam{
+	transactorMock.On("GetOperatorSetParams", mock.Anything, uint8(0)).Return(&dacore.OperatorSetParam{
+		MaxOperatorCount:         2,
+		ChurnBIPsOfOperatorStake: 20,
+		ChurnBIPsOfTotalStake:    20000,
+	}, nil)
+	transactorMock.On("GetOperatorSetParams", mock.Anything, uint8(1)).Return(&dacore.OperatorSetParam{
 		MaxOperatorCount:         1,
 		ChurnBIPsOfOperatorStake: 20,
 		ChurnBIPsOfTotalStake:    20000,
