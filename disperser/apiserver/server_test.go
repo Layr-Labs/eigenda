@@ -30,12 +30,15 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
+	tmock "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/peer"
 )
 
 var (
-	queue              disperser.BlobStore
-	dispersalServer    *apiserver.DispersalServer
+	queue           disperser.BlobStore
+	dispersalServer *apiserver.DispersalServer
+	transactor      *mock.MockTransactor
+
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
 	UUID               = uuid.New()
@@ -76,32 +79,21 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
+	quorumParams := []*core.SecurityParam{
+		{QuorumID: 0, AdversaryThreshold: 50, QuorumThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 50, QuorumThreshold: 100},
+	}
+	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*pb.SecurityParams{
-			{
-				QuorumId:           2,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		},
+		Data:    data,
+		Quorums: []byte{2},
 	})
 	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*pb.SecurityParams{
-			{
-				QuorumId:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-			{
-				QuorumId:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    90,
-			},
-		},
+		Data:    data,
+		Quorums: []byte{0, 0},
 	})
 	assert.ErrorContains(t, err, "invalid request: security_params must not contain duplicate quorum_id")
 }
@@ -261,20 +253,16 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		},
 	}
 	ctx := peer.NewContext(context.Background(), p)
+
+	quorumParams := []*core.SecurityParam{
+		{QuorumID: 0, AdversaryThreshold: 80, QuorumThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 80, QuorumThreshold: 100},
+	}
+	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*pb.SecurityParams{
-			{
-				QuorumId:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-			{
-				QuorumId:           1,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		},
+		Data:    data,
+		Quorums: []byte{0, 1},
 	})
 	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
@@ -388,13 +376,13 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
-	tx := &mock.MockTransactor{}
-	tx.On("GetCurrentBlockNumber").Return(uint32(100), nil)
-	tx.On("GetQuorumCount").Return(uint8(2), nil)
+	transactor = &mock.MockTransactor{}
+	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
+	transactor.On("GetQuorumCount").Return(uint8(2), nil)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort: "51001",
-	}, queue, tx, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
+	}, queue, transactor, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {
@@ -406,20 +394,15 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
+	quorumParams := []*core.SecurityParam{
+		{QuorumID: 0, AdversaryThreshold: 80, QuorumThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 80, QuorumThreshold: 100},
+	}
+	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+
 	reply, err := server.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*pb.SecurityParams{
-			{
-				QuorumId:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-			{
-				QuorumId:           1,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		},
+		Data:    data,
+		Quorums: []byte{0, 1},
 	})
 	assert.NoError(t, err)
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()

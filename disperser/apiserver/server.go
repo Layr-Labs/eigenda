@@ -631,14 +631,15 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	// Set first two quorums to be required
-	requiredQuourms := uint8(2)
-	if s.quorumCount < 2 {
+	// requiredQuorums := uint8(2)
+	requiredQuorums := uint8(0)
+	if s.quorumCount < requiredQuorums {
 		s.updateQuorumCount(ctx)
 	}
-	if s.quorumCount < 2 {
-		requiredQuourms = s.quorumCount
+	if s.quorumCount < requiredQuorums {
+		requiredQuorums = s.quorumCount
 	}
-	for i := uint8(0); i < requiredQuourms; i++ {
+	for i := uint8(0); i < requiredQuorums; i++ {
 		seenQuorums[i] = struct{}{}
 	}
 
