@@ -96,10 +96,11 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 
 	totalProcessed := 0
 	metadatas, exclusiveStartKey, err := f.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, f.numBlobsPerFetch, nil)
+	if err != nil {
+		return fmt.Errorf("FinalizeBlobs: error getting blob headers: %w", err)
+	}
+
 	for len(metadatas) > 0 {
-		if err != nil {
-			return fmt.Errorf("FinalizeBlobs: error getting blob headers: %w", err)
-		}
 		metas := metadatas
 		f.logger.Info("FinalizeBlobs: finalizing blobs", "numBlobs", len(metas), "finalizedBlockNumber", lastFinalBlock)
 		pool.Submit(func() {
@@ -111,8 +112,12 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 			break
 		}
 		metadatas, exclusiveStartKey, err = f.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, f.numBlobsPerFetch, exclusiveStartKey)
+		if err != nil {
+			return fmt.Errorf("FinalizeBlobs: error getting blob headers on subsequent call: %w", err)
+		}
 	}
 	pool.StopWait()
+
 	f.logger.Info("FinalizeBlobs: successfully processed all finalized blobs", "finalizedBlockNumber", lastFinalBlock, "totalProcessed", totalProcessed, "elapsedTime", time.Since(startTime))
 	f.metrics.UpdateLastSeenFinalizedBlock(lastFinalBlock)
 	f.metrics.UpdateNumBlobs("processed", totalProcessed)
@@ -121,6 +126,14 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 }
 
 func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.BlobMetadata, lastFinalBlock uint64) {
+	// Panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			// Log panic
+			f.logger.Error("FinalizeBlobs: encountered panic", "recovered", r)
+		}
+	}()
+
 	for _, m := range metadatas {
 		// Check if metadata is nil before proceeding
 		if m == nil {
