@@ -78,7 +78,7 @@ message DisperseBlobRequest {
 	// Clients can define one SecurityParams per quorum, and specify multiple quorums.
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
-	repeated SecurityParams security_params = 2;
+	bytes quorums = 2;
 
 	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
 	// corresponding to the key used by the client to sign the BlobAuthHeader.
@@ -123,38 +123,6 @@ message RetrieveBlobReply {
 }
 
 // Data Types
-
-// SecurityParams contains the security parameters for a given quorum.
-message SecurityParams {
-	// The ID of the quorum.
-	// The quorum must be already registered on EigenLayer. The ID must be
-	// in range [0, 254].
-	uint32 quorum_id = 1;
-	// The max percentage of stake within the quorum that can be held by or delegated
-	// to adversarial operators.
-	//
-	// Clients use this to customize the trust assumption (safety).
-	//
-	// Requires: 1 <= adversary_threshold < 100
-	uint32 adversary_threshold = 2;
-	// The min percentage of stake that must attest in order to consider
-	// the dispersal is successful.
-	//
-	// Clients use this to customize liveness requirement. The higher this number,
-	// the more operators may need to be up for attesting the blob, so the chance
-	// the dispersal request to fail may be higher (liveness for dispersal).
-	//
-	// Requires:
-	//     1 <= quorum_threshld <= 100
-	//     quorum_threshld > adversary_threshold + 10.
-	//
-	// Note: The adversary_threshold and quorum_threshold will directly influence the
-	// cost of encoding for the blob to be dispersed, roughly by a factor of
-	// 100 / (quorum_threshold - adversary_threshold). See the spec for more details:
-	// https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/protocol-modules/storage/overview.md
-	// Currently it's required that the difference must be at least 10.
-	uint32 quorum_threshold = 3;
-}
 
 enum BlobStatus {
 	UNKNOWN = 0;

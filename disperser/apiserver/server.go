@@ -101,7 +101,13 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return errors.New("expected DisperseBlobRequest")
 	}
 
-	blob := getBlobFromRequest(request.DisperseRequest)
+	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
+	if err != nil {
+		for quorumID := range request.DisperseRequest.Quorums {
+			s.metrics.HandleFailedRequest(string(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
+		}
+		return err
+	}
 
 	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
 	// Decode public key
@@ -169,62 +175,19 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 
-	blob := getBlobFromRequest(req)
+	blob, err := s.validateRequestAndGetBlob(ctx, req)
+	if err != nil {
+		for quorumID := range req.Quorums {
+			s.metrics.HandleFailedRequest(string(quorumID), len(req.GetData()), "DisperseBlob")
+		}
+		return nil, err
+	}
 
 	reply, err := s.disperseBlob(ctx, blob, "")
 	if err != nil {
 		s.logger.Info("failed to disperse blob", "err", err)
 	}
 	return reply, err
-}
-
-func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Blob) error {
-
-	securityParams := blob.RequestHeader.SecurityParams
-	if len(securityParams) == 0 {
-		return fmt.Errorf("invalid request: security_params must not be empty")
-	}
-	if len(securityParams) > 256 {
-		return fmt.Errorf("invalid request: security_params must not exceed 256")
-	}
-
-	seenQuorums := make(map[uint8]struct{})
-	// The quorum ID must be in range [0, 254]. It'll actually be converted
-	// to uint8, so it cannot be greater than 254.
-	for _, param := range securityParams {
-		if _, ok := seenQuorums[param.QuorumID]; ok {
-			return fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
-		}
-		seenQuorums[param.QuorumID] = struct{}{}
-
-		if param.QuorumID >= s.quorumCount {
-			err := s.updateQuorumCount(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get onchain quorum count: %w", err)
-			}
-
-			if param.QuorumID >= s.quorumCount {
-				return fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
-			}
-		}
-	}
-
-	blobSize := len(blob.Data)
-	// The blob size in bytes must be in range [1, maxBlobSize].
-	if blobSize > maxBlobSize {
-		return fmt.Errorf("blob size cannot exceed 2 MiB")
-	}
-	if blobSize == 0 {
-		return fmt.Errorf("blob size must be greater than 0")
-	}
-
-	if err := blob.RequestHeader.Validate(); err != nil {
-		s.logger.Warn("invalid header", "err", err)
-		return err
-	}
-
-	return nil
-
 }
 
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
@@ -234,6 +197,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	defer timer.ObserveDuration()
 
 	securityParams := blob.RequestHeader.SecurityParams
+
+	// securityParams := blob.RequestHeader.SecurityParams
 	securityParamsStrings := make([]string, len(securityParams))
 	for i, sp := range securityParams {
 		securityParamsStrings[i] = sp.String()
@@ -251,15 +216,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 
 	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
-
-	err = s.validateBlobRequest(ctx, blob)
-	if err != nil {
-		for _, param := range securityParams {
-			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
-		}
-		return nil, err
-	}
 
 	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
@@ -636,28 +592,83 @@ func getResponseStatus(status disperser.BlobStatus) pb.BlobStatus {
 	}
 }
 
-func getBlobFromRequest(req *pb.DisperseBlobRequest) *core.Blob {
-	params := make([]*core.SecurityParam, len(req.SecurityParams))
+func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*core.Blob, error) {
 
-	for i, param := range req.GetSecurityParams() {
-		params[i] = &core.SecurityParam{
-			QuorumID:           core.QuorumID(param.QuorumId),
-			AdversaryThreshold: uint8(param.AdversaryThreshold),
-			QuorumThreshold:    uint8(param.QuorumThreshold),
+	data := req.GetData()
+	blobSize := len(data)
+	// The blob size in bytes must be in range [1, maxBlobSize].
+	if blobSize > maxBlobSize {
+		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
+	}
+	if blobSize == 0 {
+		return nil, fmt.Errorf("blob size must be greater than 0")
+	}
+
+	securityParams, err := s.tx.GetQuorumSecurityParams(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seenQuorums := make(map[uint8]struct{})
+	// The quorum ID must be in range [0, 254]. It'll actually be converted
+	// to uint8, so it cannot be greater than 254.
+	for _, quorumID := range req.GetQuorums() {
+		if _, ok := seenQuorums[quorumID]; ok {
+			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
+		}
+		seenQuorums[quorumID] = struct{}{}
+
+		if quorumID >= s.quorumCount {
+			err := s.updateQuorumCount(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get onchain quorum count: %w", err)
+			}
+
+			if quorumID >= s.quorumCount {
+				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, quorumID)
+			}
 		}
 	}
 
-	data := req.GetData()
-
-	blob := &core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			BlobAuthHeader: core.BlobAuthHeader{
-				AccountID: req.AccountId,
-			},
-			SecurityParams: params,
-		},
-		Data: data,
+	// Set first two quorums to be required
+	requiredQuourms := uint8(2)
+	if s.quorumCount < 2 {
+		s.updateQuorumCount(ctx)
+	}
+	if s.quorumCount < 2 {
+		requiredQuourms = s.quorumCount
+	}
+	for i := uint8(0); i < requiredQuourms; i++ {
+		seenQuorums[i] = struct{}{}
 	}
 
-	return blob
+	params := make([]*core.SecurityParam, len(seenQuorums))
+	i := 0
+	for quorumID := range seenQuorums {
+		params[i] = &core.SecurityParam{
+			QuorumID:           core.QuorumID(quorumID),
+			AdversaryThreshold: securityParams[i].AdversaryThreshold,
+			QuorumThreshold:    securityParams[i].QuorumThreshold,
+		}
+		i++
+	}
+
+	header := core.BlobRequestHeader{
+		BlobAuthHeader: core.BlobAuthHeader{
+			AccountID: req.AccountId,
+		},
+		SecurityParams: params,
+	}
+
+	if err := header.Validate(); err != nil {
+		s.logger.Warn("invalid header", "err", err)
+		return nil, err
+	}
+
+	blob := &core.Blob{
+		RequestHeader: header,
+		Data:          data,
+	}
+
+	return blob, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/pingcap/errors"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
@@ -601,6 +602,38 @@ func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (ui
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
+}
+
+func (t *Transactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.SecurityParam, error) {
+	adversaryThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	confirmationThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumConfirmationThresholdPercentages(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(adversaryThresholdPercentegesBytes) != len(confirmationThresholdPercentegesBytes) {
+		return nil, errors.New("adversaryThresholdPercentegesBytes and confirmationThresholdPercentegesBytes have different lengths")
+	}
+
+	securityParams := make([]*core.SecurityParam, len(adversaryThresholdPercentegesBytes))
+
+	for i := range adversaryThresholdPercentegesBytes {
+		securityParams[i] = &core.SecurityParam{
+			AdversaryThreshold:    adversaryThresholdPercentegesBytes[i],
+			ConfirmationThreshold: confirmationThresholdPercentegesBytes[i],
+		}
+	}
+
+	return securityParams, nil
+
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {

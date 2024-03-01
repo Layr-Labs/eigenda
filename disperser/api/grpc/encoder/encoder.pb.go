@@ -197,7 +197,7 @@ func (x *EncodeBlobRequest) GetData() []byte {
 	return nil
 }
 
-func (x *EncodeBlobRequest) ParamsFromMins() *EncodingParams {
+func (x *EncodeBlobRequest) GetEncodingParams() *EncodingParams {
 	if x != nil {
 		return x.EncodingParams
 	}
