@@ -23,7 +23,7 @@ import (
 var (
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
-	dynamoClient       *commondynamodb.Client
+	dynamoClient       commondynamodb.IClient
 	clientConfig       commonaws.ClientConfig
 
 	deployLocalStack bool

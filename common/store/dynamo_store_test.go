@@ -27,7 +27,7 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4566"
 
-	dynamoClient     *dynamodb.Client
+	dynamoClient     dynamodb.IClient
 	dynamoParamStore common.KVStore[common.RateBucketParams]
 	bucketTableName  = "BucketStore"
 )

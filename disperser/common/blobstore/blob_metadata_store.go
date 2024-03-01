@@ -27,13 +27,13 @@ const (
 //   - StatusIndex: (Partition Key: Status, Sort Key: RequestedAt) -> Metadata
 //   - BatchIndex: (Partition Key: BatchHeaderHash, Sort Key: BlobIndex) -> Metadata
 type BlobMetadataStore struct {
-	dynamoDBClient *commondynamodb.Client
+	dynamoDBClient commondynamodb.IClient
 	logger         common.Logger
 	tableName      string
 	ttl            time.Duration
 }
 
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger common.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
+func NewBlobMetadataStore(dynamoDBClient commondynamodb.IClient, logger common.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
@@ -136,7 +136,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 	}
 
 	// When no more results to fetch, the LastEvaluatedKey is nil
-	if queryResult.Items == nil && queryResult.LastEvaluatedKey == nil {
+	if len(queryResult.Items) == 0 && queryResult.LastEvaluatedKey == nil {
 		return nil, nil, nil
 	}
 

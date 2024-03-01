@@ -47,6 +47,19 @@ type Client struct {
 	logger       common.Logger
 }
 
+type IClient interface {
+	PutItem(ctx context.Context, tableName string, item map[string]types.AttributeValue) error
+	PutItems(ctx context.Context, tableName string, items []Item) ([]Item, error) // If you decide to include batch put
+	GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error)
+	QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expressionValues ExpresseionValues) ([]Item, error)
+	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expressionValues ExpresseionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error)
+	QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expressionValues ExpresseionValues) (int32, error)
+	UpdateItem(ctx context.Context, tableName string, key Key, update Item) (Item, error)
+	DeleteItem(ctx context.Context, tableName string, key Key) error
+	DeleteItems(ctx context.Context, tableName string, keys []Key) ([]Key, error)
+	DeleteTable(ctx context.Context, tableName string) error
+}
+
 func NewClient(cfg commonaws.ClientConfig, logger common.Logger) (*Client, error) {
 	var err error
 	once.Do(func() {

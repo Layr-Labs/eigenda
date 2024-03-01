@@ -2,18 +2,28 @@ package blobstore_test
 
 import (
 	"context"
+	"errors"
+	"log"
 	"testing"
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
+
+// MockDynamoDBClient is a mock of DynamoDB interface
+type MockDynamoDBClient struct {
+	mock.Mock
+}
 
 func TestBlobMetadataStoreOperations(t *testing.T) {
 	ctx := context.Background()
@@ -253,4 +263,111 @@ func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperse
 			Fee:                     fee,
 		},
 	}
+}
+
+func TestGetBlobMetadataByStatusWithPagination_ErrorQueryingDynamoDB(t *testing.T) {
+	ctx := context.Background()
+
+	// Use your setup for mocking the DynamoDB client
+	mockDynamoDBClient := new(MockDynamoDBClient)
+	mockDynamoDBClient.On("QueryIndexWithPagination", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(commondynamodb.QueryResult{}, errors.New("dynamodb query error"))
+	blobMetadataStore = blobstore.NewBlobMetadataStore(mockDynamoDBClient, logger, metadataTableName, time.Hour)
+
+	metadatas, key, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, 1, nil)
+	assert.Equal(t, 0, len(metadatas))
+	assert.Nil(t, key)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dynamodb query error")
+}
+
+func TestGetBlobMetadataByStatusWithPagination_WithyResult(t *testing.T) {
+	ctx := context.Background()
+	blobKey1 := disperser.BlobKey{
+		BlobHash:     blobHash,
+		MetadataHash: "hash",
+	}
+
+	metadata1 := &disperser.BlobMetadata{
+		MetadataHash: blobKey1.MetadataHash,
+		BlobHash:     blobHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+	}
+	item, err := attributevalue.MarshalMap(metadata1)
+	if err != nil {
+		// Handle the error, perhaps log it or return it
+		log.Fatalf("failed to marshal metadata to Item: %v", err)
+	}
+
+	var result commondynamodb.QueryResult
+	result.Items = append(result.Items, item)
+	result.LastEvaluatedKey = map[string]types.AttributeValue{
+		"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
+		"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
+	}
+	// Use your setup for mocking the DynamoDB client
+	mockDynamoDBClient := new(MockDynamoDBClient)
+	mockDynamoDBClient.On("QueryIndexWithPagination", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(result, nil)
+	blobMetadataStore = blobstore.NewBlobMetadataStore(mockDynamoDBClient, logger, metadataTableName, time.Hour)
+
+	metadatas, key, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, 1, nil)
+	assert.Equal(t, 1, len(metadatas))
+	assert.NotNil(t, key)
+	assert.NoError(t, err)
+}
+
+func (m *MockDynamoDBClient) PutItem(ctx context.Context, tableName string, item map[string]types.AttributeValue) error {
+	args := m.Called(ctx, tableName, item)
+	return args.Error(0)
+}
+
+func (m *MockDynamoDBClient) PutItems(ctx context.Context, tableName string, items []commondynamodb.Item) ([]commondynamodb.Item, error) {
+	args := m.Called(ctx, tableName, items)
+	return args.Get(0).([]commondynamodb.Item), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error) {
+	args := m.Called(ctx, tableName, key)
+	return args.Get(0).(map[string]types.AttributeValue), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expressionValues commondynamodb.ExpresseionValues) ([]commondynamodb.Item, error) {
+	args := m.Called(ctx, tableName, indexName, keyCondition, expressionValues)
+	return args.Get(0).([]commondynamodb.Item), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expressionValues commondynamodb.ExpresseionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (commondynamodb.QueryResult, error) {
+	args := m.Called(ctx, tableName, indexName, keyCondition, expressionValues, limit, exclusiveStartKey)
+	return args.Get(0).(commondynamodb.QueryResult), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expressionValues commondynamodb.ExpresseionValues) (int32, error) {
+	args := m.Called(ctx, tableName, indexName, keyCondition, expressionValues)
+	return int32(args.Int(0)), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) UpdateItem(ctx context.Context, tableName string, key commondynamodb.Key, update commondynamodb.Item) (commondynamodb.Item, error) {
+	args := m.Called(ctx, tableName, key, update)
+	return args.Get(0).(commondynamodb.Item), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) DeleteItem(ctx context.Context, tableName string, key commondynamodb.Key) error {
+	args := m.Called(ctx, tableName, key)
+	return args.Error(0)
+}
+
+func (m *MockDynamoDBClient) DeleteItems(ctx context.Context, tableName string, keys []commondynamodb.Key) ([]commondynamodb.Key, error) {
+	args := m.Called(ctx, tableName, keys)
+	return args.Get(0).([]commondynamodb.Key), args.Error(1)
+}
+
+func (m *MockDynamoDBClient) DeleteTable(ctx context.Context, tableName string) error {
+	args := m.Called(ctx, tableName)
+	return args.Error(0)
 }
