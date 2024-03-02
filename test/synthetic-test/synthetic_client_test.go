@@ -87,6 +87,7 @@ var (
 	validateOnchainTransaction bool = false
 	retrievalClient            clients.RetrievalClient
 	logger                     logging.Logger
+	tx                         *eth.Transactor
 )
 
 func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
@@ -184,6 +185,10 @@ func TestMain(m *testing.M) {
 	}
 
 	// Initialize Clients
+	tx, err := eth.NewTransactor(logger, ethClient, retrievalClientConfig.Bls_Operator_State_Retriever, retrievalClientConfig.EigenDA_ServiceManager_Retriever)
+	if err != nil {
+		panic("failed to initialize transactor")
+	}
 	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, *retrieverClientConfig)
 	logger := testSuite.Logger
 
@@ -206,12 +211,6 @@ func TestMain(m *testing.M) {
 
 // SetUp RetrievalClient to retriever blob from Operator Node
 func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger logging.Logger) error {
-	// https://github.com/Layr-Labs/eigenda/blob/b8c151436ecefc8046e4aefcdcfee67abf9e8faa/inabox/tests/integration_suite_test.go#L124
-	tx, err := eth.NewTransactor(logger, ethClient, retrievalClientConfig.Bls_Operator_State_Retriever, retrievalClientConfig.EigenDA_ServiceManager_Retriever)
-	if err != nil {
-		return err
-	}
-
 	cs := eth.NewChainState(tx, ethClient)
 	querier := graphql.NewClient(retrievalClientConfig.ChurnerGraphUrl, nil)
 	indexedChainStateClient := thegraph.NewIndexedChainState(cs, querier, logger)
@@ -265,11 +264,23 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	disperseBlobStartTime := time.Now()
 	ctx := context.Background()
 
+	blockNum, err := testSuite.EthClient.BlockNumber(ctx)
+	if err != nil {
+		logger.Printf("failed to get block number: %v", err)
+		t.Fail()
+		return
+	}
+
+	requiredQuorums, err := tx.GetRequiredQuorums(context.Background(), uint32(blockNum))
+	if err != nil {
+		logger.Printf("failed to get required quorums: %v", err)
+		t.Fail()
+		return
+	}
+
 	logger.Printf("Start to Disperse New Blob")
-	// Disperse Blob with QuorumID 0, ConfirmationThreshold 50, AdversaryThreshold 25
-	// TODO: Set random values for QuorumID, ConfirmationThreshold, AdversaryThreshold
-	key, err := disperseBlob(data, 0, 50, 25)
-	logger.Printf("Blob Key After Dispersing %s", hex.EncodeToString(key))
+	key, err := disperseBlob(data, nil)
+	logger.Printf("Blob Keys After Dispersing %s", hex.EncodeToString(key))
 	assert.Nil(t, err)
 	assert.NotNil(t, key)
 	if key == nil {
@@ -353,18 +364,20 @@ loop:
 					logger.Printf("RetrievalClient:GetReferenceBlockNumber() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
 					logger.Printf("RetrievalClient:GetBatchRoot() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
 
-					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
-						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-						0,
-					)
-					assert.Nil(t, err)
-					logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
-					assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
+					for _, quorumID := range requiredQuorums {
+						retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
+							[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+							blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+							uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+							[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+							quorumID,
+						)
+						assert.Nil(t, err)
+						logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
+						assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
 
-					logger.Printf("Blob using Retrieval Client %v", blobReply)
+						logger.Printf("Blob using Retrieval Client %v", blobReply)
+					}
 				}
 
 				break loop
@@ -381,15 +394,17 @@ loop:
 	}
 }
 
-func disperseBlob(data []byte, quorumID uint32, quorumThreshold uint32, adversaryThreshold uint32) ([]byte, error) {
+func disperseBlob(data []byte, customQuorums []core.QuorumID) ([]byte, error) {
 	disperserTestClient := testSuite.Clients.Clients[Disperser]
 	logger := testSuite.Logger
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), disperserTestClient.Timeout)
 	defer cancel()
 
+	logger.Printf("Disperse Blob with custom quorums %v", customQuorums)
+
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data:                data,
-		CustomQuorumNumbers: nil,
+		CustomQuorumNumbers: customQuorums,
 	}
 
 	disperserClient := disperserTestClient.Client.(disperser_rpc.DisperserClient)
