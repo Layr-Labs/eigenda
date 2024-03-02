@@ -57,6 +57,6 @@ func (c *MockNodeClient) GetChunks(
 	chunksChan <- clients.RetrievedChunks{
 		OperatorID: opID,
 		Err:        nil,
-		Chunks:     encodedBlob[opID].Bundles[quorumID],
+		Chunks:     encodedBlob.BundlesByOperator[opID][quorumID],
 	}
 }

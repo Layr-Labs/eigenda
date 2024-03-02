@@ -34,26 +34,27 @@ func NewDispatcher(cfg *Config, logger common.Logger) *dispatcher {
 
 var _ disperser.Dispatcher = (*dispatcher)(nil)
 
-func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader) chan core.SignerMessage {
+func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader) chan core.SignerMessage {
 	update := make(chan core.SignerMessage, len(state.IndexedOperators))
 
 	// Disperse
-	c.sendAllChunks(ctx, state, blobs, header, update)
+	c.sendAllChunks(ctx, state, blobs, batchHeader, update)
 
 	return update
 }
 
-func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader, update chan core.SignerMessage) {
+func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, update chan core.SignerMessage) {
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
 			blobMessages := make([]*core.BlobMessage, 0)
 			for _, blob := range blobs {
-				// only include messages assigned to the operator
-				if msg, ok := blob[id]; ok {
-					blobMessages = append(blobMessages, msg)
-				}
+				blobMessages = append(blobMessages, &core.BlobMessage{
+					BlobHeader: blob.BlobHeader,
+					// Bundles will be empty if the operator is not in the quorums blob is dispersed on
+					Bundles: blob.BundlesByOperator[id],
+				})
 			}
-			sig, err := c.sendChunks(ctx, blobMessages, header, &op)
+			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
 				update <- core.SignerMessage{
 					Err:       err,
@@ -76,7 +77,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 	}
 }
 
-func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, header *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
 	// TODO Add secure Grpc
 
 	conn, err := grpc.Dial(
@@ -92,7 +93,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	gc := node.NewDispersalClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
-	request, totalSize, err := GetStoreChunksRequest(blobs, header)
+	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +111,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	return sig, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchHeader) (*node.StoreChunksRequest, int64, error) {
+func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader) (*node.StoreChunksRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
@@ -123,7 +124,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, header *core.BatchH
 	}
 
 	request := &node.StoreChunksRequest{
-		BatchHeader: getBatchHeaderMessage(header),
+		BatchHeader: getBatchHeaderMessage(batchHeader),
 		Blobs:       blobs,
 	}
 
@@ -158,28 +159,32 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 	quorumHeaders := make([]*node.BlobQuorumInfo, 0)
 
 	for _, header := range blob.BlobHeader.QuorumInfos {
-		if _, ok := blob.Bundles[header.QuorumID]; ok {
-			// only construct quorumHeaders for quorums in bundles
-			quorumHeaders = append(quorumHeaders, &node.BlobQuorumInfo{
-				QuorumId:           uint32(header.QuorumID),
-				AdversaryThreshold: uint32(header.AdversaryThreshold),
-				ChunkLength:        uint32(header.ChunkLength),
-				QuorumThreshold:    uint32(header.QuorumThreshold),
-				Ratelimit:          header.QuorumRate,
-			})
-		}
+		quorumHeaders = append(quorumHeaders, &node.BlobQuorumInfo{
+			QuorumId:           uint32(header.QuorumID),
+			AdversaryThreshold: uint32(header.AdversaryThreshold),
+			ChunkLength:        uint32(header.ChunkLength),
+			QuorumThreshold:    uint32(header.QuorumThreshold),
+			Ratelimit:          header.QuorumRate,
+		})
 	}
 
 	data, err := blob.Bundles.Serialize()
 	if err != nil {
 		return nil, err
 	}
-	bundles := make([]*node.Bundle, len(blob.Bundles))
+	bundles := make([]*node.Bundle, len(quorumHeaders))
 	// the ordering of quorums in bundles must be same as in quorumHeaders
 	for i, quorumHeader := range quorumHeaders {
 		quorum := quorumHeader.QuorumId
-		bundles[i] = &node.Bundle{
-			Chunks: data[quorum],
+		if _, ok := blob.Bundles[uint8(quorum)]; ok {
+			bundles[i] = &node.Bundle{
+				Chunks: data[quorum],
+			}
+		} else {
+			bundles[i] = &node.Bundle{
+				// empty bundle for quorums operators are not part of
+				Chunks: make([][]byte, 0),
+			}
 		}
 	}
 

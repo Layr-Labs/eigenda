@@ -141,15 +141,15 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		}
 
-		var encodedBlob core.EncodedBlob = make(map[core.OperatorID]*core.BlobMessage, len(assignments))
+		encodedBlob := core.EncodedBlob{
+			BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+		}
 		for id, assignment := range assignments {
 			bundles := map[core.QuorumID]core.Bundle{
 				quorumID: chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
 			}
-			encodedBlob[id] = &core.BlobMessage{
-				BlobHeader: blobHeader,
-				Bundles:    bundles,
-			}
+			encodedBlob.BlobHeader = blobHeader
+			encodedBlob.BundlesByOperator[id] = bundles
 		}
 		encodedBlobs[z] = encodedBlob
 
@@ -169,8 +169,10 @@ func checkBatch(t *testing.T, cst core.IndexedChainState, encodedBlob core.Encod
 
 	for id := range state.IndexedOperators {
 		val.UpdateOperatorID(id)
-		blobMessage := encodedBlob[id]
-		err := val.ValidateBlob(blobMessage, state.OperatorState)
+		err := val.ValidateBlob(&core.BlobMessage{
+			BlobHeader: encodedBlob.BlobHeader,
+			Bundles:    encodedBlob.BundlesByOperator[id],
+		}, state.OperatorState)
 		assert.NoError(t, err)
 	}
 
@@ -189,7 +191,10 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 		val.UpdateOperatorID(id)
 		var blobMessages []*core.BlobMessage = make([]*core.BlobMessage, numBlob)
 		for z, encodedBlob := range encodedBlobs {
-			blobMessages[z] = encodedBlob[id]
+			blobMessages[z] = &core.BlobMessage{
+				BlobHeader: encodedBlob.BlobHeader,
+				Bundles:    encodedBlob.BundlesByOperator[id],
+			}
 		}
 		err := val.ValidateBatch(blobMessages, state.OperatorState, pool)
 		assert.NoError(t, err)
