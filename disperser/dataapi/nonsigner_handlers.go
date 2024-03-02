@@ -54,7 +54,7 @@ func (oqi OperatorQuorumIntervals) GetQuorums(operatorId string, blockNum uint32
 //   - addedToQuorum, removedFromQuorum: a sequence of events that added/removed operators
 //     to/from quorums.
 //     Requires:
-//     1) the block number for all events are in range [startBlock+1, endBlock];
+//     1) the block numbers for all events are in range [startBlock+1, endBlock];
 //     2) the events are in ascending order by block number for each operator "op".
 func CreateOperatorQuorumIntervals(
 	startBlock uint32,
@@ -69,6 +69,8 @@ func CreateOperatorQuorumIntervals(
 		return nil, fmt.Errorf(msg, startBlock, endBlock)
 	}
 	operatorQuorumIntervals := make(OperatorQuorumIntervals)
+	addedToQuorumErr := "cannot add operator %s to quorum %d at block number %d, " +
+		"the operator is already in the quorum since block number: %d"
 	for op, initialQuorums := range operatorInitialQuorum {
 		if len(initialQuorums) == 0 {
 			return nil, fmt.Errorf("operator %s must be in at least one quorum at block %d", op, startBlock)
@@ -87,7 +89,7 @@ func CreateOperatorQuorumIntervals(
 		i, j := 0, 0
 		for i < len(added) && j < len(removed) {
 			// TODO(jianoaix): Having quorum addition and removal in the same block is a valid case.
-			// Will come up a followup fix to handle this special case.
+			// Come up a followup fix to handle this special case.
 			if added[i].BlockNumber == removed[j].BlockNumber {
 				msg := "Not yet supported: operator was adding and removing quorums at the " +
 					"same block. operator: %s, block number: %d"
@@ -97,9 +99,7 @@ func CreateOperatorQuorumIntervals(
 				for _, q := range added[i].QuorumNumbers {
 					start, ok := openQuorum[q]
 					if ok {
-						msg := "cannot add operator %s to quorum %d at block number %d, " +
-							"the operator is already in the quorum since block number: %d"
-						return nil, fmt.Errorf(msg, op, q, added[i].BlockNumber, start)
+						return nil, fmt.Errorf(addedToQuorumErr, op, q, added[i].BlockNumber, start)
 					}
 					openQuorum[q] = added[i].BlockNumber
 				}
@@ -116,9 +116,7 @@ func CreateOperatorQuorumIntervals(
 			for _, q := range added[i].QuorumNumbers {
 				start, ok := openQuorum[q]
 				if ok {
-					msg := "cannot add operator %s to quorum %d at block number %d, " +
-						"the operator is already in the quorum since block number: %d"
-					return nil, fmt.Errorf(msg, op, q, added[i].BlockNumber, start)
+					return nil, fmt.Errorf(addedToQuorumErr, op, q, added[i].BlockNumber, start)
 				}
 				openQuorum[q] = added[i].BlockNumber
 			}
