@@ -91,7 +91,6 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 	}
 	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
-	// fmt.Println("XX: ", err.Error())
 	assert.True(t, strings.Contains(err.Error(), "must be in ascending order by block number"))
 
 	// Removing nonexisting quorum
