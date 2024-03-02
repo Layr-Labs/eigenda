@@ -72,7 +72,27 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 	}
 	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "it is already in the quorum"))
+	assert.True(t, strings.Contains(err.Error(), "operator is already in the quorum"))
+
+	// addedQuurums not in ascending order of block number
+	addedQuorums = map[string][]*dataapi.OperatorQuorum{
+		"operator-1": []*dataapi.OperatorQuorum{
+			{
+				Operator:      "operator-1",
+				QuorumNumbers: []uint8{0x01},
+				BlockNumber:   15,
+			},
+			{
+				Operator:      "operator-1",
+				QuorumNumbers: []uint8{0x03},
+				BlockNumber:   11,
+			},
+		},
+	}
+	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	assert.Error(t, err)
+	// fmt.Println("XX: ", err.Error())
+	assert.True(t, strings.Contains(err.Error(), "must be in ascending order by block number"))
 
 	// Removing nonexisting quorum
 	addedQuorums = map[string][]*dataapi.OperatorQuorum{

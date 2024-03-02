@@ -23,7 +23,7 @@ func (oqi OperatorQuorumIntervals) GetQuorums(operatorId string, blockNum uint32
 	quorums := make([]uint8, 0)
 	for q, intervals := range oqi[operatorId] {
 		// Note: if len(intervals) is large, we can perform binary search here.
-		// In practice it shouldn't be quite small given that the quorum change is
+		// In practice it should be quite small given that the quorum change is
 		// not frequent, so search it with brute force here.
 		live := false
 		for _, interval := range intervals {
@@ -45,9 +45,17 @@ func (oqi OperatorQuorumIntervals) GetQuorums(operatorId string, blockNum uint32
 // CreateOperatorQuorumIntervals creates OperatorQuorumIntervals that are within the
 // the block interval [startBlock, endBlock] for operators.
 //
-// The initial quorums at startBlock for all operators are provided by
-// "operatorInitialQuorum", and the quorum change events during [startBlock + 1, endBlock]
-// are provided by "addedToQuorum" and "removedFromQuorum".
+// The parameters:
+//   - startBlock, endBlock: specifying the block interval that's of interest.
+//     Requires: startBlock <= endBlock.
+//   - operatorInitialQuorum: the initial quorums at startBlock that operators were
+//     registered in.
+//     Requires: operatorInitialQuorum[op] is non-empty for each operator "op".
+//   - addedToQuorum, removedFromQuorum: a sequence of events that added/removed operators
+//     to/from quorums.
+//     Requires:
+//     1) the block number for all events are in range [startBlock+1, endBlock];
+//     2) the events are in ascending order by block number for each operator "op".
 func CreateOperatorQuorumIntervals(
 	startBlock uint32,
 	endBlock uint32,
@@ -56,12 +64,14 @@ func CreateOperatorQuorumIntervals(
 	removedFromQuorum map[string][]*OperatorQuorum,
 ) (OperatorQuorumIntervals, error) {
 	if startBlock > endBlock {
-		return nil, fmt.Errorf("the startBlock must be no less than endBlock, but found startBlock: %d, endBlock: %d", startBlock, endBlock)
+		msg := "the startBlock must be no less than endBlock, but found " +
+			"startBlock: %d, endBlock: %d"
+		return nil, fmt.Errorf(msg, startBlock, endBlock)
 	}
 	operatorQuorumIntervals := make(OperatorQuorumIntervals)
 	for op, initialQuorums := range operatorInitialQuorum {
 		if len(initialQuorums) == 0 {
-			return nil, fmt.Errorf("the operator: %s must be in at least one quorum at block: %d", op, startBlock)
+			return nil, fmt.Errorf("operator %s must be in at least one quorum at block %d", op, startBlock)
 		}
 		operatorQuorumIntervals[op] = make(map[uint8][]BlockInterval)
 		openQuorum := make(map[uint8]uint32)
@@ -70,28 +80,26 @@ func CreateOperatorQuorumIntervals(
 		}
 		added := addedToQuorum[op]
 		removed := removedFromQuorum[op]
+		eventErr := validateQuorumEvents(added, removed, startBlock, endBlock)
+		if eventErr != nil {
+			return nil, eventErr
+		}
 		i, j := 0, 0
 		for i < len(added) && j < len(removed) {
-			// Skip the block if it's not after startBlock, because the operatorInitialQuorum
-			// already gives the state at startBlock.
-			if added[i].BlockNumber <= startBlock {
-				i++
-				continue
-			}
-			if removed[j].BlockNumber <= startBlock {
-				j++
-				continue
-			}
-			// TODO: Having quorum addition and removal in the same block is a valid case.
+			// TODO(jianoaix): Having quorum addition and removal in the same block is a valid case.
 			// Will come up a followup fix to handle this special case.
 			if added[i].BlockNumber == removed[j].BlockNumber {
-				return nil, fmt.Errorf("Not yet supported: the operator: %s was adding and removing quorums at the same block number: %d", op, added[i].BlockNumber)
+				msg := "Not yet supported: operator was adding and removing quorums at the " +
+					"same block. operator: %s, block number: %d"
+				return nil, fmt.Errorf(msg, op, added[i].BlockNumber)
 			}
 			if added[i].BlockNumber < removed[j].BlockNumber {
 				for _, q := range added[i].QuorumNumbers {
 					start, ok := openQuorum[q]
 					if ok {
-						return nil, fmt.Errorf("cannot add operator: %s to quorum: %d at block number: %d, because it is already in the quorum since block number: %d", op, q, start, added[i].BlockNumber)
+						msg := "cannot add operator %s to quorum %d at block number %d, " +
+							"the operator is already in the quorum since block number: %d"
+						return nil, fmt.Errorf(msg, op, q, added[i].BlockNumber, start)
 					}
 					openQuorum[q] = added[i].BlockNumber
 				}
@@ -108,7 +116,9 @@ func CreateOperatorQuorumIntervals(
 			for _, q := range added[i].QuorumNumbers {
 				start, ok := openQuorum[q]
 				if ok {
-					return nil, fmt.Errorf("cannot add operator: %s to quorum: %d at block number: %d, because it is already in the quorum since block number: %d", op, q, start, added[i].BlockNumber)
+					msg := "cannot add operator %s to quorum %d at block number %d, " +
+						"the operator is already in the quorum since block number: %d"
+					return nil, fmt.Errorf(msg, op, q, added[i].BlockNumber, start)
 				}
 				openQuorum[q] = added[i].BlockNumber
 			}
@@ -142,10 +152,14 @@ func removeQuorums(operatorQuorum *OperatorQuorum, openQuorum map[uint8]uint32, 
 	for _, q := range operatorQuorum.QuorumNumbers {
 		start, ok := openQuorum[q]
 		if !ok {
-			return fmt.Errorf("cannot remove a quorum: %d, because the operator: %s is not in the quorum at block number: %d", q, op, operatorQuorum.BlockNumber)
+			msg := "cannot remove a quorum %d, the operator %s is not yet in the quorum " +
+				"at block %d"
+			return fmt.Errorf(msg, q, op, operatorQuorum.BlockNumber)
 		}
 		if start >= operatorQuorum.BlockNumber {
-			return fmt.Errorf("deregistration block number: %d must be strictly greater than its registration block number: %d, for operator: %s, quorum: %d", operatorQuorum.BlockNumber, start, op, q)
+			msg := "deregistration block number %d must be strictly greater than its " +
+				"registration block number %d, for operator %s, quorum %d"
+			return fmt.Errorf(msg, operatorQuorum.BlockNumber, start, op, q)
 		}
 		interval := BlockInterval{
 			StartBlock: start,
@@ -160,4 +174,25 @@ func removeQuorums(operatorQuorum *OperatorQuorum, openQuorum map[uint8]uint32, 
 		delete(openQuorum, q)
 	}
 	return nil
+}
+
+// validateQuorumEvents validates the operator quorum events have the desired block numbers and
+// are in ascending order by block number.
+func validateQuorumEvents(added []*OperatorQuorum, removed []*OperatorQuorum, startBlock, endBlock uint32) error {
+	validate := func(events []*OperatorQuorum) error {
+		for i := range events {
+			if events[i].BlockNumber <= startBlock || events[i].BlockNumber > endBlock {
+				return fmt.Errorf("quorum events must be in range [%d, %d]", startBlock+1, endBlock)
+			}
+			if i > 0 && events[i].BlockNumber < events[i-1].BlockNumber {
+				return fmt.Errorf("quorum events must be in ascending order by block number")
+			}
+		}
+		return nil
+	}
+	err := validate(added)
+	if err != nil {
+		return err
+	}
+	return validate(removed)
 }
