@@ -77,30 +77,67 @@ func (g *Encoder) MakeFrames(
 	indices := make([]uint32, 0)
 	frames := make([]Frame, g.NumChunks)
 
-	for i := uint64(0); i < uint64(g.NumChunks); i++ {
+	jobChan := make(chan JobRequest, g.NumRSWorker)
+	results := make(chan error, g.NumRSWorker)
 
-		// finds out which coset leader i-th node is having
-		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
-
-		// mutltiprover return proof in butterfly order
-		frame := Frame{}
-		indices = append(indices, j)
-
-		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
-		err := rb.ReverseBitOrderFr(ys)
-		if err != nil {
-			return nil, nil, err
-		}
-		coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		frame.Coeffs = coeffs
-
-		frames[k] = frame
-		k++
+	for w := uint64(0); w < uint64(g.NumRSWorker); w++ {
+		go g.interpolyWorker(
+			polyEvals,
+			jobChan,
+			results,
+			frames,
+		)
 	}
+
+	for i := uint64(0); i < g.NumChunks; i++ {
+		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
+		jr := JobRequest{
+			Index:      uint64(i),
+			FrameIndex: k,
+		}
+		jobChan <- jr
+		k++
+		indices = append(indices, j)
+	}
+	close(jobChan)
+
+	for w := uint64(0); w < uint64(g.NumRSWorker); w++ {
+		interPolyErr := <-results
+		if interPolyErr != nil {
+			err = interPolyErr
+		}
+	}
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("proof worker error: %v", err)
+	}
+
+	/*
+		for i := uint64(0); i < uint64(g.NumChunks); i++ {
+
+			// finds out which coset leader i-th node is having
+			j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
+
+			// mutltiprover return proof in butterfly order
+			frame := Frame{}
+			indices = append(indices, j)
+
+			ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
+			err := rb.ReverseBitOrderFr(ys)
+			if err != nil {
+				return nil, nil, err
+			}
+			coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
+			if err != nil {
+				return nil, nil, err
+			}
+
+			frame.Coeffs = coeffs
+
+			frames[k] = frame
+			k++
+		}
+	*/
 
 	return frames, indices, nil
 }
@@ -126,4 +163,37 @@ func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Elemen
 	}
 
 	return evals, pdCoeffs, nil
+}
+
+type JobRequest struct {
+	Index      uint64
+	FrameIndex uint64
+}
+
+func (g *Encoder) interpolyWorker(
+	polyEvals []fr.Element,
+	jobChan <-chan JobRequest,
+	results chan<- error,
+	frames []Frame,
+) {
+
+	for jr := range jobChan {
+		i := jr.Index
+		k := jr.FrameIndex
+		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
+		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
+		err := rb.ReverseBitOrderFr(ys)
+		if err != nil {
+			results <- err
+		}
+		coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
+		if err != nil {
+			results <- err
+		}
+
+		frames[k].Coeffs = coeffs
+	}
+
+	results <- nil
+
 }
