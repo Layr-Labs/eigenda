@@ -7,8 +7,6 @@ import (
 	"net"
 	"time"
 
-	_ "net/http/pprof"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser"
