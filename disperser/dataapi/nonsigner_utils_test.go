@@ -35,7 +35,7 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 	}
 	_, err = dataapi.CreateOperatorQuorumIntervals(100, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "startBlock must be no less than endBlock"))
+	assert.True(t, strings.Contains(err.Error(), "endBlock must be no less than startBlock"))
 
 	// Equal block number
 	addedQuorums = map[string][]*dataapi.OperatorQuorum{
