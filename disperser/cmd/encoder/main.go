@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/Layr-Labs/eigenda/common"
+
 
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	"github.com/urfave/cli"
@@ -55,11 +55,6 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return err
 	}
 	defer enc.Close()
-
-	// Start pprof
-	go func() {
-		http.ListenAndServe(":6060", nil)
-	}()
 
 	err = enc.Start(context.Background())
 	if err != nil {
