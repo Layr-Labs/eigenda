@@ -77,10 +77,16 @@ func (g *Encoder) MakeFrames(
 	indices := make([]uint32, 0)
 	frames := make([]Frame, g.NumChunks)
 
-	jobChan := make(chan JobRequest, g.NumRSWorker)
-	results := make(chan error, g.NumRSWorker)
+	numWorker := uint64(g.NumRSWorker)
 
-	for w := uint64(0); w < uint64(g.NumRSWorker); w++ {
+	if uint64(numWorker) > g.NumChunks {
+		numWorker = g.NumChunks
+	}
+
+	jobChan := make(chan JobRequest, numWorker)
+	results := make(chan error, numWorker)
+
+	for w := uint64(0); w < uint64(numWorker); w++ {
 		go g.interpolyWorker(
 			polyEvals,
 			jobChan,
@@ -101,7 +107,7 @@ func (g *Encoder) MakeFrames(
 	}
 	close(jobChan)
 
-	for w := uint64(0); w < uint64(g.NumRSWorker); w++ {
+	for w := uint64(0); w < uint64(numWorker); w++ {
 		interPolyErr := <-results
 		if interPolyErr != nil {
 			err = interPolyErr
