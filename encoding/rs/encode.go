@@ -118,33 +118,6 @@ func (g *Encoder) MakeFrames(
 		return nil, nil, fmt.Errorf("proof worker error: %v", err)
 	}
 
-	/*
-		for i := uint64(0); i < uint64(g.NumChunks); i++ {
-
-			// finds out which coset leader i-th node is having
-			j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
-
-			// mutltiprover return proof in butterfly order
-			frame := Frame{}
-			indices = append(indices, j)
-
-			ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
-			err := rb.ReverseBitOrderFr(ys)
-			if err != nil {
-				return nil, nil, err
-			}
-			coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
-			if err != nil {
-				return nil, nil, err
-			}
-
-			frame.Coeffs = coeffs
-
-			frames[k] = frame
-			k++
-		}
-	*/
-
 	return frames, indices, nil
 }
 
