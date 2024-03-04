@@ -83,7 +83,10 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 
 // prepareBatch takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, quorumIndex uint, bn uint) ([]core.EncodedBlob, core.BatchHeader) {
+func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) ([]core.EncodedBlob, core.BatchHeader, *mock.ChainDataMock) {
+
+	cst, err := mock.MakeChainDataMock(core.OperatorIndex(operatorCount))
+	assert.NoError(t, err)
 
 	batchHeader := core.BatchHeader{
 		ReferenceBlockNumber: bn,
@@ -91,107 +94,110 @@ func prepareBatch(t *testing.T, cst core.IndexedChainState, blobs []core.Blob, q
 	}
 
 	numBlob := len(blobs)
-	var encodedBlobs []core.EncodedBlob = make([]core.EncodedBlob, numBlob)
+	encodedBlobs := make([]core.EncodedBlob, numBlob)
+	blobHeaders := make([]*core.BlobHeader, numBlob)
 
 	for z, blob := range blobs {
-		quorumID := blob.RequestHeader.SecurityParams[quorumIndex].QuorumID
-		quorums := []core.QuorumID{quorumID}
-
-		state, err := cst.GetOperatorState(context.Background(), bn, quorums)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		blobSize := uint(len(blob.Data))
-		blobLength := encoding.GetBlobLength(blobSize)
-
-		chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, blob.RequestHeader.SecurityParams[quorumIndex])
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		quorumHeader := &core.BlobQuorumInfo{
-			SecurityParam: core.SecurityParam{
-				QuorumID:           quorumID,
-				AdversaryThreshold: blob.RequestHeader.SecurityParams[quorumIndex].AdversaryThreshold,
-				QuorumThreshold:    blob.RequestHeader.SecurityParams[quorumIndex].QuorumThreshold,
-			},
-			ChunkLength: chunkLength,
-		}
-
-		assignments, info, err := asn.GetAssignments(state, blobLength, quorumHeader)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
-
-		commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
-		if err != nil {
-			t.Fatal(err)
-		}
 
 		blobHeader := &core.BlobHeader{
-			BlobCommitments: encoding.BlobCommitments{
+			QuorumInfos: make([]*core.BlobQuorumInfo, 0),
+		}
+		blobHeaders[z] = blobHeader
+
+		encodedBlob := make(map[core.OperatorID]*core.BlobMessage, operatorCount)
+
+		for _, securityParam := range blob.RequestHeader.SecurityParams {
+
+			quorumID := securityParam.QuorumID
+			quorums := []core.QuorumID{quorumID}
+
+			state, err := cst.GetOperatorState(context.Background(), bn, quorums)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			blobSize := uint(len(blob.Data))
+			blobLength := encoding.GetBlobLength(blobSize)
+
+			chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, securityParam)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			quorumHeader := &core.BlobQuorumInfo{
+				SecurityParam: core.SecurityParam{
+					QuorumID:           quorumID,
+					AdversaryThreshold: securityParam.AdversaryThreshold,
+					QuorumThreshold:    securityParam.QuorumThreshold,
+				},
+				ChunkLength: chunkLength,
+			}
+
+			assignments, info, err := asn.GetAssignments(state, blobLength, quorumHeader)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+
+			commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			blobHeader.BlobCommitments = encoding.BlobCommitments{
 				Commitment:       commitments.Commitment,
 				LengthCommitment: commitments.LengthCommitment,
 				LengthProof:      commitments.LengthProof,
 				Length:           commitments.Length,
-			},
-			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
+			}
+
+			blobHeader.QuorumInfos = append(blobHeader.QuorumInfos, quorumHeader)
+
+			for id, assignment := range assignments {
+				_, ok := encodedBlob[id]
+
+				if !ok {
+					encodedBlob[id] = &core.BlobMessage{
+						BlobHeader: blobHeader,
+						Bundles: map[core.QuorumID]core.Bundle{
+							quorumID: chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
+						},
+					}
+				} else {
+					encodedBlob[id].Bundles[quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
+				}
+			}
+
 		}
 
-		var encodedBlob core.EncodedBlob = make(map[core.OperatorID]*core.BlobMessage, len(assignments))
-		for id, assignment := range assignments {
-			bundles := map[core.QuorumID]core.Bundle{
-				quorumID: chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
-			}
-			encodedBlob[id] = &core.BlobMessage{
-				BlobHeader: blobHeader,
-				Bundles:    bundles,
-			}
-		}
 		encodedBlobs[z] = encodedBlob
-
 	}
 
-	return encodedBlobs, batchHeader
+	// Set the batch root
 
-}
+	batchHeader.SetBatchRoot(blobHeaders)
 
-// checkBatch runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
-// the DA nodes' validation checks fails
-func checkBatch(t *testing.T, cst core.IndexedChainState, encodedBlob core.EncodedBlob, header core.BatchHeader) {
-	val := core.NewChunkValidator(v, asn, cst, [32]byte{})
-
-	quorums := []core.QuorumID{0}
-	state, _ := cst.GetIndexedOperatorState(context.Background(), header.ReferenceBlockNumber, quorums)
-
-	for id := range state.IndexedOperators {
-		val.UpdateOperatorID(id)
-		blobMessage := encodedBlob[id]
-		err := val.ValidateBlob(blobMessage, state.OperatorState)
-		assert.NoError(t, err)
-	}
+	return encodedBlobs, batchHeader, cst
 
 }
 
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
 func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader, pool common.WorkerPool) {
-	val := core.NewChunkValidator(v, asn, cst, [32]byte{})
+	val := core.NewDataValidator(v, asn, cst, [32]byte{})
 
-	quorums := []core.QuorumID{0}
+	quorums := []core.QuorumID{0, 1}
 	state, _ := cst.GetIndexedOperatorState(context.Background(), header.ReferenceBlockNumber, quorums)
 	numBlob := len(encodedBlobs)
 
 	for id := range state.IndexedOperators {
 		val.UpdateOperatorID(id)
-		var blobMessages []*core.BlobMessage = make([]*core.BlobMessage, numBlob)
+		blobMessages := make([]*core.BlobMessage, numBlob)
 		for z, encodedBlob := range encodedBlobs {
 			blobMessages[z] = encodedBlob[id]
 		}
-		err := val.ValidateBatch(blobMessages, state.OperatorState, pool)
+		err := val.ValidateBatch(&header, blobMessages, state.OperatorState, pool)
 		assert.NoError(t, err)
 	}
 
@@ -199,9 +205,10 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 
 func TestCoreLibrary(t *testing.T) {
 
-	numBlob := 1 // must be greater than 0
-	blobLengths := []int{1, 64, 1000}
 	operatorCounts := []uint{1, 2, 4, 10, 30}
+
+	numBlob := 3 // must be greater than 0
+	blobLengths := []int{1, 64, 1000}
 
 	securityParams := []*core.SecurityParam{
 		{
@@ -210,66 +217,32 @@ func TestCoreLibrary(t *testing.T) {
 			QuorumThreshold:    100,
 		},
 		{
-			QuorumID:           0,
+			QuorumID:           1,
 			AdversaryThreshold: 80,
 			QuorumThreshold:    90,
 		},
 	}
 
-	quorumIndex := uint(0)
 	bn := uint(0)
 
 	pool := workerpool.New(1)
 
 	for _, operatorCount := range operatorCounts {
-		cst, err := mock.MakeChainDataMock(core.OperatorIndex(operatorCount))
-		assert.NoError(t, err)
-		batches := make([]core.EncodedBlob, 0)
-		batchHeader := core.BatchHeader{
-			ReferenceBlockNumber: bn,
-			BatchRoot:            [32]byte{},
-		}
+
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
+		blobs := make([]core.Blob, 0)
 		for _, blobLength := range blobLengths {
-
-			for _, securityParam := range securityParams {
-
-				t.Run(fmt.Sprintf("blobLength=%v, operatorCount=%v, securityParams=%v", blobLength, operatorCount, securityParam), func(t *testing.T) {
-
-					blobs := make([]core.Blob, numBlob)
-					for i := 0; i < numBlob; i++ {
-						blobs[i] = makeTestBlob(t, blobLength, []*core.SecurityParam{securityParam})
-					}
-
-					batch, header := prepareBatch(t, cst, blobs, quorumIndex, bn)
-					batches = append(batches, batch...)
-
-					checkBatch(t, cst, batch[0], header)
-				})
+			for i := 0; i < numBlob; i++ {
+				blobs = append(blobs, makeTestBlob(t, blobLength, securityParams))
 			}
-
 		}
-		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(batches)), func(t *testing.T) {
-			checkBatchByUniversalVerifier(t, cst, batches, batchHeader, pool)
+
+		blobMessages, header, cst := prepareBatch(t, operatorCount, blobs, bn)
+
+		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(blobs)), func(t *testing.T) {
+			checkBatchByUniversalVerifier(t, cst, blobMessages, header, pool)
 		})
 
 	}
 
-}
-
-func TestParseOperatorSocket(t *testing.T) {
-	operatorSocket := "localhost:1234;5678"
-	host, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(operatorSocket)
-	assert.NoError(t, err)
-	assert.Equal(t, "localhost", host)
-	assert.Equal(t, "1234", dispersalPort)
-	assert.Equal(t, "5678", retrievalPort)
-
-	_, _, _, err = core.ParseOperatorSocket("localhost:12345678")
-	assert.NotNil(t, err)
-	assert.Equal(t, "invalid socket address format, missing retrieval port: localhost:12345678", err.Error())
-
-	_, _, _, err = core.ParseOperatorSocket("localhost1234;5678")
-	assert.NotNil(t, err)
-	assert.Equal(t, "invalid socket address format: localhost1234;5678", err.Error())
 }
