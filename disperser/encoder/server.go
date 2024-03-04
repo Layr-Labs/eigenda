@@ -51,10 +51,10 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 		return nil, fmt.Errorf("too many requests")
 	}
 	//s.runningRequests <- struct{}{}
-	defer s.popRequest()
 
 	if ctx.Err() != nil {
 		s.metrics.IncrementCanceledBlobRequestNum()
+		s.popRequest()
 		return nil, ctx.Err()
 	}
 
@@ -82,6 +82,7 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	}
 
 	commits, chunks, err := s.prover.EncodeAndProve(req.Data, encodingParams)
+	s.popRequest()
 
 	if err != nil {
 		return nil, err
