@@ -50,7 +50,7 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, fmt.Errorf("too many requests")
 	}
-	s.runningRequests <- struct{}{}
+	//s.runningRequests <- struct{}{}
 	defer s.popRequest()
 
 	if ctx.Err() != nil {
@@ -69,7 +69,7 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 
 func (s *Server) popRequest() {
 	<-s.requestPool
-	<-s.runningRequests
+	//<-s.runningRequests
 }
 
 func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {

@@ -41,12 +41,14 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
+	//g.Config.Holder <- struct{}{}
+
 	poly := &GlobalPoly{
 		Values: polyEvals,
 		Coeffs: polyCoeffs,
 	}
 
-	if g.verbose {
+	if g.Config.Verbose {
 		log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
 	}
 
@@ -77,7 +79,7 @@ func (g *Encoder) MakeFrames(
 	indices := make([]uint32, 0)
 	frames := make([]Frame, g.NumChunks)
 
-	numWorker := uint64(g.NumRSWorker)
+	numWorker := uint64(g.Config.NumRSWorker)
 
 	if uint64(numWorker) > g.NumChunks {
 		numWorker = g.NumChunks

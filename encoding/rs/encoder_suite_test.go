@@ -4,6 +4,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -18,6 +19,7 @@ var (
 	numNode                  uint64
 	numSys                   uint64
 	numPar                   uint64
+	encConfig                = rs.EncoderConfig{}
 )
 
 func setupSuite(t *testing.T) func(t *testing.T) {
@@ -26,6 +28,12 @@ func setupSuite(t *testing.T) func(t *testing.T) {
 	numNode = uint64(4)
 	numSys = uint64(3)
 	numPar = numNode - numSys
+
+	encConfig = rs.EncoderConfig{
+		Verbose:     true,
+		NumRSWorker: runtime.GOMAXPROCS(0),
+		Holder:      make(chan struct{}, 1),
+	}
 
 	return func(t *testing.T) {
 		log.Println("Tearing down suite")

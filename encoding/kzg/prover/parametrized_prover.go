@@ -28,6 +28,7 @@ type ParametrizedProver struct {
 	Ks         *kzg.KZGSettings
 	SFs        *fft.FFTSettings   // fft used for submatrix product helper
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
+	Holder     chan struct{}
 }
 
 type WorkerResult struct {
@@ -186,6 +187,8 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 		}
 	}
 
+	//<-p.Holder
+
 	t1 := time.Now()
 
 	// only 1 ifft is needed
@@ -249,7 +252,7 @@ func (p *ParametrizedProver) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint
 
 	toeV := make([]fr.Element, 2*dimE-1)
 	for i := uint64(0); i < dim; i++ {
-		
+
 		toeV[i].Set(&polyFr[m-(j+i*l)])
 	}
 

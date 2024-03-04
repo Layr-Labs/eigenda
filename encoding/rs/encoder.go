@@ -2,7 +2,6 @@ package rs
 
 import (
 	"math"
-	"runtime"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -13,9 +12,13 @@ type Encoder struct {
 
 	Fs *fft.FFTSettings
 
-	verbose bool
+	Config EncoderConfig
+}
 
+type EncoderConfig struct {
+	Verbose     bool
 	NumRSWorker int
+	Holder      chan struct{}
 }
 
 // The function creates a high level struct that determines the encoding the a data of a
@@ -26,7 +29,7 @@ type Encoder struct {
 // original data. When some systematic chunks are missing but identical parity chunk are
 // available, the receive can go through a Reed Solomon decoding to reconstruct the
 // original data.
-func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) {
+func NewEncoder(params encoding.EncodingParams, config EncoderConfig) (*Encoder, error) {
 
 	err := params.Validate()
 	if err != nil {
@@ -39,8 +42,7 @@ func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) 
 	return &Encoder{
 		EncodingParams: params,
 		Fs:             fs,
-		verbose:        verbose,
-		NumRSWorker:    runtime.GOMAXPROCS(0),
+		Config:         config,
 	}, nil
 
 }
