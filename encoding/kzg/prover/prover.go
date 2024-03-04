@@ -20,6 +20,10 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+const (
+	NUM_CONCURRENT = 2
+)
+
 type Prover struct {
 	*kzg.KzgConfig
 	Srs          *kzg.SRS
@@ -28,6 +32,7 @@ type Prover struct {
 	LoadG2Points bool
 
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
+	Holder              chan struct{}
 }
 
 var _ encoding.Prover = &Prover{}
@@ -90,6 +95,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 		G2Trailing:          g2Trailing,
 		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
 		LoadG2Points:        loadG2Points,
+		Holder:              make(chan struct{}, NUM_CONCURRENT),
 	}
 
 	if config.PreloadEncoder {
@@ -191,7 +197,13 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, g.SRSOrder)
 	}
 
-	encoder, err := rs.NewEncoder(params, g.Verbose)
+	encConfig := rs.EncoderConfig{
+		Verbose:     g.Verbose,
+		NumRSWorker: int(g.NumWorker-8) / NUM_CONCURRENT,
+		Holder:      g.Holder,
+	}
+
+	encoder, err := rs.NewEncoder(params, encConfig)
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err
@@ -240,9 +252,9 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		Ks:         ks,
 		SFs:        sfs,
 		FFTPointsT: fftPointsT,
+		Holder:     g.Holder,
 	}, nil
 }
-
 
 // Detect the precomputed table from the specified directory
 // the file name follow the name convention of

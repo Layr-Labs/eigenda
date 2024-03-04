@@ -77,7 +77,7 @@ func TestKzgRs() {
 
 	//inputFr := kzg.ToFrArray(inputBytes)
 	inputSize := uint64(numSymbols)
-	inputFr := make([]fr.Element, inputSize)
+	inputFr := make([]fr.Element, enc.NumEvaluations())
 	for i := uint64(0); i < inputSize; i++ {
 		inputFr[i].SetInt64(int64(i + 1))
 	}
@@ -86,7 +86,7 @@ func TestKzgRs() {
 	printFr(inputFr)
 
 	//inputSize := uint64(len(inputFr))
-	commit, lowDegreeCommit, lowDegreeProof, frames, fIndices, err := enc.Encode(inputFr)
+	commit, lowDegreeCommit, lowDegreeProof, frames, fIndices, err := enc.Encode(inputFr, uint64(numSymbols))
 	_ = lowDegreeProof
 	_ = lowDegreeCommit
 	if err != nil {

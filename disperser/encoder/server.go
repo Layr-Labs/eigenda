@@ -26,8 +26,8 @@ type Server struct {
 	metrics *Metrics
 	close   func()
 
-	runningRequests chan struct{}
-	requestPool     chan struct{}
+	//runningRequests chan struct{}
+	requestPool chan struct{}
 }
 
 func NewServer(config ServerConfig, logger common.Logger, prover encoding.Prover, metrics *Metrics) *Server {
@@ -37,8 +37,8 @@ func NewServer(config ServerConfig, logger common.Logger, prover encoding.Prover
 		prover:  prover,
 		metrics: metrics,
 
-		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:     make(chan struct{}, config.RequestPoolSize),
+		//runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
+		requestPool: make(chan struct{}, config.RequestPoolSize),
 	}
 }
 
@@ -50,11 +50,11 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, fmt.Errorf("too many requests")
 	}
-	s.runningRequests <- struct{}{}
-	defer s.popRequest()
+	//s.runningRequests <- struct{}{}
 
 	if ctx.Err() != nil {
 		s.metrics.IncrementCanceledBlobRequestNum()
+		s.popRequest()
 		return nil, ctx.Err()
 	}
 
@@ -69,7 +69,7 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 
 func (s *Server) popRequest() {
 	<-s.requestPool
-	<-s.runningRequests
+	//<-s.runningRequests
 }
 
 func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
@@ -82,6 +82,7 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	}
 
 	commits, chunks, err := s.prover.EncodeAndProve(req.Data, encodingParams)
+	s.popRequest()
 
 	if err != nil {
 		return nil, err

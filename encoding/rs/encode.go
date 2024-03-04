@@ -41,12 +41,16 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
+	blockingStart := time.Now()
+	g.Config.Holder <- struct{}{}
+	makeFrameStart := time.Now()
+
 	poly := &GlobalPoly{
 		Values: polyEvals,
 		Coeffs: polyCoeffs,
 	}
 
-	if g.verbose {
+	if g.Config.Verbose {
 		log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
 	}
 
@@ -56,8 +60,9 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
-	log.Printf("  SUMMARY: Encode %v byte among %v numNode takes %v\n",
-		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
+	log.Printf("  SUMMARY: Encode %v input byte among %v numNode with coding ratio (%v/%v). Total duration %v . Interpolation %v . blocking %v . MakeFrame %v\n",
+		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, len(inputFr), g.NumEvaluations(),
+		time.Since(start), blockingStart.Sub(start), makeFrameStart.Sub(blockingStart), time.Since(makeFrameStart))
 
 	return poly, frames, indices, nil
 }
@@ -77,29 +82,45 @@ func (g *Encoder) MakeFrames(
 	indices := make([]uint32, 0)
 	frames := make([]Frame, g.NumChunks)
 
-	for i := uint64(0); i < uint64(g.NumChunks); i++ {
+	numWorker := uint64(g.Config.NumRSWorker)
 
-		// finds out which coset leader i-th node is having
+	if uint64(numWorker) > g.NumChunks {
+		numWorker = g.NumChunks
+	}
+
+	jobChan := make(chan JobRequest, numWorker)
+	results := make(chan error, numWorker)
+
+	for w := uint64(0); w < uint64(numWorker); w++ {
+		go g.interpolyWorker(
+			polyEvals,
+			jobChan,
+			results,
+			frames,
+		)
+	}
+
+	for i := uint64(0); i < g.NumChunks; i++ {
 		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
-
-		// mutltiprover return proof in butterfly order
-		frame := Frame{}
-		indices = append(indices, j)
-
-		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
-		err := rb.ReverseBitOrderFr(ys)
-		if err != nil {
-			return nil, nil, err
+		jr := JobRequest{
+			Index:      uint64(i),
+			FrameIndex: k,
 		}
-		coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		frame.Coeffs = coeffs
-
-		frames[k] = frame
+		jobChan <- jr
 		k++
+		indices = append(indices, j)
+	}
+	close(jobChan)
+
+	for w := uint64(0); w < uint64(numWorker); w++ {
+		interPolyErr := <-results
+		if interPolyErr != nil {
+			err = interPolyErr
+		}
+	}
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("proof worker error: %v", err)
 	}
 
 	return frames, indices, nil
@@ -107,23 +128,47 @@ func (g *Encoder) MakeFrames(
 
 // Encoding Reed Solomon using FFT
 func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Element, error) {
-
-	if len(coeffs) > int(g.NumEvaluations()) {
-		return nil, nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
+	if len(coeffs) != int(g.NumEvaluations()) {
+		return nil, nil, fmt.Errorf("the provided encoding parameters are not consistent for the size of the data input")
 	}
 
-	pdCoeffs := make([]fr.Element, g.NumEvaluations())
-	for i := 0; i < len(coeffs); i++ {
-		pdCoeffs[i].Set(&coeffs[i])
-	}
-	for i := len(coeffs); i < len(pdCoeffs); i++ {
-		pdCoeffs[i].SetZero()
-	}
-
-	evals, err := g.Fs.FFT(pdCoeffs, false)
+	evals, err := g.Fs.FFT(coeffs, false)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return evals, pdCoeffs, nil
+	return evals, coeffs, nil
+}
+
+type JobRequest struct {
+	Index      uint64
+	FrameIndex uint64
+}
+
+func (g *Encoder) interpolyWorker(
+	polyEvals []fr.Element,
+	jobChan <-chan JobRequest,
+	results chan<- error,
+	frames []Frame,
+) {
+
+	for jr := range jobChan {
+		i := jr.Index
+		k := jr.FrameIndex
+		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
+		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
+		err := rb.ReverseBitOrderFr(ys)
+		if err != nil {
+			results <- err
+		}
+		coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
+		if err != nil {
+			results <- err
+		}
+
+		frames[k].Coeffs = coeffs
+	}
+
+	results <- nil
+
 }

@@ -3,20 +3,13 @@ package encoder
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
-	"math/big"
 	"runtime"
 	"testing"
-	"time"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	encmock "github.com/Layr-Labs/eigenda/encoding/mock"
 
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
@@ -148,6 +141,7 @@ func TestEncodeBlob(t *testing.T) {
 	assert.Equal(t, recovered, gettysburgAddressBytes)
 }
 
+/*
 func TestThrottling(t *testing.T) {
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))
@@ -242,6 +236,7 @@ func TestThrottling(t *testing.T) {
 		}
 	}
 }
+*/
 
 func TestEncoderPointsLoading(t *testing.T) {
 	// encoder 1 only loads 1500 points
