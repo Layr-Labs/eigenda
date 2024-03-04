@@ -20,6 +20,10 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+const (
+	NUM_CONCURRENT = 2
+)
+
 type Prover struct {
 	*kzg.KzgConfig
 	Srs          *kzg.SRS
@@ -91,7 +95,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 		G2Trailing:          g2Trailing,
 		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
 		LoadG2Points:        loadG2Points,
-		Holder:              make(chan struct{}, 1),
+		Holder:              make(chan struct{}, NUM_CONCURRENT),
 	}
 
 	if config.PreloadEncoder {
@@ -195,7 +199,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 	encConfig := rs.EncoderConfig{
 		Verbose:     g.Verbose,
-		NumRSWorker: int(g.NumWorker - 8),
+		NumRSWorker: int(g.NumWorker-8) / NUM_CONCURRENT,
 		Holder:      g.Holder,
 	}
 
