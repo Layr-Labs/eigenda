@@ -28,7 +28,7 @@ services:
   churner:
     build:
       context: .
-      dockerfile: churner/cmd/Dockerfile
+      dockerfile: operators/churner/cmd/Dockerfile
     image: ghcr.io/layr-labs/eigenda/churner:${BUILD_TAG:-latest}
   nodeplugin:
     build:
