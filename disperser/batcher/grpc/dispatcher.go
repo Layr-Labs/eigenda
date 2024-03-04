@@ -156,16 +156,16 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		lengthProofData.YA1 = blob.BlobHeader.LengthProof.Y.A1.Marshal()
 	}
 
-	quorumHeaders := make([]*node.BlobQuorumInfo, 0)
+	quorumHeaders := make([]*node.BlobQuorumInfo, len(blob.BlobHeader.QuorumInfos))
 
-	for _, header := range blob.BlobHeader.QuorumInfos {
-		quorumHeaders = append(quorumHeaders, &node.BlobQuorumInfo{
+	for i, header := range blob.BlobHeader.QuorumInfos {
+		quorumHeaders[i] = &node.BlobQuorumInfo{
 			QuorumId:           uint32(header.QuorumID),
 			AdversaryThreshold: uint32(header.AdversaryThreshold),
 			ChunkLength:        uint32(header.ChunkLength),
 			QuorumThreshold:    uint32(header.QuorumThreshold),
 			Ratelimit:          header.QuorumRate,
-		})
+		}
 	}
 
 	data, err := blob.Bundles.Serialize()
