@@ -187,7 +187,7 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 		}
 	}
 
-	//<-p.Holder
+	<-p.Holder
 
 	t1 := time.Now()
 

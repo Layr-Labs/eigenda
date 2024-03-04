@@ -26,8 +26,8 @@ type Server struct {
 	metrics *Metrics
 	close   func()
 
-	runningRequests chan struct{}
-	requestPool     chan struct{}
+	//runningRequests chan struct{}
+	requestPool chan struct{}
 }
 
 func NewServer(config ServerConfig, logger common.Logger, prover encoding.Prover, metrics *Metrics) *Server {
@@ -37,8 +37,8 @@ func NewServer(config ServerConfig, logger common.Logger, prover encoding.Prover
 		prover:  prover,
 		metrics: metrics,
 
-		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:     make(chan struct{}, config.RequestPoolSize),
+		//runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
+		requestPool: make(chan struct{}, config.RequestPoolSize),
 	}
 }
 

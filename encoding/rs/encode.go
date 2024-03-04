@@ -41,7 +41,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
-	//g.Config.Holder <- struct{}{}
+	g.Config.Holder <- struct{}{}
 
 	poly := &GlobalPoly{
 		Values: polyEvals,
