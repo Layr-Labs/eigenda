@@ -41,7 +41,9 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
+	blockingStart := time.Now()
 	g.Config.Holder <- struct{}{}
+	makeFrameStart := time.Now()
 
 	poly := &GlobalPoly{
 		Values: polyEvals,
@@ -58,8 +60,9 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
-	log.Printf("  SUMMARY: Encode %v byte among %v numNode takes %v\n",
-		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, time.Since(start))
+	log.Printf("  SUMMARY: Encode %v input byte among %v numNode with coding ratio (%v/%v). Total duration %v . Interpolation %v . blocking %v . MakeFrame %v\n",
+		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, len(inputFr), g.NumEvaluations(),
+		time.Since(start), blockingStart.Sub(start), makeFrameStart.Sub(blockingStart), time.Since(makeFrameStart))
 
 	return poly, frames, indices, nil
 }
