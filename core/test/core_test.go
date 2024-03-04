@@ -104,7 +104,11 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 		}
 		blobHeaders[z] = blobHeader
 
-		encodedBlob := make(map[core.OperatorID]*core.BlobMessage, operatorCount)
+		encodedBlob := core.EncodedBlob{
+			BlobHeader:        blobHeader,
+			BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+		}
+		encodedBlobs[z] = encodedBlob
 
 		for _, securityParam := range blob.RequestHeader.SecurityParams {
 
@@ -155,23 +159,18 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			blobHeader.QuorumInfos = append(blobHeader.QuorumInfos, quorumHeader)
 
 			for id, assignment := range assignments {
-				_, ok := encodedBlob[id]
-
+				_, ok := encodedBlob.BundlesByOperator[id]
 				if !ok {
-					encodedBlob[id] = &core.BlobMessage{
-						BlobHeader: blobHeader,
-						Bundles: map[core.QuorumID]core.Bundle{
-							quorumID: chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
-						},
+					encodedBlob.BundlesByOperator[id] = map[core.QuorumID]core.Bundle{
+						quorumID: chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
 					}
 				} else {
-					encodedBlob[id].Bundles[quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
+					encodedBlob.BundlesByOperator[id][quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
 				}
 			}
 
 		}
 
-		encodedBlobs[z] = encodedBlob
 	}
 
 	// Set the batch root
@@ -195,7 +194,10 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 		val.UpdateOperatorID(id)
 		blobMessages := make([]*core.BlobMessage, numBlob)
 		for z, encodedBlob := range encodedBlobs {
-			blobMessages[z] = encodedBlob[id]
+			blobMessages[z] = &core.BlobMessage{
+				BlobHeader: encodedBlob.BlobHeader,
+				Bundles:    encodedBlob.BundlesByOperator[id],
+			}
 		}
 		err := val.ValidateBatch(&header, blobMessages, state.OperatorState, pool)
 		assert.NoError(t, err)

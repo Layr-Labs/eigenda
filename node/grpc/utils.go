@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -30,10 +31,12 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
 	for i, blob := range in.GetBlobs() {
-
 		blobHeader, err := GetBlobHeaderFromProto(blob.GetHeader())
 		if err != nil {
 			return nil, err
+		}
+		if len(blob.GetBundles()) != len(blob.GetHeader().GetQuorumHeaders()) {
+			return nil, fmt.Errorf("number of quorum headers (%d) does not match number of bundles in blob message (%d)", len(blob.GetHeader().GetQuorumHeaders()), len(blob.GetBundles()))
 		}
 
 		bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
