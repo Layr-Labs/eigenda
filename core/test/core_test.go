@@ -175,7 +175,10 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 	// Set the batch root
 
-	batchHeader.SetBatchRoot(blobHeaders)
+	_, err = batchHeader.SetBatchRoot(blobHeaders)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	return encodedBlobs, batchHeader, cst
 
