@@ -195,7 +195,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 	encConfig := rs.EncoderConfig{
 		Verbose:     g.Verbose,
-		NumRSWorker: int(g.NumWorker),
+		NumRSWorker: int(g.NumWorker - 8),
 		Holder:      g.Holder,
 	}
 
