@@ -23,9 +23,9 @@ func TestProveAllCosetThreads(t *testing.T) {
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
-	inputFr := rs.ToFrArray(gettysburgAddressBytes)
+	inputFr, numEle := rs.ToFrArrayWithPadding(gettysburgAddressBytes, enc.NumEvaluations())
 
-	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+	commit, _, _, frames, fIndices, err := enc.Encode(inputFr, numEle)
 	require.Nil(t, err)
 
 	for i := 0; i < len(frames); i++ {

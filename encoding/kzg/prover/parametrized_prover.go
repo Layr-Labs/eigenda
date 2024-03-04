@@ -38,24 +38,20 @@ type WorkerResult struct {
 
 // just a wrapper to take bytes not Fr Element
 func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
-	inputFr := rs.ToFrArray(inputBytes)
-	return g.Encode(inputFr)
+	inputFr, numEle := rs.ToFrArrayWithPadding(inputBytes, g.NumEvaluations())
+	return g.Encode(inputFr, numEle)
 }
 
-func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
+func (g *ParametrizedProver) Encode(paddedCoeffs []fr.Element, numEle uint64) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
 
 	startTime := time.Now()
-	poly, frames, indices, err := g.Encoder.Encode(inputFr)
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
 
-	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
-	}
+	inputFr := paddedCoeffs[:numEle]
+
+	coeffs := inputFr
 
 	// compute commit for the full poly
-	commit, err := g.Commit(poly.Coeffs)
+	commit, err := g.Commit(coeffs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -63,7 +59,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	config := ecc.MultiExpConfig{}
 
 	var lowDegreeCommitment bn254.G2Affine
-	_, err = lowDegreeCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
+	_, err = lowDegreeCommitment.MultiExp(g.Srs.G2[:len(coeffs)], coeffs, config)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -85,7 +81,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
 	var lowDegreeProof bn254.G2Affine
-	_, err = lowDegreeProof.MultiExp(shiftedSecret, poly.Coeffs, config)
+	_, err = lowDegreeProof.MultiExp(shiftedSecret, coeffs, config)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -94,11 +90,17 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		log.Printf("    Generating Low Degree Proof takes  %v\n", time.Since(intermediate))
 		intermediate = time.Now()
 	}
+	
+	poly, frames, indices, err := g.Encoder.Encode(paddedCoeffs)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
+		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", numEle, int(g.KzgConfig.SRSNumberToLoad))
+	}
 
 	// compute proofs
-	paddedCoeffs := make([]fr.Element, g.NumEvaluations())
-	copy(paddedCoeffs, poly.Coeffs)
-
 	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)

@@ -128,25 +128,16 @@ func (g *Encoder) MakeFrames(
 
 // Encoding Reed Solomon using FFT
 func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Element, error) {
-
-	if len(coeffs) > int(g.NumEvaluations()) {
-		return nil, nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
+	if len(coeffs) != int(g.NumEvaluations()) {
+		return nil, nil, fmt.Errorf("the provided encoding parameters are not consistent for the size of the data input")
 	}
 
-	pdCoeffs := make([]fr.Element, g.NumEvaluations())
-	for i := 0; i < len(coeffs); i++ {
-		pdCoeffs[i].Set(&coeffs[i])
-	}
-	for i := len(coeffs); i < len(pdCoeffs); i++ {
-		pdCoeffs[i].SetZero()
-	}
-
-	evals, err := g.Fs.FFT(pdCoeffs, false)
+	evals, err := g.Fs.FFT(coeffs, false)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return evals, pdCoeffs, nil
+	return evals, coeffs, nil
 }
 
 type JobRequest struct {
