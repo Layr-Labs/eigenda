@@ -90,7 +90,8 @@ func TestChurn(t *testing.T) {
 
 	// retry prior to expiry should fail
 	_, err = s.Churn(ctx, request)
-	assert.ErrorContains(t, err, "previous approval not expired, retry in")
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 90")
 }
 
 func TestChurnWithInvalidQuorum(t *testing.T) {
@@ -122,7 +123,8 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	}, nil)
 
 	_, err := s.Churn(ctx, request)
-	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: invalid request: the quorum_id must be in range [0, 1], but found 2")
 }
 
 func setupMockTransactor() {
