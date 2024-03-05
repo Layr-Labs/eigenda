@@ -1,7 +1,7 @@
 package rs
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"time"
 
@@ -109,7 +109,7 @@ func (g *Encoder) MakeFrames(
 func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Element, error) {
 
 	if len(coeffs) > int(g.NumEvaluations()) {
-		return nil, nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
+		return nil, nil, errors.New("the provided encoding parameters are not sufficient for the size of the data input")
 	}
 
 	pdCoeffs := make([]fr.Element, g.NumEvaluations())

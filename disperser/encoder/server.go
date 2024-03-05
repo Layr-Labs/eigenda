@@ -2,6 +2,7 @@ package encoder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -48,7 +49,7 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum()
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return nil, fmt.Errorf("too many requests")
+		return nil, errors.New("too many requests")
 	}
 	s.runningRequests <- struct{}{}
 	defer s.popRequest()

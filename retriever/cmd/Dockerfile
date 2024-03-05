@@ -11,7 +11,7 @@ COPY contracts /app/contracts
 COPY disperser /app/disperser
 COPY clients /app/clients
 COPY node /app/node
-COPY churner /app/churner
+COPY operators/churner /app/operators/churner
 COPY indexer /app/indexer
 COPY encoding /app/encoding
 COPY go.mod /app

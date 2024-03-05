@@ -110,7 +110,11 @@ func (i *indexer) Index(ctx context.Context) error {
 	if err != nil || !initialized || syncFromBlock-myLatestHeader.Number > maxSyncBlocks {
 		i.Logger.Info("Fast forwarding to sync block", "block", syncFromBlock)
 		// This probably just wipes the HeaderStore clean
-		i.HeaderStore.FastForward()
+		ffErr := i.HeaderStore.FastForward()
+
+		if ffErr != nil && !errors.Is(ffErr, ErrNoHeaders) {
+			return ffErr
+		}
 
 		for _, h := range i.Handlers {
 			err := h.Filterer.SetSyncPoint(clientLatestHeader)

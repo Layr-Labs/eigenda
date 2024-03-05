@@ -12,7 +12,6 @@ import (
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
@@ -23,6 +22,7 @@ import (
 	indexermock "github.com/Layr-Labs/eigenda/core/thegraph/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 }
 
 func setup(m *testing.M) {
-	rootPath := "../../"
+	rootPath := "../../../"
 
 	if testName == "" {
 		var err error
