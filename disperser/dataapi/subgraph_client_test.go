@@ -125,6 +125,66 @@ var (
 		"0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
 	}
 
+	batchNonSigningInfo = []*subgraph.BatchNonSigningInfo{
+		{
+			BatchId:         "1",
+			BatchHeaderHash: "0x890588400acb4f9f7f438c0d21734acb36a6c4c75df6560827e23b452bbdcc69",
+			BatchHeader: struct {
+				QuorumNumbers        []graphql.String `json:"quorumNumbers"`
+				ReferenceBlockNumber graphql.String
+			}{
+				QuorumNumbers: []graphql.String{
+					"00",
+					"01",
+				},
+				ReferenceBlockNumber: "81",
+			},
+			NonSigning: struct {
+				NonSigners []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				} `graphql:"nonSigners"`
+			}{
+				NonSigners: []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				}{
+					{
+						OperatorId: "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+					},
+					{
+						OperatorId: "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312",
+					},
+				},
+			},
+		},
+		{
+			BatchId:         "0",
+			BatchHeaderHash: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310",
+			BatchHeader: struct {
+				QuorumNumbers        []graphql.String `json:"quorumNumbers"`
+				ReferenceBlockNumber graphql.String
+			}{
+				QuorumNumbers: []graphql.String{
+					"01",
+					"02",
+				},
+				ReferenceBlockNumber: "80",
+			},
+			NonSigning: struct {
+				NonSigners []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				} `graphql:"nonSigners"`
+			}{
+				NonSigners: []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				}{
+					{
+						OperatorId: "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+					},
+				},
+			},
+		},
+	}
+
 	subgraphBatches = []*subgraph.Batches{
 		{
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f207",
@@ -402,6 +462,32 @@ func TestQueryNumBatchesByOperatorsInThePastBlockTimestamp(t *testing.T) {
 
 	numBatches := numBatchesByOperators["0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"]
 	assert.Equal(t, 3, numBatches)
+}
+
+func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
+	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
+	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
+	result, err := subgraphClient.QueryBatchNonSigningInfoInInterval(context.Background(), int64(1))
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(result))
+
+	// First batch's nonsigning info.
+	assert.Equal(t, 2, len(result[0].QuorumNumbers))
+	assert.Equal(t, uint8(0), result[0].QuorumNumbers[0])
+	assert.Equal(t, uint8(1), result[0].QuorumNumbers[1])
+	assert.Equal(t, uint64(81), result[0].ReferenceBlockNumber)
+	assert.Equal(t, 2, len(result[0].NonSigners))
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[0].NonSigners[0])
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", result[0].NonSigners[1])
+
+	// Second batch's nonsigning info.
+	assert.Equal(t, 2, len(result[1].QuorumNumbers))
+	assert.Equal(t, uint8(1), result[1].QuorumNumbers[0])
+	assert.Equal(t, uint8(2), result[1].QuorumNumbers[1])
+	assert.Equal(t, uint64(80), result[1].ReferenceBlockNumber)
+	assert.Equal(t, 1, len(result[1].NonSigners))
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[1].NonSigners[0])
 }
 
 func assertGasFees(t *testing.T, gasFees *dataapi.GasFees) {
