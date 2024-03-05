@@ -176,10 +176,10 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
-			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
-			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
-			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			ChunkLength:                  quorum.ChunkLength,
+			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
+			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
+			ConfirmationThresholdPercentage: uint8(quorum.GetQuorumThresholdPercentage()),
+			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
 	return rollupbindings.IEigenDAServiceManagerBlobHeader{
@@ -198,10 +198,10 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
 	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              batchHeaderProto.GetQuorumNumbers(),
-		QuorumThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
-		ReferenceBlockNumber:       batchHeaderProto.GetReferenceBlockNumber(),
+		BlobHeadersRoot:                  batchRoot,
+		QuorumNumbers:                    batchHeaderProto.GetQuorumNumbers(),
+		ConfirmationThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
+		ReferenceBlockNumber:             batchHeaderProto.GetReferenceBlockNumber(),
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
