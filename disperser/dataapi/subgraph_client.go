@@ -57,11 +57,11 @@ type (
 		BlockNumber   uint64
 	}
 	OperatorQuorumEvents struct {
-		// Mapping from operator address to a list of sorted events (ascending by BlockNumber)
-		// where the operator was added to quorums.
+		// AddedToQuorum is mapping from operator address to a list of sorted events
+		// (ascending by BlockNumber) where the operator was added to quorums.
 		AddedToQuorum map[string][]*OperatorQuorum
-		// Mapping from operator address to a list of sorted events (ascending by BlockNumber)
-		// where the operator was removed from quorums.
+		// RemovedFromQuorum is mapping from operator address to a list of sorted events
+		// (ascending by BlockNumber) where the operator was removed from quorums.
 		RemovedFromQuorum map[string][]*OperatorQuorum
 	}
 	DeregisteredOperatorInfo struct {

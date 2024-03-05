@@ -464,6 +464,8 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	assert.Equal(t, "operator-1", added1[0].Operator)
 	assert.Equal(t, uint64(80), added1[0].BlockNumber)
 	assert.Equal(t, 2, len(added1[0].QuorumNumbers))
+	// Note: the quorumId is 48 not 01 is because the string "01" is in UTF-8
+	// encoding (the default in golang), and it corresponding to 48 in decimal.
 	assert.Equal(t, uint8(48), added1[0].QuorumNumbers[0])
 	assert.Equal(t, uint8(49), added1[0].QuorumNumbers[1])
 	assert.Equal(t, "operator-1", added1[1].Operator)
