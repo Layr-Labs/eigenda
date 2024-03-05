@@ -52,7 +52,7 @@ type Node struct {
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
 	ChainState              core.ChainState
-	Validator               core.ChunkValidator
+	Validator               core.ShardValidator
 	Transactor              core.Transactor
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
@@ -118,7 +118,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 		return nil, err
 	}
 	asgn := &core.StdAssignmentCoordinator{}
-	validator := core.NewChunkValidator(v, asgn, cst, config.ID)
+	validator := core.NewShardValidator(v, asgn, cst, config.ID)
 
 	// Create new store
 
@@ -363,7 +363,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 
 	pool := workerpool.New(n.Config.NumBatchValidators)
-	return n.Validator.ValidateBatch(blobs, operatorState, pool)
+	return n.Validator.ValidateBatch(header, blobs, operatorState, pool)
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {

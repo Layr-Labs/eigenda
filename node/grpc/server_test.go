@@ -103,10 +103,10 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 
 	ratelimiter := &commonmock.NoopRatelimiter{}
 
-	var val core.ChunkValidator
+	var val core.ShardValidator
 
 	if mockValidator {
-		mockVal := core_mock.NewMockChunkValidator()
+		mockVal := core_mock.NewMockShardValidator()
 		mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
 		mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		val = mockVal
@@ -124,7 +124,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 			panic("failed to create test encoder")
 		}
 
-		val = core.NewChunkValidator(v, asn, cst, opID)
+		val = core.NewShardValidator(v, asn, cst, opID)
 	}
 
 	node := &node.Node{

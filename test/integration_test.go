@@ -262,7 +262,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger common.
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
 		_, v0 := mustMakeTestComponents()
-		val := core.NewChunkValidator(v0, asn, cst, id)
+		val := core.NewShardValidator(v0, asn, cst, id)
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()
