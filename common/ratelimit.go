@@ -2,7 +2,7 @@ package common
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 	"strings"
 	"time"
@@ -65,7 +65,7 @@ func GetClientAddress(ctx context.Context, header string, numProxies int, allowD
 	if header == "" || allowDirectConnectionFallback {
 		p, ok := peer.FromContext(ctx)
 		if !ok {
-			return "", fmt.Errorf("failed to get peer from request")
+			return "", errors.New("failed to get peer from request")
 		}
 		addr := p.Addr.String()
 		host, _, err := net.SplitHostPort(addr)
@@ -75,7 +75,7 @@ func GetClientAddress(ctx context.Context, header string, numProxies int, allowD
 		return host, nil
 	}
 
-	return "", fmt.Errorf("failed to get ip")
+	return "", errors.New("failed to get ip")
 }
 
 func splitHeader(header []string) []string {

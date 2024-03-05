@@ -2,7 +2,7 @@ package batcher_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -47,7 +47,7 @@ func TestProcessTransaction(t *testing.T) {
 	ethClient.AssertNumberOfCalls(t, "EnsureAnyTransactionEvaled", 1)
 
 	// now test the case where the transaction fails
-	randomErr := fmt.Errorf("random error")
+	randomErr := errors.New("random error")
 	ethClient.On("EnsureAnyTransactionEvaled").Return(nil, randomErr)
 	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
@@ -110,7 +110,7 @@ func TestTransactionFailure(t *testing.T) {
 	ethClient.On("GetLatestGasCaps").Return(big.NewInt(1e9), big.NewInt(1e9), nil)
 	ethClient.On("UpdateGas").Return(txn, nil).Once()
 	// now assume that the transaction fails on retry
-	speedUpFailure := fmt.Errorf("speed up failure")
+	speedUpFailure := errors.New("speed up failure")
 	ethClient.On("UpdateGas").Return(nil, speedUpFailure).Once()
 	ethClient.On("SendTransaction").Return(nil)
 	// assume that the transaction is not mined within the timeout
@@ -144,7 +144,7 @@ func TestSendTransactionRetry(t *testing.T) {
 	ethClient.On("UpdateGas").Return(txn, nil)
 	ethClient.On("SendTransaction").Return(nil).Once()
 	// assume that it fails to send the replacement transaction once
-	ethClient.On("SendTransaction").Return(fmt.Errorf("send txn failure")).Once()
+	ethClient.On("SendTransaction").Return(errors.New("send txn failure")).Once()
 	// assume that the transaction is not mined within the timeout
 	ethClient.On("EnsureAnyTransactionEvaled").Return(nil, context.DeadlineExceeded).Once()
 	ethClient.On("EnsureAnyTransactionEvaled").Return(&types.Receipt{
@@ -181,7 +181,7 @@ func TestSendTransactionRetryFailure(t *testing.T) {
 	ethClient.On("UpdateGas").Return(txn, nil)
 	ethClient.On("SendTransaction").Return(nil).Once()
 	// assume that it keeps failing to send the replacement transaction
-	sendErr := fmt.Errorf("send txn failure")
+	sendErr := errors.New("send txn failure")
 	ethClient.On("SendTransaction").Return(sendErr)
 	// assume that the transaction is not mined within the timeout
 	ethClient.On("EnsureAnyTransactionEvaled").Return(nil, context.DeadlineExceeded)

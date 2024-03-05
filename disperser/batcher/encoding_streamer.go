@@ -99,7 +99,7 @@ func NewEncodingStreamer(
 	metrics *EncodingStreamerMetrics,
 	logger common.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
-		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
+		return nil, errors.New("EncodingQueueLimit should be greater than 0")
 	}
 	return &EncodingStreamer{
 		StreamerConfig:         config,
@@ -462,24 +462,24 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			encodedBlobByKey[blobKey] = make(core.EncodedBlob)
+			blobHeader := &core.BlobHeader{
+				BlobCommitments: *result.Commitment,
+			}
+			blobHeaderByKey[blobKey] = blobHeader
+			encodedBlobByKey[blobKey] = core.EncodedBlob{
+				BlobHeader:        blobHeader,
+				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+			}
 		}
 
 		// Populate the assigned bundles
 		for opID, assignment := range result.Assignments {
-			blobMessage, ok := encodedBlobByKey[blobKey][opID]
+			bundles, ok := encodedBlobByKey[blobKey].BundlesByOperator[opID]
 			if !ok {
-				blobHeader := &core.BlobHeader{
-					BlobCommitments: *result.Commitment,
-				}
-				blobHeaderByKey[blobKey] = blobHeader
-				blobMessage = &core.BlobMessage{
-					BlobHeader: blobHeader,
-					Bundles:    make(core.Bundles),
-				}
-				encodedBlobByKey[blobKey][opID] = blobMessage
+				encodedBlobByKey[blobKey].BundlesByOperator[opID] = make(core.Bundles)
+				bundles = encodedBlobByKey[blobKey].BundlesByOperator[opID]
 			}
-			blobMessage.Bundles[result.BlobQuorumInfo.QuorumID] = append(blobMessage.Bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID] = append(bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
 		}
 
 		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)
@@ -487,9 +487,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 
 	// Populate the blob quorum infos
 	for blobKey, encodedBlob := range encodedBlobByKey {
-		for _, blobMessage := range encodedBlob {
-			blobMessage.BlobHeader.QuorumInfos = blobQuorums[blobKey]
-		}
+		encodedBlob.BlobHeader.QuorumInfos = blobQuorums[blobKey]
 	}
 
 	for blobKey, metadata := range metadataByKey {

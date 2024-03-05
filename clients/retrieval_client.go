@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -130,7 +131,7 @@ func (r *retrievalClient) RetrieveBlob(
 
 	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get assignments")
+		return nil, errors.New("failed to get assignments")
 	}
 
 	// Fetch chunks from all operators

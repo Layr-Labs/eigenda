@@ -3,7 +3,7 @@ package batcher_test
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -322,7 +322,7 @@ func TestEncodingFailure(t *testing.T) {
 	assert.Nil(t, err)
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
-	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, fmt.Errorf("errrrr"))
+	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, errors.New("errrrr"))
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
 	err = encodingStreamer.RequestEncoding(context.Background(), out)
@@ -431,31 +431,30 @@ func TestPartialBlob(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 1)
-	assert.Len(t, batch.EncodedBlobs[0], numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
 
 	encodedBlob1 := batch.EncodedBlobs[0]
 	assert.NotNil(t, encodedBlob1)
+	assert.NotNil(t, encodedBlob1.BlobHeader)
+	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
+	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
+	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           0,
+			AdversaryThreshold: 75,
+			QuorumThreshold:    100,
+		},
+		ChunkLength: 8,
+	}})
 
-	for _, blobMessage := range encodedBlob1 {
-		assert.NotNil(t, blobMessage)
-		assert.NotNil(t, blobMessage.BlobHeader)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments.Commitment)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments.LengthProof)
-		assert.Equal(t, blobMessage.BlobHeader.BlobCommitments.Length, uint(48))
-		assert.Len(t, blobMessage.BlobHeader.QuorumInfos, 1)
-		assert.ElementsMatch(t, blobMessage.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
-			SecurityParam: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 75,
-				QuorumThreshold:    100,
-			},
-			ChunkLength: 8,
-		}})
-
-		assert.Contains(t, batch.BlobHeaders, blobMessage.BlobHeader)
-		assert.Len(t, blobMessage.Bundles, 1)
-		assert.Greater(t, len(blobMessage.Bundles[0]), 0)
+	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
+	assert.Len(t, encodedBlob1.BundlesByOperator, numOperators)
+	for _, bundles := range encodedBlob1.BundlesByOperator {
+		assert.Len(t, bundles, 1)
+		assert.Greater(t, len(bundles[0]), 0)
 		break
 	}
 
@@ -646,7 +645,7 @@ func TestGetBatch(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
-	assert.Len(t, batch.EncodedBlobs[0], numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
 
 	var encodedBlob1 core.EncodedBlob
 	var encodedBlob2 core.EncodedBlob
@@ -663,59 +662,57 @@ func TestGetBatch(t *testing.T) {
 	}
 	assert.NotNil(t, encodedBlob1)
 	assert.NotNil(t, encodedBlob2)
-	for _, blobMessage := range encodedBlob1 {
-		assert.NotNil(t, blobMessage)
-		assert.NotNil(t, blobMessage.BlobHeader)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments.Commitment)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments.LengthProof)
-		assert.Equal(t, blobMessage.BlobHeader.BlobCommitments.Length, uint(48))
-		assert.Len(t, blobMessage.BlobHeader.QuorumInfos, 2)
-		assert.ElementsMatch(t, blobMessage.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
-			{
-				SecurityParam: core.SecurityParam{
-					QuorumID:           0,
-					AdversaryThreshold: 80,
-					QuorumThreshold:    100,
-				},
-				ChunkLength: 16,
-			},
-			{
-				SecurityParam: core.SecurityParam{
-					QuorumID:           1,
-					AdversaryThreshold: 70,
-					QuorumThreshold:    95,
-				},
-				ChunkLength: 8,
-			},
-		})
 
-		assert.Contains(t, batch.BlobHeaders, blobMessage.BlobHeader)
-		assert.Len(t, blobMessage.Bundles, 2)
-		assert.Greater(t, len(blobMessage.Bundles[0]), 0)
-		assert.Greater(t, len(blobMessage.Bundles[1]), 0)
+	assert.NotNil(t, encodedBlob1.BlobHeader)
+	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
+	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
+	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
+		{
+			SecurityParam: core.SecurityParam{
+				QuorumID:           0,
+				AdversaryThreshold: 80,
+				QuorumThreshold:    100,
+			},
+			ChunkLength: 16,
+		},
+		{
+			SecurityParam: core.SecurityParam{
+				QuorumID:           1,
+				AdversaryThreshold: 70,
+				QuorumThreshold:    95,
+			},
+			ChunkLength: 8,
+		},
+	})
+
+	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
+	for _, bundles := range encodedBlob1.BundlesByOperator {
+		assert.Len(t, bundles, 2)
+		assert.Greater(t, len(bundles[0]), 0)
+		assert.Greater(t, len(bundles[1]), 0)
 		break
 	}
 
-	for _, blobMessage := range encodedBlob2 {
-		assert.NotNil(t, blobMessage)
-		assert.NotNil(t, blobMessage.BlobHeader)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments.Commitment)
-		assert.NotNil(t, blobMessage.BlobHeader.BlobCommitments.LengthProof)
-		assert.Equal(t, blobMessage.BlobHeader.BlobCommitments.Length, uint(48))
-		assert.Len(t, blobMessage.BlobHeader.QuorumInfos, 1)
-		assert.ElementsMatch(t, blobMessage.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
-			SecurityParam: core.SecurityParam{
-				QuorumID:           2,
-				AdversaryThreshold: 75,
-				QuorumThreshold:    100,
-			},
-			ChunkLength: 8,
-		}})
-
-		assert.Len(t, blobMessage.Bundles, 1)
-		assert.Greater(t, len(blobMessage.Bundles[core.QuorumID(2)]), 0)
+	assert.NotNil(t, encodedBlob2.BlobHeader)
+	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
+	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
+	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           2,
+			AdversaryThreshold: 75,
+			QuorumThreshold:    100,
+		},
+		ChunkLength: 8,
+	}})
+	for _, bundles := range encodedBlob2.BundlesByOperator {
+		assert.Len(t, bundles, 1)
+		assert.Greater(t, len(bundles[core.QuorumID(2)]), 0)
 		break
 	}
 	assert.Len(t, batch.BlobHeaders, 2)
