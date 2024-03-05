@@ -112,7 +112,7 @@ func (i *indexer) Index(ctx context.Context) error {
 		// This probably just wipes the HeaderStore clean
 		ffErr := i.HeaderStore.FastForward()
 
-		if !errors.Is(ffErr, ErrNoHeaders) {
+		if ffErr != nil && !errors.Is(ffErr, ErrNoHeaders) {
 			return ffErr
 		}
 
