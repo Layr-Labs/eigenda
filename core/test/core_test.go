@@ -294,14 +294,20 @@ func TestImproperBatchHeader(t *testing.T) {
 
 	blobMessages, header, cst := prepareBatch(t, operatorCount, blobs, bn)
 
+	// Leave out a blob
+	err := checkBatchByUniversalVerifier(cst, blobMessages[:len(blobMessages)-2], header, pool)
+	assert.Error(t, err)
+
+	// Add an extra blob
 	headers := make([]*core.BlobHeader, len(blobs)-1)
 	for i := range headers {
 		headers[i] = blobMessages[i].BlobHeader
 	}
 
-	header.SetBatchRoot(headers)
+	_, err = header.SetBatchRoot(headers)
+	assert.NoError(t, err)
 
-	err := checkBatchByUniversalVerifier(cst, blobMessages, header, pool)
+	err = checkBatchByUniversalVerifier(cst, blobMessages, header, pool)
 	assert.Error(t, err)
 
 }
