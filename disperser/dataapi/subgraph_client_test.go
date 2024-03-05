@@ -538,7 +538,7 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
 	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
-	result, err := subgraphClient.QueryOperatorQuorumEvent(context.Background(), uint64(78), uint64(88))
+	result, err := subgraphClient.QueryOperatorQuorumEvent(context.Background(), uint32(78), uint32(88))
 	assert.NoError(t, err)
 
 	addedMap := result.AddedToQuorum
@@ -548,14 +548,14 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 2, len(added1))
 	assert.Equal(t, "operator-1", added1[0].Operator)
-	assert.Equal(t, uint64(80), added1[0].BlockNumber)
+	assert.Equal(t, uint32(80), added1[0].BlockNumber)
 	assert.Equal(t, 2, len(added1[0].QuorumNumbers))
 	// Note: the quorumId is 48 not 01 is because the string "01" is in UTF-8
 	// encoding (the default in golang), and it corresponding to 48 in decimal.
 	assert.Equal(t, uint8(48), added1[0].QuorumNumbers[0])
 	assert.Equal(t, uint8(49), added1[0].QuorumNumbers[1])
 	assert.Equal(t, "operator-1", added1[1].Operator)
-	assert.Equal(t, uint64(82), added1[1].BlockNumber)
+	assert.Equal(t, uint32(82), added1[1].BlockNumber)
 	assert.Equal(t, 1, len(added1[1].QuorumNumbers))
 	assert.Equal(t, uint8(50), added1[1].QuorumNumbers[0])
 	// Quorum events for operator-2.
@@ -563,7 +563,7 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 1, len(added2))
 	assert.Equal(t, "operator-2", added2[0].Operator)
-	assert.Equal(t, uint64(82), added2[0].BlockNumber)
+	assert.Equal(t, uint32(82), added2[0].BlockNumber)
 	assert.Equal(t, 1, len(added2[0].QuorumNumbers))
 	assert.Equal(t, uint8(50), added2[0].QuorumNumbers[0])
 
@@ -574,11 +574,11 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 2, len(removed1))
 	assert.Equal(t, "operator-1", removed1[0].Operator)
-	assert.Equal(t, uint64(81), removed1[0].BlockNumber)
+	assert.Equal(t, uint32(81), removed1[0].BlockNumber)
 	assert.Equal(t, 1, len(removed1[0].QuorumNumbers))
 	assert.Equal(t, uint8(48), removed1[0].QuorumNumbers[0])
 	assert.Equal(t, "operator-1", removed1[1].Operator)
-	assert.Equal(t, uint64(83), removed1[1].BlockNumber)
+	assert.Equal(t, uint32(83), removed1[1].BlockNumber)
 	assert.Equal(t, 1, len(removed1[1].QuorumNumbers))
 	assert.Equal(t, uint8(49), removed1[1].QuorumNumbers[0])
 	// Quorum events for operator-2.
@@ -586,7 +586,7 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 1, len(removed2))
 	assert.Equal(t, "operator-2", removed2[0].Operator)
-	assert.Equal(t, uint64(83), removed2[0].BlockNumber)
+	assert.Equal(t, uint32(83), removed2[0].BlockNumber)
 	assert.Equal(t, 1, len(removed2[0].QuorumNumbers))
 	assert.Equal(t, uint8(50), removed2[0].QuorumNumbers[0])
 }

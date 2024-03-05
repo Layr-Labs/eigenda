@@ -126,7 +126,7 @@ func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*subgraph.OperatorQuorum, error) {
+func (m *MockSubgraphApi) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*subgraph.OperatorQuorum, error) {
 	args := m.Called()
 
 	var value []*subgraph.OperatorQuorum
@@ -137,7 +137,7 @@ func (m *MockSubgraphApi) QueryOperatorAddedToQuorum(ctx context.Context, startB
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*subgraph.OperatorQuorum, error) {
+func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*subgraph.OperatorQuorum, error) {
 	args := m.Called()
 
 	var value []*subgraph.OperatorQuorum

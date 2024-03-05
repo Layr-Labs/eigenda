@@ -27,8 +27,8 @@ type (
 		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
-		QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*OperatorQuorum, error)
-		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*OperatorQuorum, error)
+		QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
+		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 	}
 
 	api struct {
@@ -211,7 +211,7 @@ func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, op
 }
 
 // QueryOperatorAddedToQuorum finds operators' quorum opt-in history in range [startBlock, endBlock].
-func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*OperatorQuorum, error) {
+func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error) {
 	if startBlock > endBlock {
 		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
 	}
@@ -228,7 +228,7 @@ func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlo
 }
 
 // QueryOperatorRemovedFromQuorum finds operators' quorum opt-out history in range [startBlock, endBlock].
-func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint64) ([]*OperatorQuorum, error) {
+func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error) {
 	if startBlock > endBlock {
 		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
 	}

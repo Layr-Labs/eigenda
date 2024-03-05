@@ -54,7 +54,7 @@ type (
 	OperatorQuorum struct {
 		Operator      string
 		QuorumNumbers []byte
-		BlockNumber   uint64
+		BlockNumber   uint32
 	}
 	OperatorQuorumEvents struct {
 		// AddedToQuorum is mapping from operator address to a list of sorted events
@@ -172,7 +172,7 @@ func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.
 	return batchNonSigningOperatorIds, nil
 }
 
-func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint64) (*OperatorQuorumEvents, error) {
+func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error) {
 	var (
 		operatorAddedQuorum   []*subgraph.OperatorQuorum
 		operatorRemovedQuorum []*subgraph.OperatorQuorum
@@ -634,7 +634,7 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 		parsed[i] = &OperatorQuorum{
 			Operator:      string(opq.Operator),
 			QuorumNumbers: []byte(opq.QuorumNumbers),
-			BlockNumber:   blockNum,
+			BlockNumber:   uint32(blockNum),
 		}
 	}
 	// Sort the quorum events by ascending order of block number.
