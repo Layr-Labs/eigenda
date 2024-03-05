@@ -96,6 +96,12 @@ type (
 		OperatorId string
 		Count      int
 	}
+	BatchNonSigningInfo struct {
+		QuorumNumbers        []uint8
+		ReferenceBlockNumber uint64
+		// The operatorIds of nonsigners for the batch.
+		NonSigners []string
+	}
 	subgraphClient struct {
 		api    subgraph.Api
 		logger common.Logger
@@ -134,6 +140,22 @@ func (sc *subgraphClient) QueryOperatorsWithLimit(ctx context.Context, limit int
 		operators[i] = operator
 	}
 	return operators, nil
+}
+
+func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error) {
+	batchNonSigningInfoGql, err := sc.api.QueryBatchNonSigningInfo(ctx, intervalSeconds)
+	if err != nil {
+		return nil, err
+	}
+	batchNonSigningInfo := make([]*BatchNonSigningInfo, len(batchNonSigningInfoGql))
+	for i, infoGql := range batchNonSigningInfoGql {
+		info, err := convertNonSigningInfo(infoGql)
+		if err != nil {
+			return nil, err
+		}
+		batchNonSigningInfo[i] = info
+	}
+	return batchNonSigningInfo, nil
 }
 
 func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error) {
@@ -623,4 +645,29 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 		return parsed[i].BlockNumber < parsed[j].BlockNumber
 	})
 	return parsed, nil
+}
+
+func convertNonSigningInfo(infoGql *subgraph.BatchNonSigningInfo) (*BatchNonSigningInfo, error) {
+	quorums := make([]uint8, len(infoGql.BatchHeader.QuorumNumbers))
+	for i, q := range infoGql.BatchHeader.QuorumNumbers {
+		quorum, err := strconv.ParseUint(string(q), 10, 8)
+		if err != nil {
+			return nil, err
+		}
+		quorums[i] = uint8(quorum)
+	}
+	blockNum, err := strconv.ParseUint(string(infoGql.BatchHeader.ReferenceBlockNumber), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	nonSigners := make([]string, len(infoGql.NonSigning.NonSigners))
+	for i, nonSigner := range infoGql.NonSigning.NonSigners {
+		nonSigners[i] = string(nonSigner.OperatorId)
+	}
+
+	return &BatchNonSigningInfo{
+		QuorumNumbers:        quorums,
+		ReferenceBlockNumber: blockNum,
+		NonSigners:           nonSigners,
+	}, nil
 }

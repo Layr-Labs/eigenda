@@ -222,6 +222,7 @@ func (h *HeaderStore) GetLatestObject(acc indexer.Accumulator, finalized bool) (
 }
 
 // GetObject retrieves the accumulator object attached to the latest header having the requested object type.
-func (h *HeaderStore) FastForward() {
+func (h *HeaderStore) FastForward() error {
 	h.Chain = make([]*Header, 0)
+	return nil
 }

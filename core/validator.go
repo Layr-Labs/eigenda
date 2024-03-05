@@ -132,7 +132,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		// for each quorum
 		for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
 			chunks, assignment, params, err := v.validateBlobQuorum(quorumHeader, blob, operatorState)
-			if err == ErrBlobQuorumSkip {
+			if errors.Is(err, ErrBlobQuorumSkip) {
 				continue
 			} else if err != nil {
 				return err

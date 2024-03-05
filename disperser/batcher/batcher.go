@@ -213,22 +213,22 @@ func (b *Batcher) updateConfirmationInfo(
 	txnReceipt *types.Receipt,
 ) ([]*disperser.BlobMetadata, error) {
 	if txnReceipt.BlockNumber == nil {
-		return nil, fmt.Errorf("HandleSingleBatch: error getting transaction receipt block number")
+		return nil, errors.New("HandleSingleBatch: error getting transaction receipt block number")
 	}
 	if len(batchData.blobs) == 0 {
-		return nil, fmt.Errorf("failed to process confirmed batch: no blobs from transaction manager metadata")
+		return nil, errors.New("failed to process confirmed batch: no blobs from transaction manager metadata")
 	}
 	if batchData.batchHeader == nil {
-		return nil, fmt.Errorf("failed to process confirmed batch: batch header from transaction manager metadata is nil")
+		return nil, errors.New("failed to process confirmed batch: batch header from transaction manager metadata is nil")
 	}
 	if len(batchData.blobHeaders) == 0 {
-		return nil, fmt.Errorf("failed to process confirmed batch: no blob headers from transaction manager metadata")
+		return nil, errors.New("failed to process confirmed batch: no blob headers from transaction manager metadata")
 	}
 	if batchData.merkleTree == nil {
-		return nil, fmt.Errorf("failed to process confirmed batch: merkle tree from transaction manager metadata is nil")
+		return nil, errors.New("failed to process confirmed batch: merkle tree from transaction manager metadata is nil")
 	}
 	if batchData.aggSig == nil {
-		return nil, fmt.Errorf("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
+		return nil, errors.New("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
 	}
 	headerHash, err := batchData.batchHeader.GetBatchHeaderHash()
 	if err != nil {
@@ -316,12 +316,12 @@ func (b *Batcher) updateConfirmationInfo(
 
 func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *ReceiptOrErr) error {
 	if receiptOrErr.Metadata == nil {
-		return fmt.Errorf("failed to process confirmed batch: no metadata from transaction manager response")
+		return errors.New("failed to process confirmed batch: no metadata from transaction manager response")
 	}
 	confirmationMetadata := receiptOrErr.Metadata.(confirmationMetadata)
 	blobs := confirmationMetadata.blobs
 	if len(blobs) == 0 {
-		return fmt.Errorf("failed to process confirmed batch: no blobs from transaction manager metadata")
+		return errors.New("failed to process confirmed batch: no blobs from transaction manager metadata")
 	}
 	if receiptOrErr.Err != nil {
 		_ = b.handleFailure(ctx, blobs, FailConfirmBatch)
@@ -329,7 +329,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 	}
 	if confirmationMetadata.aggSig == nil {
 		_ = b.handleFailure(ctx, blobs, FailNoAggregatedSignature)
-		return fmt.Errorf("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
+		return errors.New("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
 	}
 	b.logger.Info("received ConfirmBatch transaction receipt", "blockNumber", receiptOrErr.Receipt.BlockNumber, "txnHash", receiptOrErr.Receipt.TxHash.Hex())
 
@@ -440,7 +440,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailNoSignatures)
-		return fmt.Errorf("HandleSingleBatch: no blobs received sufficient signatures")
+		return errors.New("HandleSingleBatch: no blobs received sufficient signatures")
 	}
 
 	// Confirm the batch
@@ -483,7 +483,7 @@ func serializeProof(proof *merkletree.Proof) []byte {
 
 func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.Receipt) (uint32, error) {
 	if len(txReceipt.Logs) == 0 {
-		return 0, fmt.Errorf("failed to get transaction receipt with logs")
+		return 0, errors.New("failed to get transaction receipt with logs")
 	}
 	for _, log := range txReceipt.Logs {
 		if len(log.Topics) == 0 {
@@ -514,7 +514,7 @@ func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.
 			return unpackedData[0].(uint32), nil
 		}
 	}
-	return 0, fmt.Errorf("failed to find BatchConfirmed log from the transaction")
+	return 0, errors.New("failed to find BatchConfirmed log from the transaction")
 }
 
 func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uint32, error) {

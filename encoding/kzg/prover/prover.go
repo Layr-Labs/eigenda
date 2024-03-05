@@ -51,7 +51,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if loadG2Points {
 		if len(config.G2Path) == 0 {
-			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
+			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
 		}
 
 		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
@@ -72,7 +72,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 	} else {
 		// todo, there are better ways to handle it
 		if len(config.G2PowerOf2Path) == 0 {
-			return nil, fmt.Errorf("G2PowerOf2Path is empty. However, object needs to load G2Points")
+			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
 		}
 	}
 
@@ -242,7 +242,6 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		FFTPointsT: fftPointsT,
 	}, nil
 }
-
 
 // Detect the precomputed table from the specified directory
 // the file name follow the name convention of

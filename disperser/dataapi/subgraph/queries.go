@@ -42,6 +42,19 @@ type (
 			} `graphql:"nonSigners"`
 		} `graphql:"nonSigning"`
 	}
+	BatchNonSigningInfo struct {
+		BatchId         graphql.String
+		BatchHeaderHash graphql.String
+		BatchHeader     struct {
+			QuorumNumbers        []graphql.String `json:"quorumNumbers"`
+			ReferenceBlockNumber graphql.String
+		}
+		NonSigning struct {
+			NonSigners []struct {
+				OperatorId graphql.String `graphql:"operatorId"`
+			} `graphql:"nonSigners"`
+		} `graphql:"nonSigning"`
+	}
 	SocketUpdates struct {
 		Socket graphql.String
 	}
@@ -75,6 +88,9 @@ type (
 	}
 	queryBatchNonSigningOperatorIdsInInterval struct {
 		BatchNonSigningOperatorIds []*BatchNonSigningOperatorIds `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
+	}
+	queryBatchNonSigningInfo struct {
+		BatchNonSigningInfo []*BatchNonSigningInfo `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
 	}
 	queryOperatorRegisteredsGTBlockTimestamp struct {
 		OperatorRegistereds []*Operator `graphql:"operatorRegistereds(orderBy: blockTimestamp, where: {blockTimestamp_gt: $blockTimestamp_gt})"`

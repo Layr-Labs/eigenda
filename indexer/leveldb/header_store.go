@@ -2,9 +2,10 @@ package leveldb
 
 import (
 	"errors"
+	"os"
+
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/syndtr/goleveldb/leveldb"
-	"os"
 )
 
 var (
@@ -269,26 +270,24 @@ func (s *HeaderStore) GetObject(
 	return accObj, hdrEntry.Header, nil
 }
 
-func (s *HeaderStore) FastForward() {
+func (s *HeaderStore) FastForward() error {
 	// TODO: make FastForward() return an error to avoid panics here
 	finalized, err := s.GetLatestHeader(true)
-	if errors.Is(err, indexer.ErrNoHeaders) {
-		return
-	}
+
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	path := s.db.Path
 	s.Close()
 
 	if err := os.RemoveAll(path); err != nil {
-		panic(err)
+		return err
 	}
 
 	db, err := newLevelDB(path, s.opener...)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	s.db = db
@@ -299,8 +298,9 @@ func (s *HeaderStore) FastForward() {
 
 	_, err = s.AddHeaders(headers)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func (s *HeaderStore) updateHeaderEntry(header *indexer.Header, accKey []byte, tx *transaction) *headerEntry {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -187,7 +188,7 @@ func FromBlobStatusProto(status disperser_rpc.BlobStatus) (*BlobStatus, error) {
 	var res BlobStatus
 	switch status {
 	case disperser_rpc.BlobStatus_UNKNOWN:
-		return nil, fmt.Errorf("unexpected blob status BlobStatus_UNKNOWN")
+		return nil, errors.New("unexpected blob status BlobStatus_UNKNOWN")
 	case disperser_rpc.BlobStatus_PROCESSING:
 		res = Processing
 		return &res, nil

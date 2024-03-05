@@ -33,6 +33,10 @@ message ChurnRequest {
 	//   - If any of the quorum here has already been registered, this entire request
 	//     will fail to proceed.
 	//   - If any of the quorum fails to register, this entire request will fail.
+	//   - Regardless of whether the specified quorums are full or not, the Churner
+	//     will return parameters for all quorums specified here. The smart contract will
+	//     determine whether it needs to churn out existing operators based on whether
+	//     the quorums have available space.
 	// The IDs must be in range [0, 254].
 	repeated uint32 quorum_ids = 6;
 }
@@ -41,6 +45,17 @@ message ChurnReply {
 	// The signature signed by the Churner.
 	SignatureWithSaltAndExpiry signature_with_salt_and_expiry = 1;
 	// A list of existing operators that get churned out.
+	// This list will contain all quorums specified in the ChurnRequest even if some quorums
+	// may not have any churned out operators. If a quorum has available space, OperatorToChurn
+	// object will contain the quorum ID and empty operator and pubkey. The smart contract should
+	// only churn out the operators for quorums that are full.
+	//
+	// For example, if the ChurnRequest specifies quorums 0 and 1 where quorum 0 is full
+	// and quorum 1 has available space, the ChurnReply will contain two OperatorToChurn objects
+	// with the respective quorums. OperatorToChurn for quorum 0 will contain the operator to churn
+	// out and OperatorToChurn for quorum 1 will contain empty operator (zero address) and pubkey.
+	// The smart contract should only churn out the operators for quorum 0 because quorum 1
+	// has available space without having any operators churned.
 	// Note: it's possible an operator gets churned out just for one or more quorums
 	// (rather than entirely churned out for all quorums).
 	repeated OperatorToChurn operators_to_churn = 2;

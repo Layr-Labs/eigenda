@@ -23,6 +23,7 @@ type (
 		QueryBatchesByBlockTimestampRange(ctx context.Context, start, end uint64) ([]*Batches, error)
 		QueryOperators(ctx context.Context, first int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningOperatorIds, error)
+		QueryBatchNonSigningInfo(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error)
 		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
@@ -109,6 +110,35 @@ func (a *api) QueryOperators(ctx context.Context, first int) ([]*Operator, error
 	}
 
 	return result.OperatorRegistereds, nil
+}
+
+func (a *api) QueryBatchNonSigningInfo(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error) {
+	nonSigningAfter := time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix()
+	variables := map[string]any{
+		"blockTimestamp_gt": graphql.Int(nonSigningAfter),
+	}
+	skip := 0
+
+	result := new(queryBatchNonSigningInfo)
+	batchNonSigningInfo := make([]*BatchNonSigningInfo, 0)
+	for {
+		variables["first"] = graphql.Int(maxEntriesPerQuery)
+		variables["skip"] = graphql.Int(skip)
+
+		err := a.uiMonitoringGql.Query(ctx, &result, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(result.BatchNonSigningInfo) == 0 {
+			break
+		}
+		batchNonSigningInfo = append(batchNonSigningInfo, result.BatchNonSigningInfo...)
+
+		skip += maxEntriesPerQuery
+	}
+
+	return batchNonSigningInfo, nil
 }
 
 func (a *api) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningOperatorIds, error) {
