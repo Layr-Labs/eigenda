@@ -2,12 +2,6 @@ package dataapi
 
 import "fmt"
 
-type OperatorQuorum struct {
-	Operator      string
-	QuorumNumbers []byte
-	BlockNumber   uint32
-}
-
 // Representing an interval [StartBlock, EndBlock] (inclusive).
 type BlockInterval struct {
 	StartBlock uint32
