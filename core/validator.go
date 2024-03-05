@@ -88,7 +88,7 @@ func (v *dataValidator) UpdateOperatorID(operatorID OperatorID) {
 
 func (v *dataValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
 
-	err := ValidateBatchHeaderRoot(batchHeader, blobs)
+	err := validateBatchHeaderRoot(batchHeader, blobs)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (v *dataValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobComm
 	out <- nil
 }
 
-func ValidateBatchHeaderRoot(batchHeader *BatchHeader, blobs []*BlobMessage) error {
+func validateBatchHeaderRoot(batchHeader *BatchHeader, blobs []*BlobMessage) error {
 	// Check the batch header root
 
 	headers := make([]*BlobHeader, len(blobs))

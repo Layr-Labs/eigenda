@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/gammazero/workerpool"
+	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -186,12 +187,14 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
-func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader, pool common.WorkerPool) {
+func checkBatchByUniversalVerifier(cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader, pool common.WorkerPool) error {
 	val := core.NewDataValidator(v, asn, cst, [32]byte{})
 
 	quorums := []core.QuorumID{0, 1}
 	state, _ := cst.GetIndexedOperatorState(context.Background(), header.ReferenceBlockNumber, quorums)
 	numBlob := len(encodedBlobs)
+
+	var errList *multierror.Error
 
 	for id := range state.IndexedOperators {
 		val.UpdateOperatorID(id)
@@ -203,12 +206,16 @@ func checkBatchByUniversalVerifier(t *testing.T, cst core.IndexedChainState, enc
 			}
 		}
 		err := val.ValidateBatch(&header, blobMessages, state.OperatorState, pool)
-		assert.NoError(t, err)
+		if err != nil {
+			errList = multierror.Append(errList, err)
+		}
 	}
+
+	return errList.ErrorOrNil()
 
 }
 
-func TestCoreLibrary(t *testing.T) {
+func TestValidationSucceeds(t *testing.T) {
 
 	operatorCounts := []uint{1, 2, 4, 10, 30}
 
@@ -245,9 +252,56 @@ func TestCoreLibrary(t *testing.T) {
 		blobMessages, header, cst := prepareBatch(t, operatorCount, blobs, bn)
 
 		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(blobs)), func(t *testing.T) {
-			checkBatchByUniversalVerifier(t, cst, blobMessages, header, pool)
+			err := checkBatchByUniversalVerifier(cst, blobMessages, header, pool)
+			assert.NoError(t, err)
 		})
 
 	}
+
+}
+
+func TestImproperBatchHeader(t *testing.T) {
+
+	operatorCount := uint(10)
+
+	numBlob := 3 // must be greater than 0
+	blobLengths := []int{1, 64, 1000}
+
+	securityParams := []*core.SecurityParam{
+		{
+			QuorumID:           0,
+			AdversaryThreshold: 50,
+			QuorumThreshold:    100,
+		},
+		{
+			QuorumID:           1,
+			AdversaryThreshold: 80,
+			QuorumThreshold:    90,
+		},
+	}
+
+	bn := uint(0)
+
+	pool := workerpool.New(1)
+
+	// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
+	blobs := make([]core.Blob, 0)
+	for _, blobLength := range blobLengths {
+		for i := 0; i < numBlob; i++ {
+			blobs = append(blobs, makeTestBlob(t, blobLength, securityParams))
+		}
+	}
+
+	blobMessages, header, cst := prepareBatch(t, operatorCount, blobs, bn)
+
+	headers := make([]*core.BlobHeader, len(blobs)-1)
+	for i := range headers {
+		headers[i] = blobMessages[i].BlobHeader
+	}
+
+	header.SetBatchRoot(headers)
+
+	err := checkBatchByUniversalVerifier(cst, blobMessages, header, pool)
+	assert.Error(t, err)
 
 }
