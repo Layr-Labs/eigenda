@@ -2,6 +2,7 @@ package churner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -126,24 +127,24 @@ func (s *Server) checkShouldBeRateLimited(now time.Time, request ChurnRequest) e
 func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest) error {
 
 	if len(req.OperatorRequestSignature) != 64 {
-		return fmt.Errorf("invalid signature length")
+		return errors.New("invalid signature length")
 	}
 
 	if len(req.OperatorToRegisterPubkeyG1) != 64 {
-		return fmt.Errorf("invalid operatorToRegisterPubkeyG1 length")
+		return errors.New("invalid operatorToRegisterPubkeyG1 length")
 	}
 
 	if len(req.OperatorToRegisterPubkeyG2) != 128 {
-		return fmt.Errorf("invalid operatorToRegisterPubkeyG2 length")
+		return errors.New("invalid operatorToRegisterPubkeyG2 length")
 	}
 
 	if len(req.Salt) != 32 {
-		return fmt.Errorf("invalid salt length")
+		return errors.New("invalid salt length")
 	}
 
 	// TODO: ensure that all quorumIDs are valid
 	if len(req.QuorumIds) == 0 {
-		return fmt.Errorf("invalid quorumIds length")
+		return errors.New("invalid quorumIds length")
 	}
 
 	for quorumID := range req.GetQuorumIds() {

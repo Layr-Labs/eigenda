@@ -3,7 +3,7 @@ package batcher_test
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"math/big"
 	"runtime"
 	"sync"
@@ -275,7 +275,7 @@ func TestBlobFailures(t *testing.T) {
 		assert.Equal(t, 3, len(heartbeats), "Expected heartbeats, but none were received")
 	}()
 
-	confirmationErr := fmt.Errorf("error")
+	confirmationErr := errors.New("error")
 	blobStore := components.blobStore
 	ctx := context.Background()
 	requestedAt, blobKey := queueBlob(t, ctx, &blob, blobStore)
@@ -444,7 +444,7 @@ func TestBlobRetry(t *testing.T) {
 	assert.Equal(t, disperser.Processing, meta.BlobStatus)
 
 	// Trigger a retry
-	confirmationErr := fmt.Errorf("error")
+	confirmationErr := errors.New("error")
 	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
 		Receipt:  nil,
 		Err:      confirmationErr,

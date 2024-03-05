@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var errSystemBlobRateLimit = fmt.Errorf("request ratelimited: system blob limit")
-var errSystemThroughputRateLimit = fmt.Errorf("request ratelimited: system throughput limit")
-var errAccountBlobRateLimit = fmt.Errorf("request ratelimited: account blob limit")
-var errAccountThroughputRateLimit = fmt.Errorf("request ratelimited: account throughput limit")
+var errSystemBlobRateLimit = errors.New("request ratelimited: system blob limit")
+var errSystemThroughputRateLimit = errors.New("request ratelimited: system throughput limit")
+var errAccountBlobRateLimit = errors.New("request ratelimited: account blob limit")
+var errAccountThroughputRateLimit = errors.New("request ratelimited: account throughput limit")
 
 const systemAccountKey = "system"
 
@@ -182,10 +182,10 @@ func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Bl
 
 	securityParams := blob.RequestHeader.SecurityParams
 	if len(securityParams) == 0 {
-		return fmt.Errorf("invalid request: security_params must not be empty")
+		return errors.New("invalid request: security_params must not be empty")
 	}
 	if len(securityParams) > 256 {
-		return fmt.Errorf("invalid request: security_params must not exceed 256")
+		return errors.New("invalid request: security_params must not exceed 256")
 	}
 
 	seenQuorums := make(map[uint8]struct{})
@@ -193,7 +193,7 @@ func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Bl
 	// to uint8, so it cannot be greater than 254.
 	for _, param := range securityParams {
 		if _, ok := seenQuorums[param.QuorumID]; ok {
-			return fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
+			return errors.New("invalid request: security_params must not contain duplicate quorum_id")
 		}
 		seenQuorums[param.QuorumID] = struct{}{}
 
@@ -212,10 +212,10 @@ func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Bl
 	blobSize := len(blob.Data)
 	// The blob size in bytes must be in range [1, maxBlobSize].
 	if blobSize > maxBlobSize {
-		return fmt.Errorf("blob size cannot exceed 2 MiB")
+		return errors.New("blob size cannot exceed 2 MiB")
 	}
 	if blobSize == 0 {
-		return fmt.Errorf("blob size must be greater than 0")
+		return errors.New("blob size must be greater than 0")
 	}
 
 	if err := blob.RequestHeader.Validate(); err != nil {
@@ -584,7 +584,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("could not start tcp listener")
+		return errors.New("could not start tcp listener")
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
@@ -598,7 +598,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
-		return fmt.Errorf("could not start GRPC server")
+		return errors.New("could not start GRPC server")
 	}
 
 	return nil

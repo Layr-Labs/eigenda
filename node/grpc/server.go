@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -206,7 +207,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	}
 
 	if !allow {
-		return nil, fmt.Errorf("request rate limited")
+		return nil, errors.New("request rate limited")
 	}
 
 	chunks, ok := s.node.Store.GetChunks(ctx, batchHeaderHash, int(in.GetBlobIndex()), uint8(in.GetQuorumId()))
@@ -255,7 +256,7 @@ func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, bl
 
 	blobHeaderBytes, err := s.node.Store.GetBlobHeader(ctx, batchHeaderHash, blobIndex)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get the blob header from Store")
+		return nil, nil, errors.New("failed to get the blob header from Store")
 	}
 
 	var protoBlobHeader pb.BlobHeader
