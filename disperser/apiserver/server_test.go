@@ -86,7 +86,7 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 			},
 		},
 	})
-	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
+	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: the quorum_id must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data: data,
@@ -103,7 +103,7 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 			},
 		},
 	})
-	assert.ErrorContains(t, err, "invalid request: security_params must not contain duplicate quorum_id")
+	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: security_params must not contain duplicate quorum_id")
 }
 
 func TestGetBlobStatus(t *testing.T) {
@@ -246,7 +246,9 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 
 	// Try to retrieve the blob before it is confirmed
 	_, err = retrieveBlob(t, dispersalServer, 2)
-	assert.Error(t, err)
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "rpc error: code = Internal desc = failed to get blob metadata, please retry")
+
 }
 
 func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
@@ -277,7 +279,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "brpc error: code = InvalidArgument desc = lob size cannot exceed 2 MiB")
+	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = blob size cannot exceed 2 MiB")
 }
 
 func setup(m *testing.M) {
