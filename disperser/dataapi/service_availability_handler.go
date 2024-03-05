@@ -109,8 +109,25 @@ func newClientPool(size int, serverAddr string) (*ClientPool, error) {
 func (s *server) getClientPool(serviceName string) (*ClientPool, bool) {
 	mutex.Lock()
 	defer mutex.Unlock()
-
+	var err error
 	pool, ok := s.clientPools[serviceName]
+
+	// If the pool is nil, create a new pool
+	if pool == nil {
+		if serviceName == "Disperser" {
+			s.clientPools["Disperser"], err = newClientPool(maxGRPCClientPoolSize, s.disperserHostName)
+			s.logger.Error("Error initializing client pool", "serviceName", serviceName, "err", err)
+			return nil, false
+		}
+
+		if serviceName == "Churner" {
+			s.clientPools["Churner"], err = newClientPool(maxGRPCClientPoolSize, s.churnerHostName)
+			s.logger.Error("Error initializing client pool", "serviceName", serviceName, "err", err)
+			return nil, false
+		}
+
+		pool = s.clientPools[serviceName]
+	}
 	return pool, ok
 }
 

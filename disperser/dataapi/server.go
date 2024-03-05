@@ -28,7 +28,7 @@ import (
 const (
 	maxWorkerPoolLimit    = 10
 	maxQueryBatchesLimit  = 2
-	maxGRPCClientPoolSize = 10
+	maxGRPCClientPoolSize = 2
 )
 
 var errNotFound = errors.New("not found")
@@ -164,8 +164,11 @@ func (s *server) Start() error {
 		// optimize performance and disable debug features.
 		gin.SetMode(gin.ReleaseMode)
 	}
-	err := s.InitGRPCClientPools(maxGRPCClientPoolSize)
 
+	// Initialize gRPC client pools for Disperser and Churner
+	// Creates pre-warmed connections to the gRPC servers
+	s.clientPools = make(map[string]*ClientPool)
+	err := s.InitGRPCClientPools(maxGRPCClientPoolSize)
 	if err != nil {
 		s.logger.Error("Failed to initialize gRPC client pools", "error", err)
 	}
@@ -516,7 +519,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	// Get query parameters if
+	// Get query parameters to filter services
 	serviceName := c.DefaultQuery("service-name", "") // If not specified, default to return all services
 
 	// If service name is not specified, return all services

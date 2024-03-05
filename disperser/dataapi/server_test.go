@@ -1343,7 +1343,9 @@ func processResponse(t *testing.T, res *http.Response) {
 	assert.GreaterOrEqual(t, response.Meta.Size, 1)
 	assert.GreaterOrEqual(t, len(response.Data), 1)
 
-	serviceData := response.Data[0]
-	assert.Equal(t, "Disperser", serviceData.ServiceName)
-	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
+	if len(response.Data) > 0 {
+		serviceData := response.Data[0]
+		assert.Equal(t, "Disperser", serviceData.ServiceName)
+		assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
+	}
 }
