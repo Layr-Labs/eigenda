@@ -73,12 +73,10 @@ message DisperseBlobRequest {
 	// The data to be dispersed.
 	// The size of data must be <= 2MiB.
 	bytes data = 1;
-	// Security parameters allowing clients to customize the safety (via adversary threshold)
-	// and liveness (via quorum threshold).
-	// Clients can define one SecurityParams per quorum, and specify multiple quorums.
+	// The quorums to which the blob will be sent, in addition to any required quorums. 
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
-	bytes quorums = 2;
+	repeated uint32 quorum_numbers = 2;
 
 	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
 	// corresponding to the key used by the client to sign the BlobAuthHeader.
@@ -171,7 +169,7 @@ message BlobQuorumParam {
 	// Same as SecurityParams.adversary_threshold.
 	uint32 adversary_threshold_percentage = 2;
 	// Same as SecurityParams.quorum_threshold.
-	uint32 quorum_threshold_percentage = 3;
+	uint32 confirmation_threshold_percentage = 3;
 	// The length of each chunk.
 	uint32 chunk_length = 4;
 }

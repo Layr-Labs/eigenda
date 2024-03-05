@@ -105,8 +105,8 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
 	if err != nil {
-		for quorumID := range request.DisperseRequest.Quorums {
-			s.metrics.HandleFailedRequest(string(uint8(quorumID)), len(request.DisperseRequest.GetData()), "DisperseBlob")
+		for _, quorumID := range request.DisperseRequest.QuorumNumbers {
+			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
 		}
 		return err
 	}
@@ -179,8 +179,8 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
-		for quorumID := range req.Quorums {
-			s.metrics.HandleFailedRequest(string(uint8(quorumID)), len(req.GetData()), "DisperseBlob")
+		for _, quorumID := range req.QuorumNumbers {
+			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
 		return nil, err
 	}
@@ -446,10 +446,10 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 		quorumIndexes := make([]byte, len(quorumInfos))
 		for i, quorumInfo := range quorumInfos {
 			blobQuorumParams[i] = &pb.BlobQuorumParam{
-				QuorumNumber:                 uint32(quorumInfo.QuorumID),
-				AdversaryThresholdPercentage: uint32(quorumInfo.AdversaryThreshold),
-				QuorumThresholdPercentage:    uint32(quorumInfo.ConfirmationThreshold),
-				ChunkLength:                  uint32(quorumInfo.ChunkLength),
+				QuorumNumber:                    uint32(quorumInfo.QuorumID),
+				AdversaryThresholdPercentage:    uint32(quorumInfo.AdversaryThreshold),
+				ConfirmationThresholdPercentage: uint32(quorumInfo.ConfirmationThreshold),
+				ChunkLength:                     uint32(quorumInfo.ChunkLength),
 			}
 			quorumIndexes[i] = byte(slices.Index(quorumNumbers, quorumInfo.QuorumID))
 		}
@@ -614,7 +614,8 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	seenQuorums := make(map[uint8]struct{})
 	// The quorum ID must be in range [0, 254]. It'll actually be converted
 	// to uint8, so it cannot be greater than 254.
-	for _, quorumID := range req.GetQuorums() {
+	for i := range req.GetQuorumNumbers() {
+		quorumID := uint8(req.GetQuorumNumbers()[i])
 		if _, ok := seenQuorums[quorumID]; ok {
 			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
 		}

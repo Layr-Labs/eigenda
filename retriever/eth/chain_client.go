@@ -78,7 +78,7 @@ func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddres
 	batchHeaderInput := inputs[0].(struct {
 		BlobHeadersRoot                  [32]byte "json:\"blobHeadersRoot\""
 		QuorumNumbers                    []byte   "json:\"quorumNumbers\""
-		ConfirmationThresholdPercentages []byte   "json:\"quorumThresholdPercentages\""
+		ConfirmationThresholdPercentages []byte   "json:\"confirmationThresholdPercentages\""
 		ReferenceBlockNumber             uint32   "json:\"referenceBlockNumber\""
 	})
 

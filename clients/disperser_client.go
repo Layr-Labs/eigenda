@@ -75,9 +75,14 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
 	defer cancel()
 
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
+	}
+
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:    data,
-		Quorums: quorums,
+		Data:          data,
+		QuorumNumbers: quorumNumbers,
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)
@@ -114,10 +119,15 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, fmt.Errorf("frror while calling DisperseBlobAuthenticated: %v", err)
 	}
 
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
+	}
+
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:      data,
-		Quorums:   quorums,
-		AccountId: c.signer.GetAccountID(),
+		Data:          data,
+		QuorumNumbers: quorumNumbers,
+		AccountId:     c.signer.GetAccountID(),
 	}
 
 	// Send the initial request

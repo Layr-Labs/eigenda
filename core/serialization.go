@@ -125,7 +125,7 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 			Type: "bytes",
 		},
 		{
-			Name: "quorumThresholdPercentages",
+			Name: "confirmationThresholdPercentages",
 			Type: "bytes",
 		},
 		{
@@ -144,15 +144,15 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 	}
 
 	s := struct {
-		BatchRoot                  [32]byte
-		QuorumNumbers              []byte
-		QuorumThresholdPercentages []byte
-		ReferenceBlockNumber       uint32
+		BatchRoot                        [32]byte
+		QuorumNumbers                    []byte
+		ConfirmationThresholdPercentages []byte
+		ReferenceBlockNumber             uint32
 	}{
-		BatchRoot:                  batchHeader.BlobHeadersRoot,
-		QuorumNumbers:              batchHeader.QuorumNumbers,
-		QuorumThresholdPercentages: batchHeader.ConfirmationThresholdPercentages,
-		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
+		BatchRoot:                        batchHeader.BlobHeadersRoot,
+		QuorumNumbers:                    batchHeader.QuorumNumbers,
+		ConfirmationThresholdPercentages: batchHeader.ConfirmationThresholdPercentages,
+		ReferenceBlockNumber:             uint32(batchHeader.ReferenceBlockNumber),
 	}
 
 	bytes, err := arguments.Pack(s)

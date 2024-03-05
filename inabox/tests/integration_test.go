@@ -178,7 +178,7 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
 			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
-			ConfirmationThresholdPercentage: uint8(quorum.GetQuorumThresholdPercentage()),
+			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
 			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
