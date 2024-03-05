@@ -25,5 +25,5 @@ type HeaderStore interface {
 	// GetLatestObject retrieves the accumulator object attached to the latest header having the requested object type.
 	GetLatestObject(acc Accumulator, finalized bool) (AccumulatorObject, *Header, error)
 
-	FastForward()
+	FastForward() error
 }
