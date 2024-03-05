@@ -303,7 +303,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		if err != nil {
 			// If batch already exists, we don't store it again, but we should not
 			// error out in such case.
-			if err == ErrBatchAlreadyExist {
+			if errors.Is(err, ErrBatchAlreadyExist) {
 				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
 			} else {
 				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil, latency: 0}
