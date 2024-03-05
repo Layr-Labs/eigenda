@@ -72,6 +72,8 @@ definitions:
         type: boolean
       operator_id:
         type: string
+      operator_process_error:
+        type: string
       socket:
         type: string
     type: object

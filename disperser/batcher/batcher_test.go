@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,6 +117,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics, handleBatchLivenessChan)
 	assert.NoError(t, err)
 
+	var mu sync.Mutex
 	var heartbeatsReceived []time.Time
 	doneListening := make(chan bool)
 
@@ -123,7 +125,9 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 		for {
 			select {
 			case hb := <-b.HeartbeatChan:
+				mu.Lock() // Lock before modifying the slice
 				heartbeatsReceived = append(heartbeatsReceived, hb)
+				mu.Unlock()
 			case <-doneListening:
 				return
 			}
@@ -140,6 +144,9 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 			ethClient:        ethClient,
 		}, b, func() []time.Time {
 			close(doneListening) // Stop the goroutine listening to heartbeats
+
+			mu.Lock() // Lock before reading the slice
+			defer mu.Unlock()
 			return heartbeatsReceived
 		}
 }

@@ -12,8 +12,9 @@ import (
 )
 
 type OperatorOnlineStatus struct {
-	OperatorInfo        *Operator
-	IndexedOperatorInfo *core.IndexedOperatorInfo
+	OperatorInfo         *Operator
+	IndexedOperatorInfo  *core.IndexedOperatorInfo
+	OperatorProcessError string
 }
 
 var (
@@ -46,7 +47,7 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	}
 
 	// Log the time taken
-	s.logger.Info("Time taken to get deregistered operators for days: %v", time.Since(startTime))
+	s.logger.Info("Time taken to get deregistered operators for days", "duration", time.Since(startTime))
 	sort.Slice(DeregisteredOperatorMetadata, func(i, j int) bool {
 		return DeregisteredOperatorMetadata[i].BlockNumber < DeregisteredOperatorMetadata[j].BlockNumber
 	})
@@ -60,8 +61,9 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 
 	for _, operatorInfo := range operators {
 		operatorStatus := OperatorOnlineStatus{
-			OperatorInfo:        operatorInfo.Metadata,
-			IndexedOperatorInfo: operatorInfo.IndexedOperatorInfo,
+			OperatorInfo:         operatorInfo.Metadata,
+			IndexedOperatorInfo:  operatorInfo.IndexedOperatorInfo,
+			OperatorProcessError: operatorInfo.OperatorProcessError,
 		}
 
 		// Submit each operator status check to the worker pool
@@ -74,22 +76,28 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 }
 
 func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
-	socket := core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
-	isOnline := checkIsOperatorOnline(socket)
+	var isOnline bool
+	var socket string
+	if operatorStatus.IndexedOperatorInfo != nil {
+		logger.Error("IndexedOperatorInfo is nil for operator %v", operatorStatus.OperatorInfo)
+		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
+		isOnline = checkIsOperatorOnline(socket)
+	}
 
 	// Log the online status
 	if isOnline {
-		logger.Debug("Operator %v is online at %s", operatorStatus.IndexedOperatorInfo, socket)
+		logger.Debug("Operator is online", "operatorInfo", operatorStatus.IndexedOperatorInfo, "socket", socket)
 	} else {
-		logger.Debug("Operator %v is offline at %s", operatorStatus.IndexedOperatorInfo, socket)
+		logger.Debug("Operator is offline", "operatorInfo", operatorStatus.IndexedOperatorInfo, "socket", socket)
 	}
 
 	// Create the metadata regardless of online status
 	metadata := &DeregisteredOperatorMetadata{
-		OperatorId:  string(operatorStatus.OperatorInfo.OperatorId[:]),
-		BlockNumber: uint(operatorStatus.OperatorInfo.BlockNumber),
-		Socket:      socket,
-		IsOnline:    isOnline,
+		OperatorId:           string(operatorStatus.OperatorInfo.OperatorId[:]),
+		BlockNumber:          uint(operatorStatus.OperatorInfo.BlockNumber),
+		Socket:               socket,
+		IsOnline:             isOnline,
+		OperatorProcessError: operatorStatus.OperatorProcessError,
 	}
 
 	// Send the metadata to the results channel

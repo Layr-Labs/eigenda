@@ -4,13 +4,13 @@ RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
 # build node with local monorepo go modules
 COPY ./node /app/node
-COPY churner /app/churner
+COPY operators/churner /app/operators/churner
 COPY indexer /app/indexer
 COPY common /app/common
 COPY core /app/core
 COPY api /app/api
 COPY contracts /app/contracts
-COPY pkg /app/pkg
+COPY encoding /app/encoding
 COPY go.mod /app
 COPY go.sum /app
 

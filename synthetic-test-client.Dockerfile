@@ -10,11 +10,11 @@ COPY api /app/api
 COPY clients /app/clients
 COPY node /app/node
 COPY common /app/common
-COPY churner /app/churner
+COPY operators/churner /app/operators/churner
 COPY core /app/core
 COPY indexer /app/indexer
 COPY contracts /app/contracts
-COPY pkg /app/pkg
+COPY encoding /app/encoding
 # Set the working directory inside the container
 WORKDIR /app
 
