@@ -151,7 +151,7 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 	}{
 		BatchRoot:                  batchHeader.BlobHeadersRoot,
 		QuorumNumbers:              batchHeader.QuorumNumbers,
-		QuorumThresholdPercentages: batchHeader.QuorumThresholdPercentages,
+		QuorumThresholdPercentages: batchHeader.ConfirmationThresholdPercentages,
 		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
 	}
 
