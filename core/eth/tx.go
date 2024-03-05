@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/gammazero/workerpool"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
@@ -27,7 +28,8 @@ import (
 )
 
 var (
-	maxNumberOfQuorums = 192
+	maxNumberOfQuorums      = 192
+	maxNumWorkerPoolThreads = 8
 )
 
 type Transactor struct {
@@ -535,10 +537,85 @@ func (t *Transactor) OperatorIDToAddress(ctx context.Context, operatorId core.Op
 	}, operatorId)
 }
 
+func (t *Transactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
+	type AddressOrError struct {
+		address gethcommon.Address
+		index   int
+		err     error
+	}
+	resultChan := make(chan AddressOrError, len(operatorIds))
+	pool := workerpool.New(maxNumWorkerPoolThreads)
+	for i, operatorId := range operatorIds {
+		idx := i
+		op := operatorId
+		pool.Submit(func() {
+			addr, err := t.Bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
+				Context: ctx,
+			}, op)
+			resultChan <- AddressOrError{address: addr, index: idx, err: err}
+		})
+	}
+	pool.StopWait()
+	close(resultChan)
+
+	addresses := make([]gethcommon.Address, len(operatorIds))
+	for result := range resultChan {
+		if result.err != nil {
+			return nil, result.err
+		}
+		addresses[result.index] = result.address
+	}
+	return addresses, nil
+}
+
 func (t *Transactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
 	return t.Bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
+}
+
+func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
+	// Get indices in batch (1 RPC).
+	byteOperatorIds := make([][32]byte, len(operatorIds))
+	for i := range operatorIds {
+		byteOperatorIds[i] = [32]byte(operatorIds[i])
+	}
+	indices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
+		Context: ctx,
+	}, blockNumber, byteOperatorIds)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get bitmaps in N RPCs, but in parallel.
+	type BitmapOrError struct {
+		bitmap *big.Int
+		index  uint32
+		err    error
+	}
+	resultChan := make(chan BitmapOrError, len(indices))
+	pool := workerpool.New(maxNumWorkerPoolThreads)
+	for i, index := range indices {
+		idx := index
+		op := operatorIds[i]
+		pool.Submit(func() {
+			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
+				Context: ctx,
+			}, op, blockNumber, big.NewInt(int64(idx)))
+			resultChan <- BitmapOrError{bitmap: bm, index: idx, err: err}
+		})
+	}
+	pool.StopWait()
+	close(resultChan)
+
+	bitmaps := make([]*big.Int, len(indices))
+	for result := range resultChan {
+		if result.err != nil {
+			return nil, result.err
+		}
+		bitmaps[result.index] = result.bitmap
+	}
+	return bitmaps, nil
 }
 
 func (t *Transactor) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
