@@ -277,7 +277,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
+	assert.Equal(t, err.Error(), "brpc error: code = InvalidArgument desc = lob size cannot exceed 2 MiB")
 }
 
 func setup(m *testing.M) {
