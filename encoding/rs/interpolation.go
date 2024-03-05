@@ -73,7 +73,7 @@ func (g *Encoder) GetInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.
 	mod := int32(len(g.Fs.ExpandedRootsOfUnity) - 1)
 
 	for i := 0; i < len(chunk); i++ {
-		// We cam lookup the inverse power by counting RootOfUnity backward
+		// We can lookup the inverse power by counting RootOfUnity backward
 		j := (-int32(k)*int32(i))%mod + mod
 		coeffs[i].Mul(&shiftedInterpolationPoly[i], &g.Fs.ExpandedRootsOfUnity[j])
 	}

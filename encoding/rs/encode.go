@@ -164,10 +164,12 @@ func (g *Encoder) interpolyWorker(
 		err := rb.ReverseBitOrderFr(ys)
 		if err != nil {
 			results <- err
+			return
 		}
 		coeffs, err := g.GetInterpolationPolyCoeff(ys, uint32(j))
 		if err != nil {
 			results <- err
+			return
 		}
 
 		frames[k].Coeffs = coeffs
