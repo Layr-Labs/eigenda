@@ -538,12 +538,12 @@ func (t *Transactor) OperatorIDToAddress(ctx context.Context, operatorId core.Op
 }
 
 func (t *Transactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
-	type IdOrError struct {
+	type AddressOrError struct {
 		address gethcommon.Address
 		index   int
 		err     error
 	}
-	resultChan := make(chan IdOrError, len(operatorIds))
+	resultChan := make(chan AddressOrError, len(operatorIds))
 	pool := workerpool.New(maxNumWorkerPoolThreads)
 	for i, operatorId := range operatorIds {
 		idx := i
@@ -552,7 +552,7 @@ func (t *Transactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds [
 			addr, err := t.Bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
 				Context: ctx,
 			}, op)
-			resultChan <- IdOrError{address: addr, index: idx, err: err}
+			resultChan <- AddressOrError{address: addr, index: idx, err: err}
 		})
 	}
 	pool.StopWait()
