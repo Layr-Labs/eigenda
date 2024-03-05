@@ -93,12 +93,12 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Process disperse_request
 	in, err := stream.Recv()
 	if err != nil {
-		return fmt.Errorf("error receiving next message: %v", err)
+		return common.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
 	request, ok := in.Payload.(*pb.AuthenticatedRequest_DisperseRequest)
 	if !ok {
-		return errors.New("expected DisperseBlobRequest")
+		return common.NewInvalidArgError("missing DisperseBlobRequest")
 	}
 
 	blob := getBlobFromRequest(request.DisperseRequest)
@@ -107,12 +107,12 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Decode public key
 	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+		return common.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+		return common.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
@@ -131,12 +131,12 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Recieve challenge_reply
 	in, err = stream.Recv()
 	if err != nil {
-		return fmt.Errorf("error receiving next message: %v", err)
+		return common.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
 	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_AuthenticationData)
 	if !ok {
-		return errors.New("expected AuthenticationData")
+		return common.NewInvalidArgError("expected AuthenticationData")
 	}
 
 	blob.RequestHeader.Nonce = challenge
@@ -144,7 +144,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
 	if err != nil {
-		return fmt.Errorf("failed to authenticate blob request: %v", err)
+		return common.NewInvalidArgError(fmt.Sprintf("failed to authenticate blob request: %v", err))
 	}
 
 	// Disperse the blob
@@ -247,7 +247,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
-		return nil, err
+		return nil, common.NewInvalidArgError(err.Error())
 	}
 
 	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
@@ -258,7 +258,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
-		return nil, err
+		return nil, common.NewInvalidArgError(err.Error())
 	}
 
 	if s.ratelimiter != nil {
@@ -274,7 +274,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 					s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 				}
 			}
-			return nil, err
+			return nil, common.NewResourceExhaustedError(err.Error())
 		}
 	}
 
@@ -286,7 +286,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			s.metrics.HandleBlobStoreFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
 		s.logger.Error("failed to store blob", "err", err)
-		return nil, fmt.Errorf("failed to store blob, please try again later")
+		return nil, common.NewInternalError("failed to store blob, please try again later")
 	}
 
 	for _, param := range securityParams {
@@ -443,24 +443,25 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 
 	requestID := req.GetRequestId()
 	if len(requestID) == 0 {
-		return nil, fmt.Errorf("invalid request: request_id must not be empty")
+		return nil, common.NewInvalidArgError("request_id must not be empty")
 	}
 
 	s.logger.Info("received a new blob status request", "requestID", string(requestID))
 	metadataKey, err := disperser.ParseBlobKey(string(requestID))
 	if err != nil {
-		return nil, err
+		return nil, common.NewInvalidArgError(fmt.Sprintf("failed to parse the requestID: %s", err.Error()))
 	}
 
 	s.logger.Debug("metadataKey", "metadataKey", metadataKey.String())
 	metadata, err := s.blobStore.GetBlobMetadata(ctx, metadataKey)
 	if err != nil {
-		return nil, err
+		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		return nil, common.NewInternalError(fmt.Sprintf("failed to get blob metadata, blobkey: %s", metadataKey.String()))
 	}
 
 	isConfirmed, err := metadata.IsConfirmed()
 	if err != nil {
-		return nil, err
+		return nil, common.NewInternalError(fmt.Sprintf("missing confirmation information: %s", err.Error()))
 	}
 
 	s.logger.Debug("isConfirmed", "metadata", metadata, "isConfirmed", isConfirmed)
@@ -556,7 +557,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
 		s.metrics.IncrementFailedBlobRequestNum("", "RetrieveBlob")
 
-		return nil, err
+		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		return nil, common.NewInternalError("failed to get blob metadata, please retry")
 	}
 
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
@@ -564,7 +566,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.logger.Error("Failed to retrieve blob", "err", err)
 		s.metrics.HandleFailedRequest("", len(data), "RetrieveBlob")
 
-		return nil, err
+		return nil, common.NewInternalError("failed to get blob data, please retry")
 	}
 
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
