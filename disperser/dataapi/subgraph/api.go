@@ -27,6 +27,8 @@ type (
 		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
+		QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
+		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 	}
 
 	api struct {
@@ -206,4 +208,38 @@ func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, op
 	}
 
 	return &query.Operator, nil
+}
+
+// QueryOperatorAddedToQuorum finds operators' quorum opt-in history in range [startBlock, endBlock].
+func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error) {
+	if startBlock > endBlock {
+		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
+	}
+	variables := map[string]any{
+		"blockNumber_gt": graphql.Int(startBlock - 1),
+		"blockNumber_lt": graphql.Int(endBlock + 1),
+	}
+	query := new(queryOperatorAddedToQuorum)
+	err := a.operatorStateGql.Query(ctx, &query, variables)
+	if err != nil {
+		return nil, err
+	}
+	return query.OperatorAddedToQuorum, nil
+}
+
+// QueryOperatorRemovedFromQuorum finds operators' quorum opt-out history in range [startBlock, endBlock].
+func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error) {
+	if startBlock > endBlock {
+		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
+	}
+	variables := map[string]any{
+		"blockNumber_gt": graphql.Int(startBlock - 1),
+		"blockNumber_lt": graphql.Int(endBlock + 1),
+	}
+	query := new(queryOperatorRemovedFromQuorum)
+	err := a.operatorStateGql.Query(ctx, &query, variables)
+	if err != nil {
+		return nil, err
+	}
+	return query.OperatorRemovedFromQuorum, nil
 }

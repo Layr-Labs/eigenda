@@ -29,6 +29,12 @@ type (
 		BlockNumber     graphql.String
 		TransactionHash graphql.String
 	}
+	OperatorQuorum struct {
+		Id            graphql.String
+		Operator      graphql.String
+		QuorumNumbers graphql.String
+		BlockNumber   graphql.String
+	}
 	BatchNonSigningOperatorIds struct {
 		NonSigning struct {
 			NonSigners []struct {
@@ -94,5 +100,11 @@ type (
 	}
 	queryOperatorById struct {
 		Operator IndexedOperatorInfo `graphql:"operator(id: $id)"`
+	}
+	queryOperatorAddedToQuorum struct {
+		OperatorAddedToQuorum []*OperatorQuorum `graphql:"operatorAddedToQuorum(orderBy: blockTimestamp, where: {and [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
+	}
+	queryOperatorRemovedFromQuorum struct {
+		OperatorRemovedFromQuorum []*OperatorQuorum `graphql:"operatorRemovedFromQuorum(orderBy: blockTimestamp, where: {and [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
 	}
 )
