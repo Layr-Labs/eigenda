@@ -3,7 +3,7 @@ package batcher_test
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -322,7 +322,7 @@ func TestEncodingFailure(t *testing.T) {
 	assert.Nil(t, err)
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
-	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, fmt.Errorf("errrrr"))
+	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, errors.New("errrrr"))
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
 	err = encodingStreamer.RequestEncoding(context.Background(), out)

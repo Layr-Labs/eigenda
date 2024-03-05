@@ -1,7 +1,7 @@
 package apiserver
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"strconv"
 	"strings"
@@ -98,16 +98,16 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 
 	numQuorums := len(c.IntSlice(RegisteredQuorumFlagName))
 	if len(c.StringSlice(TotalUnauthBlobRateFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of total unauth blob rates does not match number of quorums")
+		return RateConfig{}, errors.New("number of total unauth blob rates does not match number of quorums")
 	}
 	if len(c.StringSlice(PerUserUnauthBlobRateFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of per user unauth blob intervals does not match number of quorums")
+		return RateConfig{}, errors.New("number of per user unauth blob intervals does not match number of quorums")
 	}
 	if len(c.IntSlice(TotalUnauthThroughputFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of total unauth throughput does not match number of quorums")
+		return RateConfig{}, errors.New("number of total unauth throughput does not match number of quorums")
 	}
 	if len(c.IntSlice(PerUserUnauthThroughputFlagName)) != numQuorums {
-		return RateConfig{}, fmt.Errorf("number of per user unauth throughput does not match number of quorums")
+		return RateConfig{}, errors.New("number of per user unauth throughput does not match number of quorums")
 	}
 
 	quorumRateInfos := make(map[core.QuorumID]QuorumRateInfo)

@@ -67,7 +67,7 @@ func ValidateEncodingParams(params EncodingParams, blobLength, SRSOrder int) err
 	}
 
 	if int(params.ChunkLength*params.NumChunks) < blobLength {
-		return fmt.Errorf("the supplied encoding parameters are not sufficient for the size of the data input")
+		return errors.New("the supplied encoding parameters are not sufficient for the size of the data input")
 	}
 
 	return nil

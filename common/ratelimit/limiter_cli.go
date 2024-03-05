@@ -65,7 +65,7 @@ func validateConfig(cfg Config) error {
 	}
 	for _, mult := range cfg.Multipliers {
 		if mult <= 0 {
-			return fmt.Errorf("multiplier must be positive")
+			return errors.New("multiplier must be positive")
 		}
 	}
 	return nil

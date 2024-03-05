@@ -2,7 +2,7 @@ package store
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/Layr-Labs/eigenda/common"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -37,7 +37,7 @@ func (s *dynamodbBucketStore[T]) GetItem(ctx context.Context, requesterID string
 		return nil, err
 	}
 	if item == nil {
-		return nil, fmt.Errorf("item not found")
+		return nil, errors.New("item not found")
 	}
 
 	params := new(T)
