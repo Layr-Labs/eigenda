@@ -26,7 +26,10 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      */
     uint32 public constant BLOCK_STALE_MEASURE = 150;
 
+    /// @notice The quorum adversary threshold percentages
     bytes public constant quorumAdversaryThresholdPercentages = hex"2121";
+
+    /// @notice The quorum confirmation threshold percentages
     bytes public constant quorumConfirmationThresholdPercentages = hex"4242";
     
     /// @notice The current batchId

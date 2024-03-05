@@ -57,12 +57,13 @@ library EigenDARollupUtils {
                 "EigenDARollupUtils.verifyBlob: quorumNumber does not match"
             );
 
-            // make sure that the adversaryThresholdPercentage is less than the given quorumThresholdPercentage
+            // make sure that the adversaryThresholdPercentage is less than the given confirmationThresholdPercentage
             require(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage 
-                < blobHeader.quorumBlobParams[i].quorumThresholdPercentage, 
+                < blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
                 "EigenDARollupUtils.verifyBlob: adversaryThresholdPercentage is not valid"
             );
 
+            // make sure that the adversaryThresholdPercentage is at least the given quorumAdversaryThresholdPercentage
             uint8 _adversaryThresholdPercentage = getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
             if(_adversaryThresholdPercentage > 0){
                 require(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage >= _adversaryThresholdPercentage, 
@@ -70,15 +71,21 @@ library EigenDARollupUtils {
                 );
             }
 
-            // make sure that the stake signed for is greater than the given quorumThresholdPercentage
-            require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumThresholdPercentages[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
-                >= blobHeader.quorumBlobParams[i].quorumThresholdPercentage, 
-                "EigenDARollupUtils.verifyBlob: quorumThresholdPercentage is not met"
+            // make sure that the stake signed for is greater than the given confirmationThresholdPercentage
+            require(uint8(blobVerificationProof.batchMetadata.batchHeader.confirmationThresholdPercentages[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
+                >= blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
+                "EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met"
             );
 
         }
     }
 
+    /**
+     * @notice gets the adversary threshold percentage for a given quorum
+     * @param eigenDAServiceManager the contract in which the batch was confirmed 
+     * @param quorumNumber the quorum number to get the adversary threshold percentage for
+     * @dev returns 0 if the quorumNumber is not found
+     */
     function getQuorumAdversaryThreshold(
         IEigenDAServiceManager eigenDAServiceManager,
         uint256 quorumNumber

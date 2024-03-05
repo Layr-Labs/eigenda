@@ -122,10 +122,10 @@ contract MockRollupTest is BLSMockAVSDeployer {
         bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
         bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
-        // add dummy quorum numbers and quorum threshold percentages making sure quorumThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
+        // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
         for (uint i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers = abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
-            batchHeader.quorumThresholdPercentages = abi.encodePacked(batchHeader.quorumThresholdPercentages, blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage + defaultCodingRatioPercentage);
+            batchHeader.confirmationThresholdPercentages = abi.encodePacked(batchHeader.confirmationThresholdPercentages, blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage + defaultCodingRatioPercentage);
         }
         batchHeader.referenceBlockNumber = uint32(block.number);
 
@@ -174,7 +174,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
-            blobHeader.quorumBlobParams[i].quorumThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }
         // mark all quorum numbers as unused
         for (uint i = 0; i < numQuorumsBlobParams; i++) {
@@ -185,8 +185,8 @@ contract MockRollupTest is BLSMockAVSDeployer {
     }
 
     function testGetQuorumAdversaryThreshold () public {
-        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 0) == 50, "getQuorumAdversaryThreshold failed");
-        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 1) == 50, "getQuorumAdversaryThreshold failed");
+        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 0) == 33, "getQuorumAdversaryThreshold failed");
+        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 1) == 33, "getQuorumAdversaryThreshold failed");
     }
 
 }

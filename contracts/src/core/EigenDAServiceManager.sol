@@ -80,10 +80,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"
         );
 
-        //make sure that the quorumNumbers and quorumThresholdPercentages are of the same length
+        //make sure that the quorumNumbers and confirmationThresholdPercentages are of the same length
         require(
-            batchHeader.quorumNumbers.length == batchHeader.quorumThresholdPercentages.length,
-            "EigenDAServiceManager.confirmBatch: quorumNumbers and quorumThresholdPercentages must be of the same length"
+            batchHeader.quorumNumbers.length == batchHeader.confirmationThresholdPercentages.length,
+            "EigenDAServiceManager.confirmBatch: quorumNumbers and confirmationThresholdPercentages must be of the same length"
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
@@ -101,12 +101,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         );
 
         // check that signatories own at least a threshold percentage of each quourm
-        for (uint i = 0; i < batchHeader.quorumThresholdPercentages.length; i++) {
-            // we don't check that the quorumThresholdPercentages are not >100 because a greater value would trivially fail the check, implying 
+        for (uint i = 0; i < batchHeader.confirmationThresholdPercentages.length; i++) {
+            // we don't check that the confirmationThresholdPercentages are not >100 because a greater value would trivially fail the check, implying 
             // signed stake > total stake
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
-                    quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.quorumThresholdPercentages[i]),
+                    quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.confirmationThresholdPercentages[i]),
                 "EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"
             );
         }
