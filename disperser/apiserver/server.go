@@ -615,6 +615,11 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	// The quorum ID must be in range [0, 254]. It'll actually be converted
 	// to uint8, so it cannot be greater than 254.
 	for i := range req.GetQuorumNumbers() {
+
+		if req.GetQuorumNumbers()[i] > 254 {
+			return nil, fmt.Errorf("invalid request: quorum_id must be in range [0, 254], but found %d", req.GetQuorumNumbers()[i])
+		}
+
 		quorumID := uint8(req.GetQuorumNumbers()[i])
 		if _, ok := seenQuorums[quorumID]; ok {
 			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
