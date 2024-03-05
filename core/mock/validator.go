@@ -12,22 +12,22 @@ var (
 	ErrChunkLengthMismatch = errors.New("chunk length mismatch")
 )
 
-// MockDataValidator is a mock implementation of DataValidator
-type MockDataValidator struct {
+// MockShardValidator is a mock implementation of ShardValidator
+type MockShardValidator struct {
 	mock.Mock
 }
 
-var _ core.DataValidator = (*MockDataValidator)(nil)
+var _ core.ShardValidator = (*MockShardValidator)(nil)
 
-func NewMockDataValidator() *MockDataValidator {
-	return &MockDataValidator{}
+func NewMockShardValidator() *MockShardValidator {
+	return &MockShardValidator{}
 }
 
-func (v *MockDataValidator) ValidateBatch(batchHeader *core.BatchHeader, blobs []*core.BlobMessage, operatorState *core.OperatorState, pool common.WorkerPool) error {
+func (v *MockShardValidator) ValidateBatch(batchHeader *core.BatchHeader, blobs []*core.BlobMessage, operatorState *core.OperatorState, pool common.WorkerPool) error {
 	args := v.Called(blobs, operatorState, pool)
 	return args.Error(0)
 }
 
-func (v *MockDataValidator) UpdateOperatorID(operatorID core.OperatorID) {
+func (v *MockShardValidator) UpdateOperatorID(operatorID core.OperatorID) {
 	v.Called(operatorID)
 }

@@ -52,7 +52,7 @@ type Node struct {
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
 	ChainState              core.ChainState
-	Validator               core.DataValidator
+	Validator               core.ShardValidator
 	Transactor              core.Transactor
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
@@ -118,7 +118,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger)
 		return nil, err
 	}
 	asgn := &core.StdAssignmentCoordinator{}
-	validator := core.NewDataValidator(v, asgn, cst, config.ID)
+	validator := core.NewShardValidator(v, asgn, cst, config.ID)
 
 	// Create new store
 

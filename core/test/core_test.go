@@ -188,7 +188,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
 func checkBatchByUniversalVerifier(cst core.IndexedChainState, encodedBlobs []core.EncodedBlob, header core.BatchHeader, pool common.WorkerPool) error {
-	val := core.NewDataValidator(v, asn, cst, [32]byte{})
+	val := core.NewShardValidator(v, asn, cst, [32]byte{})
 
 	quorums := []core.QuorumID{0, 1}
 	state, _ := cst.GetIndexedOperatorState(context.Background(), header.ReferenceBlockNumber, quorums)

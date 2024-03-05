@@ -13,21 +13,21 @@ var (
 	ErrBlobQuorumSkip      = errors.New("blob skipped for a quorum before verification")
 )
 
-type DataValidator interface {
+type ShardValidator interface {
 	ValidateBatch(*BatchHeader, []*BlobMessage, *OperatorState, common.WorkerPool) error
 	UpdateOperatorID(OperatorID)
 }
 
-// dataValidator implements the validation logic that a DA node should apply to its received data
-type dataValidator struct {
+// shardValidator implements the validation logic that a DA node should apply to its received data
+type shardValidator struct {
 	verifier   encoding.Verifier
 	assignment AssignmentCoordinator
 	chainState ChainState
 	operatorID OperatorID
 }
 
-func NewDataValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) DataValidator {
-	return &dataValidator{
+func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ShardValidator {
+	return &shardValidator{
 		verifier:   v,
 		assignment: asgn,
 		chainState: cst,
@@ -35,7 +35,7 @@ func NewDataValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst Chain
 	}
 }
 
-func (v *dataValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
+func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
 	if quorumHeader.AdversaryThreshold >= quorumHeader.QuorumThreshold {
 		return nil, nil, nil, fmt.Errorf("invalid header: quorum threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
 	}
@@ -82,11 +82,11 @@ func (v *dataValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *B
 	return chunks, &assignment, &params, nil
 }
 
-func (v *dataValidator) UpdateOperatorID(operatorID OperatorID) {
+func (v *shardValidator) UpdateOperatorID(operatorID OperatorID) {
 	v.operatorID = operatorID
 }
 
-func (v *dataValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
+func (v *shardValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
 
 	err := validateBatchHeaderRoot(batchHeader, blobs)
 	if err != nil {
@@ -181,7 +181,7 @@ func (v *dataValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMes
 	return nil
 }
 
-func (v *dataValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
+func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
 
 	err := v.verifier.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
 	if err != nil {
@@ -192,7 +192,7 @@ func (v *dataValidator) universalVerifyWorker(params encoding.EncodingParams, su
 	out <- nil
 }
 
-func (v *dataValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
+func (v *shardValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
 	err := v.verifier.VerifyBlobLength(blobCommitments)
 	if err != nil {
 		out <- err
