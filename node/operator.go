@@ -10,9 +10,9 @@ import (
 	"time"
 
 	grpcchurner "github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"

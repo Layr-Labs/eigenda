@@ -61,8 +61,8 @@ jobs:
         run: forge --version
 
       - name: Build contracts
-        run: | 
-          cd contracts && forge build 
+        run: |
+          cd contracts && forge build
 
       # TODO: add back DA contracts if we will need them in tests.
       # - name: Compile contracts
@@ -70,13 +70,13 @@ jobs:
       #     make compile-el
       #     make compile-dl
 
-      - name: Churner 
-        run: go test -v ./churner/tests
+      - name: Churner
+        run: go test -v ./operators/churner/tests
 
-      - name: Indexer 
+      - name: Indexer
         run: go test -v ./core/indexer
 
-      - name: Node Plugin 
+      - name: Node Plugin
         run: go test -v ./node/plugin/tests
 
       - name: Graph Indexer

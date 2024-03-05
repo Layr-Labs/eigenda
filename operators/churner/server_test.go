@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	commock "github.com/Layr-Labs/eigenda/common/mock"
@@ -15,6 +14,7 @@ import (
 	dacore "github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	indexermock "github.com/Layr-Labs/eigenda/core/thegraph/mock"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"

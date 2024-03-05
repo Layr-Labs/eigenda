@@ -154,11 +154,19 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 			log.Printf("invalid allowlist entry: failed to convert throughput from string: %s", allowlistEntry)
 			continue
 		}
-		allowlist[ip] = map[core.QuorumID]PerUserRateInfo{
-			core.QuorumID(quorumID): {
+		rateInfoByQuorum, ok := allowlist[ip]
+		if !ok {
+			allowlist[ip] = map[core.QuorumID]PerUserRateInfo{
+				core.QuorumID(quorumID): {
+					Throughput: common.RateParam(byteRate),
+					BlobRate:   common.RateParam(blobRate * blobRateMultiplier),
+				},
+			}
+		} else {
+			rateInfoByQuorum[core.QuorumID(quorumID)] = PerUserRateInfo{
 				Throughput: common.RateParam(byteRate),
 				BlobRate:   common.RateParam(blobRate * blobRateMultiplier),
-			},
+			}
 		}
 	}
 

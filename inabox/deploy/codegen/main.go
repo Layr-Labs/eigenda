@@ -7,11 +7,11 @@ import (
 	"os"
 	"text/template"
 
-	churner "github.com/Layr-Labs/eigenda/churner/flags"
 	dis "github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	bat "github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	enc "github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	opr "github.com/Layr-Labs/eigenda/node/flags"
+	churner "github.com/Layr-Labs/eigenda/operators/churner/flags"
 	retriever "github.com/Layr-Labs/eigenda/retriever/flags"
 
 	"github.com/urfave/cli"
@@ -20,7 +20,7 @@ import (
 var myTemplate = `
 type {{.Name}} struct{
 	{{range $var := .Fields}}
-		{{$var.EnvVar}} string 
+		{{$var.EnvVar}} string
 	{{end}}
 }
 func (vars {{.Name}}) getEnvMap() map[string]string {
@@ -108,7 +108,7 @@ func genVars(name string, flags []cli.Flag) string {
 
 func main() {
 
-	configs := `package deploy 
+	configs := `package deploy
 
 	import "reflect"
 	`
