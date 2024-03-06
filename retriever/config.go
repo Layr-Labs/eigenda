@@ -3,8 +3,8 @@ package retriever
 import (
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
@@ -14,7 +14,7 @@ import (
 type Config struct {
 	EncoderConfig   kzg.KzgConfig
 	EthClientConfig geth.EthClientConfig
-	LoggerConfig    logging.Config
+	LoggerConfig    common.LoggerConfig
 	IndexerConfig   indexer.Config
 	MetricsConfig   MetricsConfig
 
@@ -31,7 +31,7 @@ func NewConfig(ctx *cli.Context) *Config {
 	return &Config{
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
-		LoggerConfig:    logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:    common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
 		IndexerConfig:   indexer.ReadIndexerConfig(ctx),
 		MetricsConfig: MetricsConfig{
 			HTTPPort: ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),

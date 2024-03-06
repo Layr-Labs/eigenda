@@ -8,13 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -197,9 +198,8 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	_, privateKey, err := plugin.GetECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
 	assert.NoError(t, err)
 	assert.NotNil(t, privateKey)
-
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	loggerConfig := common.DefaultLoggerConfig()
+	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
 	assert.NotNil(t, logger)
 
 	ethConfig := geth.EthClientConfig{
@@ -232,8 +232,8 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 
 func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	hexPk := strings.TrimPrefix(testConfig.Pks.EcdsaMap[testConfig.Deployers[0].Name].PrivateKey, "0x")
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	loggerConfig := common.DefaultLoggerConfig()
+	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
 	assert.NotNil(t, logger)
 
 	ethConfig := geth.EthClientConfig{

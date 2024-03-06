@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
@@ -69,7 +69,7 @@ type Config struct {
 	UseSecureGrpc                 bool
 
 	EthClientConfig geth.EthClientConfig
-	LoggingConfig   logging.Config
+	LoggingConfig   common.LoggerConfig
 	EncoderConfig   kzg.KzgConfig
 }
 
@@ -157,7 +157,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		PrivateBls:                    privateBls,
 		EthClientConfig:               ethClientConfig,
 		EncoderConfig:                 kzg.ReadCLIConfig(ctx),
-		LoggingConfig:                 logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggingConfig:                 common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProvider:                 ctx.GlobalString(flags.PubIPProviderFlag.Name),

@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
@@ -37,7 +38,7 @@ type components struct {
 }
 
 func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint64, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
-	logger := &cmock.Logger{}
+	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
@@ -60,7 +61,7 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 }
 
 func TestEncodingQueueLimit(t *testing.T) {
-	logger := &cmock.Logger{}
+	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
@@ -286,7 +287,7 @@ func TestStreamingEncoding(t *testing.T) {
 }
 
 func TestEncodingFailure(t *testing.T) {
-	logger := &cmock.Logger{}
+	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)

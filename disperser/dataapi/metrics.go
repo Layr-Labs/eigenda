@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -26,10 +26,10 @@ type Metrics struct {
 	Latency     *prometheus.SummaryVec
 
 	httpPort string
-	logger   common.Logger
+	logger   logging.Logger
 }
 
-func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string, logger common.Logger) *Metrics {
+func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -100,10 +100,10 @@ func (g *Metrics) Start(ctx context.Context) {
 type DynamoDBCollector struct {
 	blobMetadataStore *blobstore.BlobMetadataStore
 	blobStatusMetric  *prometheus.Desc
-	logger            common.Logger
+	logger            logging.Logger
 }
 
-func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger common.Logger) *DynamoDBCollector {
+func NewDynamoDBCollector(blobMetadataStore *blobstore.BlobMetadataStore, logger logging.Logger) *DynamoDBCollector {
 	return &DynamoDBCollector{
 		blobMetadataStore: blobMetadataStore,
 		blobStatusMetric: prometheus.NewDesc("dynamodb_blob_metadata_status_count",

@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
@@ -16,7 +16,7 @@ type Config struct {
 	AwsClientConfig   aws.ClientConfig
 	BlobstoreConfig   blobstore.Config
 	ServerConfig      disperser.ServerConfig
-	LoggerConfig      logging.Config
+	LoggerConfig      common.LoggerConfig
 	MetricsConfig     disperser.MetricsConfig
 	RatelimiterConfig ratelimit.Config
 	RateConfig        apiserver.RateConfig
@@ -50,7 +50,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		},
-		LoggerConfig: logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig: common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
 		MetricsConfig: disperser.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),

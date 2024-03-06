@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -22,7 +21,6 @@ type (
 		BalanceAt(ctx context.Context, contract common.Address, blockNumber *big.Int) (*big.Int, error)
 		BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 		BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
-		Blockchain() *core.BlockChain
 		CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error)
 		Close() error
 		CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)

@@ -10,11 +10,11 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -53,10 +53,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := logging.GetLogger(config.LoggerConfig)
-	if err != nil {
-		return err
-	}
+	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 
 	client, err := geth.NewClient(config.EthClientConfig, logger)
 	if err != nil {

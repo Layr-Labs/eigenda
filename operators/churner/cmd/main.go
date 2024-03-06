@@ -9,12 +9,12 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -60,10 +60,7 @@ func run(ctx *cli.Context) error {
 	)
 
 	config := churner.NewConfig(ctx)
-	logger, err := logging.GetLogger(config.LoggerConfig)
-	if err != nil {
-		return err
-	}
+	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 
 	log.Println("Starting geth client")
 	gethClient, err := geth.NewClient(config.EthClientConfig, logger)

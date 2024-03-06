@@ -9,6 +9,7 @@ import (
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -237,7 +238,7 @@ func (f pubkeyRegistrationEventFilterer) addPubkeyRegistration(events []operator
 }
 
 type OperatorPubKeysFilterer struct {
-	Logger        common.Logger
+	Logger        logging.Logger
 	Filterer      bind.ContractFilterer
 	BlsRegAddress gethcommon.Address
 

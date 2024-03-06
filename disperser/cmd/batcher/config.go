@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -19,7 +19,7 @@ type Config struct {
 	EthClientConfig geth.EthClientConfig
 	AwsClientConfig aws.ClientConfig
 	EncoderConfig   kzg.KzgConfig
-	LoggerConfig    logging.Config
+	LoggerConfig    common.LoggerConfig
 	MetricsConfig   batcher.MetricsConfig
 	IndexerConfig   indexer.Config
 	GraphUrl        string
@@ -41,7 +41,7 @@ func NewConfig(ctx *cli.Context) Config {
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
-		LoggerConfig:    logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:    common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
 		BatcherConfig: batcher.Config{
 			PullInterval:             ctx.GlobalDuration(flags.PullIntervalFlag.Name),
 			FinalizerInterval:        ctx.GlobalDuration(flags.FinalizerIntervalFlag.Name),

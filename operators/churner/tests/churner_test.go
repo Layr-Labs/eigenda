@@ -14,8 +14,6 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
-	commock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -24,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +37,7 @@ var (
 	testConfig                     *deploy.Config
 	templateName                   string
 	testName                       string
-	logger                         = &commock.Logger{}
+	logger                         = logging.NewNoopLogger()
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
@@ -187,7 +186,7 @@ func TestChurner(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger common.Logger) (*eth.Transactor, error) {
+func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Transactor, error) {
 	ethClientCfg := geth.EthClientConfig{
 		RPCURL:           rpcURL,
 		PrivateKeyString: privateKey,
@@ -209,7 +208,7 @@ func newTestServer(t *testing.T) *churner.Server {
 			RPCURL:           rpcURL,
 			PrivateKeyString: churnerPrivateKeyHex,
 		},
-		LoggerConfig:                  logging.DefaultCLIConfig(),
+		LoggerConfig:                  common.DefaultLoggerConfig(),
 		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetreiver,
 		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
 	}

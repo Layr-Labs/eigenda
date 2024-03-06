@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/gammazero/workerpool"
 )
@@ -104,13 +104,13 @@ type (
 	}
 	subgraphClient struct {
 		api    subgraph.Api
-		logger common.Logger
+		logger logging.Logger
 	}
 )
 
 var _ SubgraphClient = (*subgraphClient)(nil)
 
-func NewSubgraphClient(api subgraph.Api, logger common.Logger) *subgraphClient {
+func NewSubgraphClient(api subgraph.Api, logger logging.Logger) *subgraphClient {
 	return &subgraphClient{api: api, logger: logger}
 }
 

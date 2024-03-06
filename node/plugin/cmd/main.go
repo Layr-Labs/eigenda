@@ -7,14 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli"
 )
 
@@ -75,11 +76,8 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ECDSA key read and decrypted from %s", config.EcdsaKeyFile)
 
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	if err != nil {
-		log.Printf("Error: failed to create a EigenDA logger: %v", err)
-		return
-	}
+	loggerConfig := common.DefaultLoggerConfig()
+	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           config.ChainRpcUrl,

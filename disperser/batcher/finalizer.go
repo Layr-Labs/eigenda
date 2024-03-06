@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gammazero/workerpool"
@@ -34,7 +35,7 @@ type finalizer struct {
 	maxNumRetriesPerBlob uint
 	numBlobsPerFetch     int32
 	numWorkers           int
-	logger               common.Logger
+	logger               logging.Logger
 	metrics              *FinalizerMetrics
 }
 
@@ -47,7 +48,7 @@ func NewFinalizer(
 	maxNumRetriesPerBlob uint,
 	numBlobsPerFetch int32,
 	numWorkers int,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *FinalizerMetrics,
 ) Finalizer {
 	return &finalizer{

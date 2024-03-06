@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -18,10 +19,10 @@ type ChainClient interface {
 
 type chainClient struct {
 	ethClient common.EthClient
-	logger    common.Logger
+	logger    logging.Logger
 }
 
-func NewChainClient(ethClient common.EthClient, logger common.Logger) *chainClient {
+func NewChainClient(ethClient common.EthClient, logger logging.Logger) *chainClient {
 	return &chainClient{
 		ethClient: ethClient,
 		logger:    logger,

@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
@@ -15,7 +15,7 @@ type Config struct {
 	AwsClientConfig  aws.ClientConfig
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
-	LoggerConfig     logging.Config
+	LoggerConfig     common.LoggerConfig
 	PrometheusConfig prometheus.Config
 	MetricsConfig    dataapi.MetricsConfig
 
@@ -41,7 +41,7 @@ func NewConfig(ctx *cli.Context) Config {
 		},
 		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		LoggerConfig:                  logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:                  common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
 		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/clients"
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/tools/traffic/flags"
 	"github.com/urfave/cli"
 )
@@ -17,7 +17,7 @@ type Config struct {
 	DataSize               uint64
 	QuorumThreshold        uint8
 	AdversarialThreshold   uint8
-	LoggingConfig          logging.Config
+	LoggingConfig          common.LoggerConfig
 	RandomizeBlobs         bool
 	InstanceLaunchInterval time.Duration
 }
@@ -35,7 +35,7 @@ func NewConfig(ctx *cli.Context) *Config {
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
 		QuorumThreshold:        uint8(ctx.GlobalUint(flags.QuorumThresholdFlag.Name)),
 		AdversarialThreshold:   uint8(ctx.GlobalUint(flags.AdversarialThresholdFlag.Name)),
-		LoggingConfig:          logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggingConfig:          common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 	}

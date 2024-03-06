@@ -6,8 +6,8 @@ import (
 	"math"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -44,10 +44,10 @@ type QueryResult struct {
 
 type Client struct {
 	dynamoClient *dynamodb.Client
-	logger       common.Logger
+	logger       logging.Logger
 }
 
-func NewClient(cfg commonaws.ClientConfig, logger common.Logger) (*Client, error) {
+func NewClient(cfg commonaws.ClientConfig, logger logging.Logger) (*Client, error) {
 	var err error
 	once.Do(func() {
 		createClient := func(service, region string, options ...interface{}) (aws.Endpoint, error) {

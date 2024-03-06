@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	mockcm "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	ethereumcm "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/indexer/inmem"
 )
 
-var logger = &mockcm.Logger{}
+var logger = logging.NewNoopLogger()
 
 func newTestFilterer(sc *mock.ContractSimulator, isFastMode bool) *Filterer {
 	return &Filterer{

@@ -11,13 +11,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli"
 )
 
@@ -52,11 +52,7 @@ func main() {
 func RunDataApi(ctx *cli.Context) error {
 	config := NewConfig(ctx)
 
-	logger, err := logging.GetLogger(config.LoggerConfig)
-	if err != nil {
-		return err
-	}
-
+	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 	if err != nil {
 		return err

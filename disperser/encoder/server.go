@@ -8,11 +8,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -22,7 +22,7 @@ type Server struct {
 	pb.UnimplementedEncoderServer
 
 	config  ServerConfig
-	logger  common.Logger
+	logger  logging.Logger
 	prover  encoding.Prover
 	metrics *Metrics
 	close   func()
@@ -31,7 +31,7 @@ type Server struct {
 	requestPool     chan struct{}
 }
 
-func NewServer(config ServerConfig, logger common.Logger, prover encoding.Prover, metrics *Metrics) *Server {
+func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
 	return &Server{
 		config:  config,
 		logger:  logger,
@@ -131,8 +131,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 }
 
 func (s *Server) Start() error {
-	s.logger.Trace("Entering Start function...")
-	defer s.logger.Trace("Exiting Start function...")
+	s.logger.Debug("Entering Start function...")
+	defer s.logger.Debug("Exiting Start function...")
 
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)

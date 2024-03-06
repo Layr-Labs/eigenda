@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -54,13 +54,13 @@ type SignatureAggregator interface {
 }
 
 type StdSignatureAggregator struct {
-	Logger     common.Logger
+	Logger     logging.Logger
 	Transactor Transactor
 	// OperatorAddresses contains the ethereum addresses of the operators corresponding to their operator IDs
 	OperatorAddresses *lru.Cache[OperatorID, gethcommon.Address]
 }
 
-func NewStdSignatureAggregator(logger common.Logger, transactor Transactor) (*StdSignatureAggregator, error) {
+func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*StdSignatureAggregator, error) {
 	operatorAddrs, err := lru.New[OperatorID, gethcommon.Address](maxNumOperatorAddresses)
 	if err != nil {
 		return nil, err
