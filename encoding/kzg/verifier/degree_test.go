@@ -12,19 +12,17 @@ import (
 )
 
 func TestLengthProof(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
 	for z := 0; z < numBlob; z++ {
 		extra := make([]byte, z*31*2)
-		inputBytes := append(GETTYSBURG_ADDRESS_BYTES, extra...)
+		inputBytes := append(gettysburgAddressBytes, extra...)
 		inputFr := rs.ToFrArray(inputBytes)
 
 		_, lowDegreeCommitment, lowDegreeProof, _, _, err := enc.Encode(inputFr)

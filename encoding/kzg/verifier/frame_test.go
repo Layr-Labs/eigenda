@@ -16,18 +16,16 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	group, _ := prover.NewProver(kzgConfig, true)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 	require.NotNil(t, enc)
 
-	commit, _, _, frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	commit, _, _, frames, _, err := enc.EncodeBytes(gettysburgAddressBytes)
 	require.Nil(t, err)
 	require.NotNil(t, commit)
 	require.NotNil(t, frames)

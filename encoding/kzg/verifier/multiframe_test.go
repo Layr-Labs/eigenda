@@ -12,20 +12,18 @@ import (
 )
 
 func TestUniversalVerify(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
 	samples := make([]verifier.Sample, 0)
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+		inputFr := rs.ToFrArray(gettysburgAddressBytes)
 
 		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 		require.Nil(t, err)
@@ -55,8 +53,6 @@ func TestUniversalVerify(t *testing.T) {
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	kzgConfigCopy := *kzgConfig
 	group, err := prover.NewProver(&kzgConfigCopy, true)
@@ -66,14 +62,14 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	v, err := verifier.NewVerifier(kzgConfig, true)
 	assert.NoError(t, err)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	assert.NoError(t, err)
 
 	numBlob := 5
 	samples := make([]verifier.Sample, 0)
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+		inputFr := rs.ToFrArray(gettysburgAddressBytes)
 
 		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 		require.Nil(t, err)
