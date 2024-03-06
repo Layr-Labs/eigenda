@@ -98,7 +98,7 @@ type (
 	}
 	BatchNonSigningInfo struct {
 		QuorumNumbers        []uint8
-		ReferenceBlockNumber uint64
+		ReferenceBlockNumber uint32
 		// The operatorIds of nonsigners for the batch.
 		NonSigners []string
 	}
@@ -667,7 +667,7 @@ func convertNonSigningInfo(infoGql *subgraph.BatchNonSigningInfo) (*BatchNonSign
 
 	return &BatchNonSigningInfo{
 		QuorumNumbers:        quorums,
-		ReferenceBlockNumber: blockNum,
+		ReferenceBlockNumber: uint32(blockNum),
 		NonSigners:           nonSigners,
 	}, nil
 }

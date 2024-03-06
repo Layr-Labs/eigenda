@@ -511,7 +511,7 @@ func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
 	assert.Equal(t, 2, len(result[0].QuorumNumbers))
 	assert.Equal(t, uint8(0), result[0].QuorumNumbers[0])
 	assert.Equal(t, uint8(1), result[0].QuorumNumbers[1])
-	assert.Equal(t, uint64(81), result[0].ReferenceBlockNumber)
+	assert.Equal(t, uint32(81), result[0].ReferenceBlockNumber)
 	assert.Equal(t, 2, len(result[0].NonSigners))
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[0].NonSigners[0])
 	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", result[0].NonSigners[1])
@@ -520,7 +520,7 @@ func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
 	assert.Equal(t, 2, len(result[1].QuorumNumbers))
 	assert.Equal(t, uint8(1), result[1].QuorumNumbers[0])
 	assert.Equal(t, uint8(2), result[1].QuorumNumbers[1])
-	assert.Equal(t, uint64(80), result[1].ReferenceBlockNumber)
+	assert.Equal(t, uint32(80), result[1].ReferenceBlockNumber)
 	assert.Equal(t, 1, len(result[1].NonSigners))
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[1].NonSigners[0])
 }

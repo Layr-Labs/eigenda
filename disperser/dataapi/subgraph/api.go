@@ -213,7 +213,7 @@ func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, op
 // QueryOperatorAddedToQuorum finds operators' quorum opt-in history in range [startBlock, endBlock].
 func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error) {
 	if startBlock > endBlock {
-		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
+		return nil, fmt.Errorf("endBlock must be no less than startBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
 	}
 	variables := map[string]any{
 		"blockNumber_gt": graphql.Int(startBlock - 1),
@@ -230,7 +230,7 @@ func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlo
 // QueryOperatorRemovedFromQuorum finds operators' quorum opt-out history in range [startBlock, endBlock].
 func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error) {
 	if startBlock > endBlock {
-		return nil, fmt.Errorf("startBlock must be no less than endBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
+		return nil, fmt.Errorf("endBlock must be no less than startBlock, startBlock: %d, endBlock: %d", startBlock, endBlock)
 	}
 	variables := map[string]any{
 		"blockNumber_gt": graphql.Int(startBlock - 1),
