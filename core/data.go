@@ -17,15 +17,15 @@ type QuorumID = uint8
 
 // SecurityParam contains the quorum ID and the adversary threshold for the quorum;
 type SecurityParam struct {
-	QuorumID QuorumID `json:"quorum_id"`
+	QuorumID QuorumID
 	// AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum
-	AdversaryThreshold uint8 `json:"adversary_threshold"`
+	AdversaryThreshold uint8
 	// ConfirmationThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
-	ConfirmationThreshold uint8 `json:"quorum_threshold"`
+	ConfirmationThreshold uint8
 	// Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used
 	// for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
 	// data was posted to the DA node.
-	QuorumRate common.RateParam `json:"quorum_rate"`
+	QuorumRate common.RateParam
 }
 
 const (
