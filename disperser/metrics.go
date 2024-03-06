@@ -48,7 +48,7 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 				Name:      "requests_total",
 				Help:      "the number of blob requests",
 			},
-			[]string{"status", "quorum", "method"},
+			[]string{"status_code", "status", "quorum", "method"},
 		),
 		BlobSize: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -82,9 +82,10 @@ func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
 // IncrementSuccessfulBlobRequestNum increments the number of successful blob requests
 func (g *Metrics) IncrementSuccessfulBlobRequestNum(quorum string, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": "success",
-		"quorum": quorum,
-		"method": method,
+		"status_code": "200",
+		"status":      "success",
+		"quorum":      quorum,
+		"method":      method,
 	}).Inc()
 }
 
@@ -98,18 +99,29 @@ func (g *Metrics) HandleSuccessfulRequest(quorum string, blobBytes int, method s
 	}).Add(float64(blobBytes))
 }
 
-// IncrementFailedBlobRequestNum increments the number of failed blob requests
-func (g *Metrics) IncrementFailedBlobRequestNum(quorum string, method string) {
+// IncrementBlobRequestNum increments the number of blob requests received
+func (g *Metrics) IncrementBlobRequestNum(method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": "failed",
-		"quorum": quorum,
-		"method": method,
+		"status_code": "total",
+		"status":      "total",
+		"quorum":      "",
+		"method":      method,
+	}).Inc()
+}
+
+// IncrementFailedBlobRequestNum increments the number of failed blob requests
+func (g *Metrics) IncrementFailedBlobRequestNum(statusCode string, quorum string, method string) {
+	g.NumBlobRequests.With(prometheus.Labels{
+		"status_code": statusCode,
+		"status":      "failed",
+		"quorum":      quorum,
+		"method":      method,
 	}).Inc()
 }
 
 // HandleFailedRequest updates the number of failed requests and the size of the blob
-func (g *Metrics) HandleFailedRequest(quorum string, blobBytes int, method string) {
-	g.IncrementFailedBlobRequestNum(quorum, method)
+func (g *Metrics) HandleFailedRequest(statusCode string, quorum string, blobBytes int, method string) {
+	g.IncrementFailedBlobRequestNum(statusCode, quorum, method)
 	g.BlobSize.With(prometheus.Labels{
 		"status": "failed",
 		"quorum": quorum,
@@ -120,9 +132,10 @@ func (g *Metrics) HandleFailedRequest(quorum string, blobBytes int, method strin
 // HandleBlobStoreFailedRequest updates the number of requests failed to store blob and the size of the blob
 func (g *Metrics) HandleBlobStoreFailedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": StoreBlobFailure,
-		"quorum": quorum,
-		"method": method,
+		"status_code": "500",
+		"status":      StoreBlobFailure,
+		"quorum":      quorum,
+		"method":      method,
 	}).Inc()
 	g.BlobSize.With(prometheus.Labels{
 		"status": StoreBlobFailure,
@@ -134,9 +147,10 @@ func (g *Metrics) HandleBlobStoreFailedRequest(quorum string, blobBytes int, met
 // HandleSystemRateLimitedRequest updates the number of system rate limited requests and the size of the blob
 func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": SystemRateLimitedFailure,
-		"quorum": quorum,
-		"method": method,
+		"status_code": "429",
+		"status":      SystemRateLimitedFailure,
+		"quorum":      quorum,
+		"method":      method,
 	}).Inc()
 	g.BlobSize.With(prometheus.Labels{
 		"status": SystemRateLimitedFailure,
@@ -148,9 +162,10 @@ func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, m
 // HandleAccountRateLimitedRequest updates the number of account rate limited requests and the size of the blob
 func (g *Metrics) HandleAccountRateLimitedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status": AccountRateLimitedFailure,
-		"quorum": quorum,
-		"method": method,
+		"status_code": "429",
+		"status":      AccountRateLimitedFailure,
+		"quorum":      quorum,
+		"method":      method,
 	}).Inc()
 	g.BlobSize.With(prometheus.Labels{
 		"status": AccountRateLimitedFailure,

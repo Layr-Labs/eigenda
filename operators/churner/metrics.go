@@ -14,6 +14,7 @@ import (
 
 type FailReason string
 
+// Note: failure reason constants must be maintained in sync with statusCodeMap.
 const (
 	FailReasonRateLimitExceeded           FailReason = "rate_limit_exceeded"            // Rate limited: per operator rate limiting
 	FailReasonInsufficientStakeToRegister FailReason = "insufficient_stake_to_register" // Operator doesn't have enough stake to be registered
@@ -23,7 +24,20 @@ const (
 	FailReasonInvalidSignature            FailReason = "invalid_signature"              // Invalid signature: operator's signature is wrong
 	FailReasonProcessChurnRequestFailed   FailReason = "failed_process_churn_request"   // Failed to process churn request
 	FailReasonInvalidRequest              FailReason = "invalid_request"                // Invalid request: request is malformed
+
 )
+
+// Note: statusCodeMap must be maintained in sync with failure reason constants.
+var statusCodeMap map[FailReason]string = map[FailReason]string{
+	FailReasonRateLimitExceeded:           "429",
+	FailReasonInsufficientStakeToRegister: "400",
+	FailReasonInsufficientStakeToChurn:    "400",
+	FailReasonQuorumIdOutOfRange:          "400",
+	FailReasonPrevApprovalNotExpired:      "429",
+	FailReasonInvalidSignature:            "400",
+	FailReasonProcessChurnRequestFailed:   "500",
+	FailReasonInvalidRequest:              "400",
+}
 
 type MetricsConfig struct {
 	HTTPPort      string
@@ -87,8 +101,15 @@ func (g *Metrics) IncrementSuccessfulRequestNum(method string) {
 
 // IncrementFailedRequestNum increments the number of failed requests
 func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) {
+	code, ok := statusCodeMap[reason]
+	if !ok {
+		g.logger.Error("cannot map failure reason to status code", "failure reason", reason)
+		// Treat this as an internal server error. This is a conservative approach to
+		// handle a negligence of mapping from failure reason to status code.
+		code = "500"
+	}
 	g.NumRequests.With(prometheus.Labels{
-		"status": "failed",
+		"status": code,
 		"reason": string(reason),
 		"method": method,
 	}).Inc()
