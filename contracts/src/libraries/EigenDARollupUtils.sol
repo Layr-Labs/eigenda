@@ -72,7 +72,7 @@ library EigenDARollupUtils {
             }
 
             // make sure that the stake signed for is greater than the given confirmationThresholdPercentage
-            require(uint8(blobVerificationProof.batchMetadata.batchHeader.confirmationThresholdPercentages[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
+            require(uint8(blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
                 >= blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
                 "EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met"
             );

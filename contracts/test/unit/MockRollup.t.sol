@@ -125,7 +125,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
         for (uint i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers = abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
-            batchHeader.confirmationThresholdPercentages = abi.encodePacked(batchHeader.confirmationThresholdPercentages, blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage + defaultCodingRatioPercentage);
+            batchHeader.signedStakeForQuorums = abi.encodePacked(batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage + defaultCodingRatioPercentage);
         }
         batchHeader.referenceBlockNumber = uint32(block.number);
 

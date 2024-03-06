@@ -45,7 +45,7 @@ interface IEigenDAServiceManager is IServiceManager {
     struct BatchHeader {
         bytes32 blobHeadersRoot;
         bytes quorumNumbers; // each byte is a different quorum number
-        bytes confirmationThresholdPercentages; // every bytes is an amount less than 100 specifying the percentage of stake 
+        bytes signedStakeForQuorums; // every bytes is an amount less than 100 specifying the percentage of stake 
                                           // the must have signed in the corresponding quorum in `quorumNumbers` 
         uint32 referenceBlockNumber;
     }

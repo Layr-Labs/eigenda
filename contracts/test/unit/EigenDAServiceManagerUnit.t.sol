@@ -171,9 +171,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     function testConfirmBatch_Revert_LengthMismatch(uint256 pseudoRandomNumber) public {
         (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
-        batchHeader.confirmationThresholdPercentages = new bytes(0);
+        batchHeader.signedStakeForQuorums = new bytes(0);
 
-        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: quorumNumbers and confirmationThresholdPercentages must be of the same length"));
+        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: quorumNumbers and signedStakeForQuorums must be of the same length"));
         cheats.prank(confirmer, confirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -204,9 +204,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         IEigenDAServiceManager.BatchHeader memory batchHeader;
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked("blobHeadersRoot", pseudoRandomNumber));
         batchHeader.quorumNumbers = quorumNumbers;
-        batchHeader.confirmationThresholdPercentages = new bytes(quorumNumbers.length);
+        batchHeader.signedStakeForQuorums = new bytes(quorumNumbers.length);
         for (uint256 i = 0; i < quorumNumbers.length; i++) {
-            batchHeader.confirmationThresholdPercentages[i] = bytes1(threshold);
+            batchHeader.signedStakeForQuorums[i] = bytes1(threshold);
         }
         batchHeader.referenceBlockNumber = referenceBlockNumber;
         return batchHeader;
