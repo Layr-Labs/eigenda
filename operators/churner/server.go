@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -58,7 +59,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
-		return nil, common.NewInvalidArgError(fmt.Sprintf("invalid request: %s", err.Error()))
+		return nil, api.NewInvalidArgError(fmt.Sprintf("invalid request: %s", err.Error()))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -71,7 +72,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	// Global rate limiting: check that we are after the previous approval's expiry
 	if now.Unix() < s.latestExpiry {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
-		return nil, common.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix()))
+		return nil, api.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix()))
 	}
 
 	request := createChurnRequest(req)
@@ -79,14 +80,14 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
-		return nil, common.NewInvalidArgError(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
+		return nil, api.NewInvalidArgError(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
 	}
 
 	// Per-operator rate limiting: check if the request should be rate limited
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
-		return nil, common.NewResourceExhaustedError(fmt.Sprintf("rate limiter error: %s", err.Error()))
+		return nil, api.NewResourceExhaustedError(fmt.Sprintf("rate limiter error: %s", err.Error()))
 	}
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
@@ -95,7 +96,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}
-		return nil, common.NewInternalError(fmt.Sprintf("failed to process churn request: %s", err.Error()))
+		return nil, api.NewInternalError(fmt.Sprintf("failed to process churn request: %s", err.Error()))
 	}
 
 	// update the latest expiry
