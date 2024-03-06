@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc/status"
 )
 
 type Server struct {
@@ -57,7 +59,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
-		return nil, fmt.Errorf("invalid request: %w", err)
+		return nil, api.NewInvalidArgError(fmt.Sprintf("invalid request: %s", err.Error()))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -67,10 +69,10 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	s.logger.Info("Received request: ", "QuorumIds", req.GetQuorumIds())
 
 	now := time.Now()
-	// check that we are after the previous approval's expiry
+	// Global rate limiting: check that we are after the previous approval's expiry
 	if now.Unix() < s.latestExpiry {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
-		return nil, fmt.Errorf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix())
+		return nil, api.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix()))
 	}
 
 	request := createChurnRequest(req)
@@ -78,20 +80,23 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
-		return nil, fmt.Errorf("failed to verify request signature: %w", err)
+		return nil, api.NewInvalidArgError(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
 	}
 
-	// check if the request should be rate limited
+	// Per-operator rate limiting: check if the request should be rate limited
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
-		return nil, fmt.Errorf("rate limiter error: %w", err)
+		return nil, api.NewResourceExhaustedError(fmt.Sprintf("rate limiter error: %s", err.Error()))
 	}
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
-		return nil, fmt.Errorf("failed to process churn request: %w", err)
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+		return nil, api.NewInternalError(fmt.Sprintf("failed to process churn request: %s", err.Error()))
 	}
 
 	// update the latest expiry
