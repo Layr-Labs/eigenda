@@ -40,7 +40,11 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	chainState, _ = core_mock.MakeChainDataMock(core.OperatorIndex(4))
+	chainState, _ = core_mock.MakeChainDataMock(map[uint8]int{
+		0: 4,
+		1: 4,
+		2: 4,
+	})
 	os.Exit(m.Run())
 }
 
@@ -122,7 +126,11 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 
 		asn := &core.StdAssignmentCoordinator{}
 
-		cst, err := core_mock.MakeChainDataMock(core.OperatorIndex(10))
+		cst, err := core_mock.MakeChainDataMock(map[uint8]int{
+			0: 10,
+			1: 10,
+			2: 10,
+		})
 		if err != nil {
 			panic("failed to create test encoder")
 		}
