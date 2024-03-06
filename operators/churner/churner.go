@@ -233,8 +233,9 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 			msg := "registering operator must have %f%% more than the stake of the " +
 				"lowest-stake operator. Block number used for this decision: %d, " +
 				"registering operator address: %s, registering operator stake: %d, " +
-				"stake of lowest-stake operator: %d, quorum ID: %d"
-			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, quorumID))
+				"stake of lowest-stake operator: %d, operatorId of lowest-stake operator: " +
+				"%x, quorum ID: %d"
+			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, lowestStakeOperatorId, quorumID))
 		}
 
 		// verify the lowest stake against the total stake
