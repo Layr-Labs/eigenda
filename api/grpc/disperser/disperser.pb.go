@@ -360,6 +360,7 @@ type DisperseBlobRequest struct {
 	// The data to be dispersed.
 	// The size of data must be <= 2MiB.
 	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	// The quorums to which the blob will be sent, in addition to any required quorums.
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`

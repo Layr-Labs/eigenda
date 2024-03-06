@@ -85,7 +85,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 			SecurityParam: core.SecurityParam{
 				QuorumID:              core.QuorumID(header.GetQuorumId()),
 				AdversaryThreshold:    uint8(header.GetAdversaryThreshold()),
-				ConfirmationThreshold: uint8(header.GetQuorumThreshold()),
+				ConfirmationThreshold: uint8(header.GetConfirmationThreshold()),
 				QuorumRate:            header.GetRatelimit(),
 			},
 			ChunkLength: uint(header.GetChunkLength()),

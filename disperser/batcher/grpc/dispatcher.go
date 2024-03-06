@@ -157,11 +157,11 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 
 	for i, header := range blob.BlobHeader.QuorumInfos {
 		quorumHeaders[i] = &node.BlobQuorumInfo{
-			QuorumId:           uint32(header.QuorumID),
-			AdversaryThreshold: uint32(header.AdversaryThreshold),
-			ChunkLength:        uint32(header.ChunkLength),
-			QuorumThreshold:    uint32(header.ConfirmationThreshold),
-			Ratelimit:          header.QuorumRate,
+			QuorumId:              uint32(header.QuorumID),
+			AdversaryThreshold:    uint32(header.AdversaryThreshold),
+			ChunkLength:           uint32(header.ChunkLength),
+			ConfirmationThreshold: uint32(header.ConfirmationThreshold),
+			Ratelimit:             header.QuorumRate,
 		}
 	}
 
