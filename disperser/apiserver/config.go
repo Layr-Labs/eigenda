@@ -39,7 +39,7 @@ type PerUserRateInfo struct {
 
 type Allowlist = map[string]map[core.QuorumID]PerUserRateInfo
 
-type Config struct {
+type RateConfig struct {
 	QuorumRateInfos map[core.QuorumID]QuorumRateInfo
 	ClientIPHeader  string
 	Allowlist       Allowlist
@@ -94,20 +94,20 @@ func CLIFlags(envPrefix string) []cli.Flag {
 	}
 }
 
-func ReadCLIConfig(c *cli.Context) (Config, error) {
+func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 
 	numQuorums := len(c.IntSlice(RegisteredQuorumFlagName))
 	if len(c.StringSlice(TotalUnauthBlobRateFlagName)) != numQuorums {
-		return Config{}, fmt.Errorf("number of total unauth blob rates does not match number of quorums")
+		return RateConfig{}, fmt.Errorf("number of total unauth blob rates does not match number of quorums")
 	}
 	if len(c.StringSlice(PerUserUnauthBlobRateFlagName)) != numQuorums {
-		return Config{}, fmt.Errorf("number of per user unauth blob intervals does not match number of quorums")
+		return RateConfig{}, fmt.Errorf("number of per user unauth blob intervals does not match number of quorums")
 	}
 	if len(c.IntSlice(TotalUnauthThroughputFlagName)) != numQuorums {
-		return Config{}, fmt.Errorf("number of total unauth throughput does not match number of quorums")
+		return RateConfig{}, fmt.Errorf("number of total unauth throughput does not match number of quorums")
 	}
 	if len(c.IntSlice(PerUserUnauthThroughputFlagName)) != numQuorums {
-		return Config{}, fmt.Errorf("number of per user unauth throughput does not match number of quorums")
+		return RateConfig{}, fmt.Errorf("number of per user unauth throughput does not match number of quorums")
 	}
 
 	quorumRateInfos := make(map[core.QuorumID]QuorumRateInfo)
@@ -115,11 +115,11 @@ func ReadCLIConfig(c *cli.Context) (Config, error) {
 
 		totalBlobRate, err := strconv.ParseFloat(c.StringSlice(TotalUnauthBlobRateFlagName)[ind], 64)
 		if err != nil {
-			return Config{}, err
+			return RateConfig{}, err
 		}
 		accountBlobRate, err := strconv.ParseFloat(c.StringSlice(PerUserUnauthBlobRateFlagName)[ind], 64)
 		if err != nil {
-			return Config{}, err
+			return RateConfig{}, err
 		}
 
 		quorumRateInfos[core.QuorumID(quorumID)] = QuorumRateInfo{
@@ -162,7 +162,7 @@ func ReadCLIConfig(c *cli.Context) (Config, error) {
 		}
 	}
 
-	return Config{
+	return RateConfig{
 		QuorumRateInfos: quorumRateInfos,
 		ClientIPHeader:  c.String(ClientIPHeaderFlagName),
 		Allowlist:       allowlist,

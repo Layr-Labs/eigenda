@@ -335,7 +335,7 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
 
-	rateConfig := apiserver.Config{
+	rateConfig := apiserver.RateConfig{
 		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
 			0: {
 				PerUserUnauthThroughput: 20 * 1024,

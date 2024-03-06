@@ -73,7 +73,7 @@ message DisperseBlobRequest {
 	// The data to be dispersed.
 	// The size of data must be <= 2MiB.
 	bytes data = 1;
-	// The quorums to which the blob will be sent, in addition to any required quorums. 
+	// The quorums to which the blob will be sent. 
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
 	repeated uint32 quorum_numbers = 2;
@@ -140,7 +140,7 @@ enum BlobStatus {
 	FAILED = 3;
 	// FINALIZED means that the block containing the blob's confirmation transaction has been finalized on Ethereum
 	FINALIZED = 4;
-	// INSUFFICIENT_SIGNATURES means that the quorum threshold for the blob was not met
+	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
 	// for at least one quorum.
 	INSUFFICIENT_SIGNATURES = 5;
 }
@@ -166,9 +166,12 @@ message BlobHeader {
 message BlobQuorumParam {
 	// The ID of the quorum.
 	uint32 quorum_number = 1;
-	// Same as SecurityParams.adversary_threshold.
+	// The max percentage of stake within the quorum that can be held by or delegated
+	// to adversarial operators. Currently, this and the next parameter are standardized
+	// across the quorum using values read from the EigenDA contracts.
 	uint32 adversary_threshold_percentage = 2;
-	// Same as SecurityParams.quorum_threshold.
+	// The min percentage of stake that must attest in order to consider
+	// the dispersal is successful.
 	uint32 confirmation_threshold_percentage = 3;
 	// The length of each chunk.
 	uint32 chunk_length = 4;

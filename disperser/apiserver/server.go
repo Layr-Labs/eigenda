@@ -40,7 +40,7 @@ type DispersalServer struct {
 	mu *sync.Mutex
 
 	serverConfig disperser.ServerConfig
-	config       Config
+	rateConfig   RateConfig
 
 	blobStore   disperser.BlobStore
 	tx          core.Transactor
@@ -64,9 +64,9 @@ func NewDispersalServer(
 	logger common.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
-	config Config,
+	rateConfig RateConfig,
 ) *DispersalServer {
-	for ip, rateInfoByQuorum := range config.Allowlist {
+	for ip, rateInfoByQuorum := range rateConfig.Allowlist {
 		for quorumID, rateInfo := range rateInfoByQuorum {
 			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
 		}
@@ -76,7 +76,7 @@ func NewDispersalServer(
 
 	return &DispersalServer{
 		serverConfig:  serverConfig,
-		config:        config,
+		rateConfig:    rateConfig,
 		blobStore:     store,
 		tx:            tx,
 		quorumCount:   0,
@@ -206,7 +206,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	blobSize := len(blob.Data)
 
-	origin, err := common.GetClientAddress(ctx, s.config.ClientIPHeader, 2, true)
+	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
@@ -258,7 +258,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 }
 
 func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
-	unauthRates, ok := s.config.QuorumRateInfos[quorumID]
+	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
 	if !ok {
 		return nil, "", fmt.Errorf("no configured rate exists for quorum %d", quorumID)
 	}
@@ -270,7 +270,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	// Check if the address is in the allowlist
 	if len(authenticatedAddress) > 0 {
-		quorumRates, ok := s.config.Allowlist[authenticatedAddress]
+		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
 		if ok {
 			rateInfo, ok := quorumRates[quorumID]
 			if ok {
@@ -290,7 +290,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	key := "ip:" + origin
 
-	for account, rateInfoByQuorum := range s.config.Allowlist {
+	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
 		if !strings.Contains(origin, account) {
 			continue
 		}
@@ -323,7 +323,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 
 	for i, param := range blob.RequestHeader.SecurityParams {
 
-		rates, ok := s.config.QuorumRateInfos[param.QuorumID]
+		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}

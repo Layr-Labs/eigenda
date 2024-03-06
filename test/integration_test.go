@@ -175,7 +175,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	ratelimiter := &commonmock.NoopRatelimiter{}
-	rateConfig := apiserver.Config{
+	rateConfig := apiserver.RateConfig{
 		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
 			0: {
 				PerUserUnauthThroughput: 0,

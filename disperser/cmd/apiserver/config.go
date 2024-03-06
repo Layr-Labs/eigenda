@@ -19,7 +19,7 @@ type Config struct {
 	LoggerConfig      logging.Config
 	MetricsConfig     disperser.MetricsConfig
 	RatelimiterConfig ratelimit.Config
-	RateConfig        apiserver.Config
+	RateConfig        apiserver.RateConfig
 	EnableRatelimiter bool
 	BucketTableName   string
 	BucketStoreSize   int
