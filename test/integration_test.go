@@ -182,7 +182,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 				TotalUnauthThroughput:   0,
 			},
 		},
-		TestMode: true,
 	}
 
 	serverConfig := disperser.ServerConfig{

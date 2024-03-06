@@ -373,7 +373,6 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 				},
 			},
 		},
-		TestMode: true,
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)

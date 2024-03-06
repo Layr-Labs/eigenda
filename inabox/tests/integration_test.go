@@ -59,13 +59,13 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []uint8{})
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []uint8{1})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []uint8{})
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []uint8{0, 1})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -131,17 +131,15 @@ var _ = Describe("Inabox Integration", func() {
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		retrieved, err := retrievalClient.RetrieveBlob(ctx,
+		_, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			0, // retrieve blob 1 from quorum 0, which should not be available
 		)
-		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
-
-		retrieved, err = retrievalClient.RetrieveBlob(ctx,
+		Expect(err).NotTo(BeNil())
+		retrieved, err := retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),

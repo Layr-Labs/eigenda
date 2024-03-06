@@ -35,8 +35,6 @@ const systemAccountKey = "system"
 
 const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
 
-const requiredQuorums = 2
-
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
 	mu *sync.Mutex
@@ -635,20 +633,6 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 			if quorumID >= s.quorumCount {
 				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, quorumID)
 			}
-		}
-	}
-
-	// Set first two quorums to be required
-	if !s.config.TestMode {
-		actualRequiredQuorums := uint8(requiredQuorums)
-		if s.quorumCount < requiredQuorums {
-			s.updateQuorumCount(ctx)
-		}
-		if s.quorumCount < requiredQuorums {
-			actualRequiredQuorums = s.quorumCount
-		}
-		for i := uint8(0); i < actualRequiredQuorums; i++ {
-			seenQuorums[i] = struct{}{}
 		}
 	}
 

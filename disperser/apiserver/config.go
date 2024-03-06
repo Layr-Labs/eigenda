@@ -19,7 +19,6 @@ const (
 	PerUserUnauthBlobRateFlagName   = "auth.per-user-unauth-blob-rate"
 	ClientIPHeaderFlagName          = "auth.client-ip-header"
 	AllowlistFlagName               = "auth.allowlist"
-	TestModeFlagName                = "test-mode"
 
 	// We allow the user to specify the blob rate in blobs/sec, but internally we use blobs/sec * 1e6 (i.e. blobs/microsec).
 	// This is because the rate limiter takes an integer rate.
@@ -44,7 +43,6 @@ type Config struct {
 	QuorumRateInfos map[core.QuorumID]QuorumRateInfo
 	ClientIPHeader  string
 	Allowlist       Allowlist
-	TestMode        bool
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -92,11 +90,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST"),
 			Required: false,
 			Value:    &cli.StringSlice{},
-		},
-		cli.BoolFlag{
-			Name:     TestModeFlagName,
-			Usage:    "Enable test mode; in test mode, we do not force any quorum to be used",
-			Required: false,
 		},
 	}
 }
@@ -173,6 +166,5 @@ func ReadCLIConfig(c *cli.Context) (Config, error) {
 		QuorumRateInfos: quorumRateInfos,
 		ClientIPHeader:  c.String(ClientIPHeaderFlagName),
 		Allowlist:       allowlist,
-		TestMode:        c.Bool(TestModeFlagName),
 	}, nil
 }
