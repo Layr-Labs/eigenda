@@ -24,7 +24,6 @@ const (
 	FailReasonInvalidSignature            FailReason = "invalid_signature"              // Invalid signature: operator's signature is wrong
 	FailReasonProcessChurnRequestFailed   FailReason = "failed_process_churn_request"   // Failed to process churn request
 	FailReasonInvalidRequest              FailReason = "invalid_request"                // Invalid request: request is malformed
-
 )
 
 // Note: statusCodeMap must be maintained in sync with failure reason constants.
@@ -88,6 +87,15 @@ func NewMetrics(httpPort string, logger common.Logger) *Metrics {
 // ObserveLatency observes the latency of a stage in 'stage
 func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
 	g.Latency.WithLabelValues(method).Observe(latencyMs)
+}
+
+// IncrementRequestNum increments the number of successful requests
+func (g *Metrics) IncrementRequestNum(method string) {
+	g.NumRequests.With(prometheus.Labels{
+		"status": "total",
+		"method": method,
+		"reason": "",
+	}).Inc()
 }
 
 // IncrementSuccessfulRequestNum increments the number of successful requests

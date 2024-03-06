@@ -55,6 +55,7 @@ func (s *Server) Start(metricsConfig MetricsConfig) error {
 }
 
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
+	s.metrics.IncrementRequestNum("Churn")
 
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
