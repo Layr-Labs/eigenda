@@ -198,10 +198,10 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
 	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:                  batchRoot,
-		QuorumNumbers:                    batchHeaderProto.GetQuorumNumbers(),
-		ConfirmationThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
-		ReferenceBlockNumber:             batchHeaderProto.GetReferenceBlockNumber(),
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
+		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
+		ReferenceBlockNumber:  batchHeaderProto.GetReferenceBlockNumber(),
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())

@@ -465,14 +465,14 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		nonSignerPubkeys[i] = pubKeyG1ToBN254G1Point(signature)
 	}
 
-	confirmationThresholdPercentages := quorumParamsToThresholdPercentages(quorums)
+	signedStakeForQuorums := serializeSignedStakeForQuorums(quorums)
 	batchH := eigendasrvmg.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:                  batchHeader.BatchRoot,
-		QuorumNumbers:                    quorumNumbers,
-		ConfirmationThresholdPercentages: confirmationThresholdPercentages,
-		ReferenceBlockNumber:             uint32(batchHeader.ReferenceBlockNumber),
+		BlobHeadersRoot:       batchHeader.BatchRoot,
+		QuorumNumbers:         quorumNumbers,
+		SignedStakeForQuorums: signedStakeForQuorums,
+		ReferenceBlockNumber:  uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.ConfirmationThresholdPercentages))
+	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -787,7 +787,7 @@ func quorumParamsToQuorumNumbers(quorumParams map[core.QuorumID]*core.QuorumResu
 	return quorumNumbers
 }
 
-func quorumParamsToThresholdPercentages(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
+func serializeSignedStakeForQuorums(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
 	thresholdPercentages := make([]byte, len(quorumParams))
 	quorums := make([]uint8, len(quorumParams))
 	i := 0

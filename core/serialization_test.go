@@ -41,10 +41,10 @@ func TestBatchHeaderEncoding(t *testing.T) {
 	assert.Equal(t, hexutil.Encode(hash[:]), reducedBatchHeaderHash)
 
 	onchainBatchHeader := binding.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:                  batchRoot,
-		QuorumNumbers:                    []byte{0},
-		ConfirmationThresholdPercentages: []byte{100},
-		ReferenceBlockNumber:             1,
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         []byte{0},
+		SignedStakeForQuorums: []byte{100},
+		ReferenceBlockNumber:  1,
 	}
 	hash, err = core.HashBatchHeader(onchainBatchHeader)
 	assert.NoError(t, err)
