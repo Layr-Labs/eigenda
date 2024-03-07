@@ -74,17 +74,17 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 	return availabilityStatuses, nil
 }
 
-func NewEigenDAServiceHealthCheck(creator GRPCConn, disperserHostName, churnerHostName string) EigenDAServiceChecker {
+func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, churnerHostName string) EigenDAServiceChecker {
 
 	// Create Pre-configured connections to the services
 	// Saves from having to creae new connection evertytime
-	disperserConn, err := creator.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
+	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
 
 	if err != nil {
 		return nil
 	}
 
-	churnerConn, err := creator.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
+	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
 
 	if err != nil {
 		return nil
