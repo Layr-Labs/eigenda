@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
@@ -32,6 +33,10 @@ const (
 )
 
 var errNotFound = errors.New("not found")
+
+type EigenDAServiceChecker interface {
+	CheckHealth(ctx context.Context, serviceName string) (*grpc_health_v1.HealthCheckResponse, error)
+}
 
 type (
 	BlobMetadataResponse struct {
@@ -111,11 +116,6 @@ type (
 		Error string `json:"error"`
 	}
 
-	// ClientPool represents a pool of gRPC client connections
-	ClientPool struct {
-		clients chan *grpc.ClientConn
-	}
-
 	server struct {
 		serverMode     string
 		socketAddr     string
@@ -127,10 +127,10 @@ type (
 		transactor     core.Transactor
 		chainState     core.ChainState
 
-		metrics           *Metrics
-		disperserHostName string
-		churnerHostName   string
-		clientPools       map[string]*ClientPool
+		metrics               *Metrics
+		disperserHostName     string
+		churnerHostName       string
+		eigenDAServiceChecker EigenDAServiceChecker
 	}
 )
 
@@ -143,20 +143,28 @@ func NewServer(
 	chainState core.ChainState,
 	logger common.Logger,
 	metrics *Metrics,
+	eigenDAServiceChecker EigenDAServiceChecker,
+
 ) *server {
+	// Initialize the health checker service for EigenDA services
+	if eigenDAServiceChecker == nil {
+		eigenDAServiceChecker = NewEigenDAServiceHealthCheck(config.DisperserHostname, config.ChurnerHostname)
+	}
+
 	return &server{
-		logger:            logger,
-		serverMode:        config.ServerMode,
-		socketAddr:        config.SocketAddr,
-		allowOrigins:      config.AllowOrigins,
-		blobstore:         blobstore,
-		promClient:        promClient,
-		subgraphClient:    subgraphClient,
-		transactor:        transactor,
-		chainState:        chainState,
-		metrics:           metrics,
-		disperserHostName: config.DisperserHostname,
-		churnerHostName:   config.ChurnerHostname,
+		logger:                logger,
+		serverMode:            config.ServerMode,
+		socketAddr:            config.SocketAddr,
+		allowOrigins:          config.AllowOrigins,
+		blobstore:             blobstore,
+		promClient:            promClient,
+		subgraphClient:        subgraphClient,
+		transactor:            transactor,
+		chainState:            chainState,
+		metrics:               metrics,
+		disperserHostName:     config.DisperserHostname,
+		churnerHostName:       config.ChurnerHostname,
+		eigenDAServiceChecker: eigenDAServiceChecker,
 	}
 }
 
@@ -164,14 +172,6 @@ func (s *server) Start() error {
 	if s.serverMode == gin.ReleaseMode {
 		// optimize performance and disable debug features.
 		gin.SetMode(gin.ReleaseMode)
-	}
-
-	// Initialize gRPC client pools for Disperser and Churner
-	// Creates pre-warmed connections to the gRPC servers
-	s.clientPools = make(map[string]*ClientPool)
-	err := s.InitGRPCClientPools(maxGRPCClientPoolSize)
-	if err != nil {
-		s.logger.Error("Failed to initialize gRPC client pools", "error", err)
 	}
 
 	router := gin.New()
@@ -532,6 +532,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	} else if serviceName == "" {
 		services = append(services, "Disperser", "Churner")
 	}
+	fmt.Print("Getting service availability")
 
 	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
 	if err != nil {

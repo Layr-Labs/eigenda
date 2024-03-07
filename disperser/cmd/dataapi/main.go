@@ -103,6 +103,7 @@ func RunDataApi(ctx *cli.Context) error {
 			chainState,
 			logger,
 			metrics,
+			nil,
 		)
 	)
 
