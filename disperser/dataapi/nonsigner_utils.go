@@ -1,8 +1,19 @@
 package dataapi
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
-// Representing an interval [StartBlock, EndBlock] (inclusive).
+// NumBatchesAtBlock represents the number of batches at current block, as well as
+// accumulated number of batches from a start block to the current block.
+type NumBatchesAtBlock struct {
+	BlockNumber uint32
+	NumBatches  int
+	AccuBatches int
+}
+
+// BlockInterval represents an interval [StartBlock, EndBlock] (inclusive).
 type BlockInterval struct {
 	StartBlock uint32
 	EndBlock   uint32
@@ -44,7 +55,7 @@ func (oqi OperatorQuorumIntervals) GetQuorums(operatorId string, blockNum uint32
 //     Requires: startBlock <= endBlock.
 //   - operatorInitialQuorum: the initial quorums at startBlock that operators were
 //     registered in.
-//     Requires: operatorInitialQuorum[op] is non-empty for each operator "op".
+//     Requires: operatorInitialQuorum contains all operators of interest (caller to ensure).
 //   - addedToQuorum, removedFromQuorum: a sequence of events that added/removed operators
 //     to/from quorums.
 //     Requires:
@@ -66,9 +77,6 @@ func CreateOperatorQuorumIntervals(
 	addedToQuorumErr := "cannot add operator %s to quorum %d at block number %d, " +
 		"the operator is already in the quorum since block number %d"
 	for op, initialQuorums := range operatorInitialQuorum {
-		if len(initialQuorums) == 0 {
-			return nil, fmt.Errorf("operator %s must be in at least one quorum at block %d", op, startBlock)
-		}
 		operatorQuorumIntervals[op] = make(map[uint8][]BlockInterval)
 		openQuorum := make(map[uint8]uint32)
 		for _, q := range initialQuorums {
@@ -179,4 +187,85 @@ func validateQuorumEvents(added []*OperatorQuorum, removed []*OperatorQuorum, st
 		return err
 	}
 	return validate(removed)
+}
+
+// ComputeNumBatches returns the number of batches in the block interval [startBlock, endBlock].
+func ComputeNumBatches(intervals []*NumBatchesAtBlock, startBlock, endBlock uint32) int {
+	start := getLowerBoundIndex(intervals, startBlock)
+	end := getUpperBoundIndex(intervals, endBlock)
+	fmt.Println("XXX start:", start, "end:", end, "startBlock:", startBlock, "endBlock:", endBlock)
+	num := 0
+	if end > 0 {
+		num = intervals[end-1].AccuBatches
+	}
+	if start > 0 {
+		num = num - intervals[start-1].AccuBatches
+	}
+	return num
+}
+
+// CreatQuorumBatches returns quorumBatches, where quorumBatches[q] is a list of
+// NumBatchesAtBlocks in ascending by block number.
+func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8][]*NumBatchesAtBlock {
+	quorumBatchMap := make(map[uint8]map[uint32]int)
+	for _, batch := range batches {
+		for _, q := range batch.QuorumNumbers {
+			if _, ok := quorumBatchMap[q]; !ok {
+				quorumBatchMap[q] = make(map[uint32]int)
+			}
+			quorumBatchMap[q][batch.ReferenceBlockNumber]++
+		}
+	}
+	quorumBatches := make(map[uint8][]*NumBatchesAtBlock)
+	for q, s := range quorumBatchMap {
+		result := quorumBatches[q]
+		for block, num := range s {
+			element := &NumBatchesAtBlock{
+				BlockNumber: block,
+				NumBatches:  num,
+				AccuBatches: num,
+			}
+			result = append(result, element)
+		}
+		sort.SliceStable(result, func(i, j int) bool {
+			// note: since it's created from a map with block number as key, all block
+			// numbers are different.
+			return result[i].BlockNumber < result[j].BlockNumber
+		})
+		for i := 1; i < len(result); i++ {
+			result[i].AccuBatches = result[i].NumBatches + result[i-1].AccuBatches
+		}
+		quorumBatches[q] = result
+	}
+	return quorumBatches
+}
+
+// getLowerBoundIndex returns the index of the first element intervals[i] where the
+// intervals[i].BlockNumber is no less than the given "blockNum".
+func getLowerBoundIndex(intervals []*NumBatchesAtBlock, blockNum uint32) int {
+	low, high := 0, len(intervals)-1
+	for low <= high {
+		mid := low + (high-low)/2
+		if intervals[mid].BlockNumber < blockNum {
+			low = mid + 1
+		} else {
+			high = mid - 1
+		}
+	}
+	return high + 1
+}
+
+// getUpperBoundIndex returns the index of the first element intervals[i] where the
+// intervals[i].BlockNumber is greater than the given "blockNum".
+func getUpperBoundIndex(intervals []*NumBatchesAtBlock, blockNum uint32) int {
+	low, high := 0, len(intervals)-1
+	for low <= high {
+		mid := low + (high-low)/2
+		if intervals[mid].BlockNumber <= blockNum {
+			low = mid + 1
+		} else {
+			high = mid - 1
+		}
+	}
+	return high + 1
 }
