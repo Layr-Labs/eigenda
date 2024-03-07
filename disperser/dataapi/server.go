@@ -27,9 +27,8 @@ import (
 )
 
 const (
-	maxWorkerPoolLimit    = 10
-	maxQueryBatchesLimit  = 2
-	maxGRPCClientPoolSize = 2
+	maxWorkerPoolLimit   = 10
+	maxQueryBatchesLimit = 2
 )
 
 var errNotFound = errors.New("not found")
