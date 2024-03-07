@@ -153,6 +153,22 @@ TRACE[10-12|22:02:13.376] [batcher] AggregateSignatures took       duration=10.6
 TRACE[10-12|22:02:13.376] [batcher] Confirming batch...            caller=batcher.go:198
 ```
 
+Validate the blob was stored in a batch:
+
+```
+# Update the value of INSERT_REQUEST_ID with the result of your disperse call
+
+grpcurl -plaintext -d '{"request_id": "INSERT_REQUEST_ID"}' localhost:32003 disperser.Disperser/GetBlobStatus
+```
+
+Retrieve a blob:
+
+```
+# Note the value for batch_header_hash can be obtained from the result of your
+# call to GetBlobStatus via info.blob_verification_proof.batch_metadata.batch_header_hash.
+
+grpcurl -plaintext ./api/proto/disperser/disperser.proto -d '{"batch_header_hash": "INSERT_VALUE", "blob_index":"0"}' localhost:32003 disperser.Disperser/RetrieveBlob
+```
 ### Cleanup
 
 If you followed [Option 1](#option-1-simplest) above, you can run the following command in order to clean up the test infra:
