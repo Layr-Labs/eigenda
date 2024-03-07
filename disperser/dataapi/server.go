@@ -150,7 +150,7 @@ func NewServer(
 ) *server {
 	// Initialize the health checker service for EigenDA services
 	if grpcConn == nil {
-		grpcConn = &StandardGRPCDialer{}
+		grpcConn = &GRPCDialerSkipTLS{}
 	}
 
 	if eigenDAServiceChecker == nil {
@@ -564,6 +564,11 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	for _, status := range availabilityStatuses {
 		if status.ServiceStatus == "NOT_SERVING" {
 			availabilityStatus = http.StatusServiceUnavailable
+			break
+		}
+
+		if status.ServiceStatus == "UNKNOWN" {
+			availabilityStatus = http.StatusInternalServerError
 			break
 		}
 

@@ -132,7 +132,11 @@ func RunDataApi(ctx *cli.Context) error {
 	// Block until a signal is received.
 	<-quit
 	logger.Info("Shutting down server...")
-	server.Shutdown()
+	err = server.Shutdown()
+
+	if err != nil {
+		logger.Errorf("Failed to shutdown server: %v", err)
+	}
 
 	return server.Start()
 }
