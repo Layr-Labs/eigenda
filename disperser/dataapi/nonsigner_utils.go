@@ -193,7 +193,6 @@ func validateQuorumEvents(added []*OperatorQuorum, removed []*OperatorQuorum, st
 func ComputeNumBatches(intervals []*NumBatchesAtBlock, startBlock, endBlock uint32) int {
 	start := getLowerBoundIndex(intervals, startBlock)
 	end := getUpperBoundIndex(intervals, endBlock)
-	fmt.Println("XXX start:", start, "end:", end, "startBlock:", startBlock, "endBlock:", endBlock)
 	num := 0
 	if end > 0 {
 		num = intervals[end-1].AccuBatches
@@ -205,7 +204,7 @@ func ComputeNumBatches(intervals []*NumBatchesAtBlock, startBlock, endBlock uint
 }
 
 // CreatQuorumBatches returns quorumBatches, where quorumBatches[q] is a list of
-// NumBatchesAtBlocks in ascending by block number.
+// NumBatchesAtBlocks in ascending order by block number.
 func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8][]*NumBatchesAtBlock {
 	quorumBatchMap := make(map[uint8]map[uint32]int)
 	for _, batch := range batches {
