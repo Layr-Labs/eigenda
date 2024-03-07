@@ -248,7 +248,12 @@ func (s *server) Start() error {
 func (s *server) Shutdown() error {
 
 	if s.eigenDAServiceChecker != nil {
-		s.eigenDAServiceChecker.CloseConnections()
+		err := s.eigenDAServiceChecker.CloseConnections()
+
+		if err != nil {
+			s.logger.Error("Failed to close connections", "error", err)
+			return err
+		}
 	}
 
 	return nil
