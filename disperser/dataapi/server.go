@@ -72,6 +72,7 @@ type (
 
 	OperatorNonsigningPercentageMetrics struct {
 		OperatorId           string  `json:"operator_id"`
+		QuorumId             uint8   `json:"quorum_id"`
 		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 		TotalBatches         int     `json:"total_batches"`
 		Percentage           float64 `json:"percentage"`
@@ -410,7 +411,8 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	if err != nil || interval == 0 {
 		interval = 3600
 	}
-	metric, err := s.getOperatorNonsigningPercentage(c.Request.Context(), interval)
+	// metric, err := s.getOperatorNonsigningPercentage(c.Request.Context(), interval)
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), interval)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)

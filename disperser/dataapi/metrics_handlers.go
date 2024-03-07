@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
-	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -145,60 +143,60 @@ func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]N
 	return &nonSignersObj, nil
 }
 
-func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSeconds int64) (*OperatorsNonsigningPercentage, error) {
-	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(nonSigners) == 0 {
-		return &OperatorsNonsigningPercentage{}, nil
-	}
-
-	pastBlockTimestamp := uint64(time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix())
-	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp, nonSigners)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(numBatchesByOperators) == 0 {
-		return &OperatorsNonsigningPercentage{}, nil
-	}
-
-	operators := make([]*OperatorNonsigningPercentageMetrics, 0)
-	for operatorId, totalUnsignedBatches := range nonSigners {
-		if totalUnsignedBatches > 0 {
-			numBatches := numBatchesByOperators[operatorId]
-			if numBatches == 0 {
-				continue
-			}
-			ps := fmt.Sprintf("%.2f", (float64(totalUnsignedBatches)/float64(numBatches))*100)
-			pf, err := strconv.ParseFloat(ps, 64)
-			if err != nil {
-				return nil, err
-			}
-			operatorMetric := OperatorNonsigningPercentageMetrics{
-				OperatorId:           operatorId,
-				TotalUnsignedBatches: totalUnsignedBatches,
-				TotalBatches:         numBatches,
-				Percentage:           pf,
-			}
-			operators = append(operators, &operatorMetric)
-		}
-	}
-
-	// Sort by descending order of nonsigning rate.
-	sort.Slice(operators, func(i, j int) bool {
-		if operators[i].Percentage == operators[j].Percentage {
-			return operators[i].OperatorId < operators[j].OperatorId
-		}
-		return operators[i].Percentage > operators[j].Percentage
-	})
-
-	return &OperatorsNonsigningPercentage{
-		Meta: Meta{
-			Size: len(operators),
-		},
-		Data: operators,
-	}, nil
-}
+// func (s *server) getOperatorNonsigningPercentage(ctx context.Context, intervalSeconds int64) (*OperatorsNonsigningPercentage, error) {
+// 	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	if len(nonSigners) == 0 {
+// 		return &OperatorsNonsigningPercentage{}, nil
+// 	}
+//
+// 	pastBlockTimestamp := uint64(time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix())
+// 	numBatchesByOperators, err := s.subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx, pastBlockTimestamp, nonSigners)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	if len(numBatchesByOperators) == 0 {
+// 		return &OperatorsNonsigningPercentage{}, nil
+// 	}
+//
+// 	operators := make([]*OperatorNonsigningPercentageMetrics, 0)
+// 	for operatorId, totalUnsignedBatches := range nonSigners {
+// 		if totalUnsignedBatches > 0 {
+// 			numBatches := numBatchesByOperators[operatorId]
+// 			if numBatches == 0 {
+// 				continue
+// 			}
+// 			ps := fmt.Sprintf("%.2f", (float64(totalUnsignedBatches)/float64(numBatches))*100)
+// 			pf, err := strconv.ParseFloat(ps, 64)
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 			operatorMetric := OperatorNonsigningPercentageMetrics{
+// 				OperatorId:           operatorId,
+// 				TotalUnsignedBatches: totalUnsignedBatches,
+// 				TotalBatches:         numBatches,
+// 				Percentage:           pf,
+// 			}
+// 			operators = append(operators, &operatorMetric)
+// 		}
+// 	}
+//
+// 	// Sort by descending order of nonsigning rate.
+// 	sort.Slice(operators, func(i, j int) bool {
+// 		if operators[i].Percentage == operators[j].Percentage {
+// 			return operators[i].OperatorId < operators[j].OperatorId
+// 		}
+// 		return operators[i].Percentage > operators[j].Percentage
+// 	})
+//
+// 	return &OperatorsNonsigningPercentage{
+// 		Meta: Meta{
+// 			Size: len(operators),
+// 		},
+// 		Data: operators,
+// 	}, nil
+// }
