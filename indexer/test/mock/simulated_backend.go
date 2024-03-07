@@ -8,10 +8,10 @@ import (
 
 	cm "github.com/Layr-Labs/eigenda/common"
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -27,7 +27,7 @@ type (
 		Commit() common.Hash
 		EstimateGas(ctx context.Context, call ethereum.CallMsg) (uint64, error)
 		FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error)
-		Fork(ctx context.Context, parent common.Hash) error
+		Fork(parent common.Hash) error
 		HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 		HeaderByNumber(ctx context.Context, block *big.Int) (*types.Header, error)
 		NonceAt(ctx context.Context, contract common.Address, blockNumber *big.Int) (uint64, error)
@@ -50,7 +50,8 @@ type (
 	}
 
 	simulatedBackend struct {
-		*backends.SimulatedBackend
+		*simulated.Backend
+		simulated.Client
 	}
 )
 

@@ -50,7 +50,7 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	logger := logging.NewSlogJsonLogger(config.LoggingConfig.OutputWriter, &config.LoggingConfig.HandlerOpts)
+	logger := logging.NewSlogTextLogger(config.LoggingConfig.OutputWriter, &config.LoggingConfig.HandlerOpts)
 	pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
 
 	// Create the node.
