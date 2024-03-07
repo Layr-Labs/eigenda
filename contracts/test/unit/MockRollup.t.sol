@@ -146,9 +146,9 @@ contract MockRollupTest is BLSMockAVSDeployer {
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
-        blobVerificationProof.quorumThresholdIndexes = new bytes(batchHeader.quorumNumbers.length);
+        blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
-            blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
         return (blobHeader[1], blobVerificationProof);

@@ -20,7 +20,7 @@ library EigenDARollupUtils {
         uint8 blobIndex;
         IEigenDAServiceManager.BatchMetadata batchMetadata;
         bytes inclusionProof;
-        bytes quorumThresholdIndexes;
+        bytes quorumIndices;
     }
     
     /**
@@ -53,7 +53,7 @@ library EigenDARollupUtils {
         // require that the security param in each blob is met
         for (uint i = 0; i < blobHeader.quorumBlobParams.length; i++) {
             // make sure that the quorumIndex matches the given quorumNumber
-            require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) == blobHeader.quorumBlobParams[i].quorumNumber, 
+            require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProof.quorumIndices[i])]) == blobHeader.quorumBlobParams[i].quorumNumber, 
                 "EigenDARollupUtils.verifyBlob: quorumNumber does not match"
             );
 
@@ -72,7 +72,7 @@ library EigenDARollupUtils {
             }
 
             // make sure that the stake signed for is greater than the given confirmationThresholdPercentage
-            require(uint8(blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
+            require(uint8(blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProof.quorumIndices[i])]) 
                 >= blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
                 "EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met"
             );

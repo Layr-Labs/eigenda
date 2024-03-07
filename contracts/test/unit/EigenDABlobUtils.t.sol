@@ -103,9 +103,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
-        blobVerificationProof.quorumThresholdIndexes = new bytes(batchHeader.quorumNumbers.length);
+        blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
-            blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
         uint256 gasBefore = gasleft();
@@ -189,9 +189,9 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
-        blobVerificationProof.quorumThresholdIndexes = new bytes(batchHeader.quorumNumbers.length);
+        blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
-            blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
         uint256 gasBefore = gasleft();
@@ -235,10 +235,10 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
-        blobVerificationProof.quorumThresholdIndexes = new bytes(batchHeader.quorumNumbers.length);
+        blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
             // implant the incorrect quorumNumbers here
-            blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
         }
 
         cheats.expectRevert("EigenDARollupUtils.verifyBlob: quorumNumber does not match");
@@ -280,10 +280,10 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
-        blobVerificationProof.quorumThresholdIndexes = new bytes(batchHeader.quorumNumbers.length);
+        blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
         for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
             // implant the incorrect quorumNumbers here
-            blobVerificationProof.quorumThresholdIndexes[i] = bytes1(uint8(i));
+            blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
         cheats.expectRevert("EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met");
