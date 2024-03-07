@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -104,6 +106,7 @@ func RunDataApi(ctx *cli.Context) error {
 			logger,
 			metrics,
 			nil,
+			nil,
 		)
 	)
 
@@ -113,6 +116,23 @@ func RunDataApi(ctx *cli.Context) error {
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
 	}
+
+	// Setup channel to listen for termination signals
+	quit := make(chan os.Signal, 1)
+	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Run server in a separate goroutine so that it doesn't block.
+	go func() {
+		if err := server.Start(); err != nil {
+			logger.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Block until a signal is received.
+	<-quit
+	logger.Info("Shutting down server...")
+	server.Shutdown()
 
 	return server.Start()
 }

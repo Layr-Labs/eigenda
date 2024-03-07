@@ -34,7 +34,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/goleak"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
@@ -56,7 +55,7 @@ var (
 
 	mockTx                          = &coremock.MockTransactor{}
 	mockChainState, _               = coremock.MakeChainDataMock(core.OperatorIndex(1))
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
@@ -73,6 +72,16 @@ var (
 
 type MockSubgraphClient struct {
 	mock.Mock
+}
+
+type MockGRPConn struct{}
+
+func (mc *MockGRPConn) Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	// Here, return a mock connection. How you implement this depends on your testing framework
+	// and what aspects of the gRPC connection you wish to mock.
+	// For a simple approach, you might not even need to return a real *grpc.ClientConn
+	// but rather a mock or stub that satisfies the interface.
+	return &grpc.ClientConn{}, nil // Simplified, consider using a more sophisticated mock.
 }
 
 type MockHealthCheckService struct {
@@ -92,6 +101,11 @@ func (m *MockHealthCheckService) CheckHealth(ctx context.Context, serviceName st
 		return nil, fmt.Errorf("unsupported service: %s", serviceName)
 	}
 	return response, nil
+}
+
+func (m *MockHealthCheckService) CloseConnections() error {
+	// Close any open connections or resources
+	return nil
 }
 
 func (m *MockHealthCheckService) AddResponse(serviceName string, response *grpc_health_v1.HealthCheckResponse) {
@@ -344,7 +358,7 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfoNoSocketInfo, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -393,7 +407,7 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfoNoSocketInfo, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -461,7 +475,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
 
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -506,7 +520,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *tes
 
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -562,7 +576,7 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -627,7 +641,7 @@ func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
@@ -680,7 +694,7 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -738,7 +752,7 @@ func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -780,7 +794,7 @@ func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
@@ -826,7 +840,7 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -884,7 +898,7 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 
@@ -940,7 +954,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -1007,7 +1021,7 @@ func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -1082,7 +1096,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo3, nil).Once()
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, nil)
 
 	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 
@@ -1133,22 +1147,8 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 }
 
 func TestGetServiceAvailability(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
 	r := setUpRouter()
 
-	var wg sync.WaitGroup
-	serviceNames := []string{"Disperser", "Churner"}
-	hosts := []string{"localhost:32007", "localhost:32009"} // Example DNS names for different services
-	cleanupFuncs := make([]func(), 0, len(hosts))
-
-	for i, host := range hosts {
-		wg.Add(1)
-		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
-	}
-	wg.Wait() // Wait for servers to start
 	mockHealthCheckService := NewMockHealthCheckService()
 	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
@@ -1158,14 +1158,7 @@ func TestGetServiceAvailability(t *testing.T) {
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
 	})
 
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), mockHealthCheckService)
-
-	// Initialize the gRPC client pools
-	// maxGRPCClientPoolSize := 5
-	// if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
-	// 	t.Fatalf("Failed to initialize gRPC client pools: %v", err)
-	// }
-
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, mockHealthCheckService)
 	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
@@ -1195,41 +1188,20 @@ func TestGetServiceAvailability(t *testing.T) {
 
 	assert.Equal(t, "Churner", service2Data.ServiceName)
 	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), service2Data.ServiceStatus)
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
-	}
 }
 
 func TestGetServiceAvailability_QueryDisperser(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
 	r := setUpRouter()
-
-	var wg sync.WaitGroup
-	serviceNames := []string{"Disperser", "Churner"}
-	hosts := []string{"localhost:32007", "localhost:32009"}
-
-	cleanupFuncs := make([]func(), 0, len(hosts))
-	for i, host := range hosts {
-		wg.Add(1)
-		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
-	}
-	wg.Wait() // Wait for servers to start
 
 	mockHealthCheckService := NewMockHealthCheckService()
 	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
 	})
-	// Assuming "Churner" service is also expected to be SERVING for this test
 	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
 	})
 
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), mockHealthCheckService)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, mockHealthCheckService)
 
 	// Initialize the gRPC client pools
 	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
@@ -1258,30 +1230,11 @@ func TestGetServiceAvailability_QueryDisperser(t *testing.T) {
 	serviceData := response.Data[0]
 	assert.Equal(t, "Disperser", serviceData.ServiceName)
 	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
-	}
 }
 
 func TestGetServiceAvailability_QueryInvalidService(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
 	r := setUpRouter()
 
-	var wg sync.WaitGroup
-	serviceNames := []string{"Disperser", "Churner"}
-	hosts := []string{"localhost:32007", "localhost:32009"}
-
-	cleanupFuncs := make([]func(), 0, len(hosts))
-	for i, host := range hosts {
-		wg.Add(1)
-		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
-	}
-	wg.Wait() // Wait for servers to start
 	mockHealthCheckService := NewMockHealthCheckService()
 	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
@@ -1290,13 +1243,8 @@ func TestGetServiceAvailability_QueryInvalidService(t *testing.T) {
 	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), mockHealthCheckService)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, mockHealthCheckService)
 
-	// Initialize the gRPC client pools
-	// maxGRPCClientPoolSize := 5
-	// if err := testDataApiServer.InitGRPCClientPools(maxGRPCClientPoolSize); err != nil {
-	// 	t.Fatalf("Failed to initialize gRPC client pools: %v", err)
-	// }
 	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
 	w := httptest.NewRecorder()
@@ -1317,30 +1265,10 @@ func TestGetServiceAvailability_QueryInvalidService(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 0, response.Meta.Size)
 	assert.Equal(t, 0, len(response.Data))
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
-	}
 }
 
 func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
 	r := setUpRouter()
-
-	var wg sync.WaitGroup
-	serviceNames := []string{"Disperser", "Churner"}
-	hosts := []string{"localhost:32007", "localhost:32009"}
-
-	cleanupFuncs := make([]func(), 0, len(hosts))
-	for i, host := range hosts {
-		wg.Add(1)
-		cleanup := startGRPCServerWithError(host, serviceNames[i], &wg)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
-	}
-	wg.Wait() // Wait for servers to start
 
 	mockHealthCheckService := NewMockHealthCheckService()
 	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
@@ -1350,7 +1278,7 @@ func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
 	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_NOT_SERVING,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), mockHealthCheckService)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, mockHealthCheckService)
 
 	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
@@ -1376,31 +1304,10 @@ func TestGetServiceAvailability_HealthCheckError(t *testing.T) {
 	serviceData := response.Data[0]
 	assert.Equal(t, "Disperser", serviceData.ServiceName)
 	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING.String(), serviceData.ServiceStatus)
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
-	}
 }
 
 func TestGetServiceAvailability_HealthyUnHealthyService(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
 	r := setUpRouter()
-
-	var wg sync.WaitGroup
-	serviceNames := []string{"Disperser", "Churner"}
-	hosts := []string{"localhost:32007", "localhost:32009"}
-
-	cleanupFuncs := make([]func(), 0, len(hosts))
-	wg.Add(1)
-	cleanup1 := startGRPCServerWithHealthCheck(hosts[0], serviceNames[0], &wg)
-	cleanupFuncs = append(cleanupFuncs, cleanup1)
-	wg.Add(1)
-	cleanup2 := startGRPCServerWithError(hosts[1], serviceNames[1], &wg)
-	cleanupFuncs = append(cleanupFuncs, cleanup2)
-	wg.Wait() // Wait for servers to start
 	mockHealthCheckService := NewMockHealthCheckService()
 	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_NOT_SERVING,
@@ -1409,7 +1316,7 @@ func TestGetServiceAvailability_HealthyUnHealthyService(t *testing.T) {
 	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_NOT_SERVING,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), mockHealthCheckService)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, mockHealthCheckService)
 
 	// Initialize the gRPC client pools
 	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
@@ -1441,30 +1348,11 @@ func TestGetServiceAvailability_HealthyUnHealthyService(t *testing.T) {
 
 	assert.Equal(t, "Churner", service2Data.ServiceName)
 	assert.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING.String(), service2Data.ServiceStatus)
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
-	}
 }
 
 func TestGetServiceAvailability_QueryDisperser_MultipleRequests(t *testing.T) {
-	// TODO: Identify which GoLeak is causing the test to fail
-	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run"))
-
 	r := setUpRouter()
 
-	var wg sync.WaitGroup
-	serviceNames := []string{"Disperser", "Churner"}
-	hosts := []string{"localhost:32007", "localhost:32009"}
-
-	cleanupFuncs := make([]func(), 0, len(hosts))
-	for i, host := range hosts {
-		wg.Add(1)
-		cleanup := startGRPCServerWithHealthCheck(host, serviceNames[i], &wg)
-		cleanupFuncs = append(cleanupFuncs, cleanup)
-	}
-	wg.Wait() // Wait for servers to start
 	mockHealthCheckService := NewMockHealthCheckService()
 	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
@@ -1473,9 +1361,7 @@ func TestGetServiceAvailability_QueryDisperser_MultipleRequests(t *testing.T) {
 	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
 		Status: grpc_health_v1.HealthCheckResponse_SERVING,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), mockHealthCheckService)
-
-	// Initialize the gRPC client pools
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{}), mockTx, mockChainState, &commock.Logger{}, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPConn{}, mockHealthCheckService)
 
 	r.GET("/v1/eigenda/service-availability", testDataApiServer.GetEigenDAServiceAvailability)
 
@@ -1499,11 +1385,6 @@ func TestGetServiceAvailability_QueryDisperser_MultipleRequests(t *testing.T) {
 	// Process responses
 	for res := range responses {
 		processResponse(t, res)
-	}
-
-	// At the end of your test, stop all servers
-	for _, cleanup := range cleanupFuncs {
-		cleanup() // Stops each gRPC server
 	}
 }
 
@@ -1615,56 +1496,6 @@ func getOperatorData(operatorMetadtas []*dataapi.DeregisteredOperatorMetadata, o
 	}
 	return dataapi.DeregisteredOperatorMetadata{}
 
-}
-
-func startGRPCServerWithHealthCheck(host string, serviceName string, wg *sync.WaitGroup) func() {
-	defer wg.Done()
-
-	lis, err := net.Listen("tcp", host)
-	if err != nil {
-		log.Fatalf("Failed to listen on %s: %v", host, err)
-	}
-
-	grpcServer := grpc.NewServer()
-	healthServer := health.NewServer()
-	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
-	healthServer.SetServingStatus(serviceName, grpc_health_v1.HealthCheckResponse_SERVING)
-
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve gRPC on %s: %v", host, err)
-		}
-	}()
-
-	return func() { grpcServer.GracefulStop() }
-}
-
-type ErrorHealthServer struct {
-	grpc_health_v1.UnimplementedHealthServer
-}
-
-func (e *ErrorHealthServer) Check(ctx context.Context, in *grpc_health_v1.HealthCheckRequest) (*grpc_health_v1.HealthCheckResponse, error) {
-	return nil, fmt.Errorf("forced error")
-}
-
-func startGRPCServerWithError(host string, serviceName string, wg *sync.WaitGroup) func() {
-	defer wg.Done()
-
-	lis, err := net.Listen("tcp", host)
-	if err != nil {
-		log.Fatalf("Failed to listen on %s: %v", host, err)
-	}
-
-	grpcServer := grpc.NewServer()
-	grpc_health_v1.RegisterHealthServer(grpcServer, &ErrorHealthServer{})
-
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve gRPC on %s: %v", host, err)
-		}
-	}()
-
-	return func() { grpcServer.GracefulStop() }
 }
 
 // processResponse processes a single http.Response and closes its body.

@@ -3,11 +3,11 @@ package dataapi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -36,6 +36,7 @@ var errNotFound = errors.New("not found")
 
 type EigenDAServiceChecker interface {
 	CheckHealth(ctx context.Context, serviceName string) (*grpc_health_v1.HealthCheckResponse, error)
+	CloseConnections() error
 }
 
 type (
@@ -143,12 +144,18 @@ func NewServer(
 	chainState core.ChainState,
 	logger common.Logger,
 	metrics *Metrics,
+	grpcConn GRPCConn,
 	eigenDAServiceChecker EigenDAServiceChecker,
 
 ) *server {
 	// Initialize the health checker service for EigenDA services
+	if grpcConn == nil {
+		grpcConn = &StandardGRPCDialer{}
+	}
+
 	if eigenDAServiceChecker == nil {
-		eigenDAServiceChecker = NewEigenDAServiceHealthCheck(config.DisperserHostname, config.ChurnerHostname)
+
+		eigenDAServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
 	}
 
 	return &server{
@@ -236,6 +243,15 @@ func (s *server) Start() error {
 
 	errChan := run(s.logger, srv)
 	return <-errChan
+}
+
+func (s *server) Shutdown() error {
+
+	if s.eigenDAServiceChecker != nil {
+		s.eigenDAServiceChecker.CloseConnections()
+	}
+
+	return nil
 }
 
 // FetchBlobHandler godoc
@@ -532,7 +548,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	} else if serviceName == "" {
 		services = append(services, "Disperser", "Churner")
 	}
-	fmt.Print("Getting service availability")
+	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
 
 	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
 	if err != nil {

@@ -16,16 +16,15 @@ var (
 	mutex sync.Mutex
 )
 
-type EigenDAServiceAvailabilityCheck struct {
-	disperserHostName string
-	churnerHostName   string
+type GRPCConn interface {
+	Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error)
 }
 
-func NewEigenDAServiceHealthCheck(disperserHostName, churnerHostName string) EigenDAServiceChecker {
-	return &EigenDAServiceAvailabilityCheck{
-		disperserHostName: disperserHostName,
-		churnerHostName:   churnerHostName,
-	}
+type StandardGRPCDialer struct{}
+
+type EigenDAServiceAvailabilityCheck struct {
+	disperserConn *grpc.ClientConn
+	churnerConn   *grpc.ClientConn
 }
 
 func (s *server) getServiceAvailability(ctx context.Context, services []string) ([]*ServiceAvailability, error) {
@@ -38,6 +37,7 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 	for i, serviceName := range services {
 		var availabilityStatus *ServiceAvailability
 		s.logger.Info("checking service health", "service", serviceName)
+
 		response, err := s.eigenDAServiceChecker.CheckHealth(ctx, serviceName)
 		if err != nil {
 			s.logger.Error("failed to check service health", "service", serviceName, "err", err)
@@ -58,29 +58,63 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 	return availabilityStatuses, nil
 }
 
+func NewEigenDAServiceHealthCheck(creator GRPCConn, disperserHostName, churnerHostName string) EigenDAServiceChecker {
+
+	// Create Pre-configured connections to the services
+	// Saves from having to creae new connection evertytime
+	disperserConn, _ := creator.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
+
+	// if err != nil {
+	// 	disperserConn = nil
+	// }
+
+	churnerConn, _ := creator.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
+
+	// if err != nil {
+	// 	churnerConn = nil
+	// }
+
+	return &EigenDAServiceAvailabilityCheck{
+		disperserConn: disperserConn,
+		churnerConn:   churnerConn,
+	}
+}
+
+// Create Connection to the service
+func (rc *StandardGRPCDialer) Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return grpc.Dial(serviceName, opts...)
+}
+
 // CheckServiceHealth matches the HealthCheckService interface
 func (sac *EigenDAServiceAvailabilityCheck) CheckHealth(ctx context.Context, serviceName string) (*grpc_health_v1.HealthCheckResponse, error) {
 	serviceName = strings.ToLower(serviceName) // Normalize service name to lower case.
-	var serverAddr string
+
+	var client grpc_health_v1.HealthClient
 
 	switch serviceName {
 	case "disperser":
-		serverAddr = sac.disperserHostName
+		client = grpc_health_v1.NewHealthClient(sac.disperserConn)
 	case "churner":
-		serverAddr = sac.churnerHostName
+		client = grpc_health_v1.NewHealthClient(sac.churnerConn)
 	default:
 		return nil, fmt.Errorf("unsupported service: %s", serviceName)
 	}
 
-	//Create connection to the server
-	conn, err := grpc.DialContext(ctx, serverAddr, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-		InsecureSkipVerify: true,
-	})), grpc.WithBlock())
-	if err != nil {
-		return nil, err
+	if client == nil {
+		return nil, fmt.Errorf("client is nil")
 	}
-	defer conn.Close()
 
-	client := grpc_health_v1.NewHealthClient(conn)
 	return client.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+}
+
+// Close Open connections
+func (sac *EigenDAServiceAvailabilityCheck) CloseConnections() error {
+	if sac.disperserConn != nil {
+		sac.disperserConn.Close()
+	}
+	if sac.churnerConn != nil {
+		sac.churnerConn.Close()
+	}
+
+	return nil
 }
