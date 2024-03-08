@@ -46,7 +46,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 		return nil, err
 	}
 
-	// Create mapping from address to operatorID.
+	// Create a mapping from address to operatorID.
 	nonsignerAddressToId := make(map[string]core.OperatorID)
 	for i := range nonsigners {
 		nonsignerAddressToId[nonsignerAddresses[i].Hex()] = nonsigners[i]
@@ -82,7 +82,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	// batches in block interval [startBlock, b] for quorum "q".
 	quorumBatches := CreatQuorumBatches(batches)
 
-	// Compute num batches failed, where numResponsible[op][q] is the number of batches
+	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
 	// that operator "op" and quorum "q" are responsible for.
 	numResponsible := computeNumResponsible(operatorQuorumIntervals, quorumBatches)
 
@@ -130,23 +130,23 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
 	addedToQuorum := make(map[string][]*OperatorQuorum)
 	removedFromQuorum := make(map[string][]*OperatorQuorum)
-	if startBlock < endBlock {
-		operatorQuorumEvents, err := s.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
-		if err != nil {
-			return nil, nil, err
+	if startBlock == endBlock {
+		return addedToQuorum, removedFromQuorum, nil
+	}
+	operatorQuorumEvents, err := s.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Make quorum events organize by operatorID (instead of address) and drop those who
+	// are not nonsigners.
+	for op, events := range operatorQuorumEvents.AddedToQuorum {
+		if id, ok := nonsignerAddressToId[op]; ok {
+			addedToQuorum[id.Hex()] = events
 		}
-
-		// Make quorum events organize by operatorID (instead of address) and drop those who
-		// are not nonsigners.
-		for op, events := range operatorQuorumEvents.AddedToQuorum {
-			if id, ok := nonsignerAddressToId[op]; ok {
-				addedToQuorum[id.Hex()] = events
-			}
-		}
-		for op, events := range operatorQuorumEvents.RemovedFromQuorum {
-			if id, ok := nonsignerAddressToId[op]; ok {
-				removedFromQuorum[id.Hex()] = events
-			}
+	}
+	for op, events := range operatorQuorumEvents.RemovedFromQuorum {
+		if id, ok := nonsignerAddressToId[op]; ok {
+			removedFromQuorum[id.Hex()] = events
 		}
 	}
 	return addedToQuorum, removedFromQuorum, nil
@@ -176,6 +176,8 @@ func computeNumFailed(batches []*BatchNonSigningInfo, operatorQuorumIntervals Op
 	for _, b := range batches {
 		for _, op := range b.NonSigners {
 			op := op[2:]
+			// Note: avg number of quorums per operator is a small number, so use brute
+			// force here (otherwise, we can create a map to make it more efficient)
 			for _, operatorQuorum := range operatorQuorumIntervals.GetQuorums(op, b.ReferenceBlockNumber) {
 				for _, batchQuorum := range b.QuorumNumbers {
 					if operatorQuorum == batchQuorum {
