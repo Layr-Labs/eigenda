@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
 
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
@@ -20,7 +21,7 @@ import (
 )
 
 var (
-	logger         = &cmock.Logger{}
+	logger         = logging.NewNoopLogger()
 	securityParams = []*core.SecurityParam{{
 		QuorumID:           1,
 		AdversaryThreshold: 80,

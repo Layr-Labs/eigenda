@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/shurcooL/graphql"
 )
@@ -72,13 +72,13 @@ type (
 		core.ChainState
 		querier GraphQLQuerier
 
-		logger common.Logger
+		logger logging.Logger
 	}
 )
 
 var _ IndexedChainState = (*indexedChainState)(nil)
 
-func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger common.Logger) *indexedChainState {
+func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger logging.Logger) *indexedChainState {
 	return &indexedChainState{
 		ChainState: cs,
 		querier:    querier,

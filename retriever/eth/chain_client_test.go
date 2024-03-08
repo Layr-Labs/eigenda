@@ -10,6 +10,7 @@ import (
 	damock "github.com/Layr-Labs/eigenda/common/mock"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -18,10 +19,10 @@ import (
 
 func TestFetchBatchHeader(t *testing.T) {
 	ethClient := &damock.MockEthClient{}
-	logger := damock.Logger{}
+	logger := logging.NewNoopLogger()
 	serviceManagerAddress := gcommon.HexToAddress("0x0000000000000000000000000000000000000000")
 	batchHeaderHash := []byte("hashhash")
-	chainClient := eth.NewChainClient(ethClient, &logger)
+	chainClient := eth.NewChainClient(ethClient, logger)
 	topics := [][]gcommon.Hash{
 		{common.BatchConfirmedEventSigHash},
 		{gcommon.BytesToHash(batchHeaderHash)},

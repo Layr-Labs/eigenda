@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -120,7 +120,7 @@ type (
 		serverMode     string
 		socketAddr     string
 		allowOrigins   []string
-		logger         common.Logger
+		logger         logging.Logger
 		blobstore      disperser.BlobStore
 		promClient     PrometheusClient
 		subgraphClient SubgraphClient
@@ -141,7 +141,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
 	eigenDAServiceChecker EigenDAServiceChecker,
@@ -669,7 +669,7 @@ func errorResponse(c *gin.Context, err error) {
 	})
 }
 
-func run(logger common.Logger, httpServer *http.Server) <-chan error {
+func run(logger logging.Logger, httpServer *http.Server) <-chan error {
 	errChan := make(chan error, 1)
 	ctx, stop := signal.NotifyContext(
 		context.Background(),

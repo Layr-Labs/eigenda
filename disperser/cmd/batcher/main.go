@@ -12,11 +12,11 @@ import (
 
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
@@ -71,12 +71,12 @@ func RunBatcher(ctx *cli.Context) error {
 		log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
 	}
 
-	config := NewConfig(ctx)
-
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	config, err := NewConfig(ctx)
 	if err != nil {
 		return err
 	}
+
+	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 
 	bucketName := config.BlobstoreConfig.BucketName
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)

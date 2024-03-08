@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli"
 )
 
@@ -38,13 +38,12 @@ func main() {
 
 func RunEncoderServer(ctx *cli.Context) error {
 
-	config := NewConfig(ctx)
-
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	config, err := NewConfig(ctx)
 	if err != nil {
 		return err
 	}
 
+	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 	enc, err := NewEncoderGRPCServer(config, logger)
 	if err != nil {
 		return err

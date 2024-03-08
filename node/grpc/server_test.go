@@ -11,7 +11,7 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	core_mock "github.com/Layr-Labs/eigenda/core/mock"
@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -84,10 +85,8 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 		ID:                        opID,
 		NumBatchValidators:        runtime.GOMAXPROCS(0),
 	}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	if err != nil {
-		panic("failed to create a new logger")
-	}
+	loggerConfig := common.DefaultLoggerConfig()
+	logger := logging.NewSlogTextLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		panic("failed to create a directory for db")

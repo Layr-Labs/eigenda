@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 type Status uint
@@ -35,7 +35,7 @@ type AccumulatorHandler struct {
 }
 
 type indexer struct {
-	Logger common.Logger
+	Logger logging.Logger
 
 	Handlers           []AccumulatorHandler
 	HeaderService      HeaderService
@@ -53,7 +53,7 @@ func New(
 	headerSrvc HeaderService,
 	headerStore HeaderStore,
 	upgradeForkWatcher UpgradeForkWatcher,
-	logger common.Logger,
+	logger logging.Logger,
 ) *indexer {
 
 	for _, h := range handlers {

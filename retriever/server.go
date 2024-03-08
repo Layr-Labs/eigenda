@@ -6,10 +6,10 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/clients"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -20,13 +20,13 @@ type Server struct {
 	retrievalClient clients.RetrievalClient
 	chainClient     eth.ChainClient
 	indexedState    core.IndexedChainState
-	logger          common.Logger
+	logger          logging.Logger
 	metrics         *Metrics
 }
 
 func NewServer(
 	config *Config,
-	logger common.Logger,
+	logger logging.Logger,
 	retrievalClient clients.RetrievalClient,
 	verifier encoding.Verifier,
 	indexedState core.IndexedChainState,

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/urfave/cli"
 )
 
@@ -109,5 +108,5 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, logging.CLIFlags(envPrefix, FlagPrefix)...)
+	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
 }

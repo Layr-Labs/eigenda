@@ -7,14 +7,14 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
-	commock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	indexermock "github.com/Layr-Labs/eigenda/core/thegraph/mock"
 	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ import (
 var (
 	keyPair                        *dacore.KeyPair
 	quorumIds                      = []uint32{0, 1}
-	logger                         = &commock.Logger{}
+	logger                         = logging.NewNoopLogger()
 	transactorMock                 = &coremock.MockTransactor{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
@@ -163,7 +163,7 @@ func setupMockTransactor() {
 
 func newTestServer(t *testing.T) *churner.Server {
 	config := &churner.Config{
-		LoggerConfig: logging.DefaultCLIConfig(),
+		LoggerConfig: common.DefaultLoggerConfig(),
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 		},

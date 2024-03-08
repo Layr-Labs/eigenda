@@ -29,7 +29,7 @@ var _ Api = (*prometheusApi)(nil)
 func NewApi(config Config) (*prometheusApi, error) {
 	var err error
 	clientOnce.Do(func() {
-		roundTripper := promconfig.NewBasicAuthRoundTripper(config.Username, promconfig.Secret(config.Secret), "", api.DefaultRoundTripper)
+		roundTripper := promconfig.NewBasicAuthRoundTripper(config.Username, promconfig.Secret(config.Secret), "", "", api.DefaultRoundTripper)
 		client, errN := api.NewClient(api.Config{
 			Address:      config.ServerURL,
 			RoundTripper: roundTripper,

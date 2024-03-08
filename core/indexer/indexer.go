@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/indexer"
 	indexereth "github.com/Layr-Labs/eigenda/indexer/eth"
 	inmemstore "github.com/Layr-Labs/eigenda/indexer/inmem"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -15,7 +16,7 @@ func CreateNewIndexer(
 	gethClient dacommon.EthClient,
 	rpcClient dacommon.RPCEthClient,
 	eigenDAServiceManagerAddr string,
-	logger dacommon.Logger,
+	logger logging.Logger,
 ) (indexer.Indexer, error) {
 
 	eigenDAServiceManager := common.HexToAddress(eigenDAServiceManagerAddr)

@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"google.golang.org/grpc"
@@ -29,7 +30,7 @@ type Server struct {
 
 	node   *node.Node
 	config *node.Config
-	logger common.Logger
+	logger logging.Logger
 
 	ratelimiter common.RateLimiter
 
@@ -39,7 +40,7 @@ type Server struct {
 // NewServer creates a new Server instance with the provided parameters.
 //
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
-func NewServer(config *node.Config, node *node.Node, logger common.Logger, ratelimiter common.RateLimiter) *Server {
+func NewServer(config *node.Config, node *node.Node, logger logging.Logger, ratelimiter common.RateLimiter) *Server {
 
 	return &Server{
 		config:      config,

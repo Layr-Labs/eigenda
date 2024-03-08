@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
@@ -20,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
@@ -68,11 +68,11 @@ func RetrieverMain(ctx *cli.Context) error {
 		),
 	)
 
-	config := retriever.NewConfig(ctx)
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	config, err := retriever.NewConfig(ctx)
 	if err != nil {
-		return err
+		log.Fatalf("failed to parse the command line flags: %v", err)
 	}
+	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 
 	nodeClient := clients.NewNodeClient(config.Timeout)
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)

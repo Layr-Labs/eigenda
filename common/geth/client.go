@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -31,13 +32,13 @@ type EthClient struct {
 	chainID          *big.Int
 	AccountAddress   gethcommon.Address
 	Contracts        map[gethcommon.Address]*bind.BoundContract
-	Logger           common.Logger
+	Logger           logging.Logger
 	numConfirmations int
 }
 
 var _ common.EthClient = (*EthClient)(nil)
 
-func NewClient(config EthClientConfig, logger common.Logger) (*EthClient, error) {
+func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error) {
 	chainClient, err := ethclient.Dial(config.RPCURL)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot connect to provider: %w", err)
@@ -210,7 +211,7 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
 		return nil, ErrTransactionFailed
 	}
-	c.Logger.Trace("transaction confirmed", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
+	c.Logger.Debug("transaction confirmed", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
 	return receipt, nil
 }
 
@@ -225,7 +226,7 @@ func (c *EthClient) EnsureAnyTransactionEvaled(ctx context.Context, txs []*types
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", receipt.TxHash.Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
 		return nil, ErrTransactionFailed
 	}
-	c.Logger.Trace("transaction confirmed", "txHash", receipt.TxHash.Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
+	c.Logger.Debug("transaction confirmed", "txHash", receipt.TxHash.Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
 	return receipt, nil
 }
 
@@ -245,20 +246,20 @@ func (c *EthClient) waitMined(ctx context.Context, txs []*types.Transaction) (*t
 				chainTip, err := c.BlockNumber(ctx)
 				if err == nil {
 					if receipt.BlockNumber.Uint64()+uint64(c.numConfirmations) > chainTip {
-						c.Logger.Trace("EnsureTransactionEvaled: transaction has been mined but don't have enough confirmations at current chain tip", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
+						c.Logger.Debug("EnsureTransactionEvaled: transaction has been mined but don't have enough confirmations at current chain tip", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
 						break
 					} else {
 						return receipt, nil
 					}
 				} else {
-					c.Logger.Trace("EnsureTransactionEvaled: failed to get chain tip while waiting for transaction to mine", "err", err)
+					c.Logger.Debug("EnsureTransactionEvaled: failed to get chain tip while waiting for transaction to mine", "err", err)
 				}
 			}
 
 			if errors.Is(err, ethereum.NotFound) {
-				c.Logger.Trace("Transaction not yet mined", "txHash", tx.Hash().Hex())
+				c.Logger.Debug("Transaction not yet mined", "txHash", tx.Hash().Hex())
 			} else if err != nil {
-				c.Logger.Trace("Transaction receipt retrieval failed", "err", err)
+				c.Logger.Debug("Transaction receipt retrieval failed", "err", err)
 			}
 		}
 		// Wait for the next round.

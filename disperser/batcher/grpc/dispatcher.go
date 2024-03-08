@@ -7,9 +7,9 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,10 +22,10 @@ type Config struct {
 type dispatcher struct {
 	*Config
 
-	logger common.Logger
+	logger logging.Logger
 }
 
-func NewDispatcher(cfg *Config, logger common.Logger) *dispatcher {
+func NewDispatcher(cfg *Config, logger logging.Logger) *dispatcher {
 	return &dispatcher{
 		Config: cfg,
 		logger: logger,

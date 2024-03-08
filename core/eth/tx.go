@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
@@ -34,7 +35,7 @@ var (
 
 type Transactor struct {
 	EthClient common.EthClient
-	Logger    common.Logger
+	Logger    logging.Logger
 	Bindings  *ContractBindings
 }
 
@@ -64,7 +65,7 @@ type BN254G2Point struct {
 }
 
 func NewTransactor(
-	logger common.Logger,
+	logger logging.Logger,
 	client common.EthClient,
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Transactor, error) {
@@ -439,12 +440,12 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigAgg, err := json.Marshal(signatureAggregation)
 	if err == nil {
-		t.Logger.Trace("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
+		t.Logger.Debug("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
 	}
 
-	t.Logger.Trace("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
+	t.Logger.Debug("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
 	for _, ns := range nonSignerOperatorIds {
-		t.Logger.Trace("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
+		t.Logger.Debug("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
 	}
 	checkSignaturesIndices, err := t.Bindings.OpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
@@ -473,7 +474,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		QuorumThresholdPercentages: quorumThresholdPercentages,
 		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
+	t.Logger.Debug("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -496,7 +497,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigChecker, err := json.Marshal(signatureChecker)
 	if err == nil {
-		t.Logger.Trace("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
+		t.Logger.Debug("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
