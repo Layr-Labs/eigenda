@@ -27,11 +27,15 @@ type Config struct {
 	UseGraph                      bool
 }
 
-func NewConfig(ctx *cli.Context) *Config {
+func NewConfig(ctx *cli.Context) (*Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return nil, err
+	}
 	return &Config{
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
-		LoggerConfig:    common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:    *loggerConfig,
 		IndexerConfig:   indexer.ReadIndexerConfig(ctx),
 		MetricsConfig: MetricsConfig{
 			HTTPPort: ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
@@ -43,5 +47,5 @@ func NewConfig(ctx *cli.Context) *Config {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		GraphUrl:                      ctx.GlobalString(flags.GraphUrlFlag.Name),
 		UseGraph:                      ctx.GlobalBool(flags.UseGraphFlag.Name),
-	}
+	}, nil
 }

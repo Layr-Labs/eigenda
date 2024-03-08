@@ -59,7 +59,10 @@ func run(ctx *cli.Context) error {
 		grpc.ChainUnaryInterceptor(),
 	)
 
-	config := churner.NewConfig(ctx)
+	config, err := churner.NewConfig(ctx)
+	if err != nil {
+		log.Fatalf("failed to parse the command line flags: %v", err)
+	}
 	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 
 	log.Println("Starting geth client")

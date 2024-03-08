@@ -22,7 +22,11 @@ type Config struct {
 	InstanceLaunchInterval time.Duration
 }
 
-func NewConfig(ctx *cli.Context) *Config {
+func NewConfig(ctx *cli.Context) (*Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return nil, err
+	}
 	return &Config{
 		Config: *clients.NewConfig(
 			ctx.GlobalString(flags.HostnameFlag.Name),
@@ -35,8 +39,8 @@ func NewConfig(ctx *cli.Context) *Config {
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
 		QuorumThreshold:        uint8(ctx.GlobalUint(flags.QuorumThresholdFlag.Name)),
 		AdversarialThreshold:   uint8(ctx.GlobalUint(flags.AdversarialThresholdFlag.Name)),
-		LoggingConfig:          common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggingConfig:          *loggerConfig,
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
-	}
+	}, nil
 }

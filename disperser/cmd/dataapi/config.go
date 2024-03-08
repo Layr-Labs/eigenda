@@ -33,7 +33,11 @@ type Config struct {
 	ChurnerHostname   string
 }
 
-func NewConfig(ctx *cli.Context) Config {
+func NewConfig(ctx *cli.Context) (Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -41,7 +45,7 @@ func NewConfig(ctx *cli.Context) Config {
 		},
 		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		LoggerConfig:                  common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:                  *loggerConfig,
 		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
@@ -62,5 +66,5 @@ func NewConfig(ctx *cli.Context) Config {
 		DisperserHostname: ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:   ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 	}
-	return config
+	return config, nil
 }

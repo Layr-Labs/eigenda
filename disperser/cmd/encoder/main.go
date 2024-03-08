@@ -38,7 +38,10 @@ func main() {
 
 func RunEncoderServer(ctx *cli.Context) error {
 
-	config := NewConfig(ctx)
+	config, err := NewConfig(ctx)
+	if err != nil {
+		return err
+	}
 
 	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 	enc, err := NewEncoderGRPCServer(config, logger)

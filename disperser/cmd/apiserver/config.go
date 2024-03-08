@@ -41,6 +41,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
+
 	config := Config{
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
@@ -50,7 +55,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		},
-		LoggerConfig: common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),

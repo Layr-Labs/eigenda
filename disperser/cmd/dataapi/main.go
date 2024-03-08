@@ -50,7 +50,10 @@ func main() {
 }
 
 func RunDataApi(ctx *cli.Context) error {
-	config := NewConfig(ctx)
+	config, err := NewConfig(ctx)
+	if err != nil {
+		return err
+	}
 
 	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)

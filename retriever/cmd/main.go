@@ -68,7 +68,10 @@ func RetrieverMain(ctx *cli.Context) error {
 		),
 	)
 
-	config := retriever.NewConfig(ctx)
+	config, err := retriever.NewConfig(ctx)
+	if err != nil {
+		log.Fatalf("failed to parse the command line flags: %v", err)
+	}
 	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 
 	nodeClient := clients.NewNodeClient(config.Timeout)

@@ -71,7 +71,10 @@ func RunBatcher(ctx *cli.Context) error {
 		log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
 	}
 
-	config := NewConfig(ctx)
+	config, err := NewConfig(ctx)
+	if err != nil {
+		return err
+	}
 
 	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
 

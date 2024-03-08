@@ -31,8 +31,11 @@ type Config struct {
 	EigenDAServiceManagerAddr     string
 }
 
-func NewConfig(ctx *cli.Context) Config {
-
+func NewConfig(ctx *cli.Context) (Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -41,7 +44,7 @@ func NewConfig(ctx *cli.Context) Config {
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
-		LoggerConfig:    common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:    *loggerConfig,
 		BatcherConfig: batcher.Config{
 			PullInterval:             ctx.GlobalDuration(flags.PullIntervalFlag.Name),
 			FinalizerInterval:        ctx.GlobalDuration(flags.FinalizerIntervalFlag.Name),
@@ -72,5 +75,5 @@ func NewConfig(ctx *cli.Context) Config {
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 	}
-	return config
+	return config, nil
 }

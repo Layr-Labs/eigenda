@@ -22,7 +22,7 @@ func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{
 			Name:   PrefixFlag(flagPrefix, LevelFlagName),
-			Usage:  `The lowest log level that will be output. Accepted options are "trace", "debug", "info", "warn", "error"`,
+			Usage:  `The lowest log level that will be output. Accepted options are "debug", "info", "warn", "error"`,
 			Value:  "info",
 			EnvVar: PrefixEnvVar(envPrefix, "LOG_LEVEL"),
 		},
@@ -45,13 +45,13 @@ func DefaultLoggerConfig() LoggerConfig {
 	}
 }
 
-func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) LoggerConfig {
+func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, error) {
 	cfg := DefaultLoggerConfig()
 	path := ctx.GlobalString(PrefixFlag(flagPrefix, PathFlagName))
 	if path != "" {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
-			panic("failed to open log file " + path)
+			return nil, err
 		}
 		cfg.OutputWriter = io.MultiWriter(os.Stdout, f)
 	}
@@ -63,5 +63,5 @@ func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) LoggerConfig {
 	}
 	cfg.HandlerOpts.Level = level
 
-	return cfg
+	return &cfg, nil
 }

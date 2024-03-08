@@ -21,10 +21,14 @@ type Config struct {
 	PerPublicKeyRateLimit time.Duration
 }
 
-func NewConfig(ctx *cli.Context) *Config {
+func NewConfig(ctx *cli.Context) (*Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return nil, err
+	}
 	return &Config{
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		LoggerConfig:                  common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:                  *loggerConfig,
 		GraphUrl:                      ctx.GlobalString(flags.GraphUrlFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
@@ -33,5 +37,5 @@ func NewConfig(ctx *cli.Context) *Config {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-	}
+	}, nil
 }

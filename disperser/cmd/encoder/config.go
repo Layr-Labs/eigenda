@@ -15,10 +15,14 @@ type Config struct {
 	MetricsConfig encoder.MetrisConfig
 }
 
-func NewConfig(ctx *cli.Context) Config {
+func NewConfig(ctx *cli.Context) (Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
-		LoggerConfig:  common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:  *loggerConfig,
 		ServerConfig: &encoder.ServerConfig{
 			GrpcPort:              ctx.GlobalString(flags.GrpcPortFlag.Name),
 			MaxConcurrentRequests: ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
@@ -29,5 +33,5 @@ func NewConfig(ctx *cli.Context) Config {
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
 	}
-	return config
+	return config, nil
 }

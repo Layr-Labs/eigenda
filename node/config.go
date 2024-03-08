@@ -136,6 +136,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		internalRetrievalFlag = ctx.GlobalString(flags.RetrievalPortFlag.Name)
 	}
 
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Hostname:                      ctx.GlobalString(flags.HostnameFlag.Name),
 		DispersalPort:                 ctx.GlobalString(flags.DispersalPortFlag.Name),
@@ -157,7 +162,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		PrivateBls:                    privateBls,
 		EthClientConfig:               ethClientConfig,
 		EncoderConfig:                 kzg.ReadCLIConfig(ctx),
-		LoggingConfig:                 common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix),
+		LoggingConfig:                 *loggerConfig,
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProvider:                 ctx.GlobalString(flags.PubIPProviderFlag.Name),
