@@ -11,6 +11,43 @@
         "version": "1"
     },
     "paths": {
+        "/eigenda/service-availability": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ServiceAvailability"
+                ],
+                "summary": "Get status of public EigenDA services.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -531,6 +568,31 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.ServiceAvailability": {
+            "type": "object",
+            "properties": {
+                "service_name": {
+                    "type": "string"
+                },
+                "service_status": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.ServiceAvailabilityResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.ServiceAvailability"
                     }
                 },
                 "meta": {

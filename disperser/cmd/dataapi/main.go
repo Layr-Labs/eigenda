@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -90,9 +92,11 @@ func RunDataApi(ctx *cli.Context) error {
 		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{
-				ServerMode:   config.ServerMode,
-				SocketAddr:   config.SocketAddr,
-				AllowOrigins: config.AllowOrigins,
+				ServerMode:        config.ServerMode,
+				SocketAddr:        config.SocketAddr,
+				AllowOrigins:      config.AllowOrigins,
+				DisperserHostname: config.DisperserHostname,
+				ChurnerHostname:   config.ChurnerHostname,
 			},
 			sharedStorage,
 			promClient,
@@ -101,6 +105,8 @@ func RunDataApi(ctx *cli.Context) error {
 			chainState,
 			logger,
 			metrics,
+			nil,
+			nil,
 		)
 	)
 
@@ -109,6 +115,27 @@ func RunDataApi(ctx *cli.Context) error {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
+	}
+
+	// Setup channel to listen for termination signals
+	quit := make(chan os.Signal, 1)
+	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Run server in a separate goroutine so that it doesn't block.
+	go func() {
+		if err := server.Start(); err != nil {
+			logger.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Block until a signal is received.
+	<-quit
+	logger.Info("Shutting down server...")
+	err = server.Shutdown()
+
+	if err != nil {
+		logger.Errorf("Failed to shutdown server: %v", err)
 	}
 
 	return server.Start()

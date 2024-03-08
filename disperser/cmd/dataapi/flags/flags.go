@@ -96,11 +96,27 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ALLOW_ORIGINS"),
 		Required: true,
 	}
-	EnableMetrics = cli.BoolFlag{
+	EnableMetricsFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
 		Usage:    "start metrics server",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
+	}
+	// EigenDA Disperser and Churner Hostnames to check Server Availability
+	// ex:
+	// disperser-goerli.eigenda.eigenops.xyz,
+	// churner-goerli.eigenda.eigenops.xyz
+	DisperserHostnameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-disperser-hostname"),
+		Usage:    "HostName of EigenDA Disperser",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DISPERSER_HOSTNAME"),
+	}
+	ChurnerHostnameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-churner-hostname"),
+		Usage:    "HostName of EigenDA Churner",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
 	/* Optional Flags*/
 	MetricsHTTPPort = cli.StringFlag{
@@ -125,7 +141,9 @@ var requiredFlags = []cli.Flag{
 	PrometheusServerSecretFlag,
 	PrometheusMetricsClusterLabelFlag,
 	AllowOriginsFlag,
-	EnableMetrics,
+	EnableMetricsFlag,
+	DisperserHostnameFlag,
+	ChurnerHostnameFlag,
 }
 
 var optionalFlags = []cli.Flag{
