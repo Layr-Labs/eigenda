@@ -89,23 +89,24 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	// Compute the nonsigning rate for each <operator, quorum> pair.
 	operators := make([]*OperatorNonsigningPercentageMetrics, 0)
 	for op, val := range numResponsible {
-		for q, num := range val {
-			if numResponsible[op][q] > 0 {
-				if unsignedCount, ok := numFailed[op][q]; ok {
-					ps := fmt.Sprintf("%.2f", (float64(unsignedCount)/float64(num))*100)
-					pf, err := strconv.ParseFloat(ps, 64)
-					if err != nil {
-						return nil, err
-					}
-					operatorMetric := OperatorNonsigningPercentageMetrics{
-						OperatorId:           op,
-						QuorumId:             q,
-						TotalUnsignedBatches: unsignedCount,
-						TotalBatches:         num,
-						Percentage:           pf,
-					}
-					operators = append(operators, &operatorMetric)
+		for q, totalCount := range val {
+			if totalCount == 0 {
+				continue
+			}
+			if unsignedCount, ok := numFailed[op][q]; ok {
+				ps := fmt.Sprintf("%.2f", (float64(unsignedCount)/float64(totalCount))*100)
+				pf, err := strconv.ParseFloat(ps, 64)
+				if err != nil {
+					return nil, err
 				}
+				operatorMetric := OperatorNonsigningPercentageMetrics{
+					OperatorId:           op,
+					QuorumId:             q,
+					TotalUnsignedBatches: unsignedCount,
+					TotalBatches:         totalCount,
+					Percentage:           pf,
+				}
+				operators = append(operators, &operatorMetric)
 			}
 		}
 	}
