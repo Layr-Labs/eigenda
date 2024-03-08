@@ -52,24 +52,8 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 		nonsignerAddressToId[nonsignerAddresses[i].Hex()] = nonsigners[i]
 	}
 
-	// Get operators' initial quorums (at startBlock).
-	bitmaps, err := s.transactor.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, nonsigners, startBlock)
-	if err != nil {
-		return nil, err
-	}
-	operatorInitialQuorum := make(map[string][]uint8)
-	for i := range bitmaps {
-		operatorInitialQuorum[nonsigners[i].Hex()] = eth.BitmapToQuorumIds(bitmaps[i])
-	}
-
-	// Get operators' quorum change events from [startBlock+1, endBlock].
-	addedToQuorum, removedFromQuorum, err := s.getOperatorQuorumEvents(ctx, startBlock, endBlock, nonsignerAddressToId)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, err := CreateOperatorQuorumIntervals(startBlock, endBlock, operatorInitialQuorum, addedToQuorum, removedFromQuorum)
+	operatorQuorumIntervals, err := s.createOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -78,13 +62,9 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	// failed to sign for operator "op" and quorum "q".
 	numFailed := computeNumFailed(batches, operatorQuorumIntervals)
 
-	// Create quorumBatches, where quorumBatches[q].AccuBatches is the total number of
-	// batches in block interval [startBlock, b] for quorum "q".
-	quorumBatches := CreatQuorumBatches(batches)
-
 	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
 	// that operator "op" and quorum "q" are responsible for.
-	numResponsible := computeNumResponsible(operatorQuorumIntervals, quorumBatches)
+	numResponsible := computeNumResponsible(batches, operatorQuorumIntervals)
 
 	// Compute the nonsigning rate for each <operator, quorum> pair.
 	operators := make([]*OperatorNonsigningPercentageMetrics, 0)
@@ -125,6 +105,32 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 		},
 		Data: operators,
 	}, nil
+}
+
+func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (OperatorQuorumIntervals, error) {
+	// Get operators' initial quorums (at startBlock).
+	bitmaps, err := s.transactor.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, nonsigners, startBlock)
+	if err != nil {
+		return nil, err
+	}
+	operatorInitialQuorum := make(map[string][]uint8)
+	for i := range bitmaps {
+		operatorInitialQuorum[nonsigners[i].Hex()] = eth.BitmapToQuorumIds(bitmaps[i])
+	}
+
+	// Get operators' quorum change events from [startBlock+1, endBlock].
+	addedToQuorum, removedFromQuorum, err := s.getOperatorQuorumEvents(ctx, startBlock, endBlock, nonsignerAddressToId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create operators' quorum intervals.
+	operatorQuorumIntervals, err := CreateOperatorQuorumIntervals(startBlock, endBlock, operatorInitialQuorum, addedToQuorum, removedFromQuorum)
+	if err != nil {
+		return nil, err
+	}
+
+	return operatorQuorumIntervals, nil
 }
 
 func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
@@ -194,7 +200,11 @@ func computeNumFailed(batches []*BatchNonSigningInfo, operatorQuorumIntervals Op
 	return numFailed
 }
 
-func computeNumResponsible(operatorQuorumIntervals OperatorQuorumIntervals, quorumBatches map[uint8][]*NumBatchesAtBlock) map[string]map[uint8]int {
+func computeNumResponsible(batches []*BatchNonSigningInfo, operatorQuorumIntervals OperatorQuorumIntervals) map[string]map[uint8]int {
+	// Create quorumBatches, where quorumBatches[q].AccuBatches is the total number of
+	// batches in block interval [startBlock, b] for quorum "q".
+	quorumBatches := CreatQuorumBatches(batches)
+
 	numResponsible := make(map[string]map[uint8]int)
 	for op, val := range operatorQuorumIntervals {
 		for q, intervals := range val {
