@@ -38,6 +38,9 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	if err != nil {
 		return nil, err
 	}
+	if len(nonsigners) == 0 {
+		return &OperatorsNonsigningPercentage{}, nil
+	}
 
 	// Get the address for the nonsigners (from their operatorIDs).
 	// nonsignerAddresses[i] is the address for nonsigners[i].
