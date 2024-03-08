@@ -58,9 +58,9 @@ type (
 	}
 
 	Metric struct {
-		Throughput float64 `json:"throughput"`
-		CostInGas  float64 `json:"cost_in_gas"`
-		TotalStake uint64  `json:"total_stake"`
+		Throughput          float64                  `json:"throughput"`
+		CostInGas           float64                  `json:"cost_in_gas"`
+		TotalStakePerQuorum map[core.QuorumID]uint64 `json:"total_stake_per_quorum"`
 	}
 
 	Throughput struct {
