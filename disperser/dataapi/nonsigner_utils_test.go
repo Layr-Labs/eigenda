@@ -382,59 +382,66 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 }
 
 func TestComputeNumBatches(t *testing.T) {
-	intervals := []*dataapi.NumBatchesAtBlock{}
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(intervals, 1, 4))
-
-	intervals = []*dataapi.NumBatchesAtBlock{
-		{
-			BlockNumber: 5,
-			AccuBatches: 2,
-		},
+	queryBatches := &dataapi.QueryBatches{
+		NumBatches:  []*dataapi.NumBatchesAtBlock{},
+		AccuBatches: []int{},
 	}
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(intervals, 1, 4))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 1, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 5, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 5, 6))
+	assert.Equal(t, 0, dataapi.ComputeNumBatches(queryBatches, 1, 4))
 
-	intervals = []*dataapi.NumBatchesAtBlock{
+	numBatches := []*dataapi.NumBatchesAtBlock{
 		{
 			BlockNumber: 5,
 			NumBatches:  2,
-			AccuBatches: 2,
+		},
+	}
+	queryBatches = &dataapi.QueryBatches{
+		NumBatches:  numBatches,
+		AccuBatches: []int{2},
+	}
+	assert.Equal(t, 0, dataapi.ComputeNumBatches(queryBatches, 1, 4))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 1, 5))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 5, 5))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 5, 6))
+
+	numBatches = []*dataapi.NumBatchesAtBlock{
+		{
+			BlockNumber: 5,
+			NumBatches:  2,
 		},
 		{
 			BlockNumber: 10,
 			NumBatches:  2,
-			AccuBatches: 4,
 		},
 		{
 			BlockNumber: 15,
 			NumBatches:  2,
-			AccuBatches: 6,
 		},
 		{
 			BlockNumber: 20,
 			NumBatches:  2,
-			AccuBatches: 8,
 		},
 	}
+	queryBatches = &dataapi.QueryBatches{
+		NumBatches:  numBatches,
+		AccuBatches: []int{2, 4, 6, 8},
+	}
 
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(intervals, 1, 4))
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(intervals, 21, 22))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 1, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 5, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 5, 9))
-	assert.Equal(t, 4, dataapi.ComputeNumBatches(intervals, 5, 10))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 6, 10))
-	assert.Equal(t, 4, dataapi.ComputeNumBatches(intervals, 5, 14))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 6, 14))
-	assert.Equal(t, 6, dataapi.ComputeNumBatches(intervals, 5, 15))
-	assert.Equal(t, 8, dataapi.ComputeNumBatches(intervals, 5, 20))
-	assert.Equal(t, 8, dataapi.ComputeNumBatches(intervals, 5, 22))
-	assert.Equal(t, 8, dataapi.ComputeNumBatches(intervals, 1, 22))
-	assert.Equal(t, 6, dataapi.ComputeNumBatches(intervals, 6, 22))
-	assert.Equal(t, 4, dataapi.ComputeNumBatches(intervals, 11, 22))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(intervals, 16, 22))
+	assert.Equal(t, 0, dataapi.ComputeNumBatches(queryBatches, 1, 4))
+	assert.Equal(t, 0, dataapi.ComputeNumBatches(queryBatches, 21, 22))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 1, 5))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 5, 5))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 5, 9))
+	assert.Equal(t, 4, dataapi.ComputeNumBatches(queryBatches, 5, 10))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 6, 10))
+	assert.Equal(t, 4, dataapi.ComputeNumBatches(queryBatches, 5, 14))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 6, 14))
+	assert.Equal(t, 6, dataapi.ComputeNumBatches(queryBatches, 5, 15))
+	assert.Equal(t, 8, dataapi.ComputeNumBatches(queryBatches, 5, 20))
+	assert.Equal(t, 8, dataapi.ComputeNumBatches(queryBatches, 5, 22))
+	assert.Equal(t, 8, dataapi.ComputeNumBatches(queryBatches, 1, 22))
+	assert.Equal(t, 6, dataapi.ComputeNumBatches(queryBatches, 6, 22))
+	assert.Equal(t, 4, dataapi.ComputeNumBatches(queryBatches, 11, 22))
+	assert.Equal(t, 2, dataapi.ComputeNumBatches(queryBatches, 16, 22))
 }
 
 func TestCreatQuorumBatches(t *testing.T) {
@@ -460,21 +467,21 @@ func TestCreatQuorumBatches(t *testing.T) {
 
 	q0, ok := quorumBatches[0]
 	assert.True(t, ok)
-	assert.Equal(t, 1, len(q0))
-	assert.Equal(t, uint32(2), q0[0].BlockNumber)
-	assert.Equal(t, 2, q0[0].AccuBatches)
+	assert.Equal(t, 1, len(q0.NumBatches))
+	assert.Equal(t, uint32(2), q0.NumBatches[0].BlockNumber)
+	assert.Equal(t, 2, q0.AccuBatches[0])
 
 	q1, ok := quorumBatches[1]
 	assert.True(t, ok)
-	assert.Equal(t, 2, len(q1))
-	assert.Equal(t, uint32(2), q1[0].BlockNumber)
-	assert.Equal(t, 1, q1[0].AccuBatches)
-	assert.Equal(t, uint32(4), q1[1].BlockNumber)
-	assert.Equal(t, 2, q1[1].AccuBatches)
+	assert.Equal(t, 2, len(q1.NumBatches))
+	assert.Equal(t, uint32(2), q1.NumBatches[0].BlockNumber)
+	assert.Equal(t, 1, q1.AccuBatches[0])
+	assert.Equal(t, uint32(4), q1.NumBatches[1].BlockNumber)
+	assert.Equal(t, 2, q1.AccuBatches[1])
 
 	q2, ok := quorumBatches[2]
 	assert.True(t, ok)
-	assert.Equal(t, 1, len(q2))
-	assert.Equal(t, uint32(4), q2[0].BlockNumber)
-	assert.Equal(t, 1, q2[0].AccuBatches)
+	assert.Equal(t, 1, len(q2.NumBatches))
+	assert.Equal(t, uint32(4), q2.NumBatches[0].BlockNumber)
+	assert.Equal(t, 1, q2.AccuBatches[0])
 }
