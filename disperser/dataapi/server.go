@@ -411,7 +411,6 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	if err != nil || interval == 0 {
 		interval = 3600
 	}
-	// metric, err := s.getOperatorNonsigningPercentage(c.Request.Context(), interval)
 	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), interval)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
