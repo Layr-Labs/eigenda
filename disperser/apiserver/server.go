@@ -90,8 +90,6 @@ func NewDispersalServer(
 }
 
 func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_DisperseBlobAuthenticatedServer) error {
-	s.metrics.IncrementBlobRequestNum("DisperseBlobAuthenticated")
-
 	// Process disperse_request
 	in, err := stream.Recv()
 	if err != nil {
@@ -170,8 +168,6 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 }
 
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
-	s.metrics.IncrementBlobRequestNum("DisperseBlob")
-
 	blob := getBlobFromRequest(req)
 
 	reply, err := s.disperseBlob(ctx, blob, "")
@@ -444,8 +440,6 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	}))
 	defer timer.ObserveDuration()
 
-	s.metrics.IncrementBlobRequestNum("GetBlobStatus")
-
 	requestID := req.GetRequestId()
 	if len(requestID) == 0 {
 		return nil, api.NewInvalidArgError("request_id must not be empty")
@@ -547,8 +541,6 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.metrics.ObserveLatency("RetrieveBlob", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
-
-	s.metrics.IncrementBlobRequestNum("RetrieveBlob")
 
 	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex)
 

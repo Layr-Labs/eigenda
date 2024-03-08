@@ -99,16 +99,6 @@ func (g *Metrics) HandleSuccessfulRequest(quorum string, blobBytes int, method s
 	}).Add(float64(blobBytes))
 }
 
-// IncrementBlobRequestNum increments the number of blob requests received
-func (g *Metrics) IncrementBlobRequestNum(method string) {
-	g.NumBlobRequests.With(prometheus.Labels{
-		"status_code": "total",
-		"status":      "total",
-		"quorum":      "",
-		"method":      method,
-	}).Inc()
-}
-
 // IncrementFailedBlobRequestNum increments the number of failed blob requests
 func (g *Metrics) IncrementFailedBlobRequestNum(statusCode string, quorum string, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{

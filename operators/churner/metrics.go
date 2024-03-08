@@ -89,15 +89,6 @@ func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
 	g.Latency.WithLabelValues(method).Observe(latencyMs)
 }
 
-// IncrementRequestNum increments the number of successful requests
-func (g *Metrics) IncrementRequestNum(method string) {
-	g.NumRequests.With(prometheus.Labels{
-		"status": "total",
-		"method": method,
-		"reason": "",
-	}).Inc()
-}
-
 // IncrementSuccessfulRequestNum increments the number of successful requests
 func (g *Metrics) IncrementSuccessfulRequestNum(method string) {
 	g.NumRequests.With(prometheus.Labels{
