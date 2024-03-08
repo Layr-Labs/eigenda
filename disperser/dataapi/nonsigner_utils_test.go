@@ -399,18 +399,22 @@ func TestComputeNumBatches(t *testing.T) {
 	intervals = []*dataapi.NumBatchesAtBlock{
 		{
 			BlockNumber: 5,
+			NumBatches:  2,
 			AccuBatches: 2,
 		},
 		{
 			BlockNumber: 10,
+			NumBatches:  2,
 			AccuBatches: 4,
 		},
 		{
 			BlockNumber: 15,
+			NumBatches:  2,
 			AccuBatches: 6,
 		},
 		{
 			BlockNumber: 20,
+			NumBatches:  2,
 			AccuBatches: 8,
 		},
 	}
@@ -434,6 +438,7 @@ func TestComputeNumBatches(t *testing.T) {
 }
 
 func TestCreatQuorumBatches(t *testing.T) {
+	// The nonsigning info for a list of batches.
 	batchNonSigningInfo := []*dataapi.BatchNonSigningInfo{
 		{
 			QuorumNumbers:        []uint8{0, 1},
