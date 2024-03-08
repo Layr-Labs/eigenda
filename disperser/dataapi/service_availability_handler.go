@@ -77,7 +77,7 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, churnerHostName string) EigenDAServiceChecker {
 
 	// Create Pre-configured connections to the services
-	// Saves from having to creae new connection evertytime
+	// Saves from having to create new connection on each request
 	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
 
 	if err != nil {
