@@ -69,6 +69,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	return &Metric{
 		Throughput:          troughput,
 		CostInGas:           costInGas,
+		TotalStake:          totalStakePerQuorum[0],
 		TotalStakePerQuorum: totalStakePerQuorum,
 	}, nil
 }
