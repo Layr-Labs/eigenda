@@ -24,6 +24,10 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
+	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
+	"github.com/Layr-Labs/eigensdk-go/signerv2"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 )
@@ -163,7 +167,51 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
-	txnManager := batcher.NewTxnManager(client, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
+	var wallet walletsdk.Wallet
+	if len(config.FireblocksConfig.APIKey) > 0 &&
+		len(config.FireblocksConfig.SecretKeyPath) > 0 &&
+		len(config.FireblocksConfig.BaseURL) > 0 &&
+		len(config.FireblocksConfig.VaultAccountName) > 0 {
+		secretKey, err := os.ReadFile(config.FireblocksConfig.SecretKeyPath)
+		if err != nil {
+			return fmt.Errorf("Cannot read fireblocks secret from %s: %w", config.FireblocksConfig.SecretKeyPath, err)
+		}
+		fireblocksClient, err := fireblocks.NewClient(
+			config.FireblocksConfig.APIKey,
+			secretKey,
+			config.FireblocksConfig.BaseURL,
+			config.TimeoutConfig.ChainReadTimeout,
+			logger,
+		)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger)
+		if err != nil {
+			return err
+		}
+	} else if len(config.EthClientConfig.PrivateKeyString) > 0 {
+		privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+		chainID, err := client.ChainID(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get chain ID: %w", err)
+		}
+		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: privateKey}, chainID)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger)
+		if err != nil {
+			return err
+		}
+	} else {
+		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
+	}
+
+	txnManager := batcher.NewTxnManager(client, wallet, config.EthClientConfig.NumConfirmations, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
 	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
 	if err != nil {
 		return err

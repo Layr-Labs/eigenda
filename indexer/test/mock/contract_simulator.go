@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/indexer/test/contracts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 )
@@ -140,7 +140,7 @@ func mustNewSimulatedBackend() (client SimulatedBackend, deployerAddr common.Add
 	balance.SetString("10000000000000000000", 10) // 10 eth in wei
 
 	deployerAddr = auth.From
-	genesisAlloc := map[common.Address]core.GenesisAccount{
+	genesisAlloc := map[common.Address]types.Account{
 		deployerAddr: {
 			Balance: balance,
 		},

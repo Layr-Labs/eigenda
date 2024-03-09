@@ -76,11 +76,11 @@ type Batcher struct {
 	Transactor            core.Transactor
 	TransactionManager    TxnManager
 	Metrics               *Metrics
+	HeartbeatChan         chan time.Time
 
-	ethClient     common.EthClient
-	finalizer     Finalizer
-	logger        logging.Logger
-	HeartbeatChan chan time.Time
+	ethClient common.EthClient
+	finalizer Finalizer
+	logger    logging.Logger
 }
 
 func NewBatcher(
@@ -482,7 +482,7 @@ func serializeProof(proof *merkletree.Proof) []byte {
 	return proofBytes
 }
 
-func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.Receipt) (uint32, error) {
+func (b *Batcher) parseBatchIDFromReceipt(txReceipt *types.Receipt) (uint32, error) {
 	if len(txReceipt.Logs) == 0 {
 		return 0, errors.New("failed to get transaction receipt with logs")
 	}
@@ -528,7 +528,7 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 		err     error
 	)
 
-	batchID, err = b.parseBatchIDFromReceipt(ctx, txReceipt)
+	batchID, err = b.parseBatchIDFromReceipt(txReceipt)
 	if err == nil {
 		return batchID, nil
 	}
@@ -544,7 +544,7 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 			continue
 		}
 
-		batchID, err = b.parseBatchIDFromReceipt(ctx, txReceipt)
+		batchID, err = b.parseBatchIDFromReceipt(txReceipt)
 		if err == nil {
 			return batchID, nil
 		}

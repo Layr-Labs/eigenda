@@ -13,17 +13,18 @@ import (
 )
 
 type Config struct {
-	BatcherConfig   batcher.Config
-	TimeoutConfig   batcher.TimeoutConfig
-	BlobstoreConfig blobstore.Config
-	EthClientConfig geth.EthClientConfig
-	AwsClientConfig aws.ClientConfig
-	EncoderConfig   kzg.KzgConfig
-	LoggerConfig    common.LoggerConfig
-	MetricsConfig   batcher.MetricsConfig
-	IndexerConfig   indexer.Config
-	GraphUrl        string
-	UseGraph        bool
+	BatcherConfig    batcher.Config
+	TimeoutConfig    batcher.TimeoutConfig
+	BlobstoreConfig  blobstore.Config
+	EthClientConfig  geth.EthClientConfig
+	AwsClientConfig  aws.ClientConfig
+	EncoderConfig    kzg.KzgConfig
+	LoggerConfig     common.LoggerConfig
+	MetricsConfig    batcher.MetricsConfig
+	IndexerConfig    indexer.Config
+	FireblocksConfig common.FireblocksConfig
+	GraphUrl         string
+	UseGraph         bool
 
 	IndexerDataDir string
 
@@ -74,6 +75,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
+		FireblocksConfig:              common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix),
 	}
 	return config, nil
 }
