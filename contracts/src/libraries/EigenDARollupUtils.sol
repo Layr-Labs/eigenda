@@ -6,6 +6,7 @@ import {Merkle} from "eigenlayer-core/contracts/libraries/Merkle.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 import {EigenDAHasher} from "./EigenDAHasher.sol";
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to prove blobs on EigenDA and open KZG commitments.
@@ -50,6 +51,9 @@ library EigenDARollupUtils {
             "EigenDARollupUtils.verifyBlob: inclusion proof is invalid"
         );
 
+        // bitmap of quorum numbers in all quorumBlobParams
+        uint256 confirmedQuorumsBitmap;
+
         // require that the security param in each blob is met
         for (uint i = 0; i < blobHeader.quorumBlobParams.length; i++) {
             // make sure that the quorumIndex matches the given quorumNumber
@@ -77,7 +81,20 @@ library EigenDARollupUtils {
                 "EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met"
             );
 
+            // mark confirmed quorum in the bitmap
+            confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, blobHeader.quorumBlobParams[i].quorumNumber);
         }
+
+        // check that required quorums are a subset of the confirmed quorums
+        require(
+            BitmapUtils.isSubsetOf(
+                BitmapUtils.orderedBytesArrayToBitmap(
+                    eigenDAServiceManager.quorumsNumbersRequired()
+                ),
+                confirmedQuorumsBitmap
+            ),
+            "EigenDARollupUtils.verifyBlob: confirmed quorums are not a subset of the required quorums"
+        );
     }
 
     /**
