@@ -35,5 +35,6 @@ services:
       SRS_ORDER: 3000
       SRS_LOAD: 3000
       CHALLENGE_ORDER: 3000
-      STD_LOG_LEVEL: "trace"
+      LOG_LEVEL: "debug"
+      LOG_FORMAT: "text"
       VERBOSE: true

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/urfave/cli"
 
@@ -50,7 +49,11 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	logger := logging.NewSlogTextLogger(config.LoggingConfig.OutputWriter, &config.LoggingConfig.HandlerOpts)
+	logger, err := common.NewLogger(config.LoggerConfig)
+	if err != nil {
+		return err
+	}
+
 	pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
 
 	// Create the node.

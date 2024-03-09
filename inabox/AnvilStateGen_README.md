@@ -54,8 +54,8 @@ services:
       CACHE_PATH: /data/kzg/SRSTables
       SRS_ORDER: 300000
       CHALLENGE_ORDER: 300000
-      STD_LOG_LEVEL: "trace"
-      FILE_LOG_LEVEL: "trace"
+      STD_LOG_LEVEL: "debug"
+      FILE_LOG_LEVEL: "debug"
       VERBOSE: true
       NUM_CONNECTIONS: 50
       AWS_ENDPOINT_URL:
@@ -138,8 +138,8 @@ services:
       CACHE_PATH: /data/kzg/SRSTables
       SRS_ORDER: 300000
       CHALLENGE_ORDER: 300000
-      STD_LOG_LEVEL: "trace"
-      FILE_LOG_LEVEL: "trace"
+      STD_LOG_LEVEL: "debug"
+      FILE_LOG_LEVEL: "debug"
       VERBOSE: true
       NUM_CONNECTIONS: 50
       AWS_ENDPOINT_URL:

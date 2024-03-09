@@ -7,6 +7,7 @@ import (
 	"os"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -14,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -63,7 +63,10 @@ func run(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalf("failed to parse the command line flags: %v", err)
 	}
-	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
+	logger, err := common.NewLogger(config.LoggerConfig)
+	if err != nil {
+		log.Fatalf("failed to create logger: %v", err)
+	}
 
 	log.Println("Starting geth client")
 	gethClient, err := geth.NewClient(config.EthClientConfig, logger)

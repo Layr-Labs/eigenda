@@ -13,7 +13,6 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -55,7 +54,11 @@ func setup(m *testing.M) {
 	}
 
 	loggerConfig := common.DefaultLoggerConfig()
-	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		teardown()
+		panic("failed to create logger")
+	}
 
 	clientConfig = commonaws.ClientConfig{
 		Region:          "us-east-1",
@@ -63,7 +66,7 @@ func setup(m *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
-	var err error
+
 	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
 	if err != nil {
 		teardown()

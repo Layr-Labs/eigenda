@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -53,8 +52,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
-
+	logger, err := common.NewLogger(config.LoggerConfig)
+	if err != nil {
+		return err
+	}
 	client, err := geth.NewClient(config.EthClientConfig, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)

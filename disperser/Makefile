@@ -56,8 +56,8 @@ run_encoder: build_encoder
   --kzg.cache-path ../inabox/resources/kzg/SRSTables \
   --kzg.srs-order 3000 \
   --kzg.num-workers 12 \
-  --disperser-encoder.log.level-std trace \
-  --disperser-encoder.log.level-file trace
+  --disperser-encoder.log.level-std debug \
+  --disperser-encoder.log.level-file debug
 
 run_dataapi_tests:
 	go test -v disperser/dataapi
