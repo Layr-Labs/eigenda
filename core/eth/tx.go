@@ -671,7 +671,8 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 }
 
 func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	return t.EthClient.GetCurrentBlockNumber(ctx)
+	bn, err := t.EthClient.BlockNumber(ctx)
+	return uint32(bn), err
 }
 
 func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
