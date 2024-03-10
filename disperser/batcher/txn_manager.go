@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -130,16 +131,21 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.logger.Debug("[TxnManager] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
-	gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
+
+	// use identical instance for one transaction
+	ethClient := t.ethClient.(geth.EthClient)
+	instance := ethClient.GetEthClientInstance()
+
+	gasTipCap, gasFeeCap, err := instance.GetLatestGasCaps(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest gas caps: %w", err)
 	}
 
-	txn, err := t.ethClient.UpdateGas(ctx, req.Tx, req.Value, gasTipCap, gasFeeCap)
+	txn, err := instance.UpdateGas(ctx, req.Tx, req.Value, gasTipCap, gasFeeCap)
 	if err != nil {
 		return fmt.Errorf("failed to update gas price: %w", err)
 	}
-	err = t.ethClient.SendTransaction(ctx, txn)
+	err = instance.SendTransaction(ctx, txn)
 	if err != nil {
 		return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
 	} else {
@@ -168,7 +174,12 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 		defer cancel()
 
 		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
-		receipt, err := t.ethClient.EnsureAnyTransactionEvaled(
+
+		// check a client instance for each iteration
+		ethClient := t.ethClient.(geth.EthClient)
+		instance := ethClient.GetEthClientInstance()
+
+		receipt, err := instance.EnsureAnyTransactionEvaled(
 			ctxWithTimeout,
 			req.txAttempts,
 			req.Tag,
@@ -185,13 +196,14 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 				continue
 			}
 			t.logger.Warn("[TxnManager] transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
-			newTx, err := t.speedUpTxn(ctx, req.Tx, req.Tag)
+			// use the same client instance
+			newTx, err := t.speedUpTxn(ctx, req.Tx, req.Tag, instance)
 			if err != nil {
 				t.logger.Error("[TxnManager] failed to speed up transaction", "err", err)
 				t.metrics.IncrementTxnCount("failure")
 				return nil, err
 			}
-			err = t.ethClient.SendTransaction(ctx, newTx)
+			err = instance.SendTransaction(ctx, newTx)
 			if err != nil {
 				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 				if retryFromFailure >= maxSpeedUpRetry {
@@ -216,11 +228,12 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 
 // speedUpTxn increases the gas price of the existing transaction by specified percentage.
 // It makes sure the new gas price is not lower than the current gas price.
-func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag string) (*types.Transaction, error) {
+func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag string, instance *geth.EthClientInstance) (*types.Transaction, error) {
 	prevGasTipCap := tx.GasTipCap()
 	prevGasFeeCap := tx.GasFeeCap()
+
 	// get the gas tip cap and gas fee cap based on current network condition
-	currentGasTipCap, currentGasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
+	currentGasTipCap, currentGasFeeCap, err := instance.GetLatestGasCaps(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +253,7 @@ func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag 
 	}
 
 	t.logger.Info("[TxnManager] increasing gas price", "tag", tag, "txHash", tx.Hash().Hex(), "nonce", tx.Nonce(), "prevGasTipCap", prevGasTipCap, "prevGasFeeCap", prevGasFeeCap, "newGasTipCap", newGasTipCap, "newGasFeeCap", newGasFeeCap)
-	return t.ethClient.UpdateGas(ctx, tx, tx.Value(), newGasTipCap, newGasFeeCap)
+	return instance.UpdateGas(ctx, tx, tx.Value(), newGasTipCap, newGasFeeCap)
 }
 
 // increaseGasPrice increases the gas price by specified percentage.

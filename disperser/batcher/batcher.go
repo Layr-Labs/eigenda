@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -539,7 +540,11 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 		b.logger.Warn("failed to get transaction receipt, retrying...", "retryIn", retrySec, "err", err)
 		time.Sleep(time.Duration(retrySec) * baseDelay)
 
-		txReceipt, err = b.ethClient.TransactionReceipt(ctx, txHash)
+		// cast into geth.EthClient type to expose GetEthClientInstance()
+		ethClient := b.ethClient.(geth.EthClient)
+		instance := ethClient.GetEthClientInstance()
+
+		txReceipt, err = instance.TransactionReceipt(ctx, txHash)
 		if err != nil {
 			continue
 		}

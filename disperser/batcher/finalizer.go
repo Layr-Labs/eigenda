@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
@@ -210,7 +211,11 @@ func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.
 	for i := 0; i < maxRetries; i++ {
 		ctxWithTimeout, cancel = context.WithTimeout(ctx, f.timeout)
 		defer cancel()
-		txReceipt, err = f.ethClient.TransactionReceipt(ctxWithTimeout, hash)
+
+		ethClient := f.ethClient.(geth.EthClient)
+		instance := ethClient.GetEthClientInstance()
+
+		txReceipt, err = instance.TransactionReceipt(ctxWithTimeout, hash)
 		if err == nil {
 			break
 		}

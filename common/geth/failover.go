@@ -2,6 +2,8 @@ package geth
 
 import (
 	"sync"
+
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 type FailoverController struct {
@@ -9,15 +11,17 @@ type FailoverController struct {
 	NumberSuccess   uint64
 	SwitchTrigger   int
 	NumberOfBackups int
+	Logger          logging.Logger
 	mu              *sync.Mutex
 }
 
-func NewFailoverController(numBackup int, switchTrigger int) *FailoverController {
+func NewFailoverController(numBackup int, switchTrigger int, logger logging.Logger) *FailoverController {
 	return &FailoverController{
 		NumberFault:     0,
 		NumberSuccess:   0,
 		SwitchTrigger:   switchTrigger,
 		NumberOfBackups: numBackup,
+		Logger:          logger,
 		mu:              &sync.Mutex{},
 	}
 }

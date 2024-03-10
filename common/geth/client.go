@@ -1,7 +1,6 @@
 package geth
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -26,7 +25,7 @@ type EthClient struct {
 }
 
 func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error) {
-	controller := NewFailoverController(len(config.RPCURLBackup), RPC_SWITCH_TRIGGER)
+	controller := NewFailoverController(len(config.RPCURLBackup), RPC_SWITCH_TRIGGER, logger)
 
 	primary, err := NewClientInstance(config, logger, controller)
 	if err != nil {
@@ -61,7 +60,7 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	}, nil
 }
 
-func (c *EthClient) GetEthClient(ctx context.Context) *EthClientInstance {
+func (c *EthClient) GetEthClientInstance() *EthClientInstance {
 	isPrimary, index := c.Controller.GetClientIndex()
 	if isPrimary {
 		return c.EthClientInstance
