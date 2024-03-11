@@ -80,11 +80,6 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	return c, err
 }
 
-func (c *EthClient) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	bn, err := c.Client.BlockNumber(ctx)
-	return uint32(bn), err
-}
-
 func (c *EthClient) GetAccountAddress() gethcommon.Address {
 	return c.AccountAddress
 }
