@@ -508,6 +508,7 @@ func TestRetryTxnReceipt(t *testing.T) {
 		BlockNumber: big.NewInt(123),
 	}
 
+	components.ethClient.On("GetEthClientInstance").Return(components.ethClient)
 	components.ethClient.On("TransactionReceipt").Return(invalidReceipt, nil).Twice()
 	components.ethClient.On("TransactionReceipt").Return(validReceipt, nil).Once()
 	blobStore := components.blobStore

@@ -19,6 +19,12 @@ type MockEthClient struct {
 
 var _ dacommon.EthClient = (*MockEthClient)(nil)
 
+func (mock *MockEthClient) GetEthClientInstance() dacommon.EthClient {
+	args := mock.Called()
+	result := args.Get(0)
+	return result.(*MockEthClient)
+}
+
 func (mock *MockEthClient) GetAccountAddress() common.Address {
 	args := mock.Called()
 	result := args.Get(0)

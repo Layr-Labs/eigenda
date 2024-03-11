@@ -35,6 +35,8 @@ func TestFinalizedBlob(t *testing.T) {
 		Run(func(args m.Arguments) {
 			args[1].(*types.Header).Number = big.NewInt(latestFinalBlock)
 		}).Return(nil).Once()
+
+	ethClient.On("GetEthClientInstance").Return(ethClient)
 	ethClient.On("TransactionReceipt", m.Anything, m.Anything).Return(&types.Receipt{
 		BlockNumber: new(big.Int).SetUint64(1_000_000),
 	}, nil)
@@ -133,6 +135,7 @@ func TestUnfinalizedBlob(t *testing.T) {
 		Run(func(args m.Arguments) {
 			args[1].(*types.Header).Number = big.NewInt(latestFinalBlock)
 		}).Return(nil).Once()
+	ethClient.On("GetEthClientInstance").Return(ethClient)
 	ethClient.On("TransactionReceipt", m.Anything, m.Anything).Return(&types.Receipt{
 		BlockNumber: new(big.Int).SetUint64(1_000_100),
 	}, nil)
@@ -205,6 +208,8 @@ func TestNoReceipt(t *testing.T) {
 		Run(func(args m.Arguments) {
 			args[1].(*types.Header).Number = big.NewInt(latestFinalBlock)
 		}).Return(nil)
+
+	ethClient.On("GetEthClientInstance").Return(ethClient)
 	ethClient.On("TransactionReceipt", m.Anything, m.Anything).Return(nil, ethereum.NotFound)
 
 	metrics := batcher.NewMetrics("9100", logger)

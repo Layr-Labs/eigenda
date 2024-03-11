@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	dacommon "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -23,6 +24,8 @@ type EthClient struct {
 	BackupInstances    []*EthClientInstance
 	Controller         *FailoverController
 }
+
+var _ dacommon.EthClient = (*EthClient)(nil)
 
 func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error) {
 	controller := NewFailoverController(len(config.RPCURLBackup), RPC_SWITCH_TRIGGER, logger)
@@ -60,7 +63,7 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	}, nil
 }
 
-func (c *EthClient) GetEthClientInstance() *EthClientInstance {
+func (c *EthClient) GetEthClientInstance() dacommon.EthClient {
 	isPrimary, index := c.Controller.GetClientIndex()
 	if isPrimary {
 		return c.EthClientInstance

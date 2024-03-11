@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -541,8 +540,8 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 		time.Sleep(time.Duration(retrySec) * baseDelay)
 
 		// cast into geth.EthClient type to expose GetEthClientInstance()
-		ethClient := b.ethClient.(geth.EthClient)
-		instance := ethClient.GetEthClientInstance()
+		//ethClient := b.ethClient.(geth.EthClient)
+		instance := b.ethClient.GetEthClientInstance()
 
 		txReceipt, err = instance.TransactionReceipt(ctx, txHash)
 		if err != nil {

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -133,8 +132,8 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 	t.logger.Debug("[TxnManager] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
 
 	// use identical instance for one transaction
-	ethClient := t.ethClient.(geth.EthClient)
-	instance := ethClient.GetEthClientInstance()
+	//ethClient := t.ethClient.(geth.EthClient)
+	instance := t.ethClient.GetEthClientInstance()
 
 	gasTipCap, gasFeeCap, err := instance.GetLatestGasCaps(ctx)
 	if err != nil {
@@ -176,8 +175,8 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
 
 		// check a client instance for each iteration
-		ethClient := t.ethClient.(geth.EthClient)
-		instance := ethClient.GetEthClientInstance()
+		//ethClient := t.ethClient.(geth.EthClient)
+		instance := t.ethClient.GetEthClientInstance()
 
 		receipt, err := instance.EnsureAnyTransactionEvaled(
 			ctxWithTimeout,
@@ -228,7 +227,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 
 // speedUpTxn increases the gas price of the existing transaction by specified percentage.
 // It makes sure the new gas price is not lower than the current gas price.
-func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag string, instance *geth.EthClientInstance) (*types.Transaction, error) {
+func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag string, instance common.EthClient) (*types.Transaction, error) {
 	prevGasTipCap := tx.GasTipCap()
 	prevGasFeeCap := tx.GasFeeCap()
 

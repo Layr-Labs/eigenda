@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	dacommon "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -73,10 +74,8 @@ func NewClientInstance(config EthClientConfig, logger logging.Logger, controller
 	return c, err
 }
 
-func (c *EthClientInstance) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	bn, err := c.Client.BlockNumber(ctx)
-	c.controller.ProcessError(err)
-	return uint32(bn), err
+func (c *EthClientInstance) GetEthClientInstance() dacommon.EthClient {
+	return c
 }
 
 func (c *EthClientInstance) GetAccountAddress() gethcommon.Address {

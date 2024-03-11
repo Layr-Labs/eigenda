@@ -29,7 +29,7 @@ type InstrumentedEthClient struct {
 	clientAndVersion  string
 }
 
-var _ common.EthClient = (*InstrumentedEthClient)(nil)
+//var _ common.EthClient = (*InstrumentedEthClient)(nil)
 
 func NewInstrumentedEthClient(config EthClientConfig, rpcCallsCollector *rpccalls.Collector, logger logging.Logger) (*InstrumentedEthClient, error) {
 	ethClient, err := NewClient(config, logger)
@@ -43,6 +43,10 @@ func NewInstrumentedEthClient(config EthClientConfig, rpcCallsCollector *rpccall
 	}
 
 	return c, err
+}
+
+func (iec *InstrumentedEthClient) GetEthClientInstance() common.EthClient {
+	return iec
 }
 
 func (iec *InstrumentedEthClient) ChainID(ctx context.Context) (*big.Int, error) {
