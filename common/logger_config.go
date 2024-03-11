@@ -1,19 +1,30 @@
 package common
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli"
 )
 
 const (
-	PathFlagName  = "log.path"
-	LevelFlagName = "log.level"
+	PathFlagName   = "log.path"
+	LevelFlagName  = "log.level"
+	FormatFlagName = "log.format"
+)
+
+type LogFormat string
+
+const (
+	JSONLogFormat LogFormat = "json"
+	TextLogFormat LogFormat = "text"
 )
 
 type LoggerConfig struct {
+	Format       LogFormat
 	OutputWriter io.Writer
 	HandlerOpts  slog.HandlerOptions
 }
@@ -32,11 +43,18 @@ func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Value:  "",
 			EnvVar: PrefixEnvVar(envPrefix, "LOG_PATH"),
 		},
+		cli.StringFlag{
+			Name:   PrefixFlag(flagPrefix, FormatFlagName),
+			Usage:  "The format of the log file. Accepted options are 'json' and 'text'",
+			Value:  "json",
+			EnvVar: PrefixEnvVar(envPrefix, "LOG_FORMAT"),
+		},
 	}
 }
 
 func DefaultLoggerConfig() LoggerConfig {
 	return LoggerConfig{
+		Format:       JSONLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: slog.HandlerOptions{
 			AddSource: true,
@@ -47,6 +65,15 @@ func DefaultLoggerConfig() LoggerConfig {
 
 func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, error) {
 	cfg := DefaultLoggerConfig()
+	format := ctx.GlobalString(PrefixFlag(flagPrefix, FormatFlagName))
+	if format == "json" {
+		cfg.Format = JSONLogFormat
+	} else if format == "text" {
+		cfg.Format = TextLogFormat
+	} else {
+		return nil, fmt.Errorf("invalid log file format %s", format)
+	}
+
 	path := ctx.GlobalString(PrefixFlag(flagPrefix, PathFlagName))
 	if path != "" {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -64,4 +91,14 @@ func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, er
 	cfg.HandlerOpts.Level = level
 
 	return &cfg, nil
+}
+
+func NewLogger(cfg LoggerConfig) (logging.Logger, error) {
+	if cfg.Format == JSONLogFormat {
+		return logging.NewSlogJsonLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
+	}
+	if cfg.Format == TextLogFormat {
+		return logging.NewSlogTextLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
+	}
+	return nil, fmt.Errorf("unknown log format: %s", cfg.Format)
 }

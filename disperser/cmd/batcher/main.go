@@ -10,9 +10,9 @@ import (
 
 	"github.com/shurcooL/graphql"
 
+	"github.com/Layr-Labs/eigenda/common"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -76,7 +76,10 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
-	logger := logging.NewSlogJsonLogger(config.LoggerConfig.OutputWriter, &config.LoggerConfig.HandlerOpts)
+	logger, err := common.NewLogger(config.LoggerConfig)
+	if err != nil {
+		return err
+	}
 
 	bucketName := config.BlobstoreConfig.BucketName
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)

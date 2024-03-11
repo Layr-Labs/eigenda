@@ -112,7 +112,8 @@ var _ = BeforeSuite(func() {
 		testConfig.StartBinaries()
 	}
 	loggerConfig := common.DefaultLoggerConfig()
-	logger = logging.NewSlogTextLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
+	logger, err = common.NewLogger(loggerConfig)
+	Expect(err).To(BeNil())
 
 	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
 	pk = strings.TrimPrefix(pk, "0x")

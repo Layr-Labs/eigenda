@@ -69,7 +69,7 @@ type Config struct {
 	UseSecureGrpc                 bool
 
 	EthClientConfig geth.EthClientConfig
-	LoggingConfig   common.LoggerConfig
+	LoggerConfig    common.LoggerConfig
 	EncoderConfig   kzg.KzgConfig
 }
 
@@ -162,7 +162,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		PrivateBls:                    privateBls,
 		EthClientConfig:               ethClientConfig,
 		EncoderConfig:                 kzg.ReadCLIConfig(ctx),
-		LoggingConfig:                 *loggerConfig,
+		LoggerConfig:                  *loggerConfig,
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProvider:                 ctx.GlobalString(flags.PubIPProviderFlag.Name),

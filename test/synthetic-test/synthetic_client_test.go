@@ -116,7 +116,12 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 	}
 
 	loggerConfig := common.DefaultLoggerConfig()
-	ethLogger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
+	ethLogger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		logger.Printf("Error: %v", err)
+		return nil
+	}
+
 	pk = strings.TrimPrefix(pk, "0X")
 	pk = strings.TrimPrefix(pk, "0x")
 	ethClient, err := geth.NewClient(geth.EthClientConfig{

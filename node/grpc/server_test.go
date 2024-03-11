@@ -21,7 +21,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -86,7 +85,11 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 		NumBatchValidators:        runtime.GOMAXPROCS(0),
 	}
 	loggerConfig := common.DefaultLoggerConfig()
-	logger := logging.NewSlogTextLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		panic("failed to create a logger")
+	}
+
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		panic("failed to create a directory for db")

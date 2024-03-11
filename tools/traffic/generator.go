@@ -24,7 +24,10 @@ type TrafficGenerator struct {
 
 func NewTrafficGenerator(config *Config) (*TrafficGenerator, error) {
 	loggerConfig := common.DefaultLoggerConfig()
-	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	return &TrafficGenerator{
 		Logger:          logger,

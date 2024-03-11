@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -199,8 +198,8 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	assert.NoError(t, err)
 	assert.NotNil(t, privateKey)
 	loggerConfig := common.DefaultLoggerConfig()
-	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
-	assert.NotNil(t, logger)
+	logger, err := common.NewLogger(loggerConfig)
+	assert.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           operator.NODE_CHAIN_RPC,
@@ -233,8 +232,8 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	hexPk := strings.TrimPrefix(testConfig.Pks.EcdsaMap[testConfig.Deployers[0].Name].PrivateKey, "0x")
 	loggerConfig := common.DefaultLoggerConfig()
-	logger := logging.NewSlogJsonLogger(loggerConfig.OutputWriter, &loggerConfig.HandlerOpts)
-	assert.NotNil(t, logger)
+	logger, err := common.NewLogger(loggerConfig)
+	assert.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           operator.NODE_CHAIN_RPC,
