@@ -403,11 +403,15 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*disperser.BlobMetadata, e
 		return nil, err
 	}
 	metadata.RequestMetadata = &requestMetadata
+
+	// Noticed that confirmation infor is not marshalled for not confirmed and finalized blobs
+	confirmationInfo := disperser.ConfirmationInfo{}
+	metadata.ConfirmationInfo = &confirmationInfo
+
 	if metadata.BlobStatus != disperser.Confirmed && metadata.BlobStatus != disperser.Finalized {
 		return &metadata, nil
 	}
 
-	confirmationInfo := disperser.ConfirmationInfo{}
 	err = attributevalue.UnmarshalMap(item, &confirmationInfo)
 	if err != nil {
 		return nil, err
