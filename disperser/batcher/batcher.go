@@ -539,8 +539,6 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 		b.logger.Warn("failed to get transaction receipt, retrying...", "retryIn", retrySec, "err", err)
 		time.Sleep(time.Duration(retrySec) * baseDelay)
 
-		// cast into geth.EthClient type to expose GetEthClientInstance()
-		//ethClient := b.ethClient.(geth.EthClient)
 		instance := b.ethClient.GetEthClientInstance()
 
 		txReceipt, err = instance.TransactionReceipt(ctx, txHash)

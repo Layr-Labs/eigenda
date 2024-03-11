@@ -175,7 +175,6 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
 
 		// check a client instance for each iteration
-		//ethClient := t.ethClient.(geth.EthClient)
 		instance := t.ethClient.GetEthClientInstance()
 
 		receipt, err := instance.EnsureAnyTransactionEvaled(

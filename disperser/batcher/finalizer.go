@@ -211,7 +211,6 @@ func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.
 		ctxWithTimeout, cancel = context.WithTimeout(ctx, f.timeout)
 		defer cancel()
 
-		//ethClient := f.ethClient.(geth.EthClient)
 		instance := f.ethClient.GetEthClientInstance()
 
 		txReceipt, err = instance.TransactionReceipt(ctxWithTimeout, hash)
