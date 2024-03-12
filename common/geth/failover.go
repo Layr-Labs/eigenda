@@ -11,6 +11,7 @@ type FailoverController struct {
 	NumberSuccess   uint64
 	SwitchTrigger   int
 	NumberOfBackups int
+	currentRPCIndex int
 	Logger          logging.Logger
 	mu              *sync.Mutex
 }
@@ -19,6 +20,7 @@ func NewFailoverController(numBackup int, switchTrigger int, logger logging.Logg
 	return &FailoverController{
 		NumberFault:     0,
 		NumberSuccess:   0,
+		currentRPCIndex: 0,
 		SwitchTrigger:   switchTrigger,
 		NumberOfBackups: numBackup,
 		Logger:          logger,
@@ -41,19 +43,20 @@ func (f *FailoverController) ProcessError(err error) {
 	if fault == SenderFault {
 		return
 	} else if fault == RPCFault {
-		f.updateRPCFault()
+		f.updateRPCFault(err)
 		return
 	} else if fault == Ok {
 		return
 	} else { // TooManyRequest
-		f.updateRPCFault()
+		f.updateRPCFault(err)
 		return
 	}
 }
 
 // update rpc fault
-func (f *FailoverController) updateRPCFault() {
+func (f *FailoverController) updateRPCFault(err error) {
 	f.NumberFault += 1
+	f.Logger.Error("RPC fault", "error", err)
 }
 
 // return two values
@@ -63,6 +66,10 @@ func (f *FailoverController) GetClientIndex() (bool, uint64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	index := (f.NumberFault / uint64(f.SwitchTrigger)) % uint64(f.NumberOfBackups+1)
+	if uint64(f.currentRPCIndex) != index {
+		f.Logger.Info("Change RPC index", "index", index)
+	}
+
 	if index == 0 {
 		return true, 0
 	} else {
