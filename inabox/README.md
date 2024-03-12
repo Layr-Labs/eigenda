@@ -21,6 +21,12 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
     ```
     go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
     ```
+- Ensure AWS CLI is installed:
+    ```
+    curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+    sudo installer -pkg AWSCLIV2.pkg -target /
+    ```
+    For Linux and Windows users, check [installation instructions](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions).
 
 ## Run a complete end-to-end test
 
