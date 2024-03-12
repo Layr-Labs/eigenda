@@ -74,7 +74,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             )
         );
 
-        mockRollup = new MockRollup(eigenDAServiceManager, s1, illegalValue, defaultStakeRequired);
+        mockRollup = new MockRollup(eigenDAServiceManager, s1);
 
         //hardcode g2 proof
         illegalProof.X[1] = 11151623676041303181597631684634074376466382703418354161831688442589830350329;
@@ -85,26 +85,16 @@ contract MockRollupTest is BLSMockAVSDeployer {
     }
 
     function testChallenge(uint256 pseudoRandomNumber) public {
-        //register alice with rollup
-        vm.deal(alice, 1 ether);
-        vm.prank(alice);
-        mockRollup.registerValidator{value: 1 ether}();
-
         //get commitment with illegal value
         (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
-        //post commitment
-        vm.prank(alice);
         mockRollup.postCommitment(blobHeader, blobVerificationProof);
 
-        //challenge commitment
-        vm.prank(bob);
-        mockRollup.challengeCommitment(block.timestamp, illegalPoint, illegalProof);
+        bool success = mockRollup.challengeCommitment(block.timestamp, illegalPoint, illegalProof, illegalValue);
+        assertEq(success, true);
 
-        //check that kzg proof was verified
-        assertEq(mockRollup.blacklist(alice), true);
-        assertEq(mockRollup.validators(alice), false);
-        assertEq(bob.balance, 1 ether);
+        success = mockRollup.challengeCommitment(block.timestamp, illegalPoint, illegalProof, 69);
+        assertEq(success, false);
     }
 
     function _getIllegalCommitment() internal view returns (BN254.G1Point memory illegalCommitment) {
