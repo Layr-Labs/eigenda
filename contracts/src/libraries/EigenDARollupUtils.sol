@@ -89,7 +89,7 @@ library EigenDARollupUtils {
         require(
             BitmapUtils.isSubsetOf(
                 BitmapUtils.orderedBytesArrayToBitmap(
-                    eigenDAServiceManager.quorumsNumbersRequired()
+                    eigenDAServiceManager.quorumNumbersRequired()
                 ),
                 confirmedQuorumsBitmap
             ),
