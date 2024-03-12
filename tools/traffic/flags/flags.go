@@ -53,18 +53,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "DATA_SIZE"),
 	}
-	AdversarialThresholdFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "adv-threshold"),
-		Usage:    "Adversarial threshold between 0 and 100",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ADV_THRESHOLD"),
-	}
-	QuorumThresholdFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "quorum-threshold"),
-		Usage:    "Quorum threshold between 0 and 100",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "QUORUM_THRESHOLD"),
-	}
 	RandomizeBlobsFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "randomize-blobs"),
 		Usage:    "Whether to randomzie blob data",
@@ -92,8 +80,6 @@ var requiredFlags = []cli.Flag{
 	NumInstancesFlag,
 	RequestIntervalFlag,
 	DataSizeFlag,
-	AdversarialThresholdFlag,
-	QuorumThresholdFlag,
 }
 
 var optionalFlags = []cli.Flag{

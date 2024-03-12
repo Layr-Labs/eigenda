@@ -74,7 +74,7 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 					return err
 				}
 			}
-			err := g.sendRequest(ctx, data, 0)
+			err := g.sendRequest(ctx, data)
 			if err != nil {
 				g.Logger.Error("failed to send blob request", "err:", err)
 			}
@@ -82,10 +82,10 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 	}
 }
 
-func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte, quorumID uint8) error {
+func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
 	defer cancel()
-	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, []uint8{quorumID})
+	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, []uint8{})
 	if err != nil {
 		return err
 	}
