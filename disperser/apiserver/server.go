@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -244,7 +245,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest("400", quorumId, blobSize, "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), quorumId, blobSize, "DisperseBlob")
 		}
 		return nil, api.NewInvalidArgError(err.Error())
 	}
@@ -255,7 +256,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest("400", quorumId, blobSize, "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), quorumId, blobSize, "DisperseBlob")
 		}
 		return nil, api.NewInvalidArgError(err.Error())
 	}
@@ -265,7 +266,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		if err != nil {
 			rateLimited := errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) || errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit)
 			if !rateLimited {
-				s.metrics.HandleFailedRequest("500", "", blobSize, "DisperseBlob")
+				s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
 				return nil, api.NewInternalError(err.Error())
 			}
 			return nil, api.NewResourceExhaustedError(err.Error())
@@ -555,14 +556,14 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
 		// TODO: we need to distinguish NOT_FOUND from actual internal error.
-		s.metrics.IncrementFailedBlobRequestNum("500", "", "RetrieveBlob")
+		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
 
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob", "err", err)
-		s.metrics.HandleFailedRequest("500", "", len(data), "RetrieveBlob")
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", len(data), "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob data, please retry")
 	}
 

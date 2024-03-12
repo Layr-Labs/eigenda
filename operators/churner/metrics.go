@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc/codes"
 )
 
 type FailReason string
@@ -28,14 +29,14 @@ const (
 
 // Note: statusCodeMap must be maintained in sync with failure reason constants.
 var statusCodeMap map[FailReason]string = map[FailReason]string{
-	FailReasonRateLimitExceeded:           "429",
-	FailReasonInsufficientStakeToRegister: "400",
-	FailReasonInsufficientStakeToChurn:    "400",
-	FailReasonQuorumIdOutOfRange:          "400",
-	FailReasonPrevApprovalNotExpired:      "429",
-	FailReasonInvalidSignature:            "400",
-	FailReasonProcessChurnRequestFailed:   "500",
-	FailReasonInvalidRequest:              "400",
+	FailReasonRateLimitExceeded:           codes.ResourceExhausted.String(),
+	FailReasonInsufficientStakeToRegister: codes.InvalidArgument.String(),
+	FailReasonInsufficientStakeToChurn:    codes.InvalidArgument.String(),
+	FailReasonQuorumIdOutOfRange:          codes.InvalidArgument.String(),
+	FailReasonPrevApprovalNotExpired:      codes.ResourceExhausted.String(),
+	FailReasonInvalidSignature:            codes.InvalidArgument.String(),
+	FailReasonProcessChurnRequestFailed:   codes.Internal.String(),
+	FailReasonInvalidRequest:              codes.InvalidArgument.String(),
 }
 
 type MetricsConfig struct {
@@ -105,7 +106,7 @@ func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) {
 		g.logger.Error("cannot map failure reason to status code", "failure reason", reason)
 		// Treat this as an internal server error. This is a conservative approach to
 		// handle a negligence of mapping from failure reason to status code.
-		code = "500"
+		code = codes.Internal.String()
 	}
 	g.NumRequests.With(prometheus.Labels{
 		"status": code,

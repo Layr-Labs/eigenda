@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc/codes"
 )
 
 type MetricsConfig struct {
@@ -82,7 +83,7 @@ func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
 // IncrementSuccessfulBlobRequestNum increments the number of successful blob requests
 func (g *Metrics) IncrementSuccessfulBlobRequestNum(quorum string, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status_code": "200",
+		"status_code": codes.OK.String(),
 		"status":      "success",
 		"quorum":      quorum,
 		"method":      method,
@@ -122,7 +123,7 @@ func (g *Metrics) HandleFailedRequest(statusCode string, quorum string, blobByte
 // HandleBlobStoreFailedRequest updates the number of requests failed to store blob and the size of the blob
 func (g *Metrics) HandleBlobStoreFailedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status_code": "500",
+		"status_code": codes.Internal.String(),
 		"status":      StoreBlobFailure,
 		"quorum":      quorum,
 		"method":      method,
@@ -137,7 +138,7 @@ func (g *Metrics) HandleBlobStoreFailedRequest(quorum string, blobBytes int, met
 // HandleSystemRateLimitedRequest updates the number of system rate limited requests and the size of the blob
 func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status_code": "429",
+		"status_code": codes.ResourceExhausted.String(),
 		"status":      SystemRateLimitedFailure,
 		"quorum":      quorum,
 		"method":      method,
@@ -152,7 +153,7 @@ func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, m
 // HandleAccountRateLimitedRequest updates the number of account rate limited requests and the size of the blob
 func (g *Metrics) HandleAccountRateLimitedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{
-		"status_code": "429",
+		"status_code": codes.ResourceExhausted.String(),
 		"status":      AccountRateLimitedFailure,
 		"quorum":      quorum,
 		"method":      method,
