@@ -157,6 +157,13 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 			continue
 		}
 
+		// Noticed minor issue in Preprod where ProcessConfirmedBatch goroutine probably set this to failed status after updateBlobs was called to finalize the blobs.
+		// For Failed blobs, it is expected that ConfirmationInfo will be null.
+		if confirmationMetadata != nil && confirmationMetadata.BlobStatus != disperser.Confirmed {
+			f.logger.Error("FinalizeBlobs: the blob retrieved is actually", confirmationMetadata.BlobStatus.String(), "blobKey", blobKey.String())
+			continue
+		}
+
 		// Additional checks for confirmationMetadata and its nested fields
 		if confirmationMetadata == nil || confirmationMetadata.ConfirmationInfo == nil {
 			f.logger.Error("FinalizeBlobs: received nil confirmationMetadata or ConfirmationInfo", "blobKey", blobKey.String())
