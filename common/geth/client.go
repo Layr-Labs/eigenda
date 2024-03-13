@@ -9,10 +9,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-const (
-	RPC_SWITCH_TRIGGER = 3
-)
-
 var (
 	FallbackGasTipCap       = big.NewInt(15000000000)
 	ErrCannotGetECDSAPubKey = errors.New("ErrCannotGetECDSAPubKey")
@@ -20,15 +16,15 @@ var (
 )
 
 type EthClient struct {
-	*EthClientInstance // the first instance
-	BackupInstances    []*EthClientInstance
-	Controller         *FailoverController
+	*EthClientBase  // the first instance
+	BackupInstances []*EthClientBase
+	Controller      *FailoverController
 }
 
 var _ dacommon.EthClient = (*EthClient)(nil)
 
 func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error) {
-	controller := NewFailoverController(len(config.RPCURLBackup), RPC_SWITCH_TRIGGER, logger)
+	controller := NewFailoverController(len(config.RPCURLBackup), config.RpcSwitchTrigger, logger)
 
 	primary, err := NewClientInstance(config, logger, controller)
 	if err != nil {
@@ -40,7 +36,7 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	}
 
 	numBackup := len(config.RPCURLBackup)
-	backups := make([]*EthClientInstance, numBackup)
+	backups := make([]*EthClientBase, numBackup)
 	for i := 0; i < numBackup; i++ {
 		// overwrite the default
 		config.RPCURL = config.RPCURLBackup[i]
@@ -57,16 +53,16 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	logger.Info("Maintain", 1+numBackup, "Eth Client Instances")
 
 	return &EthClient{
-		EthClientInstance: primary,
-		BackupInstances:   backups,
-		Controller:        controller,
+		EthClientBase:   primary,
+		BackupInstances: backups,
+		Controller:      controller,
 	}, nil
 }
 
 func (c *EthClient) GetEthClientInstance() dacommon.EthClient {
 	isPrimary, index := c.Controller.GetClientIndex()
 	if isPrimary {
-		return c.EthClientInstance
+		return c.EthClientBase
 	} else {
 		return c.BackupInstances[index]
 	}

@@ -11,6 +11,7 @@ var (
 	numConfirmationsFlagName = "chain.num-confirmations"
 	rpcUrlBackupFlagName     = "chain.rpc-backup"
 	privateKeyBackupFlagName = "chain.private-key-backup"
+	rpcSwitchTriggerFlagName = "chain.rpc-switch-trigger"
 )
 
 type EthClientConfig struct {
@@ -20,6 +21,7 @@ type EthClientConfig struct {
 
 	RPCURLBackup           []string
 	PrivateKeyStringBackup []string
+	RpcSwitchTrigger       int
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
@@ -55,6 +57,13 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRIVATE_KEY_BACKUP"),
 		},
+		cli.IntFlag{
+			Name:     rpcSwitchTriggerFlagName,
+			Usage:    "Number of retry for each rpc. If only one RPC is provided, this flag has no effect",
+			Required: false,
+			Value:    3,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "RPC_SWTICH_TRIGGER"),
+		},
 	}
 }
 
@@ -65,6 +74,7 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.RPCURLBackup = ctx.GlobalStringSlice(rpcUrlBackupFlagName)
 	cfg.PrivateKeyStringBackup = ctx.GlobalStringSlice(privateKeyBackupFlagName)
+	cfg.RpcSwitchTrigger = ctx.GlobalInt(rpcSwitchTriggerFlagName)
 
 	return cfg
 }
@@ -76,5 +86,6 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.RPCURL = ctx.GlobalString(rpcUrlFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.RPCURLBackup = ctx.GlobalStringSlice(rpcUrlBackupFlagName)
+	cfg.RpcSwitchTrigger = ctx.GlobalInt(rpcSwitchTriggerFlagName)
 	return cfg
 }

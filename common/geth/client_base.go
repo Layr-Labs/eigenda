@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-type EthClientInstance struct {
+type EthClientBase struct {
 	*ethclient.Client
 	RPCURL           string
 	privateKey       *ecdsa.PrivateKey
@@ -31,7 +31,7 @@ type EthClientInstance struct {
 	controller       *FailoverController
 }
 
-func NewClientInstance(config EthClientConfig, logger logging.Logger, controller *FailoverController) (*EthClientInstance, error) {
+func NewClientInstance(config EthClientConfig, logger logging.Logger, controller *FailoverController) (*EthClientBase, error) {
 	chainClient, err := ethclient.Dial(config.RPCURL)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot connect to provider: %w", err)
@@ -59,7 +59,7 @@ func NewClientInstance(config EthClientConfig, logger logging.Logger, controller
 		return nil, fmt.Errorf("NewClient: cannot get chainId: %w", err)
 	}
 
-	c := &EthClientInstance{
+	c := &EthClientBase{
 		RPCURL:           config.RPCURL,
 		privateKey:       privateKey,
 		chainID:          chainIDBigInt,
@@ -74,15 +74,15 @@ func NewClientInstance(config EthClientConfig, logger logging.Logger, controller
 	return c, err
 }
 
-func (c *EthClientInstance) GetEthClientInstance() dacommon.EthClient {
+func (c *EthClientBase) GetEthClientInstance() dacommon.EthClient {
 	return c
 }
 
-func (c *EthClientInstance) GetAccountAddress() gethcommon.Address {
+func (c *EthClientBase) GetAccountAddress() gethcommon.Address {
 	return c.AccountAddress
 }
 
-func (c *EthClientInstance) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
+func (c *EthClientBase) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
 	opts, err := bind.NewKeyedTransactorWithChainID(c.privateKey, c.chainID)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
@@ -92,7 +92,7 @@ func (c *EthClientInstance) GetNoSendTransactOpts() (*bind.TransactOpts, error) 
 	return opts, nil
 }
 
-func (c *EthClientInstance) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
+func (c *EthClientBase) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
 	gasTipCap, err = c.SuggestGasTipCap(ctx)
 	c.controller.ProcessError(err)
 	if err != nil {
@@ -123,7 +123,7 @@ func (c *EthClientInstance) GetLatestGasCaps(ctx context.Context) (gasTipCap, ga
 	return
 }
 
-func (c *EthClientInstance) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
+func (c *EthClientBase) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
 	gasLimit, err := c.Client.EstimateGas(ctx, ethereum.CallMsg{
 		From:      c.AccountAddress,
 		To:        tx.To(),
@@ -163,7 +163,7 @@ func (c *EthClientInstance) UpdateGas(ctx context.Context, tx *types.Transaction
 // EstimateGasPriceAndLimitAndSendTx sends and returns a transaction receipt.
 //
 // Note: tx must be a to a contract, not an EOA
-func (c *EthClientInstance) EstimateGasPriceAndLimitAndSendTx(
+func (c *EthClientBase) EstimateGasPriceAndLimitAndSendTx(
 	ctx context.Context,
 	tx *types.Transaction,
 	tag string,
@@ -199,7 +199,7 @@ func (c *EthClientInstance) EstimateGasPriceAndLimitAndSendTx(
 
 // EnsureTransactionEvaled waits for tx to be mined on the blockchain and returns the receipt.
 // If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
-func (c *EthClientInstance) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
+func (c *EthClientBase) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	receipt, err := c.waitMined(ctx, []*types.Transaction{tx})
 	if err != nil {
 		return receipt, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
@@ -214,7 +214,7 @@ func (c *EthClientInstance) EnsureTransactionEvaled(ctx context.Context, tx *typ
 
 // EnsureAnyTransactionEvaled takes multiple transactions and waits for any of them to be mined on the blockchain and returns the receipt.
 // If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
-func (c *EthClientInstance) EnsureAnyTransactionEvaled(ctx context.Context, txs []*types.Transaction, tag string) (*types.Receipt, error) {
+func (c *EthClientBase) EnsureAnyTransactionEvaled(ctx context.Context, txs []*types.Transaction, tag string) (*types.Receipt, error) {
 	receipt, err := c.waitMined(ctx, txs)
 	if err != nil {
 		return receipt, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
@@ -231,7 +231,7 @@ func (c *EthClientInstance) EnsureAnyTransactionEvaled(ctx context.Context, txs 
 // If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
 // Taken from https://github.com/ethereum/go-ethereum/blob/master/accounts/abi/bind/util.go#L32,
 // but added a check for number of confirmations.
-func (c *EthClientInstance) waitMined(ctx context.Context, txs []*types.Transaction) (*types.Receipt, error) {
+func (c *EthClientBase) waitMined(ctx context.Context, txs []*types.Transaction) (*types.Receipt, error) {
 	queryTicker := time.NewTicker(3 * time.Second)
 	defer queryTicker.Stop()
 	var receipt *types.Receipt

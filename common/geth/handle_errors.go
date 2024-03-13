@@ -59,9 +59,14 @@ func HandleError(err error) ChainConnFaults {
 		return SenderFault
 	}
 
-	// custom error parsing
+	// custom error parsing. If the error message does not contain any error code, which is 3 digit at minimum
 	errMsg := err.Error()
 	if len(errMsg) < 3 {
+		return RPCFault
+	}
+
+	// prevent ddos if error message is too large
+	if len(errMsg) > 1000 {
 		return RPCFault
 	}
 
@@ -72,7 +77,6 @@ func HandleError(err error) ChainConnFaults {
 	}
 
 	// 400 errors
-
 	// too many requests
 	if strings.Contains(errMsg, "429") {
 		return TooManyRequest
