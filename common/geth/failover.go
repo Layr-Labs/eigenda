@@ -68,6 +68,7 @@ func (f *FailoverController) GetClientIndex() (bool, uint64) {
 	index := (f.NumberFault / uint64(f.SwitchTrigger)) % uint64(f.NumberOfBackups+1)
 	if uint64(f.currentRPCIndex) != index {
 		f.Logger.Info("Change RPC index", "index", index)
+		f.currentRPCIndex = int(index)
 	}
 
 	if index == 0 {
