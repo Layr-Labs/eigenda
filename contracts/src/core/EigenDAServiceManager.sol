@@ -72,7 +72,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
         // make sure the stakes against which the Batch is being confirmed are not stale
         require(
-            batchHeader.referenceBlockNumber <= block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
+            batchHeader.referenceBlockNumber < block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
         );
 
         require(
