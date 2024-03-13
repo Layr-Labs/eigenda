@@ -31,17 +31,17 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		assert.NoError(t, err)
 
 		chunkLength, err := asn.CalculateChunkLength(operatorState, encoding.GetBlobLength(uint(blobSize)), 0, &core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: uint8(advThreshold),
-			QuorumThreshold:    uint8(quorumThreshold),
+			QuorumID:              0,
+			AdversaryThreshold:    uint8(advThreshold),
+			ConfirmationThreshold: uint8(quorumThreshold),
 		})
 		assert.NoError(t, err)
 
 		blobQuorumInfo := &core.BlobQuorumInfo{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: uint8(advThreshold),
-				QuorumThreshold:    uint8(quorumThreshold),
+				QuorumID:              0,
+				AdversaryThreshold:    uint8(advThreshold),
+				ConfirmationThreshold: uint8(quorumThreshold),
 			},
 			ChunkLength: chunkLength,
 		}

@@ -10,7 +10,6 @@ import (
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/clients"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 
@@ -60,30 +59,13 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []*core.SecurityParam{
-			{
-				QuorumID:           1,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		})
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []uint8{1})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []*core.SecurityParam{
-			{
-				QuorumID:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-			{
-				QuorumID:           1,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		})
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []uint8{0, 1})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -192,10 +174,10 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
-			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
-			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
-			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			ChunkLength:                  quorum.ChunkLength,
+			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
+			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
+			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
+			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
 	return rollupbindings.IEigenDAServiceManagerBlobHeader{
@@ -214,18 +196,16 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
 	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              batchHeaderProto.GetQuorumNumbers(),
-		QuorumThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
-		ReferenceBlockNumber:       batchHeaderProto.GetReferenceBlockNumber(),
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
+		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
+		ReferenceBlockNumber:  batchHeaderProto.GetReferenceBlockNumber(),
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
-		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{

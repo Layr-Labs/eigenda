@@ -79,10 +79,10 @@ func newTestServer(t *testing.T) *retriever.Server {
 func TestRetrieveBlob(t *testing.T) {
 	server := newTestServer(t)
 	chainClient.On("FetchBatchHeader").Return(&binding.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              []byte{0},
-		QuorumThresholdPercentages: []byte{90},
-		ReferenceBlockNumber:       0,
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         []byte{0},
+		SignedStakeForQuorums: []byte{90},
+		ReferenceBlockNumber:  0,
 	}, nil)
 
 	retrievalClient.On("RetrieveBlob").Return(gettysburgAddressBytes, nil)

@@ -76,10 +76,10 @@ func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddres
 		return nil, err
 	}
 	batchHeaderInput := inputs[0].(struct {
-		BlobHeadersRoot            [32]byte "json:\"blobHeadersRoot\""
-		QuorumNumbers              []byte   "json:\"quorumNumbers\""
-		QuorumThresholdPercentages []byte   "json:\"quorumThresholdPercentages\""
-		ReferenceBlockNumber       uint32   "json:\"referenceBlockNumber\""
+		BlobHeadersRoot       [32]byte "json:\"blobHeadersRoot\""
+		QuorumNumbers         []byte   "json:\"quorumNumbers\""
+		SignedStakeForQuorums []byte   "json:\"signedStakeForQuorums\""
+		ReferenceBlockNumber  uint32   "json:\"referenceBlockNumber\""
 	})
 
 	return (*binding.IEigenDAServiceManagerBatchHeader)(&batchHeaderInput), nil

@@ -139,7 +139,7 @@ message BlobHeader {
 message BlobQuorumInfo {
 	uint32 quorum_id = 1;
 	uint32 adversary_threshold = 2;
-	uint32 quorum_threshold = 3;
+	uint32 confirmation_threshold = 3;
 	uint32 chunk_length = 4;
 	uint32 ratelimit = 5;
 }

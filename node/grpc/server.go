@@ -195,7 +195,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	if quorumInfo == nil {
 		return nil, fmt.Errorf("invalid request: quorum ID %d not found in blob header", in.GetQuorumId())
 	}
-	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.QuorumThreshold, quorumInfo.AdversaryThreshold))
+	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.ConfirmationThreshold, quorumInfo.AdversaryThreshold))
 	rate := quorumInfo.QuorumRate
 
 	s.mu.Lock()

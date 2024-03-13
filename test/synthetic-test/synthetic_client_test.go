@@ -265,8 +265,8 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	ctx := context.Background()
 
 	logger.Printf("Start to Disperse New Blob")
-	// Disperse Blob with QuorumID 0, QuorumThreshold 50, AdversaryThreshold 25
-	// TODO: Set random values for QuorumID, QuorumThreshold, AdversaryThreshold
+	// Disperse Blob with QuorumID 0, ConfirmationThreshold 50, AdversaryThreshold 25
+	// TODO: Set random values for QuorumID, ConfirmationThreshold, AdversaryThreshold
 	key, err := disperseBlob(data, 0, 50, 25)
 	logger.Printf("Blob Key After Dispersing %s", hex.EncodeToString(key))
 	assert.Nil(t, err)
@@ -390,9 +390,9 @@ func disperseBlob(data []byte, quorumID uint32, quorumThreshold uint32, adversar
 		Data: data,
 		SecurityParams: []*disperser_rpc.SecurityParams{
 			{
-				QuorumId:           quorumID,
-				QuorumThreshold:    quorumThreshold,
-				AdversaryThreshold: adversaryThreshold,
+				QuorumId:              quorumID,
+				ConfirmationThreshold: quorumThreshold,
+				AdversaryThreshold:    adversaryThreshold,
 			},
 		},
 	}
@@ -607,9 +607,9 @@ func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingPa
 	var quorumID core.QuorumID = 0
 
 	param := &core.SecurityParam{
-		QuorumID:           quorumID,
-		QuorumThreshold:    quorumThreshold,
-		AdversaryThreshold: adversaryThreshold,
+		QuorumID:              quorumID,
+		ConfirmationThreshold: quorumThreshold,
+		AdversaryThreshold:    adversaryThreshold,
 	}
 
 	testBlob := core.Blob{

@@ -37,8 +37,8 @@ func NewChunkValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst Chai
 }
 
 func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
-	if quorumHeader.AdversaryThreshold >= quorumHeader.QuorumThreshold {
-		return nil, nil, nil, fmt.Errorf("invalid header: quorum threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.QuorumThreshold, quorumHeader.AdversaryThreshold)
+	if quorumHeader.AdversaryThreshold >= quorumHeader.ConfirmationThreshold {
+		return nil, nil, nil, fmt.Errorf("invalid header: confirmation threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.ConfirmationThreshold, quorumHeader.AdversaryThreshold)
 	}
 
 	// Check if the operator is a member of the quorum

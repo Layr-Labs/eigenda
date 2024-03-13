@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/pingcap/errors"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
@@ -464,14 +465,14 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		nonSignerPubkeys[i] = pubKeyG1ToBN254G1Point(signature)
 	}
 
-	quorumThresholdPercentages := quorumParamsToThresholdPercentages(quorums)
+	signedStakeForQuorums := serializeSignedStakeForQuorums(quorums)
 	batchH := eigendasrvmg.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchHeader.BatchRoot,
-		QuorumNumbers:              quorumNumbers,
-		QuorumThresholdPercentages: quorumThresholdPercentages,
-		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
+		BlobHeadersRoot:       batchHeader.BatchRoot,
+		QuorumNumbers:         quorumNumbers,
+		SignedStakeForQuorums: signedStakeForQuorums,
+		ReferenceBlockNumber:  uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
+	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -601,6 +602,39 @@ func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (ui
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
+}
+
+func (t *Transactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.SecurityParam, error) {
+	adversaryThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	confirmationThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumConfirmationThresholdPercentages(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(adversaryThresholdPercentegesBytes) != len(confirmationThresholdPercentegesBytes) {
+		return nil, errors.New("adversaryThresholdPercentegesBytes and confirmationThresholdPercentegesBytes have different lengths")
+	}
+
+	securityParams := make([]*core.SecurityParam, len(adversaryThresholdPercentegesBytes))
+
+	for i := range adversaryThresholdPercentegesBytes {
+		securityParams[i] = &core.SecurityParam{
+			QuorumID:              core.QuorumID(i),
+			AdversaryThreshold:    adversaryThresholdPercentegesBytes[i],
+			ConfirmationThreshold: confirmationThresholdPercentegesBytes[i],
+		}
+	}
+
+	return securityParams, nil
+
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
@@ -753,7 +787,7 @@ func quorumParamsToQuorumNumbers(quorumParams map[core.QuorumID]*core.QuorumResu
 	return quorumNumbers
 }
 
-func quorumParamsToThresholdPercentages(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
+func serializeSignedStakeForQuorums(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
 	thresholdPercentages := make([]byte, len(quorumParams))
 	quorums := make([]uint8, len(quorumParams))
 	i := 0

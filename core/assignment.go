@@ -103,7 +103,7 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 		// m_i = ceil( B*S_i / C \gamma \sum_{j=1}^N S_j )
 		num := new(big.Int).Mul(big.NewInt(int64(blobLength*percentMultiplier)), r.Stake)
 
-		gammaChunkLength := big.NewInt(int64(info.ChunkLength) * int64((info.QuorumThreshold - info.AdversaryThreshold)))
+		gammaChunkLength := big.NewInt(int64(info.ChunkLength) * int64((info.ConfirmationThreshold - info.AdversaryThreshold)))
 		denom := new(big.Int).Mul(gammaChunkLength, totalStakes)
 		m := roundUpDivideBig(num, denom)
 
@@ -178,10 +178,10 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 			return false, fmt.Errorf("total stake in quorum %d must be greater than 0", info.QuorumID)
 		}
 		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*percentMultiplier)), minStake)
-		denom := new(big.Int).Mul(big.NewInt(int64(info.QuorumThreshold-info.AdversaryThreshold)), totalStake)
+		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.QuorumThreshold-info.AdversaryThreshold))
+		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
 
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2

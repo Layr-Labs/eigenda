@@ -32,8 +32,8 @@ func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag b
 }
 
 type DisperserClient interface {
-	DisperseBlob(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error)
-	DisperseBlobAuthenticated(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error)
+	DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error)
+	DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 }
 
@@ -41,6 +41,8 @@ type disperserClient struct {
 	config *Config
 	signer core.BlobRequestSigner
 }
+
+var _ DisperserClient = &disperserClient{}
 
 func NewDisperserClient(config *Config, signer core.BlobRequestSigner) DisperserClient {
 	return &disperserClient{
@@ -59,7 +61,7 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 	}
 }
 
-func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error) {
+func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -73,18 +75,14 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, securit
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
 	defer cancel()
 
-	sp := make([]*disperser_rpc.SecurityParams, len(securityParams))
-	for i, s := range securityParams {
-		sp[i] = &disperser_rpc.SecurityParams{
-			QuorumId:           uint32(s.QuorumID),
-			QuorumThreshold:    uint32(s.QuorumThreshold),
-			AdversaryThreshold: uint32(s.AdversaryThreshold),
-		}
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
 	}
 
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:           data,
-		SecurityParams: sp,
+		Data:          data,
+		QuorumNumbers: quorumNumbers,
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)
@@ -100,7 +98,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, securit
 	return blobStatus, reply.GetRequestId(), nil
 }
 
-func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, securityParams []*core.SecurityParam) (*disperser.BlobStatus, []byte, error) {
+func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
@@ -121,19 +119,15 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, fmt.Errorf("frror while calling DisperseBlobAuthenticated: %v", err)
 	}
 
-	sp := make([]*disperser_rpc.SecurityParams, len(securityParams))
-	for i, s := range securityParams {
-		sp[i] = &disperser_rpc.SecurityParams{
-			QuorumId:           uint32(s.QuorumID),
-			QuorumThreshold:    uint32(s.QuorumThreshold),
-			AdversaryThreshold: uint32(s.AdversaryThreshold),
-		}
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
 	}
 
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:           data,
-		SecurityParams: sp,
-		AccountId:      c.signer.GetAccountID(),
+		Data:          data,
+		QuorumNumbers: quorumNumbers,
+		AccountId:     c.signer.GetAccountID(),
 	}
 
 	// Send the initial request

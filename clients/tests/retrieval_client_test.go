@@ -112,9 +112,9 @@ func setup(t *testing.T) {
 	)
 	securityParams := []*core.SecurityParam{
 		{
-			QuorumID:           quorumID,
-			QuorumThreshold:    quorumThreshold,
-			AdversaryThreshold: adversaryThreshold,
+			QuorumID:              quorumID,
+			ConfirmationThreshold: quorumThreshold,
+			AdversaryThreshold:    adversaryThreshold,
 		},
 	}
 	blob := core.Blob{
@@ -138,9 +138,9 @@ func setup(t *testing.T) {
 
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           quorumID,
-			AdversaryThreshold: adversaryThreshold,
-			QuorumThreshold:    quorumThreshold,
+			QuorumID:              quorumID,
+			AdversaryThreshold:    adversaryThreshold,
+			ConfirmationThreshold: quorumThreshold,
 		},
 		ChunkLength: chunkLength,
 	}
