@@ -156,12 +156,17 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
         blobHeader.quorumBlobParams = new IEigenDAServiceManager.QuorumBlobParam[](numQuorumsBlobParams);
         for (uint i = 0; i < numQuorumsBlobParams; i++) {
-            blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)))) % 192;
-            // make sure it isn't already used
-            while(quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
-                blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
+            if(i < 2){
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8(i);
+            } else {
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)))) % 192;
+
+                // make sure it isn't already used
+                while(quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
+                    blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
+                }
+                quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
-            quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;

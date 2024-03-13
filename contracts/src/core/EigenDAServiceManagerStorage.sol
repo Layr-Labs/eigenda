@@ -37,6 +37,13 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * this is the percentage of the total stake needed to confirm a blob
      */
     bytes public constant quorumConfirmationThresholdPercentages = hex"4242";
+
+    /** 
+     * @notice The quorum numbers required for confirmation stored as an ordered bytes array 
+     * these quorum numbers have respective canonical thresholds in the
+     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above
+     */
+    bytes public constant quorumNumbersRequired = hex"0001";
     
     /// @notice The current batchId
     uint32 public batchId;
