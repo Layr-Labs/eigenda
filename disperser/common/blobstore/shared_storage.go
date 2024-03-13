@@ -172,6 +172,8 @@ func (s *SharedBlobStore) MarkBlobProcessing(ctx context.Context, metadataKey di
 }
 
 func (s *SharedBlobStore) MarkBlobFailed(ctx context.Context, metadataKey disperser.BlobKey) error {
+	// Log failed blob
+	s.logger.Info("MarkBlobFailed: marking blob as failed", "blobKey", metadataKey.String())
 	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Failed)
 }
 
