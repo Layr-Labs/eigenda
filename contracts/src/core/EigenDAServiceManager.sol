@@ -139,9 +139,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return batchId;
     }
 
-    /// @notice Returns the block until which operators must serve.
-    function latestServeUntilBlock() external view returns (uint32) {
-        return uint32(block.number) + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
+    /// @notice Given the current block number, returns the block until which operators must serve.
+    function latestServeUntilBlock(uint32 currentBlockNumber) external view returns (uint32) {
+        return currentBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
 }
