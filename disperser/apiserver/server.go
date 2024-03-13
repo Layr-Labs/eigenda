@@ -609,6 +609,11 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		return nil, err
 	}
 
+	requiredQuorums, err := s.tx.GetRequiredQuorumNumbers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	seenQuorums := make(map[uint8]struct{})
 	// The quorum ID must be in range [0, 254]. It'll actually be converted
 	// to uint8, so it cannot be greater than 254.
@@ -636,6 +641,11 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		}
 	}
 
+	// Add the required quorums to the list of quorums to check
+	for _, quorum := range requiredQuorums {
+		seenQuorums[quorum] = struct{}{}
+	}
+
 	params := make([]*core.SecurityParam, len(seenQuorums))
 	i := 0
 	for quorumID := range seenQuorums {
@@ -653,6 +663,8 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		},
 		SecurityParams: params,
 	}
+
+	fmt.Println("header", header)
 
 	if err := header.Validate(); err != nil {
 		s.logger.Warn("invalid header", "err", err)

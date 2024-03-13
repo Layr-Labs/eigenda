@@ -209,10 +209,10 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
-		BatchId:                verificationProof.GetBatchId(),
-		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
-		BatchMetadata:          batchMetadata,
-		InclusionProof:         verificationProof.GetInclusionProof(),
-		QuorumThresholdIndexes: verificationProof.GetQuorumIndexes(),
+		BatchId:        verificationProof.GetBatchId(),
+		BlobIndex:      uint8(verificationProof.GetBlobIndex()),
+		BatchMetadata:  batchMetadata,
+		InclusionProof: verificationProof.GetInclusionProof(),
+		QuorumIndices:  verificationProof.GetQuorumIndexes(),
 	}
 }

@@ -165,6 +165,12 @@ func (t *MockTransactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.S
 	return result.([]*core.SecurityParam), args.Error(1)
 }
 
+func (t *MockTransactor) GetRequiredQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.([]uint8), args.Error(1)
+}
+
 func (t *MockTransactor) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)

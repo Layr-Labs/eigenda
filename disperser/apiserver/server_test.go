@@ -66,6 +66,39 @@ func TestDisperseBlob(t *testing.T) {
 	assert.NotNil(t, key)
 }
 
+func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
+	data := make([]byte, 1024)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	p := &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: 51001,
+		},
+	}
+	ctx := peer.NewContext(context.Background(), p)
+
+	quorumParams := []*core.SecurityParam{
+		{QuorumID: 0, AdversaryThreshold: 50, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
+	}
+	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
+
+	reply, err := dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:          data,
+		QuorumNumbers: []uint32{1},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, reply.GetResult(), pb.BlobStatus_PROCESSING)
+
+	requestID := reply.GetRequestId()
+	assert.NotNil(t, requestID)
+
+}
+
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -84,6 +117,7 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:          data,
@@ -259,6 +293,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:          data,
@@ -399,6 +434,7 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
 	reply, err := server.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:          data,

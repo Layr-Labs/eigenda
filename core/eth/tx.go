@@ -637,6 +637,16 @@ func (t *Transactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.Secur
 
 }
 
+func (t *Transactor) GetRequiredQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	requiredQuorums, err := t.Bindings.EigenDAServiceManager.QuorumNumbersRequired(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return requiredQuorums, nil
+}
+
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)

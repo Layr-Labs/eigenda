@@ -40,6 +40,7 @@ func TestRatelimit(t *testing.T) {
 		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
 	// Try with non-allowlisted IP
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
