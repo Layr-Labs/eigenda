@@ -32,7 +32,7 @@ type InstrumentedEthClient struct {
 var _ common.EthClient = (*InstrumentedEthClient)(nil)
 
 func NewInstrumentedEthClient(config EthClientConfig, rpcCallsCollector *rpccalls.Collector, logger logging.Logger) (*InstrumentedEthClient, error) {
-	ethClient, err := NewClient(config, logger)
+	ethClient, err := NewClient(config, config.RPCURLs[0], logger)
 	if err != nil {
 		return nil, err
 	}

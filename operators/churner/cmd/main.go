@@ -69,7 +69,7 @@ func run(ctx *cli.Context) error {
 	}
 
 	log.Println("Starting geth client")
-	gethClient, err := geth.NewClient(config.EthClientConfig, logger)
+	gethClient, err := geth.NewClient(config.EthClientConfig, config.EthClientConfig.RPCURLs[0], logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

@@ -38,8 +38,8 @@ type EthClient struct {
 
 var _ common.EthClient = (*EthClient)(nil)
 
-func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error) {
-	chainClient, err := ethclient.Dial(config.RPCURL)
+func NewClient(config EthClientConfig, rpcurl string, logger logging.Logger) (*EthClient, error) {
+	chainClient, err := ethclient.Dial(rpcurl)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot connect to provider: %w", err)
 	}
@@ -67,7 +67,7 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	}
 
 	c := &EthClient{
-		RPCURL:           config.RPCURL,
+		RPCURL:           rpcurl,
 		privateKey:       privateKey,
 		chainID:          chainIDBigInt,
 		AccountAddress:   accountAddress,

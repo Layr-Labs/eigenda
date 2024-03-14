@@ -75,7 +75,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	client, err := geth.NewClient(config.EthClientConfig, logger)
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, logger)
 	if err != nil {
 		return err
 	}

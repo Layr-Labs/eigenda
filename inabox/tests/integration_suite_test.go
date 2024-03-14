@@ -118,8 +118,8 @@ var _ = BeforeSuite(func() {
 	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
 	pk = strings.TrimPrefix(pk, "0x")
 	pk = strings.TrimPrefix(pk, "0X")
-	ethClient, err = geth.NewClient(geth.EthClientConfig{
-		RPCURL:           testConfig.Deployers[0].RPC,
+	ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:           []string{testConfig.Deployers[0].RPC},
 		PrivateKeyString: pk,
 		NumConfirmations: numConfirmations,
 	}, logger)
@@ -134,11 +134,11 @@ var _ = BeforeSuite(func() {
 
 func setupRetrievalClient(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
-		RPCURL:           testConfig.Deployers[0].RPC,
+		RPCURLs:           []string{testConfig.Deployers[0].RPC},
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
 		NumConfirmations: numConfirmations,
 	}
-	client, err := geth.NewClient(ethClientConfig, logger)
+	client, err := geth.NewMultiHomingClient(ethClientConfig, logger)
 	if err != nil {
 		return err
 	}

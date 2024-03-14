@@ -98,12 +98,13 @@ func RunBatcher(ctx *cli.Context) error {
 	}, logger)
 	asgn := &core.StdAssignmentCoordinator{}
 
-	client, err := geth.NewClient(config.EthClientConfig, logger)
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURL)
+	// used by non graph indexer
+	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
 	if err != nil {
 		return err
 	}

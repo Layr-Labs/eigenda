@@ -73,12 +73,12 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	Expect(ok).To(BeTrue())
 
 	config := geth.EthClientConfig{
-		RPCURL:           deployer.RPC,
+		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: op.NODE_PRIVATE_KEY,
 		NumConfirmations: 0,
 	}
 
-	c, err := geth.NewClient(config, logger)
+	c, err := geth.NewClient(config, deployer.RPC, logger)
 	Expect(err).ToNot(HaveOccurred())
 
 	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
@@ -93,12 +93,12 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 	Expect(ok).To(BeTrue())
 
 	config := geth.EthClientConfig{
-		RPCURL:           deployer.RPC,
+		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 	}
 
-	client, err := geth.NewClient(config, logger)
+	client, err := geth.NewClient(config, deployer.RPC, logger)
 	if err != nil {
 		panic(err)
 	}
