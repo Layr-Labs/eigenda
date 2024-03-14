@@ -23,7 +23,7 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringSliceFlag{
 			Name:     rpcUrlFlagName,
-			Usage:    "Chain rpc. Disperser/Batcher can accept multiple. Node accepts one",
+			Usage:    "Chain rpc. Disperser/Batcher can accept multiple comma separated rpc url. Node only accepts one",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CHAIN_RPC"),
 		},
@@ -42,7 +42,7 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 		},
 		cli.IntFlag{
 			Name:     numRetriesFlagName,
-			Usage:    "Number of maximal retry for each rpc call",
+			Usage:    "Number of maximal retry for each rpc call after failure",
 			Required: false,
 			Value:    2,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_RETRIES"),
