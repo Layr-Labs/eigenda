@@ -72,7 +72,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
         // make sure the stakes against which the Batch is being confirmed are not stale
         require(
-            batchHeader.referenceBlockNumber <= block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
+            batchHeader.referenceBlockNumber < block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
         );
 
         require(
@@ -139,9 +139,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return batchId;
     }
 
-    /// @notice Returns the block until which operators must serve.
-    function latestServeUntilBlock() external view returns (uint32) {
-        return uint32(block.number) + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
+    /// @notice Given a reference block number, returns the block until which operators must serve.
+    function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32) {
+        return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
 }
