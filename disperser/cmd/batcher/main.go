@@ -16,6 +16,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/aws/secretmanager"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -75,6 +76,9 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	batchUrl := secretmanager.ReadBatcherURLSecret()
+	config.EthClientConfig.RPCURLs = append(config.EthClientConfig.RPCURLs, batchUrl)
 
 	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
