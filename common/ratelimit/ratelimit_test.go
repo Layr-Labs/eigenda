@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +25,7 @@ func makeTestRatelimiter() (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, &mock.Logger{})
+	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logging.NewNoopLogger())
 
 	return ratelimiter, nil
 

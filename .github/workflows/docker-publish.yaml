@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+  pull_request:
   workflow_dispatch:
 
 env:
@@ -16,8 +17,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # Run this job only on push to master branch
-    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -50,6 +49,7 @@ jobs:
       - name: Build Docker image
         run: docker compose -f docker-compose-build.yaml build
       - name: Push Docker image
+        if: github.ref == 'refs/heads/master'
         run: docker compose -f docker-compose-build.yaml push
 
       - name: Send GitHub Action trigger data to Slack workflow

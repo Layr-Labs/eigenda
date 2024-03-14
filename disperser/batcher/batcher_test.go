@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -70,8 +71,7 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 
 func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.Time) {
 	// Common Components
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 
 	// Core Components
 	cst, err := coremock.MakeChainDataMock(10)

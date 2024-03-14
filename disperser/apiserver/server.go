@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -52,7 +53,7 @@ type DispersalServer struct {
 
 	metrics *disperser.Metrics
 
-	logger common.Logger
+	logger logging.Logger
 }
 
 // NewServer creates a new Server struct with the provided parameters.
@@ -62,7 +63,7 @@ func NewDispersalServer(
 	config disperser.ServerConfig,
 	store disperser.BlobStore,
 	tx core.Transactor,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
@@ -578,9 +579,6 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 }
 
 func (s *DispersalServer) Start(ctx context.Context) error {
-	s.logger.Trace("Entering Start function...")
-	defer s.logger.Trace("Exiting Start function...")
-
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
 	listener, err := net.Listen("tcp", addr)

@@ -12,18 +12,19 @@ import (
 
 	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 type TrafficGenerator struct {
-	Logger          common.Logger
+	Logger          logging.Logger
 	DisperserClient clients.DisperserClient
 	Config          *Config
 }
 
 func NewTrafficGenerator(config *Config) (*TrafficGenerator, error) {
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		return nil, err
 	}

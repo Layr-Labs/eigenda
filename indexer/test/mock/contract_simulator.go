@@ -13,10 +13,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/indexer/test/contracts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient/simulated"
 )
 
 //go:embed chain.json
@@ -42,17 +42,13 @@ type (
 
 func MustNewContractSimulator() *ContractSimulator {
 	sb, deployerAddr, deployerPK := mustNewSimulatedBackend()
-	client := &simulatedBackend{
-		sb,
-	}
-
-	wethAddress, err := mustDeployWethContract(client, deployerPK)
+	wethAddress, err := mustDeployWethContract(sb, deployerPK)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return &ContractSimulator{
-		Client:       client,
+		Client:       sb,
 		WethAddr:     wethAddress,
 		DeployerPK:   deployerPK,
 		DeployerAddr: deployerAddr,
@@ -60,8 +56,6 @@ func MustNewContractSimulator() *ContractSimulator {
 }
 
 func (cs *ContractSimulator) Start(blockWait time.Duration, cancel context.CancelFunc) {
-	ctx := context.Background()
-
 	mockChain, err := parseChainJson()
 	if err != nil {
 		log.Fatal(err)
@@ -78,7 +72,7 @@ func (cs *ContractSimulator) Start(blockWait time.Duration, cancel context.Cance
 		for _, c := range mockChain.Chain {
 			if c.Fork != nil {
 				fmt.Println("Forking to hash: ", hashById[*c.Fork])
-				err = cs.Client.Fork(ctx, hashById[*c.Fork])
+				err = cs.Client.Fork(hashById[*c.Fork])
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -131,7 +125,7 @@ func (cs *ContractSimulator) DepositEvents() ([]*contracts.WethDeposit, error) {
 	return depositEvents, nil
 }
 
-func mustNewSimulatedBackend() (client *backends.SimulatedBackend, deployerAddr common.Address, privateKey *ecdsa.PrivateKey) {
+func mustNewSimulatedBackend() (client SimulatedBackend, deployerAddr common.Address, privateKey *ecdsa.PrivateKey) {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		log.Fatal(err)
@@ -153,8 +147,11 @@ func mustNewSimulatedBackend() (client *backends.SimulatedBackend, deployerAddr 
 	}
 
 	blockGasLimit := uint64(gasLimit)
-	client = backends.NewSimulatedBackend(genesisAlloc, blockGasLimit)
-
+	b := simulated.NewBackend(genesisAlloc, simulated.WithBlockGasLimit(blockGasLimit))
+	client = &simulatedBackend{
+		Backend: b,
+		Client:  b.Client(),
+	}
 	return
 }
 

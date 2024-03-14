@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -19,7 +19,7 @@ type Config struct {
 	EthClientConfig geth.EthClientConfig
 	AwsClientConfig aws.ClientConfig
 	EncoderConfig   kzg.KzgConfig
-	LoggerConfig    logging.Config
+	LoggerConfig    common.LoggerConfig
 	MetricsConfig   batcher.MetricsConfig
 	IndexerConfig   indexer.Config
 	GraphUrl        string
@@ -31,8 +31,11 @@ type Config struct {
 	EigenDAServiceManagerAddr     string
 }
 
-func NewConfig(ctx *cli.Context) Config {
-
+func NewConfig(ctx *cli.Context) (Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -41,7 +44,7 @@ func NewConfig(ctx *cli.Context) Config {
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
-		LoggerConfig:    logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:    *loggerConfig,
 		BatcherConfig: batcher.Config{
 			PullInterval:             ctx.GlobalDuration(flags.PullIntervalFlag.Name),
 			FinalizerInterval:        ctx.GlobalDuration(flags.FinalizerIntervalFlag.Name),
@@ -72,5 +75,5 @@ func NewConfig(ctx *cli.Context) Config {
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 	}
-	return config
+	return config, nil
 }

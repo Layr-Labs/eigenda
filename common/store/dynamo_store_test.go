@@ -11,15 +11,15 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	logger = &cmock.Logger{}
+	logger = logging.NewNoopLogger()
 
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource

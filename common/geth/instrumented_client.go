@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -30,7 +31,7 @@ type InstrumentedEthClient struct {
 
 var _ common.EthClient = (*InstrumentedEthClient)(nil)
 
-func NewInstrumentedEthClient(config EthClientConfig, rpcCallsCollector *rpccalls.Collector, logger common.Logger) (*InstrumentedEthClient, error) {
+func NewInstrumentedEthClient(config EthClientConfig, rpcCallsCollector *rpccalls.Collector, logger logging.Logger) (*InstrumentedEthClient, error) {
 	ethClient, err := NewClient(config, logger)
 	if err != nil {
 		return nil, err

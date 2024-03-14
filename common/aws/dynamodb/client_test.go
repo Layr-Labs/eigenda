@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -53,10 +53,11 @@ func setup(m *testing.M) {
 		}
 	}
 
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		teardown()
-		panic("failed to get logger")
+		panic("failed to create logger")
 	}
 
 	clientConfig = commonaws.ClientConfig{
@@ -65,6 +66,7 @@ func setup(m *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
+
 	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
 	if err != nil {
 		teardown()

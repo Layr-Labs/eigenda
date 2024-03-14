@@ -132,6 +132,22 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
+  dataapi.ServiceAvailability:
+    properties:
+      service_name:
+        type: string
+      service_status:
+        type: string
+    type: object
+  dataapi.ServiceAvailabilityResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dataapi.ServiceAvailability'
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
+    type: object
   dataapi.Throughput:
     properties:
       throughput:
@@ -194,6 +210,30 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
+  /eigenda/service-availability:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Get status of public EigenDA services.
+      tags:
+      - ServiceAvailability
   /feed/blobs:
     get:
       parameters:

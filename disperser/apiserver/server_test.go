@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core"
@@ -316,11 +316,7 @@ func teardown() {
 }
 
 func newTestServer(m *testing.M) *apiserver.DispersalServer {
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	if err != nil {
-		panic("failed to create a new logger")
-	}
-
+	logger := logging.NewNoopLogger()
 	bucketName := "test-eigenda-blobstore"
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",

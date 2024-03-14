@@ -11,7 +11,7 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	core_mock "github.com/Layr-Labs/eigenda/core/mock"
@@ -84,10 +84,12 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 		ID:                        opID,
 		NumBatchValidators:        runtime.GOMAXPROCS(0),
 	}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		panic("failed to create a new logger")
+		panic("failed to create a logger")
 	}
+
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		panic("failed to create a directory for db")

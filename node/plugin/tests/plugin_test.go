@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -197,10 +197,9 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	_, privateKey, err := plugin.GetECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
 	assert.NoError(t, err)
 	assert.NotNil(t, privateKey)
-
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	assert.NoError(t, err)
-	assert.NotNil(t, logger)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           operator.NODE_CHAIN_RPC,
@@ -232,9 +231,9 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 
 func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	hexPk := strings.TrimPrefix(testConfig.Pks.EcdsaMap[testConfig.Deployers[0].Name].PrivateKey, "0x")
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	assert.NoError(t, err)
-	assert.NotNil(t, logger)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURL:           operator.NODE_CHAIN_RPC,

@@ -27,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -37,6 +36,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -86,7 +86,7 @@ var (
 	isRetrieverClientDeployed  bool = false
 	validateOnchainTransaction bool = false
 	retrievalClient            clients.RetrievalClient
-	logger                     common.Logger
+	logger                     logging.Logger
 )
 
 func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
@@ -115,12 +115,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		logger.Printf("Error initializing clients: %v", err)
 	}
 
-	ethLogger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	ethLogger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		// Handle the error
 		logger.Printf("Error: %v", err)
 		return nil
 	}
+
 	pk = strings.TrimPrefix(pk, "0X")
 	pk = strings.TrimPrefix(pk, "0x")
 	ethClient, err := geth.NewClient(geth.EthClientConfig{
@@ -204,7 +205,7 @@ func TestMain(m *testing.M) {
 }
 
 // SetUp RetrievalClient to retriever blob from Operator Node
-func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger common.Logger) error {
+func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger logging.Logger) error {
 	// https://github.com/Layr-Labs/eigenda/blob/b8c151436ecefc8046e4aefcdcfee67abf9e8faa/inabox/tests/integration_suite_test.go#L124
 	tx, err := eth.NewTransactor(logger, ethClient, retrievalClientConfig.Bls_Operator_State_Retriever, retrievalClientConfig.EigenDA_ServiceManager_Retriever)
 	if err != nil {

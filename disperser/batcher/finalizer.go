@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gammazero/workerpool"
@@ -34,7 +35,7 @@ type finalizer struct {
 	maxNumRetriesPerBlob uint
 	numBlobsPerFetch     int32
 	numWorkers           int
-	logger               common.Logger
+	logger               logging.Logger
 	metrics              *FinalizerMetrics
 }
 
@@ -47,7 +48,7 @@ func NewFinalizer(
 	maxNumRetriesPerBlob uint,
 	numBlobsPerFetch int32,
 	numWorkers int,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *FinalizerMetrics,
 ) Finalizer {
 	return &finalizer{
@@ -153,6 +154,13 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 		confirmationMetadata, err := f.blobStore.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
 			f.logger.Error("FinalizeBlobs: error getting confirmed metadata", "blobKey", blobKey.String(), "err", err)
+			continue
+		}
+
+		// Noticed minor issue where ProcessConfirmedBatch goroutine probably set this to failed status after updateBlobs was called to finalize the blobs.
+		// For Failed blobs, it is expected that ConfirmationInfo will be null.
+		if confirmationMetadata != nil && confirmationMetadata.BlobStatus != disperser.Confirmed {
+			f.logger.Error("FinalizeBlobs: the blob retrieved is actually", confirmationMetadata.BlobStatus.String(), "blobKey", blobKey.String())
 			continue
 		}
 

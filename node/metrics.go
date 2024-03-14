@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	eigenmetrics "github.com/Layr-Labs/eigensdk-go/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,7 +16,7 @@ const (
 )
 
 type Metrics struct {
-	logger common.Logger
+	logger logging.Logger
 
 	// Whether the node is registered.
 	Registered prometheus.Gauge
@@ -42,7 +42,7 @@ type Metrics struct {
 	socketAddr string
 }
 
-func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger common.Logger, socketAddr string) *Metrics {
+func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string) *Metrics {
 
 	// Add Go module collectors
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

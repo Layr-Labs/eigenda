@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -10,15 +10,19 @@ import (
 
 type Config struct {
 	EncoderConfig kzg.KzgConfig
-	LoggerConfig  logging.Config
+	LoggerConfig  common.LoggerConfig
 	ServerConfig  *encoder.ServerConfig
 	MetricsConfig encoder.MetrisConfig
 }
 
-func NewConfig(ctx *cli.Context) Config {
+func NewConfig(ctx *cli.Context) (Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
-		LoggerConfig:  logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:  *loggerConfig,
 		ServerConfig: &encoder.ServerConfig{
 			GrpcPort:              ctx.GlobalString(flags.GrpcPortFlag.Name),
 			MaxConcurrentRequests: ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
@@ -29,5 +33,5 @@ func NewConfig(ctx *cli.Context) Config {
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
 	}
-	return config
+	return config, nil
 }

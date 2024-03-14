@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -26,10 +26,10 @@ type Metrics struct {
 	NumRetrievalRequest prometheus.Counter
 
 	httpPort string
-	logger   common.Logger
+	logger   logging.Logger
 }
 
-func NewMetrics(httpPort string, logger common.Logger) *Metrics {
+func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())

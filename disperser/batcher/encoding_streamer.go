@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree"
 )
 
@@ -65,7 +66,7 @@ type EncodingStreamer struct {
 	encodingCtxCancelFuncs []context.CancelFunc
 
 	metrics *EncodingStreamerMetrics
-	logger  common.Logger
+	logger  logging.Logger
 
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
@@ -97,7 +98,7 @@ func NewEncodingStreamer(
 	encodedSizeNotifier *EncodedSizeNotifier,
 	workerPool common.WorkerPool,
 	metrics *EncodingStreamerMetrics,
-	logger common.Logger) (*EncodingStreamer, error) {
+	logger logging.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, errors.New("EncodingQueueLimit should be greater than 0")
 	}
@@ -214,7 +215,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 		}
 	}
 
-	e.logger.Trace("[encodingstreamer] metadata in processing status", "numMetadata", len(metadatas))
+	e.logger.Debug("[encodingstreamer] metadata in processing status", "numMetadata", len(metadatas))
 	metadatas = e.dedupRequests(metadatas, referenceBlockNumber)
 	if len(metadatas) == 0 {
 		e.logger.Info("no new metadatas to encode")
@@ -235,7 +236,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	// TODO: this should be done at the request time and keep the cursor so that we don't fetch the same metadata every time
 	metadatas = metadatas[:numMetadatastoProcess]
 
-	e.logger.Trace("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
+	e.logger.Debug("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
 	// Get the operator state
 	state, err := e.getOperatorState(ctx, metadatas, referenceBlockNumber)
@@ -254,9 +255,9 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	if err != nil {
 		return fmt.Errorf("error getting blobs from blob store: %w", err)
 	}
-	e.logger.Trace("[RequestEncoding] retrieved blobs to encode", "numBlobs", len(blobs), "duration", time.Since(stageTimer))
+	e.logger.Debug("[RequestEncoding] retrieved blobs to encode", "numBlobs", len(blobs), "duration", time.Since(stageTimer))
 
-	e.logger.Trace("[RequestEncoding] encoding blobs...", "numBlobs", len(blobs), "blockNumber", referenceBlockNumber)
+	e.logger.Debug("[RequestEncoding] encoding blobs...", "numBlobs", len(blobs), "blockNumber", referenceBlockNumber)
 
 	for i := range metadatas {
 		metadata := metadatas[i]

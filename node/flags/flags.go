@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
@@ -273,7 +272,7 @@ func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, kzg.CLIFlags(EnvVarPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(EnvVarPrefix)...)
-	Flags = append(Flags, logging.CLIFlags(EnvVarPrefix, FlagPrefix)...)
+	Flags = append(Flags, common.LoggerCLIFlags(EnvVarPrefix, FlagPrefix)...)
 }
 
 // Flags contains the list of configuration options available to the binary.

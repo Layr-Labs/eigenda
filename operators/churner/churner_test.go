@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ func TestProcessChurnRequest(t *testing.T) {
 	setupMockTransactor()
 	mockIndexer := &indexermock.MockIndexedChainState{}
 	config := &churner.Config{
-		LoggerConfig: logging.DefaultCLIConfig(),
+		LoggerConfig: common.DefaultLoggerConfig(),
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumConfirmations: 0,
