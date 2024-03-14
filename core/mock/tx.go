@@ -159,13 +159,13 @@ func (t *MockTransactor) GetQuorumCount(ctx context.Context, blockNumber uint32)
 	return result.(uint8), args.Error(1)
 }
 
-func (t *MockTransactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.SecurityParam, error) {
+func (t *MockTransactor) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]*core.SecurityParam, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]*core.SecurityParam), args.Error(1)
 }
 
-func (t *MockTransactor) GetRequiredQuorumNumbers(ctx context.Context) ([]uint8, error) {
+func (t *MockTransactor) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]uint8), args.Error(1)
