@@ -37,7 +37,7 @@ const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
-	mu *sync.Mutex
+	mu *sync.RWMutex
 
 	serverConfig disperser.ServerConfig
 	rateConfig   RateConfig
@@ -85,12 +85,12 @@ func NewDispersalServer(
 		rateConfig:    rateConfig,
 		blobStore:     store,
 		tx:            tx,
-		quorumCount:   0,
 		metrics:       metrics,
 		logger:        logger,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
-		mu:            &sync.Mutex{},
+		mu:            &sync.RWMutex{},
+		quorumConfig:  QuorumConfig{},
 	}
 }
 
@@ -571,18 +571,18 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig, error) {
 
+	s.mu.RLock()
 	newConfig := s.quorumConfig
+	s.mu.RUnlock()
 
-	fallbackToCache := true
-	if newConfig.QuorumCount == 0 {
-		fallbackToCache = false
-	}
+	// If the quorum count is set, we will fallback to the old quorumConfig if the RPC fails
+	fallbackToCache := newConfig.QuorumCount != 0
 
 	currentBlock, err := s.tx.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		s.logger.Error("failed to get current block number", "err", err)
 		if !fallbackToCache {
-			return newConfig, err
+			return QuorumConfig{}, err
 		}
 		return newConfig, nil
 	}
@@ -591,7 +591,7 @@ func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig,
 	if err != nil {
 		s.logger.Error("failed to get quorum count", "err", err)
 		if !fallbackToCache {
-			return newConfig, err
+			return QuorumConfig{}, err
 		}
 	} else {
 		newConfig.QuorumCount = count
@@ -601,7 +601,7 @@ func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig,
 	if err != nil {
 		s.logger.Error("failed to get quorum security params", "err", err)
 		if !fallbackToCache {
-			return newConfig, err
+			return QuorumConfig{}, err
 		}
 	} else {
 		newConfig.SecurityParams = securityParams
@@ -611,7 +611,7 @@ func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig,
 	if err != nil {
 		s.logger.Error("failed to get quorum security params", "err", err)
 		if !fallbackToCache {
-			return newConfig, err
+			return QuorumConfig{}, err
 		}
 	} else {
 		newConfig.RequiredQuorums = requiredQuorums
