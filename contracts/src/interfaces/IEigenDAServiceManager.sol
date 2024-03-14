@@ -79,8 +79,8 @@ interface IEigenDAServiceManager is IServiceManager {
     /// @notice Returns the current batchId
     function taskNumber() external view returns (uint32);
 
-    /// @notice Given the current block number, returns the block until which operators must serve.
-    function latestServeUntilBlock(uint32 currentBlockNumber) external view returns (uint32);
+    /// @notice Given a reference block number, returns the block until which operators must serve.
+    function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32);
 
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
