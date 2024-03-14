@@ -77,7 +77,7 @@ message DisperseBlobRequest {
 	// on the EigenDA smart contract. If required quorums are included here, an error will be returned.
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
-	repeated uint32 quorum_numbers = 2;
+	repeated uint32 custom_quorum_numbers = 2;
 
 	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
 	// corresponding to the key used by the client to sign the BlobAuthHeader.

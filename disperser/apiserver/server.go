@@ -103,7 +103,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
 	if err != nil {
-		for _, quorumID := range request.DisperseRequest.QuorumNumbers {
+		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
 			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
 		}
 		return err
@@ -177,7 +177,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
-		for _, quorumID := range req.QuorumNumbers {
+		for _, quorumID := range req.CustomQuorumNumbers {
 			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
 		return nil, err
@@ -617,13 +617,13 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	seenQuorums := make(map[uint8]struct{})
 	// The quorum ID must be in range [0, 254]. It'll actually be converted
 	// to uint8, so it cannot be greater than 254.
-	for i := range req.GetQuorumNumbers() {
+	for i := range req.GetCustomQuorumNumbers() {
 
-		if req.GetQuorumNumbers()[i] > 254 {
-			return nil, fmt.Errorf("invalid request: quorum_numbers must be in range [0, 254], but found %d", req.GetQuorumNumbers()[i])
+		if req.GetCustomQuorumNumbers()[i] > 254 {
+			return nil, fmt.Errorf("invalid request: quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
 		}
 
-		quorumID := uint8(req.GetQuorumNumbers()[i])
+		quorumID := uint8(req.GetCustomQuorumNumbers()[i])
 		if _, ok := seenQuorums[quorumID]; ok {
 			return nil, fmt.Errorf("invalid request: quorum_numbers must not contain duplicates")
 		}

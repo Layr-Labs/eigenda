@@ -93,14 +93,14 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{1},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{1},
 	})
 	assert.Error(t, err)
 
 	reply, err := dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, reply.GetResult(), pb.BlobStatus_PROCESSING)
@@ -108,14 +108,14 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0}, nil).Twice()
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0},
 	})
 	assert.Error(t, err)
 
 	reply, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{1},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{1},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.BlobStatus_PROCESSING, reply.GetResult())
@@ -123,8 +123,8 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil).Once()
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{},
 	})
 	assert.Error(t, err)
 }
@@ -143,14 +143,14 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	ctx := peer.NewContext(context.Background(), p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{2},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{2},
 	})
 	assert.ErrorContains(t, err, "invalid request: the quorum_numbers must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0, 0},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0, 0},
 	})
 	assert.ErrorContains(t, err, "invalid request: quorum_numbers must not contain duplicates")
 }
@@ -312,8 +312,8 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	ctx := peer.NewContext(context.Background(), p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0, 1},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0, 1},
 	})
 	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
@@ -453,8 +453,8 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	ctx := peer.NewContext(context.Background(), p)
 
 	reply, err := server.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0, 1},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0, 1},
 	})
 	assert.NoError(t, err)
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()

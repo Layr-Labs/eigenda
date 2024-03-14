@@ -36,8 +36,8 @@ func TestRatelimit(t *testing.T) {
 	// Try with non-allowlisted IP
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data50KiB,
-		QuorumNumbers: []uint32{0},
+		Data:                data50KiB,
+		CustomQuorumNumbers: []uint32{0},
 	})
 	assert.ErrorContains(t, err, "account throughput limit")
 
@@ -46,8 +46,8 @@ func TestRatelimit(t *testing.T) {
 	for i := 0; i < 20; i++ {
 
 		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-			Data:          data1KiB,
-			QuorumNumbers: []uint32{1},
+			Data:                data1KiB,
+			CustomQuorumNumbers: []uint32{1},
 		})
 		if err != nil && strings.Contains(err.Error(), "account blob limit") {
 			numLimited++
@@ -66,16 +66,16 @@ func TestRatelimit(t *testing.T) {
 	ctx = peer.NewContext(context.Background(), p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data50KiB,
-		QuorumNumbers: []uint32{0},
+		Data:                data50KiB,
+		CustomQuorumNumbers: []uint32{0},
 	})
 	assert.NoError(t, err)
 
 	// This should succeed because the account blob limit (5 blobs/s) X bucket size (3s) is larger than 10 blobs.
 	for i := 0; i < 10; i++ {
 		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-			Data:          data1KiB,
-			QuorumNumbers: []uint32{1},
+			Data:                data1KiB,
+			CustomQuorumNumbers: []uint32{1},
 		})
 		assert.NoError(t, err)
 	}
@@ -160,9 +160,9 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	err := stream.SendFromClient(&pb.AuthenticatedRequest{
 		Payload: &pb.AuthenticatedRequest_DisperseRequest{
 			DisperseRequest: &pb.DisperseBlobRequest{
-				Data:          data,
-				QuorumNumbers: quorums,
-				AccountId:     signer.GetAccountID(),
+				Data:                data,
+				CustomQuorumNumbers: quorums,
+				AccountId:           signer.GetAccountID(),
 			},
 		},
 	})

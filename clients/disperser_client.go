@@ -32,8 +32,8 @@ func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag b
 }
 
 type DisperserClient interface {
-	DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error)
-	DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error)
+	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
+	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 }
 
@@ -81,8 +81,8 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	}
 
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: quorumNumbers,
+		Data:                data,
+		CustomQuorumNumbers: quorumNumbers,
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)
@@ -125,9 +125,9 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: quorumNumbers,
-		AccountId:     c.signer.GetAccountID(),
+		Data:                data,
+		CustomQuorumNumbers: quorumNumbers,
+		AccountId:           c.signer.GetAccountID(),
 	}
 
 	// Send the initial request
