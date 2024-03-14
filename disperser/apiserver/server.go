@@ -620,12 +620,12 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	for i := range req.GetQuorumNumbers() {
 
 		if req.GetQuorumNumbers()[i] > 254 {
-			return nil, fmt.Errorf("invalid request: quorum_id must be in range [0, 254], but found %d", req.GetQuorumNumbers()[i])
+			return nil, fmt.Errorf("invalid request: quorum_numbers must be in range [0, 254], but found %d", req.GetQuorumNumbers()[i])
 		}
 
 		quorumID := uint8(req.GetQuorumNumbers()[i])
 		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("invalid request: security_params must not contain duplicate quorum_id")
+			return nil, fmt.Errorf("invalid request: quorum_numbers must not contain duplicates")
 		}
 		seenQuorums[quorumID] = struct{}{}
 
@@ -636,14 +636,21 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 			}
 
 			if quorumID >= s.quorumCount {
-				return nil, fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, quorumID)
+				return nil, fmt.Errorf("invalid request: the quorum_numbers must be in range [0, %d], but found %d", s.quorumCount-1, quorumID)
 			}
 		}
 	}
 
 	// Add the required quorums to the list of quorums to check
-	for _, quorum := range requiredQuorums {
-		seenQuorums[quorum] = struct{}{}
+	for _, quorumID := range requiredQuorums {
+		if _, ok := seenQuorums[quorumID]; ok {
+			return nil, fmt.Errorf("invalid request: quorum_numbers should not include the required quorums, but required quorum %d was found", quorumID)
+		}
+		seenQuorums[quorumID] = struct{}{}
+	}
+
+	if len(seenQuorums) == 0 {
+		return nil, fmt.Errorf("invalid request: the blob must be sent to at least one quorum")
 	}
 
 	params := make([]*core.SecurityParam, len(seenQuorums))
@@ -663,8 +670,6 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		},
 		SecurityParams: params,
 	}
-
-	fmt.Println("header", header)
 
 	if err := header.Validate(); err != nil {
 		s.logger.Warn("invalid header", "err", err)

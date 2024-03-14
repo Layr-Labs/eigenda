@@ -14,8 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/peer"
-
-	tmock "github.com/stretchr/testify/mock"
 )
 
 func TestRatelimit(t *testing.T) {
@@ -35,13 +33,6 @@ func TestRatelimit(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 50, ConfirmationThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
-	}
-	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
-	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
-
 	// Try with non-allowlisted IP
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
@@ -53,6 +44,7 @@ func TestRatelimit(t *testing.T) {
 	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 20 blobs.
 	numLimited := 0
 	for i := 0; i < 20; i++ {
+
 		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 			Data:          data1KiB,
 			QuorumNumbers: []uint32{1},
