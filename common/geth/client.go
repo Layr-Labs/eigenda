@@ -41,8 +41,8 @@ var _ common.EthClient = (*EthClient)(nil)
 // NewClient creates a new Ethereum client.
 // If PrivateKeyString in the config is empty, the client will not be able to send transactions, and it will use the senderAddress to create transactions.
 // If PrivateKeyString in the config is not empty, the client will be able to send transactions, and the senderAddress is ignored.
-func NewClient(config EthClientConfig, senderAddress gethcommon.Address, logger logging.Logger) (*EthClient, error) {
-	chainClient, err := ethclient.Dial(config.RPCURL)
+func NewClient(config EthClientConfig, senderAddress gethcommon.Address, rpcurl string, logger logging.Logger) (*EthClient, error) {
+	chainClient, err := ethclient.Dial(rpcurl)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot connect to provider: %w", err)
 	}
@@ -70,7 +70,7 @@ func NewClient(config EthClientConfig, senderAddress gethcommon.Address, logger 
 	}
 
 	c := &EthClient{
-		RPCURL:           config.RPCURL,
+		RPCURL:           rpcurl,
 		privateKey:       privateKey,
 		chainID:          chainIDBigInt,
 		AccountAddress:   accountAddress,

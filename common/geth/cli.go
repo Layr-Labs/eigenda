@@ -9,19 +9,21 @@ var (
 	rpcUrlFlagName           = "chain.rpc"
 	privateKeyFlagName       = "chain.private-key"
 	numConfirmationsFlagName = "chain.num-confirmations"
+	numRetriesFlagName       = "chain.num-retries"
 )
 
 type EthClientConfig struct {
-	RPCURL           string
+	RPCURLs          []string
 	PrivateKeyString string
 	NumConfirmations int
+	NumRetries       int
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
 	return []cli.Flag{
-		cli.StringFlag{
+		cli.StringSliceFlag{
 			Name:     rpcUrlFlagName,
-			Usage:    "Chain rpc",
+			Usage:    "Chain rpc. Disperser/Batcher can accept multiple. Node accepts one",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CHAIN_RPC"),
 		},
@@ -38,14 +40,22 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Value:    0,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_CONFIRMATIONS"),
 		},
+		cli.IntFlag{
+			Name:     numRetriesFlagName,
+			Usage:    "Number of maximal retry for each rpc call",
+			Required: false,
+			Value:    2,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_RETRIES"),
+		},
 	}
 }
 
 func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg := EthClientConfig{}
-	cfg.RPCURL = ctx.GlobalString(rpcUrlFlagName)
+	cfg.RPCURLs = ctx.GlobalStringSlice(rpcUrlFlagName)
 	cfg.PrivateKeyString = ctx.GlobalString(privateKeyFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
+	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 	return cfg
 }
 
@@ -53,7 +63,8 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 // The private key for Node should be read from encrypted key file.
 func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg := EthClientConfig{}
-	cfg.RPCURL = ctx.GlobalString(rpcUrlFlagName)
+	cfg.RPCURLs = ctx.GlobalStringSlice(rpcUrlFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
+	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 	return cfg
 }
