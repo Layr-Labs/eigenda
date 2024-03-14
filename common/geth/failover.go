@@ -38,14 +38,10 @@ func (f *FailoverController) ProcessError(err error) {
 	}
 
 	fault := HandleError(err)
-	if fault == SenderFault {
+	if fault == EVMFault {
 		return
-	} else if fault == RPCFault {
-		f.updateRPCFault(err)
-		return
-	} else if fault == Ok {
-		return
-	} else { // TooManyRequest
+	} else {
+		// attribute anything else to server fault for rotation
 		f.updateRPCFault(err)
 		return
 	}

@@ -15,6 +15,7 @@ const (
 	RPCFault
 	TooManyRequest
 	Ok
+	EVMFault
 )
 
 // this function accepts error message returned from API
@@ -42,7 +43,7 @@ func HandleError(err error) ChainConnFaults {
 		errors.Is(err, core.ErrFeeCapTooLow) ||
 		errors.Is(err, core.ErrSenderNoEOA) ||
 		errors.Is(err, core.ErrBlobFeeCapTooLow) {
-		return SenderFault
+		return EVMFault
 	}
 
 	// All geth txpool error, https://pkg.go.dev/github.com/ethereum/go-ethereum@v1.13.14/core
@@ -56,7 +57,7 @@ func HandleError(err error) ChainConnFaults {
 		errors.Is(err, txpool.ErrNegativeValue) ||
 		errors.Is(err, txpool.ErrOversizedData) ||
 		errors.Is(err, txpool.ErrFutureReplacePending) {
-		return SenderFault
+		return EVMFault
 	}
 
 	// custom error parsing. If the error message does not contain any error code, which is 3 digit at minimum
@@ -80,12 +81,6 @@ func HandleError(err error) ChainConnFaults {
 	// too many requests
 	if strings.Contains(errMsg, "429") {
 		return TooManyRequest
-	}
-
-	if strings.Contains(errMsg, "400") ||
-		strings.Contains(errMsg, "401") ||
-		strings.Contains(errMsg, "403") {
-		return SenderFault
 	}
 
 	// by default it is rpc's fault
