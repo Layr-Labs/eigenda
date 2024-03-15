@@ -105,6 +105,9 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 
 		gammaChunkLength := big.NewInt(int64(info.ChunkLength) * int64((info.QuorumThreshold - info.AdversaryThreshold)))
 		denom := new(big.Int).Mul(gammaChunkLength, totalStakes)
+		if denom.Cmp(big.NewInt(0)) == 0 {
+			return nil, AssignmentInfo{}, fmt.Errorf("gammaChunkLength %d and total stake in quorum %d must be greater than 0", gammaChunkLength, totalStakes)
+		}
 		m := roundUpDivideBig(num, denom)
 
 		numChunks += uint(m.Uint64())

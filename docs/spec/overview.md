@@ -31,7 +31,7 @@ Horizontal scalability provides the promise for the technological bottlenecks of
 
 ### Security Model
 
-EigenDA produces a DA attestation which asserts that a given blob or collection of blobs is available. Attestations are anchored to one or more "Quorums," each of which defines a set of EigenLayer stakers which underwrite the security of the attestation. Quorums should be considered as redundant: Each quorum linked to an attestion provides an independent guarantee of availability as if the other quorums did not exist. 
+EigenDA produces a DA attestation which asserts that a given blob or collection of blobs is available. Attestations are anchored to one or more "Quorums," each of which defines a set of EigenLayer stakers which underwrite the security of the attestation. Quorums should be considered as redundant: Each quorum linked to an attestation provides an independent guarantee of availability as if the other quorums did not exist. 
 
 
 Each attestation is characterized by safety and liveness tolerances:
@@ -53,9 +53,9 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 ### Core Components
 
 
-- **DA nodes** are the service providers of EigenDA, storing chunks of blob data for a pre-defined time period and serving these chunks upon request. 
+- **DA nodes** are the service providers of EigenDA, storing chunks of blob data for a predefined time period and serving these chunks upon request. 
 - The **disperser** is responsible for encoding blobs, distributing them to the DA nodes, and aggregating their digital signatures into a DA attestation. As the disperser is currently centralized, it is trusted for system liveness; the disperser will be decentralized over time.
-- The disperser and the DA nodes both depend on the **Ethereum L1** for shared state about the DA node registration and stake delegation. The L1 can is also currently used to bridge DA attestations to L2 end-user applications such as rollup chains. 
+- The disperser and the DA nodes both depend on the **Ethereum L1** for shared state about the DA node registration and stake delegation. The L1 is also currently used to bridge DA attestations to L2 end-user applications such as rollup chains. 
 
 ### Essential flows
 
@@ -73,7 +73,7 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 
 For expositional purposes, we will divide the protocol into two conceptual layers: 
 - Attestation Layer: Modules to ensure that whenever a DA attestation is accepted by an end-user (e.g. a rollup), then the data is indeed available. More specifically, the attestation layer ensures that the system observes the safety and liveness tolerances defined in the [Security Model](#Security-Model) section.
-- Network Layer: The communications protocol which ensures that the liveness and saftey of the protocol are robust against network-level events and threats. 
+- Network Layer: The communications protocol which ensures that the liveness and safety of the protocol are robust against network-level events and threats. 
 
 ![image](../assets/attestation-layer.png)
 
@@ -86,7 +86,7 @@ For expositional purposes, we will divide the protocol into two conceptual layer
 The attest layer is responsible for ensuring that when the network-level assumptions and safety and liveness tolerances are observed, the system properly makes data available. 
 
 The primary responsibility of the attestation layer is to enable consensus about whether a given blob of data is fully within the custody of a set of honest nodes. (Here, what can be taken to be a set of honest nodes is defined by the system safety tolerance and the assurance that these honest nodes will be able to transmit the data to honest retrievers is handled by the network layer.) Since EigenDA is an EigenLayer AVS it does not need its own actual consensus protocol, but can instead piggy-back off of Ethereum's consensus. As a result, the attestation layer decomposes into two fairly straightforward pieces: 
-- **Attestation Logic**: The attestation logic allows us to answer the question of whether a given blob is available, given both a DA attestation and the validator state at the associated Ethereum block. The attestation logic can be understood as simply a function of these inputs which outputs yes or no, depending on whether these inputs imply that data is available. Naturally, this function is grounded upon assumptions about the behavior of honest nodes, which must perform certain validation actions as part of the attestation layer. The attestation logic further docomposes into two major modules: 
+- **Attestation Logic**: The attestation logic allows us to answer the question of whether a given blob is available, given both a DA attestation and the validator state at the associated Ethereum block. The attestation logic can be understood as simply a function of these inputs which outputs yes or no, depending on whether these inputs imply that data is available. Naturally, this function is grounded upon assumptions about the behavior of honest nodes, which must perform certain validation actions as part of the attestation layer. The attestation logic further decomposes into two major modules: 
     - *Encoding*: The encoding module defines a procedure for blobs to be encoded in such a way that their successful reconstruction can be guaranteed given a large enough collection of unique encoded chunks. The procedure also allows for the chunks to be trustlessly verified against a blob commitment so that the disperser cannot violate the protocol.
     - *Assignment*: The assignment module provides a deterministic mapping from validator state to an allocation of encoded chunks to DA nodes. The mapping is designed to uphold safety and liveness properties with minimal data-inefficiency. 
 - **Bridging**: Bridging describes how the attestation is bridged to the consumer protocol, such as that of the rollup. In principle, bridging can be performed in one of several different ways in order to optimize efficiency and composability. At the moment, only bridging via the Ethereum L1 is directly supported. 
