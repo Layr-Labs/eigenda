@@ -13,7 +13,7 @@ import (
 )
 
 type MultiHomingClient struct {
-	RPCs       []*EthClient
+	RPCs       []dacommon.EthClient
 	rpcUrls    []string
 	NumRetries int
 	Logger     logging.Logger
@@ -33,141 +33,160 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 
 	controller := NewFailoverController(len(rpcUrls), logger)
 
-	rpcs := make([]*EthClient, len(rpcUrls))
+	client := &MultiHomingClient{
+		rpcUrls:            rpcUrls,
+		NumRetries:         config.NumRetries,
+		FailoverController: controller,
+		Logger:             logger,
+	}
+
 	for i := 0; i < len(rpcUrls); i++ {
 		rpc, err := NewClient(config, senderAddress, i, logger)
 		if err != nil {
 			logger.Info("cannot connect to rpc at start", "url", rpcUrls[i])
 			return nil, err
 		}
-		rpcs[i] = rpc
+		client.RPCs = append(client.RPCs, rpc)
 	}
 
-	return &MultiHomingClient{
-		RPCs:               rpcs,
-		rpcUrls:            rpcUrls,
-		NumRetries:         config.NumRetries,
-		FailoverController: controller,
-		Logger:             logger,
-	}, nil
+	return client, nil
 }
 
-func (m *MultiHomingClient) GetRPCInstance() *EthClient {
+func (m *MultiHomingClient) GetRPCInstance() (int, dacommon.EthClient) {
 	index := m.GetTotalNumberFault() % uint64(len(m.RPCs))
-	return m.RPCs[index]
+	return int(index), m.RPCs[index]
 }
 
 func (m *MultiHomingClient) GetAccountAddress() gethcommon.Address {
-	return m.GetRPCInstance().GetAccountAddress()
+	_, instance := m.GetRPCInstance()
+	return instance.GetAccountAddress()
 }
 
 func (m *MultiHomingClient) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().SuggestGasTipCap(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.SuggestGasTipCap(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().HeaderByNumber(ctx, number)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.HeaderByNumber(ctx, number)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().EstimateGas(ctx, msg)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.EstimateGas(ctx, msg)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 
 func (m *MultiHomingClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		err := m.GetRPCInstance().SendTransaction(ctx, tx)
+		_, instance := m.GetRPCInstance()
+		err := instance.SendTransaction(ctx, tx)
 		if err == nil {
 			return nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return err
+	return errLast
 }
 
 func (m *MultiHomingClient) TransactionReceipt(ctx context.Context, txHash gethcommon.Hash) (*types.Receipt, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().TransactionReceipt(ctx, txHash)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.TransactionReceipt(ctx, txHash)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) BlockNumber(ctx context.Context) (uint64, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().BlockNumber(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.BlockNumber(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 
 // rest is just inherited
 func (m *MultiHomingClient) BalanceAt(ctx context.Context, account gethcommon.Address, blockNumber *big.Int) (*big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().BalanceAt(ctx, account, blockNumber)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.BalanceAt(ctx, account, blockNumber)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) BlockByHash(ctx context.Context, hash gethcommon.Hash) (*types.Block, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().BlockByHash(ctx, hash)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.BlockByHash(ctx, hash)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().BlockByNumber(ctx, number)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.BlockByNumber(ctx, number)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) CallContract(
@@ -175,15 +194,17 @@ func (m *MultiHomingClient) CallContract(
 	call ethereum.CallMsg,
 	blockNumber *big.Int,
 ) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().CallContract(ctx, call, blockNumber)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.CallContract(ctx, call, blockNumber)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) CallContractAtHash(
@@ -191,15 +212,17 @@ func (m *MultiHomingClient) CallContractAtHash(
 	msg ethereum.CallMsg,
 	blockHash gethcommon.Hash,
 ) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().CallContractAtHash(ctx, msg, blockHash)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.CallContractAtHash(ctx, msg, blockHash)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) CodeAt(
@@ -207,15 +230,17 @@ func (m *MultiHomingClient) CodeAt(
 	contract gethcommon.Address,
 	blockNumber *big.Int,
 ) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().CodeAt(ctx, contract, blockNumber)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.CodeAt(ctx, contract, blockNumber)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) FeeHistory(
@@ -224,328 +249,383 @@ func (m *MultiHomingClient) FeeHistory(
 	lastBlock *big.Int,
 	rewardPercentiles []float64,
 ) (*ethereum.FeeHistory, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().FilterLogs(ctx, q)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.FilterLogs(ctx, q)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) HeaderByHash(ctx context.Context, hash gethcommon.Hash) (*types.Header, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().HeaderByHash(ctx, hash)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.HeaderByHash(ctx, hash)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) NetworkID(ctx context.Context) (*big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().NetworkID(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.NetworkID(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) NonceAt(ctx context.Context, account gethcommon.Address, blockNumber *big.Int) (uint64, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().NonceAt(ctx, account, blockNumber)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.NonceAt(ctx, account, blockNumber)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 
 func (m *MultiHomingClient) PeerCount(ctx context.Context) (uint64, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PeerCount(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PeerCount(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 
 func (m *MultiHomingClient) PendingBalanceAt(ctx context.Context, account gethcommon.Address) (*big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PendingBalanceAt(ctx, account)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PendingBalanceAt(ctx, account)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) PendingCallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PendingCallContract(ctx, msg)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PendingCallContract(ctx, msg)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) PendingCodeAt(ctx context.Context, account gethcommon.Address) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PendingCodeAt(ctx, account)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PendingCodeAt(ctx, account)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) PendingNonceAt(ctx context.Context, account gethcommon.Address) (uint64, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PendingNonceAt(ctx, account)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PendingNonceAt(ctx, account)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 func (m *MultiHomingClient) PendingStorageAt(ctx context.Context, account gethcommon.Address, key gethcommon.Hash) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PendingStorageAt(ctx, account, key)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PendingStorageAt(ctx, account, key)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 func (m *MultiHomingClient) PendingTransactionCount(ctx context.Context) (uint, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().PendingTransactionCount(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.PendingTransactionCount(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 
 func (m *MultiHomingClient) StorageAt(ctx context.Context, account gethcommon.Address, key gethcommon.Hash, blockNumber *big.Int) ([]byte, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().StorageAt(ctx, account, key, blockNumber)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.StorageAt(ctx, account, key, blockNumber)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
-	var err error
+	var errLast error
 	var result ethereum.Subscription
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err = m.GetRPCInstance().SubscribeFilterLogs(ctx, q, ch)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.SubscribeFilterLogs(ctx, q, ch)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return result, err
+	return result, errLast
 }
 
 func (m *MultiHomingClient) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error) {
-	var err error
+	var errLast error
 	var result ethereum.Subscription
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err = m.GetRPCInstance().SubscribeNewHead(ctx, ch)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.SubscribeNewHead(ctx, ch)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return result, err
+	return result, errLast
 }
 
 func (m *MultiHomingClient) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().SuggestGasPrice(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.SuggestGasPrice(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().SyncProgress(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.SyncProgress(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) TransactionByHash(ctx context.Context, hash gethcommon.Hash) (*types.Transaction, bool, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		tx, isPending, err := m.GetRPCInstance().TransactionByHash(ctx, hash)
+		_, instance := m.GetRPCInstance()
+		tx, isPending, err := instance.TransactionByHash(ctx, hash)
 		if err == nil {
 			return tx, isPending, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, true, err
+	return nil, true, errLast
 }
 
 func (m *MultiHomingClient) TransactionCount(ctx context.Context, blockHash gethcommon.Hash) (uint, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().TransactionCount(ctx, blockHash)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.TransactionCount(ctx, blockHash)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return 0, err
+	return 0, errLast
 }
 
 func (m *MultiHomingClient) TransactionInBlock(ctx context.Context, blockHash gethcommon.Hash, index uint) (*types.Transaction, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().TransactionInBlock(ctx, blockHash, index)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.TransactionInBlock(ctx, blockHash, index)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) TransactionSender(ctx context.Context, tx *types.Transaction, block gethcommon.Hash, index uint) (gethcommon.Address, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().TransactionSender(ctx, tx, block, index)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.TransactionSender(ctx, tx, block, index)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return gethcommon.Address{}, err
+	return gethcommon.Address{}, errLast
 }
 
 func (m *MultiHomingClient) ChainID(ctx context.Context) (*big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().ChainID(ctx)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.ChainID(ctx)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) GetLatestGasCaps(ctx context.Context) (*big.Int, *big.Int, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		gasTipCap, gasFeeCap, err := m.GetRPCInstance().GetLatestGasCaps(ctx)
+		_, instance := m.GetRPCInstance()
+		gasTipCap, gasFeeCap, err := instance.GetLatestGasCaps(ctx)
 		if err == nil {
 			return gasTipCap, gasFeeCap, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, nil, err
+	return nil, nil, errLast
 }
 
 func (m *MultiHomingClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Context, tx *types.Transaction, tag string, value *big.Int) (*types.Receipt, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().EstimateGasPriceAndLimitAndSendTx(ctx, tx, tag, value)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.EstimateGasPriceAndLimitAndSendTx(ctx, tx, tag, value)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) UpdateGas(ctx context.Context, tx *types.Transaction, value, gasTipCap, gasFeeCap *big.Int) (*types.Transaction, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().UpdateGas(ctx, tx, value, gasTipCap, gasFeeCap)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.UpdateGas(ctx, tx, value, gasTipCap, gasFeeCap)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 func (m *MultiHomingClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().EnsureTransactionEvaled(ctx, tx, tag)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.EnsureTransactionEvaled(ctx, tx, tag)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) EnsureAnyTransactionEvaled(ctx context.Context, txs []*types.Transaction, tag string) (*types.Receipt, error) {
-	var err error
+	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
-		result, err := m.GetRPCInstance().EnsureAnyTransactionEvaled(ctx, txs, tag)
+		_, instance := m.GetRPCInstance()
+		result, err := instance.EnsureAnyTransactionEvaled(ctx, txs, tag)
 		if err == nil {
 			return result, nil
 		}
 		m.ProcessError(err)
+		errLast = err
 	}
-	return nil, err
+	return nil, errLast
 }
 
 func (m *MultiHomingClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
-	return m.GetRPCInstance().GetNoSendTransactOpts()
+	_, instance := m.GetRPCInstance()
+	return instance.GetNoSendTransactOpts()
 }
