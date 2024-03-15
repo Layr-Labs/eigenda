@@ -70,7 +70,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	numResponsible := computeNumResponsible(batches, operatorQuorumIntervals)
 
 	// Compute the nonsigning rate for each <operator, quorum> pair.
-	operators := make([]*OperatorNonsigningPercentageMetrics, 0)
+	nonsignerMetrics := make([]*OperatorNonsigningPercentageMetrics, 0)
 	for op, val := range numResponsible {
 		for q, totalCount := range val {
 			if totalCount == 0 {
@@ -82,34 +82,34 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 				if err != nil {
 					return nil, err
 				}
-				operatorMetric := OperatorNonsigningPercentageMetrics{
+				nonsignerMetric := OperatorNonsigningPercentageMetrics{
 					OperatorId:           op,
 					QuorumId:             q,
 					TotalUnsignedBatches: unsignedCount,
 					TotalBatches:         totalCount,
 					Percentage:           pf,
 				}
-				operators = append(operators, &operatorMetric)
+				nonsignerMetrics = append(nonsignerMetrics, &nonsignerMetric)
 			}
 		}
 	}
 
 	// Sort by descending order of nonsigning rate.
-	sort.Slice(operators, func(i, j int) bool {
-		if operators[i].Percentage == operators[j].Percentage {
-			if operators[i].OperatorId == operators[j].OperatorId {
-				return operators[i].QuorumId < operators[j].QuorumId
+	sort.Slice(nonsignerMetrics, func(i, j int) bool {
+		if nonsignerMetrics[i].Percentage == nonsignerMetrics[j].Percentage {
+			if nonsignerMetrics[i].OperatorId == nonsignerMetrics[j].OperatorId {
+				return nonsignerMetrics[i].QuorumId < nonsignerMetrics[j].QuorumId
 			}
-			return operators[i].OperatorId < operators[j].OperatorId
+			return nonsignerMetrics[i].OperatorId < nonsignerMetrics[j].OperatorId
 		}
-		return operators[i].Percentage > operators[j].Percentage
+		return nonsignerMetrics[i].Percentage > nonsignerMetrics[j].Percentage
 	})
 
 	return &OperatorsNonsigningPercentage{
 		Meta: Meta{
-			Size: len(operators),
+			Size: len(nonsignerMetrics),
 		},
-		Data: operators,
+		Data: nonsignerMetrics,
 	}, nil
 }
 
