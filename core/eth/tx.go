@@ -581,7 +581,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	for i := range operatorIds {
 		byteOperatorIds[i] = [32]byte(operatorIds[i])
 	}
-	indices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
+	quorumBitmapIndices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
 		Context: ctx,
 	}, blockNumber, byteOperatorIds)
 	if err != nil {
@@ -591,25 +591,28 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	// Get bitmaps in N RPCs, but in parallel.
 	type BitmapOrError struct {
 		bitmap *big.Int
-		index  uint32
-		err    error
+		// The index is referring to the position of operator in operatorIds slice,
+		// i.e. the bitmap here (if err is nil) is for operatorIds[index].
+		index int
+		err   error
 	}
-	resultChan := make(chan BitmapOrError, len(indices))
+	resultChan := make(chan BitmapOrError, len(quorumBitmapIndices))
 	pool := workerpool.New(maxNumWorkerPoolThreads)
-	for i, index := range indices {
-		idx := index
+	for i, bitmapIndex := range quorumBitmapIndices {
+		i := i
+		bitmapIndex := bitmapIndex
 		op := operatorIds[i]
 		pool.Submit(func() {
 			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
 				Context: ctx,
-			}, op, blockNumber, big.NewInt(int64(idx)))
-			resultChan <- BitmapOrError{bitmap: bm, index: idx, err: err}
+			}, op, blockNumber, big.NewInt(int64(bitmapIndex)))
+			resultChan <- BitmapOrError{bitmap: bm, index: i, err: err}
 		})
 	}
 	pool.StopWait()
 	close(resultChan)
 
-	bitmaps := make([]*big.Int, len(indices))
+	bitmaps := make([]*big.Int, len(quorumBitmapIndices))
 	for result := range resultChan {
 		if result.err != nil {
 			return nil, result.err

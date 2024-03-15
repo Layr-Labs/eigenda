@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -27,9 +28,9 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
-	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/goleak"
@@ -301,30 +302,13 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	r := setUpRouter()
 
-	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
-
-	nonSigning := struct {
-		NonSigners []struct {
-			OperatorId graphql.String `graphql:"operatorId"`
-		} `graphql:"nonSigners"`
-	}{
-		NonSigners: []struct {
-			OperatorId graphql.String `graphql:"operatorId"`
-		}{
-			{OperatorId: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"},
-			{OperatorId: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568312"},
-		},
-	}
-	batchNonSigningOperatorIds := []*subgraph.BatchNonSigningOperatorIds{
-		{
-			NonSigning: nonSigning,
-		},
-	}
-
-	mockSubgraphApi.On("QueryBatchNonSigningOperatorIdsInInterval").Return(batchNonSigningOperatorIds, nil).Once()
-	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistereds, nil)
-	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
-	mockSubgraphApi.On("QueryBatchesByBlockTimestampRange").Return(subgraphBatches, nil)
+	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
+	addr1 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
+	addr2 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+	mockTx.On("BatchOperatorIDToAddress").Return([]gethcommon.Address{addr1, addr2}, nil)
+	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return([]*big.Int{big.NewInt(3), big.NewInt(0)}, nil)
+	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
+	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
 
 	r.GET("/v1/metrics/operator-nonsigning-percentage", testDataApiServer.FetchOperatorsNonsigningPercentageHandler)
 
@@ -347,14 +331,24 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
+	assert.Equal(t, 2, response.Meta.Size)
+	assert.Equal(t, 2, len(response.Data))
+
 	responseData := response.Data[0]
 	operatorId := responseData.OperatorId
-	assert.Equal(t, 2, response.Meta.Size)
-	assert.Equal(t, 3, responseData.TotalBatches)
+	assert.Equal(t, 1, responseData.TotalBatches)
 	assert.Equal(t, 1, responseData.TotalUnsignedBatches)
-	assert.Equal(t, float64(33.33), responseData.Percentage)
-	assert.Equal(t, "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310", operatorId)
-	assert.Equal(t, 2, len(response.Data))
+	assert.Equal(t, uint8(0), responseData.QuorumId)
+	assert.Equal(t, float64(100), responseData.Percentage)
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+
+	responseData = response.Data[1]
+	operatorId = responseData.OperatorId
+	assert.Equal(t, 2, responseData.TotalBatches)
+	assert.Equal(t, 2, responseData.TotalUnsignedBatches)
+	assert.Equal(t, uint8(1), responseData.QuorumId)
+	assert.Equal(t, float64(100), responseData.Percentage)
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
 }
 
 func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {

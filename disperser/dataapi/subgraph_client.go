@@ -25,6 +25,8 @@ type (
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
+		QueryBatchNonSigningInfoInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error)
+		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error)
 		QueryNumBatchesByOperatorsInThePastBlockTimestamp(ctx context.Context, blockTimestamp uint64, nonsigers map[string]int) (map[string]int, error)
 	}
