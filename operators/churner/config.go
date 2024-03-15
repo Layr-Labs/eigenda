@@ -3,9 +3,9 @@ package churner
 import (
 	"time"
 
-	"github.com/Layr-Labs/eigenda/churner/flags"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/operators/churner/flags"
 	"github.com/urfave/cli"
 )
 

@@ -117,7 +117,7 @@ func (t *MockTransactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context,
 }
 
 func (t *MockTransactor) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
-	args := t.Called()
+	args := t.Called(ctx, quorumID)
 	result := args.Get(0)
 	return result.(*core.OperatorSetParam), args.Error(1)
 }

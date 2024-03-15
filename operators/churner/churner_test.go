@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/churner"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/stretchr/testify/assert"
 
 	dacore "github.com/Layr-Labs/eigenda/core"
@@ -42,7 +42,7 @@ func TestProcessChurnRequest(t *testing.T) {
 		OperatorToRegisterPubkeyG1: keyPair.PubKey,
 		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2(),
 		Salt:                       salt,
-		QuorumIDs:                  []dacore.QuorumID{0},
+		QuorumIDs:                  []dacore.QuorumID{0, 1},
 	}
 
 	var requestHash [32]byte
@@ -66,11 +66,20 @@ func TestProcessChurnRequest(t *testing.T) {
 	assert.NotNil(t, response.SignatureWithSaltAndExpiry.Salt)
 	assert.NotNil(t, response.SignatureWithSaltAndExpiry.Expiry)
 	assert.Equal(t, expectedReplySignature, response.SignatureWithSaltAndExpiry.Signature)
-	assert.Equal(t, 1, len(response.OperatorsToChurn))
-
+	assert.Equal(t, 2, len(response.OperatorsToChurn))
+	actualQuorums := make([]dacore.QuorumID, 0)
 	for _, o := range response.OperatorsToChurn {
-		assert.Equal(t, uint8(0), o.QuorumId)
-		assert.Equal(t, gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"), o.Operator)
-		assert.Equal(t, keyPair.PubKey, o.Pubkey)
+		actualQuorums = append(actualQuorums, o.QuorumId)
+		if o.QuorumId == 0 {
+			// no churning for quorum 0
+			assert.Equal(t, gethcommon.HexToAddress("0x"), o.Operator)
+			assert.Nil(t, o.Pubkey)
+		}
+		if o.QuorumId == 1 {
+			// churn the operator with quorum 1
+			assert.Equal(t, gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"), o.Operator)
+			assert.Equal(t, keyPair.PubKey, o.Pubkey)
+		}
 	}
+	assert.ElementsMatch(t, []dacore.QuorumID{0, 1}, actualQuorums)
 }
