@@ -188,12 +188,12 @@ func TestChurner(t *testing.T) {
 
 func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Transactor, error) {
 	ethClientCfg := geth.EthClientConfig{
-		RPCURLs:           []string{rpcURL},
+		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 	}
 
-	gethClient, err := geth.NewClient(ethClientCfg, gethcommon.Address{}, rpcURL, logger)
+	gethClient, err := geth.NewMultiHomingClient(ethClientCfg, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
@@ -205,7 +205,7 @@ func newTestServer(t *testing.T) *churner.Server {
 	var err error
 	config := &churner.Config{
 		EthClientConfig: geth.EthClientConfig{
-			RPCURLs:           []string{rpcURL},
+			RPCURLs:          []string{rpcURL},
 			PrivateKeyString: churnerPrivateKeyHex,
 		},
 		LoggerConfig:                  common.DefaultLoggerConfig(),

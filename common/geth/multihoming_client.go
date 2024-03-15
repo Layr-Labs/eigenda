@@ -22,6 +22,12 @@ type MultiHomingClient struct {
 
 var _ dacommon.EthClient = (*MultiHomingClient)(nil)
 
+// NewMultiHomingClient is an EthClient that automatically handles RPC failures and retries by cycling through
+// multiple RPC clients. All EthClients underneath maintain active connections throughout the life time. The
+// MultiHomingClient keeps using the same EthClient for a new RPC invocation until it encounters a connection
+// error (i.e. any Non EVM error). Then the next EthClient is chosen in a round robin fashion, and the same rpc call
+// can be retried. The total number of retry is configured through cli argument. When the rpc call has used up all
+// the retry opportunity, the rpc would fail and return error. The MultiHomingClient assumes a single private key.
 func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Address, logger logging.Logger) (*MultiHomingClient, error) {
 	rpcUrls := config.RPCURLs
 
@@ -29,8 +35,7 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 
 	rpcs := make([]*EthClient, len(rpcUrls))
 	for i := 0; i < len(rpcUrls); i++ {
-		rpcurl := rpcUrls[i]
-		rpc, err := NewClient(config, senderAddress, rpcurl, logger)
+		rpc, err := NewClient(config, senderAddress, i, logger)
 		if err != nil {
 			logger.Info("cannot connect to rpc at start", "url", rpcUrls[i])
 			return nil, err

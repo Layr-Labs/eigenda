@@ -70,7 +70,7 @@ func run(ctx *cli.Context) error {
 	}
 
 	log.Println("Starting geth client")
-	gethClient, err := geth.NewClient(config.EthClientConfig, gethcommon.Address{}, config.EthClientConfig.RPCURLs[0], logger)
+	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

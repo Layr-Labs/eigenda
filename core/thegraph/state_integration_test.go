@@ -110,7 +110,7 @@ func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, log
 		NumConfirmations: 0,
 	}
 
-	client, err := geth.NewClient(config, gethcommon.Address{}, deployer.RPC, logger)
+	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	return client
 }

@@ -23,7 +23,7 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringSliceFlag{
 			Name:     rpcUrlFlagName,
-			Usage:    "Chain rpc. Disperser/Batcher can accept multiple comma separated rpc url. Node only accepts one",
+			Usage:    "Chain rpc. Disperser/Batcher can accept multiple comma separated rpc url. Node only uses the first one",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CHAIN_RPC"),
 		},
