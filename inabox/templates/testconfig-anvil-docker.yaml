@@ -45,7 +45,6 @@ services:
       SRS_LOAD: 2900
       CHALLENGE_ORDER: 3000
       LOG_LEVEL: "debug"
-      LOG_FORMAT: "text"
       VERBOSE: true
       NUM_CONNECTIONS: 50
       AWS_ENDPOINT_URL: http://host.docker.internal:4570
