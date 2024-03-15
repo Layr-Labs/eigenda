@@ -340,7 +340,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, 1, responseData.TotalUnsignedBatches)
 	assert.Equal(t, uint8(0), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
-	assert.Equal(t, "e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
 
 	responseData = response.Data[1]
 	operatorId = responseData.OperatorId
@@ -348,7 +348,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, 2, responseData.TotalUnsignedBatches)
 	assert.Equal(t, uint8(1), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
-	assert.Equal(t, "e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
 }
 
 func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
