@@ -181,9 +181,9 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 
 	quorumHeader1 := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           1,
-			QuorumThreshold:    65,
-			AdversaryThreshold: 15,
+			QuorumID:              1,
+			ConfirmationThreshold: 65,
+			AdversaryThreshold:    15,
 		},
 		ChunkLength: 10,
 	}

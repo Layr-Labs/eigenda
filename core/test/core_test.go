@@ -229,9 +229,9 @@ func TestValidationSucceeds(t *testing.T) {
 			ConfirmationThreshold: 100,
 		},
 		{
-			QuorumID:           1,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    90,
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 90,
 		},
 	}
 
@@ -269,14 +269,14 @@ func TestImproperBatchHeader(t *testing.T) {
 
 	securityParams := []*core.SecurityParam{
 		{
-			QuorumID:           0,
-			AdversaryThreshold: 50,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    50,
+			ConfirmationThreshold: 100,
 		},
 		{
-			QuorumID:           1,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    90,
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 90,
 		},
 	}
 

@@ -655,7 +655,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > 256 {
-		return errors.New("invalid request: number of custom_quorum_numbers must not exceed 256")
+		return nil, errors.New("invalid request: number of custom_quorum_numbers must not exceed 256")
 	}
 
 	quorumConfig, err := s.updateQuorumConfig(ctx)
@@ -663,8 +663,8 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		return nil, fmt.Errorf("failed to get quorum config: %w", err)
 	}
 
-	if len(req.GetCustomQuorumNumbers()) > quorumConfig.QuorumCount {
-		return errors.New("invalid request: number of custom_quorum_numbers must not exceed number of quorums")
+	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
+		return nil, errors.New("invalid request: number of custom_quorum_numbers must not exceed number of quorums")
 	}
 
 	seenQuorums := make(map[uint8]struct{})

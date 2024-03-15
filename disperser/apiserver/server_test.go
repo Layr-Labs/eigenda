@@ -152,11 +152,12 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 0},
 	})
-<<<<<<< HEAD
 	assert.ErrorContains(t, err, "invalid request: quorum_numbers must not contain duplicates")
-=======
-	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: security_params must not contain duplicate quorum_id")
+
 }
+
+func TestGetBlobStatus(t *testing.T) {
+	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -364,17 +365,9 @@ func teardown() {
 	}
 }
 
-<<<<<<< HEAD
 func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	if err != nil {
-		panic("failed to create a new logger")
-	}
-
-=======
-func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	logger := logging.NewNoopLogger()
->>>>>>> master
+
 	bucketName := "test-eigenda-blobstore"
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",

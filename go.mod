@@ -21,7 +21,7 @@ require (
 	github.com/onsi/gomega v1.27.8
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pingcap/errors v0.11.4
-	github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_golang v1.18.0
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/swag v1.16.2

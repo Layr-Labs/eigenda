@@ -444,9 +444,9 @@ func TestPartialBlob(t *testing.T) {
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: 75,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    75,
+			ConfirmationThreshold: 100,
 		},
 		ChunkLength: 8,
 	}})
@@ -673,17 +673,17 @@ func TestGetBatch(t *testing.T) {
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
 		{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    80,
+				ConfirmationThreshold: 100,
 			},
 			ChunkLength: 16,
 		},
 		{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           1,
-				AdversaryThreshold: 70,
-				QuorumThreshold:    95,
+				QuorumID:              1,
+				AdversaryThreshold:    70,
+				ConfirmationThreshold: 95,
 			},
 			ChunkLength: 8,
 		},
