@@ -53,9 +53,9 @@ dataSources:
         - name: BLSApkRegistry
           file: ./abis/BLSApkRegistry.json
       eventHandlers:
-        - event: OperatorAddedToQuorums(address,bytes)
+        - event: OperatorAddedToQuorums(address,bytes32,bytes)
           handler: handleOperatorAddedToQuorums
-        - event: OperatorRemovedFromQuorums(address,bytes)
+        - event: OperatorRemovedFromQuorums(address,bytes32,bytes)
           handler: handleOperatorRemovedFromQuorums
         - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
           handler: handleNewPubkeyRegistration
@@ -121,8 +121,8 @@ dataSources:
         - name: BLSApkRegistry
           file: ./abis/BLSApkRegistry.json
       eventHandlers:
-        - event: OperatorAddedToQuorums(address,bytes)
+        - event: OperatorAddedToQuorums(address,bytes32,bytes)
           handler: handleOperatorAddedToQuorums
-        - event: OperatorRemovedFromQuorums(address,bytes)
+        - event: OperatorRemovedFromQuorums(address,bytes32,bytes)
           handler: handleOperatorRemovedFromQuorums
       file: ./src/quorum-apk-updates.ts
