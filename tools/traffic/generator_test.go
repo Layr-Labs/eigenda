@@ -7,19 +7,16 @@ import (
 
 	"github.com/Layr-Labs/eigenda/clients"
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/stretchr/testify/mock"
 )
 
 func TestTrafficGenerator(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	if err != nil {
-		panic("failed to create new logger")
-	}
+	logger := logging.NewNoopLogger()
 	trafficGenerator := &traffic.TrafficGenerator{
 		Logger: logger,
 		Config: &traffic.Config{

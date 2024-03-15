@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 type BucketStore = common.KVStore[common.RateBucketParams]
@@ -13,10 +14,10 @@ type rateLimiter struct {
 	globalRateParams common.GlobalRateParams
 	bucketStore      BucketStore
 
-	logger common.Logger
+	logger logging.Logger
 }
 
-func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, logger common.Logger) common.RateLimiter {
+func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, logger logging.Logger) common.RateLimiter {
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,

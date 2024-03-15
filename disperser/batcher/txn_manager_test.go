@@ -2,14 +2,14 @@ package batcher_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -17,8 +17,7 @@ import (
 
 func TestProcessTransaction(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
@@ -32,7 +31,7 @@ func TestProcessTransaction(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil).Once()
 
-	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -47,7 +46,7 @@ func TestProcessTransaction(t *testing.T) {
 	ethClient.AssertNumberOfCalls(t, "EnsureAnyTransactionEvaled", 1)
 
 	// now test the case where the transaction fails
-	randomErr := fmt.Errorf("random error")
+	randomErr := errors.New("random error")
 	ethClient.On("EnsureAnyTransactionEvaled").Return(nil, randomErr)
 	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
@@ -67,8 +66,7 @@ func TestProcessTransaction(t *testing.T) {
 
 func TestReplaceGasFee(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
@@ -84,7 +82,7 @@ func TestReplaceGasFee(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -99,8 +97,7 @@ func TestReplaceGasFee(t *testing.T) {
 
 func TestTransactionFailure(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
@@ -110,7 +107,7 @@ func TestTransactionFailure(t *testing.T) {
 	ethClient.On("GetLatestGasCaps").Return(big.NewInt(1e9), big.NewInt(1e9), nil)
 	ethClient.On("UpdateGas").Return(txn, nil).Once()
 	// now assume that the transaction fails on retry
-	speedUpFailure := fmt.Errorf("speed up failure")
+	speedUpFailure := errors.New("speed up failure")
 	ethClient.On("UpdateGas").Return(nil, speedUpFailure).Once()
 	ethClient.On("SendTransaction").Return(nil)
 	// assume that the transaction is not mined within the timeout
@@ -119,7 +116,7 @@ func TestTransactionFailure(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -132,8 +129,7 @@ func TestTransactionFailure(t *testing.T) {
 
 func TestSendTransactionRetry(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
@@ -144,14 +140,14 @@ func TestSendTransactionRetry(t *testing.T) {
 	ethClient.On("UpdateGas").Return(txn, nil)
 	ethClient.On("SendTransaction").Return(nil).Once()
 	// assume that it fails to send the replacement transaction once
-	ethClient.On("SendTransaction").Return(fmt.Errorf("send txn failure")).Once()
+	ethClient.On("SendTransaction").Return(errors.New("send txn failure")).Once()
 	// assume that the transaction is not mined within the timeout
 	ethClient.On("EnsureAnyTransactionEvaled").Return(nil, context.DeadlineExceeded).Once()
 	ethClient.On("EnsureAnyTransactionEvaled").Return(&types.Receipt{
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -169,8 +165,7 @@ func TestSendTransactionRetry(t *testing.T) {
 
 func TestSendTransactionRetryFailure(t *testing.T) {
 	ethClient := &mock.MockEthClient{}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, 5, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
@@ -181,12 +176,12 @@ func TestSendTransactionRetryFailure(t *testing.T) {
 	ethClient.On("UpdateGas").Return(txn, nil)
 	ethClient.On("SendTransaction").Return(nil).Once()
 	// assume that it keeps failing to send the replacement transaction
-	sendErr := fmt.Errorf("send txn failure")
+	sendErr := errors.New("send txn failure")
 	ethClient.On("SendTransaction").Return(sendErr)
 	// assume that the transaction is not mined within the timeout
 	ethClient.On("EnsureAnyTransactionEvaled").Return(nil, context.DeadlineExceeded)
 
-	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,

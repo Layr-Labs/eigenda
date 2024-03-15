@@ -7,12 +7,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
@@ -30,6 +32,11 @@ const (
 )
 
 var errNotFound = errors.New("not found")
+
+type EigenDAServiceChecker interface {
+	CheckHealth(ctx context.Context, serviceName string) (*grpc_health_v1.HealthCheckResponse, error)
+	CloseConnections() error
+}
 
 type (
 	BlobMetadataResponse struct {
@@ -53,7 +60,9 @@ type (
 	Metric struct {
 		Throughput float64 `json:"throughput"`
 		CostInGas  float64 `json:"cost_in_gas"`
-		TotalStake uint64  `json:"total_stake"`
+		// deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.
+		TotalStake          uint64                   `json:"total_stake"`
+		TotalStakePerQuorum map[core.QuorumID]uint64 `json:"total_stake_per_quorum"`
 	}
 
 	Throughput struct {
@@ -95,6 +104,16 @@ type (
 		Data []*DeregisteredOperatorMetadata `json:"data"`
 	}
 
+	ServiceAvailability struct {
+		ServiceName   string `json:"service_name"`
+		ServiceStatus string `json:"service_status"`
+	}
+
+	ServiceAvailabilityResponse struct {
+		Meta Meta                   `json:"meta"`
+		Data []*ServiceAvailability `json:"data"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -103,14 +122,17 @@ type (
 		serverMode     string
 		socketAddr     string
 		allowOrigins   []string
-		logger         common.Logger
+		logger         logging.Logger
 		blobstore      disperser.BlobStore
 		promClient     PrometheusClient
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
 
-		metrics *Metrics
+		metrics               *Metrics
+		disperserHostName     string
+		churnerHostName       string
+		eigenDAServiceChecker EigenDAServiceChecker
 	}
 )
 
@@ -121,20 +143,36 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
+	grpcConn GRPCConn,
+	eigenDAServiceChecker EigenDAServiceChecker,
+
 ) *server {
+	// Initialize the health checker service for EigenDA services
+	if grpcConn == nil {
+		grpcConn = &GRPCDialerSkipTLS{}
+	}
+
+	if eigenDAServiceChecker == nil {
+
+		eigenDAServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+	}
+
 	return &server{
-		logger:         logger,
-		serverMode:     config.ServerMode,
-		socketAddr:     config.SocketAddr,
-		allowOrigins:   config.AllowOrigins,
-		blobstore:      blobstore,
-		promClient:     promClient,
-		subgraphClient: subgraphClient,
-		transactor:     transactor,
-		chainState:     chainState,
-		metrics:        metrics,
+		logger:                logger,
+		serverMode:            config.ServerMode,
+		socketAddr:            config.SocketAddr,
+		allowOrigins:          config.AllowOrigins,
+		blobstore:             blobstore,
+		promClient:            promClient,
+		subgraphClient:        subgraphClient,
+		transactor:            transactor,
+		chainState:            chainState,
+		metrics:               metrics,
+		disperserHostName:     config.DisperserHostname,
+		churnerHostName:       config.ChurnerHostname,
+		eigenDAServiceChecker: eigenDAServiceChecker,
 	}
 }
 
@@ -159,6 +197,10 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+		}
+		serviceAvailability := v1.Group("/eigenda")
+		{
+			serviceAvailability.GET("/service-availability", s.GetEigenDAServiceAvailability)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -202,6 +244,20 @@ func (s *server) Start() error {
 
 	errChan := run(s.logger, srv)
 	return <-errChan
+}
+
+func (s *server) Shutdown() error {
+
+	if s.eigenDAServiceChecker != nil {
+		err := s.eigenDAServiceChecker.CloseConnections()
+
+		if err != nil {
+			s.logger.Error("Failed to close connections", "error", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 // FetchBlobHandler godoc
@@ -469,6 +525,69 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	})
 }
 
+// GetEigenDAServiceAvailability godoc
+//
+//	@Summary	Get status of public EigenDA services.
+//	@Tags		ServiceAvailability
+//	@Produce	json
+//	@Success	200	{object}	ServiceAvailabilityResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/eigenda/service-availability [get]
+func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("GetEigenDAServiceAvailability", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Get query parameters to filter services
+	serviceName := c.DefaultQuery("service-name", "") // If not specified, default to return all services
+
+	// If service name is not specified, return all services
+	services := []string{}
+
+	if serviceName == "disperser" {
+		services = append(services, "Disperser")
+	} else if serviceName == "churner" {
+		services = append(services, "Churner")
+	} else if serviceName == "" {
+		services = append(services, "Disperser", "Churner")
+	}
+	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
+
+	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("GetEigenDAServiceAvailability")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
+
+	// Set the status code to 503 if any of the services are not serving
+	availabilityStatus := http.StatusOK
+	for _, status := range availabilityStatuses {
+		if status.ServiceStatus == "NOT_SERVING" {
+			availabilityStatus = http.StatusServiceUnavailable
+			break
+		}
+
+		if status.ServiceStatus == "UNKNOWN" {
+			availabilityStatus = http.StatusInternalServerError
+			break
+		}
+
+	}
+
+	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+		Meta: Meta{
+			Size: len(availabilityStatuses),
+		},
+		Data: availabilityStatuses,
+	})
+}
+
 func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
 	var (
 		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
@@ -552,7 +671,7 @@ func errorResponse(c *gin.Context, err error) {
 	})
 }
 
-func run(logger common.Logger, httpServer *http.Server) <-chan error {
+func run(logger logging.Logger, httpServer *http.Server) <-chan error {
 	errChan := make(chan error, 1)
 	ctx, stop := signal.NotifyContext(
 		context.Background(),

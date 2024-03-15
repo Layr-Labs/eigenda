@@ -12,8 +12,6 @@ import (
 )
 
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	kzgConfig.CacheDir = "./data/SRSTable"
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

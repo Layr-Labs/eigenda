@@ -147,7 +147,7 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_INDEXER_PULL_INTERVAL: "1s",
 
 		CHURNER_STD_LOG_LEVEL:  "debug",
-		CHURNER_FILE_LOG_LEVEL: "trace",
+		CHURNER_FILE_LOG_LEVEL: "debug",
 		CHURNER_LOG_PATH:       logPath,
 
 		CHURNER_ENABLE_METRICS:    "true",
@@ -210,7 +210,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_CHAIN_RPC:                     "",
 		BATCHER_PRIVATE_KEY:                   key[2:],
 		BATCHER_STD_LOG_LEVEL:                 "debug",
-		BATCHER_FILE_LOG_LEVEL:                "trace",
+		BATCHER_FILE_LOG_LEVEL:                "debug",
 		BATCHER_LOG_PATH:                      logPath,
 		BATCHER_GRAPH_URL:                     graphUrl,
 		BATCHER_USE_GRAPH:                     "true",
@@ -307,7 +307,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_CHAIN_RPC:                   "",
 		NODE_PRIVATE_KEY:                 key[2:],
 		NODE_STD_LOG_LEVEL:               "debug",
-		NODE_FILE_LOG_LEVEL:              "trace",
+		NODE_FILE_LOG_LEVEL:              "debug",
 		NODE_LOG_PATH:                    logPath,
 		NODE_NUM_BATCH_VALIDATORS:        "128",
 		NODE_PUBLIC_IP_PROVIDER:          "mockip",
@@ -347,7 +347,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
 
 		RETRIEVER_STD_LOG_LEVEL:  "debug",
-		RETRIEVER_FILE_LOG_LEVEL: "trace",
+		RETRIEVER_FILE_LOG_LEVEL: "debug",
 		RETRIEVER_LOG_PATH:       logPath,
 	}
 

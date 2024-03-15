@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -22,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
@@ -41,7 +41,7 @@ var (
 
 	metadataTableName = "test-BlobMetadata"
 	bucketTableName   = "test-BucketStore"
-	logger            common.Logger
+	logger            logging.Logger
 	ethClient         common.EthClient
 	rpcClient         common.RPCEthClient
 	mockRollup        *rollupbindings.ContractMockRollup
@@ -111,8 +111,10 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
 	}
-	logger, err = logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err = common.NewLogger(loggerConfig)
 	Expect(err).To(BeNil())
+
 	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
 	pk = strings.TrimPrefix(pk, "0x")
 	pk = strings.TrimPrefix(pk, "0X")

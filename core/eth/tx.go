@@ -10,6 +10,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/gammazero/workerpool"
 	"github.com/pingcap/errors"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
@@ -28,12 +30,13 @@ import (
 )
 
 var (
-	maxNumberOfQuorums = 192
+	maxNumberOfQuorums      = 192
+	maxNumWorkerPoolThreads = 8
 )
 
 type Transactor struct {
 	EthClient common.EthClient
-	Logger    common.Logger
+	Logger    logging.Logger
 	Bindings  *ContractBindings
 }
 
@@ -63,7 +66,7 @@ type BN254G2Point struct {
 }
 
 func NewTransactor(
-	logger common.Logger,
+	logger logging.Logger,
 	client common.EthClient,
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Transactor, error) {
@@ -438,12 +441,12 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigAgg, err := json.Marshal(signatureAggregation)
 	if err == nil {
-		t.Logger.Trace("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
+		t.Logger.Debug("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
 	}
 
-	t.Logger.Trace("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
+	t.Logger.Debug("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
 	for _, ns := range nonSignerOperatorIds {
-		t.Logger.Trace("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
+		t.Logger.Debug("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
 	}
 	checkSignaturesIndices, err := t.Bindings.OpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
@@ -472,7 +475,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		SignedStakeForQuorums: signedStakeForQuorums,
 		ReferenceBlockNumber:  uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
+	t.Logger.Debug("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -495,7 +498,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigChecker, err := json.Marshal(signatureChecker)
 	if err == nil {
-		t.Logger.Trace("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
+		t.Logger.Debug("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
@@ -536,10 +539,85 @@ func (t *Transactor) OperatorIDToAddress(ctx context.Context, operatorId core.Op
 	}, operatorId)
 }
 
+func (t *Transactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
+	type AddressOrError struct {
+		address gethcommon.Address
+		index   int
+		err     error
+	}
+	resultChan := make(chan AddressOrError, len(operatorIds))
+	pool := workerpool.New(maxNumWorkerPoolThreads)
+	for i, operatorId := range operatorIds {
+		idx := i
+		op := operatorId
+		pool.Submit(func() {
+			addr, err := t.Bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
+				Context: ctx,
+			}, op)
+			resultChan <- AddressOrError{address: addr, index: idx, err: err}
+		})
+	}
+	pool.StopWait()
+	close(resultChan)
+
+	addresses := make([]gethcommon.Address, len(operatorIds))
+	for result := range resultChan {
+		if result.err != nil {
+			return nil, result.err
+		}
+		addresses[result.index] = result.address
+	}
+	return addresses, nil
+}
+
 func (t *Transactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
 	return t.Bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
+}
+
+func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
+	// Get indices in batch (1 RPC).
+	byteOperatorIds := make([][32]byte, len(operatorIds))
+	for i := range operatorIds {
+		byteOperatorIds[i] = [32]byte(operatorIds[i])
+	}
+	indices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
+		Context: ctx,
+	}, blockNumber, byteOperatorIds)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get bitmaps in N RPCs, but in parallel.
+	type BitmapOrError struct {
+		bitmap *big.Int
+		index  uint32
+		err    error
+	}
+	resultChan := make(chan BitmapOrError, len(indices))
+	pool := workerpool.New(maxNumWorkerPoolThreads)
+	for i, index := range indices {
+		idx := index
+		op := operatorIds[i]
+		pool.Submit(func() {
+			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
+				Context: ctx,
+			}, op, blockNumber, big.NewInt(int64(idx)))
+			resultChan <- BitmapOrError{bitmap: bm, index: idx, err: err}
+		})
+	}
+	pool.StopWait()
+	close(resultChan)
+
+	bitmaps := make([]*big.Int, len(indices))
+	for result := range resultChan {
+		if result.err != nil {
+			return nil, result.err
+		}
+		bitmaps[result.index] = result.bitmap
+	}
+	return bitmaps, nil
 }
 
 func (t *Transactor) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
@@ -594,7 +672,8 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 }
 
 func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	return t.EthClient.GetCurrentBlockNumber(ctx)
+	bn, err := t.EthClient.BlockNumber(ctx)
+	return uint32(bn), err
 }
 
 func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {

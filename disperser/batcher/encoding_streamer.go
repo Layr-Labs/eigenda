@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree"
 )
 
@@ -65,7 +66,7 @@ type EncodingStreamer struct {
 	encodingCtxCancelFuncs []context.CancelFunc
 
 	metrics *EncodingStreamerMetrics
-	logger  common.Logger
+	logger  logging.Logger
 
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
@@ -97,9 +98,9 @@ func NewEncodingStreamer(
 	encodedSizeNotifier *EncodedSizeNotifier,
 	workerPool common.WorkerPool,
 	metrics *EncodingStreamerMetrics,
-	logger common.Logger) (*EncodingStreamer, error) {
+	logger logging.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
-		return nil, fmt.Errorf("EncodingQueueLimit should be greater than 0")
+		return nil, errors.New("EncodingQueueLimit should be greater than 0")
 	}
 	return &EncodingStreamer{
 		StreamerConfig:         config,
@@ -214,7 +215,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 		}
 	}
 
-	e.logger.Trace("[encodingstreamer] metadata in processing status", "numMetadata", len(metadatas))
+	e.logger.Debug("[encodingstreamer] metadata in processing status", "numMetadata", len(metadatas))
 	metadatas = e.dedupRequests(metadatas, referenceBlockNumber)
 	if len(metadatas) == 0 {
 		e.logger.Info("no new metadatas to encode")
@@ -235,7 +236,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	// TODO: this should be done at the request time and keep the cursor so that we don't fetch the same metadata every time
 	metadatas = metadatas[:numMetadatastoProcess]
 
-	e.logger.Trace("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
+	e.logger.Debug("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
 	// Get the operator state
 	state, err := e.getOperatorState(ctx, metadatas, referenceBlockNumber)
@@ -254,9 +255,9 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	if err != nil {
 		return fmt.Errorf("error getting blobs from blob store: %w", err)
 	}
-	e.logger.Trace("[RequestEncoding] retrieved blobs to encode", "numBlobs", len(blobs), "duration", time.Since(stageTimer))
+	e.logger.Debug("[RequestEncoding] retrieved blobs to encode", "numBlobs", len(blobs), "duration", time.Since(stageTimer))
 
-	e.logger.Trace("[RequestEncoding] encoding blobs...", "numBlobs", len(blobs), "blockNumber", referenceBlockNumber)
+	e.logger.Debug("[RequestEncoding] encoding blobs...", "numBlobs", len(blobs), "blockNumber", referenceBlockNumber)
 
 	for i := range metadatas {
 		metadata := metadatas[i]
@@ -462,24 +463,24 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			encodedBlobByKey[blobKey] = make(core.EncodedBlob)
+			blobHeader := &core.BlobHeader{
+				BlobCommitments: *result.Commitment,
+			}
+			blobHeaderByKey[blobKey] = blobHeader
+			encodedBlobByKey[blobKey] = core.EncodedBlob{
+				BlobHeader:        blobHeader,
+				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+			}
 		}
 
 		// Populate the assigned bundles
 		for opID, assignment := range result.Assignments {
-			blobMessage, ok := encodedBlobByKey[blobKey][opID]
+			bundles, ok := encodedBlobByKey[blobKey].BundlesByOperator[opID]
 			if !ok {
-				blobHeader := &core.BlobHeader{
-					BlobCommitments: *result.Commitment,
-				}
-				blobHeaderByKey[blobKey] = blobHeader
-				blobMessage = &core.BlobMessage{
-					BlobHeader: blobHeader,
-					Bundles:    make(core.Bundles),
-				}
-				encodedBlobByKey[blobKey][opID] = blobMessage
+				encodedBlobByKey[blobKey].BundlesByOperator[opID] = make(core.Bundles)
+				bundles = encodedBlobByKey[blobKey].BundlesByOperator[opID]
 			}
-			blobMessage.Bundles[result.BlobQuorumInfo.QuorumID] = append(blobMessage.Bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID] = append(bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
 		}
 
 		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)
@@ -487,9 +488,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 
 	// Populate the blob quorum infos
 	for blobKey, encodedBlob := range encodedBlobByKey {
-		for _, blobMessage := range encodedBlob {
-			blobMessage.BlobHeader.QuorumInfos = blobQuorums[blobKey]
-		}
+		encodedBlob.BlobHeader.QuorumInfos = blobQuorums[blobKey]
 	}
 
 	for blobKey, metadata := range metadataByKey {

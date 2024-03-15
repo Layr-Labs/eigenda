@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -19,7 +19,7 @@ type MetrisConfig struct {
 }
 
 type Metrics struct {
-	logger   common.Logger
+	logger   logging.Logger
 	registry *prometheus.Registry
 	httpPort string
 
@@ -27,7 +27,7 @@ type Metrics struct {
 	Latency               *prometheus.SummaryVec
 }
 
-func NewMetrics(httpPort string, logger common.Logger) *Metrics {
+func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())

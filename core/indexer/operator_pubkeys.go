@@ -5,9 +5,9 @@ import (
 	"encoding/gob"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -30,10 +30,10 @@ type OperatorPubKeys struct {
 }
 
 type OperatorPubKeysAccumulator struct {
-	Logger common.Logger
+	Logger logging.Logger
 }
 
-func NewOperatorPubKeysAccumulator(logger common.Logger) *OperatorPubKeysAccumulator {
+func NewOperatorPubKeysAccumulator(logger logging.Logger) *OperatorPubKeysAccumulator {
 	return &OperatorPubKeysAccumulator{
 		Logger: logger,
 	}

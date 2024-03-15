@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	"github.com/urfave/cli"
 )
@@ -38,9 +38,12 @@ func main() {
 
 func RunEncoderServer(ctx *cli.Context) error {
 
-	config := NewConfig(ctx)
+	config, err := NewConfig(ctx)
+	if err != nil {
+		return err
+	}
 
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
 	}

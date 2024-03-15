@@ -3,7 +3,7 @@ package batcher_test
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"math/big"
 	"runtime"
 	"sync"
@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -70,8 +71,7 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 
 func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.Time) {
 	// Common Components
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 
 	// Core Components
 	cst, err := coremock.MakeChainDataMock(10)
@@ -275,7 +275,7 @@ func TestBlobFailures(t *testing.T) {
 		assert.Equal(t, 3, len(heartbeats), "Expected heartbeats, but none were received")
 	}()
 
-	confirmationErr := fmt.Errorf("error")
+	confirmationErr := errors.New("error")
 	blobStore := components.blobStore
 	ctx := context.Background()
 	requestedAt, blobKey := queueBlob(t, ctx, &blob, blobStore)
@@ -444,7 +444,7 @@ func TestBlobRetry(t *testing.T) {
 	assert.Equal(t, disperser.Processing, meta.BlobStatus)
 
 	// Trigger a retry
-	confirmationErr := fmt.Errorf("error")
+	confirmationErr := errors.New("error")
 	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
 		Receipt:  nil,
 		Err:      confirmationErr,

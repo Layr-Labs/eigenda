@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	ethcomm "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
@@ -41,14 +41,7 @@ func (m *mockChainState) GetOperatorStateByOperator(ctx context.Context, blockNu
 }
 
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
-	logger, err := logging.GetLogger(logging.Config{
-		StdFormat:  "terminal",
-		StdLevel:   "debug",
-		FileFormat: "logfmt",
-		FileLevel:  "debug",
-	})
-	assert.NoError(t, err)
-
+	logger := logging.NewNoopLogger()
 	operatorsQueryCalled := false
 	querier := &mockGraphQLQuerier{}
 	querier.QueryFn = func(ctx context.Context, q any, variables map[string]any) error {
@@ -93,7 +86,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	}
 
 	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
-	err = cs.Start(context.Background())
+	err := cs.Start(context.Background())
 	assert.NoError(t, err)
 
 	headerNum, err := cs.GetCurrentBlockNumber()
@@ -105,13 +98,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 }
 
 func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
-	logger, err := logging.GetLogger(logging.Config{
-		StdFormat:  "terminal",
-		StdLevel:   "debug",
-		FileFormat: "logfmt",
-		FileLevel:  "debug",
-	})
-	assert.NoError(t, err)
+	logger := logging.NewNoopLogger()
 
 	chainState := &mockChainState{}
 	chainState.GetCurrentBlockNumberFn = func() (uint, error) {
@@ -143,7 +130,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	}
 
 	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
-	err = cs.Start(context.Background())
+	err := cs.Start(context.Background())
 	assert.NoError(t, err)
 
 	headerNum, err := cs.GetCurrentBlockNumber()

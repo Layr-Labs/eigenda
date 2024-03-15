@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -50,7 +51,7 @@ type churner struct {
 	QuorumCount uint8
 
 	privateKey *ecdsa.PrivateKey
-	logger     common.Logger
+	logger     logging.Logger
 	metrics    *Metrics
 }
 
@@ -58,7 +59,7 @@ func NewChurner(
 	config *Config,
 	indexer thegraph.IndexedChainState,
 	transactor core.Transactor,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
 ) (*churner, error) {
 	privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
@@ -229,7 +230,12 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// register needs to have 1.1 times the stake of the lowest-stake operator.
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
-			return nil, fmt.Errorf("registering operator must have %f%% more than the stake of the lowest-stake operator. Stake of registering operator: %d, stake of lowest-stake operator: %d, quorum ID: %d", float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, operatorToRegisterStake, lowestStake, quorumID)
+			msg := "registering operator must have %f%% more than the stake of the " +
+				"lowest-stake operator. Block number used for this decision: %d, " +
+				"registering operator address: %s, registering operator stake: %d, " +
+				"stake of lowest-stake operator: %d, operatorId of lowest-stake operator: " +
+				"%x, quorum ID: %d"
+			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, lowestStakeOperatorId, quorumID))
 		}
 
 		// verify the lowest stake against the total stake
@@ -241,7 +247,11 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// stake.
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
 			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
-			return nil, fmt.Errorf("operator to churn out must have less than %f%% of the total stake. Stake of the operator to churn: %d, total stake in quorum: %d, quorum ID: %d", float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, lowestStake, totalStake, quorumID)
+			msg := "operator to churn out must have less than %f%% of the total stake. " +
+				"Block number used for this decision: %d, operatorId of the operator " +
+				"to churn: %x, stake of the operator to churn: %d, total stake in " +
+				"quorum: %d, quorum ID: %d"
+			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
 		}
 
 		operatorToChurnAddress, err := c.Transactor.OperatorIDToAddress(ctx, lowestStakeOperatorId)
@@ -253,6 +263,9 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		if err != nil {
 			return nil, err
 		}
+
+		// log the churn decision just made
+		c.logger.Info("Churner made a churn decision", "address of operator churned out", operatorToChurnAddress.Hex(), "stake of operator churned out", lowestStake.String(), "address of operator churned in", operatorToRegisterAddress.Hex(), "stake of operator churned in", operatorToRegisterStake.String(), "block number", currentBlockNumber, "quorumID", quorumID)
 
 		// add the operator to churn to the list
 		operatorsToChurn = append(operatorsToChurn, core.OperatorToChurn{

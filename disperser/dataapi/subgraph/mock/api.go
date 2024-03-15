@@ -67,6 +67,17 @@ func (m *MockSubgraphApi) QueryOperators(ctx context.Context, first int) ([]*sub
 	return value, args.Error(1)
 }
 
+func (m *MockSubgraphApi) QueryBatchNonSigningInfo(ctx context.Context, first int64) ([]*subgraph.BatchNonSigningInfo, error) {
+	args := m.Called()
+
+	var value []*subgraph.BatchNonSigningInfo
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.BatchNonSigningInfo)
+	}
+
+	return value, args.Error(1)
+}
+
 func (m *MockSubgraphApi) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, first int64) ([]*subgraph.BatchNonSigningOperatorIds, error) {
 	args := m.Called()
 
@@ -110,6 +121,28 @@ func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context
 	var value *subgraph.IndexedOperatorInfo
 	if args.Get(0) != nil {
 		value = args.Get(0).(*subgraph.IndexedOperatorInfo)
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*subgraph.OperatorQuorum, error) {
+	args := m.Called()
+
+	var value []*subgraph.OperatorQuorum
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.OperatorQuorum)
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*subgraph.OperatorQuorum, error) {
+	args := m.Called()
+
+	var value []*subgraph.OperatorQuorum
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.OperatorQuorum)
 	}
 
 	return value, args.Error(1)

@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gammazero/workerpool"
@@ -78,7 +79,7 @@ type Batcher struct {
 
 	ethClient     common.EthClient
 	finalizer     Finalizer
-	logger        common.Logger
+	logger        logging.Logger
 	HeartbeatChan chan time.Time
 }
 
@@ -95,7 +96,7 @@ func NewBatcher(
 	finalizer Finalizer,
 	transactor core.Transactor,
 	txnManager TxnManager,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
 	heartbeatChan chan time.Time,
 ) (*Batcher, error) {
@@ -213,22 +214,22 @@ func (b *Batcher) updateConfirmationInfo(
 	txnReceipt *types.Receipt,
 ) ([]*disperser.BlobMetadata, error) {
 	if txnReceipt.BlockNumber == nil {
-		return nil, fmt.Errorf("HandleSingleBatch: error getting transaction receipt block number")
+		return nil, errors.New("HandleSingleBatch: error getting transaction receipt block number")
 	}
 	if len(batchData.blobs) == 0 {
-		return nil, fmt.Errorf("failed to process confirmed batch: no blobs from transaction manager metadata")
+		return nil, errors.New("failed to process confirmed batch: no blobs from transaction manager metadata")
 	}
 	if batchData.batchHeader == nil {
-		return nil, fmt.Errorf("failed to process confirmed batch: batch header from transaction manager metadata is nil")
+		return nil, errors.New("failed to process confirmed batch: batch header from transaction manager metadata is nil")
 	}
 	if len(batchData.blobHeaders) == 0 {
-		return nil, fmt.Errorf("failed to process confirmed batch: no blob headers from transaction manager metadata")
+		return nil, errors.New("failed to process confirmed batch: no blob headers from transaction manager metadata")
 	}
 	if batchData.merkleTree == nil {
-		return nil, fmt.Errorf("failed to process confirmed batch: merkle tree from transaction manager metadata is nil")
+		return nil, errors.New("failed to process confirmed batch: merkle tree from transaction manager metadata is nil")
 	}
 	if batchData.aggSig == nil {
-		return nil, fmt.Errorf("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
+		return nil, errors.New("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
 	}
 	headerHash, err := batchData.batchHeader.GetBatchHeaderHash()
 	if err != nil {
@@ -316,12 +317,12 @@ func (b *Batcher) updateConfirmationInfo(
 
 func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *ReceiptOrErr) error {
 	if receiptOrErr.Metadata == nil {
-		return fmt.Errorf("failed to process confirmed batch: no metadata from transaction manager response")
+		return errors.New("failed to process confirmed batch: no metadata from transaction manager response")
 	}
 	confirmationMetadata := receiptOrErr.Metadata.(confirmationMetadata)
 	blobs := confirmationMetadata.blobs
 	if len(blobs) == 0 {
-		return fmt.Errorf("failed to process confirmed batch: no blobs from transaction manager metadata")
+		return errors.New("failed to process confirmed batch: no blobs from transaction manager metadata")
 	}
 	if receiptOrErr.Err != nil {
 		_ = b.handleFailure(ctx, blobs, FailConfirmBatch)
@@ -329,7 +330,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 	}
 	if confirmationMetadata.aggSig == nil {
 		_ = b.handleFailure(ctx, blobs, FailNoAggregatedSignature)
-		return fmt.Errorf("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
+		return errors.New("failed to process confirmed batch: aggSig from transaction manager metadata is nil")
 	}
 	b.logger.Info("received ConfirmBatch transaction receipt", "blockNumber", receiptOrErr.Receipt.BlockNumber, "txnHash", receiptOrErr.Receipt.TxHash.Hex())
 
@@ -344,7 +345,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 		b.logger.Error("failed to update confirmation info", "failed", len(blobsToRetry), "total", len(blobs))
 		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
 	}
-	b.logger.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
+	b.logger.Debug("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
 	batchSize := int64(0)
 	for _, blobMeta := range blobs {
@@ -398,16 +399,16 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Trace("[batcher] CreateBatch took", "duration", time.Since(stageTimer))
+	log.Debug("[batcher] CreateBatch took", "duration", time.Since(stageTimer))
 
 	// Dispatch encoded batch
-	log.Trace("[batcher] Dispatching encoded batch...")
+	log.Debug("[batcher] Dispatching encoded batch...")
 	stageTimer = time.Now()
 	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
-	log.Trace("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
+	log.Debug("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
 
 	// Get the batch header hash
-	log.Trace("[batcher] Getting batch header hash...")
+	log.Debug("[batcher] Getting batch header hash...")
 	headerHash, err := batch.BatchHeader.GetBatchHeaderHash()
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailBatchHeaderHash)
@@ -415,7 +416,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	// Aggregate the signatures
-	log.Trace("[batcher] Aggregating signatures...")
+	log.Debug("[batcher] Aggregating signatures...")
 
 	// construct quorumParams
 	quorumIDs := make([]core.QuorumID, 0, len(batch.State.AggKeys))
@@ -429,7 +430,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
 	}
-	log.Trace("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
+	log.Debug("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
 	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners), aggSig.QuorumResults)
 	for _, quorumResult := range aggSig.QuorumResults {
@@ -440,11 +441,11 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailNoSignatures)
-		return fmt.Errorf("HandleSingleBatch: no blobs received sufficient signatures")
+		return errors.New("HandleSingleBatch: no blobs received sufficient signatures")
 	}
 
 	// Confirm the batch
-	log.Trace("[batcher] Confirming batch...")
+	log.Debug("[batcher] Confirming batch...")
 
 	txn, err := b.Transactor.BuildConfirmBatchTxn(ctx, batch.BatchHeader, aggSig.QuorumResults, aggSig)
 	if err != nil {
@@ -483,7 +484,7 @@ func serializeProof(proof *merkletree.Proof) []byte {
 
 func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.Receipt) (uint32, error) {
 	if len(txReceipt.Logs) == 0 {
-		return 0, fmt.Errorf("failed to get transaction receipt with logs")
+		return 0, errors.New("failed to get transaction receipt with logs")
 	}
 	for _, log := range txReceipt.Logs {
 		if len(log.Topics) == 0 {
@@ -514,7 +515,7 @@ func (b *Batcher) parseBatchIDFromReceipt(ctx context.Context, txReceipt *types.
 			return unpackedData[0].(uint32), nil
 		}
 	}
-	return 0, fmt.Errorf("failed to find BatchConfirmed log from the transaction")
+	return 0, errors.New("failed to find BatchConfirmed log from the transaction")
 }
 
 func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uint32, error) {

@@ -25,6 +25,7 @@
 package fft
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -40,17 +41,15 @@ func (fs *FFTSettings) ShiftPoly(poly []fr.Element) {
 	invFactor.Inverse(&shiftFactor)
 	var tmp fr.Element
 	for i := 0; i < len(poly); i++ {
-		
+
 		tmp.Set(&poly[i])
 
-		
 		poly[i].Mul(&tmp, &factorPower)
 
 		// TODO: pre-compute all these shift scalars
-		
+
 		tmp.Set(&factorPower)
 
-		
 		factorPower.Mul(&tmp, &invFactor)
 	}
 }
@@ -58,21 +57,21 @@ func (fs *FFTSettings) ShiftPoly(poly []fr.Element) {
 // unshift poly, in-place. Multiplies each coeff with shift_factor**i
 func (fs *FFTSettings) UnshiftPoly(poly []fr.Element) {
 	var shiftFactor fr.Element
-	
+
 	shiftFactor.SetInt64(int64(5))
 	var factorPower fr.Element
 	factorPower.SetOne()
-	
+
 	var tmp fr.Element
 	for i := 0; i < len(poly); i++ {
 		tmp.Set(&poly[i])
-		
+
 		poly[i].Mul(&tmp, &factorPower)
-		
+
 		// TODO: pre-compute all these shift scalars
-		
+
 		tmp.Set(&factorPower)
-		
+
 		factorPower.Mul(&tmp, &shiftFactor)
 	}
 }
@@ -94,17 +93,17 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 
 	for i, s := range samples {
 		if (s == nil) != zeroEval[i].IsZero() {
-			return nil, fmt.Errorf("bad zero eval")
+			return nil, errors.New("bad zero eval")
 		}
 	}
 
 	polyEvaluationsWithZero := make([]fr.Element, len(samples))
 	for i, s := range samples {
 		if s == nil {
-			
+
 			polyEvaluationsWithZero[i].SetZero()
 		} else {
-			
+
 			polyEvaluationsWithZero[i].Mul(s, &zeroEval[i])
 		}
 	}
@@ -130,7 +129,7 @@ func (fs *FFTSettings) RecoverPolyFromSamples(samples []*fr.Element, zeroPolyFn 
 
 	evalShiftedReconstructedPoly := evalShiftedPolyWithZero
 	for i := 0; i < len(evalShiftedReconstructedPoly); i++ {
-		
+
 		evalShiftedReconstructedPoly[i].Div(&evalShiftedPolyWithZero[i], &evalShiftedZeroPoly[i])
 	}
 	shiftedReconstructedPoly, err := fs.FFT(evalShiftedReconstructedPoly, true)

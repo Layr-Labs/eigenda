@@ -138,7 +138,10 @@ type BatchHeader struct {
 }
 
 // EncodedBlob contains the messages to be sent to a group of DA nodes corresponding to a single blob
-type EncodedBlob = map[OperatorID]*BlobMessage
+type EncodedBlob struct {
+	BlobHeader        *BlobHeader
+	BundlesByOperator map[OperatorID]Bundles
+}
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
 type Bundle = []*encoding.Frame

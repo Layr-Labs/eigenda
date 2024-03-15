@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
@@ -19,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,10 +28,10 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var errSystemBlobRateLimit = fmt.Errorf("request ratelimited: system blob limit")
-var errSystemThroughputRateLimit = fmt.Errorf("request ratelimited: system throughput limit")
-var errAccountBlobRateLimit = fmt.Errorf("request ratelimited: account blob limit")
-var errAccountThroughputRateLimit = fmt.Errorf("request ratelimited: account throughput limit")
+var errSystemBlobRateLimit = errors.New("request ratelimited: system blob limit")
+var errSystemThroughputRateLimit = errors.New("request ratelimited: system throughput limit")
+var errAccountBlobRateLimit = errors.New("request ratelimited: account blob limit")
+var errAccountThroughputRateLimit = errors.New("request ratelimited: account throughput limit")
 
 const systemAccountKey = "system"
 
@@ -51,7 +53,7 @@ type DispersalServer struct {
 
 	metrics *disperser.Metrics
 
-	logger common.Logger
+	logger logging.Logger
 }
 
 type QuorumConfig struct {
@@ -67,7 +69,7 @@ func NewDispersalServer(
 	serverConfig disperser.ServerConfig,
 	store disperser.BlobStore,
 	tx core.Transactor,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
@@ -99,12 +101,12 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Process disperse_request
 	in, err := stream.Recv()
 	if err != nil {
-		return fmt.Errorf("error receiving next message: %v", err)
+		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
 	request, ok := in.Payload.(*pb.AuthenticatedRequest_DisperseRequest)
 	if !ok {
-		return errors.New("expected DisperseBlobRequest")
+		return api.NewInvalidArgError("missing DisperseBlobRequest")
 	}
 
 	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
@@ -112,19 +114,19 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
 			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
 		}
-		return err
+		return api.NewInvalidArgError(err.Error())
 	}
 
 	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
 	// Decode public key
 	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err)
+		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
@@ -143,12 +145,12 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Recieve challenge_reply
 	in, err = stream.Recv()
 	if err != nil {
-		return fmt.Errorf("error receiving next message: %v", err)
+		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
 	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_AuthenticationData)
 	if !ok {
-		return errors.New("expected AuthenticationData")
+		return api.NewInvalidArgError("expected AuthenticationData")
 	}
 
 	blob.RequestHeader.Nonce = challenge
@@ -156,7 +158,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
 	if err != nil {
-		return fmt.Errorf("failed to authenticate blob request: %v", err)
+		return api.NewInvalidArgError(fmt.Sprintf("failed to authenticate blob request: %v", err))
 	}
 
 	// Disperse the blob
@@ -186,7 +188,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		for _, quorumID := range req.CustomQuorumNumbers {
 			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
-		return nil, err
+		return nil, api.NewInvalidArgError(err.Error())
 	}
 
 	reply, err := s.disperseBlob(ctx, blob, "")
@@ -218,7 +220,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			quorumId := string(param.QuorumID)
 			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
-		return nil, err
+		return nil, api.NewInvalidArgError(err.Error())
 	}
 
 	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
@@ -236,7 +238,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 					s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
 				}
 			}
-			return nil, err
+			return nil, api.NewResourceExhaustedError(err.Error())
 		}
 	}
 
@@ -248,7 +250,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			s.metrics.HandleBlobStoreFailedRequest(quorumId, blobSize, "DisperseBlob")
 		}
 		s.logger.Error("failed to store blob", "err", err)
-		return nil, fmt.Errorf("failed to store blob, please try again later")
+		return nil, api.NewInternalError("failed to store blob, please try again later")
 	}
 
 	for _, param := range securityParams {
@@ -405,24 +407,25 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 
 	requestID := req.GetRequestId()
 	if len(requestID) == 0 {
-		return nil, fmt.Errorf("invalid request: request_id must not be empty")
+		return nil, api.NewInvalidArgError("request_id must not be empty")
 	}
 
 	s.logger.Info("received a new blob status request", "requestID", string(requestID))
 	metadataKey, err := disperser.ParseBlobKey(string(requestID))
 	if err != nil {
-		return nil, err
+		return nil, api.NewInvalidArgError(fmt.Sprintf("failed to parse the requestID: %s", err.Error()))
 	}
 
 	s.logger.Debug("metadataKey", "metadataKey", metadataKey.String())
 	metadata, err := s.blobStore.GetBlobMetadata(ctx, metadataKey)
 	if err != nil {
-		return nil, err
+		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		return nil, api.NewInternalError(fmt.Sprintf("failed to get blob metadata, blobkey: %s", metadataKey.String()))
 	}
 
 	isConfirmed, err := metadata.IsConfirmed()
 	if err != nil {
-		return nil, err
+		return nil, api.NewInternalError(fmt.Sprintf("missing confirmation information: %s", err.Error()))
 	}
 
 	s.logger.Debug("isConfirmed", "metadata", metadata, "isConfirmed", isConfirmed)
@@ -518,7 +521,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
 		s.metrics.IncrementFailedBlobRequestNum("", "RetrieveBlob")
 
-		return nil, err
+		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
 
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
@@ -526,7 +530,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.logger.Error("Failed to retrieve blob", "err", err)
 		s.metrics.HandleFailedRequest("", len(data), "RetrieveBlob")
 
-		return nil, err
+		return nil, api.NewInternalError("failed to get blob data, please retry")
 	}
 
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
@@ -537,14 +541,11 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 }
 
 func (s *DispersalServer) Start(ctx context.Context) error {
-	s.logger.Trace("Entering Start function...")
-	defer s.logger.Trace("Exiting Start function...")
-
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("could not start tcp listener")
+		return errors.New("could not start tcp listener")
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
@@ -558,7 +559,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	s.logger.Info("port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
-		return fmt.Errorf("could not start GRPC server")
+		return errors.New("could not start GRPC server")
 	}
 
 	return nil
@@ -653,9 +654,17 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		return nil, fmt.Errorf("blob size must be greater than 0")
 	}
 
+	if len(req.GetCustomQuorumNumbers()) > 256 {
+		return errors.New("invalid request: number of custom_quorum_numbers must not exceed 256")
+	}
+
 	quorumConfig, err := s.updateQuorumConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get quorum config: %w", err)
+	}
+
+	if len(req.GetCustomQuorumNumbers()) > quorumConfig.QuorumCount {
+		return errors.New("invalid request: number of custom_quorum_numbers must not exceed number of quorums")
 	}
 
 	seenQuorums := make(map[uint8]struct{})

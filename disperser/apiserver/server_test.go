@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 
@@ -21,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core"
@@ -152,11 +152,11 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 0},
 	})
+<<<<<<< HEAD
 	assert.ErrorContains(t, err, "invalid request: quorum_numbers must not contain duplicates")
+=======
+	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: security_params must not contain duplicate quorum_id")
 }
-
-func TestGetBlobStatus(t *testing.T) {
-	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -295,7 +295,9 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 
 	// Try to retrieve the blob before it is confirmed
 	_, err = retrieveBlob(t, dispersalServer, 2)
-	assert.Error(t, err)
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "rpc error: code = Internal desc = failed to get blob metadata, please retry")
+
 }
 
 func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
@@ -316,7 +318,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		CustomQuorumNumbers: []uint32{0, 1},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
+	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = blob size cannot exceed 2 MiB")
 }
 
 func setup(m *testing.M) {
@@ -362,12 +364,17 @@ func teardown() {
 	}
 }
 
+<<<<<<< HEAD
 func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
 	if err != nil {
 		panic("failed to create a new logger")
 	}
 
+=======
+func newTestServer(m *testing.M) *apiserver.DispersalServer {
+	logger := logging.NewNoopLogger()
+>>>>>>> master
 	bucketName := "test-eigenda-blobstore"
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",

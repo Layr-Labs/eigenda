@@ -51,7 +51,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if loadG2Points {
 		if len(config.G2Path) == 0 {
-			return nil, fmt.Errorf("G2Path is empty. However, object needs to load G2Points")
+			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
 		}
 
 		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
@@ -72,7 +72,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	} else {
 		// todo, there are better ways to handle it
 		if len(config.G2PowerOf2Path) == 0 {
-			return nil, fmt.Errorf("G2PowerOf2Path is empty. However, object needs to load G2Points")
+			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
 		}
 	}
 
@@ -320,7 +320,7 @@ func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, 
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("PairingCheck pairing not ok. SRS is invalid")
+		return errors.New("PairingCheck pairing not ok. SRS is invalid")
 	}
 
 	return nil

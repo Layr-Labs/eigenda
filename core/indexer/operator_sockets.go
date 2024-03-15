@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	"github.com/Layr-Labs/eigenda/common"
 	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 const (
@@ -17,10 +17,10 @@ const (
 type OperatorSockets map[core.OperatorID]string
 
 type OperatorSocketsAccumulator struct {
-	Logger common.Logger
+	Logger logging.Logger
 }
 
-func NewOperatorSocketsAccumulator(logger common.Logger) *OperatorSocketsAccumulator {
+func NewOperatorSocketsAccumulator(logger logging.Logger) *OperatorSocketsAccumulator {
 	return &OperatorSocketsAccumulator{
 		Logger: logger,
 	}

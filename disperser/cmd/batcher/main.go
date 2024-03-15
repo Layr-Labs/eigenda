@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -9,13 +10,13 @@ import (
 
 	"github.com/shurcooL/graphql"
 
+	"github.com/Layr-Labs/eigenda/common"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
@@ -70,9 +71,12 @@ func RunBatcher(ctx *cli.Context) error {
 		log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
 	}
 
-	config := NewConfig(ctx)
+	config, err := NewConfig(ctx)
+	if err != nil {
+		return err
+	}
 
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
 	}
@@ -152,7 +156,7 @@ func RunBatcher(ctx *cli.Context) error {
 	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
-		return fmt.Errorf("encoder socket must be specified")
+		return errors.New("encoder socket must be specified")
 	}
 	encoderClient, err := encoder.NewEncoderClient(config.BatcherConfig.EncoderSocket, config.TimeoutConfig.EncodingTimeout)
 	if err != nil {

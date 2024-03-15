@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
@@ -15,7 +15,7 @@ type Config struct {
 	AwsClientConfig  aws.ClientConfig
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
-	LoggerConfig     logging.Config
+	LoggerConfig     common.LoggerConfig
 	PrometheusConfig prometheus.Config
 	MetricsConfig    dataapi.MetricsConfig
 
@@ -28,9 +28,16 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+
+	DisperserHostname string
+	ChurnerHostname   string
 }
 
-func NewConfig(ctx *cli.Context) Config {
+func NewConfig(ctx *cli.Context) (Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -38,7 +45,7 @@ func NewConfig(ctx *cli.Context) Config {
 		},
 		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		LoggerConfig:                  logging.ReadCLIConfig(ctx, flags.FlagPrefix),
+		LoggerConfig:                  *loggerConfig,
 		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
@@ -54,8 +61,10 @@ func NewConfig(ctx *cli.Context) Config {
 		AllowOrigins: ctx.GlobalStringSlice(flags.AllowOriginsFlag.Name),
 		MetricsConfig: dataapi.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
-			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
+			EnableMetrics: ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		},
+		DisperserHostname: ctx.GlobalString(flags.DisperserHostnameFlag.Name),
+		ChurnerHostname:   ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 	}
-	return config
+	return config, nil
 }

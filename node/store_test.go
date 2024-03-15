@@ -8,11 +8,11 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -176,7 +176,8 @@ func TestStoringBlob(t *testing.T) {
 	storeDuration := uint32(1)
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
-	s, _ := node.NewLevelDBStore(t.TempDir(), &mock.Logger{}, node.NewMetrics(noopMetrics, reg, &mock.Logger{}, ":9090"), staleMeasure, storeDuration)
+	logger := logging.NewNoopLogger()
+	s, _ := node.NewLevelDBStore(t.TempDir(), logger, node.NewMetrics(noopMetrics, reg, logger, ":9090"), staleMeasure, storeDuration)
 	ctx := context.Background()
 
 	// Empty store

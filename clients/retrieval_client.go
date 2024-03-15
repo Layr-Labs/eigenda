@@ -2,11 +2,12 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
@@ -24,7 +25,7 @@ type RetrievalClient interface {
 }
 
 type retrievalClient struct {
-	logger                common.Logger
+	logger                logging.Logger
 	indexedChainState     core.IndexedChainState
 	assignmentCoordinator core.AssignmentCoordinator
 	nodeClient            NodeClient
@@ -35,7 +36,7 @@ type retrievalClient struct {
 var _ RetrievalClient = (*retrievalClient)(nil)
 
 func NewRetrievalClient(
-	logger common.Logger,
+	logger logging.Logger,
 	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
@@ -130,7 +131,7 @@ func (r *retrievalClient) RetrieveBlob(
 
 	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get assignments")
+		return nil, errors.New("failed to get assignments")
 	}
 
 	// Fetch chunks from all operators

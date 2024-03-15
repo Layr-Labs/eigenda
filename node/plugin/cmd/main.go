@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -75,9 +75,10 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ECDSA key read and decrypted from %s", config.EcdsaKeyFile)
 
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		log.Printf("Error: failed to create a EigenDA logger: %v", err)
+		log.Printf("Error: failed to create logger: %v", err)
 		return
 	}
 

@@ -10,8 +10,6 @@ import (
 )
 
 func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	group, _ := prover.NewProver(kzgConfig, true)
 

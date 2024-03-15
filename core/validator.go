@@ -13,22 +13,21 @@ var (
 	ErrBlobQuorumSkip      = errors.New("blob skipped for a quorum before verification")
 )
 
-type ChunkValidator interface {
-	ValidateBatch([]*BlobMessage, *OperatorState, common.WorkerPool) error
-	ValidateBlob(*BlobMessage, *OperatorState) error
+type ShardValidator interface {
+	ValidateBatch(*BatchHeader, []*BlobMessage, *OperatorState, common.WorkerPool) error
 	UpdateOperatorID(OperatorID)
 }
 
-// chunkValidator implements the validation logic that a DA node should apply to its received chunks
-type chunkValidator struct {
+// shardValidator implements the validation logic that a DA node should apply to its received data
+type shardValidator struct {
 	verifier   encoding.Verifier
 	assignment AssignmentCoordinator
 	chainState ChainState
 	operatorID OperatorID
 }
 
-func NewChunkValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ChunkValidator {
-	return &chunkValidator{
+func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ShardValidator {
+	return &shardValidator{
 		verifier:   v,
 		assignment: asgn,
 		chainState: cst,
@@ -36,7 +35,7 @@ func NewChunkValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst Chai
 	}
 }
 
-func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
+func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
 	if quorumHeader.AdversaryThreshold >= quorumHeader.ConfirmationThreshold {
 		return nil, nil, nil, fmt.Errorf("invalid header: confirmation threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.ConfirmationThreshold, quorumHeader.AdversaryThreshold)
 	}
@@ -83,41 +82,17 @@ func (v *chunkValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	return chunks, &assignment, &params, nil
 }
 
-func (v *chunkValidator) ValidateBlob(blob *BlobMessage, operatorState *OperatorState) error {
-	if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
-		return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobHeader.QuorumInfos))
-	}
+func (v *shardValidator) UpdateOperatorID(operatorID OperatorID) {
+	v.operatorID = operatorID
+}
 
-	// Validate the blob length
-	err := v.verifier.VerifyBlobLength(blob.BlobHeader.BlobCommitments)
+func (v *shardValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
+
+	err := validateBatchHeaderRoot(batchHeader, blobs)
 	if err != nil {
 		return err
 	}
 
-	for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
-		// preprocess validation info
-		chunks, assignment, params, err := v.validateBlobQuorum(quorumHeader, blob, operatorState)
-		if err == ErrBlobQuorumSkip {
-			continue
-		} else if err != nil {
-			return err
-		} else {
-			// Check the received chunks against the commitment
-			err = v.verifier.VerifyFrames(chunks, assignment.GetIndices(), blob.BlobHeader.BlobCommitments, *params)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (v *chunkValidator) UpdateOperatorID(operatorID OperatorID) {
-	v.operatorID = operatorID
-}
-
-func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
@@ -132,7 +107,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		// for each quorum
 		for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
 			chunks, assignment, params, err := v.validateBlobQuorum(quorumHeader, blob, operatorState)
-			if err == ErrBlobQuorumSkip {
+			if errors.Is(err, ErrBlobQuorumSkip) {
 				continue
 			} else if err != nil {
 				return err
@@ -191,7 +166,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 		})
 	}
 	// check if commitments are equivalent
-	err := v.verifier.VerifyCommitEquivalenceBatch(blobCommitmentList)
+	err = v.verifier.VerifyCommitEquivalenceBatch(blobCommitmentList)
 	if err != nil {
 		return err
 	}
@@ -206,7 +181,7 @@ func (v *chunkValidator) ValidateBatch(blobs []*BlobMessage, operatorState *Oper
 	return nil
 }
 
-func (v *chunkValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
+func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
 
 	err := v.verifier.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
 	if err != nil {
@@ -217,7 +192,7 @@ func (v *chunkValidator) universalVerifyWorker(params encoding.EncodingParams, s
 	out <- nil
 }
 
-func (v *chunkValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
+func (v *shardValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
 	err := v.verifier.VerifyBlobLength(blobCommitments)
 	if err != nil {
 		out <- err
@@ -225,4 +200,28 @@ func (v *chunkValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCom
 	}
 
 	out <- nil
+}
+
+func validateBatchHeaderRoot(batchHeader *BatchHeader, blobs []*BlobMessage) error {
+	// Check the batch header root
+
+	headers := make([]*BlobHeader, len(blobs))
+
+	for i, blob := range blobs {
+		headers[i] = blob.BlobHeader
+	}
+
+	derivedHeader := &BatchHeader{}
+
+	_, err := derivedHeader.SetBatchRoot(headers)
+	if err != nil {
+		return fmt.Errorf("failed to compute batch header root: %w", err)
+	}
+
+	if batchHeader.BatchRoot != derivedHeader.BatchRoot {
+		return fmt.Errorf("batch header root does not match computed root")
+	}
+
+	return nil
+
 }

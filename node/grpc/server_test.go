@@ -11,7 +11,7 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common/logging"
+	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	core_mock "github.com/Layr-Labs/eigenda/core/mock"
@@ -84,10 +84,12 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 		ID:                        opID,
 		NumBatchValidators:        runtime.GOMAXPROCS(0),
 	}
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		panic("failed to create a new logger")
+		panic("failed to create a logger")
 	}
+
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		panic("failed to create a directory for db")
@@ -103,10 +105,10 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 
 	ratelimiter := &commonmock.NoopRatelimiter{}
 
-	var val core.ChunkValidator
+	var val core.ShardValidator
 
 	if mockValidator {
-		mockVal := core_mock.NewMockChunkValidator()
+		mockVal := core_mock.NewMockShardValidator()
 		mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
 		mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		val = mockVal
@@ -124,7 +126,7 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 			panic("failed to create test encoder")
 		}
 
-		val = core.NewChunkValidator(v, asn, cst, opID)
+		val = core.NewShardValidator(v, asn, cst, opID)
 	}
 
 	node := &node.Node{
@@ -177,6 +179,15 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 		ChunkLength: 10,
 	}
 
+	quorumHeader1 := &core.BlobQuorumInfo{
+		SecurityParam: core.SecurityParam{
+			QuorumID:           1,
+			QuorumThreshold:    65,
+			AdversaryThreshold: 15,
+		},
+		ChunkLength: 10,
+	}
+
 	blobHeaders := []*core.BlobHeader{
 		{
 			BlobCommitments: encoding.BlobCommitments{
@@ -185,7 +196,7 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 				LengthProof:      &lengthProof,
 				Length:           48,
 			},
-			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
+			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader, quorumHeader1},
 		},
 		{
 			BlobCommitments: encoding.BlobCommitments{
@@ -208,8 +219,8 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 	assert.NoError(t, err)
 
-	blobHeaderProto0 := blobHeaderToProto(t, blobHeaders[0])
-	blobHeaderProto1 := blobHeaderToProto(t, blobHeaders[1])
+	blobHeaderProto0 := blobHeaderToProto(blobHeaders[0])
+	blobHeaderProto1 := blobHeaderToProto(blobHeaders[1])
 
 	req := &pb.StoreChunksRequest{
 		BatchHeader: &pb.BatchHeader{
@@ -222,6 +233,10 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 				Bundles: []*pb.Bundle{
 					{
 						Chunks: [][]byte{encodedChunk},
+					},
+					{
+						// Empty bundle for the second quorum
+						Chunks: [][]byte{},
 					},
 				},
 			},
@@ -275,6 +290,14 @@ func TestRetrieveChunks(t *testing.T) {
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, chunk)
+
+	retrievalReply, err = server.RetrieveChunks(ctx, &pb.RetrieveChunksRequest{
+		BatchHeaderHash: batchHeaderHash[:],
+		BlobIndex:       0,
+		QuorumId:        1,
+	})
+	assert.NoError(t, err)
+	assert.Empty(t, retrievalReply.GetChunks())
 }
 
 // If a batch fails to validate, it should not be stored in the store.
@@ -323,9 +346,33 @@ func TestGetBlobHeader(t *testing.T) {
 	ok, err := merkletree.VerifyProofUsing(blobHeaderHash[:], false, proof, [][]byte{batchRoot[:]}, keccak256.New())
 	assert.NoError(t, err)
 	assert.True(t, ok)
+
+	// Get blob header for the second quorum
+	reply, err = server.GetBlobHeader(context.Background(), &pb.GetBlobHeaderRequest{
+		BatchHeaderHash: batchHeaderHash[:],
+		BlobIndex:       0,
+		QuorumId:        1,
+	})
+	assert.NoError(t, err)
+
+	actual = reply.GetBlobHeader()
+	expected = protoBlobHeaders[0]
+	assert.True(t, proto.Equal(expected, actual))
+
+	blobHeaderHash, err = blobHeaders[0].GetBlobHeaderHash()
+	assert.NoError(t, err)
+
+	proof = &merkletree.Proof{
+		Hashes: reply.GetProof().GetHashes(),
+		Index:  uint64(reply.GetProof().GetIndex()),
+	}
+
+	ok, err = merkletree.VerifyProofUsing(blobHeaderHash[:], false, proof, [][]byte{batchRoot[:]}, keccak256.New())
+	assert.NoError(t, err)
+	assert.True(t, ok)
 }
 
-func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader {
+func blobHeaderToProto(blobHeader *core.BlobHeader) *pb.BlobHeader {
 	var lengthCommitment, lengthProof pb.G2Commitment
 	if blobHeader.LengthCommitment != nil {
 		lengthCommitment.XA0 = blobHeader.LengthCommitment.X.A0.Marshal()
@@ -339,11 +386,14 @@ func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader
 		lengthProof.YA0 = blobHeader.LengthProof.Y.A0.Marshal()
 		lengthProof.YA1 = blobHeader.LengthProof.Y.A1.Marshal()
 	}
-	quorumHeader := &pb.BlobQuorumInfo{
-		QuorumId:              uint32(blobHeader.QuorumInfos[0].QuorumID),
-		ConfirmationThreshold: uint32(blobHeader.QuorumInfos[0].ConfirmationThreshold),
-		AdversaryThreshold:    uint32(blobHeader.QuorumInfos[0].AdversaryThreshold),
-		ChunkLength:           uint32(blobHeader.QuorumInfos[0].ChunkLength),
+	quorumHeaders := make([]*pb.BlobQuorumInfo, len(blobHeader.QuorumInfos))
+	for i, quorumInfo := range blobHeader.QuorumInfos {
+		quorumHeaders[i] = &pb.BlobQuorumInfo{
+			QuorumId:              uint32(quorumInfo.QuorumID),
+			ConfirmationThreshold: uint32(quorumInfo.ConfirmationThreshold),
+			AdversaryThreshold:    uint32(quorumInfo.AdversaryThreshold),
+			ChunkLength:           uint32(quorumInfo.ChunkLength),
+		}
 	}
 
 	return &pb.BlobHeader{
@@ -354,6 +404,6 @@ func blobHeaderToProto(t *testing.T, blobHeader *core.BlobHeader) *pb.BlobHeader
 		LengthCommitment: &lengthCommitment,
 		LengthProof:      &lengthProof,
 		Length:           uint32(blobHeader.Length),
-		QuorumHeaders:    []*pb.BlobQuorumInfo{quorumHeader},
+		QuorumHeaders:    quorumHeaders,
 	}
 }

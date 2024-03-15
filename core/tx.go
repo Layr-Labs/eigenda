@@ -95,8 +95,15 @@ type Transactor interface {
 	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)
 
+	// BatchOperatorIDToAddress returns the addresses of the operators from the operator id.
+	BatchOperatorIDToAddress(ctx context.Context, operatorIds []OperatorID) ([]gethcommon.Address, error)
+
 	// GetCurrentQuorumBitmapByOperatorId returns the current quorum bitmap for the operator.
 	GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId OperatorID) (*big.Int, error)
+
+	// GetQuorumBitmapForOperatorsAtBlockNumber returns the quorum bitmaps for the operators
+	// at the given block number.
+	GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorId []OperatorID, blockNumber uint32) ([]*big.Int, error)
 
 	// GetOperatorSetParams returns operator set params for the quorum.
 	GetOperatorSetParams(ctx context.Context, quorumID QuorumID) (*OperatorSetParam, error)

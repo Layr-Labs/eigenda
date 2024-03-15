@@ -193,3 +193,20 @@ func TestHashPubKeyG1(t *testing.T) {
 	hash := eth.HashPubKeyG1(pk)
 	assert.Equal(t, common.Bytes2Hex(hash[:]), "426d1a0363fbdcd0c8d33b643252164057193ca022958fa0da99d9e70c980dd7")
 }
+
+func TestParseOperatorSocket(t *testing.T) {
+	operatorSocket := "localhost:1234;5678"
+	host, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(operatorSocket)
+	assert.NoError(t, err)
+	assert.Equal(t, "localhost", host)
+	assert.Equal(t, "1234", dispersalPort)
+	assert.Equal(t, "5678", retrievalPort)
+
+	_, _, _, err = core.ParseOperatorSocket("localhost:12345678")
+	assert.NotNil(t, err)
+	assert.Equal(t, "invalid socket address format, missing retrieval port: localhost:12345678", err.Error())
+
+	_, _, _, err = core.ParseOperatorSocket("localhost1234;5678")
+	assert.NotNil(t, err)
+	assert.Equal(t, "invalid socket address format: localhost1234;5678", err.Error())
+}

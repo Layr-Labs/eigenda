@@ -6,8 +6,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -28,12 +28,12 @@ type Object struct {
 
 type client struct {
 	s3Client *s3.Client
-	logger   common.Logger
+	logger   logging.Logger
 }
 
 var _ Client = (*client)(nil)
 
-func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger common.Logger) (*client, error) {
+func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.Logger) (*client, error) {
 	var err error
 	once.Do(func() {
 		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {

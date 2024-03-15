@@ -27,12 +27,12 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/peer"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -126,7 +126,7 @@ type TestDisperser struct {
 	txnManager    *batchermock.MockTxnManager
 }
 
-func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger common.Logger) TestDisperser {
+func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger logging.Logger) TestDisperser {
 	dispatcherConfig := &dispatcher.Config{
 		Timeout: time.Second,
 	}
@@ -206,7 +206,7 @@ type TestOperator struct {
 	Server *nodegrpc.Server
 }
 
-func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger common.Logger) map[core.OperatorID]TestOperator {
+func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging.Logger) map[core.OperatorID]TestOperator {
 	bn := uint(0)
 	state := cst.GetTotalOperatorState(context.Background(), bn)
 
@@ -262,7 +262,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger common.
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
 		_, v0 := mustMakeTestComponents()
-		val := core.NewChunkValidator(v0, asn, cst, id)
+		val := core.NewShardValidator(v0, asn, cst, id)
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()
@@ -325,7 +325,7 @@ type TestRetriever struct {
 	Server *retriever.Server
 }
 
-func mustMakeRetriever(cst core.IndexedChainState, logger common.Logger) (*commonmock.MockEthClient, TestRetriever) {
+func mustMakeRetriever(cst core.IndexedChainState, logger logging.Logger) (*commonmock.MockEthClient, TestRetriever) {
 	config := &retriever.Config{
 		Timeout: 5 * time.Second,
 	}
@@ -358,7 +358,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
-	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	logger := logging.NewNoopLogger()
 	assert.NoError(t, err)
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store, logger)

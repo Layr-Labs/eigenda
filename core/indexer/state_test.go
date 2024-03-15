@@ -14,10 +14,10 @@ import (
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/indexer/leveldb"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexedstate "github.com/Layr-Labs/eigenda/core/indexer"
@@ -44,7 +44,7 @@ func init() {
 		"The header store implementation to be used (inmem, leveldb)")
 }
 
-func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
+func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 
 	for _, op := range env.Operators {
 		tx := mustMakeOperatorTransactor(env, op, logger)
@@ -67,7 +67,7 @@ func mustRegisterOperators(env *deploy.Config, logger common.Logger) {
 	}
 }
 
-func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger common.Logger) core.Transactor {
+func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Transactor {
 
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
@@ -87,7 +87,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 
 }
 
-func mustMakeTestClients(env *deploy.Config, privateKey string, logger common.Logger) (common.EthClient, common.RPCEthClient) {
+func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.Logger) (common.EthClient, common.RPCEthClient) {
 
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
@@ -112,7 +112,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger common.Lo
 
 }
 
-func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger common.Logger) *indexedstate.IndexedChainState {
+func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *indexedstate.IndexedChainState {
 	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
 	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
@@ -151,19 +151,13 @@ var _ = Describe("Indexer", func() {
 				Skip("No test path provided")
 			}
 
-			logger, err := logging.GetLogger(logging.Config{
-				StdFormat:  "terminal",
-				StdLevel:   "debug",
-				FileFormat: "logfmt",
-				FileLevel:  "debug",
-			})
-			Expect(err).ToNot(HaveOccurred())
-
+			logger := logging.NewNoopLogger()
 			ctx, cancel := context.WithCancel(context.Background())
 			_ = cancel
 
 			var (
 				store indexer.HeaderStore
+				err   error
 			)
 			if headerStoreType == "leveldb" {
 				dbPath := filepath.Join(testConfig.Path, "db")

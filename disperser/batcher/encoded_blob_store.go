@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 type requestID string
@@ -26,7 +26,7 @@ type encodedBlobStore struct {
 	// encodedResultSize is the total size of all the chunks in the encoded results in bytes
 	encodedResultSize uint64
 
-	logger common.Logger
+	logger logging.Logger
 }
 
 // EncodingResult contains information about the encoding of a blob
@@ -47,7 +47,7 @@ type EncodingResultOrStatus struct {
 	Err error
 }
 
-func newEncodedBlobStore(logger common.Logger) *encodedBlobStore {
+func newEncodedBlobStore(logger logging.Logger) *encodedBlobStore {
 	return &encodedBlobStore{
 		requested:         make(map[requestID]struct{}),
 		encoded:           make(map[requestID]*EncodingResult),
@@ -161,7 +161,7 @@ func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint)
 			e.logger.Error("GetNewAndDeleteStaleEncodingResults: unexpected case", "refBlockNumber", encodedResult.ReferenceBlockNumber, "blockNumber", blockNumber, "status", encodedResult.Status)
 		}
 	}
-	e.logger.Trace("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "pendingConfirmation", pendingConfirmation, "blockNumber", blockNumber, "encodedSize", e.encodedResultSize)
+	e.logger.Debug("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "pendingConfirmation", pendingConfirmation, "blockNumber", blockNumber, "encodedSize", e.encodedResultSize)
 
 	return fetched
 }

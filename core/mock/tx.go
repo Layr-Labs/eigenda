@@ -110,6 +110,18 @@ func (t *MockTransactor) OperatorIDToAddress(ctx context.Context, operatorId cor
 	return result.(gethcommon.Address), args.Error(1)
 }
 
+func (t *MockTransactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.([]gethcommon.Address), args.Error(1)
+}
+
+func (t *MockTransactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.([]*big.Int), args.Error(1)
+}
+
 func (t *MockTransactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)

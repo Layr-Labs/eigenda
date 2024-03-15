@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	commock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 )
@@ -123,6 +123,101 @@ var (
 		"0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
 		"0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310": 1,
 		"0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311": 1,
+	}
+
+	operatorAddedToQuorum = []*subgraph.OperatorQuorum{
+		{
+			Operator:      "operator-2",
+			QuorumNumbers: "2",
+			BlockNumber:   "82",
+		},
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "2",
+			BlockNumber:   "82",
+		},
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "01",
+			BlockNumber:   "80",
+		},
+	}
+	operatorRemovedFromQuorum = []*subgraph.OperatorQuorum{
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "0",
+			BlockNumber:   "81",
+		},
+		{
+			Operator:      "operator-2",
+			QuorumNumbers: "2",
+			BlockNumber:   "83",
+		},
+		{
+			Operator:      "operator-1",
+			QuorumNumbers: "1",
+			BlockNumber:   "83",
+		},
+	}
+
+	batchNonSigningInfo = []*subgraph.BatchNonSigningInfo{
+		{
+			BatchId:         "1",
+			BatchHeaderHash: "0x890588400acb4f9f7f438c0d21734acb36a6c4c75df6560827e23b452bbdcc69",
+			BatchHeader: struct {
+				QuorumNumbers        []graphql.String `json:"quorumNumbers"`
+				ReferenceBlockNumber graphql.String
+			}{
+				QuorumNumbers: []graphql.String{
+					"00",
+					"01",
+				},
+				ReferenceBlockNumber: "81",
+			},
+			NonSigning: struct {
+				NonSigners []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				} `graphql:"nonSigners"`
+			}{
+				NonSigners: []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				}{
+					{
+						OperatorId: "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+					},
+					{
+						OperatorId: "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312",
+					},
+				},
+			},
+		},
+		{
+			BatchId:         "0",
+			BatchHeaderHash: "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310",
+			BatchHeader: struct {
+				QuorumNumbers        []graphql.String `json:"quorumNumbers"`
+				ReferenceBlockNumber graphql.String
+			}{
+				QuorumNumbers: []graphql.String{
+					"01",
+					"02",
+				},
+				ReferenceBlockNumber: "80",
+			},
+			NonSigning: struct {
+				NonSigners []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				} `graphql:"nonSigners"`
+			}{
+				NonSigners: []struct {
+					OperatorId graphql.String `graphql:"operatorId"`
+				}{
+					{
+						OperatorId: "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+					},
+				},
+			},
+		},
 	}
 
 	subgraphBatches = []*subgraph.Batches{
@@ -309,7 +404,7 @@ var (
 
 func TestQueryBatchesWithLimit(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
 	batches, err := subgraphClient.QueryBatchesWithLimit(context.Background(), 2, 0)
 	assert.NoError(t, err)
@@ -336,7 +431,7 @@ func TestQueryBatchesWithLimit(t *testing.T) {
 func TestQueryOperators(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryOperators").Return(subgraphOperatorRegistereds, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	operators, err := subgraphClient.QueryOperatorsWithLimit(context.Background(), 2)
 	assert.NoError(t, err)
 
@@ -363,7 +458,7 @@ func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(context.Background(), 1)
 	assert.NoError(t, err)
 
@@ -393,7 +488,7 @@ func TestQueryNumBatchesByOperatorsInThePastBlockTimestamp(t *testing.T) {
 	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistereds, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryBatchesByBlockTimestampRange").Return(subgraphBatches, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, &commock.Logger{})
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	numBatchesByOperators, err := subgraphClient.QueryNumBatchesByOperatorsInThePastBlockTimestamp(context.Background(), uint64(1), nonSigners)
 	assert.NoError(t, err)
 
@@ -404,10 +499,94 @@ func TestQueryNumBatchesByOperatorsInThePastBlockTimestamp(t *testing.T) {
 	assert.Equal(t, 3, numBatches)
 }
 
+func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
+	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
+	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	result, err := subgraphClient.QueryBatchNonSigningInfoInInterval(context.Background(), int64(1))
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(result))
+
+	// First batch's nonsigning info.
+	assert.Equal(t, 2, len(result[0].QuorumNumbers))
+	assert.Equal(t, uint8(0), result[0].QuorumNumbers[0])
+	assert.Equal(t, uint8(1), result[0].QuorumNumbers[1])
+	assert.Equal(t, uint32(81), result[0].ReferenceBlockNumber)
+	assert.Equal(t, 2, len(result[0].NonSigners))
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[0].NonSigners[0])
+	assert.Equal(t, "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312", result[0].NonSigners[1])
+
+	// Second batch's nonsigning info.
+	assert.Equal(t, 2, len(result[1].QuorumNumbers))
+	assert.Equal(t, uint8(1), result[1].QuorumNumbers[0])
+	assert.Equal(t, uint8(2), result[1].QuorumNumbers[1])
+	assert.Equal(t, uint32(80), result[1].ReferenceBlockNumber)
+	assert.Equal(t, 1, len(result[1].NonSigners))
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[1].NonSigners[0])
+}
+
 func assertGasFees(t *testing.T, gasFees *dataapi.GasFees) {
 	assert.NotNil(t, gasFees)
 	assert.Equal(t, []byte("0x0006afd9ce41ba0f3414ba2650a9cd2f47c0e22af21651f7fd902f71df678c5d9942"), gasFees.Id)
 	assert.Equal(t, uint64(249815), gasFees.GasUsed)
 	assert.Equal(t, uint64(1000045336), gasFees.GasPrice)
 	assert.Equal(t, uint64(249826325612840), gasFees.TxFee)
+}
+
+func TestQueryOperatorQuorumEvent(t *testing.T) {
+	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
+	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
+	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	result, err := subgraphClient.QueryOperatorQuorumEvent(context.Background(), uint32(78), uint32(88))
+	assert.NoError(t, err)
+
+	addedMap := result.AddedToQuorum
+	assert.Equal(t, 2, len(addedMap))
+	// Quorum events for operator-1.
+	added1, ok := addedMap["operator-1"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(added1))
+	assert.Equal(t, "operator-1", added1[0].Operator)
+	assert.Equal(t, uint32(80), added1[0].BlockNumber)
+	assert.Equal(t, 2, len(added1[0].QuorumNumbers))
+	// Note: the quorumId is 48 not 01 is because the string "01" is in UTF-8
+	// encoding (the default in golang), and it corresponding to 48 in decimal.
+	assert.Equal(t, uint8(48), added1[0].QuorumNumbers[0])
+	assert.Equal(t, uint8(49), added1[0].QuorumNumbers[1])
+	assert.Equal(t, "operator-1", added1[1].Operator)
+	assert.Equal(t, uint32(82), added1[1].BlockNumber)
+	assert.Equal(t, 1, len(added1[1].QuorumNumbers))
+	assert.Equal(t, uint8(50), added1[1].QuorumNumbers[0])
+	// Quorum events for operator-2.
+	added2, ok := addedMap["operator-2"]
+	assert.True(t, ok)
+	assert.Equal(t, 1, len(added2))
+	assert.Equal(t, "operator-2", added2[0].Operator)
+	assert.Equal(t, uint32(82), added2[0].BlockNumber)
+	assert.Equal(t, 1, len(added2[0].QuorumNumbers))
+	assert.Equal(t, uint8(50), added2[0].QuorumNumbers[0])
+
+	removedMap := result.RemovedFromQuorum
+	assert.Equal(t, 2, len(removedMap))
+	// Quorum events for operator-1.
+	removed1, ok := removedMap["operator-1"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(removed1))
+	assert.Equal(t, "operator-1", removed1[0].Operator)
+	assert.Equal(t, uint32(81), removed1[0].BlockNumber)
+	assert.Equal(t, 1, len(removed1[0].QuorumNumbers))
+	assert.Equal(t, uint8(48), removed1[0].QuorumNumbers[0])
+	assert.Equal(t, "operator-1", removed1[1].Operator)
+	assert.Equal(t, uint32(83), removed1[1].BlockNumber)
+	assert.Equal(t, 1, len(removed1[1].QuorumNumbers))
+	assert.Equal(t, uint8(49), removed1[1].QuorumNumbers[0])
+	// Quorum events for operator-2.
+	removed2, ok := removedMap["operator-2"]
+	assert.True(t, ok)
+	assert.Equal(t, 1, len(removed2))
+	assert.Equal(t, "operator-2", removed2[0].Operator)
+	assert.Equal(t, uint32(83), removed2[0].BlockNumber)
+	assert.Equal(t, 1, len(removed2[0].QuorumNumbers))
+	assert.Equal(t, uint8(50), removed2[0].QuorumNumbers[0])
 }

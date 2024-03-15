@@ -9,9 +9,9 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/clients"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
@@ -68,10 +68,13 @@ func RetrieverMain(ctx *cli.Context) error {
 		),
 	)
 
-	config := retriever.NewConfig(ctx)
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	config, err := retriever.NewConfig(ctx)
 	if err != nil {
-		return err
+		log.Fatalf("failed to parse the command line flags: %v", err)
+	}
+	logger, err := common.NewLogger(config.LoggerConfig)
+	if err != nil {
+		log.Fatalf("failed to create logger: %v", err)
 	}
 
 	nodeClient := clients.NewNodeClient(config.Timeout)

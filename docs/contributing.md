@@ -12,7 +12,6 @@ In general, the `core` project contains implementation of all the important busi
 # Directory structure
 <pre>
 ┌── <a href="../api">api</a> Protobuf definitions and contract bindings
-├── <a href="../churner">churner</a>: Churner service
 ├── <a href="../clients">clients</a>: Client-side libraries for users to integrate with EigenDA
 ├── <a href="../common">common</a>: Common utility libraries
 ├── <a href="../contracts">contracts</a>
@@ -24,6 +23,7 @@ In general, the `core` project contains implementation of all the important busi
 ├── <a href="../inabox">inabox</a>: Inabox test to run EigenDA system on a single machine
 |── <a href="../indexer">indexer</a>: A simple indexer for efficiently tracking chain state and maintaining accumulators
 ├── <a href="../node">node</a>: DA node service
+├── <a href="../operators">operators</a>: Operator network management such as Churner and Ejector
 ├── <a href="../retriever">retriever</a>: Retriever service
 |── <a href="../subgraphs">subgraphs</a>: The subgraphs indexer for onchain information
 ├── <a href="../test">test</a>: Tools for running integration tests
