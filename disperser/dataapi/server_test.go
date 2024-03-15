@@ -228,8 +228,8 @@ func TestFetchMetricsHandler(t *testing.T) {
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
-	mockSubgraphApi.On("QueryOperators").Return(subgraphOperatorRegistereds, nil)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
 	r.GET("/v1/metrics", testDataApiServer.FetchMetricsHandler)
@@ -253,6 +253,9 @@ func TestFetchMetricsHandler(t *testing.T) {
 	assert.Equal(t, 16555.555555555555, response.Throughput)
 	assert.Equal(t, float64(85.14485344239945), response.CostInGas)
 	assert.Equal(t, uint64(1), response.TotalStake)
+	assert.Len(t, response.TotalStakePerQuorum, 2)
+	assert.Equal(t, uint64(1), response.TotalStakePerQuorum[0])
+	assert.Equal(t, uint64(1), response.TotalStakePerQuorum[1])
 }
 
 func TestFetchMetricsTroughputHandler(t *testing.T) {

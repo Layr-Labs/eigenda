@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"sort"
 	"strconv"
 	"time"
@@ -22,16 +21,27 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
-	operatorState, err := s.chainState.GetOperatorState(ctx, uint(blockNumber), []core.QuorumID{core.QuorumID(0)})
+	quorumCount, err := s.transactor.GetQuorumCount(ctx, blockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quorum count: %w", err)
+	}
+	// assume quorum IDs are consequent integers starting from 0
+	quorumIDs := make([]core.QuorumID, quorumCount)
+	for i := 0; i < int(quorumCount); i++ {
+		quorumIDs[i] = core.QuorumID(i)
+	}
+	operatorState, err := s.chainState.GetOperatorState(ctx, uint(blockNumber), quorumIDs)
 	if err != nil {
 		return nil, err
 	}
-	if len(operatorState.Operators) != 1 {
-		return nil, fmt.Errorf("Requesting for one quorum (quorumID=0), but got %v", operatorState.Operators)
+	if len(operatorState.Operators) != int(quorumCount) {
+		return nil, fmt.Errorf("Requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
 	}
-	totalStake := big.NewInt(0)
-	for _, op := range operatorState.Operators[0] {
-		totalStake.Add(totalStake, op.Stake)
+	totalStakePerQuorum := map[core.QuorumID]uint64{}
+	for quorumID, opInfoByID := range operatorState.Operators {
+		for _, opInfo := range opInfoByID {
+			totalStakePerQuorum[quorumID] += opInfo.Stake.Uint64()
+		}
 	}
 
 	result, err := s.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
@@ -42,13 +52,13 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	var (
 		totalBytes   float64
 		timeDuration float64
-		troughput    float64
+		throughput   float64
 		valuesSize   = len(result.Values)
 	)
 	if valuesSize > 1 {
 		totalBytes = result.Values[valuesSize-1].Value - result.Values[0].Value
 		timeDuration = result.Values[valuesSize-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
-		troughput = totalBytes / timeDuration
+		throughput = totalBytes / timeDuration
 	}
 
 	costInGas, err := s.calculateTotalCostGasUsed(ctx)
@@ -57,9 +67,10 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	}
 
 	return &Metric{
-		Throughput: troughput,
-		CostInGas:  costInGas,
-		TotalStake: totalStake.Uint64(),
+		Throughput:          throughput,
+		CostInGas:           costInGas,
+		TotalStake:          totalStakePerQuorum[0],
+		TotalStakePerQuorum: totalStakePerQuorum,
 	}, nil
 }
 
