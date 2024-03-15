@@ -1,6 +1,8 @@
 package geth
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
@@ -10,6 +12,7 @@ var (
 	privateKeyFlagName       = "chain.private-key"
 	numConfirmationsFlagName = "chain.num-confirmations"
 	numRetriesFlagName       = "chain.num-retries"
+	networkTimeoutFlagName   = "chain.network-timeout"
 )
 
 type EthClientConfig struct {
@@ -17,6 +20,7 @@ type EthClientConfig struct {
 	PrivateKeyString string
 	NumConfirmations int
 	NumRetries       int
+	NetworkTimeout   time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
@@ -47,6 +51,13 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Value:    2,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_RETRIES"),
 		},
+		cli.DurationFlag{
+			Name:     networkTimeoutFlagName,
+			Usage:    "Network timeout to wait for RPC",
+			Required: false,
+			Value:    3 * time.Second,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "NETWORK_TIMEOUT"),
+		},
 	}
 }
 
@@ -56,6 +67,7 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg.PrivateKeyString = ctx.GlobalString(privateKeyFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
+	cfg.NetworkTimeout = ctx.GlobalDuration(networkTimeoutFlagName)
 	return cfg
 }
 
@@ -66,5 +78,6 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.RPCURLs = ctx.GlobalStringSlice(rpcUrlFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
+	cfg.NetworkTimeout = ctx.GlobalDuration(networkTimeoutFlagName)
 	return cfg
 }
