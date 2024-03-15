@@ -35,7 +35,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 		return nil, err
 	}
 	if len(operatorState.Operators) != int(quorumCount) {
-		return nil, fmt.Errorf("Requesting for %d quorum (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
+		return nil, fmt.Errorf("Requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
 	}
 	totalStakePerQuorum := map[core.QuorumID]uint64{}
 	for quorumID, opInfoByID := range operatorState.Operators {
@@ -52,13 +52,13 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	var (
 		totalBytes   float64
 		timeDuration float64
-		troughput    float64
+		throughput   float64
 		valuesSize   = len(result.Values)
 	)
 	if valuesSize > 1 {
 		totalBytes = result.Values[valuesSize-1].Value - result.Values[0].Value
 		timeDuration = result.Values[valuesSize-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
-		troughput = totalBytes / timeDuration
+		throughput = totalBytes / timeDuration
 	}
 
 	costInGas, err := s.calculateTotalCostGasUsed(ctx)
@@ -67,7 +67,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	}
 
 	return &Metric{
-		Throughput:          troughput,
+		Throughput:          throughput,
 		CostInGas:           costInGas,
 		TotalStake:          totalStakePerQuorum[0],
 		TotalStakePerQuorum: totalStakePerQuorum,
