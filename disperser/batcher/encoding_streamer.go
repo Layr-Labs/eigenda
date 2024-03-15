@@ -18,11 +18,6 @@ import (
 
 const encodingInterval = 2 * time.Second
 
-// For local environments where we create a chain, deploy the contracts, and
-// then start the encoding streamer, we make sure that the reference block number
-// is at least 1000 so that the operator state is available.
-const MinimumReferenceBlockNumber = 1000
-
 var errNoEncodedResults = errors.New("no encoded results")
 
 type EncodedSizeNotifier struct {
