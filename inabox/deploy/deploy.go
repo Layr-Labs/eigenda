@@ -101,7 +101,7 @@ func (env *Config) deployEigenDAContracts() {
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	execForgeScript("script/MockRollupDeployer.s.sol:MockRollupDeployer", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(address,uint256)", env.EigenDA.ServiceManager, big.NewInt(1e18).String()})
+	execForgeScript("script/MockRollupDeployer.s.sol:MockRollupDeployer", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(address)", env.EigenDA.ServiceManager})
 
 	//add rollup address to path
 	data = readFile("script/output/mock_rollup_deploy_output.json")
