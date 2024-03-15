@@ -28,7 +28,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * time that nodes can be active after they have deregistered. The larger it is, the farther back stakes can be used, but the longer operators
      * have to serve after they've deregistered.
      */
-    uint32 public constant BLOCK_STALE_MEASURE = 150;
+    uint32 public constant BLOCK_STALE_MEASURE = 300;
     
     /// @notice The current batchId
     uint32 public batchId;

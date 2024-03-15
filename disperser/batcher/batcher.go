@@ -57,6 +57,8 @@ type Config struct {
 	BatchSizeMBLimit     uint
 	MaxNumRetriesPerBlob uint
 
+	FinalizationBlockDelay uint
+
 	TargetNumChunks          uint
 	MaxBlobsToFetchFromStore int
 }
@@ -110,6 +112,7 @@ func NewBatcher(
 		EncodingQueueLimit:       config.EncodingRequestQueueSize,
 		TargetNumChunks:          config.TargetNumChunks,
 		MaxBlobsToFetchFromStore: config.MaxBlobsToFetchFromStore,
+		FinalizationBlockDelay:   config.FinalizationBlockDelay,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
 	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)

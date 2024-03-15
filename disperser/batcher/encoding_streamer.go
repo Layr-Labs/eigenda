@@ -18,6 +18,11 @@ import (
 
 const encodingInterval = 2 * time.Second
 
+// For local environments where we create a chain, deploy the contracts, and
+// then start the encoding streamer, we make sure that the reference block number
+// is at least 1000 so that the operator state is available.
+const MinimumReferenceBlockNumber = 1000
+
 var errNoEncodedResults = errors.New("no encoded results")
 
 type EncodedSizeNotifier struct {
@@ -46,6 +51,8 @@ type StreamerConfig struct {
 
 	// Maximum number of Blobs to fetch from store
 	MaxBlobsToFetchFromStore int
+
+	FinalizationBlockDelay uint
 }
 
 type EncodingStreamer struct {
@@ -208,6 +215,10 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 		if err != nil {
 			return fmt.Errorf("failed to get current block number, won't request encoding: %w", err)
 		} else {
+			if blockNumber > e.FinalizationBlockDelay {
+				blockNumber -= e.FinalizationBlockDelay
+			}
+
 			e.mu.Lock()
 			e.ReferenceBlockNumber = blockNumber
 			e.mu.Unlock()

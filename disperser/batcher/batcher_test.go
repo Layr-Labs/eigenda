@@ -73,10 +73,12 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	// Common Components
 	logger := logging.NewNoopLogger()
 
+	finalizationBlockDelay := uint(75)
+
 	// Core Components
 	cst, err := coremock.MakeChainDataMock(10)
 	assert.NoError(t, err)
-	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	cst.On("GetCurrentBlockNumber").Return(uint(10)+finalizationBlockDelay, nil)
 	asgn := &core.StdAssignmentCoordinator{}
 	transactor := &coremock.MockTransactor{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
@@ -99,6 +101,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 		BatchSizeMBLimit:         100,
 		SRSOrder:                 3000,
 		MaxNumRetriesPerBlob:     2,
+		FinalizationBlockDelay:   finalizationBlockDelay,
 	}
 	timeoutConfig := bat.TimeoutConfig{
 		EncodingTimeout:    10 * time.Second,
