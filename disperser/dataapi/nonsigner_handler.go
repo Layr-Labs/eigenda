@@ -97,6 +97,9 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	// Sort by descending order of nonsigning rate.
 	sort.Slice(operators, func(i, j int) bool {
 		if operators[i].Percentage == operators[j].Percentage {
+			if operators[i].OperatorId == operators[j].OperatorId {
+				return operators[i].QuorumId < operators[j].QuorumId
+			}
 			return operators[i].OperatorId < operators[j].OperatorId
 		}
 		return operators[i].Percentage > operators[j].Percentage
@@ -177,6 +180,14 @@ func getNonSigners(batches []*BatchNonSigningInfo) ([]core.OperatorID, error) {
 		}
 		nonsigners = append(nonsigners, core.OperatorID(b))
 	}
+	sort.Slice(nonsigners, func(i, j int) bool {
+		for k := range nonsigners[i] {
+			if nonsigners[i][k] != nonsigners[j][k] {
+				return nonsigners[i][k] < nonsigners[j][k]
+			}
+		}
+		return false
+	})
 	return nonsigners, nil
 }
 
