@@ -12,12 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func makeOperatorId(id int) core.OperatorID {
-	data := [32]byte{}
-	copy(data[:], []byte(fmt.Sprintf("%d", id)))
-	return data
-}
-
 func TestOperatorAssignments(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
@@ -38,49 +32,49 @@ func TestOperatorAssignments(t *testing.T) {
 	assignments, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
 	assert.NoError(t, err)
 	expectedAssignments := map[core.OperatorID]core.Assignment{
-		makeOperatorId(0): {
+		mock.MakeOperatorId(0): {
 			StartIndex: 0,
 			NumChunks:  1,
 		},
-		makeOperatorId(1): {
+		mock.MakeOperatorId(1): {
 			StartIndex: 1,
-			NumChunks:  1,
-		},
-		makeOperatorId(2): {
-			StartIndex: 2,
 			NumChunks:  2,
 		},
-		makeOperatorId(3): {
-			StartIndex: 4,
-			NumChunks:  2,
+		mock.MakeOperatorId(2): {
+			StartIndex: 3,
+			NumChunks:  3,
 		},
-		makeOperatorId(4): {
+		mock.MakeOperatorId(3): {
 			StartIndex: 6,
-			NumChunks:  2,
+			NumChunks:  4,
 		},
-		makeOperatorId(5): {
-			StartIndex: 8,
+		mock.MakeOperatorId(4): {
+			StartIndex: 10,
+			NumChunks:  5,
+		},
+		mock.MakeOperatorId(5): {
+			StartIndex: 15,
+			NumChunks:  6,
+		},
+		mock.MakeOperatorId(6): {
+			StartIndex: 21,
 			NumChunks:  3,
 		},
-		makeOperatorId(6): {
-			StartIndex: 11,
-			NumChunks:  3,
-		},
-		makeOperatorId(7): {
+		mock.MakeOperatorId(7): {
 			StartIndex: 14,
 			NumChunks:  3,
 		},
-		makeOperatorId(8): {
+		mock.MakeOperatorId(8): {
 			StartIndex: 17,
 			NumChunks:  4,
 		},
-		makeOperatorId(9): {
+		mock.MakeOperatorId(9): {
 			StartIndex: 21,
 			NumChunks:  4,
 		},
 	}
 	expectedInfo := core.AssignmentInfo{
-		TotalChunks: 25,
+		TotalChunks: 21,
 	}
 
 	assert.Equal(t, expectedInfo, info)
@@ -119,16 +113,18 @@ func FuzzOperatorAssignments(f *testing.F) {
 	}
 
 	for i := 0; i < 100; i++ {
-		f.Add(rand.Intn(1000)+1, rand.Intn(2) == 0)
+		f.Add(rand.Intn(254)+1, rand.Intn(2) == 0)
 	}
 
 	f.Fuzz(func(t *testing.T, numOperators int, useTargetNumChunks bool) {
 
 		// Generate a random slice of integers of length n
 
-		stakes := make([]int, numOperators)
-		for i := range stakes {
-			stakes[i] = rand.Intn(100)
+		stakes := map[core.QuorumID]map[core.OperatorID]int{
+			0: {},
+		}
+		for i := 0; i < numOperators; i++ {
+			stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
 		}
 
 		advThreshold := rand.Intn(99)

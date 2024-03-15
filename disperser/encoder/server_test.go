@@ -73,7 +73,11 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 		Data: gettysburgAddressBytes,
 	}
 
-	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
+	indexedChainState, _ := coremock.MakeChainDataMock(map[uint8]int{
+		0: 10,
+		1: 10,
+		2: 10,
+	})
 	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
 	if err != nil {
 		log.Fatalf("failed to get operator state: %s", err)

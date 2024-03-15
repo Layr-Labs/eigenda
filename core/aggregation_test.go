@@ -23,7 +23,10 @@ var (
 
 func TestMain(m *testing.M) {
 	var err error
-	dat, err = mock.MakeChainDataMock(10)
+	dat, err = mock.MakeChainDataMock(map[uint8]int{
+		0: 6,
+		1: 3,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +50,7 @@ func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update
 	// In real life, the ordering will be random, but we simulate the signing in a fixed order
 	// to simulate stakes deterministically
 	for i := 0; i < len(state.PrivateOperators); i++ {
-		id := makeOperatorId(i)
+		id := mock.MakeOperatorId(i)
 		op := state.PrivateOperators[id]
 		sig := op.KeyPair.SignMessage(message)
 		if count < len(state.IndexedOperators)-int(advCount) {
@@ -75,7 +78,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 		quorums        []core.QuorumResult
 		adversaryCount uint
 		expectedErr    error
-		meetsQuorum    bool
+		meetsQuorum    []bool
 	}{
 		{
 			name: "Succeeds when all operators sign at quorum threshold 100",
@@ -87,19 +90,19 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			},
 			adversaryCount: 0,
 			expectedErr:    nil,
-			meetsQuorum:    true,
+			meetsQuorum:    []bool{true},
 		},
 		{
-			name: "Succeeds when 9/10 operators sign at quorum threshold 80",
+			name: "Succeeds when 9/10 operators sign at quorum threshold 70",
 			quorums: []core.QuorumResult{
 				{
 					QuorumID:      0,
-					PercentSigned: 80,
+					PercentSigned: 70,
 				},
 			},
 			adversaryCount: 1,
 			expectedErr:    nil,
-			meetsQuorum:    true,
+			meetsQuorum:    []bool{true},
 		},
 		{
 			name: "Fails when 8/10 operators sign at quorum threshold 90",
@@ -111,14 +114,45 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			},
 			adversaryCount: 2,
 			expectedErr:    nil,
-			meetsQuorum:    false,
+			meetsQuorum:    []bool{false},
+		},
+		{
+			name: "Fails when 9/10 operators sign at quorum threshold 80 for 2 quorums",
+			quorums: []core.QuorumResult{
+				{
+					QuorumID:      0,
+					PercentSigned: 80,
+				},
+				{
+					QuorumID:      1,
+					PercentSigned: 80,
+				},
+			},
+			adversaryCount: 1,
+			expectedErr:    nil,
+			meetsQuorum:    []bool{false, true},
+		},
+		{
+			name: "Succeeds when 9/10 operators sign at quorum threshold 70 and 100",
+			quorums: []core.QuorumResult{
+				{
+					QuorumID:      0,
+					PercentSigned: 70,
+				},
+				{
+					QuorumID:      1,
+					PercentSigned: 100,
+				},
+			},
+			adversaryCount: 1,
+			expectedErr:    nil,
+			meetsQuorum:    []bool{true, true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			state := dat.GetTotalOperatorState(context.Background(), 0)
+			state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, []core.QuorumID{0, 1})
 
 			update := make(chan core.SignerMessage)
 			message := [32]byte{1, 2, 3, 4, 5, 6}
@@ -133,8 +167,8 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			sigAgg, err := agg.AggregateSignatures(context.Background(), state.IndexedOperatorState, quorumIDs, message, update)
 			assert.NoError(t, err)
 
-			for _, quorum := range tt.quorums {
-				if tt.meetsQuorum {
+			for i, quorum := range tt.quorums {
+				if tt.meetsQuorum[i] {
 					assert.GreaterOrEqual(t, sigAgg.QuorumResults[quorum.QuorumID].PercentSigned, quorum.PercentSigned)
 				} else {
 					assert.Less(t, sigAgg.QuorumResults[quorum.QuorumID].PercentSigned, quorum.PercentSigned)

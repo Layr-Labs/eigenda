@@ -86,7 +86,11 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
 func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) ([]core.EncodedBlob, core.BatchHeader, *mock.ChainDataMock) {
 
-	cst, err := mock.MakeChainDataMock(core.OperatorIndex(operatorCount))
+	cst, err := mock.MakeChainDataMock(map[uint8]int{
+		0: int(operatorCount),
+		1: int(operatorCount),
+		2: int(operatorCount),
+	})
 	assert.NoError(t, err)
 
 	batchHeader := core.BatchHeader{

@@ -40,7 +40,11 @@ type components struct {
 func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint64, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
 	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
-	cst, err := coremock.MakeChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(map[uint8]int{
+		0: numOperators,
+		1: numOperators,
+		2: numOperators,
+	})
 	assert.Nil(t, err)
 	p, err := makeTestProver()
 	assert.Nil(t, err)
@@ -63,7 +67,11 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 func TestEncodingQueueLimit(t *testing.T) {
 	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
-	cst, err := coremock.MakeChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(map[uint8]int{
+		0: numOperators,
+		1: numOperators,
+		2: numOperators,
+	})
 	assert.Nil(t, err)
 	encoderClient := mock.NewMockEncoderClient()
 	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, nil)
@@ -289,7 +297,11 @@ func TestStreamingEncoding(t *testing.T) {
 func TestEncodingFailure(t *testing.T) {
 	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
-	cst, err := coremock.MakeChainDataMock(numOperators)
+	cst, err := coremock.MakeChainDataMock(map[uint8]int{
+		0: numOperators,
+		1: numOperators,
+		2: numOperators,
+	})
 	assert.Nil(t, err)
 	encoderClient := mock.NewMockEncoderClient()
 	asgn := &core.StdAssignmentCoordinator{}
