@@ -668,16 +668,15 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		}
 
 		quorumID := uint8(req.GetCustomQuorumNumbers()[i])
+		if quorumID >= quorumConfig.QuorumCount {
+			return nil, fmt.Errorf("invalid request: the quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
+		}
+
 		if _, ok := seenQuorums[quorumID]; ok {
 			return nil, fmt.Errorf("invalid request: quorum_numbers must not contain duplicates")
 		}
 		seenQuorums[quorumID] = struct{}{}
 
-		if quorumID >= quorumConfig.QuorumCount {
-			if err != nil {
-				return nil, fmt.Errorf("invalid request: the quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
-			}
-		}
 	}
 
 	// Add the required quorums to the list of quorums to check
