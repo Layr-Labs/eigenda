@@ -18,7 +18,7 @@ import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.
 import {EigenDAServiceManager, IAVSDirectory} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 
-import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
+import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
