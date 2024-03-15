@@ -19,7 +19,7 @@ type MultiHomingClient struct {
 	NumRetries int
 	Logger     logging.Logger
 	*FailoverController
-	Timeout time.Duration
+	Timeout time.Duration // Network timeout is injected in additional to parent context timeout
 }
 
 var _ dacommon.EthClient = (*MultiHomingClient)(nil)
@@ -40,7 +40,7 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 		NumRetries:         config.NumRetries,
 		FailoverController: controller,
 		Logger:             logger,
-		Timeout:            time.Second * 2,
+		Timeout:            config.NetworkTimeout,
 	}
 
 	for i := 0; i < len(rpcUrls); i++ {
