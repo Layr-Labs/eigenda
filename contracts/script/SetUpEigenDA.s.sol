@@ -14,7 +14,7 @@ import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
-import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
+import "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
