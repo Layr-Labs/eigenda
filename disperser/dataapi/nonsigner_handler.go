@@ -83,7 +83,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 					return nil, err
 				}
 				nonsignerMetric := OperatorNonsigningPercentageMetrics{
-					OperatorId:           op,
+					OperatorId:           fmt.Sprintf("0x%s", op),
 					QuorumId:             q,
 					TotalUnsignedBatches: unsignedCount,
 					TotalBatches:         totalCount,
