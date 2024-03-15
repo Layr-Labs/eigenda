@@ -14,8 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/peer"
-
-	tmock "github.com/stretchr/testify/mock"
 )
 
 func TestRatelimit(t *testing.T) {
@@ -35,26 +33,21 @@ func TestRatelimit(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 50, ConfirmationThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
-	}
-	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
-
 	// Try with non-allowlisted IP
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data50KiB,
-		QuorumNumbers: []uint32{0},
+		Data:                data50KiB,
+		CustomQuorumNumbers: []uint32{0},
 	})
 	assert.ErrorContains(t, err, "account throughput limit")
 
 	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 20 blobs.
 	numLimited := 0
 	for i := 0; i < 20; i++ {
+
 		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-			Data:          data1KiB,
-			QuorumNumbers: []uint32{1},
+			Data:                data1KiB,
+			CustomQuorumNumbers: []uint32{1},
 		})
 		if err != nil && strings.Contains(err.Error(), "account blob limit") {
 			numLimited++
@@ -73,16 +66,16 @@ func TestRatelimit(t *testing.T) {
 	ctx = peer.NewContext(context.Background(), p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data50KiB,
-		QuorumNumbers: []uint32{0},
+		Data:                data50KiB,
+		CustomQuorumNumbers: []uint32{0},
 	})
 	assert.NoError(t, err)
 
 	// This should succeed because the account blob limit (5 blobs/s) X bucket size (3s) is larger than 10 blobs.
 	for i := 0; i < 10; i++ {
 		_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-			Data:          data1KiB,
-			QuorumNumbers: []uint32{1},
+			Data:                data1KiB,
+			CustomQuorumNumbers: []uint32{1},
 		})
 		assert.NoError(t, err)
 	}
@@ -167,9 +160,9 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	err := stream.SendFromClient(&pb.AuthenticatedRequest{
 		Payload: &pb.AuthenticatedRequest_DisperseRequest{
 			DisperseRequest: &pb.DisperseBlobRequest{
-				Data:          data,
-				QuorumNumbers: quorums,
-				AccountId:     signer.GetAccountID(),
+				Data:                data,
+				CustomQuorumNumbers: quorums,
+				AccountId:           signer.GetAccountID(),
 			},
 		},
 	})

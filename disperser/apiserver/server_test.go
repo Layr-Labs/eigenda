@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -24,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -37,7 +37,6 @@ import (
 var (
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
-	transactor      *mock.MockTransactor
 
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
@@ -66,6 +65,70 @@ func TestDisperseBlob(t *testing.T) {
 	assert.NotNil(t, key)
 }
 
+func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
+
+	transactor := &mock.MockTransactor{}
+	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
+	transactor.On("GetQuorumCount").Return(uint8(2), nil)
+	quorumParams := []*core.SecurityParam{
+		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
+	}
+	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+
+	dispersalServer := newTestServer(transactor)
+
+	data := make([]byte, 1024)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	p := &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: 51001,
+		},
+	}
+	ctx := peer.NewContext(context.Background(), p)
+
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
+
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: []uint32{1},
+	})
+	assert.Error(t, err)
+
+	reply, err := dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: []uint32{},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, reply.GetResult(), pb.BlobStatus_PROCESSING)
+	assert.NotNil(t, reply.GetRequestId())
+
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0}, nil).Twice()
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0},
+	})
+	assert.Error(t, err)
+
+	reply, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: []uint32{1},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, pb.BlobStatus_PROCESSING, reply.GetResult())
+	assert.NotNil(t, reply.GetRequestId())
+
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil).Once()
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: []uint32{},
+	})
+	assert.Error(t, err)
+}
+
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -79,23 +142,17 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 50, ConfirmationThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 50, ConfirmationThreshold: 100},
-	}
-	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: []uint32{2},
+	})
+	assert.ErrorContains(t, err, "invalid request: the quorum_numbers must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{2},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0, 0},
 	})
-	assert.ErrorContains(t, err, "invalid request: the quorum_id must be in range [0, 1], but found 2")
-
-	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0, 0},
-	})
-	assert.ErrorContains(t, err, "invalid request: security_params must not contain duplicate quorum_id")
+	assert.ErrorContains(t, err, "invalid request: quorum_numbers must not contain duplicates")
 }
 
 func TestGetBlobStatus(t *testing.T) {
@@ -254,15 +311,9 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
-	}
-	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
-
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0, 1},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0, 1},
 	})
 	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "blob size cannot exceed 2 MiB")
@@ -292,7 +343,17 @@ func setup(m *testing.M) {
 		panic("failed to deploy AWS resources")
 	}
 
-	dispersalServer = newTestServer(m)
+	transactor := &mock.MockTransactor{}
+	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
+	transactor.On("GetQuorumCount").Return(uint8(2), nil)
+	quorumParams := []*core.SecurityParam{
+		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
+		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
+	}
+	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
+	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
+
+	dispersalServer = newTestServer(transactor)
 }
 
 func teardown() {
@@ -301,7 +362,7 @@ func teardown() {
 	}
 }
 
-func newTestServer(m *testing.M) *apiserver.DispersalServer {
+func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	logger, err := logging.GetLogger(logging.DefaultCLIConfig())
 	if err != nil {
 		panic("failed to create a new logger")
@@ -376,9 +437,6 @@ func newTestServer(m *testing.M) *apiserver.DispersalServer {
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
-	transactor = &mock.MockTransactor{}
-	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
-	transactor.On("GetQuorumCount").Return(uint8(2), nil)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort: "51001",
@@ -394,15 +452,9 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
-	quorumParams := []*core.SecurityParam{
-		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
-		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
-	}
-	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
-
 	reply, err := server.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:          data,
-		QuorumNumbers: []uint32{0, 1},
+		Data:                data,
+		CustomQuorumNumbers: []uint32{0, 1},
 	})
 	assert.NoError(t, err)
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()

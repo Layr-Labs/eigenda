@@ -604,16 +604,18 @@ func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (ui
 	})
 }
 
-func (t *Transactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.SecurityParam, error) {
+func (t *Transactor) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]*core.SecurityParam, error) {
 	adversaryThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
-		Context: ctx,
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	confirmationThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumConfirmationThresholdPercentages(&bind.CallOpts{
-		Context: ctx,
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
 	if err != nil {
 		return nil, err
@@ -635,6 +637,17 @@ func (t *Transactor) GetQuorumSecurityParams(ctx context.Context) ([]*core.Secur
 
 	return securityParams, nil
 
+}
+
+func (t *Transactor) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
+	requiredQuorums, err := t.Bindings.EigenDAServiceManager.QuorumNumbersRequired(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return requiredQuorums, nil
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
