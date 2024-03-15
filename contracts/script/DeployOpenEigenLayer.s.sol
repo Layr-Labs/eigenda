@@ -177,7 +177,6 @@ contract DeployOpenEigenLayer is Script, Test {
             address(eigenPodManagerImplementation),
             abi.encodeWithSelector(
                 EigenPodManager.initialize.selector,
-                type(uint256).max,
                 IBeaconChainOracle(address(0)),
                 executorMultisig,
                 eigenLayerPauserReg,
