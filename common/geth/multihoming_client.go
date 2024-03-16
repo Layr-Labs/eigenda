@@ -24,6 +24,8 @@ type MultiHomingClient struct {
 
 var _ dacommon.EthClient = (*MultiHomingClient)(nil)
 
+const BLOCK_INTERVAL = 12 * time.Second
+
 // NewMultiHomingClient is an EthClient that automatically handles RPC failures and retries by cycling through
 // multiple RPC clients. All EthClients underneath maintain active connections throughout the life time. The
 // MultiHomingClient keeps using the same EthClient for a new RPC invocation until it encounters a connection
@@ -678,7 +680,7 @@ func (m *MultiHomingClient) EnsureTransactionEvaled(ctx context.Context, tx *typ
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.Timeout)
+		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, 2*BLOCK_INTERVAL)
 		result, err := instance.EnsureTransactionEvaled(instanceCtx, tx, tag)
 		instanceCtxCancel()
 		if err == nil {
@@ -694,7 +696,7 @@ func (m *MultiHomingClient) EnsureAnyTransactionEvaled(ctx context.Context, txs 
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.Timeout)
+		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, 2*BLOCK_INTERVAL)
 		result, err := instance.EnsureAnyTransactionEvaled(instanceCtx, txs, tag)
 		instanceCtxCancel()
 		if err == nil {
