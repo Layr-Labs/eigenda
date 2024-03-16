@@ -119,7 +119,7 @@ func ReverseBitOrder(length uint32, swap func(i, j uint32)) error {
 // rearrange Fr elements in reverse bit order. Supports 2**31 max element count.
 func ReverseBitOrderFr(values []fr.Element) error {
 	if len(values) > (1 << 31) {
-		return ErrFrRBOListTooLarge
+		return fmt.Errorf("%w: received %d elements, maximum allowed is %d", ErrFrRBOListTooLarge, len(values), 1<<31)
 	}
 	var tmp fr.Element
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
@@ -134,9 +134,10 @@ func ReverseBitOrderFr(values []fr.Element) error {
 }
 
 // rearrange Fr ptr elements in reverse bit order. Supports 2**31 max element count.
+
 func ReverseBitOrderFrPtr(values []*fr.Element) error {
 	if len(values) > (1 << 31) {
-		return ErrFrRBOListTooLarge
+		return fmt.Errorf("%w: received %d elements, maximum allowed is %d", ErrFrRBOListTooLarge, len(values), 1<<31)
 	}
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		values[i], values[j] = values[j], values[i]
@@ -144,16 +145,16 @@ func ReverseBitOrderFrPtr(values []*fr.Element) error {
 	return err
 }
 
+
 func ReverseBitOrderG1Point(values []bn254.G1Affine) error {
 	if len(values) > (1 << 31) {
-		return ErrG1RBOListTooLarge
+		return fmt.Errorf("%w: received %d points, maximum allowed is %d", ErrG1RBOListTooLarge, len(values), 1<<31)
 	}
 	var tmp bn254.G1Affine
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		tmp.Set(&values[i])
 		values[i].Set(&values[j])
 		values[j].Set(&tmp)
-
 	})
 	return err
 }
