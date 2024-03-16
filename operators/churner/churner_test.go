@@ -25,6 +25,8 @@ func TestProcessChurnRequest(t *testing.T) {
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumConfirmations: 0,
+			NetworkTimeout:   networkTimeout,
+			NumRetries:       numRetries,
 		},
 	}
 	metrics := churner.NewMetrics("9001", logger)

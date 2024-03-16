@@ -108,6 +108,8 @@ func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, log
 		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
+		NetworkTimeout:   3 * time.Second,
+		NumRetries:       0,
 	}
 
 	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)

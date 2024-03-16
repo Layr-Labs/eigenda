@@ -44,6 +44,8 @@ var (
 	operatorAddr                   = ""
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
+	networkTimeout                 = 3 * time.Second
+	numRetries                     = 0
 )
 
 func TestMain(m *testing.M) {
@@ -191,6 +193,8 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
+		NetworkTimeout:   networkTimeout,
+		NumRetries:       numRetries,
 	}
 
 	gethClient, err := geth.NewMultiHomingClient(ethClientCfg, gethcommon.Address{}, logger)
@@ -207,6 +211,8 @@ func newTestServer(t *testing.T) *churner.Server {
 		EthClientConfig: geth.EthClientConfig{
 			RPCURLs:          []string{rpcURL},
 			PrivateKeyString: churnerPrivateKeyHex,
+			NetworkTimeout:   networkTimeout,
+			NumRetries:       numRetries,
 		},
 		LoggerConfig:                  common.DefaultLoggerConfig(),
 		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetreiver,
