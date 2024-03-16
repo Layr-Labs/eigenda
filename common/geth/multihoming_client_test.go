@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	damock "github.com/Layr-Labs/eigenda/common/mock"
@@ -18,7 +19,7 @@ var (
 	rpcURLs    = []string{"127.0.0.1", "127.0.0.2", "127.0.0.3"}
 )
 
-func makeTestMultihomingClient(t *testing.T, numRetries int) (*geth.MultiHomingClient, error) {
+func makeTestMultihomingClient(numRetries int) (*geth.MultiHomingClient, error) {
 	logger := logging.NewNoopLogger()
 
 	ethClientCfg := geth.EthClientConfig{
@@ -26,6 +27,7 @@ func makeTestMultihomingClient(t *testing.T, numRetries int) (*geth.MultiHomingC
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 		NumRetries:       numRetries,
+		NetworkTimeout:   time.Second,
 	}
 
 	mockClient := geth.MultiHomingClient{}
@@ -54,7 +56,7 @@ func makeFailureCall(t *testing.T, client *geth.MultiHomingClient, numCall int) 
 }
 
 func TestMultihomingClientZeroRetry(t *testing.T) {
-	client, _ := makeTestMultihomingClient(t, 0)
+	client, _ := makeTestMultihomingClient(0)
 
 	index, _ := client.GetRPCInstance()
 	require.Equal(t, index, 0)
@@ -77,7 +79,7 @@ func TestMultihomingClientZeroRetry(t *testing.T) {
 }
 
 func TestMultihomingClientOneRetry(t *testing.T) {
-	client, _ := makeTestMultihomingClient(t, 1)
+	client, _ := makeTestMultihomingClient(1)
 
 	index, _ := client.GetRPCInstance()
 	require.Equal(t, index, 0)
@@ -100,7 +102,7 @@ func TestMultihomingClientOneRetry(t *testing.T) {
 }
 
 func TestMultihomingClientTwoRetry(t *testing.T) {
-	client, _ := makeTestMultihomingClient(t, 2)
+	client, _ := makeTestMultihomingClient(2)
 
 	index, _ := client.GetRPCInstance()
 	require.Equal(t, index, 0)
