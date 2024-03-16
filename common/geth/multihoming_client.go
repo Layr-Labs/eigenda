@@ -119,7 +119,7 @@ func (m *MultiHomingClient) SendTransaction(ctx context.Context, tx *types.Trans
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.Timeout)
+		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, 2*BLOCK_INTERVAL)
 		err := instance.SendTransaction(instanceCtx, tx)
 		instanceCtxCancel()
 		if err == nil {
