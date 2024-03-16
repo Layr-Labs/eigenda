@@ -34,7 +34,7 @@ func (f *FailoverController) ProcessError(err error) {
 	}
 
 	fault := HandleError(err)
-	if fault == EVMFault {
+	if fault == EVMFault || fault == Ok {
 		return
 	} else {
 		// attribute anything else to server fault for rotation

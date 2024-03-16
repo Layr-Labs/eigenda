@@ -2,7 +2,6 @@ package geth
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool"
@@ -11,10 +10,8 @@ import (
 type ChainConnFaults int64
 
 const (
-	SenderFault ChainConnFaults = iota
-	RPCFault
-	TooManyRequest
-	Ok
+	Ok ChainConnFaults = iota
+	ConnectionFault
 	EVMFault
 )
 
@@ -60,29 +57,5 @@ func HandleError(err error) ChainConnFaults {
 		return EVMFault
 	}
 
-	// custom error parsing. If the error message does not contain any error code, which is 3 digit at minimum
-	errMsg := err.Error()
-	if len(errMsg) < 3 {
-		return RPCFault
-	}
-
-	// prevent ddos if error message is too large
-	if len(errMsg) > 1000 {
-		return RPCFault
-	}
-
-	// for example, https://docs.alchemy.com/reference/error-reference 500 errors
-	if strings.Contains(errMsg, "500") ||
-		strings.Contains(errMsg, "503") {
-		return RPCFault
-	}
-
-	// 400 errors
-	// too many requests
-	if strings.Contains(errMsg, "429") {
-		return TooManyRequest
-	}
-
-	// by default it is rpc's fault
-	return RPCFault
+	return ConnectionFault
 }

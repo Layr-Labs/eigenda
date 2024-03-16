@@ -76,7 +76,7 @@ func TestMultihomingClientZeroRetry(t *testing.T) {
 	require.Equal(t, index, 0)
 }
 
-func TestMultihomingClientONERetry(t *testing.T) {
+func TestMultihomingClientOneRetry(t *testing.T) {
 	client, _ := makeTestMultihomingClient(t, 1)
 
 	index, _ := client.GetRPCInstance()
@@ -99,7 +99,7 @@ func TestMultihomingClientONERetry(t *testing.T) {
 	require.Equal(t, index, 0)
 }
 
-func TestMultihomingClientTWORetry(t *testing.T) {
+func TestMultihomingClientTwoRetry(t *testing.T) {
 	client, _ := makeTestMultihomingClient(t, 2)
 
 	index, _ := client.GetRPCInstance()
