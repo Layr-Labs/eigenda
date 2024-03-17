@@ -1,23 +1,23 @@
 {
   "addresses": {
-    "blsApkRegistry": "0x1bDDE392F15641A132CeFa8F441AD9e225e9FB11",
-    "blsApkRegistryImplementation": "0x1a64332278B3C8d4b213B1E09CFD4856825bc3fb",
-    "eigenDAProxyAdmin": "0x798EB817B7C109c6780264D5161183809C817216",
-    "eigenDAServiceManager": "0x824604a31b580Aec16D8Dd7ae9A27661Dc65cBA3",
-    "eigenDAServiceManagerImplementation": "0x5A0eE5d133eE5E1487A75A520dC0E821d7660810",
-    "indexRegistry": "0xBb9fF06dC86B57397782e6252Be85583c202f8A4",
-    "indexRegistryImplementation": "0x8597858b03142F9219B79bFB2939544a37E459d4",
-    "mockRollup": "0x6ffE77C321a773e2A27B0B0a31C5e1bBda83672B",
-    "operatorStateRetriever": "0x6A0a88f59c6726882c7BebD495dBca1e73bD4845",
-    "registryCoordinator": "0x95A49cB0aED0e8f299223Da3A8A335440f5F00E7",
-    "registryCoordinatorImplementation": "0x3b23F9216Ba9c21b978A03548Dcfd29008b66e6B",
-    "serviceManagerRouter": "0x590Dfdb432bDEF2357Fa0e62AAb8E466B1314E67",
-    "stakeRegistry": "0x6d28cEC1659BC3a9BC814c3EFc1412878B406579",
-    "stakeRegistryImplementation": "0x08af6CE42c4df3493a36c4cac236E7033074F75e"
+    "blsApkRegistry": "0xAd7f9e558170a149Ca8E90f41Ab2444A5d3bd6aD",
+    "blsApkRegistryImplementation": "0x482a96D5879e32347d8df125f038D7eC8Ab358dd",
+    "eigenDAProxyAdmin": "0x9Fd7E279f5bD692Dc04792151E14Ad814FC60eC1",
+    "eigenDAServiceManager": "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
+    "eigenDAServiceManagerImplementation": "0xEB11a0f320E39d3371Fec4Bf5C76944DfBA8ee10",
+    "indexRegistry": "0x8cE5F2a53cBd29710eb94A04e40C07A4DdF15d10",
+    "indexRegistryImplementation": "0x1D4d6054BD11A5711ad7c5d3E376C987a603e17C",
+    "mockRollup": "0x0433646AdCeE95fbF89b3BFDb8157e75c19b6C2e",
+    "operatorStateRetriever": "0x17cA8C41a59466710443143b2ECF08CaA35d80ad",
+    "registryCoordinator": "0x2c61EA360D6500b58E7f481541A36B443Bc858c6",
+    "registryCoordinatorImplementation": "0x6f21A84E7f185cCBA248B436e3b583E609d1dE1D",
+    "serviceManagerRouter": "0xDb028E067fe81e9f406C2DE382Ba82e9cD7cBD03",
+    "stakeRegistry": "0x53668EBf2e28180e38B122c641BC51Ca81088871",
+    "stakeRegistryImplementation": "0x854dc9e5d011B060bf77B1a492302C349f2f00b5"
   },
   "chainInfo": {
     "chainId": 17000,
-    "deploymentBlock": 1161097
+    "deploymentBlock": 1161126
   },
   "permissions": {
     "eigenDABatchConfirmer": "0x09983E7E97cF430c1dE8408Ccf67261FC8317EA6",
