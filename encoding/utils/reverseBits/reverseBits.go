@@ -134,7 +134,6 @@ func ReverseBitOrderFr(values []fr.Element) error {
 }
 
 // rearrange Fr ptr elements in reverse bit order. Supports 2**31 max element count.
-
 func ReverseBitOrderFrPtr(values []*fr.Element) error {
 	if len(values) > (1 << 31) {
 		return fmt.Errorf("%w: received %d elements, maximum allowed is %d", ErrFrRBOListTooLarge, len(values), 1<<31)
@@ -144,7 +143,6 @@ func ReverseBitOrderFrPtr(values []*fr.Element) error {
 	})
 	return err
 }
-
 
 func ReverseBitOrderG1Point(values []bn254.G1Affine) error {
 	if len(values) > (1 << 31) {
