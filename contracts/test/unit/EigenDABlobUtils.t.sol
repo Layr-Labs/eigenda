@@ -240,7 +240,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: confirmed quorums are not a subset of the required quorums");
+        cheats.expectRevert("EigenDARollupUtils.verifyBlob: required quorums are not a subset of the confirmed quorums");
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
