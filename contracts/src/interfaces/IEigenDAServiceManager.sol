@@ -46,7 +46,7 @@ interface IEigenDAServiceManager is IServiceManager {
         bytes32 blobHeadersRoot;
         bytes quorumNumbers; // each byte is a different quorum number
         bytes signedStakeForQuorums; // every bytes is an amount less than 100 specifying the percentage of stake 
-                                          // the must have signed in the corresponding quorum in `quorumNumbers` 
+                                     // that has signed in the corresponding quorum in `quorumNumbers` 
         uint32 referenceBlockNumber;
     }
     
@@ -85,10 +85,10 @@ interface IEigenDAServiceManager is IServiceManager {
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
 
-    /// @notice Returns the bytes array of quotaAdversaryThresholdPercentages
+    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
 
-    /// @notice Returns the bytes array of quotaAdversaryThresholdPercentages
+    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
 
     /// @notice Returns the bytes array of quorumsNumbersRequired

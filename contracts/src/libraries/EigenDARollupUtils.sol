@@ -93,7 +93,7 @@ library EigenDARollupUtils {
                 ),
                 confirmedQuorumsBitmap
             ),
-            "EigenDARollupUtils.verifyBlob: confirmed quorums are not a subset of the required quorums"
+            "EigenDARollupUtils.verifyBlob: required quorums are not a subset of the confirmed quorums"
         );
     }
 
