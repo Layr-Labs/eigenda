@@ -9,10 +9,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,14 +80,7 @@ func TestIndexerIntegration(t *testing.T) {
 	setup()
 	defer teardown()
 
-	logger, err := logging.GetLogger(logging.Config{
-		StdFormat:  "terminal",
-		StdLevel:   "debug",
-		FileFormat: "logfmt",
-		FileLevel:  "debug",
-	})
-	assert.NoError(t, err)
-
+	logger := logging.NewNoopLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewTransactor(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
 	assert.NoError(t, err)
@@ -106,7 +99,7 @@ func TestIndexerIntegration(t *testing.T) {
 	assert.Equal(t, len(testConfig.Operators), len(state.IndexedOperators))
 }
 
-func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger common.Logger) common.EthClient {
+func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) common.EthClient {
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	assert.True(t, ok)
 

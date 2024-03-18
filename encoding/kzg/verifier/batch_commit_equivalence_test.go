@@ -14,16 +14,14 @@ import (
 )
 
 func TestBatchEquivalence(t *testing.T) {
-	teardownSuite := setupSuite(t)
-	defer teardownSuite(t)
 
 	group, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
-	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	inputFr := rs.ToFrArray(gettysburgAddressBytes)
 	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 

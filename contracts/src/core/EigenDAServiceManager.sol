@@ -2,10 +2,9 @@
 pragma solidity ^0.8.9;
 
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
-import {IAVSDirectory} from "eigenlayer-core/contracts/interfaces/IAVSDirectory.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
 
-import {ServiceManagerBase} from "eigenlayer-middleware/ServiceManagerBase.sol";
+import {ServiceManagerBase, IAVSDirectory} from "eigenlayer-middleware/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
@@ -72,7 +71,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
         // make sure the stakes against which the Batch is being confirmed are not stale
         require(
-            batchHeader.referenceBlockNumber <= block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
+            batchHeader.referenceBlockNumber < block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
         );
 
         require(
@@ -80,10 +79,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"
         );
 
-        //make sure that the quorumNumbers and quorumThresholdPercentages are of the same length
+        //make sure that the quorumNumbers and signedStakeForQuorums are of the same length
         require(
-            batchHeader.quorumNumbers.length == batchHeader.quorumThresholdPercentages.length,
-            "EigenDAServiceManager.confirmBatch: quorumNumbers and quorumThresholdPercentages must be of the same length"
+            batchHeader.quorumNumbers.length == batchHeader.signedStakeForQuorums.length,
+            "EigenDAServiceManager.confirmBatch: quorumNumbers and signedStakeForQuorums must be of the same length"
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
@@ -101,12 +100,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         );
 
         // check that signatories own at least a threshold percentage of each quourm
-        for (uint i = 0; i < batchHeader.quorumThresholdPercentages.length; i++) {
-            // we don't check that the quorumThresholdPercentages are not >100 because a greater value would trivially fail the check, implying 
+        for (uint i = 0; i < batchHeader.signedStakeForQuorums.length; i++) {
+            // we don't check that the signedStakeForQuorums are not >100 because a greater value would trivially fail the check, implying 
             // signed stake > total stake
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
-                    quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.quorumThresholdPercentages[i]),
+                    quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
                 "EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"
             );
         }
@@ -139,9 +138,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return batchId;
     }
 
-    /// @notice Returns the block until which operators must serve.
-    function latestServeUntilBlock() external view returns (uint32) {
-        return uint32(block.number) + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
+    /// @notice Given a reference block number, returns the block until which operators must serve.
+    function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32) {
+        return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
 }

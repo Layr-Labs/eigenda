@@ -21,7 +21,7 @@ export function handleConfirmBatchCall(confirmBatchCall: ConfirmBatchCall): void
   batchHeader.blobHeadersRoot = confirmBatchCall.inputs.batchHeader.blobHeadersRoot
   batchHeader.blobHeadersRoot = confirmBatchCall.inputs.batchHeader.blobHeadersRoot
   batchHeader.quorumNumbers = bytesToBigIntArray(confirmBatchCall.inputs.batchHeader.quorumNumbers)
-  batchHeader.quorumThresholdPercentages = bytesToBigIntArray(confirmBatchCall.inputs.batchHeader.quorumThresholdPercentages)
+  batchHeader.signedStakeForQuorums = bytesToBigIntArray(confirmBatchCall.inputs.batchHeader.signedStakeForQuorums)
   batchHeader.referenceBlockNumber = confirmBatchCall.inputs.batchHeader.referenceBlockNumber
   batchHeader.batch = BATCH_PREFIX_BYTES.concat(confirmBatchCall.transaction.hash) // only one batch per tx
   batchHeader.save()

@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,31 +40,37 @@ const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
-	mu *sync.Mutex
+	mu *sync.RWMutex
 
-	config disperser.ServerConfig
+	serverConfig disperser.ServerConfig
+	rateConfig   RateConfig
 
-	blobStore   disperser.BlobStore
-	tx          core.Transactor
-	quorumCount uint8
+	blobStore    disperser.BlobStore
+	tx           core.Transactor
+	quorumConfig QuorumConfig
 
-	rateConfig    RateConfig
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
 	metrics *disperser.Metrics
 
-	logger common.Logger
+	logger logging.Logger
+}
+
+type QuorumConfig struct {
+	RequiredQuorums []core.QuorumID
+	QuorumCount     uint8
+	SecurityParams  []*core.SecurityParam
 }
 
 // NewServer creates a new Server struct with the provided parameters.
 //
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
 func NewDispersalServer(
-	config disperser.ServerConfig,
+	serverConfig disperser.ServerConfig,
 	store disperser.BlobStore,
 	tx core.Transactor,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
@@ -77,16 +84,16 @@ func NewDispersalServer(
 	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
 
 	return &DispersalServer{
-		config:        config,
+		serverConfig:  serverConfig,
+		rateConfig:    rateConfig,
 		blobStore:     store,
 		tx:            tx,
-		quorumCount:   0,
 		metrics:       metrics,
 		logger:        logger,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
-		rateConfig:    rateConfig,
-		mu:            &sync.Mutex{},
+		mu:            &sync.RWMutex{},
+		quorumConfig:  QuorumConfig{},
 	}
 }
 
@@ -97,12 +104,18 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
-	request, ok := in.Payload.(*pb.AuthenticatedRequest_DisperseRequest)
+	request, ok := in.GetPayload().(*pb.AuthenticatedRequest_DisperseRequest)
 	if !ok {
 		return api.NewInvalidArgError("missing DisperseBlobRequest")
 	}
 
-	blob := getBlobFromRequest(request.DisperseRequest)
+	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
+	if err != nil {
+		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
+			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
+		}
+		return api.NewInvalidArgError(err.Error())
+	}
 
 	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
 	// Decode public key
@@ -135,7 +148,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
-	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_AuthenticationData)
+	challengeReply, ok := in.GetPayload().(*pb.AuthenticatedRequest_AuthenticationData)
 	if !ok {
 		return api.NewInvalidArgError("expected AuthenticationData")
 	}
@@ -169,62 +182,19 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 }
 
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
-	blob := getBlobFromRequest(req)
+	blob, err := s.validateRequestAndGetBlob(ctx, req)
+	if err != nil {
+		for _, quorumID := range req.CustomQuorumNumbers {
+			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
+		}
+		return nil, api.NewInvalidArgError(err.Error())
+	}
 
 	reply, err := s.disperseBlob(ctx, blob, "")
 	if err != nil {
 		s.logger.Info("failed to disperse blob", "err", err)
 	}
 	return reply, err
-}
-
-func (s *DispersalServer) validateBlobRequest(ctx context.Context, blob *core.Blob) error {
-
-	securityParams := blob.RequestHeader.SecurityParams
-	if len(securityParams) == 0 {
-		return errors.New("invalid request: security_params must not be empty")
-	}
-	if len(securityParams) > 256 {
-		return errors.New("invalid request: security_params must not exceed 256")
-	}
-
-	seenQuorums := make(map[uint8]struct{})
-	// The quorum ID must be in range [0, 254]. It'll actually be converted
-	// to uint8, so it cannot be greater than 254.
-	for _, param := range securityParams {
-		if _, ok := seenQuorums[param.QuorumID]; ok {
-			return errors.New("invalid request: security_params must not contain duplicate quorum_id")
-		}
-		seenQuorums[param.QuorumID] = struct{}{}
-
-		if param.QuorumID >= s.quorumCount {
-			err := s.updateQuorumCount(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get onchain quorum count: %w", err)
-			}
-
-			if param.QuorumID >= s.quorumCount {
-				return fmt.Errorf("invalid request: the quorum_id must be in range [0, %d], but found %d", s.quorumCount-1, param.QuorumID)
-			}
-		}
-	}
-
-	blobSize := len(blob.Data)
-	// The blob size in bytes must be in range [1, maxBlobSize].
-	if blobSize > maxBlobSize {
-		return errors.New("blob size cannot exceed 2 MiB")
-	}
-	if blobSize == 0 {
-		return errors.New("blob size must be greater than 0")
-	}
-
-	if err := blob.RequestHeader.Validate(); err != nil {
-		s.logger.Warn("invalid header", "err", err)
-		return err
-	}
-
-	return nil
-
 }
 
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string) (*pb.DisperseBlobReply, error) {
@@ -234,6 +204,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	defer timer.ObserveDuration()
 
 	securityParams := blob.RequestHeader.SecurityParams
+
+	// securityParams := blob.RequestHeader.SecurityParams
 	securityParamsStrings := make([]string, len(securityParams))
 	for i, sp := range securityParams {
 		securityParamsStrings[i] = sp.String()
@@ -250,16 +222,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
-	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
-
-	err = s.validateBlobRequest(ctx, blob)
-	if err != nil {
-		for _, param := range securityParams {
-			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), quorumId, blobSize, "DisperseBlob")
-		}
-		return nil, api.NewInvalidArgError(err.Error())
-	}
+	s.logger.Debug("received a new blob dispersal request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
@@ -375,7 +338,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		blobSize := len(blob.Data)
 		length := encoding.GetBlobLength(uint(blobSize))
-		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.QuorumThreshold), uint8(param.AdversaryThreshold))
+		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
 		encodedSize := encoding.GetBlobSize(encodedLength)
 
 		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
@@ -489,10 +452,10 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 		quorumIndexes := make([]byte, len(quorumInfos))
 		for i, quorumInfo := range quorumInfos {
 			blobQuorumParams[i] = &pb.BlobQuorumParam{
-				QuorumNumber:                 uint32(quorumInfo.QuorumID),
-				AdversaryThresholdPercentage: uint32(quorumInfo.AdversaryThreshold),
-				QuorumThresholdPercentage:    uint32(quorumInfo.QuorumThreshold),
-				ChunkLength:                  uint32(quorumInfo.ChunkLength),
+				QuorumNumber:                    uint32(quorumInfo.QuorumID),
+				AdversaryThresholdPercentage:    uint32(quorumInfo.AdversaryThreshold),
+				ConfirmationThresholdPercentage: uint32(quorumInfo.ConfirmationThreshold),
+				ChunkLength:                     uint32(quorumInfo.ChunkLength),
 			}
 			quorumIndexes[i] = byte(slices.Index(quorumNumbers, quorumInfo.QuorumID))
 		}
@@ -575,11 +538,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 }
 
 func (s *DispersalServer) Start(ctx context.Context) error {
-	s.logger.Trace("Entering Start function...")
-	defer s.logger.Trace("Exiting Start function...")
-
 	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return errors.New("could not start tcp listener")
@@ -594,7 +554,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, gs)
 
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")
 	}
@@ -602,21 +562,64 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *DispersalServer) updateQuorumCount(ctx context.Context) error {
+// updateQuorumConfig updates the quorum config and returns the updated quorum config. If the update fails,
+// it will fallback to the old quorumConfig if it is set. This is to improve the robustness of the disperser to
+// RPC failures since the quorum config is rarely updated. In the event that quorumConfig is incorrect, this will
+// not result in a safety failure since all parameters are separately validated on the smart contract.
+
+func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig, error) {
+
+	s.mu.RLock()
+	newConfig := s.quorumConfig
+	s.mu.RUnlock()
+
+	// If the quorum count is set, we will fallback to the old quorumConfig if the RPC fails
+	fallbackToCache := newConfig.QuorumCount != 0
+
 	currentBlock, err := s.tx.GetCurrentBlockNumber(ctx)
 	if err != nil {
-		return err
+		s.logger.Error("failed to get current block number", "err", err)
+		if !fallbackToCache {
+			return QuorumConfig{}, err
+		}
+		return newConfig, nil
 	}
+
 	count, err := s.tx.GetQuorumCount(ctx, currentBlock)
 	if err != nil {
-		return err
+		s.logger.Error("failed to get quorum count", "err", err)
+		if !fallbackToCache {
+			return QuorumConfig{}, err
+		}
+	} else {
+		newConfig.QuorumCount = count
+	}
+
+	securityParams, err := s.tx.GetQuorumSecurityParams(ctx, currentBlock)
+	if err != nil {
+		s.logger.Error("failed to get quorum security params", "err", err)
+		if !fallbackToCache {
+			return QuorumConfig{}, err
+		}
+	} else {
+		newConfig.SecurityParams = securityParams
+	}
+
+	requiredQuorums, err := s.tx.GetRequiredQuorumNumbers(ctx, currentBlock)
+	if err != nil {
+		s.logger.Error("failed to get quorum security params", "err", err)
+		if !fallbackToCache {
+			return QuorumConfig{}, err
+		}
+	} else {
+		newConfig.RequiredQuorums = requiredQuorums
 	}
 
 	s.logger.Debug("updating quorum count", "currentBlock", currentBlock, "count", count)
 	s.mu.Lock()
-	s.quorumCount = count
+	s.quorumConfig = newConfig
 	s.mu.Unlock()
-	return nil
+	return newConfig, nil
 }
 
 func getResponseStatus(status disperser.BlobStatus) pb.BlobStatus {
@@ -636,28 +639,91 @@ func getResponseStatus(status disperser.BlobStatus) pb.BlobStatus {
 	}
 }
 
-func getBlobFromRequest(req *pb.DisperseBlobRequest) *core.Blob {
-	params := make([]*core.SecurityParam, len(req.SecurityParams))
-
-	for i, param := range req.GetSecurityParams() {
-		params[i] = &core.SecurityParam{
-			QuorumID:           core.QuorumID(param.QuorumId),
-			AdversaryThreshold: uint8(param.AdversaryThreshold),
-			QuorumThreshold:    uint8(param.QuorumThreshold),
-		}
-	}
+func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*core.Blob, error) {
 
 	data := req.GetData()
-
-	blob := &core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			BlobAuthHeader: core.BlobAuthHeader{
-				AccountID: req.AccountId,
-			},
-			SecurityParams: params,
-		},
-		Data: data,
+	blobSize := len(data)
+	// The blob size in bytes must be in range [1, maxBlobSize].
+	if blobSize > maxBlobSize {
+		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
+	}
+	if blobSize == 0 {
+		return nil, fmt.Errorf("blob size must be greater than 0")
 	}
 
-	return blob
+	if len(req.GetCustomQuorumNumbers()) > 256 {
+		return nil, errors.New("invalid request: number of custom_quorum_numbers must not exceed 256")
+	}
+
+	quorumConfig, err := s.updateQuorumConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quorum config: %w", err)
+	}
+
+	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
+		return nil, errors.New("invalid request: number of custom_quorum_numbers must not exceed number of quorums")
+	}
+
+	seenQuorums := make(map[uint8]struct{})
+	// The quorum ID must be in range [0, 254]. It'll actually be converted
+	// to uint8, so it cannot be greater than 254.
+	for i := range req.GetCustomQuorumNumbers() {
+
+		if req.GetCustomQuorumNumbers()[i] > 254 {
+			return nil, fmt.Errorf("invalid request: quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
+		}
+
+		quorumID := uint8(req.GetCustomQuorumNumbers()[i])
+		if quorumID >= quorumConfig.QuorumCount {
+			return nil, fmt.Errorf("invalid request: the quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
+		}
+
+		if _, ok := seenQuorums[quorumID]; ok {
+			return nil, fmt.Errorf("invalid request: quorum_numbers must not contain duplicates")
+		}
+		seenQuorums[quorumID] = struct{}{}
+
+	}
+
+	// Add the required quorums to the list of quorums to check
+	for _, quorumID := range quorumConfig.RequiredQuorums {
+		if _, ok := seenQuorums[quorumID]; ok {
+			return nil, fmt.Errorf("invalid request: quorum_numbers should not include the required quorums, but required quorum %d was found", quorumID)
+		}
+		seenQuorums[quorumID] = struct{}{}
+	}
+
+	if len(seenQuorums) == 0 {
+		return nil, fmt.Errorf("invalid request: the blob must be sent to at least one quorum")
+	}
+
+	params := make([]*core.SecurityParam, len(seenQuorums))
+	i := 0
+	for quorumID := range seenQuorums {
+		params[i] = &core.SecurityParam{
+			QuorumID:              core.QuorumID(quorumID),
+			AdversaryThreshold:    quorumConfig.SecurityParams[i].AdversaryThreshold,
+			ConfirmationThreshold: quorumConfig.SecurityParams[i].ConfirmationThreshold,
+		}
+		i++
+	}
+
+	header := core.BlobRequestHeader{
+		BlobAuthHeader: core.BlobAuthHeader{
+			AccountID: req.AccountId,
+		},
+		SecurityParams: params,
+	}
+
+	if err := header.Validate(); err != nil {
+		s.logger.Warn("invalid header", "err", err)
+		return nil, err
+	}
+
+	blob := &core.Blob{
+		RequestHeader: header,
+		Data:          data,
+	}
+
+	return blob, nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"google.golang.org/grpc"
@@ -29,7 +30,7 @@ type Server struct {
 
 	node   *node.Node
 	config *node.Config
-	logger common.Logger
+	logger logging.Logger
 
 	ratelimiter common.RateLimiter
 
@@ -39,7 +40,7 @@ type Server struct {
 // NewServer creates a new Server instance with the provided parameters.
 //
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
-func NewServer(config *node.Config, node *node.Node, logger common.Logger, ratelimiter common.RateLimiter) *Server {
+func NewServer(config *node.Config, node *node.Node, logger logging.Logger, ratelimiter common.RateLimiter) *Server {
 
 	return &Server{
 		config:      config,
@@ -82,7 +83,7 @@ func (s *Server) serveDispersal() error {
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalDispersalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %w", err)
+		s.logger.Fatalf("Could not start tcp listener: %v", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 1024) // 1 GiB
@@ -106,7 +107,7 @@ func (s *Server) serveRetrieval() error {
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalRetrievalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %w", err)
+		s.logger.Fatalf("Could not start tcp listener: %v", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
@@ -196,7 +197,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	if quorumInfo == nil {
 		return nil, fmt.Errorf("invalid request: quorum ID %d not found in blob header", in.GetQuorumId())
 	}
-	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.QuorumThreshold, quorumInfo.AdversaryThreshold))
+	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.ConfirmationThreshold, quorumInfo.AdversaryThreshold))
 	rate := quorumInfo.QuorumRate
 
 	s.mu.Lock()

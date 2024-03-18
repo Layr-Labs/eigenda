@@ -65,6 +65,28 @@
       "startBlock": 10470500
     }
   },
+  "preprod-holesky": {
+    "RegistryCoordinator": {
+      "address": "0x2c61EA360D6500b58E7f481541A36B443Bc858c6",
+      "startBlock": 1161126
+    },
+    "BLSApkRegistry": {
+      "address": "0xAd7f9e558170a149Ca8E90f41Ab2444A5d3bd6aD",
+      "startBlock": 1161126
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0xAd7f9e558170a149Ca8E90f41Ab2444A5d3bd6aD",
+      "startBlock": 1161126
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0x2c61EA360D6500b58E7f481541A36B443Bc858c6",
+      "startBlock": 1161126
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0xAd7f9e558170a149Ca8E90f41Ab2444A5d3bd6aD",
+      "startBlock": 1161126
+    }
+  },
   "goerli": {
     "RegistryCoordinator": {
       "address": "0x7661dA87296c0A245d11ADeD7f48265463bc3eC6",

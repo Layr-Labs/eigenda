@@ -10,9 +10,9 @@ import (
 	"time"
 
 	grpcchurner "github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"
@@ -31,7 +31,7 @@ type Operator struct {
 }
 
 // RegisterOperator operator registers the operator with the given public key for the given quorum IDs.
-func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerUrl string, useSecureGrpc bool, logger common.Logger) error {
+func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerUrl string, useSecureGrpc bool, logger logging.Logger) error {
 	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, operator.OperatorId)
 	if err != nil {
 		return fmt.Errorf("failed to get registered quorum ids for an operator: %w", err)
@@ -110,7 +110,7 @@ func UpdateOperatorQuorums(
 	transactor core.Transactor,
 	churnerUrl string,
 	useSecureGrpc bool,
-	logger common.Logger,
+	logger logging.Logger,
 ) error {
 	err := DeregisterOperator(ctx, operator.KeyPair, transactor)
 	if err != nil {
@@ -124,7 +124,7 @@ func UpdateOperatorSocket(ctx context.Context, transactor core.Transactor, socke
 	return transactor.UpdateOperatorSocket(ctx, socket)
 }
 
-func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger common.Logger) (*grpcchurner.ChurnReply, error) {
+func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger logging.Logger) (*grpcchurner.ChurnReply, error) {
 	logger.Info("churner url", "url", churnerUrl)
 
 	credential := insecure.NewCredentials()

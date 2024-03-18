@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/node/leveldb"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,7 +27,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
 	db     DB
-	logger common.Logger
+	logger logging.Logger
 
 	blockStaleMeasure   uint32
 	storeDurationBlocks uint32
@@ -37,7 +38,7 @@ type Store struct {
 
 // NewLevelDBStore creates a new Store object with a db at the provided path and the given logger.
 // TODO(jianoaix): parameterize this so we can switch between different database backends.
-func NewLevelDBStore(path string, logger common.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
+func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
 	// Create the db at the path. This is currently hardcoded to use
 	// levelDB.
 	db, err := leveldb.NewLevelDBStore(path)
@@ -312,7 +313,7 @@ func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobInd
 	if err != nil {
 		return nil, false
 	}
-	log.Trace("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
+	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
 	chunks, err := decodeChunks(data)
 	if err != nil {
@@ -361,15 +362,24 @@ func decodeChunks(data []byte) ([][]byte, error) {
 
 	for {
 		var length uint64
-		if err := binary.Read(buf, binary.LittleEndian, &length); err != nil {
+		err := binary.Read(buf, binary.LittleEndian, &length)
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		chunk := make([]byte, length)
-		if _, err := buf.Read(chunk); err != nil {
-			break
+		if err != nil {
+			return nil, err
 		}
-		chunks = append(chunks, chunk)
 
+		chunk := make([]byte, length)
+		_, err = buf.Read(chunk)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		chunks = append(chunks, chunk)
 		if buf.Len() < 8 {
 			break
 		}

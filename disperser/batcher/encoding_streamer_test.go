@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
@@ -37,7 +38,7 @@ type components struct {
 }
 
 func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshold uint64, streamerConfig batcher.StreamerConfig) (*batcher.EncodingStreamer, *components) {
-	logger := &cmock.Logger{}
+	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
@@ -60,7 +61,7 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 }
 
 func TestEncodingQueueLimit(t *testing.T) {
-	logger := &cmock.Logger{}
+	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
@@ -75,9 +76,9 @@ func TestEncodingQueueLimit(t *testing.T) {
 	encodingStreamer.ReferenceBlockNumber = 10
 
 	securityParams := []*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}}
 	blobData := []byte{1, 2, 3, 4, 5}
 	blob := core.Blob{
@@ -135,9 +136,9 @@ func TestBatchTrigger(t *testing.T) {
 	encodingStreamer, c := createEncodingStreamer(t, 10, 200_000, streamerConfig)
 
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}})
 	ctx := context.Background()
 	_, err := c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
@@ -194,9 +195,9 @@ func TestStreamingEncoding(t *testing.T) {
 	encodingStreamer, c := createEncodingStreamer(t, 0, 1e12, streamerConfig)
 
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}})
 	ctx := context.Background()
 	metadataKey, err := c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
@@ -225,9 +226,9 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.Equal(t, uint(10), encodedResult.ReferenceBlockNumber)
 	assert.Equal(t, &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: 80,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
 		},
 		ChunkLength: 16,
 	}, encodedResult.BlobQuorumInfo)
@@ -286,7 +287,7 @@ func TestStreamingEncoding(t *testing.T) {
 }
 
 func TestEncodingFailure(t *testing.T) {
-	logger := &cmock.Logger{}
+	logger := logging.NewNoopLogger()
 	blobStore := inmem.NewBlobStore()
 	cst, err := coremock.MakeChainDataMock(numOperators)
 	assert.Nil(t, err)
@@ -309,13 +310,13 @@ func TestEncodingFailure(t *testing.T) {
 
 	// put a blob in the blobstore
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}, {
-		QuorumID:           1,
-		AdversaryThreshold: 70,
-		QuorumThreshold:    100,
+		QuorumID:              1,
+		AdversaryThreshold:    70,
+		ConfirmationThreshold: 100,
 	}})
 
 	metadataKey, err := blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
@@ -357,9 +358,9 @@ func TestPartialBlob(t *testing.T) {
 
 	// put in first blob and request encoding
 	blob1 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 75,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    75,
+		ConfirmationThreshold: 100,
 	}})
 
 	metadataKey1, err := c.blobStore.StoreBlob(ctx, &blob1, uint64(time.Now().UnixNano()))
@@ -380,13 +381,13 @@ func TestPartialBlob(t *testing.T) {
 
 	// Put in second blob and request encoding
 	blob2 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           1,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              1,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}, {
-		QuorumID:           2,
-		AdversaryThreshold: 70,
-		QuorumThreshold:    95,
+		QuorumID:              2,
+		AdversaryThreshold:    70,
+		ConfirmationThreshold: 95,
 	}})
 	metadataKey2, err := c.blobStore.StoreBlob(ctx, &blob2, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
@@ -443,9 +444,9 @@ func TestPartialBlob(t *testing.T) {
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			AdversaryThreshold: 75,
-			QuorumThreshold:    100,
+			QuorumID:              0,
+			AdversaryThreshold:    75,
+			ConfirmationThreshold: 100,
 		},
 		ChunkLength: 8,
 	}})
@@ -482,13 +483,13 @@ func TestIncorrectParameters(t *testing.T) {
 	// security parameter. Thus, the entire blob should be rejected.
 
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 50,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    50,
+		ConfirmationThreshold: 100,
 	}, {
-		QuorumID:           1,
-		AdversaryThreshold: 90,
-		QuorumThreshold:    100,
+		QuorumID:              1,
+		AdversaryThreshold:    90,
+		ConfirmationThreshold: 100,
 	}})
 	blob.Data = make([]byte, 10000)
 	_, err := rand.Read(blob.Data)
@@ -526,24 +527,24 @@ func TestInvalidQuorum(t *testing.T) {
 
 	// this blob should not be encoded because the quorum does not exist
 	blob1 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 75,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    75,
+		ConfirmationThreshold: 100,
 	}, {
-		QuorumID:           99, // this quorum does not exist
-		AdversaryThreshold: 75,
-		QuorumThreshold:    100,
+		QuorumID:              99, // this quorum does not exist
+		AdversaryThreshold:    75,
+		ConfirmationThreshold: 100,
 	}})
 
 	// this blob should be encoded
 	blob2 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 75,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    75,
+		ConfirmationThreshold: 100,
 	}, {
-		QuorumID:           1,
-		AdversaryThreshold: 75,
-		QuorumThreshold:    100,
+		QuorumID:              1,
+		AdversaryThreshold:    75,
+		ConfirmationThreshold: 100,
 	}})
 
 	metadataKey1, err := c.blobStore.StoreBlob(ctx, &blob1, uint64(time.Now().UnixNano()))
@@ -576,18 +577,18 @@ func TestGetBatch(t *testing.T) {
 
 	// put 2 blobs in the blobstore
 	blob1 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}, {
-		QuorumID:           1,
-		AdversaryThreshold: 70,
-		QuorumThreshold:    95,
+		QuorumID:              1,
+		AdversaryThreshold:    70,
+		ConfirmationThreshold: 95,
 	}})
 	blob2 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           2,
-		AdversaryThreshold: 75,
-		QuorumThreshold:    100,
+		QuorumID:              2,
+		AdversaryThreshold:    75,
+		ConfirmationThreshold: 100,
 	}})
 	metadataKey1, err := c.blobStore.StoreBlob(ctx, &blob1, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
@@ -672,17 +673,17 @@ func TestGetBatch(t *testing.T) {
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
 		{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    80,
+				ConfirmationThreshold: 100,
 			},
 			ChunkLength: 16,
 		},
 		{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           1,
-				AdversaryThreshold: 70,
-				QuorumThreshold:    95,
+				QuorumID:              1,
+				AdversaryThreshold:    70,
+				ConfirmationThreshold: 95,
 			},
 			ChunkLength: 8,
 		},
@@ -704,9 +705,9 @@ func TestGetBatch(t *testing.T) {
 	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           2,
-			AdversaryThreshold: 75,
-			QuorumThreshold:    100,
+			QuorumID:              2,
+			AdversaryThreshold:    75,
+			ConfirmationThreshold: 100,
 		},
 		ChunkLength: 8,
 	}})

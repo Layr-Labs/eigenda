@@ -4,7 +4,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/urfave/cli"
 )
 
@@ -96,11 +95,27 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ALLOW_ORIGINS"),
 		Required: true,
 	}
-	EnableMetrics = cli.BoolFlag{
+	EnableMetricsFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
 		Usage:    "start metrics server",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
+	}
+	// EigenDA Disperser and Churner Hostnames to check Server Availability
+	// ex:
+	// disperser-goerli.eigenda.eigenops.xyz,
+	// churner-goerli.eigenda.eigenops.xyz
+	DisperserHostnameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-disperser-hostname"),
+		Usage:    "HostName of EigenDA Disperser",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DISPERSER_HOSTNAME"),
+	}
+	ChurnerHostnameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-churner-hostname"),
+		Usage:    "HostName of EigenDA Churner",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
 	/* Optional Flags*/
 	MetricsHTTPPort = cli.StringFlag{
@@ -125,7 +140,9 @@ var requiredFlags = []cli.Flag{
 	PrometheusServerSecretFlag,
 	PrometheusMetricsClusterLabelFlag,
 	AllowOriginsFlag,
-	EnableMetrics,
+	EnableMetricsFlag,
+	DisperserHostnameFlag,
+	ChurnerHostnameFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -138,7 +155,7 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, logging.CLIFlags(envVarPrefix, FlagPrefix)...)
+	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 }

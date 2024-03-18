@@ -12,7 +12,6 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/node"
@@ -50,7 +49,7 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := logging.GetLogger(config.LoggingConfig)
+	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
 	}

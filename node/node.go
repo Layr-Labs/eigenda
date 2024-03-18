@@ -17,17 +17,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigensdk-go/chainio/constructor"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
-	"github.com/Layr-Labs/eigensdk-go/metrics/collectors/economic"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gammazero/workerpool"
 )
@@ -46,7 +43,7 @@ var (
 
 type Node struct {
 	Config                  *Config
-	Logger                  common.Logger
+	Logger                  logging.Logger
 	KeyPair                 *core.KeyPair
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
@@ -63,7 +60,7 @@ type Node struct {
 }
 
 // NewNode creates a new Node with the provided config.
-func NewNode(config *Config, pubIPProvider pubip.Provider, logger common.Logger) (*Node, error) {
+func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger) (*Node, error) {
 	// Setup metrics
 	// sdkClients, err := buildSdkClients(config, logger)
 	// if err != nil {
@@ -345,7 +342,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
 	sig := n.KeyPair.SignMessage(batchHeaderHash)
-	log.Trace("Signed batch header hash", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()))
+	log.Debug("Signed batch header hash", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()))
 	n.Metrics.AcceptBatches("signed", batchSize)
 	n.Metrics.ObserveLatency("StoreChunks", "signed", float64(time.Since(stageTimer).Milliseconds()))
 	log.Debug("Sign batch took", "duration", time.Since(stageTimer))
@@ -423,44 +420,4 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 			n.updateSocketAddress(ctx, newSocketAddr)
 		}
 	}
-}
-
-// we only need to build the sdk clients for eigenmetrics right now,
-// but we might eventually want to move as much as possible to the sdk
-//
-//lint:ignore U1000 this function will be used once we move to the sdk
-func buildSdkClients(config *Config, logger common.Logger) (*constructor.Clients, error) {
-	// we need to make a transactor just so we can get the registryCoordinatorAddr
-	// to pass to the sdk config
-	client, err := geth.NewClient(config.EthClientConfig, logger)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create chain.Client: %w", err)
-	}
-	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	if err != nil {
-		return nil, err
-	}
-	registryCoordinatorAddr, err := tx.Bindings.EigenDAServiceManager.RegistryCoordinator(&bind.CallOpts{})
-	if err != nil {
-		return nil, err
-	}
-	sdkConfig := constructor.Config{
-		EcdsaPrivateKeyString: config.EthClientConfig.PrivateKeyString,
-		EthHttpUrl:            config.EthClientConfig.RPCURL,
-		// setting as http url for now since eigenDA doesn't have a ws endpoint in its config
-		// should be fine since we won't use subscriptions, but this will cause issues if we do by mistake..
-		EthWsUrl:                      config.EthClientConfig.RPCURL,
-		BlsRegistryCoordinatorAddr:    registryCoordinatorAddr.Hex(),
-		BlsOperatorStateRetrieverAddr: config.BLSOperatorStateRetrieverAddr,
-		AvsName:                       AppName,
-		PromMetricsIpPortAddress:      ":" + config.MetricsPort,
-	}
-	sdkClients, err := constructor.BuildClients(sdkConfig, logger)
-	if err != nil {
-		return nil, err
-	}
-	// we also register the economicMetricsCollector with the registry
-	economicMetricsCollector := economic.NewCollector(sdkClients.ElChainReader, sdkClients.AvsRegistryChainReader, AppName, logger, client.AccountAddress, QuorumNames)
-	sdkClients.PrometheusRegistry.MustRegister(economicMetricsCollector)
-	return sdkClients, nil
 }

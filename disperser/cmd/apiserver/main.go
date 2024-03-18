@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -53,11 +52,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := logging.GetLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
 	}
-
 	client, err := geth.NewClient(config.EthClientConfig, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)

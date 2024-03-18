@@ -10,7 +10,6 @@ import (
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/clients"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 
@@ -30,19 +29,7 @@ var _ = Describe("Inabox Integration", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 		defer cancel()
 
-		optsWithValue, err := ethClient.GetNoSendTransactOpts()
-		Expect(err).To(BeNil())
-		optsWithValue.Value = big.NewInt(1e18)
-		tx, err := mockRollup.RegisterValidator(optsWithValue)
-		Expect(err).To(BeNil())
 		gasTipCap, gasFeeCap, err := ethClient.GetLatestGasCaps(ctx)
-		Expect(err).To(BeNil())
-		tx, err = ethClient.UpdateGas(ctx, tx, optsWithValue.Value, gasTipCap, gasFeeCap)
-		Expect(err).To(BeNil())
-		err = ethClient.SendTransaction(ctx, tx)
-		Expect(err).To(BeNil())
-		mineAnvilBlocks(numConfirmations + 1)
-		_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "RegisterValidator")
 		Expect(err).To(BeNil())
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
@@ -60,30 +47,13 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []*core.SecurityParam{
-			{
-				QuorumID:           1,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		})
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []uint8{})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []*core.SecurityParam{
-			{
-				QuorumID:           0,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-			{
-				QuorumID:           1,
-				AdversaryThreshold: 80,
-				QuorumThreshold:    100,
-			},
-		})
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []uint8{})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -149,15 +119,17 @@ var _ = Describe("Inabox Integration", func() {
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		_, err = retrievalClient.RetrieveBlob(ctx,
+		retrieved, err := retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-			0, // retrieve blob 1 from quorum 0, which should not be available
+			0, // retrieve blob 1 from quorum 0
 		)
-		Expect(err).NotTo(BeNil())
-		retrieved, err := retrievalClient.RetrieveBlob(ctx,
+		Expect(err).To(BeNil())
+		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+
+		retrieved, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
@@ -192,10 +164,10 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
-			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
-			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
-			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			ChunkLength:                  quorum.ChunkLength,
+			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
+			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
+			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
+			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
 	return rollupbindings.IEigenDAServiceManagerBlobHeader{
@@ -214,25 +186,23 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
 	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              batchHeaderProto.GetQuorumNumbers(),
-		QuorumThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
-		ReferenceBlockNumber:       batchHeaderProto.GetReferenceBlockNumber(),
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
+		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
+		ReferenceBlockNumber:  batchHeaderProto.GetReferenceBlockNumber(),
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
-		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
-		BatchId:                verificationProof.GetBatchId(),
-		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
-		BatchMetadata:          batchMetadata,
-		InclusionProof:         verificationProof.GetInclusionProof(),
-		QuorumThresholdIndexes: verificationProof.GetQuorumIndexes(),
+		BatchId:        verificationProof.GetBatchId(),
+		BlobIndex:      uint8(verificationProof.GetBlobIndex()),
+		BatchMetadata:  batchMetadata,
+		InclusionProof: verificationProof.GetInclusionProof(),
+		QuorumIndices:  verificationProof.GetQuorumIndexes(),
 	}
 }

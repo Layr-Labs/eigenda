@@ -8,8 +8,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/status"
@@ -24,14 +24,14 @@ type Server struct {
 	latestExpiry                int64
 	lastRequestTimeByOperatorID map[core.OperatorID]time.Time
 
-	logger  common.Logger
+	logger  logging.Logger
 	metrics *Metrics
 }
 
 func NewServer(
 	config *Config,
 	churner *churner,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
 ) *Server {
 	return &Server{

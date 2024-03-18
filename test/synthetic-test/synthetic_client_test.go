@@ -27,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigenda/clients"
 	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -37,6 +36,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -86,7 +86,7 @@ var (
 	isRetrieverClientDeployed  bool = false
 	validateOnchainTransaction bool = false
 	retrievalClient            clients.RetrievalClient
-	logger                     common.Logger
+	logger                     logging.Logger
 )
 
 func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
@@ -115,12 +115,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		logger.Printf("Error initializing clients: %v", err)
 	}
 
-	ethLogger, err := logging.GetLogger(logging.DefaultCLIConfig())
+	loggerConfig := common.DefaultLoggerConfig()
+	ethLogger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		// Handle the error
 		logger.Printf("Error: %v", err)
 		return nil
 	}
+
 	pk = strings.TrimPrefix(pk, "0X")
 	pk = strings.TrimPrefix(pk, "0x")
 	ethClient, err := geth.NewClient(geth.EthClientConfig{
@@ -204,7 +205,7 @@ func TestMain(m *testing.M) {
 }
 
 // SetUp RetrievalClient to retriever blob from Operator Node
-func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger common.Logger) error {
+func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *RetrieverClientConfig, logger logging.Logger) error {
 	// https://github.com/Layr-Labs/eigenda/blob/b8c151436ecefc8046e4aefcdcfee67abf9e8faa/inabox/tests/integration_suite_test.go#L124
 	tx, err := eth.NewTransactor(logger, ethClient, retrievalClientConfig.Bls_Operator_State_Retriever, retrievalClientConfig.EigenDA_ServiceManager_Retriever)
 	if err != nil {
@@ -265,8 +266,8 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	ctx := context.Background()
 
 	logger.Printf("Start to Disperse New Blob")
-	// Disperse Blob with QuorumID 0, QuorumThreshold 50, AdversaryThreshold 25
-	// TODO: Set random values for QuorumID, QuorumThreshold, AdversaryThreshold
+	// Disperse Blob with QuorumID 0, ConfirmationThreshold 50, AdversaryThreshold 25
+	// TODO: Set random values for QuorumID, ConfirmationThreshold, AdversaryThreshold
 	key, err := disperseBlob(data, 0, 50, 25)
 	logger.Printf("Blob Key After Dispersing %s", hex.EncodeToString(key))
 	assert.Nil(t, err)
@@ -387,14 +388,8 @@ func disperseBlob(data []byte, quorumID uint32, quorumThreshold uint32, adversar
 	defer cancel()
 
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*disperser_rpc.SecurityParams{
-			{
-				QuorumId:           quorumID,
-				QuorumThreshold:    quorumThreshold,
-				AdversaryThreshold: adversaryThreshold,
-			},
-		},
+		Data:                data,
+		CustomQuorumNumbers: nil,
 	}
 
 	disperserClient := disperserTestClient.Client.(disperser_rpc.DisperserClient)
@@ -496,10 +491,10 @@ func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IE
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
-			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
-			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
-			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			ChunkLength:                  quorum.GetChunkLength(),
+			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
+			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
+			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
+			ChunkLength:                     quorum.GetChunkLength(),
 		}
 	}
 
@@ -520,20 +515,18 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
 	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              batchHeaderProto.GetQuorumNumbers(),
-		QuorumThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
-		ReferenceBlockNumber:       batchHeaderProto.GetReferenceBlockNumber(),
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
+		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
+		ReferenceBlockNumber:  batchHeaderProto.GetReferenceBlockNumber(),
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
 	logger.Printf("VerificationProof:SignatoryRecordHash: %v\n", sig)
 	logger.Printf("VerificationProof:ConfirmationBlockNumber: %v\n", batchMetadataProto.GetConfirmationBlockNumber())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
-		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
 
@@ -544,11 +537,11 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	logger.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
 
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
-		BatchId:                verificationProof.GetBatchId(),
-		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
-		BatchMetadata:          batchMetadata,
-		InclusionProof:         verificationProof.GetInclusionProof(),
-		QuorumThresholdIndexes: verificationProof.GetQuorumIndexes(),
+		BatchId:        verificationProof.GetBatchId(),
+		BlobIndex:      uint8(verificationProof.GetBlobIndex()),
+		BatchMetadata:  batchMetadata,
+		InclusionProof: verificationProof.GetInclusionProof(),
+		QuorumIndices:  verificationProof.GetQuorumIndexes(),
 	}
 }
 
@@ -607,9 +600,9 @@ func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingPa
 	var quorumID core.QuorumID = 0
 
 	param := &core.SecurityParam{
-		QuorumID:           quorumID,
-		QuorumThreshold:    quorumThreshold,
-		AdversaryThreshold: adversaryThreshold,
+		QuorumID:              quorumID,
+		ConfirmationThreshold: quorumThreshold,
+		AdversaryThreshold:    adversaryThreshold,
 	}
 
 	testBlob := core.Blob{

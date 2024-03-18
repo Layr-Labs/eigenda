@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gammazero/workerpool"
@@ -78,7 +79,7 @@ type Batcher struct {
 
 	ethClient     common.EthClient
 	finalizer     Finalizer
-	logger        common.Logger
+	logger        logging.Logger
 	HeartbeatChan chan time.Time
 }
 
@@ -95,7 +96,7 @@ func NewBatcher(
 	finalizer Finalizer,
 	transactor core.Transactor,
 	txnManager TxnManager,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
 	heartbeatChan chan time.Time,
 ) (*Batcher, error) {
@@ -344,7 +345,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 		b.logger.Error("failed to update confirmation info", "failed", len(blobsToRetry), "total", len(blobs))
 		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
 	}
-	b.logger.Trace("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
+	b.logger.Debug("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
 	batchSize := int64(0)
 	for _, blobMeta := range blobs {
@@ -398,16 +399,16 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Trace("[batcher] CreateBatch took", "duration", time.Since(stageTimer))
+	log.Debug("[batcher] CreateBatch took", "duration", time.Since(stageTimer))
 
 	// Dispatch encoded batch
-	log.Trace("[batcher] Dispatching encoded batch...")
+	log.Debug("[batcher] Dispatching encoded batch...")
 	stageTimer = time.Now()
 	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
-	log.Trace("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
+	log.Debug("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
 
 	// Get the batch header hash
-	log.Trace("[batcher] Getting batch header hash...")
+	log.Debug("[batcher] Getting batch header hash...")
 	headerHash, err := batch.BatchHeader.GetBatchHeaderHash()
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailBatchHeaderHash)
@@ -415,7 +416,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	// Aggregate the signatures
-	log.Trace("[batcher] Aggregating signatures...")
+	log.Debug("[batcher] Aggregating signatures...")
 
 	// construct quorumParams
 	quorumIDs := make([]core.QuorumID, 0, len(batch.State.AggKeys))
@@ -429,7 +430,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
 	}
-	log.Trace("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
+	log.Debug("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
 	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners), aggSig.QuorumResults)
 	for _, quorumResult := range aggSig.QuorumResults {
@@ -444,7 +445,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	// Confirm the batch
-	log.Trace("[batcher] Confirming batch...")
+	log.Debug("[batcher] Confirming batch...")
 
 	txn, err := b.Transactor.BuildConfirmBatchTxn(ctx, batch.BatchHeader, aggSig.QuorumResults, aggSig)
 	if err != nil {
@@ -563,7 +564,7 @@ func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header
 	for _, blob := range headers {
 		thisPassed := true
 		for _, quorum := range blob.QuorumInfos {
-			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.QuorumThreshold {
+			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 				thisPassed = false
 				break
 			}
@@ -578,7 +579,7 @@ func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header
 
 func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {
 	for _, quorum := range header.QuorumInfos {
-		if signedQuorums[quorum.QuorumID].PercentSigned < quorum.QuorumThreshold {
+		if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 			return false
 		}
 	}

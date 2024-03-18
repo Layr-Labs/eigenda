@@ -8,7 +8,6 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
-	commock "github.com/Layr-Labs/eigenda/common/mock"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -18,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"github.com/Layr-Labs/eigenda/retriever/mock"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +59,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 	var err error
 	config := &retriever.Config{}
 
-	logger := &commock.Logger{}
+	logger := logging.NewNoopLogger()
 
 	indexedChainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
 	if err != nil {
@@ -79,10 +79,10 @@ func newTestServer(t *testing.T) *retriever.Server {
 func TestRetrieveBlob(t *testing.T) {
 	server := newTestServer(t)
 	chainClient.On("FetchBatchHeader").Return(&binding.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              []byte{0},
-		QuorumThresholdPercentages: []byte{90},
-		ReferenceBlockNumber:       0,
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         []byte{0},
+		SignedStakeForQuorums: []byte{90},
+		ReferenceBlockNumber:  0,
 	}, nil)
 
 	retrievalClient.On("RetrieveBlob").Return(gettysburgAddressBytes, nil)

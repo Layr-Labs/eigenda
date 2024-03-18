@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 type EncoderGRPCServer struct {
 	Server *encoder.Server
 }
 
-func NewEncoderGRPCServer(config Config, logger common.Logger) (*EncoderGRPCServer, error) {
+func NewEncoderGRPCServer(config Config, logger logging.Logger) (*EncoderGRPCServer, error) {
 
 	p, err := prover.NewProver(&config.EncoderConfig, true)
 	if err != nil {

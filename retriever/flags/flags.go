@@ -3,7 +3,6 @@ package flags
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/logging"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
@@ -105,6 +104,6 @@ func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, kzg.CLIFlags(envPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
-	Flags = append(Flags, logging.CLIFlags(envPrefix, FlagPrefix)...)
+	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
 	Flags = append(Flags, indexer.CLIFlags(envPrefix)...)
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -57,7 +58,7 @@ type txnManager struct {
 
 	ethClient   common.EthClient
 	requestChan chan *TxnRequest
-	logger      common.Logger
+	logger      logging.Logger
 
 	receiptChan        chan *ReceiptOrErr
 	queueSize          int
@@ -67,7 +68,7 @@ type txnManager struct {
 
 var _ TxnManager = (*txnManager)(nil)
 
-func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger common.Logger, metrics *TxnManagerMetrics) TxnManager {
+func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger logging.Logger, metrics *TxnManagerMetrics) TxnManager {
 	return &txnManager{
 		ethClient:          ethClient,
 		requestChan:        make(chan *TxnRequest, queueSize),

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -51,7 +51,7 @@ type churner struct {
 	QuorumCount uint8
 
 	privateKey *ecdsa.PrivateKey
-	logger     common.Logger
+	logger     logging.Logger
 	metrics    *Metrics
 }
 
@@ -59,7 +59,7 @@ func NewChurner(
 	config *Config,
 	indexer thegraph.IndexedChainState,
 	transactor core.Transactor,
-	logger common.Logger,
+	logger logging.Logger,
 	metrics *Metrics,
 ) (*churner, error) {
 	privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)

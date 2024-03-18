@@ -17,15 +17,15 @@ type QuorumID = uint8
 
 // SecurityParam contains the quorum ID and the adversary threshold for the quorum;
 type SecurityParam struct {
-	QuorumID QuorumID `json:"quorum_id"`
+	QuorumID QuorumID
 	// AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum
-	AdversaryThreshold uint8 `json:"adversary_threshold"`
-	// QuorumThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
-	QuorumThreshold uint8 `json:"quorum_threshold"`
+	AdversaryThreshold uint8
+	// ConfirmationThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
+	ConfirmationThreshold uint8
 	// Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used
 	// for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
 	// data was posted to the DA node.
-	QuorumRate common.RateParam `json:"quorum_rate"`
+	QuorumRate common.RateParam
 }
 
 const (
@@ -36,7 +36,7 @@ const (
 )
 
 func (s *SecurityParam) String() string {
-	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, QuorumThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.QuorumThreshold)
+	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, ConfirmationThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.ConfirmationThreshold)
 }
 
 // QuorumResult contains the quorum ID and the amount signed for the quorum
@@ -77,10 +77,10 @@ type BlobRequestHeader struct {
 
 func (h *BlobRequestHeader) Validate() error {
 	for _, quorum := range h.SecurityParams {
-		if quorum.QuorumThreshold < quorum.AdversaryThreshold+10 {
+		if quorum.ConfirmationThreshold < quorum.AdversaryThreshold+10 {
 			return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
 		}
-		if quorum.QuorumThreshold > 100 {
+		if quorum.ConfirmationThreshold > 100 {
 			return errors.New("invalid request: quorum threshold exceeds 100")
 		}
 		if quorum.AdversaryThreshold == 0 {
@@ -104,7 +104,7 @@ type BlobHeader struct {
 	QuorumInfos []*BlobQuorumInfo
 
 	// AccountID is the account that is paying for the blob to be stored
-	AccountID AccountID `json:"account_id"`
+	AccountID AccountID
 }
 
 func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
@@ -121,7 +121,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_COEFFICIENT, uint(quorum.QuorumThreshold-quorum.AdversaryThreshold)))
+		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_COEFFICIENT, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }

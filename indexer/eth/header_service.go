@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	head "github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -16,10 +17,10 @@ const DistanceFromHead = 100
 
 type HeaderService struct {
 	rpcEthClient common.RPCEthClient
-	logger       common.Logger
+	logger       logging.Logger
 }
 
-func NewHeaderService(logger common.Logger, rpcEthClient common.RPCEthClient) *HeaderService {
+func NewHeaderService(logger logging.Logger, rpcEthClient common.RPCEthClient) *HeaderService {
 	return &HeaderService{logger: logger, rpcEthClient: rpcEthClient}
 }
 

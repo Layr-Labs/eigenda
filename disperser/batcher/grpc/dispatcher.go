@@ -7,9 +7,9 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,10 +22,10 @@ type Config struct {
 type dispatcher struct {
 	*Config
 
-	logger common.Logger
+	logger logging.Logger
 }
 
-func NewDispatcher(cfg *Config, logger common.Logger) *dispatcher {
+func NewDispatcher(cfg *Config, logger logging.Logger) *dispatcher {
 	return &dispatcher{
 		Config: cfg,
 		logger: logger,
@@ -160,11 +160,11 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 
 	for i, header := range blob.BlobHeader.QuorumInfos {
 		quorumHeaders[i] = &node.BlobQuorumInfo{
-			QuorumId:           uint32(header.QuorumID),
-			AdversaryThreshold: uint32(header.AdversaryThreshold),
-			ChunkLength:        uint32(header.ChunkLength),
-			QuorumThreshold:    uint32(header.QuorumThreshold),
-			Ratelimit:          header.QuorumRate,
+			QuorumId:              uint32(header.QuorumID),
+			AdversaryThreshold:    uint32(header.AdversaryThreshold),
+			ChunkLength:           uint32(header.ChunkLength),
+			ConfirmationThreshold: uint32(header.ConfirmationThreshold),
+			Ratelimit:             header.QuorumRate,
 		}
 	}
 

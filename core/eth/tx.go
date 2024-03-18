@@ -10,7 +10,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
+	"github.com/pingcap/errors"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
@@ -34,7 +36,7 @@ var (
 
 type Transactor struct {
 	EthClient common.EthClient
-	Logger    common.Logger
+	Logger    logging.Logger
 	Bindings  *ContractBindings
 }
 
@@ -64,7 +66,7 @@ type BN254G2Point struct {
 }
 
 func NewTransactor(
-	logger common.Logger,
+	logger logging.Logger,
 	client common.EthClient,
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Transactor, error) {
@@ -439,12 +441,12 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigAgg, err := json.Marshal(signatureAggregation)
 	if err == nil {
-		t.Logger.Trace("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
+		t.Logger.Debug("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
 	}
 
-	t.Logger.Trace("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
+	t.Logger.Debug("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
 	for _, ns := range nonSignerOperatorIds {
-		t.Logger.Trace("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
+		t.Logger.Debug("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
 	}
 	checkSignaturesIndices, err := t.Bindings.OpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
@@ -466,14 +468,14 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		nonSignerPubkeys[i] = pubKeyG1ToBN254G1Point(signature)
 	}
 
-	quorumThresholdPercentages := quorumParamsToThresholdPercentages(quorums)
+	signedStakeForQuorums := serializeSignedStakeForQuorums(quorums)
 	batchH := eigendasrvmg.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchHeader.BatchRoot,
-		QuorumNumbers:              quorumNumbers,
-		QuorumThresholdPercentages: quorumThresholdPercentages,
-		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
+		BlobHeadersRoot:       batchHeader.BatchRoot,
+		QuorumNumbers:         quorumNumbers,
+		SignedStakeForQuorums: signedStakeForQuorums,
+		ReferenceBlockNumber:  uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Trace("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.QuorumThresholdPercentages))
+	t.Logger.Debug("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -496,7 +498,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigChecker, err := json.Marshal(signatureChecker)
 	if err == nil {
-		t.Logger.Trace("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
+		t.Logger.Debug("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
@@ -580,7 +582,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	for i := range operatorIds {
 		byteOperatorIds[i] = [32]byte(operatorIds[i])
 	}
-	indices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
+	quorumBitmapIndices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
 		Context: ctx,
 	}, blockNumber, byteOperatorIds)
 	if err != nil {
@@ -590,25 +592,28 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	// Get bitmaps in N RPCs, but in parallel.
 	type BitmapOrError struct {
 		bitmap *big.Int
-		index  uint32
-		err    error
+		// The index is referring to the position of operator in operatorIds slice,
+		// i.e. the bitmap here (if err is nil) is for operatorIds[index].
+		index int
+		err   error
 	}
-	resultChan := make(chan BitmapOrError, len(indices))
+	resultChan := make(chan BitmapOrError, len(quorumBitmapIndices))
 	pool := workerpool.New(maxNumWorkerPoolThreads)
-	for i, index := range indices {
-		idx := index
+	for i, bitmapIndex := range quorumBitmapIndices {
+		i := i
+		bitmapIndex := bitmapIndex
 		op := operatorIds[i]
 		pool.Submit(func() {
 			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
 				Context: ctx,
-			}, op, blockNumber, big.NewInt(int64(idx)))
-			resultChan <- BitmapOrError{bitmap: bm, index: idx, err: err}
+			}, op, blockNumber, big.NewInt(int64(bitmapIndex)))
+			resultChan <- BitmapOrError{bitmap: bm, index: i, err: err}
 		})
 	}
 	pool.StopWait()
 	close(resultChan)
 
-	bitmaps := make([]*big.Int, len(indices))
+	bitmaps := make([]*big.Int, len(quorumBitmapIndices))
 	for result := range resultChan {
 		if result.err != nil {
 			return nil, result.err
@@ -670,7 +675,8 @@ func (t *Transactor) CalculateOperatorChurnApprovalDigestHash(
 }
 
 func (t *Transactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	return t.EthClient.GetCurrentBlockNumber(ctx)
+	bn, err := t.EthClient.BlockNumber(ctx)
+	return uint32(bn), err
 }
 
 func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
@@ -678,6 +684,52 @@ func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (ui
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
+}
+
+func (t *Transactor) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]*core.SecurityParam, error) {
+	adversaryThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	confirmationThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumConfirmationThresholdPercentages(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(adversaryThresholdPercentegesBytes) != len(confirmationThresholdPercentegesBytes) {
+		return nil, errors.New("adversaryThresholdPercentegesBytes and confirmationThresholdPercentegesBytes have different lengths")
+	}
+
+	securityParams := make([]*core.SecurityParam, len(adversaryThresholdPercentegesBytes))
+
+	for i := range adversaryThresholdPercentegesBytes {
+		securityParams[i] = &core.SecurityParam{
+			QuorumID:              core.QuorumID(i),
+			AdversaryThreshold:    adversaryThresholdPercentegesBytes[i],
+			ConfirmationThreshold: confirmationThresholdPercentegesBytes[i],
+		}
+	}
+
+	return securityParams, nil
+
+}
+
+func (t *Transactor) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
+	requiredQuorums, err := t.Bindings.EigenDAServiceManager.QuorumNumbersRequired(&bind.CallOpts{
+		Context:     ctx,
+		BlockNumber: big.NewInt(int64(blockNumber)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return requiredQuorums, nil
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
@@ -830,7 +882,7 @@ func quorumParamsToQuorumNumbers(quorumParams map[core.QuorumID]*core.QuorumResu
 	return quorumNumbers
 }
 
-func quorumParamsToThresholdPercentages(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
+func serializeSignedStakeForQuorums(quorumParams map[core.QuorumID]*core.QuorumResult) []byte {
 	thresholdPercentages := make([]byte, len(quorumParams))
 	quorums := make([]uint8, len(quorumParams))
 	i := 0

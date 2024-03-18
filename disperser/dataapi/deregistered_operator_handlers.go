@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
 
@@ -55,7 +55,7 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	return DeregisteredOperatorMetadata, nil
 }
 
-func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
+func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger logging.Logger) {
 	operators := deregisteredOperatorState.Operators
 	wp := workerpool.New(poolSize)
 
@@ -75,7 +75,7 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 	wp.StopWait() // Wait for all submitted tasks to complete and stop the pool
 }
 
-func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger common.Logger) {
+func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger logging.Logger) {
 	var isOnline bool
 	var socket string
 	if operatorStatus.IndexedOperatorInfo != nil {
