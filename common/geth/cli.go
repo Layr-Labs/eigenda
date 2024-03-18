@@ -1,8 +1,6 @@
 package geth
 
 import (
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
@@ -12,8 +10,6 @@ var (
 	privateKeyFlagName       = "chain.private-key"
 	numConfirmationsFlagName = "chain.num-confirmations"
 	numRetriesFlagName       = "chain.num-retries"
-	networkTimeoutFlagName   = "chain.network-timeout"
-	writeTimeoutFlagName     = "chain.write-timeout"
 )
 
 type EthClientConfig struct {
@@ -21,8 +17,6 @@ type EthClientConfig struct {
 	PrivateKeyString string
 	NumConfirmations int
 	NumRetries       int
-	NetworkTimeout   time.Duration
-	WriteTimeout     time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
