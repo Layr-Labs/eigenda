@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	damock "github.com/Layr-Labs/eigenda/common/mock"
@@ -27,7 +26,6 @@ func makeTestMultihomingClient(numRetries int) (*geth.MultiHomingClient, error) 
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 		NumRetries:       numRetries,
-		NetworkTimeout:   time.Second,
 	}
 
 	mockClient := geth.MultiHomingClient{}
