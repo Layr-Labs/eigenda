@@ -1,0 +1,30 @@
+{
+  "addresses": {
+    "blsApkRegistry": "0x066cF95c1bf0927124DFB8B02B401bc23A79730D",
+    "blsApkRegistryImplementation": "0x885C0CC8118E428a2C04de58A93eB15Ed4F0e064",
+    "eigenDAProxyAdmin": "0xB043055dd967A382577c2f5261fA6428f2905c15",
+    "eigenDAServiceManager": "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
+    "eigenDAServiceManagerImplementation": "0x0A987C508b0f56154CA534b7Fa5b84863cbcc49d",
+    "indexRegistry": "0x2E3D6c0744b10eb0A4e6F679F71554a39Ec47a5D",
+    "indexRegistryImplementation": "0x889B040116f453D89e9d6d692Ad70Edd7357420d",
+    "mockRollup": "0x4B1481fFF061A0099408e71702b40Fe0932080Bc",
+    "operatorStateRetriever": "0xB4baAfee917fb4449f5ec64804217bccE9f46C67",
+    "registryCoordinator": "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490",
+    "registryCoordinatorImplementation": "0xC908fAFAE29B5C9F0b5E0Da1d3025b8d6D42bfa0",
+    "serviceManagerRouter": "0x44632dfBdCb6D3E21EF613B0ca8A6A0c618F5a37",
+    "stakeRegistry": "0xBDACD5998989Eec814ac7A0f0f6596088AA2a270",
+    "stakeRegistryImplementation": "0xa8d25410c3e3347d93647f10FB6961069BEc98E5"
+  },
+  "chainInfo": {
+    "chainId": 17000,
+    "deploymentBlock": 1168409
+  },
+  "permissions": {
+    "eigenDABatchConfirmer": "0xC0996A3Cc9ECF2A96115C117f6Da99FA80F525eB",
+    "eigenDAChurner": "0x400c0D378F0E6881efb11b8E82480A3140B69258",
+    "eigenDAEjector": "0x28Ade60640fdBDb2609D8d8734D1b5cBeFc0C348",
+    "eigenDAOwner": "0x28Ade60640fdBDb2609D8d8734D1b5cBeFc0C348",
+    "eigenDAUpgrader": "0x28Ade60640fdBDb2609D8d8734D1b5cBeFc0C348",
+    "pauserRegistry": "0x85Ef7299F8311B25642679edBF02B62FA2212F06"
+  }
+}
