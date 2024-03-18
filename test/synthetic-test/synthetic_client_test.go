@@ -388,14 +388,8 @@ func disperseBlob(data []byte, quorumID uint32, quorumThreshold uint32, adversar
 	defer cancel()
 
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data: data,
-		SecurityParams: []*disperser_rpc.SecurityParams{
-			{
-				QuorumId:              quorumID,
-				ConfirmationThreshold: quorumThreshold,
-				AdversaryThreshold:    adversaryThreshold,
-			},
-		},
+		Data:                data,
+		CustomQuorumNumbers: nil,
 	}
 
 	disperserClient := disperserTestClient.Client.(disperser_rpc.DisperserClient)
@@ -497,10 +491,10 @@ func blobHeaderFromProto(blobHeader *disperser_rpc.BlobHeader) rollupbindings.IE
 	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
 		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
-			QuorumNumber:                 uint8(quorum.GetQuorumNumber()),
-			AdversaryThresholdPercentage: uint8(quorum.GetAdversaryThresholdPercentage()),
-			QuorumThresholdPercentage:    uint8(quorum.GetQuorumThresholdPercentage()),
-			ChunkLength:                  quorum.GetChunkLength(),
+			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
+			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
+			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
+			ChunkLength:                     quorum.GetChunkLength(),
 		}
 	}
 
@@ -521,20 +515,18 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
 	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:            batchRoot,
-		QuorumNumbers:              batchHeaderProto.GetQuorumNumbers(),
-		QuorumThresholdPercentages: batchHeaderProto.GetQuorumSignedPercentages(),
-		ReferenceBlockNumber:       batchHeaderProto.GetReferenceBlockNumber(),
+		BlobHeadersRoot:       batchRoot,
+		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
+		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
+		ReferenceBlockNumber:  batchHeaderProto.GetReferenceBlockNumber(),
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	fee := new(big.Int).SetBytes(batchMetadataProto.GetFee())
 	logger.Printf("VerificationProof:SignatoryRecordHash: %v\n", sig)
 	logger.Printf("VerificationProof:ConfirmationBlockNumber: %v\n", batchMetadataProto.GetConfirmationBlockNumber())
 	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
-		Fee:                     fee,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
 
@@ -545,11 +537,11 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	logger.Printf("VerificationProof:QuorumThresholdIndexes: %v\n", verificationProof.GetQuorumIndexes())
 
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
-		BatchId:                verificationProof.GetBatchId(),
-		BlobIndex:              uint8(verificationProof.GetBlobIndex()),
-		BatchMetadata:          batchMetadata,
-		InclusionProof:         verificationProof.GetInclusionProof(),
-		QuorumThresholdIndexes: verificationProof.GetQuorumIndexes(),
+		BatchId:        verificationProof.GetBatchId(),
+		BlobIndex:      uint8(verificationProof.GetBlobIndex()),
+		BatchMetadata:  batchMetadata,
+		InclusionProof: verificationProof.GetInclusionProof(),
+		QuorumIndices:  verificationProof.GetQuorumIndexes(),
 	}
 }
 
