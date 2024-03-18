@@ -85,6 +85,9 @@ func (c *EthClient) GetAccountAddress() gethcommon.Address {
 }
 
 func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
+	if c.privateKey == nil {
+		return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: private key is nil")
+	}
 	opts, err := bind.NewKeyedTransactorWithChainID(c.privateKey, c.chainID)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)

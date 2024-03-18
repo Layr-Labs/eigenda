@@ -174,7 +174,7 @@ func RunBatcher(ctx *cli.Context) error {
 		len(config.FireblocksConfig.VaultAccountName) > 0 {
 		secretKey, err := os.ReadFile(config.FireblocksConfig.SecretKeyPath)
 		if err != nil {
-			return fmt.Errorf("Cannot read fireblocks secret from %s: %w", config.FireblocksConfig.SecretKeyPath, err)
+			return fmt.Errorf("cannot read fireblocks secret from %s: %w", config.FireblocksConfig.SecretKeyPath, err)
 		}
 		fireblocksClient, err := fireblocks.NewClient(
 			config.FireblocksConfig.APIKey,
