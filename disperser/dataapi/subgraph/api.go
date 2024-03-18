@@ -219,12 +219,23 @@ func (a *api) QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlo
 		"blockNumber_gt": graphql.Int(startBlock - 1),
 		"blockNumber_lt": graphql.Int(endBlock + 1),
 	}
-	query := new(queryOperatorAddedToQuorum)
-	err := a.operatorStateGql.Query(ctx, &query, variables)
-	if err != nil {
-		return nil, err
+	skip := 0
+	result := new(queryOperatorAddedToQuorum)
+	addedQuorums := make([]*OperatorQuorum, 0)
+	for {
+		variables["first"] = graphql.Int(maxEntriesPerQuery)
+		variables["skip"] = graphql.Int(skip)
+		err := a.operatorStateGql.Query(ctx, &result, variables)
+		if err != nil {
+			return nil, err
+		}
+		if len(result.OperatorAddedToQuorum) == 0 {
+			break
+		}
+		addedQuorums = append(addedQuorums, result.OperatorAddedToQuorum...)
+		skip += maxEntriesPerQuery
 	}
-	return query.OperatorAddedToQuorum, nil
+	return addedQuorums, nil
 }
 
 // QueryOperatorRemovedFromQuorum finds operators' quorum opt-out history in range [startBlock, endBlock].
@@ -236,10 +247,21 @@ func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, en
 		"blockNumber_gt": graphql.Int(startBlock - 1),
 		"blockNumber_lt": graphql.Int(endBlock + 1),
 	}
-	query := new(queryOperatorRemovedFromQuorum)
-	err := a.operatorStateGql.Query(ctx, &query, variables)
-	if err != nil {
-		return nil, err
+	skip := 0
+	result := new(queryOperatorRemovedFromQuorum)
+	removedQuorums := make([]*OperatorQuorum, 0)
+	for {
+		variables["first"] = graphql.Int(maxEntriesPerQuery)
+		variables["skip"] = graphql.Int(skip)
+		err := a.operatorStateGql.Query(ctx, &result, variables)
+		if err != nil {
+			return nil, err
+		}
+		if len(result.OperatorRemovedFromQuorum) == 0 {
+			break
+		}
+		removedQuorums = append(removedQuorums, result.OperatorRemovedFromQuorum...)
+		skip += maxEntriesPerQuery
 	}
-	return query.OperatorRemovedFromQuorum, nil
+	return removedQuorums, nil
 }

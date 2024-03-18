@@ -52,9 +52,10 @@ type (
 		TransactionHash []byte
 	}
 	OperatorQuorum struct {
-		Operator      string
-		QuorumNumbers []byte
-		BlockNumber   uint32
+		Operator       string
+		QuorumNumbers  []byte
+		BlockNumber    uint32
+		BlockTimestamp uint64
 	}
 	OperatorQuorumEvents struct {
 		// AddedToQuorum is mapping from operator address to a list of sorted events
@@ -79,6 +80,7 @@ type (
 		Count      int
 	}
 	BatchNonSigningInfo struct {
+		BlockNumber          uint32
 		QuorumNumbers        []uint8
 		ReferenceBlockNumber uint32
 		// The operatorIds of nonsigners for the batch.
@@ -358,10 +360,25 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 		if err != nil {
 			return nil, err
 		}
+		blockTimestamp, err := strconv.ParseUint(string(opq.BlockTimestamp), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		quorumStr := string(opq.QuorumNumbers)[2:]
+		quorumNumbers := make([]byte, 0)
+		for i := 0; i < len(quorumStr); i += 2 {
+			pair := quorumStr[i : i+2]
+			quorum, err := strconv.Atoi(pair)
+			if err != nil {
+				return nil, err
+			}
+			quorumNumbers = append(quorumNumbers, uint8(quorum))
+		}
 		parsed[i] = &OperatorQuorum{
-			Operator:      string(opq.Operator),
-			QuorumNumbers: []byte(opq.QuorumNumbers),
-			BlockNumber:   uint32(blockNum),
+			Operator:       string(opq.Operator),
+			QuorumNumbers:  quorumNumbers,
+			BlockNumber:    uint32(blockNum),
+			BlockTimestamp: blockTimestamp,
 		}
 	}
 	// Sort the quorum events by ascending order of block number.
@@ -387,12 +404,17 @@ func convertNonSigningInfo(infoGql *subgraph.BatchNonSigningInfo) (*BatchNonSign
 	if err != nil {
 		return nil, err
 	}
+	confirmBlockNum, err := strconv.ParseUint(string(infoGql.BlockNumber), 10, 64)
+	if err != nil {
+		return nil, err
+	}
 	nonSigners := make([]string, len(infoGql.NonSigning.NonSigners))
 	for i, nonSigner := range infoGql.NonSigning.NonSigners {
 		nonSigners[i] = string(nonSigner.OperatorId)
 	}
 
 	return &BatchNonSigningInfo{
+		BlockNumber:          uint32(confirmBlockNum),
 		QuorumNumbers:        quorums,
 		ReferenceBlockNumber: uint32(blockNum),
 		NonSigners:           nonSigners,
