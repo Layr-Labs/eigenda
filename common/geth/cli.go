@@ -13,6 +13,7 @@ var (
 	numConfirmationsFlagName = "chain.num-confirmations"
 	numRetriesFlagName       = "chain.num-retries"
 	networkTimeoutFlagName   = "chain.network-timeout"
+	writeTimeoutFlagName     = "chain.write-timeout"
 )
 
 type EthClientConfig struct {
@@ -21,6 +22,7 @@ type EthClientConfig struct {
 	NumConfirmations int
 	NumRetries       int
 	NetworkTimeout   time.Duration
+	WriteTimeout     time.Duration
 }
 
 func EthClientFlags(envPrefix string) []cli.Flag {
@@ -58,6 +60,13 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Value:    3 * time.Second,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NETWORK_TIMEOUT"),
 		},
+		cli.DurationFlag{
+			Name:     writeTimeoutFlagName,
+			Usage:    "Writing to Ethereum timeout",
+			Required: false,
+			Value:    24 * time.Second,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "WRITE_TIMEOUT"),
+		},
 	}
 }
 
@@ -68,6 +77,7 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 	cfg.NetworkTimeout = ctx.GlobalDuration(networkTimeoutFlagName)
+	cfg.WriteTimeout = ctx.GlobalDuration(writeTimeoutFlagName)
 	return cfg
 }
 
@@ -79,5 +89,6 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 	cfg.NetworkTimeout = ctx.GlobalDuration(networkTimeoutFlagName)
+	cfg.WriteTimeout = ctx.GlobalDuration(writeTimeoutFlagName)
 	return cfg
 }
