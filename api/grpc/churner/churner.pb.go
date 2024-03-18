@@ -131,15 +131,16 @@ type ChurnReply struct {
 	// The signature signed by the Churner.
 	SignatureWithSaltAndExpiry *SignatureWithSaltAndExpiry `protobuf:"bytes,1,opt,name=signature_with_salt_and_expiry,json=signatureWithSaltAndExpiry,proto3" json:"signature_with_salt_and_expiry,omitempty"`
 	// A list of existing operators that get churned out.
-	// This list will contain the target operators to be churned out for all quorums specified
-	// in the ChurnRequest even if some quorums may not have any churned out operators.
-	// It is smart contract's responsibility to determine whether it needs to churn out
-	// these target operators based on whether the quorums have available space.
+	// This list will contain all quorums specified in the ChurnRequest even if some quorums
+	// may not have any churned out operators. If a quorum has available space, OperatorToChurn
+	// object will contain the quorum ID and empty operator and pubkey. The smart contract should
+	// only churn out the operators for quorums that are full.
 	//
 	// For example, if the ChurnRequest specifies quorums 0 and 1 where quorum 0 is full
-	// and quorum 1 has available space, the ChurnReply will contain the operators to be
-	// churned out for both quorums 0 and 1 (operators with lowest stake). However,
-	// smart contract should only churn out the operators for quorum 0 because quorum 1
+	// and quorum 1 has available space, the ChurnReply will contain two OperatorToChurn objects
+	// with the respective quorums. OperatorToChurn for quorum 0 will contain the operator to churn
+	// out and OperatorToChurn for quorum 1 will contain empty operator (zero address) and pubkey.
+	// The smart contract should only churn out the operators for quorum 0 because quorum 1
 	// has available space without having any operators churned.
 	// Note: it's possible an operator gets churned out just for one or more quorums
 	// (rather than entirely churned out for all quorums).

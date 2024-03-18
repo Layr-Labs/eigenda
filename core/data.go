@@ -104,7 +104,7 @@ type BlobHeader struct {
 	QuorumInfos []*BlobQuorumInfo
 
 	// AccountID is the account that is paying for the blob to be stored
-	AccountID AccountID `json:"account_id"`
+	AccountID AccountID
 }
 
 func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {

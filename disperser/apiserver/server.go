@@ -104,7 +104,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
-	request, ok := in.Payload.(*pb.AuthenticatedRequest_DisperseRequest)
+	request, ok := in.GetPayload().(*pb.AuthenticatedRequest_DisperseRequest)
 	if !ok {
 		return api.NewInvalidArgError("missing DisperseBlobRequest")
 	}
@@ -148,7 +148,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
-	challengeReply, ok := in.Payload.(*pb.AuthenticatedRequest_AuthenticationData)
+	challengeReply, ok := in.GetPayload().(*pb.AuthenticatedRequest_AuthenticationData)
 	if !ok {
 		return api.NewInvalidArgError("expected AuthenticationData")
 	}
@@ -223,7 +223,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
-	s.logger.Debug("received a new blob request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
+	s.logger.Debug("received a new blob dispersal request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
