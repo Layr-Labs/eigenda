@@ -22,7 +22,7 @@ type chainClient struct {
 	logger    logging.Logger
 }
 
-func NewChainClient(ethClient common.EthClient, logger logging.Logger) *chainClient {
+func NewChainClient(ethClient common.EthClient, logger logging.Logger) ChainClient {
 	return &chainClient{
 		ethClient: ethClient,
 		logger:    logger,

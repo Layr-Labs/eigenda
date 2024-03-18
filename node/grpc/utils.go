@@ -21,7 +21,7 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 	var batchRoot [32]byte
 	copy(batchRoot[:], in.GetBatchHeader().GetBatchRoot())
 	batchHeader := core.BatchHeader{
-		ReferenceBlockNumber: uint(in.BatchHeader.ReferenceBlockNumber),
+		ReferenceBlockNumber: uint(in.GetBatchHeader().GetReferenceBlockNumber()),
 		BatchRoot:            batchRoot,
 	}
 	return &batchHeader, nil

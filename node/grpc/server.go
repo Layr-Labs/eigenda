@@ -83,7 +83,7 @@ func (s *Server) serveDispersal() error {
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalDispersalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %w", err)
+		s.logger.Fatalf("Could not start tcp listener: %v", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 1024) // 1 GiB
@@ -107,7 +107,7 @@ func (s *Server) serveRetrieval() error {
 	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalRetrievalPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %w", err)
+		s.logger.Fatalf("Could not start tcp listener: %v", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB

@@ -250,7 +250,7 @@ func (*AuthenticatedReply_BlobAuthHeader) isAuthenticatedReply_Payload() {}
 func (*AuthenticatedReply_DisperseReply) isAuthenticatedReply_Payload() {}
 
 // BlobAuthHeader contains information about the blob for the client to verify and sign.
-// - Once payments are enabled, the BlobAuthHeader the KZG commitment to the blob, which the client
+// - Once payments are enabled, the BlobAuthHeader will contain the KZG commitment to the blob, which the client
 // will verify and sign. Having the client verify the KZG commitment instead of calculating it avoids
 // the need for the client to have the KZG structured reference string (SRS), which can be large.
 // The signed KZG commitment prevents the disperser from sending a different blob to the DA Nodes
