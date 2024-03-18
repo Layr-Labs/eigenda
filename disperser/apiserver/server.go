@@ -112,7 +112,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
 	if err != nil {
 		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
-			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
 		}
 		return api.NewInvalidArgError(err.Error())
 	}
@@ -185,7 +185,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
 		for _, quorumID := range req.CustomQuorumNumbers {
-			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
 		return nil, api.NewInvalidArgError(err.Error())
 	}
