@@ -1,0 +1,97 @@
+{
+    "chainInfo": {
+      "chainId": 17000
+    },
+  
+    "permissions" : {
+      "owner": "0x28Ade60640fdBDb2609D8d8734D1b5cBeFc0C348",
+      "upgrader": "0x28Ade60640fdBDb2609D8d8734D1b5cBeFc0C348",
+      "churner": "0x400c0D378F0E6881efb11b8E82480A3140B69258",
+      "ejector": "0x28Ade60640fdBDb2609D8d8734D1b5cBeFc0C348",
+      "batchConfirmer": "0xC0996A3Cc9ECF2A96115C117f6Da99FA80F525eB",
+      "pauser": "0x0000000000000000000000000000000000000000",
+      "initalPausedStatus": 1
+    },
+  
+    "minimumStakes": [
+      32000000000000000000,
+      32000000000000000000
+    ],
+  
+    "strategyWeights": [
+      [
+        {
+          "0_strategy": "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3", 
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x3A8fBdf9e77DFc25d09741f51d3E181b25d0c4E0", 
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000001",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000002",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000003",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000004",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000005",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000006",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000007",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000008",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x0000000000000000000000000000000000000009",
+          "1_multiplier": 1000000000000000000
+        },
+        {
+          "0_strategy": "0x000000000000000000000000000000000000000A",
+          "1_multiplier": 1000000000000000000
+        }
+      ],
+      [
+        {
+          "0_strategy": "0x80528D6e9A2BAbFc766965E0E26d5aB08D9CFaF9", 
+          "1_multiplier": 1000000000000000000
+        }
+      ]
+    ],
+  
+    "operatorSetParams": [
+      {
+        "0_maxOperatorCount": 200,
+        "1_kickBIPsOfOperatorStake": 11000,
+        "2_kickBIPsOfTotalStake": 50
+      },
+      {
+        "0_maxOperatorCount": 30,
+        "1_kickBIPsOfOperatorStake": 11000,
+        "2_kickBIPsOfTotalStake": 334
+      }
+    ]
+  
+  }

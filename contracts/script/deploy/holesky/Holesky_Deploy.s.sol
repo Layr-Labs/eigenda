@@ -28,9 +28,12 @@ import "forge-std/StdJson.sol";
 contract Deployer_Holesky is ExistingDeploymentParser {
     using BN254 for BN254.G1Point;
 
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/Holesky_preprod.json"));
-    string public deployConfigPath = string(bytes("./script/deploy/holesky/config/preprod.config.json"));
-    string public outputPath = string.concat("script/deploy/holesky/output/holesky_preprod_deployment_data.json");
+    //string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/Holesky_preprod.json"));
+    //string public deployConfigPath = string(bytes("./script/deploy/holesky/config/preprod.config.json"));
+    //string public outputPath = string.concat("script/deploy/holesky/output/holesky_preprod_deployment_data.json");
+    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/Holesky_testnet.json"));
+    string public deployConfigPath = string(bytes("./script/deploy/holesky/config/testnet.config.json"));
+    string public outputPath = string.concat("script/deploy/holesky/output/holesky_testnet_deployment_data.json");
 
     ProxyAdmin public eigenDAProxyAdmin;
     address public eigenDAOwner;
