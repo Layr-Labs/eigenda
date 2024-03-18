@@ -649,7 +649,7 @@ func (m *MultiHomingClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Contex
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.Timeout)
+		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, 2*BLOCK_INTERVAL)
 		result, err := instance.EstimateGasPriceAndLimitAndSendTx(instanceCtx, tx, tag, value)
 		instanceCtxCancel()
 		if err == nil {
