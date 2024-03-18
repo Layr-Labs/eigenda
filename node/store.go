@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -361,15 +362,24 @@ func decodeChunks(data []byte) ([][]byte, error) {
 
 	for {
 		var length uint64
-		if err := binary.Read(buf, binary.LittleEndian, &length); err != nil {
+		err := binary.Read(buf, binary.LittleEndian, &length)
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		chunk := make([]byte, length)
-		if _, err := buf.Read(chunk); err != nil {
-			break
+		if err != nil {
+			return nil, err
 		}
-		chunks = append(chunks, chunk)
 
+		chunk := make([]byte, length)
+		_, err = buf.Read(chunk)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		chunks = append(chunks, chunk)
 		if buf.Len() < 8 {
 			break
 		}
