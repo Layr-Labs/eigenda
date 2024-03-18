@@ -75,17 +75,15 @@ type BlobRequestHeader struct {
 	SecurityParams []*SecurityParam `json:"security_params"`
 }
 
-func (h *BlobRequestHeader) Validate() error {
-	for _, quorum := range h.SecurityParams {
-		if quorum.ConfirmationThreshold < quorum.AdversaryThreshold+10 {
-			return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
-		}
-		if quorum.ConfirmationThreshold > 100 {
-			return errors.New("invalid request: quorum threshold exceeds 100")
-		}
-		if quorum.AdversaryThreshold == 0 {
-			return errors.New("invalid request: adversary threshold equals 0")
-		}
+func (sp *SecurityParam) Validate() error {
+	if sp.ConfirmationThreshold < sp.AdversaryThreshold+10 {
+		return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
+	}
+	if sp.ConfirmationThreshold > 100 {
+		return errors.New("invalid request: quorum threshold exceeds 100")
+	}
+	if sp.AdversaryThreshold == 0 {
+		return errors.New("invalid request: adversary threshold equals 0")
 	}
 	return nil
 }

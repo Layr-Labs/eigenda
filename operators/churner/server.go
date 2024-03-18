@@ -144,11 +144,18 @@ func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest)
 	}
 
 	// TODO: ensure that all quorumIDs are valid
-	if len(req.QuorumIds) == 0 {
-		return errors.New("invalid quorumIds length")
+	if len(req.QuorumIds) == 0 || len(req.QuorumIds) > 255 {
+		return fmt.Errorf("invalid quorumIds length %d", len(req.QuorumIds))
 	}
 
+	seenQuorums := make(map[int]struct{})
 	for quorumID := range req.GetQuorumIds() {
+		// make sure there are no duplicate quorum IDs
+		if _, ok := seenQuorums[quorumID]; ok {
+			return errors.New("invalid request: security_params must not contain duplicate quorum_id")
+		}
+		seenQuorums[quorumID] = struct{}{}
+
 		if quorumID >= int(s.churner.QuorumCount) {
 			err := s.churner.UpdateQuorumCount(ctx)
 			if err != nil {

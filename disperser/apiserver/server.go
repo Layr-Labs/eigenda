@@ -59,7 +59,7 @@ type DispersalServer struct {
 type QuorumConfig struct {
 	RequiredQuorums []core.QuorumID
 	QuorumCount     uint8
-	SecurityParams  []*core.SecurityParam
+	SecurityParams  map[core.QuorumID]core.SecurityParam
 }
 
 // NewServer creates a new Server struct with the provided parameters.
@@ -205,8 +205,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	defer timer.ObserveDuration()
 
 	securityParams := blob.RequestHeader.SecurityParams
-
-	// securityParams := blob.RequestHeader.SecurityParams
 	securityParamsStrings := make([]string, len(securityParams))
 	for i, sp := range securityParams {
 		securityParamsStrings[i] = sp.String()
@@ -605,7 +603,12 @@ func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig,
 			return QuorumConfig{}, err
 		}
 	} else {
-		newConfig.SecurityParams = securityParams
+		if newConfig.SecurityParams == nil {
+			newConfig.SecurityParams = make(map[core.QuorumID]core.SecurityParam)
+		}
+		for _, sp := range securityParams {
+			newConfig.SecurityParams[sp.QuorumID] = sp
+		}
 	}
 
 	requiredQuorums, err := s.tx.GetRequiredQuorumNumbers(ctx, currentBlock)
@@ -705,8 +708,12 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	for quorumID := range seenQuorums {
 		params[i] = &core.SecurityParam{
 			QuorumID:              core.QuorumID(quorumID),
-			AdversaryThreshold:    quorumConfig.SecurityParams[i].AdversaryThreshold,
-			ConfirmationThreshold: quorumConfig.SecurityParams[i].ConfirmationThreshold,
+			AdversaryThreshold:    quorumConfig.SecurityParams[quorumID].AdversaryThreshold,
+			ConfirmationThreshold: quorumConfig.SecurityParams[quorumID].ConfirmationThreshold,
+		}
+		err = params[i].Validate()
+		if err != nil {
+			return nil, fmt.Errorf("invalid request: %w", err)
 		}
 		i++
 	}
@@ -716,11 +723,6 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 			AccountID: req.AccountId,
 		},
 		SecurityParams: params,
-	}
-
-	if err := header.Validate(); err != nil {
-		s.logger.Warn("invalid header", "err", err)
-		return nil, err
 	}
 
 	blob := &core.Blob{

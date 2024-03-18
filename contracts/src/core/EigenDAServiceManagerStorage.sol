@@ -26,25 +26,27 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      */
     uint32 public constant BLOCK_STALE_MEASURE = 150;
 
-    /** 
-     * @notice The quorum adversary threshold percentages stored as an ordered bytes array 
-     * this is the percentage of the total stake that must be adversarial to consider a blob invalid
+    /**
+     * @notice The quorum adversary threshold percentages stored as an ordered bytes array
+     * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
+     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
     bytes public constant quorumAdversaryThresholdPercentages = hex"2121";
 
-    /** 
-     * @notice The quorum confirmation threshold percentages stored as an ordered bytes array 
-     * this is the percentage of the total stake needed to confirm a blob
+    /**
+     * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
+     * this is the percentage of the total stake needed to confirm a blob.
+     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
     bytes public constant quorumConfirmationThresholdPercentages = hex"4242";
 
-    /** 
-     * @notice The quorum numbers required for confirmation stored as an ordered bytes array 
+    /**
+     * @notice The quorum numbers required for confirmation stored as an ordered bytes array
      * these quorum numbers have respective canonical thresholds in the
-     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above
+     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
      */
     bytes public constant quorumNumbersRequired = hex"0001";
-    
+
     /// @notice The current batchId
     uint32 public batchId;
 
@@ -54,8 +56,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice address that is permissioned to confirm batches
     address public batchConfirmer;
 
-     // storage gap for upgradeability
-     // slither-disable-next-line shadowing-state
-     uint256[47] private __GAP;
-
+    // storage gap for upgradeability
+    // slither-disable-next-line shadowing-state
+    uint256[47] private __GAP;
 }

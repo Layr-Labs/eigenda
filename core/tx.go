@@ -131,7 +131,7 @@ type Transactor interface {
 	GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error)
 
 	// GetQuorumSecurityParams returns the security params for the registered quorums.
-	GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]*SecurityParam, error)
+	GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]SecurityParam, error)
 
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
