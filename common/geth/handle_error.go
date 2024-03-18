@@ -13,7 +13,7 @@ func (f *FailoverController) handleHttpError(httpRespError rpc.HTTPError) bool {
 	if sc >= 200 && sc < 300 {
 		// 2xx error
 		return false
-	} else if sc >= 300 && sc < 400 {
+	} else if sc >= 400 && sc < 500 {
 		// 4xx error, Client Error. Alchemy documents 400,401,403,429
 		// https://docs.alchemy.com/reference/error-reference
 		return false

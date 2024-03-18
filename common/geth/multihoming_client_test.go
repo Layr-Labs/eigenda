@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	damock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ var (
 	rpcURLs    = []string{"127.0.0.1", "127.0.0.2", "127.0.0.3"}
 )
 
-func makeTestMultihomingClient(numRetries int) (*geth.MultiHomingClient, error) {
+func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.MultiHomingClient, error) {
 	logger := logging.NewNoopLogger()
 
 	ethClientCfg := geth.EthClientConfig{
@@ -38,7 +38,7 @@ func makeTestMultihomingClient(numRetries int) (*geth.MultiHomingClient, error) 
 
 	for i := 0; i < len(rpcURLs); i++ {
 		mockEthClient := &damock.MockEthClient{}
-		mockEthClient.On("ChainID", mock.Anything).Return(big.NewInt(0), ethereum.NotFound)
+		mockEthClient.On("ChainID", mock.Anything).Return(big.NewInt(0), designatedError)
 		mockClient.RPCs = append(mockClient.RPCs, mockEthClient)
 	}
 
@@ -53,8 +53,39 @@ func makeFailureCall(t *testing.T, client *geth.MultiHomingClient, numCall int) 
 	}
 }
 
-func TestMultihomingClientZeroRetry(t *testing.T) {
-	client, _ := makeTestMultihomingClient(0)
+func make500Error() rpc.HTTPError {
+	var httpRespError rpc.HTTPError
+	httpRespError.StatusCode = 500
+	httpRespError.Status = "INTERNAL_ERROR"
+	httpRespError.Body = []byte{}
+	return httpRespError
+}
+
+func TestMultihomingClientSenderFaultZeroRetry(t *testing.T) {
+	// 2xx and 4xx attributes to sender's fault, RPC should not rotate
+	statusCodes := []int{201, 202, 400, 401, 403, 429}
+	for _, sc := range statusCodes {
+		var httpRespError rpc.HTTPError
+		httpRespError.StatusCode = sc
+		httpRespError.Status = "INTERNAL_ERROR"
+		httpRespError.Body = []byte{}
+
+		client, _ := makeTestMultihomingClient(0, httpRespError)
+
+		index, _ := client.GetRPCInstance()
+		require.Equal(t, index, 0)
+
+		makeFailureCall(t, client, 1)
+
+		// given num retry is 0, when failure arises above, current rpc should becomes the next one
+		index, _ = client.GetRPCInstance()
+		require.Equal(t, index, 0)
+	}
+}
+
+func TestMultihomingClientRPCFaultZeroRetry(t *testing.T) {
+	httpRespError := make500Error()
+	client, _ := makeTestMultihomingClient(0, httpRespError)
 
 	index, _ := client.GetRPCInstance()
 	require.Equal(t, index, 0)
@@ -76,8 +107,10 @@ func TestMultihomingClientZeroRetry(t *testing.T) {
 	require.Equal(t, index, 0)
 }
 
-func TestMultihomingClientOneRetry(t *testing.T) {
-	client, _ := makeTestMultihomingClient(1)
+func TestMultihomingClientRPCFaultOneRetry(t *testing.T) {
+	httpRespError := make500Error()
+
+	client, _ := makeTestMultihomingClient(1, httpRespError)
 
 	index, _ := client.GetRPCInstance()
 	require.Equal(t, index, 0)
@@ -99,8 +132,9 @@ func TestMultihomingClientOneRetry(t *testing.T) {
 	require.Equal(t, index, 0)
 }
 
-func TestMultihomingClientTwoRetry(t *testing.T) {
-	client, _ := makeTestMultihomingClient(2)
+func TestMultihomingClientRPCFaultTwoRetry(t *testing.T) {
+	httpRespError := make500Error()
+	client, _ := makeTestMultihomingClient(2, httpRespError)
 
 	index, _ := client.GetRPCInstance()
 	require.Equal(t, index, 0)
