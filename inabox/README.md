@@ -167,7 +167,7 @@ Retrieve a blob:
 # Note the value for batch_header_hash can be obtained from the result of your
 # call to GetBlobStatus via info.blob_verification_proof.batch_metadata.batch_header_hash.
 
-grpcurl -plaintext ./api/proto/disperser/disperser.proto -d '{"batch_header_hash": "INSERT_VALUE", "blob_index":"0"}' localhost:32003 disperser.Disperser/RetrieveBlob
+grpcurl -plaintext -d '{"batch_header_hash": "INSERT_VALUE", "blob_index":"0"}' localhost:32003 disperser.Disperser/RetrieveBlob
 ```
 ### Cleanup
 
