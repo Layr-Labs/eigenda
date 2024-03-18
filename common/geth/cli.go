@@ -53,20 +53,6 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Value:    2,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_RETRIES"),
 		},
-		cli.DurationFlag{
-			Name:     networkTimeoutFlagName,
-			Usage:    "Network timeout to wait for RPC",
-			Required: false,
-			Value:    3 * time.Second,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "NETWORK_TIMEOUT"),
-		},
-		cli.DurationFlag{
-			Name:     writeTimeoutFlagName,
-			Usage:    "Writing to Ethereum timeout",
-			Required: false,
-			Value:    24 * time.Second,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "WRITE_TIMEOUT"),
-		},
 	}
 }
 
@@ -76,8 +62,7 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg.PrivateKeyString = ctx.GlobalString(privateKeyFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
-	cfg.NetworkTimeout = ctx.GlobalDuration(networkTimeoutFlagName)
-	cfg.WriteTimeout = ctx.GlobalDuration(writeTimeoutFlagName)
+
 	return cfg
 }
 
@@ -88,7 +73,6 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.RPCURLs = ctx.GlobalStringSlice(rpcUrlFlagName)
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
-	cfg.NetworkTimeout = ctx.GlobalDuration(networkTimeoutFlagName)
-	cfg.WriteTimeout = ctx.GlobalDuration(writeTimeoutFlagName)
+
 	return cfg
 }

@@ -3,7 +3,6 @@ package geth
 import (
 	"context"
 	"math/big"
-	"time"
 
 	dacommon "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -19,8 +18,6 @@ type MultiHomingClient struct {
 	NumRetries int
 	Logger     logging.Logger
 	*FailoverController
-	NetworkTimeout time.Duration // Network timeout is injected in additional to parent context timeout
-	WriteTimeout   time.Duration
 }
 
 var _ dacommon.EthClient = (*MultiHomingClient)(nil)
@@ -41,8 +38,6 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 		NumRetries:         config.NumRetries,
 		FailoverController: controller,
 		Logger:             logger,
-		NetworkTimeout:     config.NetworkTimeout,
-		WriteTimeout:       config.WriteTimeout,
 	}
 
 	for i := 0; i < len(rpcUrls); i++ {
@@ -58,7 +53,7 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 }
 
 func (m *MultiHomingClient) GetRPCInstance() (int, dacommon.EthClient) {
-	index := m.GetTotalNumberFault() % uint64(len(m.RPCs))
+	index := m.GetTotalNumberRpcFault() % uint64(len(m.RPCs))
 	return int(index), m.RPCs[index]
 }
 
@@ -71,9 +66,7 @@ func (m *MultiHomingClient) SuggestGasTipCap(ctx context.Context) (*big.Int, err
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.SuggestGasTipCap(instanceCtx)
-		instanceCtxCancel()
+		result, err := instance.SuggestGasTipCap(ctx)
 		if err == nil {
 			return result, nil
 		}
@@ -87,9 +80,9 @@ func (m *MultiHomingClient) HeaderByNumber(ctx context.Context, number *big.Int)
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.HeaderByNumber(instanceCtx, number)
-		instanceCtxCancel()
+
+		result, err := instance.HeaderByNumber(ctx, number)
+
 		if err == nil {
 			return result, nil
 		}
@@ -103,9 +96,9 @@ func (m *MultiHomingClient) EstimateGas(ctx context.Context, msg ethereum.CallMs
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.EstimateGas(instanceCtx, msg)
-		instanceCtxCancel()
+
+		result, err := instance.EstimateGas(ctx, msg)
+
 		if err == nil {
 			return result, nil
 		}
@@ -119,9 +112,9 @@ func (m *MultiHomingClient) SendTransaction(ctx context.Context, tx *types.Trans
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.WriteTimeout)
-		err := instance.SendTransaction(instanceCtx, tx)
-		instanceCtxCancel()
+
+		err := instance.SendTransaction(ctx, tx)
+
 		if err == nil {
 			return nil
 		}
@@ -135,9 +128,9 @@ func (m *MultiHomingClient) TransactionReceipt(ctx context.Context, txHash gethc
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.TransactionReceipt(instanceCtx, txHash)
-		instanceCtxCancel()
+
+		result, err := instance.TransactionReceipt(ctx, txHash)
+
 		if err == nil {
 			return result, nil
 		}
@@ -151,9 +144,9 @@ func (m *MultiHomingClient) BlockNumber(ctx context.Context) (uint64, error) {
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.BlockNumber(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.BlockNumber(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -168,9 +161,9 @@ func (m *MultiHomingClient) BalanceAt(ctx context.Context, account gethcommon.Ad
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.BalanceAt(instanceCtx, account, blockNumber)
-		instanceCtxCancel()
+
+		result, err := instance.BalanceAt(ctx, account, blockNumber)
+
 		if err == nil {
 			return result, nil
 		}
@@ -184,9 +177,9 @@ func (m *MultiHomingClient) BlockByHash(ctx context.Context, hash gethcommon.Has
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.BlockByHash(instanceCtx, hash)
-		instanceCtxCancel()
+
+		result, err := instance.BlockByHash(ctx, hash)
+
 		if err == nil {
 			return result, nil
 		}
@@ -200,9 +193,9 @@ func (m *MultiHomingClient) BlockByNumber(ctx context.Context, number *big.Int) 
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.BlockByNumber(instanceCtx, number)
-		instanceCtxCancel()
+
+		result, err := instance.BlockByNumber(ctx, number)
+
 		if err == nil {
 			return result, nil
 		}
@@ -220,9 +213,9 @@ func (m *MultiHomingClient) CallContract(
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.CallContract(instanceCtx, call, blockNumber)
-		instanceCtxCancel()
+
+		result, err := instance.CallContract(ctx, call, blockNumber)
+
 		if err == nil {
 			return result, nil
 		}
@@ -240,9 +233,9 @@ func (m *MultiHomingClient) CallContractAtHash(
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.CallContractAtHash(instanceCtx, msg, blockHash)
-		instanceCtxCancel()
+
+		result, err := instance.CallContractAtHash(ctx, msg, blockHash)
+
 		if err == nil {
 			return result, nil
 		}
@@ -260,9 +253,9 @@ func (m *MultiHomingClient) CodeAt(
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.CodeAt(instanceCtx, contract, blockNumber)
-		instanceCtxCancel()
+
+		result, err := instance.CodeAt(ctx, contract, blockNumber)
+
 		if err == nil {
 			return result, nil
 		}
@@ -281,9 +274,9 @@ func (m *MultiHomingClient) FeeHistory(
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.FeeHistory(instanceCtx, blockCount, lastBlock, rewardPercentiles)
-		instanceCtxCancel()
+
+		result, err := instance.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
+
 		if err == nil {
 			return result, nil
 		}
@@ -297,9 +290,9 @@ func (m *MultiHomingClient) FilterLogs(ctx context.Context, q ethereum.FilterQue
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.FilterLogs(instanceCtx, q)
-		instanceCtxCancel()
+
+		result, err := instance.FilterLogs(ctx, q)
+
 		if err == nil {
 			return result, nil
 		}
@@ -313,9 +306,9 @@ func (m *MultiHomingClient) HeaderByHash(ctx context.Context, hash gethcommon.Ha
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.HeaderByHash(instanceCtx, hash)
-		instanceCtxCancel()
+
+		result, err := instance.HeaderByHash(ctx, hash)
+
 		if err == nil {
 			return result, nil
 		}
@@ -329,9 +322,9 @@ func (m *MultiHomingClient) NetworkID(ctx context.Context) (*big.Int, error) {
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.NetworkID(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.NetworkID(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -345,9 +338,9 @@ func (m *MultiHomingClient) NonceAt(ctx context.Context, account gethcommon.Addr
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.NonceAt(instanceCtx, account, blockNumber)
-		instanceCtxCancel()
+
+		result, err := instance.NonceAt(ctx, account, blockNumber)
+
 		if err == nil {
 			return result, nil
 		}
@@ -361,9 +354,9 @@ func (m *MultiHomingClient) PeerCount(ctx context.Context) (uint64, error) {
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PeerCount(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.PeerCount(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -377,9 +370,9 @@ func (m *MultiHomingClient) PendingBalanceAt(ctx context.Context, account gethco
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PendingBalanceAt(instanceCtx, account)
-		instanceCtxCancel()
+
+		result, err := instance.PendingBalanceAt(ctx, account)
+
 		if err == nil {
 			return result, nil
 		}
@@ -393,9 +386,9 @@ func (m *MultiHomingClient) PendingCallContract(ctx context.Context, msg ethereu
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PendingCallContract(instanceCtx, msg)
-		instanceCtxCancel()
+
+		result, err := instance.PendingCallContract(ctx, msg)
+
 		if err == nil {
 			return result, nil
 		}
@@ -409,9 +402,9 @@ func (m *MultiHomingClient) PendingCodeAt(ctx context.Context, account gethcommo
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PendingCodeAt(instanceCtx, account)
-		instanceCtxCancel()
+
+		result, err := instance.PendingCodeAt(ctx, account)
+
 		if err == nil {
 			return result, nil
 		}
@@ -425,9 +418,9 @@ func (m *MultiHomingClient) PendingNonceAt(ctx context.Context, account gethcomm
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PendingNonceAt(instanceCtx, account)
-		instanceCtxCancel()
+
+		result, err := instance.PendingNonceAt(ctx, account)
+
 		if err == nil {
 			return result, nil
 		}
@@ -440,9 +433,9 @@ func (m *MultiHomingClient) PendingStorageAt(ctx context.Context, account gethco
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PendingStorageAt(instanceCtx, account, key)
-		instanceCtxCancel()
+
+		result, err := instance.PendingStorageAt(ctx, account, key)
+
 		if err == nil {
 			return result, nil
 		}
@@ -455,9 +448,9 @@ func (m *MultiHomingClient) PendingTransactionCount(ctx context.Context) (uint, 
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.PendingTransactionCount(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.PendingTransactionCount(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -471,9 +464,9 @@ func (m *MultiHomingClient) StorageAt(ctx context.Context, account gethcommon.Ad
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.StorageAt(instanceCtx, account, key, blockNumber)
-		instanceCtxCancel()
+
+		result, err := instance.StorageAt(ctx, account, key, blockNumber)
+
 		if err == nil {
 			return result, nil
 		}
@@ -488,9 +481,9 @@ func (m *MultiHomingClient) SubscribeFilterLogs(ctx context.Context, q ethereum.
 	var result ethereum.Subscription
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.SubscribeFilterLogs(instanceCtx, q, ch)
-		instanceCtxCancel()
+
+		result, err := instance.SubscribeFilterLogs(ctx, q, ch)
+
 		if err == nil {
 			return result, nil
 		}
@@ -505,9 +498,9 @@ func (m *MultiHomingClient) SubscribeNewHead(ctx context.Context, ch chan<- *typ
 	var result ethereum.Subscription
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.SubscribeNewHead(instanceCtx, ch)
-		instanceCtxCancel()
+
+		result, err := instance.SubscribeNewHead(ctx, ch)
+
 		if err == nil {
 			return result, nil
 		}
@@ -521,9 +514,9 @@ func (m *MultiHomingClient) SuggestGasPrice(ctx context.Context) (*big.Int, erro
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.SuggestGasPrice(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.SuggestGasPrice(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -537,9 +530,9 @@ func (m *MultiHomingClient) SyncProgress(ctx context.Context) (*ethereum.SyncPro
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.SyncProgress(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.SyncProgress(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -553,9 +546,9 @@ func (m *MultiHomingClient) TransactionByHash(ctx context.Context, hash gethcomm
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		tx, isPending, err := instance.TransactionByHash(instanceCtx, hash)
-		instanceCtxCancel()
+
+		tx, isPending, err := instance.TransactionByHash(ctx, hash)
+
 		if err == nil {
 			return tx, isPending, nil
 		}
@@ -569,9 +562,9 @@ func (m *MultiHomingClient) TransactionCount(ctx context.Context, blockHash geth
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.TransactionCount(instanceCtx, blockHash)
-		instanceCtxCancel()
+
+		result, err := instance.TransactionCount(ctx, blockHash)
+
 		if err == nil {
 			return result, nil
 		}
@@ -585,9 +578,9 @@ func (m *MultiHomingClient) TransactionInBlock(ctx context.Context, blockHash ge
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.TransactionInBlock(instanceCtx, blockHash, index)
-		instanceCtxCancel()
+
+		result, err := instance.TransactionInBlock(ctx, blockHash, index)
+
 		if err == nil {
 			return result, nil
 		}
@@ -601,9 +594,9 @@ func (m *MultiHomingClient) TransactionSender(ctx context.Context, tx *types.Tra
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.TransactionSender(instanceCtx, tx, block, index)
-		instanceCtxCancel()
+
+		result, err := instance.TransactionSender(ctx, tx, block, index)
+
 		if err == nil {
 			return result, nil
 		}
@@ -617,9 +610,9 @@ func (m *MultiHomingClient) ChainID(ctx context.Context) (*big.Int, error) {
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.ChainID(instanceCtx)
-		instanceCtxCancel()
+
+		result, err := instance.ChainID(ctx)
+
 		if err == nil {
 			return result, nil
 		}
@@ -633,9 +626,9 @@ func (m *MultiHomingClient) GetLatestGasCaps(ctx context.Context) (*big.Int, *bi
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		gasTipCap, gasFeeCap, err := instance.GetLatestGasCaps(instanceCtx)
-		instanceCtxCancel()
+
+		gasTipCap, gasFeeCap, err := instance.GetLatestGasCaps(ctx)
+
 		if err == nil {
 			return gasTipCap, gasFeeCap, nil
 		}
@@ -649,9 +642,9 @@ func (m *MultiHomingClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Contex
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.WriteTimeout)
-		result, err := instance.EstimateGasPriceAndLimitAndSendTx(instanceCtx, tx, tag, value)
-		instanceCtxCancel()
+
+		result, err := instance.EstimateGasPriceAndLimitAndSendTx(ctx, tx, tag, value)
+
 		if err == nil {
 			return result, nil
 		}
@@ -665,9 +658,9 @@ func (m *MultiHomingClient) UpdateGas(ctx context.Context, tx *types.Transaction
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.NetworkTimeout)
-		result, err := instance.UpdateGas(instanceCtx, tx, value, gasTipCap, gasFeeCap)
-		instanceCtxCancel()
+
+		result, err := instance.UpdateGas(ctx, tx, value, gasTipCap, gasFeeCap)
+
 		if err == nil {
 			return result, nil
 		}
@@ -680,9 +673,9 @@ func (m *MultiHomingClient) EnsureTransactionEvaled(ctx context.Context, tx *typ
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.WriteTimeout)
-		result, err := instance.EnsureTransactionEvaled(instanceCtx, tx, tag)
-		instanceCtxCancel()
+
+		result, err := instance.EnsureTransactionEvaled(ctx, tx, tag)
+
 		if err == nil {
 			return result, nil
 		}
@@ -696,9 +689,9 @@ func (m *MultiHomingClient) EnsureAnyTransactionEvaled(ctx context.Context, txs 
 	var errLast error
 	for i := 0; i < m.NumRetries+1; i++ {
 		_, instance := m.GetRPCInstance()
-		instanceCtx, instanceCtxCancel := context.WithTimeout(ctx, m.WriteTimeout)
-		result, err := instance.EnsureAnyTransactionEvaled(instanceCtx, txs, tag)
-		instanceCtxCancel()
+
+		result, err := instance.EnsureAnyTransactionEvaled(ctx, txs, tag)
+
 		if err == nil {
 			return result, nil
 		}

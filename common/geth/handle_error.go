@@ -3,59 +3,39 @@ package geth
 import (
 	"errors"
 
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/txpool"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
-type ChainConnFaults int64
+// handleHttpError returns a boolean indicating if error atrributes to remote RPC
+func (f *FailoverController) handleHttpError(httpRespError rpc.HTTPError) bool {
+	sc := httpRespError.StatusCode
+	f.Logger.Info("[RPC Error]", "Status Code", sc)
+	if sc >= 200 && sc < 300 {
+		// 2xx error
+		return false
+	} else if sc >= 300 && sc < 400 {
+		// 4xx error, Client Error. Alchemy documents 400,401,403,429
+		// https://docs.alchemy.com/reference/error-reference
+		return false
+	} else if sc >= 500 {
+		// 5xx codes, Server Error, Alchemy documents 500, 503
+		return true
+	}
+	// by default, attribute to rpc
+	return true
+}
 
-const (
-	Ok ChainConnFaults = iota
-	ConnectionFault
-	EVMFault
-)
-
-// this function accepts error message returned from API
-// decide if it is servers fault
-func HandleError(err error) ChainConnFaults {
-	if err == nil {
-		return Ok
+// handleError returns a boolean indicating if error atrributes to remote RPC
+func (f *FailoverController) handleError(err error) bool {
+	var httpRespError rpc.HTTPError
+	if errors.As(err, &httpRespError) {
+		// if error is http error
+		return f.handleHttpError(httpRespError)
+	} else {
+		// If no http response is returned, it is a connection issue,
+		// since we can't accurately attribute the network issue to neither sender nor receiver
+		// side. Optimistically, switch rpc client
+		return true
 	}
 
-	// All geth core error codes from , https://pkg.go.dev/github.com/ethereum/go-ethereum@v1.13.14/core
-	// return false, as it is not RPC issue
-	if errors.Is(err, core.ErrNonceTooLow) ||
-		errors.Is(err, core.ErrNonceTooHigh) ||
-		errors.Is(err, core.ErrNonceMax) ||
-		errors.Is(err, core.ErrGasLimitReached) ||
-		errors.Is(err, core.ErrInsufficientFundsForTransfer) ||
-		errors.Is(err, core.ErrMaxInitCodeSizeExceeded) ||
-		errors.Is(err, core.ErrInsufficientFunds) ||
-		errors.Is(err, core.ErrGasUintOverflow) ||
-		errors.Is(err, core.ErrIntrinsicGas) ||
-		errors.Is(err, core.ErrTxTypeNotSupported) ||
-		errors.Is(err, core.ErrTipAboveFeeCap) ||
-		errors.Is(err, core.ErrTipVeryHigh) ||
-		errors.Is(err, core.ErrFeeCapVeryHigh) ||
-		errors.Is(err, core.ErrFeeCapTooLow) ||
-		errors.Is(err, core.ErrSenderNoEOA) ||
-		errors.Is(err, core.ErrBlobFeeCapTooLow) {
-		return EVMFault
-	}
-
-	// All geth txpool error, https://pkg.go.dev/github.com/ethereum/go-ethereum@v1.13.14/core
-	// return false, as it is not RPC issue
-	if errors.Is(err, txpool.ErrAlreadyKnown) ||
-		errors.Is(err, txpool.ErrInvalidSender) ||
-		errors.Is(err, txpool.ErrUnderpriced) ||
-		errors.Is(err, txpool.ErrReplaceUnderpriced) ||
-		errors.Is(err, txpool.ErrAccountLimitExceeded) ||
-		errors.Is(err, txpool.ErrGasLimit) ||
-		errors.Is(err, txpool.ErrNegativeValue) ||
-		errors.Is(err, txpool.ErrOversizedData) ||
-		errors.Is(err, txpool.ErrFutureReplacePending) {
-		return EVMFault
-	}
-
-	return ConnectionFault
 }

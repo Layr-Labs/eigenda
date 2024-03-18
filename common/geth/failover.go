@@ -7,7 +7,7 @@ import (
 )
 
 type FailoverController struct {
-	NumberFault     uint64
+	NumberRpcFault  uint64
 	currentRPCIndex int
 	NumRPCClient    int
 	Logger          logging.Logger
@@ -33,18 +33,15 @@ func (f *FailoverController) ProcessError(err error) {
 		return
 	}
 
-	fault := HandleError(err)
-	if fault == EVMFault || fault == Ok {
-		return
-	} else {
-		// attribute anything else to server fault for rotation
-		f.NumberFault += 1
-		return
+	rpcFault := f.handleError(err)
+
+	if rpcFault {
+		f.NumberRpcFault += 1
 	}
 }
 
-func (f *FailoverController) GetTotalNumberFault() uint64 {
+func (f *FailoverController) GetTotalNumberRpcFault() uint64 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.NumberFault
+	return f.NumberRpcFault
 }
