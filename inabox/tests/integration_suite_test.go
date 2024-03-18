@@ -47,7 +47,6 @@ var (
 	mockRollup        *rollupbindings.ContractMockRollup
 	retrievalClient   clients.RetrievalClient
 	numConfirmations  int = 3
-	networkTimeout        = 3 * time.Second
 	numRetries            = 0
 
 	cancel context.CancelFunc
@@ -124,6 +123,7 @@ var _ = BeforeSuite(func() {
 		RPCURLs:          []string{testConfig.Deployers[0].RPC},
 		PrivateKeyString: pk,
 		NumConfirmations: numConfirmations,
+		NumRetries:       numRetries,
 	}, gcommon.Address{}, logger)
 	Expect(err).To(BeNil())
 	rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
@@ -139,7 +139,6 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		RPCURLs:          []string{testConfig.Deployers[0].RPC},
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
 		NumConfirmations: numConfirmations,
-		NetworkTimeout:   networkTimeout,
 		NumRetries:       numRetries,
 	}
 	client, err := geth.NewMultiHomingClient(ethClientConfig, gcommon.Address{}, logger)

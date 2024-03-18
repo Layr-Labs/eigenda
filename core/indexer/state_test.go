@@ -77,7 +77,6 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: op.NODE_PRIVATE_KEY,
 		NumConfirmations: 0,
-		NetworkTimeout:   3 * time.Second,
 		NumRetries:       0,
 	}
 
@@ -103,7 +102,6 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
-		NetworkTimeout:   3 * time.Second,
 		NumRetries:       0,
 	}
 
