@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
-/*
+
 import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
 
@@ -15,6 +15,8 @@ import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.so
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {OperatorStateRetriever} from "eigenlayer-middleware/OperatorStateRetriever.sol";
+import {ServiceManagerRouter} from "eigenlayer-middleware/ServiceManagerRouter.sol";
+import {MockRollup, BN254, IEigenDAServiceManager} from "src/rollup/MockRollup.sol";
 
 import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
 import "forge-std/Test.sol";
@@ -23,13 +25,12 @@ import "forge-std/StdJson.sol";
 
 
 //forge script script/deploy/goerliv2/GoerliV2_Deploy.s.sol:Deployer_GV2 --rpc-url $RPC_URL  --private-key $PRIVATE_KEY -vvvv //--broadcast 
-contract Deployer_GV2 is ExistingDeploymentParser {
+contract Deployer_Holesky is ExistingDeploymentParser {
+    using BN254 for BN254.G1Point;
 
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_deployment_2024_6_2.json"));
-    //string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/GV2_preprod_deployment_2024_30_1.json"));
-    string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/prod.config.json"));
-    //string public deployConfigPath = string(bytes("./script/deploy/goerliv2/config/preprod.config.json"));
-    string public outputPath = string.concat("script/deploy/goerliv2/output/GV2_prod_deployment_data.json");
+    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/Holesky_preprod.json"));
+    string public deployConfigPath = string(bytes("./script/deploy/holesky/config/preprod.config.json"));
+    string public outputPath = string.concat("script/deploy/holesky/output/holesky_preprod_deployment_data.json");
 
     ProxyAdmin public eigenDAProxyAdmin;
     address public eigenDAOwner;
@@ -44,6 +45,8 @@ contract Deployer_GV2 is ExistingDeploymentParser {
     IndexRegistry public indexRegistry;
     StakeRegistry public stakeRegistry;
     OperatorStateRetriever public operatorStateRetriever;
+    ServiceManagerRouter public serviceManagerRouter;
+    MockRollup public mockRollup;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -83,7 +86,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         *//*
+         */
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -114,7 +117,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         //deploy stake registry implementation
         stakeRegistryImplementation = new StakeRegistry(
             registryCoordinator,
-            delegation
+            delegationManager
         );
 
         //upgrade stake registry proxy to implementation
@@ -195,13 +198,22 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         //deploy the operator state retriever
         operatorStateRetriever = new OperatorStateRetriever();
 
+        //deploy service manager router
+        serviceManagerRouter = new ServiceManagerRouter();
+
+        //deploy mock rollup
+        mockRollup = new MockRollup(
+            IEigenDAServiceManager(eigenDAServiceManager),
+            BN254.generatorG1().scalar_mul(2)
+        );
+
         // transfer ownership of proxy admin to upgrader
         eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
 
         vm.stopBroadcast();
 
         // sanity checks
-        _verifyContractPointers(
+        __verifyContractPointers(
             apkRegistry,
             eigenDAServiceManager,
             registryCoordinator,
@@ -209,7 +221,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
             stakeRegistry
         );
 
-        _verifyContractPointers(
+        __verifyContractPointers(
             apkRegistryImplementation,
             eigenDAServiceManagerImplementation,
             registryCoordinatorImplementation,
@@ -217,14 +229,14 @@ contract Deployer_GV2 is ExistingDeploymentParser {
             stakeRegistryImplementation
         );
 
-        _verifyImplementations();
-        _verifyInitalizations(config_data);
+        __verifyImplementations();
+        __verifyInitalizations(config_data);
 
         //write output
         _writeOutput(config_data);
     }
 
-    function _verifyContractPointers(
+    function __verifyContractPointers(
         BLSApkRegistry _apkRegistry,
         EigenDAServiceManager _eigenDAServiceManager,
         RegistryCoordinator _registryCoordinator,
@@ -236,7 +248,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         require(address(_indexRegistry.registryCoordinator()) == address(registryCoordinator), "indexRegistry.registryCoordinator() != registryCoordinator");
 
         require(address(_stakeRegistry.registryCoordinator()) == address(registryCoordinator), "stakeRegistry.registryCoordinator() != registryCoordinator");
-        require(address(_stakeRegistry.delegation()) == address(delegation), "stakeRegistry.delegationManager() != delegation");
+        require(address(_stakeRegistry.delegation()) == address(delegationManager), "stakeRegistry.delegationManager() != delegation");
 
         require(address(_eigenDAServiceManager.registryCoordinator()) == address(registryCoordinator), "eigenDAServiceManager.registryCoordinator() != registryCoordinator");
         require(address(_eigenDAServiceManager.stakeRegistry()) == address(stakeRegistry), "eigenDAServiceManager.stakeRegistry() != stakeRegistry");
@@ -247,7 +259,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         require(address(_registryCoordinator.indexRegistry()) == address(indexRegistry), "registryCoordinator.indexRegistry() != indexRegistry");
     }
 
-    function _verifyImplementations() internal view {
+    function __verifyImplementations() internal view {
         require(eigenDAProxyAdmin.getProxyImplementation(
             TransparentUpgradeableProxy(payable(address(eigenDAServiceManager)))) == address(eigenDAServiceManagerImplementation),
             "eigenDAServiceManager: implementation set incorrectly");
@@ -265,7 +277,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
             "stakeRegistry: implementation set incorrectly");
     }
 
-    function _verifyInitalizations(string memory config_data) internal {
+    function __verifyInitalizations(string memory config_data) internal {
         (
             uint96[] memory minimumStakeForQuourm, 
             IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers
@@ -321,6 +333,9 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         vm.serializeAddress(deployed_addresses, "indexRegistry", address(indexRegistry));
         vm.serializeAddress(deployed_addresses, "indexRegistryImplementation", address(indexRegistryImplementation));
         vm.serializeAddress(deployed_addresses, "stakeRegistry", address(stakeRegistry));
+        vm.serializeAddress(deployed_addresses, "stakeRegistryImplementation", address(stakeRegistryImplementation));
+        vm.serializeAddress(deployed_addresses, "serviceManagerRouter", address(serviceManagerRouter));
+        vm.serializeAddress(deployed_addresses, "mockRollup", address(mockRollup));
         string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "stakeRegistryImplementation", address(stakeRegistryImplementation));
 
         string memory chain_info = "chainInfo";
@@ -359,4 +374,3 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         ejector = stdJson.readAddress(config_data, ".permissions.ejector");
     }
 }
-*/

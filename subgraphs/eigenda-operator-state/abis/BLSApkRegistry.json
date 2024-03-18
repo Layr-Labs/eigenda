@@ -577,6 +577,12 @@
                 "internalType": "address"
             },
             {
+                "name": "operatorId",
+                "type": "bytes32",
+                "indexed": false,
+                "internalType": "bytes32"
+            },
+            {
                 "name": "quorumNumbers",
                 "type": "bytes",
                 "indexed": false,
@@ -594,6 +600,12 @@
                 "type": "address",
                 "indexed": false,
                 "internalType": "address"
+            },
+            {
+                "name": "operatorId",
+                "type": "bytes32",
+                "indexed": false,
+                "internalType": "bytes32"
             },
             {
                 "name": "quorumNumbers",

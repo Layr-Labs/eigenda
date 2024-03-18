@@ -77,4 +77,4 @@ Since the DA nodes will allow a range of `ChunkLength` values, as long as they s
 
 ### Rollup Smart Contract
 
-When the rollup confirms its blob against the EigenDA batch, it checks that the `QuorumThreshold` for the blob is greater than the `AdversaryThreshold`. This means that if the `ChunkLength` determined by the disperser is invalid, the batch cannot be confirmed as a sufficient number of nodes will not sign.
+When the rollup confirms its blob against the EigenDA batch, it checks that the `ConfirmationThreshold` for the blob is greater than the `AdversaryThreshold`. This means that if the `ChunkLength` determined by the disperser is invalid, the batch cannot be confirmed as a sufficient number of nodes will not sign.

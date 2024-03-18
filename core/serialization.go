@@ -125,7 +125,7 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 			Type: "bytes",
 		},
 		{
-			Name: "quorumThresholdPercentages",
+			Name: "confirmationThresholdPercentages",
 			Type: "bytes",
 		},
 		{
@@ -144,15 +144,15 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 	}
 
 	s := struct {
-		BatchRoot                  [32]byte
-		QuorumNumbers              []byte
-		QuorumThresholdPercentages []byte
-		ReferenceBlockNumber       uint32
+		BatchRoot                        [32]byte
+		QuorumNumbers                    []byte
+		ConfirmationThresholdPercentages []byte
+		ReferenceBlockNumber             uint32
 	}{
-		BatchRoot:                  batchHeader.BlobHeadersRoot,
-		QuorumNumbers:              batchHeader.QuorumNumbers,
-		QuorumThresholdPercentages: batchHeader.QuorumThresholdPercentages,
-		ReferenceBlockNumber:       uint32(batchHeader.ReferenceBlockNumber),
+		BatchRoot:                        batchHeader.BlobHeadersRoot,
+		QuorumNumbers:                    batchHeader.QuorumNumbers,
+		ConfirmationThresholdPercentages: batchHeader.SignedStakeForQuorums,
+		ReferenceBlockNumber:             uint32(batchHeader.ReferenceBlockNumber),
 	}
 
 	bytes, err := arguments.Pack(s)
@@ -225,7 +225,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 		qbp[i] = quorumBlobParams{
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
+			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
@@ -318,7 +318,7 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 		qbp[i] = quorumBlobParams{
 			QuorumNumber:                 uint8(q.QuorumID),
 			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.QuorumThreshold),
+			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}

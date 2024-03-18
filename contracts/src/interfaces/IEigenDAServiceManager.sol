@@ -27,7 +27,7 @@ interface IEigenDAServiceManager is IServiceManager {
     struct QuorumBlobParam {
         uint8 quorumNumber;
         uint8 adversaryThresholdPercentage;
-        uint8 quorumThresholdPercentage; 
+        uint8 confirmationThresholdPercentage; 
         uint32 chunkLength; // the length of the chunks in the quorum
     }
 
@@ -45,8 +45,8 @@ interface IEigenDAServiceManager is IServiceManager {
     struct BatchHeader {
         bytes32 blobHeadersRoot;
         bytes quorumNumbers; // each byte is a different quorum number
-        bytes quorumThresholdPercentages; // every bytes is an amount less than 100 specifying the percentage of stake 
-                                          // the must have signed in the corresponding quorum in `quorumNumbers` 
+        bytes signedStakeForQuorums; // every bytes is an amount less than 100 specifying the percentage of stake 
+                                     // that has signed in the corresponding quorum in `quorumNumbers` 
         uint32 referenceBlockNumber;
     }
     
@@ -54,17 +54,7 @@ interface IEigenDAServiceManager is IServiceManager {
     struct BatchMetadata {
         BatchHeader batchHeader; // the header of the data store
         bytes32 signatoryRecordHash; // the hash of the signatory record
-        uint96 fee; // the amount of paymentToken paid for the datastore
         uint32 confirmationBlockNumber; // the block number at which the batch was confirmed
-    }
-
-    // Relevant metadata for a given datastore
-    struct BatchMetadataWithSignatoryRecord {
-        bytes32 batchHeaderHash; // the header hash of the data store
-        uint32 referenceBlockNumber; // the block number at which stakes 
-        bytes32[] nonSignerPubkeyHashes; // the pubkeyHashes of all of the nonSigners
-        uint96 fee; // the amount of paymentToken paid for the datastore
-        uint32 blockNumber; // the block number at which the datastore was confirmed
     }
 
     // FUNCTIONS
@@ -89,9 +79,18 @@ interface IEigenDAServiceManager is IServiceManager {
     /// @notice Returns the current batchId
     function taskNumber() external view returns (uint32);
 
-    /// @notice Returns the block until which operators must serve.
-    function latestServeUntilBlock() external view returns (uint32);
+    /// @notice Given a reference block number, returns the block until which operators must serve.
+    function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32);
 
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
+
+    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
+    function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
+
+    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
+    function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
+
+    /// @notice Returns the bytes array of quorumsNumbersRequired
+    function quorumNumbersRequired() external view returns (bytes memory);
 }

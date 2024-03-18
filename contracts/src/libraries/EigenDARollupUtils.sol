@@ -6,6 +6,7 @@ import {Merkle} from "eigenlayer-core/contracts/libraries/Merkle.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 import {EigenDAHasher} from "./EigenDAHasher.sol";
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to prove blobs on EigenDA and open KZG commitments.
@@ -20,7 +21,7 @@ library EigenDARollupUtils {
         uint8 blobIndex;
         IEigenDAServiceManager.BatchMetadata batchMetadata;
         bytes inclusionProof;
-        bytes quorumThresholdIndexes;
+        bytes quorumIndices;
     }
     
     /**
@@ -50,25 +51,64 @@ library EigenDARollupUtils {
             "EigenDARollupUtils.verifyBlob: inclusion proof is invalid"
         );
 
+        // bitmap of quorum numbers in all quorumBlobParams
+        uint256 confirmedQuorumsBitmap;
+
         // require that the security param in each blob is met
         for (uint i = 0; i < blobHeader.quorumBlobParams.length; i++) {
             // make sure that the quorumIndex matches the given quorumNumber
-            require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) == blobHeader.quorumBlobParams[i].quorumNumber, 
+            require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProof.quorumIndices[i])]) == blobHeader.quorumBlobParams[i].quorumNumber, 
                 "EigenDARollupUtils.verifyBlob: quorumNumber does not match"
             );
 
-            // make sure that the adversaryThresholdPercentage is less than the given quorumThresholdPercentage
+            // make sure that the adversaryThresholdPercentage is less than the given confirmationThresholdPercentage
             require(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage 
-                < blobHeader.quorumBlobParams[i].quorumThresholdPercentage, 
+                < blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
                 "EigenDARollupUtils.verifyBlob: adversaryThresholdPercentage is not valid"
             );
 
-            // make sure that the stake signed for is greater than the given quorumThresholdPercentage
-            require(uint8(blobVerificationProof.batchMetadata.batchHeader.quorumThresholdPercentages[uint8(blobVerificationProof.quorumThresholdIndexes[i])]) 
-                >= blobHeader.quorumBlobParams[i].quorumThresholdPercentage, 
-                "EigenDARollupUtils.verifyBlob: quorumThresholdPercentage is not met"
+            // make sure that the adversaryThresholdPercentage is at least the given quorumAdversaryThresholdPercentage
+            uint8 _adversaryThresholdPercentage = getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
+            if(_adversaryThresholdPercentage > 0){
+                require(blobHeader.quorumBlobParams[i].adversaryThresholdPercentage >= _adversaryThresholdPercentage, 
+                    "EigenDARollupUtils.verifyBlob: adversaryThresholdPercentage is not met"
+                );
+            }
+
+            // make sure that the stake signed for is greater than the given confirmationThresholdPercentage
+            require(uint8(blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProof.quorumIndices[i])]) 
+                >= blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
+                "EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met"
             );
 
+            // mark confirmed quorum in the bitmap
+            confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, blobHeader.quorumBlobParams[i].quorumNumber);
+        }
+
+        // check that required quorums are a subset of the confirmed quorums
+        require(
+            BitmapUtils.isSubsetOf(
+                BitmapUtils.orderedBytesArrayToBitmap(
+                    eigenDAServiceManager.quorumNumbersRequired()
+                ),
+                confirmedQuorumsBitmap
+            ),
+            "EigenDARollupUtils.verifyBlob: required quorums are not a subset of the confirmed quorums"
+        );
+    }
+
+    /**
+     * @notice gets the adversary threshold percentage for a given quorum
+     * @param eigenDAServiceManager the contract in which the batch was confirmed 
+     * @param quorumNumber the quorum number to get the adversary threshold percentage for
+     * @dev returns 0 if the quorumNumber is not found
+     */
+    function getQuorumAdversaryThreshold(
+        IEigenDAServiceManager eigenDAServiceManager,
+        uint256 quorumNumber
+    ) public view returns(uint8 adversaryThresholdPercentage) {
+        if(eigenDAServiceManager.quorumAdversaryThresholdPercentages().length > quorumNumber){
+            adversaryThresholdPercentage = uint8(eigenDAServiceManager.quorumAdversaryThresholdPercentages()[quorumNumber]);
         }
     }
 

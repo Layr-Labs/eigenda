@@ -33,13 +33,7 @@ type result struct {
 
 func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
 
-	blobStatus, key, err := client.DisperseBlob(ctx, data, []*core.SecurityParam{
-		{
-			QuorumID:           param.QuorumID,
-			AdversaryThreshold: param.AdversaryThreshold,
-			QuorumThreshold:    param.QuorumThreshold,
-		},
-	})
+	blobStatus, key, err := client.DisperseBlob(ctx, data, []uint8{param.QuorumID})
 	if err != nil {
 		resultChan <- result{
 			err: err,
@@ -203,9 +197,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             0,
 			blobSize:          500,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 
@@ -233,9 +227,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             0,
 			blobSize:          1000,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 
@@ -264,9 +258,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             20 * time.Second,
 			blobSize:          1000,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 
@@ -296,9 +290,9 @@ func TestRatelimit(t *testing.T) {
 			pause:             0,
 			blobSize:          5,
 			param: core.SecurityParam{
-				QuorumID:           0,
-				AdversaryThreshold: 50,
-				QuorumThreshold:    100,
+				QuorumID:              0,
+				AdversaryThreshold:    50,
+				ConfirmationThreshold: 100,
 			},
 		}
 

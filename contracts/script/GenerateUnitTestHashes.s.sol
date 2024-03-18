@@ -23,7 +23,7 @@ contract GenerateHashes is Script {
         quorumBlobParam[0] = IEigenDAServiceManager.QuorumBlobParam({
             quorumNumber: 0,
             adversaryThresholdPercentage: 80,
-            quorumThresholdPercentage: 100,
+            confirmationThresholdPercentage: 100,
             chunkLength: 10
         });
 
@@ -40,7 +40,7 @@ contract GenerateHashes is Script {
         quorumBlobParam[0] = IEigenDAServiceManager.QuorumBlobParam({
             quorumNumber: 1,
             adversaryThresholdPercentage: 80,
-            quorumThresholdPercentage: 100,
+            confirmationThresholdPercentage: 100,
             chunkLength: 10
         });
 

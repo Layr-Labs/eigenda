@@ -86,10 +86,10 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	for i, header := range h.GetQuorumHeaders() {
 		quorumHeaders[i] = &core.BlobQuorumInfo{
 			SecurityParam: core.SecurityParam{
-				QuorumID:           core.QuorumID(header.GetQuorumId()),
-				AdversaryThreshold: uint8(header.GetAdversaryThreshold()),
-				QuorumThreshold:    uint8(header.GetQuorumThreshold()),
-				QuorumRate:         header.GetRatelimit(),
+				QuorumID:              core.QuorumID(header.GetQuorumId()),
+				AdversaryThreshold:    uint8(header.GetAdversaryThreshold()),
+				ConfirmationThreshold: uint8(header.GetConfirmationThreshold()),
+				QuorumRate:            header.GetRatelimit(),
 			},
 			ChunkLength: uint(header.GetChunkLength()),
 		}
@@ -183,7 +183,7 @@ func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte, quorumID uint8) (*m
 // 	for _, param := range p.GetQuorumParams() {
 // 		qp := core.QuorumParam{
 // 			QuorumID:        core.QuorumID(param.GetQuorumId()),
-// 			QuorumThreshold: uint8(param.GetQuorumThreshold()),
+// 			ConfirmationThreshold: uint8(param.GetQuorumThreshold()),
 // 		}
 // 		quorum = append(quorum, qp)
 // 	}
