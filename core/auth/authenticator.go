@@ -30,7 +30,7 @@ func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error 
 	sig := header.AuthenticationData
 
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	if sig == nil || len(sig) != 65 {
+	if len(sig) != 65 {
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 

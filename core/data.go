@@ -76,7 +76,7 @@ type BlobRequestHeader struct {
 }
 
 func (sp *SecurityParam) Validate() error {
-	if sp.ConfirmationThreshold < sp.AdversaryThreshold+10 {
+	if sp.ConfirmationThreshold < sp.AdversaryThreshold || sp.ConfirmationThreshold-sp.AdversaryThreshold < 10 {
 		return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
 	}
 	if sp.ConfirmationThreshold > 100 {
