@@ -110,7 +110,7 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 	for _, quorumID := range churnRequest.QuorumIDs {
 		for _, quorumIDAlreadyRegisteredFor := range quorumIDsAlreadyRegisteredFor {
 			if quorumIDAlreadyRegisteredFor == quorumID {
-				return nil, errors.New("operator is already registered in quorum")
+				return nil, api.NewInvalidArgError("operator is already registered in quorum")
 			}
 		}
 	}

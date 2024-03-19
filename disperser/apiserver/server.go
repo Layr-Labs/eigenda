@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -97,7 +98,6 @@ func NewDispersalServer(
 }
 
 func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_DisperseBlobAuthenticatedServer) error {
-
 	// Process disperse_request
 	in, err := stream.Recv()
 	if err != nil {
@@ -112,7 +112,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
 	if err != nil {
 		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
-			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
 		}
 		return api.NewInvalidArgError(err.Error())
 	}
@@ -182,11 +182,10 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 }
 
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
-
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
 		for _, quorumID := range req.CustomQuorumNumbers {
-			s.metrics.HandleFailedRequest(fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
 		return nil, api.NewInvalidArgError(err.Error())
 	}
@@ -218,7 +217,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), quorumId, blobSize, "DisperseBlob")
 		}
 		return nil, api.NewInvalidArgError(err.Error())
 	}
@@ -228,15 +227,10 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
-			for _, param := range securityParams {
-				quorumId := string(param.QuorumID)
-				if errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) {
-					s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-				} else if errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit) {
-					s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-				} else {
-					s.metrics.HandleFailedRequest(quorumId, blobSize, "DisperseBlob")
-				}
+			rateLimited := errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) || errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit)
+			if !rateLimited {
+				s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
+				return nil, api.NewInternalError(err.Error())
 			}
 			return nil, api.NewResourceExhaustedError(err.Error())
 		}
@@ -332,6 +326,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 	for i, param := range blob.RequestHeader.SecurityParams {
 
 		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
+		quorumId := string(param.QuorumID)
 		if !ok {
 			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
@@ -357,6 +352,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
+			s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
 			return errSystemThroughputRateLimit
 		}
 
@@ -367,6 +363,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
+			s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
 			return errSystemBlobRateLimit
 		}
 
@@ -379,6 +376,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("account byte ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", accountRates.Throughput)
+			s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
 			return errAccountThroughputRateLimit
 		}
 
@@ -389,6 +387,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *
 		}
 		if !allowed {
 			s.logger.Warn("account blob ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
+			s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
 			return errAccountBlobRateLimit
 		}
 
@@ -519,17 +518,15 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
-		s.metrics.IncrementFailedBlobRequestNum("", "RetrieveBlob")
-
 		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
 
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob", "err", err)
-		s.metrics.HandleFailedRequest("", len(data), "RetrieveBlob")
-
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", len(data), "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob data, please retry")
 	}
 

@@ -55,7 +55,6 @@ func (s *Server) Start(metricsConfig MetricsConfig) error {
 }
 
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
-
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
@@ -92,10 +91,10 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
 		return nil, api.NewInternalError(fmt.Sprintf("failed to process churn request: %s", err.Error()))
 	}
 
