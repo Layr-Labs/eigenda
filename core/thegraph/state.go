@@ -48,8 +48,16 @@ type (
 		SocketUpdates []SocketUpdates `graphql:"socketUpdates(first: 1, orderBy: blockNumber, orderDirection: desc)"`
 	}
 
+	// The indexed operator state consists of both mutable properties (socket) and  immutable properties
+	// (everyhing else: pubkeyG1, pubkeyG2, id). For the socket, we always want the latest value, irrespective
+	// of the reference block number. For the immutable properties, we can also use the value from the latest block
+	// since value cannot change. Thus, we always pull the state from the latest block indexed by the subgraph.
+	//
+	// Note that the deregistrationBlockNumber will only be set if the operator has deregistered from all quorums. By using
+	// the latest block, we allow the false-positive case where an operator was deregistered from all quorums at the reference
+	// block, but then re-registered afterward. We filter out these operators in GetIndexedOperatorState.
 	QueryOperatorsGql struct {
-		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, where: {deregistrationBlockNumber_gt: $blockNumber}, block: {number: $blockNumber})"`
+		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, where: {deregistrationBlockNumber_gt: $blockNumber})"`
 	}
 
 	QueryOperatorByIdGql struct {
@@ -129,6 +137,25 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
 	if err != nil {
 		return nil, err
+	}
+
+	// Detect missing operators
+	operatorSeen := make(map[core.OperatorID]struct{})
+	for _, quorumOperators := range operatorState.Operators {
+		for operatorID := range quorumOperators {
+			if indexedOperators[operatorID] == nil {
+				return nil, fmt.Errorf("operator %s not found in indexed state", operatorID.Hex())
+			}
+			operatorSeen[operatorID] = struct{}{}
+		}
+	}
+
+	// Filter out the operators who are not part of any quorum. This can happen if the operator re-registered
+	// after the reference block number.
+	for operatorID := range indexedOperators {
+		if _, ok := operatorSeen[operatorID]; !ok {
+			delete(indexedOperators, operatorID)
+		}
 	}
 
 	state := &core.IndexedOperatorState{

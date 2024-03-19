@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	dacore "github.com/Layr-Labs/eigenda/core"
-	indexermock "github.com/Layr-Labs/eigenda/core/thegraph/mock"
+	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
