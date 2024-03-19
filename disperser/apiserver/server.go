@@ -600,9 +600,7 @@ func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig,
 			return QuorumConfig{}, err
 		}
 	} else {
-		if newConfig.SecurityParams == nil {
-			newConfig.SecurityParams = make(map[core.QuorumID]core.SecurityParam)
-		}
+		newConfig.SecurityParams = make(map[core.QuorumID]core.SecurityParam)
 		for _, sp := range securityParams {
 			newConfig.SecurityParams[sp.QuorumID] = sp
 		}
