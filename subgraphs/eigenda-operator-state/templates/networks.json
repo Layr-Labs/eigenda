@@ -108,5 +108,27 @@
       "address": "0xb406d8e5F4BA1430D57c8231cc872C2c369E1F5F",
       "startBlock": 10497644
     }
+  },
+  "holesky": {
+    "RegistryCoordinator": {
+      "address": "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490",
+      "startBlock": 1168409
+    },
+    "BLSApkRegistry": {
+      "address": "0x066cF95c1bf0927124DFB8B02B401bc23A79730D",
+      "startBlock": 1168409
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0x066cF95c1bf0927124DFB8B02B401bc23A79730D",
+      "startBlock": 1168409
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490",
+      "startBlock": 1168409
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0x066cF95c1bf0927124DFB8B02B401bc23A79730D",
+      "startBlock": 1168409
+    }
   }
 }
