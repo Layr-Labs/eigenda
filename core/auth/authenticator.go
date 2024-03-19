@@ -27,6 +27,12 @@ func NewAuthenticator(config AuthConfig) core.BlobRequestAuthenticator {
 }
 
 func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error {
+	sig := header.AuthenticationData
+
+	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
+	if sig == nil || len(sig) != 65 {
+		return fmt.Errorf("signature length is unexpected: %d", len(sig))
+	}
 
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, header.Nonce)
@@ -37,17 +43,10 @@ func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error 
 		return fmt.Errorf("failed to decode public key (%v): %v", header.AccountID, err)
 	}
 
-	sig := header.AuthenticationData
-
 	// Decode public key
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
 		return fmt.Errorf("failed to decode public key (%v): %v", header.AccountID, err)
-	}
-
-	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	if sig == nil || len(sig) != 65 {
-		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
 	// Verify the signature

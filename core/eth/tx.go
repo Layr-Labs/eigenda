@@ -686,7 +686,7 @@ func (t *Transactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (ui
 	})
 }
 
-func (t *Transactor) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]*core.SecurityParam, error) {
+func (t *Transactor) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]core.SecurityParam, error) {
 	adversaryThresholdPercentegesBytes, err := t.Bindings.EigenDAServiceManager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
@@ -707,10 +707,10 @@ func (t *Transactor) GetQuorumSecurityParams(ctx context.Context, blockNumber ui
 		return nil, errors.New("adversaryThresholdPercentegesBytes and confirmationThresholdPercentegesBytes have different lengths")
 	}
 
-	securityParams := make([]*core.SecurityParam, len(adversaryThresholdPercentegesBytes))
+	securityParams := make([]core.SecurityParam, len(adversaryThresholdPercentegesBytes))
 
 	for i := range adversaryThresholdPercentegesBytes {
-		securityParams[i] = &core.SecurityParam{
+		securityParams[i] = core.SecurityParam{
 			QuorumID:              core.QuorumID(i),
 			AdversaryThreshold:    adversaryThresholdPercentegesBytes[i],
 			ConfirmationThreshold: confirmationThresholdPercentegesBytes[i],

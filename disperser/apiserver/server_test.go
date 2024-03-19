@@ -70,7 +70,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	transactor := &mock.MockTransactor{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	transactor.On("GetQuorumCount").Return(uint8(2), nil)
-	quorumParams := []*core.SecurityParam{
+	quorumParams := []core.SecurityParam{
 		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 	}
@@ -349,7 +349,7 @@ func setup(m *testing.M) {
 	transactor := &mock.MockTransactor{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	transactor.On("GetQuorumCount").Return(uint8(2), nil)
-	quorumParams := []*core.SecurityParam{
+	quorumParams := []core.SecurityParam{
 		{QuorumID: 0, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 		{QuorumID: 1, AdversaryThreshold: 80, ConfirmationThreshold: 100},
 	}
