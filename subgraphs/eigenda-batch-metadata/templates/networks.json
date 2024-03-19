@@ -28,5 +28,11 @@
       "address": "0xa3b1689Ab85409B15e07d2ED50A6EA9905074Ee5",
       "startBlock": 10497644
     }
+  },
+  "holesky": {
+    "EigenDAServiceManager": {
+      "address": "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
+      "startBlock": 1168409
+    }
   }
 }
