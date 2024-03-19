@@ -121,36 +121,42 @@ var (
 
 	operatorAddedToQuorum = []*subgraph.OperatorQuorum{
 		{
-			Operator:      "operator-2",
-			QuorumNumbers: "2",
-			BlockNumber:   "82",
+			Operator:       "operator-2",
+			QuorumNumbers:  "0x02",
+			BlockNumber:    "82",
+			BlockTimestamp: "1702666070",
 		},
 		{
-			Operator:      "operator-1",
-			QuorumNumbers: "2",
-			BlockNumber:   "82",
+			Operator:       "operator-1",
+			QuorumNumbers:  "0x02",
+			BlockNumber:    "82",
+			BlockTimestamp: "1702666070",
 		},
 		{
-			Operator:      "operator-1",
-			QuorumNumbers: "01",
-			BlockNumber:   "80",
+			Operator:       "operator-1",
+			QuorumNumbers:  "0x01",
+			BlockNumber:    "80",
+			BlockTimestamp: "1702666046",
 		},
 	}
 	operatorRemovedFromQuorum = []*subgraph.OperatorQuorum{
 		{
-			Operator:      "operator-1",
-			QuorumNumbers: "0",
-			BlockNumber:   "81",
+			Operator:       "operator-1",
+			QuorumNumbers:  "0x00",
+			BlockNumber:    "81",
+			BlockTimestamp: "1702666058",
 		},
 		{
-			Operator:      "operator-2",
-			QuorumNumbers: "2",
-			BlockNumber:   "83",
+			Operator:       "operator-2",
+			QuorumNumbers:  "0x02",
+			BlockNumber:    "83",
+			BlockTimestamp: "1702666082",
 		},
 		{
-			Operator:      "operator-1",
-			QuorumNumbers: "1",
-			BlockNumber:   "83",
+			Operator:       "operator-1",
+			QuorumNumbers:  "0x01",
+			BlockNumber:    "83",
+			BlockTimestamp: "1702666082",
 		},
 	}
 
@@ -184,6 +190,7 @@ var (
 					},
 				},
 			},
+			BlockNumber: "83",
 		},
 		{
 			BatchId:         "0",
@@ -211,6 +218,7 @@ var (
 					},
 				},
 			},
+			BlockNumber: "82",
 		},
 	}
 
