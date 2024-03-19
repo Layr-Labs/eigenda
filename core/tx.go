@@ -101,11 +101,9 @@ type Transactor interface {
 	// GetCurrentQuorumBitmapByOperatorId returns the current quorum bitmap for the operator.
 	GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId OperatorID) (*big.Int, error)
 
-	// GetQuorumBitmapForOperatorsAtBlockNumber returns the quorum bitmaps for the operators
-	// at the given block number.
-	// The result slice will be of same length as "operatorIds", with the i-th entry be the
-	// result for the operatorIds[i]. If an operator failed to find bitmap, the corresponding
-	// result entry will be an empty bitmap.
+	// GetQuorumBitmapForOperatorsAtBlockNumber returns the quorum bitmaps for the operators at the given block number.
+	// The result slice will be of same length as "operatorIds", with the i-th entry be the result for the operatorIds[i].
+	// If an operator failed to find bitmap, the corresponding result entry will be an empty bitmap.
 	GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []OperatorID, blockNumber uint32) ([]*big.Int, error)
 
 	// GetOperatorSetParams returns operator set params for the quorum.
