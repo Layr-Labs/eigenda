@@ -582,7 +582,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	type BitmapIndexOrError struct {
 		bitmapIndex int
 		// The index is referring to the position of operator in operatorIds slice,
-		// i.e. the bitmap here (if err is nil) is for operatorIds[index].
+		// i.e. the bitmapIndex here is for operatorIds[index].
 		index int
 		err   error
 	}
