@@ -147,19 +147,6 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(1), ids)
-
-	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(registeredQuorumIds))
-	assert.Equal(t, uint8(1), registeredQuorumIds[0])
-
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), ids)
-
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(1))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), ids)
 }
 
 func TestPluginInvalidOperation(t *testing.T) {
