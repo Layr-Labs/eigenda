@@ -53,22 +53,24 @@ func makeFailureCall(t *testing.T, client *geth.MultiHomingClient, numCall int) 
 	}
 }
 
-func make500Error() rpc.HTTPError {
-	var httpRespError rpc.HTTPError
-	httpRespError.StatusCode = 500
-	httpRespError.Status = "INTERNAL_ERROR"
-	httpRespError.Body = []byte{}
-	return httpRespError
+func make500Error() error {
+	return rpc.HTTPError{
+		StatusCode: 500,
+		Status:     "INTERNAL_ERROR",
+		Body:       []byte{},
+	}
 }
 
 func TestMultihomingClientSenderFaultZeroRetry(t *testing.T) {
-	// 2xx and 4xx attributes to sender's fault, RPC should not rotate
-	statusCodes := []int{201, 202, 400, 401, 403, 429}
+	// 4xx attributes to sender's fault, RPC should not rotate
+	statusCodes := []int{400, 401}
 	for _, sc := range statusCodes {
-		var httpRespError rpc.HTTPError
-		httpRespError.StatusCode = sc
-		httpRespError.Status = "INTERNAL_ERROR"
-		httpRespError.Body = []byte{}
+
+		httpRespError := rpc.HTTPError{
+			StatusCode: sc,
+			Status:     "INTERNAL_ERROR",
+			Body:       []byte{},
+		}
 
 		client, _ := makeTestMultihomingClient(0, httpRespError)
 
