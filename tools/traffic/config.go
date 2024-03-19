@@ -15,8 +15,6 @@ type Config struct {
 	NumInstances           uint
 	RequestInterval        time.Duration
 	DataSize               uint64
-	ConfirmationThreshold  uint8
-	AdversarialThreshold   uint8
 	LoggingConfig          common.LoggerConfig
 	RandomizeBlobs         bool
 	InstanceLaunchInterval time.Duration
@@ -37,8 +35,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
 		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
-		ConfirmationThreshold:  uint8(ctx.GlobalUint(flags.QuorumThresholdFlag.Name)),
-		AdversarialThreshold:   uint8(ctx.GlobalUint(flags.AdversarialThresholdFlag.Name)),
 		LoggingConfig:          *loggerConfig,
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
