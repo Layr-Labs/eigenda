@@ -364,6 +364,10 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 		if err != nil {
 			return nil, err
 		}
+		if len(opq.QuorumNumbers) < 2 || len(opq.QuorumNumbers)%2 != 0 {
+			return nil, fmt.Errorf("the QuorumNumbers is expected to start with 0x and have an even length, QuorumNumbers: %s", string(opq.QuorumNumbers))
+		}
+		// The quorum numbers string starts with "0x", so we should skip it.
 		quorumStr := string(opq.QuorumNumbers)[2:]
 		quorumNumbers := make([]byte, 0)
 		for i := 0; i < len(quorumStr); i += 2 {
