@@ -18,6 +18,9 @@ import (
 
 // Constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
 func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
+	if in.GetBatchHeader() == nil {
+		return nil, errors.New("the batch_header field is nil")
+	}
 	var batchRoot [32]byte
 	copy(batchRoot[:], in.GetBatchHeader().GetBatchRoot())
 	batchHeader := core.BatchHeader{
@@ -40,15 +43,15 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 		}
 
 		bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
-		for i, chunks := range blob.GetBundles() {
-			quorumID := blob.GetHeader().GetQuorumHeaders()[i].QuorumId
+		for j, chunks := range blob.GetBundles() {
+			quorumID := blob.GetHeader().GetQuorumHeaders()[j].QuorumId
 			bundles[uint8(quorumID)] = make([]*encoding.Frame, len(chunks.GetChunks()))
-			for j, data := range chunks.GetChunks() {
+			for k, data := range chunks.GetChunks() {
 				chunk, err := new(encoding.Frame).Deserialize(data)
 				if err != nil {
 					return nil, err
 				}
-				bundles[uint8(quorumID)][j] = chunk
+				bundles[uint8(quorumID)][k] = chunk
 			}
 		}
 
@@ -108,7 +111,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 }
 
 // rebuildMerkleTree rebuilds the merkle tree from the blob headers and batch header.
-func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte, quorumID uint8) (*merkletree.MerkleTree, error) {
+func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte) (*merkletree.MerkleTree, error) {
 	batchHeaderBytes, err := s.node.Store.GetBatchHeader(context.Background(), batchHeaderHash)
 	if err != nil {
 		return nil, errors.New("failed to get the batch header from Store")

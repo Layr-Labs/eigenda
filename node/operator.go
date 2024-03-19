@@ -148,7 +148,7 @@ func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl st
 	defer cancel()
 
 	request := newChurnRequest(operator.Address, operator.KeyPair, operator.QuorumIDs)
-	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 300)
+	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 1)
 
 	return gc.Churn(ctx, request, opt)
 }
