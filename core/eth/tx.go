@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"slices"
 
@@ -580,8 +581,10 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	// Get the bitmap indices for all the given operators.
 	type BitmapIndexOrError struct {
 		bitmapIndex int
-		index       int
-		err         error
+		// The index is referring to the position of operator in operatorIds slice,
+		// i.e. the bitmap here (if err is nil) is for operatorIds[index].
+		index int
+		err   error
 	}
 	indexChan := make(chan BitmapIndexOrError, len(operatorIds))
 	indexPool := workerpool.New(maxNumWorkerPoolThreads)
@@ -604,6 +607,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	}
 	indexPool.StopWait()
 	close(indexChan)
+	// quorumBitmapIndices[i] is the bitmap index for operatorIds[i].
 	quorumBitmapIndices := make([]int, len(operatorIds))
 	for result := range indexChan {
 		if result.err != nil {
@@ -629,7 +633,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 		op := operatorIds[i]
 		pool.Submit(func() {
 			if bitmapIndex == -1 {
-				resultChan <- BitmapOrError{bitmap: nil, index: i, err: errors.New("no bitmap found for operator")}
+				resultChan <- BitmapOrError{bitmap: nil, index: i, err: fmt.Errorf("no bitmap index found for operator: %s", op.Hex())}
 				return
 			}
 			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
@@ -644,6 +648,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 	bitmaps := make([]*big.Int, len(quorumBitmapIndices))
 	for result := range resultChan {
 		if result.err != nil {
+			// For operators not found bitmap, set the bitmap to empty.
 			bitmaps[result.index] = big.NewInt(0)
 		} else {
 			bitmaps[result.index] = result.bitmap
