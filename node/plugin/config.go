@@ -25,7 +25,7 @@ var (
 	OperationFlag = cli.StringFlag{
 		Name:     "operation",
 		Required: true,
-		Usage:    "Supported operations: opt-in, opt-out, update-quorums",
+		Usage:    "Supported operations: opt-in, opt-out",
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "OPERATION"),
 	}
 
@@ -133,7 +133,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	op := ctx.GlobalString(OperationFlag.Name)
-	if op != "opt-in" && op != "opt-out" && op != "update-quorums" {
+	if op != "opt-in" && op != "opt-out" {
 		return nil, errors.New("unsupported operation type")
 	}
 

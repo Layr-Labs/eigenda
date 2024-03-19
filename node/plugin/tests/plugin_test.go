@@ -148,9 +148,6 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(1), ids)
 
-	operator.NODE_QUORUM_ID_LIST = "1"
-	testConfig.RunNodePluginBinary("update-quorums", operator)
-
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(registeredQuorumIds))

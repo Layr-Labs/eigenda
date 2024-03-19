@@ -141,14 +141,6 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully opt-out the EigenDA, for operator ID: %x, operator address: %x", operatorID, sk.Address)
-	} else if config.Operation == "update-quorums" {
-		log.Printf("Info: Operator with Operator Address: %x is updating its quorums: %v", sk.Address, config.QuorumIDList)
-		err = node.UpdateOperatorQuorums(context.Background(), operator, tx, config.ChurnerUrl, true, logger)
-		if err != nil {
-			log.Printf("Error: failed to update quorums for operator ID: %x, operator address: %x, quorums: %v, error: %v", operatorID, sk.Address, config.QuorumIDList, err)
-			return
-		}
-		log.Printf("Info: successfully updated quorums, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
 	} else if config.Operation == "update-socket" {
 		log.Printf("Info: Operator with Operator Address: %x is updating its socket: %s", sk.Address, config.Socket)
 		err = node.UpdateOperatorSocket(context.Background(), tx, config.Socket)
