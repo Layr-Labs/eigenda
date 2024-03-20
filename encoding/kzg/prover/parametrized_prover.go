@@ -61,36 +61,36 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	config := ecc.MultiExpConfig{}
 
-	var lowDegreeCommitment bn254.G2Affine
-	_, err = lowDegreeCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
+	var lengthCommitment bn254.G2Affine
+	_, err = lengthCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
 
 	intermediate := time.Now()
 
-	polyDegreePlus1 := uint64(len(inputFr))
+	chunkLength := uint64(len(inputFr))
 
 	if g.Verbose {
 		log.Printf("    Commiting takes  %v\n", time.Since(intermediate))
 		intermediate = time.Now()
 
-		log.Printf("shift %v\n", g.SRSOrder-polyDegreePlus1)
+		log.Printf("shift %v\n", g.SRSOrder-chunkLength)
 		log.Printf("order %v\n", len(g.Srs.G2))
 		log.Println("low degree verification info")
 	}
 
-	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyDegreePlus1:]
+	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-chunkLength:]
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
-	var lowDegreeProof bn254.G2Affine
-	_, err = lowDegreeProof.MultiExp(shiftedSecret, poly.Coeffs, config)
+	var lengthProof bn254.G2Affine
+	_, err = lengthProof.MultiExp(shiftedSecret, poly.Coeffs, config)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
 
 	if g.Verbose {
-		log.Printf("    Generating Low Degree Proof takes  %v\n", time.Since(intermediate))
+		log.Printf("    Generating Length Proof takes  %v\n", time.Since(intermediate))
 		intermediate = time.Now()
 	}
 
@@ -118,7 +118,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	if g.Verbose {
 		log.Printf("Total encoding took      %v\n", time.Since(startTime))
 	}
-	return &commit, &lowDegreeCommitment, &lowDegreeProof, kzgFrames, indices, nil
+	return &commit, &lengthCommitment, &lengthProof, kzgFrames, indices, nil
 }
 
 func (g *ParametrizedProver) Commit(polyFr []fr.Element) (bn254.G1Affine, error) {
@@ -249,7 +249,7 @@ func (p *ParametrizedProver) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint
 
 	toeV := make([]fr.Element, 2*dimE-1)
 	for i := uint64(0); i < dim; i++ {
-		
+
 		toeV[i].Set(&polyFr[m-(j+i*l)])
 	}
 

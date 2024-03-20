@@ -143,7 +143,7 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 		return encoding.BlobCommitments{}, nil, err
 	}
 
-	commit, lowDegreeCommit, lowDegreeProof, kzgFrames, _, err := enc.EncodeBytes(data)
+	commit, lengthCommit, lengthProof, kzgFrames, _, err := enc.EncodeBytes(data)
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err
 	}
@@ -160,8 +160,8 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 	length := uint(len(rs.ToFrArray(data)))
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
-		LengthCommitment: (*encoding.G2Commitment)(lowDegreeCommit),
-		LengthProof:      (*encoding.G2Commitment)(lowDegreeProof),
+		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
+		LengthProof:      (*encoding.G2Commitment)(lengthProof),
 		Length:           length,
 	}
 
