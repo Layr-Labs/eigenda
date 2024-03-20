@@ -20,18 +20,21 @@ func NewRPCStatistics(logger logging.Logger) *RPCStatistics {
 }
 
 // ProcessError attributes the error and updates total number of fault for RPC
-func (f *RPCStatistics) ProcessError(err error) {
+// It returns if RPC should immediately give up
+func (f *RPCStatistics) ProcessError(err error) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err == nil {
-		return
+		return false
 	}
 
-	serverFault := f.handleError(err)
+	nextEndpoint, action := f.handleError(err)
 
-	if serverFault {
+	if nextEndpoint == NewRPC {
 		f.numberRpcFault += 1
 	}
+
+	return action == Return
 }
 
 func (f *RPCStatistics) GetTotalNumberRpcFault() uint64 {

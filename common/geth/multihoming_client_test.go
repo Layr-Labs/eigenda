@@ -18,6 +18,11 @@ var (
 	rpcURLs    = []string{"127.0.0.1", "127.0.0.2", "127.0.0.3"}
 )
 
+type JsonError struct{}
+
+func (j *JsonError) Error() string  { return "json error" }
+func (j *JsonError) ErrorCode() int { return -32000 }
+
 func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.MultiHomingClient, error) {
 	logger := logging.NewNoopLogger()
 
@@ -63,7 +68,7 @@ func make500Error() error {
 
 func TestMultihomingClientSenderFaultZeroRetry(t *testing.T) {
 	// 4xx attributes to sender's fault, RPC should not rotate
-	statusCodes := []int{400, 401}
+	statusCodes := []int{401, 499}
 	for _, sc := range statusCodes {
 
 		httpRespError := rpc.HTTPError{
@@ -77,12 +82,49 @@ func TestMultihomingClientSenderFaultZeroRetry(t *testing.T) {
 		index, _ := client.GetRPCInstance()
 		require.Equal(t, index, 0)
 
-		makeFailureCall(t, client, 1)
+		makeFailureCall(t, client, 10)
 
-		// given num retry is 0, when failure arises above, current rpc should becomes the next one
+		// given error is 401, 409, when failure arises above, current rpc will be reused
 		index, _ = client.GetRPCInstance()
 		require.Equal(t, index, 0)
 	}
+
+	// 4xx attributes to remote server fault, RPC should rotate
+	statusCodes = []int{403, 429}
+	for _, sc := range statusCodes {
+
+		httpRespError := rpc.HTTPError{
+			StatusCode: sc,
+			Status:     "INTERNAL_ERROR",
+			Body:       []byte{},
+		}
+
+		client, _ := makeTestMultihomingClient(1, httpRespError)
+
+		index, _ := client.GetRPCInstance()
+		require.Equal(t, index, 0)
+
+		makeFailureCall(t, client, 1)
+
+		// given num retry is 1, when failure arises, current rpc should becomes the next one
+		index, _ = client.GetRPCInstance()
+		require.Equal(t, index, 2)
+	}
+
+	// 2xx attributes to sender's fault with JSON RPC fault, RPC should not rotate
+	rpcError := JsonError{}
+
+	client, _ := makeTestMultihomingClient(2, &rpcError)
+
+	index, _ := client.GetRPCInstance()
+	require.Equal(t, index, 0)
+
+	makeFailureCall(t, client, 10)
+
+	// given num retry is 0, when failure arises above, current rpc should becomes the next one
+	index, _ = client.GetRPCInstance()
+	require.Equal(t, index, 0)
+
 }
 
 func TestMultihomingClientRPCFaultZeroRetry(t *testing.T) {
