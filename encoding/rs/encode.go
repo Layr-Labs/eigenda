@@ -2,6 +2,7 @@ package rs
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
