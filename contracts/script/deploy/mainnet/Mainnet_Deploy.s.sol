@@ -78,6 +78,9 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         // deploy proxy admin for ability to upgrade proxy contracts
         eigenDAProxyAdmin = new ProxyAdmin();
 
+        //deploy service manager router
+        serviceManagerRouter = new ServiceManagerRouter();
+
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
@@ -192,9 +195,6 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
 
         //deploy the operator state retriever
         operatorStateRetriever = new OperatorStateRetriever();
-
-        //deploy service manager router
-        serviceManagerRouter = new ServiceManagerRouter();
 
         //deploy mock rollup
         mockRollup = new MockRollup(
