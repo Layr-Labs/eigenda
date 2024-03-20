@@ -29,11 +29,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var errSystemBlobRateLimit = errors.New("request ratelimited: system blob limit")
-var errSystemThroughputRateLimit = errors.New("request ratelimited: system throughput limit")
-var errAccountBlobRateLimit = errors.New("request ratelimited: account blob limit")
-var errAccountThroughputRateLimit = errors.New("request ratelimited: account throughput limit")
-
 const systemAccountKey = "system"
 
 const maxBlobSize = 2 * 1024 * 1024 // 2 MiB

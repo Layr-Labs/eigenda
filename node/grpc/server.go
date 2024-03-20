@@ -200,8 +200,15 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.ConfirmationThreshold, quorumInfo.AdversaryThreshold))
 	rate := quorumInfo.QuorumRate
 
+	params := []common.RequestParams{
+		{
+			RequesterID: retrieverID,
+			BlobSize:    encodedBlobSize,
+			Rate:        rate,
+		},
+	}
 	s.mu.Lock()
-	allow, err := s.ratelimiter.AllowRequest(ctx, retrieverID, encodedBlobSize, rate)
+	allow, _, err := s.ratelimiter.AllowRequest(ctx, params)
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err
