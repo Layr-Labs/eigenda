@@ -113,7 +113,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 func (g *Prover) PreloadAllEncoders() error {
 	paramsAll, err := GetAllPrecomputedSrsMap(g.CacheDir)
 	if err != nil {
-		return nil
+		return err
 	}
 	fmt.Printf("detect %v srs maps\n", len(paramsAll))
 	for i := 0; i < len(paramsAll); i++ {

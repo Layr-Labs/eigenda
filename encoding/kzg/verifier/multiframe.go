@@ -1,11 +1,10 @@
 package verifier
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 
@@ -24,51 +23,6 @@ type Sample struct {
 	RowIndex   int // corresponds to a row in the verification matrix
 	Coeffs     []fr.Element
 	X          uint // X is the evaluating index which corresponds to the leading coset
-}
-
-// generate a random value using Fiat Shamir transform
-// we can also pseudo randomness generated locally, but we have to ensure no adversary can manipulate it
-// Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
-func GenRandomFactor(samples []Sample) (fr.Element, error) {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-
-	for _, sample := range samples {
-		err := enc.Encode(sample.Commitment)
-		if err != nil {
-			return fr.Element{}, err
-		}
-	}
-
-	var randomFr fr.Element
-
-	err := kzg.HashToSingleField(&randomFr, buffer.Bytes())
-	if err != nil {
-		return fr.Element{}, err
-	}
-
-	return randomFr, nil
-}
-
-// Every sample has its own randomness, even though multiple samples can come from identical blob
-// Randomnesss for each sample is computed by repeatedly raising the power of the root randomness
-func GenRandomnessVector(samples []Sample) ([]fr.Element, error) {
-	// root randomness
-	r, err := GenRandomFactor(samples)
-	if err != nil {
-		return nil, err
-	}
-
-	n := len(samples)
-
-	randomsFr := make([]fr.Element, n)
-	randomsFr[0].Set(&r)
-
-	// power of r
-	for j := 0; j < n-1; j++ {
-		randomsFr[j+1].Mul(&randomsFr[j], &r)
-	}
-	return randomsFr, nil
 }
 
 // the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
@@ -142,19 +96,14 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 
 	// get leading coset powers
 	leadingDs := make([]fr.Element, n)
+	bigD := big.NewInt(int64(D))
 
 	for k := 0; k < n; k++ {
 
 		// got the leading coset field element
 		h := ks.ExpandedRootsOfUnity[samples[k].X]
 		var hPow fr.Element
-		hPow.SetOne()
-
-		// raising the power for each leading coset
-		for j := uint64(0); j < D; j++ {
-			hPow.Mul(&hPow, &h)
-		}
-
+		hPow.Exp(h, bigD)
 		leadingDs[k].Set(&hPow)
 	}
 
@@ -232,14 +181,14 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	D := params.ChunkLength
 
 	if D > group.SRSNumberToLoad {
-		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v.", D, group.SRSNumberToLoad)
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, group.SRSNumberToLoad)
 	}
 
 	n := len(samples)
 	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
 
 	// generate random field elements to aggregate equality check
-	randomsFr, err := GenRandomnessVector(samples)
+	randomsFr, err := CreateRandomnessVector(n)
 	if err != nil {
 		return err
 	}

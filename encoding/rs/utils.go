@@ -19,8 +19,8 @@ func ToFrArray(data []byte) []fr.Element {
 		start := i * uint64(encoding.BYTES_PER_COEFFICIENT)
 		end := (i + 1) * uint64(encoding.BYTES_PER_COEFFICIENT)
 		if end >= uint64(len(data)) {
-			var padded [31]byte
-			copy(padded[:], data[start:])
+			var padded [32]byte
+			copy(padded[1:], data[start:])
 			eles[i].SetBytes(padded[:])
 
 		} else {
