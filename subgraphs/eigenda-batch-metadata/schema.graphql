@@ -21,7 +21,7 @@ type BatchHeader @entity(immutable: true) {
   id: Bytes!
   blobHeadersRoot: Bytes!
   quorumNumbers: [BigInt!]!
-  quorumThresholdPercentages: [BigInt!]!
+  signedStakeForQuorums: [BigInt!]!
   referenceBlockNumber: BigInt!
   batch: Batch!
 }

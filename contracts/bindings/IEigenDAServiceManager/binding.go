@@ -55,10 +55,10 @@ type IBLSSignatureCheckerNonSignerStakesAndSignature struct {
 
 // IEigenDAServiceManagerBatchHeader is an auto generated low-level Go binding around an user-defined struct.
 type IEigenDAServiceManagerBatchHeader struct {
-	BlobHeadersRoot            [32]byte
-	QuorumNumbers              []byte
-	QuorumThresholdPercentages []byte
-	ReferenceBlockNumber       uint32
+	BlobHeadersRoot       [32]byte
+	QuorumNumbers         []byte
+	SignedStakeForQuorums []byte
+	ReferenceBlockNumber  uint32
 }
 
 // ISignatureUtilsSignatureWithSaltAndExpiry is an auto generated low-level Go binding around an user-defined struct.
@@ -70,7 +70,7 @@ type ISignatureUtilsSignatureWithSaltAndExpiry struct {
 
 // ContractIEigenDAServiceManagerMetaData contains all meta data concerning the ContractIEigenDAServiceManager contract.
 var ContractIEigenDAServiceManagerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"BLOCK_STALE_MEASURE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"avsDirectory\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"batchIdToBatchMetadataHash\",\"inputs\":[{\"name\":\"batchId\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"confirmBatch\",\"inputs\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumThresholdPercentages\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deregisterOperatorFromAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOperatorRestakedStrategies\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRestakeableStrategies\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"latestServeUntilBlock\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registerOperatorToAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setBatchConfirmer\",\"inputs\":[{\"name\":\"_batchConfirmer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMetadataURI\",\"inputs\":[{\"name\":\"_metadataURI\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"taskNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"BatchConfirmed\",\"inputs\":[{\"name\":\"batchHeaderHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"batchId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"BatchConfirmerChanged\",\"inputs\":[{\"name\":\"previousAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"BLOCK_STALE_MEASURE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"avsDirectory\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"batchIdToBatchMetadataHash\",\"inputs\":[{\"name\":\"batchId\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"confirmBatch\",\"inputs\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"signedStakeForQuorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deregisterOperatorFromAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOperatorRestakedStrategies\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRestakeableStrategies\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"latestServeUntilBlock\",\"inputs\":[{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumAdversaryThresholdPercentages\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumConfirmationThresholdPercentages\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumNumbersRequired\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registerOperatorToAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setBatchConfirmer\",\"inputs\":[{\"name\":\"_batchConfirmer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"taskNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"updateAVSMetadataURI\",\"inputs\":[{\"name\":\"_metadataURI\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"BatchConfirmed\",\"inputs\":[{\"name\":\"batchHeaderHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"batchId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"BatchConfirmerChanged\",\"inputs\":[{\"name\":\"previousAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false}]",
 }
 
 // ContractIEigenDAServiceManagerABI is the input ABI used to generate the binding from.
@@ -374,12 +374,12 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSessi
 	return _ContractIEigenDAServiceManager.Contract.GetRestakeableStrategies(&_ContractIEigenDAServiceManager.CallOpts)
 }
 
-// LatestServeUntilBlock is a free data retrieval call binding the contract method 0x758f8dba.
+// LatestServeUntilBlock is a free data retrieval call binding the contract method 0xeaefd27d.
 //
-// Solidity: function latestServeUntilBlock() view returns(uint32)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) LatestServeUntilBlock(opts *bind.CallOpts) (uint32, error) {
+// Solidity: function latestServeUntilBlock(uint32 referenceBlockNumber) view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) LatestServeUntilBlock(opts *bind.CallOpts, referenceBlockNumber uint32) (uint32, error) {
 	var out []interface{}
-	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "latestServeUntilBlock")
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "latestServeUntilBlock", referenceBlockNumber)
 
 	if err != nil {
 		return *new(uint32), err
@@ -391,18 +391,111 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) Lat
 
 }
 
-// LatestServeUntilBlock is a free data retrieval call binding the contract method 0x758f8dba.
+// LatestServeUntilBlock is a free data retrieval call binding the contract method 0xeaefd27d.
 //
-// Solidity: function latestServeUntilBlock() view returns(uint32)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) LatestServeUntilBlock() (uint32, error) {
-	return _ContractIEigenDAServiceManager.Contract.LatestServeUntilBlock(&_ContractIEigenDAServiceManager.CallOpts)
+// Solidity: function latestServeUntilBlock(uint32 referenceBlockNumber) view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) LatestServeUntilBlock(referenceBlockNumber uint32) (uint32, error) {
+	return _ContractIEigenDAServiceManager.Contract.LatestServeUntilBlock(&_ContractIEigenDAServiceManager.CallOpts, referenceBlockNumber)
 }
 
-// LatestServeUntilBlock is a free data retrieval call binding the contract method 0x758f8dba.
+// LatestServeUntilBlock is a free data retrieval call binding the contract method 0xeaefd27d.
 //
-// Solidity: function latestServeUntilBlock() view returns(uint32)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) LatestServeUntilBlock() (uint32, error) {
-	return _ContractIEigenDAServiceManager.Contract.LatestServeUntilBlock(&_ContractIEigenDAServiceManager.CallOpts)
+// Solidity: function latestServeUntilBlock(uint32 referenceBlockNumber) view returns(uint32)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) LatestServeUntilBlock(referenceBlockNumber uint32) (uint32, error) {
+	return _ContractIEigenDAServiceManager.Contract.LatestServeUntilBlock(&_ContractIEigenDAServiceManager.CallOpts, referenceBlockNumber)
+}
+
+// QuorumAdversaryThresholdPercentages is a free data retrieval call binding the contract method 0x8687feae.
+//
+// Solidity: function quorumAdversaryThresholdPercentages() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) QuorumAdversaryThresholdPercentages(opts *bind.CallOpts) ([]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "quorumAdversaryThresholdPercentages")
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// QuorumAdversaryThresholdPercentages is a free data retrieval call binding the contract method 0x8687feae.
+//
+// Solidity: function quorumAdversaryThresholdPercentages() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) QuorumAdversaryThresholdPercentages() ([]byte, error) {
+	return _ContractIEigenDAServiceManager.Contract.QuorumAdversaryThresholdPercentages(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// QuorumAdversaryThresholdPercentages is a free data retrieval call binding the contract method 0x8687feae.
+//
+// Solidity: function quorumAdversaryThresholdPercentages() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) QuorumAdversaryThresholdPercentages() ([]byte, error) {
+	return _ContractIEigenDAServiceManager.Contract.QuorumAdversaryThresholdPercentages(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// QuorumConfirmationThresholdPercentages is a free data retrieval call binding the contract method 0xbafa9107.
+//
+// Solidity: function quorumConfirmationThresholdPercentages() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) QuorumConfirmationThresholdPercentages(opts *bind.CallOpts) ([]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "quorumConfirmationThresholdPercentages")
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// QuorumConfirmationThresholdPercentages is a free data retrieval call binding the contract method 0xbafa9107.
+//
+// Solidity: function quorumConfirmationThresholdPercentages() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) QuorumConfirmationThresholdPercentages() ([]byte, error) {
+	return _ContractIEigenDAServiceManager.Contract.QuorumConfirmationThresholdPercentages(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// QuorumConfirmationThresholdPercentages is a free data retrieval call binding the contract method 0xbafa9107.
+//
+// Solidity: function quorumConfirmationThresholdPercentages() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) QuorumConfirmationThresholdPercentages() ([]byte, error) {
+	return _ContractIEigenDAServiceManager.Contract.QuorumConfirmationThresholdPercentages(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// QuorumNumbersRequired is a free data retrieval call binding the contract method 0xe15234ff.
+//
+// Solidity: function quorumNumbersRequired() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCaller) QuorumNumbersRequired(opts *bind.CallOpts) ([]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDAServiceManager.contract.Call(opts, &out, "quorumNumbersRequired")
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// QuorumNumbersRequired is a free data retrieval call binding the contract method 0xe15234ff.
+//
+// Solidity: function quorumNumbersRequired() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) QuorumNumbersRequired() ([]byte, error) {
+	return _ContractIEigenDAServiceManager.Contract.QuorumNumbersRequired(&_ContractIEigenDAServiceManager.CallOpts)
+}
+
+// QuorumNumbersRequired is a free data retrieval call binding the contract method 0xe15234ff.
+//
+// Solidity: function quorumNumbersRequired() view returns(bytes)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerCallerSession) QuorumNumbersRequired() ([]byte, error) {
+	return _ContractIEigenDAServiceManager.Contract.QuorumNumbersRequired(&_ContractIEigenDAServiceManager.CallOpts)
 }
 
 // TaskNumber is a free data retrieval call binding the contract method 0x72d18e8d.
@@ -520,25 +613,25 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorS
 	return _ContractIEigenDAServiceManager.Contract.SetBatchConfirmer(&_ContractIEigenDAServiceManager.TransactOpts, _batchConfirmer)
 }
 
-// SetMetadataURI is a paid mutator transaction binding the contract method 0x750521f5.
+// UpdateAVSMetadataURI is a paid mutator transaction binding the contract method 0xa98fb355.
 //
-// Solidity: function setMetadataURI(string _metadataURI) returns()
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) SetMetadataURI(opts *bind.TransactOpts, _metadataURI string) (*types.Transaction, error) {
-	return _ContractIEigenDAServiceManager.contract.Transact(opts, "setMetadataURI", _metadataURI)
+// Solidity: function updateAVSMetadataURI(string _metadataURI) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactor) UpdateAVSMetadataURI(opts *bind.TransactOpts, _metadataURI string) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.contract.Transact(opts, "updateAVSMetadataURI", _metadataURI)
 }
 
-// SetMetadataURI is a paid mutator transaction binding the contract method 0x750521f5.
+// UpdateAVSMetadataURI is a paid mutator transaction binding the contract method 0xa98fb355.
 //
-// Solidity: function setMetadataURI(string _metadataURI) returns()
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) SetMetadataURI(_metadataURI string) (*types.Transaction, error) {
-	return _ContractIEigenDAServiceManager.Contract.SetMetadataURI(&_ContractIEigenDAServiceManager.TransactOpts, _metadataURI)
+// Solidity: function updateAVSMetadataURI(string _metadataURI) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerSession) UpdateAVSMetadataURI(_metadataURI string) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.UpdateAVSMetadataURI(&_ContractIEigenDAServiceManager.TransactOpts, _metadataURI)
 }
 
-// SetMetadataURI is a paid mutator transaction binding the contract method 0x750521f5.
+// UpdateAVSMetadataURI is a paid mutator transaction binding the contract method 0xa98fb355.
 //
-// Solidity: function setMetadataURI(string _metadataURI) returns()
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) SetMetadataURI(_metadataURI string) (*types.Transaction, error) {
-	return _ContractIEigenDAServiceManager.Contract.SetMetadataURI(&_ContractIEigenDAServiceManager.TransactOpts, _metadataURI)
+// Solidity: function updateAVSMetadataURI(string _metadataURI) returns()
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerTransactorSession) UpdateAVSMetadataURI(_metadataURI string) (*types.Transaction, error) {
+	return _ContractIEigenDAServiceManager.Contract.UpdateAVSMetadataURI(&_ContractIEigenDAServiceManager.TransactOpts, _metadataURI)
 }
 
 // ContractIEigenDAServiceManagerBatchConfirmedIterator is returned from FilterBatchConfirmed and is used to iterate over the raw logs and unpacked data for BatchConfirmed events raised by the ContractIEigenDAServiceManager contract.

@@ -172,18 +172,18 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 
 	quorumHeader := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           0,
-			QuorumThreshold:    quorumThreshold,
-			AdversaryThreshold: adversaryThreshold,
+			QuorumID:              0,
+			ConfirmationThreshold: quorumThreshold,
+			AdversaryThreshold:    adversaryThreshold,
 		},
 		ChunkLength: 10,
 	}
 
 	quorumHeader1 := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
-			QuorumID:           1,
-			QuorumThreshold:    65,
-			AdversaryThreshold: 15,
+			QuorumID:              1,
+			ConfirmationThreshold: 65,
+			AdversaryThreshold:    15,
 		},
 		ChunkLength: 10,
 	}
@@ -389,10 +389,10 @@ func blobHeaderToProto(blobHeader *core.BlobHeader) *pb.BlobHeader {
 	quorumHeaders := make([]*pb.BlobQuorumInfo, len(blobHeader.QuorumInfos))
 	for i, quorumInfo := range blobHeader.QuorumInfos {
 		quorumHeaders[i] = &pb.BlobQuorumInfo{
-			QuorumId:           uint32(quorumInfo.QuorumID),
-			QuorumThreshold:    uint32(quorumInfo.QuorumThreshold),
-			AdversaryThreshold: uint32(quorumInfo.AdversaryThreshold),
-			ChunkLength:        uint32(quorumInfo.ChunkLength),
+			QuorumId:              uint32(quorumInfo.QuorumID),
+			ConfirmationThreshold: uint32(quorumInfo.ConfirmationThreshold),
+			AdversaryThreshold:    uint32(quorumInfo.AdversaryThreshold),
+			ChunkLength:           uint32(quorumInfo.ChunkLength),
 		}
 	}
 

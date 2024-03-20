@@ -55,7 +55,6 @@ func (s *Server) Start(metricsConfig MetricsConfig) error {
 }
 
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
-
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
@@ -92,10 +91,10 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
 		return nil, api.NewInternalError(fmt.Sprintf("failed to process churn request: %s", err.Error()))
 	}
 
@@ -144,11 +143,18 @@ func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest)
 	}
 
 	// TODO: ensure that all quorumIDs are valid
-	if len(req.QuorumIds) == 0 {
-		return errors.New("invalid quorumIds length")
+	if len(req.QuorumIds) == 0 || len(req.QuorumIds) > 255 {
+		return fmt.Errorf("invalid quorumIds length %d", len(req.QuorumIds))
 	}
 
+	seenQuorums := make(map[int]struct{})
 	for quorumID := range req.GetQuorumIds() {
+		// make sure there are no duplicate quorum IDs
+		if _, ok := seenQuorums[quorumID]; ok {
+			return errors.New("invalid request: security_params must not contain duplicate quorum_id")
+		}
+		seenQuorums[quorumID] = struct{}{}
+
 		if quorumID >= int(s.churner.QuorumCount) {
 			err := s.churner.UpdateQuorumCount(ctx)
 			if err != nil {

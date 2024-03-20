@@ -164,14 +164,14 @@ func queueBlob(t *testing.T, ctx context.Context, blob *core.Blob, blobStore dis
 
 func TestBatcherIterations(t *testing.T) {
 	blob1 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}})
 	blob2 := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           1,
-		AdversaryThreshold: 70,
-		QuorumThreshold:    100,
+		QuorumID:              1,
+		AdversaryThreshold:    70,
+		ConfirmationThreshold: 100,
 	}})
 	components, batcher, getHeartbeats := makeBatcher(t)
 
@@ -266,9 +266,9 @@ func TestBatcherIterations(t *testing.T) {
 
 func TestBlobFailures(t *testing.T) {
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}})
 
 	components, batcher, getHeartbeats := makeBatcher(t)
@@ -372,9 +372,9 @@ func TestBlobFailures(t *testing.T) {
 // TestBlobRetry tests that the blob that has been dispersed to DA nodes but is pending onchain confirmation isn't re-dispersed.
 func TestBlobRetry(t *testing.T) {
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}})
 
 	components, batcher, getHeartbeats := makeBatcher(t)
@@ -476,9 +476,9 @@ func TestBlobRetry(t *testing.T) {
 func TestRetryTxnReceipt(t *testing.T) {
 	var err error
 	blob := makeTestBlob([]*core.SecurityParam{{
-		QuorumID:           0,
-		AdversaryThreshold: 80,
-		QuorumThreshold:    100,
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
 	}})
 	components, batcher, getHeartbeats := makeBatcher(t)
 

@@ -17,6 +17,12 @@
       "startBlock": 10470500
     }
   },
+  "preprod-holesky": {
+    "EigenDAServiceManager": {
+      "address": "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
+      "startBlock": 1161126
+    }
+  },
   "goerli": {
     "EigenDAServiceManager": {
       "address": "0xa3b1689Ab85409B15e07d2ED50A6EA9905074Ee5",

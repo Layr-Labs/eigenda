@@ -81,8 +81,8 @@ func (e *encodedBlobStore) HasEncodingRequested(blobKey disperser.BlobKey, quoru
 }
 
 func (e *encodedBlobStore) DeleteEncodingRequest(blobKey disperser.BlobKey, quorumID core.QuorumID) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	requestID := getRequestID(blobKey, quorumID)
 	if _, ok := e.requested[requestID]; !ok {

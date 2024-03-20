@@ -60,9 +60,9 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 	var quorumThreshold uint8 = 90
 	securityParams := []*core.SecurityParam{
 		{
-			QuorumID:           quorumID,
-			QuorumThreshold:    quorumThreshold,
-			AdversaryThreshold: adversaryThreshold,
+			QuorumID:              quorumID,
+			ConfirmationThreshold: quorumThreshold,
+			AdversaryThreshold:    adversaryThreshold,
 		},
 	}
 

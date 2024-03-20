@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
-
+/*
 import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
 
@@ -83,7 +83,7 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         */
+         *//*
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -359,3 +359,4 @@ contract Deployer_GV2 is ExistingDeploymentParser {
         ejector = stdJson.readAddress(config_data, ".permissions.ejector");
     }
 }
+*/

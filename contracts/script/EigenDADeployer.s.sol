@@ -10,15 +10,15 @@ import {OperatorStateRetriever} from "eigenlayer-middleware/OperatorStateRetriev
 import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
 import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
-import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
-import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {StakeRegistry, IStrategy} from "eigenlayer-middleware/StakeRegistry.sol";
+import {IStakeRegistry, IDelegationManager} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
 
-import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IAVSDirectory} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 
-import "eigenlayer-scripts/middleware/DeployOpenEigenLayer.s.sol";
+import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
@@ -123,7 +123,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         stakeRegistryImplementation = new StakeRegistry(
             registryCoordinator,
-            delegation
+            IDelegationManager(address(delegation))
         );
 
         eigenDAProxyAdmin.upgrade(
@@ -163,7 +163,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             for (uint i = 0; i < numStrategies; i++) {
                 strategyAndWeightingMultipliers[i] = new IStakeRegistry.StrategyParams[](1);
                 strategyAndWeightingMultipliers[i][0] = IStakeRegistry.StrategyParams({
-                    strategy: deployedStrategyArray[i],
+                    strategy: IStrategy(address(deployedStrategyArray[i])),
                     multiplier: 1 ether
                 });
             }
@@ -186,7 +186,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         }
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
-            avsDirectory,
+            IAVSDirectory(address(avsDirectory)),
             registryCoordinator,
             stakeRegistry
         );

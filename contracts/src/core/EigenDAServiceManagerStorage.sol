@@ -16,10 +16,6 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice Unit of measure (in blocks) for which data will be stored for after confirmation.
     uint32 public constant STORE_DURATION_BLOCKS = 2 weeks / 12 seconds;
 
-    /// @notice Minimum Batch size, in bytes.
-    uint32 internal constant MIN_STORE_SIZE = 32;
-    /// @notice Maximum Batch size, in bytes.
-    uint32 internal constant MAX_STORE_SIZE = 4e9;
     /**
      * @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
      * @dev To clarify edge cases, the middleware can look `BLOCK_STALE_MEASURE` blocks into the past, i.e. it may trust stakes from the interval
@@ -39,7 +35,28 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * stale when it is confirmed.
      */
     uint32 public constant BLOCK_STALE_MEASURE = 300;
-    
+
+    /**
+     * @notice The quorum adversary threshold percentages stored as an ordered bytes array
+     * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
+     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
+     */
+    bytes public constant quorumAdversaryThresholdPercentages = hex"2121";
+
+    /**
+     * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
+     * this is the percentage of the total stake needed to confirm a blob.
+     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
+     */
+    bytes public constant quorumConfirmationThresholdPercentages = hex"3737";
+
+    /**
+     * @notice The quorum numbers required for confirmation stored as an ordered bytes array
+     * these quorum numbers have respective canonical thresholds in the
+     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
+     */
+    bytes public constant quorumNumbersRequired = hex"0001";
+
     /// @notice The current batchId
     uint32 public batchId;
 
@@ -49,8 +66,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice address that is permissioned to confirm batches
     address public batchConfirmer;
 
-     // storage gap for upgradeability
-     // slither-disable-next-line shadowing-state
-     uint256[47] private __GAP;
-
+    // storage gap for upgradeability
+    // slither-disable-next-line shadowing-state
+    uint256[47] private __GAP;
 }

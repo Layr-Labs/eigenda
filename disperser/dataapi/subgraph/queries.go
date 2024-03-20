@@ -102,9 +102,9 @@ type (
 		Operator IndexedOperatorInfo `graphql:"operator(id: $id)"`
 	}
 	queryOperatorAddedToQuorum struct {
-		OperatorAddedToQuorum []*OperatorQuorum `graphql:"operatorAddedToQuorum(orderBy: blockTimestamp, where: {and [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
+		OperatorAddedToQuorum []*OperatorQuorum `graphql:"operatorAddedToQuorums(orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
 	}
 	queryOperatorRemovedFromQuorum struct {
-		OperatorRemovedFromQuorum []*OperatorQuorum `graphql:"operatorRemovedFromQuorum(orderBy: blockTimestamp, where: {and [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
+		OperatorRemovedFromQuorum []*OperatorQuorum `graphql:"operatorRemovedFromQuorums(orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
 	}
 )
