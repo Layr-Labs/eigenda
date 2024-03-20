@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
@@ -102,7 +103,7 @@ func RunBatcher(ctx *cli.Context) error {
 	}, logger)
 	asgn := &core.StdAssignmentCoordinator{}
 
-	client, err := geth.NewClient(config.EthClientConfig, logger)
+	client, err := geth.NewClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
@@ -171,7 +172,8 @@ func RunBatcher(ctx *cli.Context) error {
 	if len(config.FireblocksConfig.APIKey) > 0 &&
 		len(config.FireblocksConfig.SecretKeyPath) > 0 &&
 		len(config.FireblocksConfig.BaseURL) > 0 &&
-		len(config.FireblocksConfig.VaultAccountName) > 0 {
+		len(config.FireblocksConfig.VaultAccountName) > 0 &&
+		len(config.FireblocksConfig.WalletAddress) > 0 {
 		secretKey, err := os.ReadFile(config.FireblocksConfig.SecretKeyPath)
 		if err != nil {
 			return fmt.Errorf("cannot read fireblocks secret from %s: %w", config.FireblocksConfig.SecretKeyPath, err)
@@ -190,6 +192,14 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
+		sender, err := wallet.SenderAddress(context.Background())
+		if err != nil {
+			return err
+		}
+		if sender.Cmp(gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress)) != 0 {
+			return fmt.Errorf("configured wallet address %s does not match derived address %s", config.FireblocksConfig.WalletAddress, sender.Hex())
+		}
+		logger.Info("Initialized Fireblocks wallet", "vaultAccountName", config.FireblocksConfig.VaultAccountName, "address", sender.Hex())
 	} else if len(config.EthClientConfig.PrivateKeyString) > 0 {
 		privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
 		if err != nil {

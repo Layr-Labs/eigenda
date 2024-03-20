@@ -9,6 +9,7 @@ const (
 	FireblocksAPISecretPathFlagName    = "fireblocks-api-secret-path"
 	FireblocksBaseURLFlagName          = "fireblocks-api-url"
 	FireblocksVaultAccountNameFlagName = "fireblocks-vault-account-name"
+	FireblocksWalletAddressFlagName    = "fireblocks-wallet-address"
 )
 
 type FireblocksConfig struct {
@@ -16,6 +17,7 @@ type FireblocksConfig struct {
 	SecretKeyPath    string
 	BaseURL          string
 	VaultAccountName string
+	WalletAddress    string
 }
 
 func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -44,6 +46,12 @@ func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_VAULT_ACCOUNT_NAME"),
 		},
+		cli.StringFlag{
+			Name:     PrefixFlag(flagPrefix, FireblocksWalletAddressFlagName),
+			Usage:    "Fireblocks Wallet Address. To configure Fireblocks MPC wallet, this field is required. Otherwise, private key must be configured in eth client so that it can fall back to private key wallet.",
+			Required: false,
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_WALLET_ADDRESS"),
+		},
 	}
 }
 
@@ -53,5 +61,6 @@ func ReadFireblocksCLIConfig(ctx *cli.Context, flagPrefix string) FireblocksConf
 		SecretKeyPath:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksAPISecretPathFlagName)),
 		BaseURL:          ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksBaseURLFlagName)),
 		VaultAccountName: ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksVaultAccountNameFlagName)),
+		WalletAddress:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksWalletAddressFlagName)),
 	}
 }

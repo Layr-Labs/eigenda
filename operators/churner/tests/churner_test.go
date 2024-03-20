@@ -193,7 +193,7 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 		NumConfirmations: 0,
 	}
 
-	gethClient, err := geth.NewClient(ethClientCfg, logger)
+	gethClient, err := geth.NewClient(ethClientCfg, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

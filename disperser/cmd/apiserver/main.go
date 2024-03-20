@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
 
@@ -56,7 +57,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	client, err := geth.NewClient(config.EthClientConfig, logger)
+	client, err := geth.NewClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err

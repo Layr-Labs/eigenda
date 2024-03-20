@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -69,7 +70,7 @@ func run(ctx *cli.Context) error {
 	}
 
 	log.Println("Starting geth client")
-	gethClient, err := geth.NewClient(config.EthClientConfig, logger)
+	gethClient, err := geth.NewClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -190,7 +191,7 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 		PrivateKeyString: *privateKey,
 	}
 
-	client, err := geth.NewClient(ethConfig, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -225,7 +226,7 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 		NumConfirmations: 0,
 	}
 
-	client, err := geth.NewClient(ethConfig, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
