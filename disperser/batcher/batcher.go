@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -426,6 +427,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	for quorumID := range batch.State.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
 	}
+	slices.Sort(quorumIDs)
 
 	stageTimer = time.Now()
 	aggSig, err := b.Aggregator.AggregateSignatures(ctx, batch.State, quorumIDs, headerHash, update)
