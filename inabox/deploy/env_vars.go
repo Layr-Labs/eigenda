@@ -29,11 +29,11 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_NUM_CONFIRMATIONS string
 
-	DISPERSER_SERVER_STD_LOG_LEVEL string
-
-	DISPERSER_SERVER_FILE_LOG_LEVEL string
+	DISPERSER_SERVER_LOG_LEVEL string
 
 	DISPERSER_SERVER_LOG_PATH string
+
+	DISPERSER_SERVER_LOG_FORMAT string
 
 	DISPERSER_SERVER_BUCKET_SIZES string
 
@@ -42,8 +42,6 @@ type DisperserVars struct {
 	DISPERSER_SERVER_COUNT_FAILED string
 
 	DISPERSER_SERVER_BUCKET_STORE_SIZE string
-
-	DISPERSER_SERVER_ALLOWLIST string
 
 	DISPERSER_SERVER_AWS_REGION string
 
@@ -64,6 +62,8 @@ type DisperserVars struct {
 	DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE string
 
 	DISPERSER_SERVER_CLIENT_IP_HEADER string
+
+	DISPERSER_SERVER_ALLOWLIST string
 }
 
 func (vars DisperserVars) getEnvMap() map[string]string {
@@ -98,8 +98,6 @@ type BatcherVars struct {
 
 	BATCHER_SRS_ORDER string
 
-	BATCHER_SRS_LOAD string
-
 	BATCHER_METRICS_HTTP_PORT string
 
 	BATCHER_INDEXER_DATA_DIR string
@@ -116,9 +114,17 @@ type BatcherVars struct {
 
 	BATCHER_FINALIZER_INTERVAL string
 
+	BATCHER_FINALIZER_POOL_SIZE string
+
 	BATCHER_ENCODING_REQUEST_QUEUE_SIZE string
 
 	BATCHER_MAX_NUM_RETRIES_PER_BLOB string
+
+	BATCHER_TARGET_NUM_CHUNKS string
+
+	BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE string
+
+	BATCHER_FINALIZATION_BLOCK_DELAY string
 
 	BATCHER_CHAIN_RPC string
 
@@ -126,11 +132,11 @@ type BatcherVars struct {
 
 	BATCHER_NUM_CONFIRMATIONS string
 
-	BATCHER_STD_LOG_LEVEL string
-
-	BATCHER_FILE_LOG_LEVEL string
+	BATCHER_LOG_LEVEL string
 
 	BATCHER_LOG_PATH string
+
+	BATCHER_LOG_FORMAT string
 
 	BATCHER_INDEXER_PULL_INTERVAL string
 
@@ -141,8 +147,6 @@ type BatcherVars struct {
 	BATCHER_AWS_SECRET_ACCESS_KEY string
 
 	BATCHER_AWS_ENDPOINT_URL string
-
-	BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE string
 }
 
 func (vars BatcherVars) getEnvMap() map[string]string {
@@ -183,11 +187,13 @@ type EncoderVars struct {
 
 	DISPERSER_ENCODER_PRELOAD_ENCODER string
 
-	DISPERSER_ENCODER_STD_LOG_LEVEL string
+	DISPERSER_ENCODER_G2_POWER_OF_2_PATH string
 
-	DISPERSER_ENCODER_FILE_LOG_LEVEL string
+	DISPERSER_ENCODER_LOG_LEVEL string
 
 	DISPERSER_ENCODER_LOG_PATH string
+
+	DISPERSER_ENCODER_LOG_FORMAT string
 }
 
 func (vars EncoderVars) getEnvMap() map[string]string {
@@ -264,8 +270,6 @@ type OperatorVars struct {
 
 	NODE_G2_PATH string
 
-	NODE_G2_POWER_OF_2_PATH string
-
 	NODE_CACHE_PATH string
 
 	NODE_SRS_ORDER string
@@ -280,17 +284,19 @@ type OperatorVars struct {
 
 	NODE_PRELOAD_ENCODER string
 
+	NODE_G2_POWER_OF_2_PATH string
+
 	NODE_CHAIN_RPC string
 
 	NODE_PRIVATE_KEY string
 
 	NODE_NUM_CONFIRMATIONS string
 
-	NODE_STD_LOG_LEVEL string
-
-	NODE_FILE_LOG_LEVEL string
+	NODE_LOG_LEVEL string
 
 	NODE_LOG_PATH string
+
+	NODE_LOG_FORMAT string
 }
 
 func (vars OperatorVars) getEnvMap() map[string]string {
@@ -327,8 +333,6 @@ type RetrieverVars struct {
 
 	RETRIEVER_G2_PATH string
 
-	RETRIEVER_G2_POWER_OF_2_PATH string
-
 	RETRIEVER_CACHE_PATH string
 
 	RETRIEVER_SRS_ORDER string
@@ -343,17 +347,19 @@ type RetrieverVars struct {
 
 	RETRIEVER_PRELOAD_ENCODER string
 
+	RETRIEVER_G2_POWER_OF_2_PATH string
+
 	RETRIEVER_CHAIN_RPC string
 
 	RETRIEVER_PRIVATE_KEY string
 
 	RETRIEVER_NUM_CONFIRMATIONS string
 
-	RETRIEVER_STD_LOG_LEVEL string
-
-	RETRIEVER_FILE_LOG_LEVEL string
+	RETRIEVER_LOG_LEVEL string
 
 	RETRIEVER_LOG_PATH string
+
+	RETRIEVER_LOG_FORMAT string
 
 	RETRIEVER_INDEXER_PULL_INTERVAL string
 }
@@ -390,11 +396,11 @@ type ChurnerVars struct {
 
 	CHURNER_NUM_CONFIRMATIONS string
 
-	CHURNER_STD_LOG_LEVEL string
-
-	CHURNER_FILE_LOG_LEVEL string
+	CHURNER_LOG_LEVEL string
 
 	CHURNER_LOG_PATH string
+
+	CHURNER_LOG_FORMAT string
 
 	CHURNER_INDEXER_PULL_INTERVAL string
 }

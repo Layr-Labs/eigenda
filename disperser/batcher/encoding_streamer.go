@@ -46,6 +46,8 @@ type StreamerConfig struct {
 
 	// Maximum number of Blobs to fetch from store
 	MaxBlobsToFetchFromStore int
+
+	FinalizationBlockDelay uint
 }
 
 type EncodingStreamer struct {
@@ -208,6 +210,10 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 		if err != nil {
 			return fmt.Errorf("failed to get current block number, won't request encoding: %w", err)
 		} else {
+			if blockNumber > e.FinalizationBlockDelay {
+				blockNumber -= e.FinalizationBlockDelay
+			}
+
 			e.mu.Lock()
 			e.ReferenceBlockNumber = blockNumber
 			e.mu.Unlock()

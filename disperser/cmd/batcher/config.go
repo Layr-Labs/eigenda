@@ -58,6 +58,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxNumRetriesPerBlob:     ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
 			TargetNumChunks:          ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
 			MaxBlobsToFetchFromStore: ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
+			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
 			EncodingTimeout:    ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),

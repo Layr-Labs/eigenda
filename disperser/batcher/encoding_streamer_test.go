@@ -26,6 +26,7 @@ var (
 		EncodingRequestTimeout:   5 * time.Second,
 		EncodingQueueLimit:       100,
 		MaxBlobsToFetchFromStore: 10,
+		FinalizationBlockDelay:   75,
 	}
 )
 
@@ -206,7 +207,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, disperser.Processing, metadata.BlobStatus)
 
-	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	out := make(chan batcher.EncodingResultOrStatus)
 	err = encodingStreamer.RequestEncoding(context.Background(), out)
@@ -322,7 +323,7 @@ func TestEncodingFailure(t *testing.T) {
 	metadataKey, err := blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
 
-	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	cst.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 	encoderClient.On("EncodeBlob", tmock.Anything, tmock.Anything, tmock.Anything).Return(nil, nil, errors.New("errrrr"))
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
@@ -350,7 +351,7 @@ func TestEncodingFailure(t *testing.T) {
 func TestPartialBlob(t *testing.T) {
 	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
 
-	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	out := make(chan batcher.EncodingResultOrStatus)
 
@@ -498,7 +499,7 @@ func TestIncorrectParameters(t *testing.T) {
 	metadataKey, err := c.blobStore.StoreBlob(ctx, &blob, uint64(time.Now().UnixNano()))
 	assert.Nil(t, err)
 
-	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
@@ -519,7 +520,7 @@ func TestIncorrectParameters(t *testing.T) {
 func TestInvalidQuorum(t *testing.T) {
 	encodingStreamer, c := createEncodingStreamer(t, 10, 1e12, streamerConfig)
 
-	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	out := make(chan batcher.EncodingResultOrStatus)
 
@@ -601,7 +602,7 @@ func TestGetBatch(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, disperser.Processing, metadata2.BlobStatus)
 
-	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	c.chainDataMock.On("GetCurrentBlockNumber").Return(uint(10)+encodingStreamer.FinalizationBlockDelay, nil)
 
 	// request encoding
 	out := make(chan batcher.EncodingResultOrStatus)
