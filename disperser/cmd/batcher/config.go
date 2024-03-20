@@ -37,12 +37,20 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	ethClientConfig := geth.ReadEthClientConfig(ctx)
+	fireblocksConfig := common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix)
+	if len(fireblocksConfig.APIKey) > 0 &&
+		len(fireblocksConfig.SecretKeyPath) > 0 &&
+		len(fireblocksConfig.BaseURL) > 0 &&
+		len(fireblocksConfig.VaultAccountName) > 0 {
+		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		},
-		EthClientConfig: geth.ReadEthClientConfig(ctx),
+		EthClientConfig: ethClientConfig,
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
 		LoggerConfig:    *loggerConfig,
@@ -76,7 +84,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
-		FireblocksConfig:              common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix),
+		FireblocksConfig:              fireblocksConfig,
 	}
 	return config, nil
 }

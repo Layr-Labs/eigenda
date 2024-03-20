@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
 
@@ -87,7 +88,7 @@ func pluginOps(ctx *cli.Context) {
 		PrivateKeyString: *privateKey,
 		NumConfirmations: config.NumConfirmations,
 	}
-	client, err := geth.NewClient(ethConfig, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Printf("Error: failed to create eth client: %v", err)
 		return
