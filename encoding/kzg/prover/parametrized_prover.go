@@ -167,7 +167,7 @@ func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks
 
 	t0 := time.Now()
 
-	// compute proof by multi scaler mulplication
+	// compute proof by multi scaler multiplication
 	msmErrors := make(chan error, dimE*2)
 	for i := uint64(0); i < dimE*2; i++ {
 

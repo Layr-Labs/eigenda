@@ -25,7 +25,7 @@ type Sample struct {
 	X          uint // X is the evaluating index which corresponds to the leading coset
 }
 
-// the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
+// the rhsG1 consists of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
 func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bn254.G1Affine) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)
@@ -163,7 +163,7 @@ func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, sampl
 //
 // The order of samples do not matter.
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
-func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
+func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
 	// precheck
 	for i, s := range samples {
 		if s.RowIndex >= m {
@@ -172,7 +172,7 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 		}
 	}
 
-	verifier, err := group.GetKzgVerifier(params)
+	verifier, err := v.GetKzgVerifier(params)
 	if err != nil {
 		return err
 	}
@@ -180,8 +180,8 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 
 	D := params.ChunkLength
 
-	if D > group.SRSNumberToLoad {
-		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, group.SRSNumberToLoad)
+	if D > v.SRSNumberToLoad {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, v.SRSNumberToLoad)
 	}
 
 	n := len(samples)
@@ -209,15 +209,15 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	}
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
+	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.KzgConfig)
 
 	if err != nil {
 		// then try to access if there is a full list of g2 srs
-		G2atD, err = kzg.ReadG2Point(D, group.KzgConfig)
+		G2atD, err = kzg.ReadG2Point(D, v.KzgConfig)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Acessed the entire G2")
+		fmt.Println("Accessed the entire G2")
 	}
 
 	lhsG2 := &G2atD
