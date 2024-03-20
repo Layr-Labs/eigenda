@@ -223,14 +223,13 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	s.logger.Debug("received a new blob dispersal request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
+		allowed, name, err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
-			rateLimited := errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) || errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit)
-			if !rateLimited {
-				s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
-				return nil, api.NewInternalError(err.Error())
-			}
-			return nil, api.NewResourceExhaustedError(err.Error())
+			s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
+			return nil, api.NewInternalError(err.Error())
+		}
+		if !allowed {
+			return nil, api.NewResourceExhaustedError(fmt.Sprintf("request ratelimited: %s", name))
 		}
 	}
 
@@ -288,6 +287,8 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	// Check if the origin is in the allowlist
 
+	// If the origin is not in the allowlist, we use the origin as the account key since
+	// it is a more limited resource than an ETH public key
 	key := "ip:" + origin
 
 	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
@@ -315,84 +316,103 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 }
 
-func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
+type limiterInfo struct {
+	Name     string
+	QuorumID core.QuorumID
+}
 
-	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) (bool, string, error) {
+
+	requestParams := make([]common.RequestParams, 0)
+
+	blobSize := len(blob.Data)
+	length := encoding.GetBlobLength(uint(blobSize))
 
 	for i, param := range blob.RequestHeader.SecurityParams {
 
-		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
-		quorumId := string(param.QuorumID)
+		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
-			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
+			return false, "", fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
 		}
+
 		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
-			return err
-		}
-
-		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
-		blobSize := len(blob.Data)
-		length := encoding.GetBlobLength(uint(blobSize))
-		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
-		encodedSize := encoding.GetBlobSize(encodedLength)
-
-		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
-			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate, "accountKey", accountKey)
-
-		// Check System Ratelimit
-		systemQuorumKey := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
-		allowed, err := s.ratelimiter.AllowRequest(ctx, systemQuorumKey, encodedSize, rates.TotalUnauthThroughput)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
-			s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errSystemThroughputRateLimit
-		}
-
-		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, systemQuorumKey, blobRateMultiplier, rates.TotalUnauthBlobRate)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
-			s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errSystemBlobRateLimit
-		}
-
-		// Check Account Ratelimit
-
-		accountQuorumKey := fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, encodedSize, accountRates.Throughput)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("account byte ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", accountRates.Throughput)
-			s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errAccountThroughputRateLimit
-		}
-
-		accountQuorumKey = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, blobRateMultiplier, accountRates.BlobRate)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("account blob ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
-			s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errAccountBlobRateLimit
+			return false, "", err
 		}
 
 		// Update the quorum rate
 		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
+
+		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
+		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
+		encodedSize := encoding.GetBlobSize(encodedLength)
+
+		// System Level
+		key := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    encodedSize,
+			Rate:        globalRates.TotalUnauthThroughput,
+			Info: limiterInfo{
+				Name:     fmt.Sprintf("System throughput rate limit for quorum %d", param.QuorumID),
+				QuorumID: param.QuorumID,
+			},
+		})
+
+		key = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    blobRateMultiplier,
+			Rate:        globalRates.TotalUnauthBlobRate,
+			Info: limiterInfo{
+				Name:     fmt.Sprintf("System blob rate limit for quorum %d", param.QuorumID),
+				QuorumID: param.QuorumID,
+			},
+		})
+
+		// Account Level
+		key = fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    encodedSize,
+			Rate:        accountRates.Throughput,
+			Info: limiterInfo{
+				Name:     fmt.Sprintf("Account throughput rate limit for quorum %d", param.QuorumID),
+				QuorumID: param.QuorumID,
+			},
+		})
+
+		key = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    blobRateMultiplier,
+			Rate:        accountRates.BlobRate,
+			Info: limiterInfo{
+				Name:     fmt.Sprintf("Account blob rate limit for quorum %d", param.QuorumID),
+				QuorumID: param.QuorumID,
+			},
+		})
+
 	}
-	return nil
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	allowed, params, err := s.ratelimiter.AllowRequest(ctx, requestParams)
+	if err != nil {
+		return false, "", err
+	}
+
+	if !allowed {
+		info, ok := params.Info.(limiterInfo)
+		if !ok {
+			return false, "", fmt.Errorf("failed to cast limiterInfo")
+		}
+		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlob")
+		return false, info.Name, nil
+	}
+
+	return true, "", nil
 
 }
 

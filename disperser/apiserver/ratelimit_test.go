@@ -39,7 +39,7 @@ func TestRatelimit(t *testing.T) {
 		Data:                data50KiB,
 		CustomQuorumNumbers: []uint32{0},
 	})
-	assert.ErrorContains(t, err, "account throughput limit")
+	assert.ErrorContains(t, err, "Account throughput rate limit")
 
 	// Try with non-allowlisted IP. Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 20 blobs.
 	numLimited := 0
@@ -49,7 +49,7 @@ func TestRatelimit(t *testing.T) {
 			Data:                data1KiB,
 			CustomQuorumNumbers: []uint32{1},
 		})
-		if err != nil && strings.Contains(err.Error(), "account blob limit") {
+		if err != nil && strings.Contains(err.Error(), "Account blob rate limit") {
 			numLimited++
 		}
 	}
@@ -100,7 +100,7 @@ func TestAuthRatelimit(t *testing.T) {
 	simulateClient(t, signer, "2.2.2.2", data50KiB, []uint32{0}, errorChan, false)
 
 	err = <-errorChan
-	assert.ErrorContains(t, err, "account throughput limit")
+	assert.ErrorContains(t, err, "Account throughput rate limit")
 
 	// Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
 	for i := 0; i < 20; i++ {
@@ -109,7 +109,7 @@ func TestAuthRatelimit(t *testing.T) {
 	numLimited := 0
 	for i := 0; i < 20; i++ {
 		err = <-errorChan
-		if err != nil && strings.Contains(err.Error(), "account blob limit") {
+		if err != nil && strings.Contains(err.Error(), "Account blob rate limit") {
 			numLimited++
 		}
 	}

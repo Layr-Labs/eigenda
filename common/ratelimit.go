@@ -15,8 +15,15 @@ import (
 // ID is the authenticated Account ID. For retrieval requests, the requester ID will be the requester's IP address.
 type RequesterID = string
 
+type RequestParams struct {
+	RequesterID RequesterID
+	BlobSize    uint
+	Rate        RateParam
+	Info        interface{}
+}
+
 type RateLimiter interface {
-	AllowRequest(ctx context.Context, requesterID RequesterID, blobSize uint, rate RateParam) (bool, error)
+	AllowRequest(ctx context.Context, params []RequestParams) (bool, *RequestParams, error)
 }
 
 type GlobalRateParams struct {
