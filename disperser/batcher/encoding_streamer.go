@@ -314,7 +314,6 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			},
 			ChunkLength: chunkLength,
 		}
-
 		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, blobLength, blobQuorumInfo)
 		if err != nil {
 			e.logger.Error("[RequestEncodingForBlob] error getting assignments", "err", err)
@@ -343,7 +342,6 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 	// Execute the encoding requests
 	for ind := range pending {
-
 		res := pending[ind]
 
 		// Create a new context for each encoding request
@@ -502,6 +500,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		for _, quorum := range blobQuorums[blobKey] {
 			quorumPresent[quorum.QuorumID] = true
 		}
+		// Check if the blob has valid quorums. If any of the quorums are not valid, delete the blobKey
 		for _, quorum := range metadata.RequestMetadata.SecurityParams {
 			_, ok := quorumPresent[quorum.QuorumID]
 			if !ok {
@@ -511,6 +510,10 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 				break
 			}
 		}
+	}
+
+	if len(metadataByKey) == 0 {
+		return nil, errNoEncodedResults
 	}
 
 	// Transform maps to slices so orders in different slices match

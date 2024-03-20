@@ -228,6 +228,7 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
+		logger.Info("Initialized PrivateKey wallet", "address", address.Hex())
 	} else {
 		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
 	}

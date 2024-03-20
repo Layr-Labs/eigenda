@@ -132,7 +132,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		}
 	}
 	if len(aggKeys) == 0 {
-		return nil, errors.New("no aggregate public keys found for any of the specified quorums")
+		return nil, fmt.Errorf("no aggregate public keys found for any of the specified quorums at block number %d", blockNumber)
 	}
 
 	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
@@ -177,7 +177,7 @@ func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Con
 	)
 	err := ics.querier.Query(context.Background(), &query, variables)
 	if err != nil {
-		ics.logger.Error("Error requesting for operator", "err", err)
+		ics.logger.Error("Error requesting info for operator", "err", err, "operatorId", operatorId.Hex(), "blockNumber", blockNumber)
 		return nil, err
 	}
 
