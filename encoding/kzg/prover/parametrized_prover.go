@@ -225,7 +225,7 @@ func (p *ParametrizedProver) proofWorker(
 				points: nil,
 				err:    err,
 			}
-			return
+			continue
 		}
 
 		for i := 0; i < len(coeffs); i++ {
