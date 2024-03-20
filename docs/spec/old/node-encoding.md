@@ -9,7 +9,7 @@ The operator node will then perform the following checks for each quorum they ar
 1. Confirm Header Consistency: 
     - Generate the encoding params `numPar` and `numSys` (from `AdversaryThresholdBPs`, `QuorumThresholdBPs` and `stateView`)
     - Check that `degree` properly derives from `origDataSize` and `numSys`
-2. Confirm Degree of KZG Commitment: Use the `lowDegreeProof` to verify that `kzgCommitment` commits to a polynomial of degree less than or equal to `numSysE`*`degreeE`.
+2. Confirm Degree of KZG Commitment(length of data in field Element): Use the `lengthProof` to verify that `kzgCommitment` commits to a polynomial of degree less than or equal to `numSysE`*`degreeE`.
 3. Verify frame for the quorum against KZG Commitment: Use the `headerHash` to determine the proper indices for the chunks held by the operator, and then use the multireveal proofs contained in the chunks to verify each chunk against `kzgCommitment` commit.
 
 Indices are determined using the following formula:

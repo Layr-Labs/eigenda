@@ -169,14 +169,14 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
-func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn254.G2Affine, length uint64) error {
+func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, legnthProof *bn254.G2Affine, length uint64) error {
 
 	g1Challenge, err := kzg.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
 	if err != nil {
 		return err
 	}
 
-	err = VerifyLowDegreeProof(lengthCommit, lowDegreeProof, &g1Challenge)
+	err = VerifyLengthProof(lengthCommit, legnthProof, &g1Challenge)
 	if err != nil {
 		return fmt.Errorf("%v . %v ", "low degree proof fails", err)
 	} else {
@@ -186,11 +186,11 @@ func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lowDegreeProof *bn
 
 // The function verify low degree proof against a poly commitment
 // We wish to show x^shift poly = shiftedPoly, with
-// With shift = SRSOrder-1 - claimedDegree and
+// With shift = SRSOrder - length and
 // proof = commit(shiftedPoly) on G1
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLowDegreeProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
+func VerifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
 	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
