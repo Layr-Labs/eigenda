@@ -57,7 +57,7 @@ type (
 	// the latest block, we allow the false-positive case where an operator was deregistered from all quorums at the reference
 	// block, but then re-registered afterward. We filter out these operators in GetIndexedOperatorState.
 	QueryOperatorsGql struct {
-		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, where: {deregistrationBlockNumber_gt: $blockNumber})"`
+		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, orderBy: id, orderDirection: desc, where: {deregistrationBlockNumber_gt: $blockNumber})"`
 	}
 
 	QueryOperatorByIdGql struct {
@@ -150,7 +150,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		}
 	}
 
-	// Filter out the operators who are not part of any quorum. This can happen if the operator re-registered
+	// Filter out the operators who are not part of any quorum. This can happen if the operator registers or re-registers
 	// after the reference block number.
 	for operatorID := range indexedOperators {
 		if _, ok := operatorSeen[operatorID]; !ok {
