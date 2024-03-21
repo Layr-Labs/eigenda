@@ -17,10 +17,9 @@ import (
 )
 
 // Constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
+// Note the StoreChunksRequest is validated as soon as it enters the node gRPC
+// interface, see grpc.Server.validateStoreChunkRequest.
 func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
-	if in.GetBatchHeader() == nil {
-		return nil, errors.New("the batch_header field is nil")
-	}
 	var batchRoot [32]byte
 	copy(batchRoot[:], in.GetBatchHeader().GetBatchRoot())
 	batchHeader := core.BatchHeader{
@@ -31,6 +30,8 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 }
 
 // GetBlobMessages constructs a core.BlobMessage array from a proto of pb.StoreChunksRequest.
+// Note the StoreChunksRequest is validated as soon as it enters the node gRPC
+// interface, see grpc.Server.validateStoreChunkRequest.
 func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
 	for i, blob := range in.GetBlobs() {
