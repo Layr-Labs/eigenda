@@ -187,11 +187,11 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	assert.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
-		RPCURL:           operator.NODE_CHAIN_RPC,
+		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
 		PrivateKeyString: *privateKey,
 	}
 
-	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -221,12 +221,12 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	assert.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
-		RPCURL:           operator.NODE_CHAIN_RPC,
+		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
 		PrivateKeyString: hexPk,
 		NumConfirmations: 0,
 	}
 
-	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
