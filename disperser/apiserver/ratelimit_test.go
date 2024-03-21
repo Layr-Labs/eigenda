@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/grpc/mock"
@@ -97,14 +98,14 @@ func TestAuthRatelimit(t *testing.T) {
 	errorChan := make(chan error, 10)
 
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
-	simulateClient(t, signer, "2.2.2.2", data50KiB, []uint32{0}, errorChan, false)
+	simulateClient(t, signer, "2.2.2.2", data50KiB, []uint32{0}, 0, errorChan, false)
 
 	err = <-errorChan
 	assert.ErrorContains(t, err, "account throughput limit")
 
 	// Should fail with account blob limit because blob rate (3 blobs/s) X bucket size (3s) is smaller than 10 blobs.
 	for i := 0; i < 20; i++ {
-		simulateClient(t, signer, "3.3.3.3", data1KiB, []uint32{1}, errorChan, false)
+		simulateClient(t, signer, "3.3.3.3", data1KiB, []uint32{1}, 0, errorChan, false)
 	}
 	numLimited := 0
 	for i := 0; i < 20; i++ {
@@ -120,14 +121,14 @@ func TestAuthRatelimit(t *testing.T) {
 	signer = auth.NewSigner(privateKeyHex)
 
 	// This should succeed because the account throughput limit is 100 KiB/s for quorum 0
-	simulateClient(t, signer, "4.4.4.4", data50KiB, []uint32{0}, errorChan, false)
+	simulateClient(t, signer, "4.4.4.4", data50KiB, []uint32{0}, 0, errorChan, false)
 
 	err = <-errorChan
 	assert.NoError(t, err)
 
 	// This should succeed because the account blob limit (5 blobs/s) X bucket size (3s) is larger than 10 blobs.
 	for i := 0; i < 10; i++ {
-		simulateClient(t, signer, "5.5.5.5", data1KiB, []uint32{1}, errorChan, false)
+		simulateClient(t, signer, "5.5.5.5", data1KiB, []uint32{1}, 0, errorChan, false)
 	}
 	numLimited = 0
 	for i := 0; i < 10; i++ {
@@ -140,7 +141,7 @@ func TestAuthRatelimit(t *testing.T) {
 
 }
 
-func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, data []byte, quorums []uint32, errorChan chan error, shouldSucceed bool) {
+func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, data []byte, quorums []uint32, delay time.Duration, errorChan chan error, shouldSucceed bool) {
 
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
@@ -148,6 +149,7 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 			Port: 51001,
 		},
 	}
+
 	ctx := peer.NewContext(context.Background(), p)
 	stream := mock.MakeStreamMock(ctx)
 
@@ -183,15 +185,18 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	authData, err := signer.SignBlobRequest(authHeader)
 	assert.NoError(t, err)
 
+	time.Sleep(delay)
+
 	// Process challenge and send back challenge_reply
 	err = stream.SendFromClient(&pb.AuthenticatedRequest{Payload: &pb.AuthenticatedRequest_AuthenticationData{
 		AuthenticationData: &pb.AuthenticationData{
 			AuthenticationData: authData,
 		},
 	}})
-	assert.NoError(t, err)
 
 	if shouldSucceed {
+
+		assert.NoError(t, err)
 
 		reply, err = stream.RecvToClient()
 		assert.NoError(t, err)

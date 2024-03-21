@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -33,6 +35,13 @@ var (
 		Usage:    "Port at which disperser listens for grpc calls",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
+	}
+	GrpcTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-stream-timeout"),
+		Usage:    "Timeout for grpc streams",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_STREAM_TIMEOUT"),
+		Value:    time.Second * 10,
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
@@ -94,6 +103,7 @@ var optionalFlags = []cli.Flag{
 	EnableMetrics,
 	EnableRatelimiter,
 	BucketStoreSize,
+	GrpcTimeoutFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -98,6 +98,10 @@ func NewDispersalServer(
 }
 
 func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_DisperseBlobAuthenticatedServer) error {
+
+	ctx, cancel := context.WithTimeout(stream.Context(), s.serverConfig.GrpcTimeout)
+	defer cancel()
+
 	// Process disperse_request
 	in, err := stream.Recv()
 	if err != nil {
@@ -109,7 +113,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return api.NewInvalidArgError("missing DisperseBlobRequest")
 	}
 
-	blob, err := s.validateRequestAndGetBlob(stream.Context(), request.DisperseRequest)
+	blob, err := s.validateRequestAndGetBlob(ctx, request.DisperseRequest)
 	if err != nil {
 		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlob")
@@ -142,10 +146,27 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return err
 	}
 
-	// Recieve challenge_reply
-	in, err = stream.Recv()
-	if err != nil {
+	// Create a channel for the result of stream.Recv()
+	resultCh := make(chan *pb.AuthenticatedRequest)
+	errCh := make(chan error)
+
+	// Run stream.Recv() in a goroutine
+	go func() {
+		in, err := stream.Recv()
+		if err != nil {
+			errCh <- err
+			return
+		}
+		resultCh <- in
+	}()
+
+	// Use select to wait on either the result of stream.Recv() or the context being done
+	select {
+	case in = <-resultCh:
+	case err := <-errCh:
 		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
+	case <-ctx.Done():
+		return api.NewInvalidArgError("context deadline exceeded")
 	}
 
 	challengeReply, ok := in.GetPayload().(*pb.AuthenticatedRequest_AuthenticationData)
@@ -162,7 +183,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	// Disperse the blob
-	reply, err := s.disperseBlob(stream.Context(), blob, authenticatedAddress)
+	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress)
 	if err != nil {
 		s.logger.Info("failed to disperse blob", "err", err)
 		return err
@@ -544,6 +565,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+
 	gs := grpc.NewServer(opt)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
