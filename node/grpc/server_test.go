@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,7 +211,7 @@ func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold ui
 	}
 	batchHeader := core.BatchHeader{
 		BatchRoot:            [32]byte{0},
-		ReferenceBlockNumber: 0,
+		ReferenceBlockNumber: 1,
 	}
 
 	_, err = batchHeader.SetBatchRoot(blobHeaders)
@@ -265,6 +266,61 @@ func storeChunks(t *testing.T, server *grpc.Server) ([32]byte, [32]byte, []*core
 	assert.NotNil(t, reply.GetSignature())
 
 	return batchHeaderHash, batchRoot, blobHeaders, blobHeadersProto
+}
+
+func TestStoreChunksRequestValidation(t *testing.T) {
+	server := newTestServer(t, true)
+
+	req, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	req.BatchHeader = nil
+	_, err := server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "missing batch_header"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 33)
+	req.BatchHeader.BatchRoot = nil
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "missing batch_root in request"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 33)
+	req.BatchHeader.ReferenceBlockNumber = 0
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "missing reference_block_number in request"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 33)
+	req.Blobs = nil
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "missing blobs in request"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 33)
+	req.Blobs[0].Header = nil
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "missing blob header in request"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 33)
+	req.Blobs[0].Header.QuorumHeaders = nil
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "missing quorum headers in request"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 66)
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "adversary_threshold must be less than confirmation_threshold"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 101, 66)
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "confirmation threshold exceeds 100"))
+
+	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 0)
+	_, err = server.StoreChunks(context.Background(), req)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "adversary threshold equals 0"))
 }
 
 func TestRetrieveChunks(t *testing.T) {

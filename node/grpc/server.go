@@ -8,6 +8,7 @@ import (
 
 	"net"
 
+	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -149,12 +150,56 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 	return &pb.StoreChunksReply{Signature: sigData[:]}, nil
 }
 
+func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
+	if in.GetBatchHeader() == nil {
+		return api.NewInvalidArgError("missing batch_header in request")
+	}
+	if in.GetBatchHeader().GetBatchRoot() == nil {
+		return api.NewInvalidArgError("missing batch_root in request")
+	}
+	if in.GetBatchHeader().GetReferenceBlockNumber() == 0 {
+		return api.NewInvalidArgError("missing reference_block_number in request")
+	}
+
+	if len(in.GetBlobs()) == 0 {
+		return api.NewInvalidArgError("missing blobs in request")
+	}
+	for _, blob := range in.Blobs {
+		if blob.GetHeader() == nil {
+			return api.NewInvalidArgError("missing blob header in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
+			return api.NewInvalidArgError("missing quorum headers in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
+			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+		}
+		for _, q := range blob.GetHeader().GetQuorumHeaders() {
+			if q.GetAdversaryThreshold() >= q.GetConfirmationThreshold() {
+				return api.NewInvalidArgError("adversary_threshold must be less than confirmation_threshold")
+			}
+			if q.GetConfirmationThreshold() > 100 {
+				return api.NewInvalidArgError("confirmation threshold exceeds 100")
+			}
+			if q.AdversaryThreshold == 0 {
+				return api.NewInvalidArgError("adversary threshold equals 0")
+			}
+		}
+	}
+	return nil
+}
+
 // StoreChunks is called by dispersers to store data.
 func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(sec float64) {
 		s.node.Metrics.ObserveLatency("StoreChunks", "total", sec*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
+
+	// Validate the request.
+	if err := s.validateStoreChunkRequest(in); err != nil {
+		return nil, err
+	}
 
 	// Process the request.
 	reply, err := s.handleStoreChunksRequest(ctx, in)
