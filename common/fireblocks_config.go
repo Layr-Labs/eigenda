@@ -5,34 +5,36 @@ import (
 )
 
 const (
-	FireblocksAPIKeyFlagName           = "fireblocks-api-key"
-	FireblocksAPISecretPathFlagName    = "fireblocks-api-secret-path"
+	FireblocksAPIKeyNameFlagName       = "fireblocks-api-key-name"
+	FireblocksAPISecretNameFlagName    = "fireblocks-api-secret-name"
 	FireblocksBaseURLFlagName          = "fireblocks-api-url"
 	FireblocksVaultAccountNameFlagName = "fireblocks-vault-account-name"
 	FireblocksWalletAddressFlagName    = "fireblocks-wallet-address"
+	FireblocksSecretManagerRegion      = "fireblocks-secret-manager-region"
 )
 
 type FireblocksConfig struct {
-	APIKey           string
-	SecretKeyPath    string
+	APIKeyName       string
+	SecretKeyName    string
 	BaseURL          string
 	VaultAccountName string
 	WalletAddress    string
+	Region           string
 }
 
 func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 	return []cli.Flag{
 		cli.StringFlag{
-			Name:     PrefixFlag(flagPrefix, FireblocksAPIKeyFlagName),
-			Usage:    "Fireblocks API Key. To configure Fireblocks MPC wallet, this field is required. Otherwise, private key must be configured in eth client so that it can fall back to private key wallet.",
+			Name:     PrefixFlag(flagPrefix, FireblocksAPIKeyNameFlagName),
+			Usage:    "Fireblocks API Key Name. To configure Fireblocks MPC wallet, this field is required. Otherwise, private key must be configured in eth client so that it can fall back to private key wallet.",
 			Required: false,
-			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_KEY"),
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_KEY_NAME"),
 		},
 		cli.StringFlag{
-			Name:     PrefixFlag(flagPrefix, FireblocksAPISecretPathFlagName),
-			Usage:    "Fireblocks API Secret Path. To configure Fireblocks MPC wallet, this field is required. Otherwise, private key must be configured in eth client so that it can fall back to private key wallet.",
+			Name:     PrefixFlag(flagPrefix, FireblocksAPISecretNameFlagName),
+			Usage:    "Fireblocks API Secret Name. To configure Fireblocks MPC wallet, this field is required. Otherwise, private key must be configured in eth client so that it can fall back to private key wallet.",
 			Required: false,
-			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_SECRET_PATH"),
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_SECRET_Name"),
 		},
 		cli.StringFlag{
 			Name:     PrefixFlag(flagPrefix, FireblocksBaseURLFlagName),
@@ -52,15 +54,22 @@ func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_WALLET_ADDRESS"),
 		},
+		cli.StringFlag{
+			Name:     PrefixFlag(flagPrefix, FireblocksSecretManagerRegion),
+			Usage:    "Fireblocks AWS Secret Manager Region.",
+			Required: false,
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_SECRET_MANAGER_REGION"),
+		},
 	}
 }
 
 func ReadFireblocksCLIConfig(ctx *cli.Context, flagPrefix string) FireblocksConfig {
 	return FireblocksConfig{
-		APIKey:           ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksAPIKeyFlagName)),
-		SecretKeyPath:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksAPISecretPathFlagName)),
+		APIKeyName:       ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksAPIKeyNameFlagName)),
+		SecretKeyName:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksAPISecretNameFlagName)),
 		BaseURL:          ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksBaseURLFlagName)),
 		VaultAccountName: ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksVaultAccountNameFlagName)),
 		WalletAddress:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksWalletAddressFlagName)),
+		Region:           ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksSecretManagerRegion)),
 	}
 }
