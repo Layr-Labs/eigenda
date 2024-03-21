@@ -191,11 +191,7 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 		PrivateKeyString: *privateKey,
 	}
 
-<<<<<<< HEAD
-	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, operator.NODE_CHAIN_RPC, logger)
-=======
-	client, err := geth.NewClient(ethConfig, 0, logger)
->>>>>>> ac9d670 (add comments, remove and clean code)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 

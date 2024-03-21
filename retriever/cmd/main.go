@@ -83,7 +83,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, config.EthClientConfig.RPCURLs[0], logger)
+	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

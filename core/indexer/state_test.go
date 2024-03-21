@@ -80,11 +80,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 		NumRetries:       0,
 	}
 
-<<<<<<< HEAD
-	c, err := geth.NewClient(config, gethcommon.Address{}, deployer.RPC, logger)
-=======
-	c, err := geth.NewClient(config, 0, logger)
->>>>>>> ac9d670 (add comments, remove and clean code)
+	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	Expect(err).ToNot(HaveOccurred())
 
 	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
