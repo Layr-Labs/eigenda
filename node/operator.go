@@ -94,13 +94,15 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 	}
 }
 
-// DeregisterOperator deregisters the operator with the given public key from the all the quorums that it is registered with at the supplied block number.
-func DeregisterOperator(ctx context.Context, KeyPair *core.KeyPair, transactor core.Transactor) error {
+// DeregisterOperator deregisters the operator with the given public key from the specified quorums that it is registered with at the supplied block number.
+// If the operator isn't registered with any of the specified quorums, this function will
+// return error, and no quorum will be deregistered.
+func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.KeyPair, transactor core.Transactor) error {
 	blockNumber, err := transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber)
+	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber, operator.QuorumIDs)
 }
 
 // UpdateOperatorSocket updates the socket for the given operator

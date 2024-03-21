@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"slices"
 
@@ -280,12 +281,15 @@ func (t *Transactor) RegisterOperatorWithChurn(
 	return nil
 }
 
-// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
+// DeregisterOperator deregisters an operator with the given public key from the specified the quorums that it is
 // registered with at the supplied block number. To fully deregister an operator, this function should be called
 // with the current block number.
-func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32) error {
+// If the operator isn't registered with any of the specified quorums, this function will return error, and
+// no quorum will be deregistered.
+func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32, quorumIds []core.QuorumID) error {
+	// Make sure the operator is registered in all the quorums it tries to deregister.
 	operatorId := HashPubKeyG1(pubkeyG1)
-	quorumBitmap, opStates, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
+	quorumBitmap, _, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operatorId, blockNumber)
 	if err != nil {
@@ -293,13 +297,19 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 		return err
 	}
 
-	operatorIdsToSwap := make([][32]byte, len(opStates))
-	for i := range opStates {
-		quorum := opStates[i]
-		operatorIdsToSwap[i] = quorum[len(opStates[i])-1].OperatorId
-	}
-
 	quorumNumbers := bitmapToBytesArray(quorumBitmap)
+	for _, quorumToDereg := range quorumIds {
+		found := false
+		for _, currentQuorum := range quorumNumbers {
+			if quorumToDereg == currentQuorum {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("operator is not registered in quorum %d at block %d", quorumToDereg, blockNumber)
+		}
+	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
 	if err != nil {
@@ -308,7 +318,7 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 	}
 	tx, err := t.Bindings.RegistryCoordinator.DeregisterOperator(
 		opts,
-		quorumNumbers,
+		quorumIds,
 	)
 	if err != nil {
 		t.Logger.Error("Failed to deregister operator", "err", err)

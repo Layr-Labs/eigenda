@@ -63,7 +63,10 @@ type Transactor interface {
 	// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
 	// registered with at the supplied block number. To fully deregister an operator, this function should be called
 	// with the current block number.
-	DeregisterOperator(ctx context.Context, pubkeyG1 *G1Point, blockNumber uint32) error
+	// with the current block number.
+	// If the operator isn't registered with any of the specified quorums, this function will return error, and
+	// no quorum will be deregistered.
+	DeregisterOperator(ctx context.Context, pubkeyG1 *G1Point, blockNumber uint32, quorumIds []QuorumID) error
 
 	// UpdateOperatorSocket updates the socket of the operator in all the quorums that it is registered with.
 	UpdateOperatorSocket(ctx context.Context, socket string) error
