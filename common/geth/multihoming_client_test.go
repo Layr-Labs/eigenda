@@ -34,12 +34,11 @@ func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.Mul
 	}
 
 	mockClient := geth.MultiHomingClient{}
-	statistics := geth.NewRPCStatistics(logger)
+	controller := geth.NewFailoverController(logger)
 
-	//mockClient.rpcUrls = rpcURLs
 	mockClient.Logger = logger
 	mockClient.NumRetries = ethClientCfg.NumRetries
-	mockClient.RPCStatistics = statistics
+	mockClient.FailoverController = controller
 
 	for i := 0; i < len(rpcURLs); i++ {
 		mockEthClient := &damock.MockEthClient{}

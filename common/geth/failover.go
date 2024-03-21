@@ -6,14 +6,15 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-type RPCStatistics struct {
-	numberRpcFault uint64
-	Logger         logging.Logger
+type FailoverController struct {
 	mu             *sync.RWMutex
+	numberRpcFault uint64
+
+	Logger logging.Logger
 }
 
-func NewRPCStatistics(logger logging.Logger) *RPCStatistics {
-	return &RPCStatistics{
+func NewFailoverController(logger logging.Logger) *FailoverController {
+	return &FailoverController{
 		Logger: logger,
 		mu:     &sync.RWMutex{},
 	}
@@ -21,7 +22,7 @@ func NewRPCStatistics(logger logging.Logger) *RPCStatistics {
 
 // ProcessError attributes the error and updates total number of fault for RPC
 // It returns if RPC should immediately give up
-func (f *RPCStatistics) ProcessError(err error) bool {
+func (f *FailoverController) ProcessError(err error) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err == nil {
@@ -37,7 +38,7 @@ func (f *RPCStatistics) ProcessError(err error) bool {
 	return action == Return
 }
 
-func (f *RPCStatistics) GetTotalNumberRpcFault() uint64 {
+func (f *FailoverController) GetTotalNumberRpcFault() uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.numberRpcFault

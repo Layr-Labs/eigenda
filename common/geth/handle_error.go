@@ -22,7 +22,7 @@ const (
 
 // handleHttpError returns a boolean indicating if the current RPC should be rotated
 // the second boolean indicating if should giveup immediately
-func (f *RPCStatistics) handleHttpError(httpRespError rpc.HTTPError) (NextEndpoint, ImmediateAction) {
+func (f *FailoverController) handleHttpError(httpRespError rpc.HTTPError) (NextEndpoint, ImmediateAction) {
 	sc := httpRespError.StatusCode
 	// Default to rotation the current RPC, because it allows a higher chance to get the query completed.
 	f.Logger.Info("[HTTP Response Error]", "Status Code", sc, "Error", httpRespError)
@@ -52,13 +52,13 @@ func (f *RPCStatistics) handleHttpError(httpRespError rpc.HTTPError) (NextEndpoi
 // but a 2xx http response could contain JSON RPC error, https://github.com/ethereum/go-ethereum/blob/master/rpc/http.go#L181
 // If the error is Websocket or IPC, we only look for JSON error, https://github.com/ethereum/go-ethereum/blob/master/rpc/json.go#L67
 
-func (f *RPCStatistics) handleError(err error) (NextEndpoint, ImmediateAction) {
+func (f *FailoverController) handleError(err error) (NextEndpoint, ImmediateAction) {
 
 	var httpRespError rpc.HTTPError
 	if errors.As(err, &httpRespError) {
 		// if error is http error, i.e. non 2xx error, it is handled here
 		// if it is 2xx error, the error message is nil, https://github.com/ethereum/go-ethereum/blob/master/rpc/http.go,
-		// execution does not entere here.
+		// execution does not enter here.
 		return f.handleHttpError(httpRespError)
 	} else {
 		// it might be http2xx error, websocket error or ipc error. Parse json error code

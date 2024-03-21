@@ -19,7 +19,7 @@ type MultiHomingClient struct {
 	NumRetries   int
 	Logger       logging.Logger
 	lastRPCIndex uint64
-	*RPCStatistics
+	*FailoverController
 	mu sync.Mutex
 }
 
@@ -34,15 +34,15 @@ var _ dacommon.EthClient = (*MultiHomingClient)(nil)
 func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Address, logger logging.Logger) (*MultiHomingClient, error) {
 	rpcUrls := config.RPCURLs
 
-	rpcStatistics := NewRPCStatistics(logger)
+	FailoverController := NewFailoverController(logger)
 
 	client := &MultiHomingClient{
-		rpcUrls:       rpcUrls,
-		NumRetries:    config.NumRetries,
-		RPCStatistics: rpcStatistics,
-		lastRPCIndex:  0,
-		Logger:        logger,
-		mu:            sync.Mutex{},
+		rpcUrls:            rpcUrls,
+		NumRetries:         config.NumRetries,
+		FailoverController: FailoverController,
+		lastRPCIndex:       0,
+		Logger:             logger,
+		mu:                 sync.Mutex{},
 	}
 
 	for i := 0; i < len(rpcUrls); i++ {
