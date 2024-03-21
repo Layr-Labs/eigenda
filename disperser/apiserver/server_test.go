@@ -480,6 +480,8 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 				},
 			},
 		},
+		RetrievalBlobRate:   3 * 1e6,
+		RetrievalThroughput: 20 * 1024,
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)

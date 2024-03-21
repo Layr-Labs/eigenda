@@ -605,6 +605,46 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
 
+	// Check Ratelimit
+	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
+	if err != nil {
+		return nil, api.NewInvalidArgError(err.Error())
+	}
+
+	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
+
+	if s.ratelimiter != nil {
+		key := fmt.Sprintf("%s:%s", origin, "retrieval")
+		params := []common.RequestParams{
+			{
+				RequesterID: key + "-throughput",
+				BlobSize:    blobSize,
+				Rate:        s.rateConfig.RetrievalThroughput,
+				Info:        "Retrieval throughput rate limit",
+			},
+			{
+				RequesterID: key + "-blobrate",
+				BlobSize:    blobRateMultiplier,
+				Rate:        s.rateConfig.RetrievalBlobRate,
+				Info:        "Retrieval blob rate limit",
+			},
+		}
+
+		allowed, param, err := s.ratelimiter.AllowRequest(ctx, params)
+		if err != nil {
+			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
+		}
+		if !allowed {
+			s.metrics.HandleFailedRequest(codes.ResourceExhausted.String(), "", 0, "RetrieveBlob")
+			errorString := "request ratelimited"
+			info, ok := param.Info.(string)
+			if ok {
+				errorString += ": " + info
+			}
+			return nil, api.NewResourceExhaustedError(errorString)
+		}
+	}
+
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob", "err", err)
