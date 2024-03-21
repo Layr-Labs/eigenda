@@ -9,13 +9,13 @@ import (
 type RPCStatistics struct {
 	numberRpcFault uint64
 	Logger         logging.Logger
-	mu             *sync.Mutex
+	mu             *sync.RWMutex
 }
 
 func NewRPCStatistics(logger logging.Logger) *RPCStatistics {
 	return &RPCStatistics{
 		Logger: logger,
-		mu:     &sync.Mutex{},
+		mu:     &sync.RWMutex{},
 	}
 }
 
@@ -38,7 +38,7 @@ func (f *RPCStatistics) ProcessError(err error) bool {
 }
 
 func (f *RPCStatistics) GetTotalNumberRpcFault() uint64 {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.numberRpcFault
 }
