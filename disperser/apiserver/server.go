@@ -99,6 +99,7 @@ func NewDispersalServer(
 
 func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_DisperseBlobAuthenticatedServer) error {
 
+	// This uses the existing deadline of stream.Context() if it is earlier.
 	ctx, cancel := context.WithTimeout(stream.Context(), s.serverConfig.GrpcTimeout)
 	defer cancel()
 
