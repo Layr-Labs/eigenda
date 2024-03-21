@@ -122,5 +122,5 @@ func RunDisperserServer(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Disperser", "socket", httpSocket)
 	}
 
-	return server.Start(context.Background())
+	return server.Start()
 }

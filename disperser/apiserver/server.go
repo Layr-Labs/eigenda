@@ -96,7 +96,7 @@ func NewDispersalServer(
 	}
 }
 
-func (s *DispersalServer) Start(ctx context.Context) error {
+func (s *DispersalServer) Start() error {
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
