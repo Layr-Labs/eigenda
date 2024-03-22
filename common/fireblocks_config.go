@@ -34,7 +34,7 @@ func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Name:     PrefixFlag(flagPrefix, FireblocksAPISecretNameFlagName),
 			Usage:    "Fireblocks API Secret Name. To configure Fireblocks MPC wallet, this field is required. Otherwise, private key must be configured in eth client so that it can fall back to private key wallet.",
 			Required: false,
-			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_SECRET_Name"),
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_SECRET_NAME"),
 		},
 		cli.StringFlag{
 			Name:     PrefixFlag(flagPrefix, FireblocksBaseURLFlagName),
