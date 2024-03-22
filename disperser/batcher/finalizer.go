@@ -214,13 +214,21 @@ func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.
 	var cancel context.CancelFunc
 	var txReceipt *types.Receipt
 	var err error
-	for i := 0; i < maxRetries; i++ {
+
+	rpcCallAttempt := func() error {
 		ctxWithTimeout, cancel = context.WithTimeout(ctx, f.timeout)
 		defer cancel()
 		txReceipt, err = f.ethClient.TransactionReceipt(ctxWithTimeout, hash)
+		return err
+	}
+
+	for i := 0; i < maxRetries; i++ {
+
+		err = rpcCallAttempt()
 		if err == nil {
 			break
 		}
+
 		if errors.Is(err, ethereum.NotFound) {
 			// If the transaction is not found, it means the transaction has been reorged out of the chain.
 			return 0, err
@@ -243,14 +251,19 @@ func (f *finalizer) getLatestFinalizedBlock(ctx context.Context) (*types.Header,
 	var cancel context.CancelFunc
 	var header = types.Header{}
 	var err error
-	for i := 0; i < maxRetries; i++ {
+
+	rpcCallAttempt := func() error {
 		ctxWithTimeout, cancel = context.WithTimeout(ctx, f.timeout)
 		defer cancel()
-		err := f.rpcClient.CallContext(ctxWithTimeout, &header, "eth_getBlockByNumber", "finalized", false)
+		err = f.rpcClient.CallContext(ctxWithTimeout, &header, "eth_getBlockByNumber", "finalized", false)
+		return err
+	}
+
+	for i := 0; i < maxRetries; i++ {
+		err = rpcCallAttempt()
 		if err == nil {
 			break
 		}
-
 		retrySec := math.Pow(2, float64(i))
 		f.logger.Error("Finalizer: error getting latest finalized block", "err", err, "retrySec", retrySec)
 		time.Sleep(time.Duration(retrySec) * baseDelay)
