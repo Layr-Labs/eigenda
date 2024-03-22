@@ -2,6 +2,7 @@ package rs
 
 import (
 	"math"
+	"runtime"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -13,6 +14,8 @@ type Encoder struct {
 	Fs *fft.FFTSettings
 
 	verbose bool
+
+	NumRSWorker int
 }
 
 // The function creates a high level struct that determines the encoding the a data of a
@@ -37,6 +40,7 @@ func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) 
 		EncodingParams: params,
 		Fs:             fs,
 		verbose:        verbose,
+		NumRSWorker:    runtime.GOMAXPROCS(0),
 	}, nil
 
 }
