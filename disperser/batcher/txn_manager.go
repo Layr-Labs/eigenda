@@ -214,15 +214,24 @@ func (t *txnManager) ensureAnyTransactionEvaled(ctx context.Context, txs []*tran
 func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
 	numSpeedUps := 0
 	retryFromFailure := 0
-	for {
+
+	var receipt *types.Receipt
+	var err error
+
+	rpcCallAttempt := func() error {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
-
 		t.logger.Debug("monitoring transaction", "component", "TxnManager", "method", "monitorTransaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
-		receipt, err := t.ensureAnyTransactionEvaled(
+
+		receipt, err = t.ensureAnyTransactionEvaled(
 			ctxWithTimeout,
 			req.txAttempts,
 		)
+		return err
+	}
+
+	for {
+		err = rpcCallAttempt()
 		if err == nil {
 			t.metrics.UpdateSpeedUps(numSpeedUps)
 			t.metrics.IncrementTxnCount("success")
