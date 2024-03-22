@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
+// GetBatchHeader constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
 // Note the StoreChunksRequest is validated as soon as it enters the node gRPC
 // interface, see grpc.Server.validateStoreChunkRequest.
 func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
@@ -64,7 +64,7 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	return blobs, nil
 }
 
-// Constructs a core.BlobHeader from a proto of pb.BlobHeader.
+// GetBlobHeaderFromProto constructs a core.BlobHeader from a proto of pb.BlobHeader.
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
 	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
