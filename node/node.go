@@ -37,7 +37,6 @@ const (
 var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
-		"5": "https://goerli.eigenlayer.xyz/avs/eigenda",
 		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda"
 	}
 )
