@@ -47,13 +47,27 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
 			blobMessages := make([]*core.BlobMessage, 0)
+			hasAnyBundles := false
 			for _, blob := range blobs {
+				if _, ok := blob.BundlesByOperator[id]; ok {
+					hasAnyBundles = true
+				}
 				blobMessages = append(blobMessages, &core.BlobMessage{
 					BlobHeader: blob.BlobHeader,
 					// Bundles will be empty if the operator is not in the quorums blob is dispersed on
 					Bundles: blob.BundlesByOperator[id],
 				})
 			}
+			if !hasAnyBundles {
+				// Operator is not part of any quorum, no need to send chunks
+				update <- core.SignerMessage{
+					Err:       errors.New("operator is not part of any quorum"),
+					Signature: nil,
+					Operator:  id,
+				}
+				return
+			}
+
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
 				update <- core.SignerMessage{
