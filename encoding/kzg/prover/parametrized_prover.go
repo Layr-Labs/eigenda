@@ -225,11 +225,10 @@ func (p *ParametrizedProver) proofWorker(
 				points: nil,
 				err:    err,
 			}
-			continue
-		}
-
-		for i := 0; i < len(coeffs); i++ {
-			coeffStore[i][j] = coeffs[i]
+		} else {
+			for i := 0; i < len(coeffs); i++ {
+				coeffStore[i][j] = coeffs[i]
+			}
 		}
 	}
 

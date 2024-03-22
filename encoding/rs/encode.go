@@ -57,7 +57,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 		return nil, nil, nil, err
 	}
 
-	log.Printf("  SUMMARY: RSEncode %v byte among %v numNode with chunkSize %v takes %v\n",
+	log.Printf("  SUMMARY: RSEncode %v byte among %v numChunks with chunkLength %v takes %v\n",
 		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, g.ChunkLength, time.Since(start))
 
 	return poly, frames, indices, nil
@@ -73,21 +73,21 @@ func (g *Encoder) MakeFrames(
 	if err != nil {
 		return nil, nil, err
 	}
-	k := uint64(0)
+	
 
 	indices := make([]uint32, 0)
 	frames := make([]Frame, g.NumChunks)
 
 	numWorker := uint64(g.NumRSWorker)
 
-	if uint64(numWorker) > g.NumChunks {
+	if numWorker > g.NumChunks {
 		numWorker = g.NumChunks
 	}
 
 	jobChan := make(chan JobRequest, numWorker)
 	results := make(chan error, numWorker)
 
-	for w := uint64(0); w < uint64(numWorker); w++ {
+	for w := uint64(0); w < numWorker; w++ {
 		go g.interpolyWorker(
 			polyEvals,
 			jobChan,
@@ -96,6 +96,7 @@ func (g *Encoder) MakeFrames(
 		)
 	}
 
+	k := uint64(0)
 	for i := uint64(0); i < g.NumChunks; i++ {
 		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
 		jr := JobRequest{
@@ -108,7 +109,7 @@ func (g *Encoder) MakeFrames(
 	}
 	close(jobChan)
 
-	for w := uint64(0); w < uint64(numWorker); w++ {
+	for w := uint64(0); w < numWorker; w++ {
 		interPolyErr := <-results
 		if interPolyErr != nil {
 			err = interPolyErr
