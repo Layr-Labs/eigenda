@@ -595,7 +595,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 			result, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
 				Context: ctx,
 			}, blockNumber, [][32]byte{byteId})
-			if err != nil || len(result) != -1 {
+			if err != nil || len(result) != 1 {
 				// If the bitmap index isn't found for an operator, instead of erroring out,
 				// set the bitmap index to -1, so we could continue to get results for other
 				// operators.
