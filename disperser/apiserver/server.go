@@ -29,11 +29,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var errSystemBlobRateLimit = errors.New("request ratelimited: system blob limit")
-var errSystemThroughputRateLimit = errors.New("request ratelimited: system throughput limit")
-var errAccountBlobRateLimit = errors.New("request ratelimited: account blob limit")
-var errAccountThroughputRateLimit = errors.New("request ratelimited: account throughput limit")
-
 const systemAccountKey = "system"
 
 const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
@@ -245,14 +240,9 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	s.logger.Debug("received a new blob dispersal request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRates(ctx, blob, origin, authenticatedAddress)
+		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
-			rateLimited := errors.Is(err, errSystemBlobRateLimit) || errors.Is(err, errSystemThroughputRateLimit) || errors.Is(err, errAccountBlobRateLimit) || errors.Is(err, errAccountThroughputRateLimit)
-			if !rateLimited {
-				s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
-				return nil, api.NewInternalError(err.Error())
-			}
-			return nil, api.NewResourceExhaustedError(err.Error())
+			return nil, err
 		}
 	}
 
@@ -310,6 +300,8 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	// Check if the origin is in the allowlist
 
+	// If the origin is not in the allowlist, we use the origin as the account key since
+	// it is a more limited resource than an ETH public key
 	key := "ip:" + origin
 
 	for account, rateInfoByQuorum := range s.rateConfig.Allowlist {
@@ -337,83 +329,153 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 }
 
-func (s *DispersalServer) checkRateLimitsAndAddRates(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
+// Enum of rateTypes for the limiterInfo struct
+type RateType uint8
 
-	// TODO(robert): Remove these locks once we have resolved ratelimiting approach
-	s.mu.Lock()
-	defer s.mu.Unlock()
+const (
+	SystemThroughputType RateType = iota
+	SystemBlobRateType
+	AccountThroughputType
+	AccountBlobRateType
+)
+
+func (r RateType) String() string {
+	switch r {
+	case SystemThroughputType:
+		return "System throughput rate limit"
+	case SystemBlobRateType:
+		return "System blob rate limit"
+	case AccountThroughputType:
+		return "Account throughput rate limit"
+	case AccountBlobRateType:
+		return "Account blob rate limit"
+	default:
+		return "Unknown rate type"
+	}
+}
+
+func (r RateType) Plug() string {
+	switch r {
+	case SystemThroughputType:
+		return "system_throughput"
+	case SystemBlobRateType:
+		return "system_blob_rate"
+	case AccountThroughputType:
+		return "account_throughput"
+	case AccountBlobRateType:
+		return "account_blob_rate"
+	default:
+		return "unknown_rate_type"
+	}
+}
+
+type limiterInfo struct {
+	RateType RateType
+	QuorumID core.QuorumID
+}
+
+// checkRateLimitsAndAddRatesToHeader checks the configured rate limits for all of the quorums in the blob's security params,
+// including both system and account level rates, relative to both the blob rate and the data bandwidth rate.
+// The function will check for whitelist entries for both the authenticated address (if authenticated) and the origin.
+// If no whitelist entry is found for either the origin or the authenticated address, the origin will be used as the account key
+// and unauthenticated rates will be used. If the rate limit is exceeded, the function will return a ResourceExhaustedError.
+// checkRateLimitsAndAddRatesToHeader will also update the blob's security params with the throughput rate for each qourum.
+//
+// This information is currently passed to the DA nodes for their use is ratelimiting retrieval requests. This retrieval ratelimiting
+// is a temporary measure until the DA nodes are able to determine rates by themselves and will be simplified or replaced in the future.
+func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
+
+	requestParams := make([]common.RequestParams, 0)
+
+	blobSize := len(blob.Data)
+	length := encoding.GetBlobLength(uint(blobSize))
 
 	for i, param := range blob.RequestHeader.SecurityParams {
 
-		rates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
-		quorumId := string(param.QuorumID)
+		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
-			return fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
+			return api.NewInternalError(fmt.Sprintf("no configured rate exists for quorum %d", param.QuorumID))
 		}
+
 		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
-			return err
-		}
-
-		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
-		blobSize := len(blob.Data)
-		length := encoding.GetBlobLength(uint(blobSize))
-		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
-		encodedSize := encoding.GetBlobSize(encodedLength)
-
-		s.logger.Debug("checking rate limits", "origin", origin, "address", authenticatedAddress, "quorum", param.QuorumID, "encodedSize", encodedSize, "blobSize", blobSize,
-			"accountThroughput", accountRates.Throughput, "accountBlobRate", accountRates.BlobRate, "accountKey", accountKey)
-
-		// Check System Ratelimit
-		systemQuorumKey := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
-		allowed, err := s.ratelimiter.AllowRequest(ctx, systemQuorumKey, encodedSize, rates.TotalUnauthThroughput)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("system byte ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", rates.TotalUnauthThroughput)
-			s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errSystemThroughputRateLimit
-		}
-
-		systemQuorumKey = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, systemQuorumKey, blobRateMultiplier, rates.TotalUnauthBlobRate)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("system blob ratelimit exceeded", "systemQuorumKey", systemQuorumKey, "rate", float32(rates.TotalUnauthBlobRate)/blobRateMultiplier)
-			s.metrics.HandleSystemRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errSystemBlobRateLimit
-		}
-
-		// Check Account Ratelimit
-
-		accountQuorumKey := fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, encodedSize, accountRates.Throughput)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("account byte ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", accountRates.Throughput)
-			s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errAccountThroughputRateLimit
-		}
-
-		accountQuorumKey = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
-		allowed, err = s.ratelimiter.AllowRequest(ctx, accountQuorumKey, blobRateMultiplier, accountRates.BlobRate)
-		if err != nil {
-			return fmt.Errorf("ratelimiter error: %v", err)
-		}
-		if !allowed {
-			s.logger.Warn("account blob ratelimit exceeded", "accountQuorumKey", accountQuorumKey, "rate", float32(accountRates.BlobRate)/blobRateMultiplier)
-			s.metrics.HandleAccountRateLimitedRequest(quorumId, blobSize, "DisperseBlob")
-			return errAccountBlobRateLimit
+			return api.NewInternalError(err.Error())
 		}
 
 		// Update the quorum rate
 		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
+
+		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
+		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
+		encodedSize := encoding.GetBlobSize(encodedLength)
+
+		// System Level
+		key := fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemThroughputType.Plug())
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    encodedSize,
+			Rate:        globalRates.TotalUnauthThroughput,
+			Info: limiterInfo{
+				RateType: SystemThroughputType,
+				QuorumID: param.QuorumID,
+			},
+		})
+
+		key = fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemBlobRateType.Plug())
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    blobRateMultiplier,
+			Rate:        globalRates.TotalUnauthBlobRate,
+			Info: limiterInfo{
+				RateType: SystemBlobRateType,
+				QuorumID: param.QuorumID,
+			},
+		})
+
+		// Account Level
+		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountThroughputType.Plug())
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    encodedSize,
+			Rate:        accountRates.Throughput,
+			Info: limiterInfo{
+				RateType: AccountThroughputType,
+				QuorumID: param.QuorumID,
+			},
+		})
+
+		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountBlobRateType.Plug())
+		requestParams = append(requestParams, common.RequestParams{
+			RequesterID: key,
+			BlobSize:    blobRateMultiplier,
+			Rate:        accountRates.BlobRate,
+			Info: limiterInfo{
+				RateType: AccountBlobRateType,
+				QuorumID: param.QuorumID,
+			},
+		})
+
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	allowed, params, err := s.ratelimiter.AllowRequest(ctx, requestParams)
+	if err != nil {
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
+		return api.NewInternalError(err.Error())
+	}
+
+	if !allowed {
+		info, ok := params.Info.(limiterInfo)
+		if !ok {
+			return api.NewInternalError("failed to cast limiterInfo")
+		}
+		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlob")
+		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
+		return api.NewResourceExhaustedError(errorString)
+	}
+
 	return nil
 
 }

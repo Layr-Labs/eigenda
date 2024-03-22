@@ -40,13 +40,21 @@ func TestRatelimit(t *testing.T) {
 
 	retreiverID := "testRetriever"
 
+	params := []common.RequestParams{
+		{
+			RequesterID: retreiverID,
+			BlobSize:    10,
+			Rate:        100,
+		},
+	}
+
 	for i := 0; i < 10; i++ {
-		allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
+		allow, _, err := ratelimiter.AllowRequest(ctx, params)
 		assert.NoError(t, err)
 		assert.Equal(t, true, allow)
 	}
 
-	allow, err := ratelimiter.AllowRequest(ctx, retreiverID, 10, 100)
+	allow, _, err := ratelimiter.AllowRequest(ctx, params)
 	assert.NoError(t, err)
 	assert.Equal(t, false, allow)
 }

@@ -9,6 +9,8 @@ import (
 type NoopRatelimiter struct {
 }
 
-func (r *NoopRatelimiter) AllowRequest(ctx context.Context, retrieverID string, blobSize uint, rate common.RateParam) (bool, error) {
-	return true, nil
+var _ common.RateLimiter = &NoopRatelimiter{}
+
+func (r *NoopRatelimiter) AllowRequest(ctx context.Context, params []common.RequestParams) (bool, *common.RequestParams, error) {
+	return true, nil, nil
 }
