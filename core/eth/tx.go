@@ -3,6 +3,7 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -307,7 +308,7 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 			}
 		}
 		if !found {
-			return fmt.Errorf("operator is not registered in quorum %d at block %d", quorumToDereg, blockNumber)
+			return fmt.Errorf("operatorId %s is not registered in quorum %d at block %d", hex.EncodeToString(operatorId[:]), quorumToDereg, blockNumber)
 		}
 	}
 
