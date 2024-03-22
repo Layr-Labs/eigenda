@@ -36,6 +36,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
     address public batchConfirmer;
     address public pauser;
     uint256 public initalPausedStatus;
+    address public deployer;
 
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
@@ -72,6 +73,10 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
 
         pauser = address(eigenLayerPauserReg);
+
+        deployer = stdJson.readAddress(config_data, ".permissions.deployer");
+        require(deployer == tx.origin, "Deployer address must be the same as the tx.origin");
+        emit log_named_address("You are deploying from", deployer);
 
         vm.startBroadcast();
 
@@ -188,10 +193,14 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
                 EigenDAServiceManager.initialize.selector,
                 IPauserRegistry(pauser),
                 initalPausedStatus,
-                eigenDAOwner,
+                deployer,
                 batchConfirmer
             )
         );
+
+        string memory metadataURI = stdJson.readString(config_data, ".uri");
+        eigenDAServiceManager.updateAVSMetadataURI(metadataURI);
+        eigenDAServiceManager.transferOwnership(eigenDAOwner);
 
         //deploy the operator state retriever
         operatorStateRetriever = new OperatorStateRetriever();
@@ -229,6 +238,188 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
 
         //write output
         _writeOutput(config_data);
+    }
+
+    function test() external {
+        // get info on all the already-deployed contracts
+        _parseDeployedContracts(existingDeploymentInfoPath);
+
+        // READ JSON CONFIG DATA
+        string memory config_data = vm.readFile(deployConfigPath);
+
+        // check that the chainID matches the one in the config
+        uint256 currentChainId = block.chainid;
+        uint256 configChainId = stdJson.readUint(config_data, ".chainInfo.chainId");
+        emit log_named_uint("You are deploying on ChainID", currentChainId);
+        require(configChainId == currentChainId, "You are on the wrong chain for this config");
+
+        // parse the addresses of permissioned roles
+        eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
+        eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
+        batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
+        initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
+
+
+        pauser = address(eigenLayerPauserReg);
+
+        deployer = stdJson.readAddress(config_data, ".permissions.deployer");
+        vm.startPrank(deployer);
+
+        // deploy proxy admin for ability to upgrade proxy contracts
+        eigenDAProxyAdmin = new ProxyAdmin();
+
+        //deploy service manager router
+        serviceManagerRouter = new ServiceManagerRouter();
+
+        /**
+         * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
+         * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
+         */
+        eigenDAServiceManager = EigenDAServiceManager(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        registryCoordinator = RegistryCoordinator(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        indexRegistry = IndexRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        stakeRegistry = StakeRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        apkRegistry = BLSApkRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+
+        //deploy index registry implementation
+        indexRegistryImplementation = new IndexRegistry(
+            registryCoordinator
+        );
+
+        //upgrade index registry proxy to implementation
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(indexRegistry))),
+            address(indexRegistryImplementation)
+        );
+
+        //deploy stake registry implementation
+        stakeRegistryImplementation = new StakeRegistry(
+            registryCoordinator,
+            delegationManager
+        );
+
+        //upgrade stake registry proxy to implementation
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(stakeRegistry))),
+            address(stakeRegistryImplementation)
+        );
+
+        //deploy apk registry implementation
+        apkRegistryImplementation = new BLSApkRegistry(
+            registryCoordinator
+        );
+
+        //upgrade apk registry proxy to implementation
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(apkRegistry))),
+            address(apkRegistryImplementation)
+        );
+
+        //deploy the registry coordinator implementation.
+        registryCoordinatorImplementation = new RegistryCoordinator(
+            IServiceManager(address(eigenDAServiceManager)),
+            stakeRegistry,
+            apkRegistry,
+            indexRegistry
+        );
+
+        {
+        // parse initalization params and permissions from config data
+        (
+            uint96[] memory minimumStakeForQuourm, 
+            IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers
+        ) = _parseStakeRegistryParams(config_data);
+        (
+            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams, 
+            address churner, 
+            address ejector
+        ) = _parseRegistryCoordinatorParams(config_data);
+
+        //upgrade the registry coordinator proxy to implementation
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(registryCoordinator))),
+            address(registryCoordinatorImplementation),
+            abi.encodeWithSelector(
+                RegistryCoordinator.initialize.selector,
+                eigenDAOwner,
+                churner,
+                ejector,
+                IPauserRegistry(pauser),
+                initalPausedStatus, 
+                operatorSetParams, 
+                minimumStakeForQuourm,
+                strategyAndWeightingMultipliers 
+            )
+        );
+        }
+
+        //deploy the eigenDA service manager implementation
+        eigenDAServiceManagerImplementation = new EigenDAServiceManager(
+            avsDirectory,
+            registryCoordinator,
+            stakeRegistry
+        );
+
+        //upgrade the eigenDA service manager proxy to implementation
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
+            address(eigenDAServiceManagerImplementation),
+            abi.encodeWithSelector(
+                EigenDAServiceManager.initialize.selector,
+                IPauserRegistry(pauser),
+                initalPausedStatus,
+                deployer,
+                batchConfirmer
+            )
+        );
+
+        string memory metadataURI = stdJson.readString(config_data, ".uri");
+        eigenDAServiceManager.updateAVSMetadataURI(metadataURI);
+        eigenDAServiceManager.transferOwnership(eigenDAOwner);
+
+        //deploy the operator state retriever
+        operatorStateRetriever = new OperatorStateRetriever();
+
+        //deploy mock rollup
+        mockRollup = new MockRollup(
+            IEigenDAServiceManager(eigenDAServiceManager),
+            BN254.generatorG1().scalar_mul(2)
+        );
+
+        // transfer ownership of proxy admin to upgrader
+        eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
+
+        vm.stopPrank();
+
+        // sanity checks
+        __verifyContractPointers(
+            apkRegistry,
+            eigenDAServiceManager,
+            registryCoordinator,
+            indexRegistry,
+            stakeRegistry
+        );
+
+        __verifyContractPointers(
+            apkRegistryImplementation,
+            eigenDAServiceManagerImplementation,
+            registryCoordinatorImplementation,
+            indexRegistryImplementation,
+            stakeRegistryImplementation
+        );
+
+        __verifyImplementations();
+        __verifyInitalizations(config_data);
     }
 
     function __verifyContractPointers(
