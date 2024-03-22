@@ -16,7 +16,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
+// GetBatchHeader constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
+// Note the StoreChunksRequest is validated as soon as it enters the node gRPC
+// interface, see grpc.Server.validateStoreChunkRequest.
 func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 	var batchRoot [32]byte
 	copy(batchRoot[:], in.GetBatchHeader().GetBatchRoot())
@@ -28,6 +30,8 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 }
 
 // GetBlobMessages constructs a core.BlobMessage array from a proto of pb.StoreChunksRequest.
+// Note the StoreChunksRequest is validated as soon as it enters the node gRPC
+// interface, see grpc.Server.validateStoreChunkRequest.
 func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
 	for i, blob := range in.GetBlobs() {
@@ -40,15 +44,15 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 		}
 
 		bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
-		for i, chunks := range blob.GetBundles() {
-			quorumID := blob.GetHeader().GetQuorumHeaders()[i].QuorumId
+		for j, chunks := range blob.GetBundles() {
+			quorumID := blob.GetHeader().GetQuorumHeaders()[j].QuorumId
 			bundles[uint8(quorumID)] = make([]*encoding.Frame, len(chunks.GetChunks()))
-			for j, data := range chunks.GetChunks() {
+			for k, data := range chunks.GetChunks() {
 				chunk, err := new(encoding.Frame).Deserialize(data)
 				if err != nil {
 					return nil, err
 				}
-				bundles[uint8(quorumID)][j] = chunk
+				bundles[uint8(quorumID)][k] = chunk
 			}
 		}
 
@@ -60,7 +64,7 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	return blobs, nil
 }
 
-// Constructs a core.BlobHeader from a proto of pb.BlobHeader.
+// GetBlobHeaderFromProto constructs a core.BlobHeader from a proto of pb.BlobHeader.
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
 	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
@@ -108,7 +112,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 }
 
 // rebuildMerkleTree rebuilds the merkle tree from the blob headers and batch header.
-func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte, quorumID uint8) (*merkletree.MerkleTree, error) {
+func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte) (*merkletree.MerkleTree, error) {
 	batchHeaderBytes, err := s.node.Store.GetBatchHeader(context.Background(), batchHeaderHash)
 	if err != nil {
 		return nil, errors.New("failed to get the batch header from Store")

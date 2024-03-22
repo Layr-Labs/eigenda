@@ -319,8 +319,8 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// revert all the keys for that batch.
 		result := <-storeChan
 		if result.keys != nil {
-			if !n.Store.DeleteKeys(ctx, result.keys) {
-				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHash)
+			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
+				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHash, "err", deleteKeysErr)
 			}
 		}
 		return nil, fmt.Errorf("failed to validate batch: %w", err)

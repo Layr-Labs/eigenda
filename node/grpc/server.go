@@ -228,7 +228,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], in.GetBatchHeaderHash())
 
-	blobHeader, _, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.BlobIndex), uint8(in.GetQuorumId()))
+	blobHeader, _, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.GetBlobIndex()))
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], in.GetBatchHeaderHash())
 
-	blobHeader, protoBlobHeader, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.BlobIndex), uint8(in.GetQuorumId()))
+	blobHeader, protoBlobHeader, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.GetBlobIndex()))
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 		return nil, err
 	}
 
-	tree, err := s.rebuildMerkleTree(batchHeaderHash, uint8(in.GetQuorumId()))
+	tree, err := s.rebuildMerkleTree(batchHeaderHash)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 	}, nil
 }
 
-func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumId uint8) (*core.BlobHeader, *pb.BlobHeader, error) {
+func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blobIndex int) (*core.BlobHeader, *pb.BlobHeader, error) {
 
 	blobHeaderBytes, err := s.node.Store.GetBlobHeader(ctx, batchHeaderHash, blobIndex)
 	if err != nil {
