@@ -449,9 +449,9 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		if !ok {
 			return api.NewInternalError("failed to cast limiterInfo")
 		}
-		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
 		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlob")
-		return api.NewResourceExhaustedError(fmt.Sprintf("request ratelimited: %s", info.Name))
+		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
+		return api.NewResourceExhaustedError(errorString)
 	}
 
 	return nil
