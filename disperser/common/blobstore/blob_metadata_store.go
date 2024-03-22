@@ -3,7 +3,9 @@ package blobstore
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -249,6 +251,24 @@ func (s *BlobMetadataStore) UpdateBlobMetadata(ctx context.Context, metadataKey 
 }
 
 func (s *BlobMetadataStore) SetBlobStatus(ctx context.Context, metadataKey disperser.BlobKey, status disperser.BlobStatus) error {
+
+	// Do this only for Preprod environment.
+	// Before updating the status to failed log the previous status and
+	// the blob key to help in debugging.
+	appEnv := os.Getenv("ENVIRONMENT")
+
+	if strings.ToLower(appEnv) == "preprod" && status == disperser.Failed {
+		metadata, err := s.GetBlobMetadata(ctx, metadataKey)
+		if err != nil {
+			s.logger.Error("error getting metadata for failed blob", "err")
+		}
+
+		// Logging this as error on purpose to help in debugging by filtering logs
+		// Since we their have been instances where failed blobs were being finalized
+		// This might help understand timesequence as this blob transitions from previous state to failed state.
+		s.logger.Error("setting blob status to failed", "blobhash", metadataKey.BlobHash, "previousStatus", metadata.BlobStatus)
+	}
+
 	_, err := s.dynamoDBClient.UpdateItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"BlobHash": &types.AttributeValueMemberS{
 			Value: metadataKey.BlobHash,
