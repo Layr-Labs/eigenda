@@ -176,9 +176,15 @@ func (t *txnManager) ensureAnyTransactionEvaled(ctx context.Context, txs []*tran
 	defer queryTicker.Stop()
 	var receipt *types.Receipt
 	var err error
+	// transactions that need to be queried. Some transactions will be removed from this map depending on their status.
+	txnsToQuery := make(map[walletsdk.TxID]*types.Transaction, len(txs))
+	for _, tx := range txs {
+		txnsToQuery[tx.TxID] = tx.Transaction
+	}
+
 	for {
-		for _, tx := range txs {
-			receipt, err = t.wallet.GetTransactionReceipt(ctx, tx.TxID)
+		for txID, tx := range txnsToQuery {
+			receipt, err = t.wallet.GetTransactionReceipt(ctx, txID)
 			if err == nil {
 				chainTip, err := t.ethClient.BlockNumber(ctx)
 				if err == nil {
@@ -193,8 +199,11 @@ func (t *txnManager) ensureAnyTransactionEvaled(ctx context.Context, txs []*tran
 				}
 			}
 
-			if errors.Is(err, ethereum.NotFound) {
-				t.logger.Debug("Transaction not yet mined", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "txID", tx.TxID, "txHash", tx.Hash().Hex())
+			if errors.Is(err, ethereum.NotFound) || errors.Is(err, walletsdk.ErrReceiptNotYetAvailable) {
+				t.logger.Debug("Transaction not yet mined", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "txID", txID, "txHash", tx.Hash().Hex(), "err", err)
+			} else if errors.Is(err, walletsdk.ErrTransactionFailed) {
+				t.logger.Debug("Transaction failed", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "txID", txID, "txHash", tx.Hash().Hex(), "err", err)
+				delete(txnsToQuery, txID)
 			} else if err != nil {
 				t.logger.Debug("Transaction receipt retrieval failed", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "err", err)
 			}
