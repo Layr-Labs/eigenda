@@ -218,13 +218,9 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	s.logger.Debug("received a new blob dispersal request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
-		allowed, name, err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress)
+		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
-			s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
-			return nil, api.NewInternalError(err.Error())
-		}
-		if !allowed {
-			return nil, api.NewResourceExhaustedError(fmt.Sprintf("request ratelimited: %s", name))
+			return nil, err
 		}
 	}
 
@@ -311,12 +307,61 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 }
 
+// Enum of rateTypes for the limiterInfo struct
+type RateType uint8
+
+const (
+	SystemThroughputType RateType = iota
+	SystemBlobRateType
+	AccountThroughputType
+	AccountBlobRateType
+)
+
+func (r RateType) String() string {
+	switch r {
+	case SystemThroughputType:
+		return "System throughput rate limit"
+	case SystemBlobRateType:
+		return "System blob rate limit"
+	case AccountThroughputType:
+		return "Account throughput rate limit"
+	case AccountBlobRateType:
+		return "Account blob rate limit"
+	default:
+		return "Unknown rate type"
+	}
+}
+
+func (r RateType) Plug() string {
+	switch r {
+	case SystemThroughputType:
+		return "system_throughput"
+	case SystemBlobRateType:
+		return "system_blob_rate"
+	case AccountThroughputType:
+		return "account_throughput"
+	case AccountBlobRateType:
+		return "account_blob_rate"
+	default:
+		return "unknown_rate_type"
+	}
+}
+
 type limiterInfo struct {
-	Name     string
+	RateType RateType
 	QuorumID core.QuorumID
 }
 
-func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) (bool, string, error) {
+// checkRateLimitsAndAddRatesToHeader checks the configured rate limits for all of the quorums in the blob's security params,
+// including both system and account level rates, relative to both the blob rate and the data bandwidth rate.
+// The function will check for whitelist entries for both the authenticated address (if authenticated) and the origin.
+// If no whitelist entry is found for either the origin or the authenticated address, the origin will be used as the account key
+// and unauthenticated rates will be used. If the rate limit is exceeded, the function will return a ResourceExhaustedError.
+// checkRateLimitsAndAddRatesToHeader will also update the blob's security params with the throughput rate for each qourum.
+//
+// This information is currently passed to the DA nodes for their use is ratelimiting retrieval requests. This retrieval ratelimiting
+// is a temporary measure until the DA nodes are able to determine rates by themselves and will be simplified or replaced in the future.
+func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
 
 	requestParams := make([]common.RequestParams, 0)
 
@@ -327,12 +372,12 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
-			return false, "", fmt.Errorf("no configured rate exists for quorum %d", param.QuorumID)
+			return api.NewInternalError(fmt.Sprintf("no configured rate exists for quorum %d", param.QuorumID))
 		}
 
 		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
-			return false, "", err
+			return api.NewInternalError(err.Error())
 		}
 
 		// Update the quorum rate
@@ -343,47 +388,47 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		encodedSize := encoding.GetBlobSize(encodedLength)
 
 		// System Level
-		key := fmt.Sprintf("%s:%d", systemAccountKey, param.QuorumID)
+		key := fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemThroughputType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
 			RequesterID: key,
 			BlobSize:    encodedSize,
 			Rate:        globalRates.TotalUnauthThroughput,
 			Info: limiterInfo{
-				Name:     fmt.Sprintf("System throughput rate limit for quorum %d", param.QuorumID),
+				RateType: SystemThroughputType,
 				QuorumID: param.QuorumID,
 			},
 		})
 
-		key = fmt.Sprintf("%s:%d-blobrate", systemAccountKey, param.QuorumID)
+		key = fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemBlobRateType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
 			RequesterID: key,
 			BlobSize:    blobRateMultiplier,
 			Rate:        globalRates.TotalUnauthBlobRate,
 			Info: limiterInfo{
-				Name:     fmt.Sprintf("System blob rate limit for quorum %d", param.QuorumID),
+				RateType: SystemBlobRateType,
 				QuorumID: param.QuorumID,
 			},
 		})
 
 		// Account Level
-		key = fmt.Sprintf("%s:%d", accountKey, param.QuorumID)
+		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountThroughputType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
 			RequesterID: key,
 			BlobSize:    encodedSize,
 			Rate:        accountRates.Throughput,
 			Info: limiterInfo{
-				Name:     fmt.Sprintf("Account throughput rate limit for quorum %d", param.QuorumID),
+				RateType: AccountThroughputType,
 				QuorumID: param.QuorumID,
 			},
 		})
 
-		key = fmt.Sprintf("%s:%d-blobrate", accountKey, param.QuorumID)
+		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountBlobRateType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
 			RequesterID: key,
 			BlobSize:    blobRateMultiplier,
 			Rate:        accountRates.BlobRate,
 			Info: limiterInfo{
-				Name:     fmt.Sprintf("Account blob rate limit for quorum %d", param.QuorumID),
+				RateType: AccountBlobRateType,
 				QuorumID: param.QuorumID,
 			},
 		})
@@ -395,19 +440,21 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 	allowed, params, err := s.ratelimiter.AllowRequest(ctx, requestParams)
 	if err != nil {
-		return false, "", err
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
+		return api.NewInternalError(err.Error())
 	}
 
 	if !allowed {
 		info, ok := params.Info.(limiterInfo)
 		if !ok {
-			return false, "", fmt.Errorf("failed to cast limiterInfo")
+			return api.NewInternalError("failed to cast limiterInfo")
 		}
+		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
 		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlob")
-		return false, info.Name, nil
+		return api.NewResourceExhaustedError(fmt.Sprintf("request ratelimited: %s", info.Name))
 	}
 
-	return true, "", nil
+	return nil
 
 }
 

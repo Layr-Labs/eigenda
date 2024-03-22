@@ -23,6 +23,15 @@ type RequestParams struct {
 }
 
 type RateLimiter interface {
+	// AllowRequest checks whether the request should be allowed. If the request is allowed, the function returns true.
+	// If the request is not allowed, the function returns false and the RequestParams of the request that was not allowed.
+	// In order to for the request to be allowed, all of the requests represented by the RequestParams slice must be allowed.
+	// Each RequestParams object represents a single request. Each request is subjected to the same GlobalRateParams, but the
+	// individual parameters of the request can differ.
+	//
+	// If CountFailed is set to true in the GlobalRateParams, AllowRequest will count failed requests towards the rate limit.
+	// If CountFailed is set to false, the rate limiter will stop processing requests as soon as it encounters a request that
+	// is not allowed.
 	AllowRequest(ctx context.Context, params []RequestParams) (bool, *RequestParams, error)
 }
 
