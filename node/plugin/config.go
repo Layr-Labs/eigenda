@@ -25,7 +25,7 @@ var (
 	OperationFlag = cli.StringFlag{
 		Name:     "operation",
 		Required: true,
-		Usage:    "Supported operations: opt-in, opt-out, update-quorums",
+		Usage:    "Supported operations: opt-in, opt-out",
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "OPERATION"),
 	}
 
@@ -66,7 +66,7 @@ var (
 	}
 	QuorumIDListFlag = cli.StringFlag{
 		Name:     "quorum-id-list",
-		Usage:    "Comma separated list of quorum IDs that the node will participate in",
+		Usage:    "Comma separated list of quorum IDs that the node will participate in. There should be at least one quorum ID. This list can contain quorums node is already registered with. If the node opts in to quorums already registered with, it will be a no-op.",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "QUORUM_ID_LIST"),
 	}
@@ -131,9 +131,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 		ids = append(ids, core.QuorumID(val))
 	}
+	if len(ids) == 0 {
+		return nil, errors.New("no quorum ids provided")
+	}
 
 	op := ctx.GlobalString(OperationFlag.Name)
-	if op != "opt-in" && op != "opt-out" && op != "update-quorums" {
+	if op != "opt-in" && op != "opt-out" {
 		return nil, errors.New("unsupported operation type")
 	}
 

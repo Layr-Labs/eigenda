@@ -149,7 +149,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 
 			// If operator is not in quorum, skip
 			if !ok {
-				a.Logger.Error("Operator not found in quorum", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket)
+				a.Logger.Error("Operator not found in quorum", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumID", id)
 				continue
 			}
 

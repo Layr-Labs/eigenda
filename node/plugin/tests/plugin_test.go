@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -147,22 +148,6 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(1), ids)
-
-	operator.NODE_QUORUM_ID_LIST = "1"
-	testConfig.RunNodePluginBinary("update-quorums", operator)
-
-	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(registeredQuorumIds))
-	assert.Equal(t, uint8(1), registeredQuorumIds[0])
-
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), ids)
-
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(1))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), ids)
 }
 
 func TestPluginInvalidOperation(t *testing.T) {
@@ -202,11 +187,11 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	assert.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
-		RPCURL:           operator.NODE_CHAIN_RPC,
+		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
 		PrivateKeyString: *privateKey,
 	}
 
-	client, err := geth.NewClient(ethConfig, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -236,12 +221,12 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Transactor {
 	assert.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
-		RPCURL:           operator.NODE_CHAIN_RPC,
+		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
 		PrivateKeyString: hexPk,
 		NumConfirmations: 0,
 	}
 
-	client, err := geth.NewClient(ethConfig, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 

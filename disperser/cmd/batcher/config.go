@@ -13,17 +13,18 @@ import (
 )
 
 type Config struct {
-	BatcherConfig   batcher.Config
-	TimeoutConfig   batcher.TimeoutConfig
-	BlobstoreConfig blobstore.Config
-	EthClientConfig geth.EthClientConfig
-	AwsClientConfig aws.ClientConfig
-	EncoderConfig   kzg.KzgConfig
-	LoggerConfig    common.LoggerConfig
-	MetricsConfig   batcher.MetricsConfig
-	IndexerConfig   indexer.Config
-	GraphUrl        string
-	UseGraph        bool
+	BatcherConfig    batcher.Config
+	TimeoutConfig    batcher.TimeoutConfig
+	BlobstoreConfig  blobstore.Config
+	EthClientConfig  geth.EthClientConfig
+	AwsClientConfig  aws.ClientConfig
+	EncoderConfig    kzg.KzgConfig
+	LoggerConfig     common.LoggerConfig
+	MetricsConfig    batcher.MetricsConfig
+	IndexerConfig    indexer.Config
+	FireblocksConfig common.FireblocksConfig
+	GraphUrl         string
+	UseGraph         bool
 
 	IndexerDataDir string
 
@@ -36,12 +37,20 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	ethClientConfig := geth.ReadEthClientConfig(ctx)
+	fireblocksConfig := common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix)
+	if len(fireblocksConfig.APIKey) > 0 &&
+		len(fireblocksConfig.SecretKeyPath) > 0 &&
+		len(fireblocksConfig.BaseURL) > 0 &&
+		len(fireblocksConfig.VaultAccountName) > 0 {
+		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		},
-		EthClientConfig: geth.ReadEthClientConfig(ctx),
+		EthClientConfig: ethClientConfig,
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
 		LoggerConfig:    *loggerConfig,
@@ -57,6 +66,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxNumRetriesPerBlob:     ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
 			TargetNumChunks:          ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
 			MaxBlobsToFetchFromStore: ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
+			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
 			EncodingTimeout:    ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
@@ -74,6 +84,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
+		FireblocksConfig:              fireblocksConfig,
 	}
 	return config, nil
 }

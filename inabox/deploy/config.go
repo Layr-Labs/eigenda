@@ -146,10 +146,6 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_GRAPH_URL:             graphUrl,
 		CHURNER_INDEXER_PULL_INTERVAL: "1s",
 
-		CHURNER_STD_LOG_LEVEL:  "debug",
-		CHURNER_FILE_LOG_LEVEL: "debug",
-		CHURNER_LOG_PATH:       logPath,
-
 		CHURNER_ENABLE_METRICS:    "true",
 		CHURNER_METRICS_HTTP_PORT: "9095",
 	}
@@ -206,12 +202,8 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetreiver,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
 		BATCHER_SRS_ORDER:                     "300000",
-		BATCHER_SRS_LOAD:                      "300000",
 		BATCHER_CHAIN_RPC:                     "",
 		BATCHER_PRIVATE_KEY:                   key[2:],
-		BATCHER_STD_LOG_LEVEL:                 "debug",
-		BATCHER_FILE_LOG_LEVEL:                "debug",
-		BATCHER_LOG_PATH:                      logPath,
 		BATCHER_GRAPH_URL:                     graphUrl,
 		BATCHER_USE_GRAPH:                     "true",
 		BATCHER_BATCH_SIZE_LIMIT:              "10240", // 10 GiB
@@ -224,6 +216,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_ENCODING_REQUEST_QUEUE_SIZE:   "500",
 		BATCHER_NUM_CONFIRMATIONS:             "0",
 		BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE: "100",
+		BATCHER_FINALIZATION_BLOCK_DELAY:      "5",
 	}
 
 	env.applyDefaults(&v, "BATCHER", "batcher", ind)
@@ -306,9 +299,6 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_VERBOSE:                     "true",
 		NODE_CHAIN_RPC:                   "",
 		NODE_PRIVATE_KEY:                 key[2:],
-		NODE_STD_LOG_LEVEL:               "debug",
-		NODE_FILE_LOG_LEVEL:              "debug",
-		NODE_LOG_PATH:                    logPath,
 		NODE_NUM_BATCH_VALIDATORS:        "128",
 		NODE_PUBLIC_IP_PROVIDER:          "mockip",
 		NODE_PUBLIC_IP_CHECK_INTERVAL:    "10s",
@@ -345,10 +335,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
 
 		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
-
-		RETRIEVER_STD_LOG_LEVEL:  "debug",
-		RETRIEVER_FILE_LOG_LEVEL: "debug",
-		RETRIEVER_LOG_PATH:       logPath,
 	}
 
 	v.RETRIEVER_G2_PATH = ""

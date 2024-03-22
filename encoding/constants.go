@@ -8,6 +8,8 @@ import (
 
 const BYTES_PER_COEFFICIENT = 31
 
+const NUMBER_FR_SECURITY_BYTES = 32
+
 func init() {
 	initGlobals()
 }

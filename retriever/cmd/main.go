@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
@@ -82,7 +83,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	gethClient, err := geth.NewClient(config.EthClientConfig, logger)
+	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
@@ -98,7 +99,7 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 	cs := eth.NewChainState(tx, gethClient)
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURL)
+	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

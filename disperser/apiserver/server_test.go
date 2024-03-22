@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -63,6 +64,51 @@ func TestDisperseBlob(t *testing.T) {
 	status, _, key := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
 	assert.NotNil(t, key)
+}
+
+func TestDisperseBlobAuth(t *testing.T) {
+
+	data1KiB := make([]byte, 1024)
+	_, err := rand.Read(data1KiB)
+	assert.NoError(t, err)
+
+	// Use an unauthenticated signer
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
+	signer := auth.NewSigner(privateKeyHex)
+
+	errorChan := make(chan error, 10)
+
+	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
+	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 0, errorChan, false)
+
+	err = <-errorChan
+	assert.NoError(t, err)
+
+}
+
+func TestDisperseBlobAuthTimeout(t *testing.T) {
+
+	data1KiB := make([]byte, 1024)
+	_, err := rand.Read(data1KiB)
+	assert.NoError(t, err)
+
+	// Use an unauthenticated signer
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
+	signer := auth.NewSigner(privateKeyHex)
+
+	errorChan := make(chan error, 10)
+
+	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 2*time.Second, errorChan, false)
+
+	err = <-errorChan
+	assert.ErrorContains(t, err, "context deadline exceeded")
+
+	errorChan = make(chan error, 10)
+	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 0, errorChan, false)
+
+	err = <-errorChan
+	assert.NoError(t, err)
+
 }
 
 func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
@@ -439,7 +485,8 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
-		GrpcPort: "51001",
+		GrpcPort:    "51001",
+		GrpcTimeout: 1 * time.Second,
 	}, queue, transactor, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
 }
 

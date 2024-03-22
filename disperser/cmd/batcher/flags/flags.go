@@ -177,6 +177,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOBS_TO_FETCH_FROM_STORE"),
 		Value:    100,
 	}
+	FinalizationBlockDelayFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
+		Usage:    "The block delay to use for pulling operator state in order to ensure the state is finalized",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZATION_BLOCK_DELAY"),
+		Value:    75,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -207,6 +214,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumRetriesPerBlobFlag,
 	TargetNumChunksFlag,
 	MaxBlobsToFetchFromStoreFlag,
+	FinalizationBlockDelayFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
@@ -218,4 +226,5 @@ func init() {
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, indexer.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
+	Flags = append(Flags, common.FireblocksCLIFlags(envVarPrefix, FlagPrefix)...)
 }

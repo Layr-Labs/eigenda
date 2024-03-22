@@ -8,7 +8,7 @@ type KzgConfig struct {
 	CacheDir        string
 	NumWorker       uint64
 	SRSOrder        uint64 // Order is the total size of SRS
-	SRSNumberToLoad uint64 // Number of points to be loaded from the begining
+	SRSNumberToLoad uint64 // Number of points to be loaded from the beginning
 	Verbose         bool
 	PreloadEncoder  bool
 }

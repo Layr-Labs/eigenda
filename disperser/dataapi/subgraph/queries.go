@@ -30,10 +30,11 @@ type (
 		TransactionHash graphql.String
 	}
 	OperatorQuorum struct {
-		Id            graphql.String
-		Operator      graphql.String
-		QuorumNumbers graphql.String
-		BlockNumber   graphql.String
+		Id             graphql.String
+		Operator       graphql.String
+		QuorumNumbers  graphql.String
+		BlockNumber    graphql.String
+		BlockTimestamp graphql.String
 	}
 	BatchNonSigningOperatorIds struct {
 		NonSigning struct {
@@ -54,6 +55,7 @@ type (
 				OperatorId graphql.String `graphql:"operatorId"`
 			} `graphql:"nonSigners"`
 		} `graphql:"nonSigning"`
+		BlockNumber graphql.String
 	}
 	SocketUpdates struct {
 		Socket graphql.String
@@ -102,9 +104,9 @@ type (
 		Operator IndexedOperatorInfo `graphql:"operator(id: $id)"`
 	}
 	queryOperatorAddedToQuorum struct {
-		OperatorAddedToQuorum []*OperatorQuorum `graphql:"operatorAddedToQuorums(orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
+		OperatorAddedToQuorum []*OperatorQuorum `graphql:"operatorAddedToQuorums(first: $first, skip: $skip, orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
 	}
 	queryOperatorRemovedFromQuorum struct {
-		OperatorRemovedFromQuorum []*OperatorQuorum `graphql:"operatorRemovedFromQuorums(orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
+		OperatorRemovedFromQuorum []*OperatorQuorum `graphql:"operatorRemovedFromQuorums(first: $first, skip: $skip, orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
 	}
 )

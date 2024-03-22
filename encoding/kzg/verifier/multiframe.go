@@ -1,11 +1,10 @@
 package verifier
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 
@@ -26,52 +25,7 @@ type Sample struct {
 	X          uint // X is the evaluating index which corresponds to the leading coset
 }
 
-// generate a random value using Fiat Shamir transform
-// we can also pseudo randomness generated locally, but we have to ensure no adversary can manipulate it
-// Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
-func GenRandomFactor(samples []Sample) (fr.Element, error) {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-
-	for _, sample := range samples {
-		err := enc.Encode(sample.Commitment)
-		if err != nil {
-			return fr.Element{}, err
-		}
-	}
-
-	var randomFr fr.Element
-
-	err := kzg.HashToSingleField(&randomFr, buffer.Bytes())
-	if err != nil {
-		return fr.Element{}, err
-	}
-
-	return randomFr, nil
-}
-
-// Every sample has its own randomness, even though multiple samples can come from identical blob
-// Randomnesss for each sample is computed by repeatedly raising the power of the root randomness
-func GenRandomnessVector(samples []Sample) ([]fr.Element, error) {
-	// root randomness
-	r, err := GenRandomFactor(samples)
-	if err != nil {
-		return nil, err
-	}
-
-	n := len(samples)
-
-	randomsFr := make([]fr.Element, n)
-	randomsFr[0].Set(&r)
-
-	// power of r
-	for j := 0; j < n-1; j++ {
-		randomsFr[j+1].Mul(&randomsFr[j], &r)
-	}
-	return randomsFr, nil
-}
-
-// the rhsG1 comprises of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
+// the rhsG1 consists of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
 func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bn254.G1Affine) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)
@@ -142,19 +96,14 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 
 	// get leading coset powers
 	leadingDs := make([]fr.Element, n)
+	bigD := big.NewInt(int64(D))
 
 	for k := 0; k < n; k++ {
 
 		// got the leading coset field element
 		h := ks.ExpandedRootsOfUnity[samples[k].X]
 		var hPow fr.Element
-		hPow.SetOne()
-
-		// raising the power for each leading coset
-		for j := uint64(0); j < D; j++ {
-			hPow.Mul(&hPow, &h)
-		}
-
+		hPow.Exp(h, bigD)
 		leadingDs[k].Set(&hPow)
 	}
 
@@ -214,7 +163,7 @@ func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, sampl
 //
 // The order of samples do not matter.
 // Each sample need not have unique row, it is possible that multiple chunks of the same blob are validated altogether
-func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
+func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sample, m int) error {
 	// precheck
 	for i, s := range samples {
 		if s.RowIndex >= m {
@@ -223,7 +172,7 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 		}
 	}
 
-	verifier, err := group.GetKzgVerifier(params)
+	verifier, err := v.GetKzgVerifier(params)
 	if err != nil {
 		return err
 	}
@@ -231,15 +180,15 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 
 	D := params.ChunkLength
 
-	if D > group.SRSNumberToLoad {
-		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v.", D, group.SRSNumberToLoad)
+	if D > v.SRSNumberToLoad {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, v.SRSNumberToLoad)
 	}
 
 	n := len(samples)
 	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
 
 	// generate random field elements to aggregate equality check
-	randomsFr, err := GenRandomnessVector(samples)
+	randomsFr, err := CreateRandomnessVector(n)
 	if err != nil {
 		return err
 	}
@@ -260,15 +209,15 @@ func (group *Verifier) UniversalVerify(params encoding.EncodingParams, samples [
 	}
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, group.KzgConfig)
+	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.KzgConfig)
 
 	if err != nil {
 		// then try to access if there is a full list of g2 srs
-		G2atD, err = kzg.ReadG2Point(D, group.KzgConfig)
+		G2atD, err = kzg.ReadG2Point(D, v.KzgConfig)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Acessed the entire G2")
+		fmt.Println("Accessed the entire G2")
 	}
 
 	lhsG2 := &G2atD

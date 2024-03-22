@@ -14,6 +14,7 @@ func MakeStreamMock(ctx context.Context) *StreamMock {
 		ctx:            ctx,
 		recvToServer:   make(chan *disperser.AuthenticatedRequest, 10),
 		sentFromServer: make(chan *disperser.AuthenticatedReply, 10),
+		closed:         false,
 	}
 }
 
@@ -22,6 +23,7 @@ type StreamMock struct {
 	ctx            context.Context
 	recvToServer   chan *disperser.AuthenticatedRequest
 	sentFromServer chan *disperser.AuthenticatedReply
+	closed         bool
 }
 
 func (m *StreamMock) Context() context.Context {
@@ -42,6 +44,9 @@ func (m *StreamMock) Recv() (*disperser.AuthenticatedRequest, error) {
 }
 
 func (m *StreamMock) SendFromClient(req *disperser.AuthenticatedRequest) error {
+	if m.closed {
+		return errors.New("closed")
+	}
 	m.recvToServer <- req
 	return nil
 }
@@ -57,4 +62,5 @@ func (m *StreamMock) RecvToClient() (*disperser.AuthenticatedReply, error) {
 func (m *StreamMock) Close() {
 	close(m.recvToServer)
 	close(m.sentFromServer)
+	m.closed = true
 }

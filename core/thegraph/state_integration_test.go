@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
 )
@@ -104,12 +105,13 @@ func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, log
 	assert.True(t, ok)
 
 	config := geth.EthClientConfig{
-		RPCURL:           deployer.RPC,
+		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
+		NumRetries:       0,
 	}
 
-	client, err := geth.NewClient(config, logger)
+	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	assert.NoError(t, err)
 	return client
 }
