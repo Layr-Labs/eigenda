@@ -180,13 +180,13 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("cannot read fireblocks api key %s from secret manager: %w", config.FireblocksConfig.APIKeyName, err)
 		}
-		secretKey, err := secretmanager.ReadBytesFromSecretManager(context.Background(), config.FireblocksConfig.SecretKeyName, config.FireblocksConfig.Region)
+		secretKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.SecretKeyName, config.FireblocksConfig.Region)
 		if err != nil {
 			return fmt.Errorf("cannot read fireblocks api key %s from secret manager: %w", config.FireblocksConfig.APIKeyName, err)
 		}
 		fireblocksClient, err := fireblocks.NewClient(
 			apiKey,
-			secretKey,
+			[]byte(secretKey),
 			config.FireblocksConfig.BaseURL,
 			config.TimeoutConfig.ChainReadTimeout,
 			logger,

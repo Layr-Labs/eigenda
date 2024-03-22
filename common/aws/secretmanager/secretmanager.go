@@ -35,27 +35,3 @@ func ReadStringFromSecretManager(ctx context.Context, secretName, region string)
 
 	return secretString, nil
 }
-
-func ReadBytesFromSecretManager(ctx context.Context, secretName, region string) ([]byte, error) {
-	config, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Create Secrets Manager client
-	svc := secretsmanager.NewFromConfig(config)
-
-	input := &secretsmanager.GetSecretValueInput{
-		SecretId:     aws.String(secretName),
-		VersionStage: aws.String("AWSCURRENT"), // VersionStage defaults to AWSCURRENT if unspecified
-	}
-
-	result, err := svc.GetSecretValue(ctx, input)
-	if err != nil {
-		// For a list of exceptions thrown, see
-		// https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-		return nil, err
-	}
-
-	return result.SecretBinary, nil
-}
