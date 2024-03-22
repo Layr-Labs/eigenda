@@ -288,6 +288,9 @@ func (t *Transactor) RegisterOperatorWithChurn(
 // If the operator isn't registered with any of the specified quorums, this function will return error, and
 // no quorum will be deregistered.
 func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32, quorumIds []core.QuorumID) error {
+	if len(quorumIds) == 0 {
+		return errors.New("no quorum is specified to deregister from")
+	}
 	// Make sure the operator is registered in all the quorums it tries to deregister.
 	operatorId := HashPubKeyG1(pubkeyG1)
 	quorumBitmap, _, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{

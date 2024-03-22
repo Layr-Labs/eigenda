@@ -139,7 +139,7 @@ func pluginOps(ctx *cli.Context) {
 		log.Printf("Info: Operator with Operator Address: %x and OperatorID: %x is opting out of EigenDA", sk.Address, operatorID)
 		err = node.DeregisterOperator(context.Background(), operator, keyPair, tx)
 		if err != nil {
-			log.Printf("Error: failed to opt-out EigenDA Node Network for operator ID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
+			log.Printf("Error: failed to opt-out EigenDA Node Network for operator ID: %x, operator address: %x, quorums: %v, error: %v", operatorID, sk.Address, config.QuorumIDList, err)
 			return
 		}
 		log.Printf("Info: successfully opt-out the EigenDA, for operator ID: %x, operator address: %x", operatorID, sk.Address)
