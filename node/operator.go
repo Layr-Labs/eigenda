@@ -82,8 +82,7 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 }
 
 // DeregisterOperator deregisters the operator with the given public key from the specified quorums that it is registered with at the supplied block number.
-// If the operator isn't registered with any of the specified quorums, this function will
-// return error, and no quorum will be deregistered.
+// If the operator isn't registered with any of the specified quorums, this function will return error, and no quorum will be deregistered.
 func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.KeyPair, transactor core.Transactor) error {
 	blockNumber, err := transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
