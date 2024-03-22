@@ -90,6 +90,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 		ids = append(ids, core.QuorumID(val))
 	}
+	if len(ids) == 0 {
+		return nil, errors.New("no quorum ids provided")
+	}
 
 	expirationPollIntervalSec := ctx.GlobalUint64(flags.ExpirationPollIntervalSecFlag.Name)
 	if expirationPollIntervalSec <= minExpirationPollIntervalSec {

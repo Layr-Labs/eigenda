@@ -43,7 +43,7 @@ func (t *MockTransactor) RegisterOperator(
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
-	args := t.Called()
+	args := t.Called(ctx, keypair, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	return args.Error(0)
 }
 
@@ -56,7 +56,7 @@ func (t *MockTransactor) RegisterOperatorWithChurn(
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 	churnReply *churner.ChurnReply) error {
-	args := t.Called()
+	args := t.Called(ctx, keypair, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry, churnReply)
 	return args.Error(0)
 }
 
