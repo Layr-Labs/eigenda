@@ -55,7 +55,8 @@ type (
 	//
 	// Note that the deregistrationBlockNumber will only be set if the operator has deregistered from all quorums. By using
 	// the latest block, we allow the false-positive case where an operator was deregistered from all quorums at the reference
-	// block, but then re-registered afterward. We filter out these operators in GetIndexedOperatorState.
+	// block, but then re-registered afterward. Note that this can over-fetch operators but never under-fetch.  We filter out
+	// any extra operators in GetIndexedOperatorState.
 	QueryOperatorsGql struct {
 		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, orderBy: id, orderDirection: desc, where: {deregistrationBlockNumber_gt: $blockNumber})"`
 	}
