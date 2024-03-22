@@ -73,7 +73,6 @@ func (g *Encoder) MakeFrames(
 	if err != nil {
 		return nil, nil, err
 	}
-	
 
 	indices := make([]uint32, 0)
 	frames := make([]Frame, g.NumChunks)
@@ -96,15 +95,12 @@ func (g *Encoder) MakeFrames(
 		)
 	}
 
-	k := uint64(0)
 	for i := uint64(0); i < g.NumChunks; i++ {
 		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
 		jr := JobRequest{
-			Index:      uint64(i),
-			FrameIndex: k,
+			Index: i,
 		}
 		jobChan <- jr
-		k++
 		indices = append(indices, j)
 	}
 	close(jobChan)
@@ -147,8 +143,7 @@ func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Elemen
 }
 
 type JobRequest struct {
-	Index      uint64
-	FrameIndex uint64
+	Index uint64
 }
 
 func (g *Encoder) interpolyWorker(
@@ -160,7 +155,6 @@ func (g *Encoder) interpolyWorker(
 
 	for jr := range jobChan {
 		i := jr.Index
-		k := jr.FrameIndex
 		j := rb.ReverseBitsLimited(uint32(g.NumChunks), uint32(i))
 		ys := polyEvals[g.ChunkLength*i : g.ChunkLength*(i+1)]
 		err := rb.ReverseBitOrderFr(ys)
@@ -174,7 +168,7 @@ func (g *Encoder) interpolyWorker(
 			continue
 		}
 
-		frames[k].Coeffs = coeffs
+		frames[i].Coeffs = coeffs
 	}
 
 	results <- nil
