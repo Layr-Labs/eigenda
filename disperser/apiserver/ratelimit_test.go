@@ -185,10 +185,10 @@ func TestRetrievalRateLimit(t *testing.T) {
 	numLimited := 0
 	tt := time.Now()
 	for i := 0; i < 15; i++ {
-		_, err = retrieveBlob(t, dispersalServer, 1)
+		_, err = retrieveBlob(t, dispersalServer, requestID, 1)
 		fmt.Println(time.Since(tt))
 		tt = time.Now()
-		if err != nil {
+		if err != nil && strings.Contains(err.Error(), "request ratelimited: Retrieval blob rate limit") {
 			numLimited++
 		}
 	}
