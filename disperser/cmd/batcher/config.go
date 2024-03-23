@@ -39,10 +39,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
 	fireblocksConfig := common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix)
-	if len(fireblocksConfig.APIKey) > 0 &&
-		len(fireblocksConfig.SecretKeyPath) > 0 &&
-		len(fireblocksConfig.BaseURL) > 0 &&
-		len(fireblocksConfig.VaultAccountName) > 0 {
+	if !fireblocksConfig.Disable {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
 	}
 	config := Config{

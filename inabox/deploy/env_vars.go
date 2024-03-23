@@ -147,6 +147,8 @@ type BatcherVars struct {
 	BATCHER_AWS_SECRET_ACCESS_KEY string
 
 	BATCHER_AWS_ENDPOINT_URL string
+
+	BATCHER_FIREBLOCKS_DISABLE string
 }
 
 func (vars BatcherVars) getEnvMap() map[string]string {
