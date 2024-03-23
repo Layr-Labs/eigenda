@@ -111,6 +111,8 @@ func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.T
 	for _, quorumID := range c.QuorumIDs {
 		if !slices.Contains(registeredQuorumIds, quorumID) {
 			quorumIdsToRegister = append(quorumIdsToRegister, quorumID)
+		} else {
+			return nil, fmt.Errorf("the operator already registered for quorum %d", quorumID)
 		}
 	}
 
