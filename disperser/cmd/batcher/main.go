@@ -170,12 +170,16 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
 	var wallet walletsdk.Wallet
-	if len(config.FireblocksConfig.APIKeyName) > 0 &&
-		len(config.FireblocksConfig.SecretKeyName) > 0 &&
-		len(config.FireblocksConfig.BaseURL) > 0 &&
-		len(config.FireblocksConfig.VaultAccountName) > 0 &&
-		len(config.FireblocksConfig.WalletAddress) > 0 &&
-		len(config.FireblocksConfig.Region) > 0 {
+	if !config.FireblocksConfig.Disable {
+		validConfigflag := len(config.FireblocksConfig.APIKeyName) > 0 &&
+			len(config.FireblocksConfig.SecretKeyName) > 0 &&
+			len(config.FireblocksConfig.BaseURL) > 0 &&
+			len(config.FireblocksConfig.VaultAccountName) > 0 &&
+			len(config.FireblocksConfig.WalletAddress) > 0 &&
+			len(config.FireblocksConfig.Region) > 0 
+		if !validConfigflag{
+			return errors.New("fireblocks config is either invalid or incomplete")
+		}
 		apiKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.APIKeyName, config.FireblocksConfig.Region)
 		if err != nil {
 			return fmt.Errorf("cannot read fireblocks api key %s from secret manager: %w", config.FireblocksConfig.APIKeyName, err)

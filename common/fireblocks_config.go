@@ -11,6 +11,7 @@ const (
 	FireblocksVaultAccountNameFlagName = "fireblocks-vault-account-name"
 	FireblocksWalletAddressFlagName    = "fireblocks-wallet-address"
 	FireblocksSecretManagerRegion      = "fireblocks-secret-manager-region"
+	FireblocksDisable                  = "fireblocks-disable"
 )
 
 type FireblocksConfig struct {
@@ -20,6 +21,7 @@ type FireblocksConfig struct {
 	VaultAccountName string
 	WalletAddress    string
 	Region           string
+	Disable          bool
 }
 
 func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -60,6 +62,12 @@ func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_SECRET_MANAGER_REGION"),
 		},
+		cli.BoolFlag{
+			Name:     PrefixFlag(flagPrefix, FireblocksDisable),
+			Usage:    "Disable Fireblocks. By default, it is enabled",
+			Required: false,
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_DISABLE"),
+		},
 	}
 }
 
@@ -71,5 +79,6 @@ func ReadFireblocksCLIConfig(ctx *cli.Context, flagPrefix string) FireblocksConf
 		VaultAccountName: ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksVaultAccountNameFlagName)),
 		WalletAddress:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksWalletAddressFlagName)),
 		Region:           ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksSecretManagerRegion)),
+		Disable:          ctx.GlobalBool(PrefixFlag(flagPrefix, FireblocksDisable)),
 	}
 }
