@@ -712,7 +712,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	// Add the required quorums to the list of quorums to check
 	for _, quorumID := range quorumConfig.RequiredQuorums {
 		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("invalid request: quorum_numbers should not include the required quorums, but required quorum %d was found", quorumID)
+			return nil, fmt.Errorf("invalid request: custom_quorum_numbers should not include the required quorums %v, but required quorum %d was found", quorumConfig.RequiredQuorums, quorumID)
 		}
 		seenQuorums[quorumID] = struct{}{}
 	}
