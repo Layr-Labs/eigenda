@@ -106,7 +106,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		cli.IntFlag{
 			Name:     RetrievalThroughputFlagName,
 			Usage:    "The throughput rate limit for retrieval requests (Bytes/sec)",
-			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVAL_DATA_RATE"),
+			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVAL_BYTE_RATE"),
 			Required: true,
 		},
 	}
