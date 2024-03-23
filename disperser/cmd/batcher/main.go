@@ -176,8 +176,8 @@ func RunBatcher(ctx *cli.Context) error {
 			len(config.FireblocksConfig.BaseURL) > 0 &&
 			len(config.FireblocksConfig.VaultAccountName) > 0 &&
 			len(config.FireblocksConfig.WalletAddress) > 0 &&
-			len(config.FireblocksConfig.Region) > 0 
-		if !validConfigflag{
+			len(config.FireblocksConfig.Region) > 0
+		if !validConfigflag {
 			return errors.New("fireblocks config is either invalid or incomplete")
 		}
 		apiKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.APIKeyName, config.FireblocksConfig.Region)
@@ -186,7 +186,7 @@ func RunBatcher(ctx *cli.Context) error {
 		}
 		secretKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.SecretKeyName, config.FireblocksConfig.Region)
 		if err != nil {
-			return fmt.Errorf("cannot read fireblocks api key %s from secret manager: %w", config.FireblocksConfig.APIKeyName, err)
+			return fmt.Errorf("cannot read fireblocks secret key %s from secret manager: %w", config.FireblocksConfig.SecretKeyName, err)
 		}
 		fireblocksClient, err := fireblocks.NewClient(
 			apiKey,

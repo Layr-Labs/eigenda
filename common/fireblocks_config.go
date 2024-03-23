@@ -64,7 +64,7 @@ func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 		},
 		cli.BoolFlag{
 			Name:     PrefixFlag(flagPrefix, FireblocksDisable),
-			Usage:    "Disable Fireblocks. By default, it is enabled",
+			Usage:    "Disable Fireblocks. By default, Disable is set to false.",
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_DISABLE"),
 		},
