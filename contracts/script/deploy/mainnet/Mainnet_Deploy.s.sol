@@ -438,6 +438,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
 
         require(address(_eigenDAServiceManager.registryCoordinator()) == address(registryCoordinator), "eigenDAServiceManager.registryCoordinator() != registryCoordinator");
         require(address(_eigenDAServiceManager.stakeRegistry()) == address(stakeRegistry), "eigenDAServiceManager.stakeRegistry() != stakeRegistry");
+        require(address(_eigenDAServiceManager.avsDirectory()) == address(avsDirectory), "eigenDAServiceManager.avsDirectory() != avsDirectory");
 
         require(address(_registryCoordinator.serviceManager()) == address(eigenDAServiceManager), "registryCoordinator.eigenDAServiceManager() != eigenDAServiceManager");
         require(address(_registryCoordinator.stakeRegistry()) == address(stakeRegistry), "registryCoordinator.stakeRegistry() != stakeRegistry");
