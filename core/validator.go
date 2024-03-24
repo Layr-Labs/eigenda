@@ -36,7 +36,7 @@ func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst Chai
 }
 
 func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
-	if err := ValidateSecurityParam(uint32(quorumHeader.AdversaryThreshold), uint32(quorumHeader.ConfirmationThreshold)); err != nil {
+	if err := ValidateSecurityParam(uint32(quorumHeader.ConfirmationThreshold), uint32(quorumHeader.AdversaryThreshold)); err != nil {
 		return nil, nil, nil, err
 	}
 
