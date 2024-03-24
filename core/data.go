@@ -75,17 +75,21 @@ type BlobRequestHeader struct {
 	SecurityParams []*SecurityParam `json:"security_params"`
 }
 
-func (sp *SecurityParam) Validate() error {
-	if sp.ConfirmationThreshold < sp.AdversaryThreshold || sp.ConfirmationThreshold-sp.AdversaryThreshold < 10 {
-		return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
+func ValidateSecurityParam(confirmationThreshold, adversaryThreshold uint32) error {
+	if confirmationThreshold > 100 {
+		return errors.New("confimration threshold exceeds 100")
 	}
-	if sp.ConfirmationThreshold > 100 {
-		return errors.New("invalid request: quorum threshold exceeds 100")
+	if adversaryThreshold == 0 {
+		return errors.New("adversary threshold equals 0")
 	}
-	if sp.AdversaryThreshold == 0 {
-		return errors.New("invalid request: adversary threshold equals 0")
+	if confirmationThreshold < adversaryThreshold || confirmationThreshold-adversaryThreshold < 10 {
+		return errors.New("confirmation threshold must be >= 10 + adversary threshold")
 	}
 	return nil
+}
+
+func (sp *SecurityParam) Validate() error {
+	return ValidateSecurityParam(uint32(sp.ConfirmationThreshold), uint32(sp.AdversaryThreshold))
 }
 
 // BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
