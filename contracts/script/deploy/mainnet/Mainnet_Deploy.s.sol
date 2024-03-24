@@ -16,7 +16,6 @@ import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {OperatorStateRetriever} from "eigenlayer-middleware/OperatorStateRetriever.sol";
 import {ServiceManagerRouter} from "eigenlayer-middleware/ServiceManagerRouter.sol";
-import {MockRollup, BN254, IEigenDAServiceManager} from "src/rollup/MockRollup.sol";
 
 import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
 import "forge-std/Test.sol";
@@ -24,8 +23,7 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
 contract Deployer_Mainnet is ExistingDeploymentParser {
-    using BN254 for BN254.G1Point;
-
+    
     string public existingDeploymentInfoPath  = string(bytes("./script/deploy/mainnet/mainnet_addresses.json"));
     string public deployConfigPath = string(bytes("./script/deploy/mainnet/mainnet.config.json"));
     string public outputPath = string(bytes("script/deploy/mainnet/mainnet_deployment_data.json"));
@@ -45,7 +43,6 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
     StakeRegistry public stakeRegistry;
     OperatorStateRetriever public operatorStateRetriever;
     ServiceManagerRouter public serviceManagerRouter;
-    MockRollup public mockRollup;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -204,12 +201,6 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
 
         //deploy the operator state retriever
         operatorStateRetriever = new OperatorStateRetriever();
-
-        //deploy mock rollup
-        mockRollup = new MockRollup(
-            IEigenDAServiceManager(eigenDAServiceManager),
-            BN254.generatorG1().scalar_mul(2)
-        );
 
         // transfer ownership of proxy admin to upgrader
         eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
@@ -390,12 +381,6 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         //deploy the operator state retriever
         operatorStateRetriever = new OperatorStateRetriever();
 
-        //deploy mock rollup
-        mockRollup = new MockRollup(
-            IEigenDAServiceManager(eigenDAServiceManager),
-            BN254.generatorG1().scalar_mul(2)
-        );
-
         // transfer ownership of proxy admin to upgrader
         eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
 
@@ -522,7 +507,6 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         vm.serializeAddress(deployed_addresses, "stakeRegistry", address(stakeRegistry));
         vm.serializeAddress(deployed_addresses, "stakeRegistryImplementation", address(stakeRegistryImplementation));
         vm.serializeAddress(deployed_addresses, "serviceManagerRouter", address(serviceManagerRouter));
-        vm.serializeAddress(deployed_addresses, "mockRollup", address(mockRollup));
         string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "stakeRegistryImplementation", address(stakeRegistryImplementation));
 
         string memory chain_info = "chainInfo";
