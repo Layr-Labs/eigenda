@@ -66,7 +66,7 @@ var (
 	}
 	QuorumIDListFlag = cli.StringFlag{
 		Name:     "quorum-id-list",
-		Usage:    "Comma separated list of quorum IDs that the node will participate in. There should be at least one quorum ID. This list can contain quorums node is already registered with. If the node opts in to quorums already registered with, it will be a no-op.",
+		Usage:    "Comma separated list of quorum IDs that the node will opt-in or opt-out, depending on the OperationFlag. If OperationFlag is opt-in, all quorums should not have been registered already; if it's opt-out, all quorums should have been registered already",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "QUORUM_ID_LIST"),
 	}
