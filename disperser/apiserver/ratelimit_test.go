@@ -3,6 +3,7 @@ package apiserver_test
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -141,6 +142,58 @@ func TestAuthRatelimit(t *testing.T) {
 
 }
 
+func TestRetrievalRateLimit(t *testing.T) {
+
+	// Create random data
+	data := make([]byte, 1024)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	// Disperse the random data
+	status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
+	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
+	assert.NotNil(t, requestID)
+
+	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+		RequestId: requestID,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+
+	// Simulate blob confirmation so that we can retrieve the blob
+	securityParams := []*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	}
+	_ = simulateBlobConfirmation(t, requestID, blobSize, securityParams, 1)
+
+	reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+		RequestId: requestID,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
+
+	// Retrieve the blob and compare it with the original data
+	numLimited := 0
+	tt := time.Now()
+	for i := 0; i < 15; i++ {
+		_, err = retrieveBlob(t, dispersalServer, requestID, 1)
+		fmt.Println(time.Since(tt))
+		tt = time.Now()
+		if err != nil && strings.Contains(err.Error(), "request ratelimited: Retrieval blob rate limit") {
+			numLimited++
+		}
+	}
+	assert.Greater(t, numLimited, 0)
+}
 func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, data []byte, quorums []uint32, delay time.Duration, errorChan chan error, shouldSucceed bool) {
 
 	p := &peer.Peer{

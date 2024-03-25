@@ -20,6 +20,9 @@ const (
 	ClientIPHeaderFlagName          = "auth.client-ip-header"
 	AllowlistFlagName               = "auth.allowlist"
 
+	RetrievalBlobRateFlagName   = "auth.retrieval-blob-rate"
+	RetrievalThroughputFlagName = "auth.retrieval-throughput"
+
 	// We allow the user to specify the blob rate in blobs/sec, but internally we use blobs/sec * 1e6 (i.e. blobs/microsec).
 	// This is because the rate limiter takes an integer rate.
 	blobRateMultiplier = 1e6
@@ -43,6 +46,9 @@ type RateConfig struct {
 	QuorumRateInfos map[core.QuorumID]QuorumRateInfo
 	ClientIPHeader  string
 	Allowlist       Allowlist
+
+	RetrievalBlobRate   common.RateParam
+	RetrievalThroughput common.RateParam
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -90,6 +96,18 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST"),
 			Required: false,
 			Value:    &cli.StringSlice{},
+		},
+		cli.IntFlag{
+			Name:     RetrievalBlobRateFlagName,
+			Usage:    "The blob rate limit for retrieval requests (Blobs/sec)",
+			Required: true,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVAL_BLOB_RATE"),
+		},
+		cli.IntFlag{
+			Name:     RetrievalThroughputFlagName,
+			Usage:    "The throughput rate limit for retrieval requests (Bytes/sec)",
+			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVAL_BYTE_RATE"),
+			Required: true,
 		},
 	}
 }
@@ -171,8 +189,10 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 	}
 
 	return RateConfig{
-		QuorumRateInfos: quorumRateInfos,
-		ClientIPHeader:  c.String(ClientIPHeaderFlagName),
-		Allowlist:       allowlist,
+		QuorumRateInfos:     quorumRateInfos,
+		ClientIPHeader:      c.String(ClientIPHeaderFlagName),
+		Allowlist:           allowlist,
+		RetrievalBlobRate:   common.RateParam(c.Int(RetrievalBlobRateFlagName) * blobRateMultiplier),
+		RetrievalThroughput: common.RateParam(c.Int(RetrievalThroughputFlagName)),
 	}, nil
 }
