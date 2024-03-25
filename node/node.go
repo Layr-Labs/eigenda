@@ -192,13 +192,14 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
 		}
 		operator := &Operator{
-			Address:    crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
-			Socket:     socket,
-			Timeout:    10 * time.Second,
-			PrivKey:    privateKey,
-			KeyPair:    n.KeyPair,
-			OperatorId: n.Config.ID,
-			QuorumIDs:  n.Config.QuorumIDList,
+			Address:             crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
+			Socket:              socket,
+			Timeout:             10 * time.Second,
+			PrivKey:             privateKey,
+			KeyPair:             n.KeyPair,
+			OperatorId:          n.Config.ID,
+			QuorumIDs:           n.Config.QuorumIDList,
+			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 		}
 		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Config.Timeout, n.Logger)
 		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
@@ -212,7 +213,6 @@ func (n *Node) Start(ctx context.Context) error {
 		} else {
 			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet", n.ChainID.String())
 		}
-
 	}
 
 	n.CurrentSocket = socket
