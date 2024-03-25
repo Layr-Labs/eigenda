@@ -600,6 +600,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 				// set the bitmap index to -1, so we could continue to get results for other
 				// operators.
 				indexChan <- BitmapIndexOrError{bitmapIndex: -1, index: i, err: err}
+				t.Logger.Info("Failed to get bitmap index for operator", "operatorId", id.Hex(), "err", err)
 			} else {
 				indexChan <- BitmapIndexOrError{bitmapIndex: int(result[0]), index: i, err: err}
 			}
