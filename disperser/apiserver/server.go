@@ -337,6 +337,8 @@ const (
 	SystemBlobRateType
 	AccountThroughputType
 	AccountBlobRateType
+	RetrievalThroughputType
+	RetrievalBlobRateType
 )
 
 func (r RateType) String() string {
@@ -349,6 +351,10 @@ func (r RateType) String() string {
 		return "Account throughput rate limit"
 	case AccountBlobRateType:
 		return "Account blob rate limit"
+	case RetrievalThroughputType:
+		return "Retrieval throughput rate limit"
+	case RetrievalBlobRateType:
+		return "Retrieval blob rate limit"
 	default:
 		return "Unknown rate type"
 	}
@@ -364,6 +370,10 @@ func (r RateType) Plug() string {
 		return "account_throughput"
 	case AccountBlobRateType:
 		return "account_blob_rate"
+	case RetrievalThroughputType:
+		return "retrieval_throughput"
+	case RetrievalBlobRateType:
+		return "retrieval_blob_rate"
 	default:
 		return "unknown_rate_type"
 	}
@@ -588,6 +598,34 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}))
 	defer timer.ObserveDuration()
 
+	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
+	if err != nil {
+		return nil, api.NewInvalidArgError(err.Error())
+	}
+
+	if s.ratelimiter != nil {
+		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
+			{
+				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()),
+				BlobSize:    blobRateMultiplier,
+				Rate:        s.rateConfig.RetrievalBlobRate,
+				Info:        RetrievalBlobRateType.String(),
+			},
+		})
+		if err != nil {
+			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
+		}
+		if !allowed {
+			s.metrics.HandleFailedRequest(codes.ResourceExhausted.String(), "", 0, "RetrieveBlob")
+			errorString := "request ratelimited"
+			info, ok := param.Info.(string)
+			if ok {
+				errorString += ": " + info
+			}
+			return nil, api.NewResourceExhaustedError(errorString)
+		}
+	}
+
 	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex)
 
 	batchHeaderHash := req.GetBatchHeaderHash()
@@ -606,27 +644,45 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}
 
 	// Check Ratelimit
-	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
-	if err != nil {
-		return nil, api.NewInvalidArgError(err.Error())
-	}
 
 	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
 
 	if s.ratelimiter != nil {
-		key := fmt.Sprintf("%s:%s", origin, "retrieval")
-		params := []common.RequestParams{
+		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
 			{
-				RequesterID: key + "-throughput",
+				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()),
 				BlobSize:    blobSize,
 				Rate:        s.rateConfig.RetrievalThroughput,
-				Info:        "Retrieval throughput rate limit",
+				Info:        RetrievalThroughputType.String(),
+			},
+		})
+		if err != nil {
+			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
+		}
+		if !allowed {
+			s.metrics.HandleFailedRequest(codes.ResourceExhausted.String(), "", 0, "RetrieveBlob")
+			errorString := "request ratelimited"
+			info, ok := param.Info.(string)
+			if ok {
+				errorString += ": " + info
+			}
+			return nil, api.NewResourceExhaustedError(errorString)
+		}
+	}
+
+	if s.ratelimiter != nil {
+		params := []common.RequestParams{
+			{
+				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()),
+				BlobSize:    blobSize,
+				Rate:        s.rateConfig.RetrievalThroughput,
+				Info:        RetrievalThroughputType.String(),
 			},
 			{
-				RequesterID: key + "-blobrate",
+				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()),
 				BlobSize:    blobRateMultiplier,
 				Rate:        s.rateConfig.RetrievalBlobRate,
-				Info:        "Retrieval blob rate limit",
+				Info:        RetrievalBlobRateType.String(),
 			},
 		}
 
