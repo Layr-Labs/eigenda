@@ -60,7 +60,7 @@ func (t *MockTransactor) RegisterOperatorWithChurn(
 	return args.Error(0)
 }
 
-func (t *MockTransactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32) error {
+func (t *MockTransactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32, quorumIds []core.QuorumID) error {
 	args := t.Called()
 	return args.Error(0)
 }

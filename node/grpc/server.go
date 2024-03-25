@@ -175,14 +175,8 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
-			if q.GetAdversaryThreshold() >= q.GetConfirmationThreshold() {
-				return api.NewInvalidArgError("adversary_threshold must be less than confirmation_threshold")
-			}
-			if q.GetConfirmationThreshold() > 100 {
-				return api.NewInvalidArgError("confirmation threshold exceeds 100")
-			}
-			if q.AdversaryThreshold == 0 {
-				return api.NewInvalidArgError("adversary threshold equals 0")
+			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
+				return err
 			}
 		}
 	}

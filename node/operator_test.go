@@ -2,6 +2,7 @@ package node_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,20 +31,29 @@ func TestRegisterOperator(t *testing.T) {
 		OperatorId: operatorID,
 		QuorumIDs:  []core.QuorumID{0, 1},
 	}
-	tx := &coremock.MockTransactor{}
-	tx.On("GetRegisteredQuorumIdsForOperator").Return([]uint8{0}, nil)
-	tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
-		MaxOperatorCount:         1,
-		ChurnBIPsOfOperatorStake: 20,
-		ChurnBIPsOfTotalStake:    20000,
-	}, nil)
-	tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(0), nil)
-	tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	createMockTx := func(quorumIDs []uint8) *coremock.MockTransactor {
+		tx := &coremock.MockTransactor{}
+		tx.On("GetRegisteredQuorumIdsForOperator").Return(quorumIDs, nil)
+		tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
+			MaxOperatorCount:         1,
+			ChurnBIPsOfOperatorStake: 20,
+			ChurnBIPsOfTotalStake:    20000,
+		}, nil)
+		tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(0), nil)
+		tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		return tx
+
+	}
+	tx1 := createMockTx([]uint8{2})
 	churnerClient := &nodemock.ChurnerClient{}
 	churnerClient.On("Churn").Return(nil, nil)
-	err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger)
+	err = node.RegisterOperator(context.Background(), operator, tx1, churnerClient, logger)
 	assert.NoError(t, err)
-	tx.AssertCalled(t, "RegisterOperator", mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything)
+	// Try to register with a quorum that's already registered
+	tx2 := createMockTx([]uint8{0})
+	err = node.RegisterOperator(context.Background(), operator, tx2, churnerClient, logger)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "the operator already registered for quorum 0"))
 }
 
 func TestRegisterOperatorWithChurn(t *testing.T) {
@@ -59,10 +69,10 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 		PrivKey:    nil,
 		KeyPair:    keyPair,
 		OperatorId: operatorID,
-		QuorumIDs:  []core.QuorumID{0, 1},
+		QuorumIDs:  []core.QuorumID{1},
 	}
 	tx := &coremock.MockTransactor{}
-	tx.On("GetRegisteredQuorumIdsForOperator").Return([]uint8{0}, nil)
+	tx.On("GetRegisteredQuorumIdsForOperator").Return([]uint8{2}, nil)
 	tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
 		MaxOperatorCount:         1,
 		ChurnBIPsOfOperatorStake: 20,

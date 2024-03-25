@@ -36,8 +36,8 @@ func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst Chai
 }
 
 func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
-	if quorumHeader.AdversaryThreshold >= quorumHeader.ConfirmationThreshold {
-		return nil, nil, nil, fmt.Errorf("invalid header: confirmation threshold (%d) does not exceed adversary threshold (%d)", quorumHeader.ConfirmationThreshold, quorumHeader.AdversaryThreshold)
+	if err := ValidateSecurityParam(uint32(quorumHeader.ConfirmationThreshold), uint32(quorumHeader.AdversaryThreshold)); err != nil {
+		return nil, nil, nil, err
 	}
 
 	// Check if the operator is a member of the quorum
@@ -59,7 +59,7 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 		return nil, nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Bundles[quorumHeader.QuorumID]), assignment.NumChunks, quorumHeader.QuorumID)
 	}
 
-	// Validate the chunkLength against the quorum and adversary threshold parameters
+	// Validate the chunkLength against the confirmation and adversary threshold parameters
 	ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobHeader.Length, quorumHeader)
 	if err != nil || !ok {
 		return nil, nil, nil, fmt.Errorf("invalid chunk length: %w", err)

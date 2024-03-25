@@ -776,7 +776,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		// Note: no matter if dual quorum staking is enabled or not, custom_quorum_numbers cannot
 		// use any required quorums that are defined onchain.
 		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("custom_quorum_numbers should not include the required quorums, but required quorum %d was found", quorumID)
+			return nil, fmt.Errorf("custom_quorum_numbers should not include the required quorums %v, but required quorum %d was found", quorumConfig.RequiredQuorums, quorumID)
 		}
 		if s.serverConfig.EnableDualQuorums {
 			seenQuorums[quorumID] = struct{}{}

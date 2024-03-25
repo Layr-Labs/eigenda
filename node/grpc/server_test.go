@@ -310,12 +310,12 @@ func TestStoreChunksRequestValidation(t *testing.T) {
 	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 66)
 	_, err = server.StoreChunks(context.Background(), req)
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "adversary_threshold must be less than confirmation_threshold"))
+	assert.True(t, strings.Contains(err.Error(), "confirmation threshold must be >= 10 + adversary threshold"))
 
 	req, _, _, _, _ = makeStoreChunksRequest(t, 101, 66)
 	_, err = server.StoreChunks(context.Background(), req)
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "confirmation threshold exceeds 100"))
+	assert.True(t, strings.Contains(err.Error(), "confimration threshold exceeds 100"))
 
 	req, _, _, _, _ = makeStoreChunksRequest(t, 66, 0)
 	_, err = server.StoreChunks(context.Background(), req)
