@@ -31,7 +31,9 @@
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | signature_with_salt_and_expiry | [SignatureWithSaltAndExpiry](#churner-SignatureWithSaltAndExpiry) |  | The signature signed by the Churner. |
-| operators_to_churn | [OperatorToChurn](#churner-OperatorToChurn) | repeated | A list of existing operators that get churned out. Note: it&#39;s possible an operator gets churned out just for one or more quorums (rather than entirely churned out for all quorums). |
+| operators_to_churn | [OperatorToChurn](#churner-OperatorToChurn) | repeated | A list of existing operators that get churned out. This list will contain all quorums specified in the ChurnRequest even if some quorums may not have any churned out operators. If a quorum has available space, OperatorToChurn object will contain the quorum ID and empty operator and pubkey. The smart contract should only churn out the operators for quorums that are full.
+
+For example, if the ChurnRequest specifies quorums 0 and 1 where quorum 0 is full and quorum 1 has available space, the ChurnReply will contain two OperatorToChurn objects with the respective quorums. OperatorToChurn for quorum 0 will contain the operator to churn out and OperatorToChurn for quorum 1 will contain empty operator (zero address) and pubkey. The smart contract should only churn out the operators for quorum 0 because quorum 1 has available space without having any operators churned. Note: it&#39;s possible an operator gets churned out just for one or more quorums (rather than entirely churned out for all quorums). |
 
 
 
@@ -51,7 +53,7 @@
 | operator_to_register_pubkey_g2 | [bytes](#bytes) |  |  |
 | operator_request_signature | [bytes](#bytes) |  | The operator&#39;s BLS signature signed on the keccak256 hash of concat(&#34;ChurnRequest&#34;, operator address, g1, g2, salt). |
 | salt | [bytes](#bytes) |  | The salt used as part of the message to sign on for operator_request_signature. |
-| quorum_ids | [uint32](#uint32) | repeated | The quorums to register for. Note: - If any of the quorum here has already been registered, this entire request will fail to proceed. - If any of the quorum fails to register, this entire request will fail. The IDs must be in range [0, 255]. |
+| quorum_ids | [uint32](#uint32) | repeated | The quorums to register for. Note: - If any of the quorum here has already been registered, this entire request will fail to proceed. - If any of the quorum fails to register, this entire request will fail. - Regardless of whether the specified quorums are full or not, the Churner will return parameters for all quorums specified here. The smart contract will determine whether it needs to churn out existing operators based on whether the quorums have available space. The IDs must be in range [0, 254]. |
 
 
 
