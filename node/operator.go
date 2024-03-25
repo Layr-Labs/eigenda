@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -29,15 +30,15 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
 		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
 	}
-	var quorumsToRegister []core.QuorumID
-	var err error
-	if operator.RegisterNodeAtStart {
-		quorumsToRegister, err = GetQuorumIdsNotRegistered(ctx, transactor, operator.OperatorId, operator.QuorumIDs)
-	} else {
-		quorumsToRegister, err = operator.getQuorumIdsToRegister(ctx, transactor)
-	}
+	quorumsToRegister, err := operator.getQuorumIdsToRegister(ctx, transactor)
 	if err != nil {
 		return fmt.Errorf("failed to get quorum ids to register: %w", err)
+	}
+	if !operator.RegisterNodeAtStart {
+		// For operator-initiated registration, the supplied quorums must be not registered yet.
+		if len(quorumsToRegister) != len(operator.QuorumIDs) {
+			return errors.New("quorums to register must be not registered yet")
+		}
 	}
 	if len(quorumsToRegister) == 0 {
 		return nil
@@ -109,32 +110,23 @@ func UpdateOperatorSocket(ctx context.Context, transactor core.Transactor, socke
 	return transactor.UpdateOperatorSocket(ctx, socket)
 }
 
-// GetQuorumIdsNotRegistered returns the quorums from quorumIDs that are not yet registered for
-// the given operator.
-func GetQuorumIdsNotRegistered(ctx context.Context, transactor core.Transactor, operatorId core.OperatorID, quorumIDs []core.QuorumID) ([]core.QuorumID, error) {
-	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, operatorId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get registered quorum ids for an operator: %w", err)
-	}
-
-	quorumIdsNotRegistered := make([]core.QuorumID, 0)
-	for _, quorumID := range quorumIDs {
-		if !slices.Contains(registeredQuorumIds, quorumID) {
-			quorumIdsNotRegistered = append(quorumIdsNotRegistered, quorumID)
-		}
-	}
-
-	return quorumIdsNotRegistered, nil
-}
-
 // getQuorumIdsToRegister returns the quorum ids that the operator is not registered in.
 func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.Transactor) ([]core.QuorumID, error) {
 	if len(c.QuorumIDs) == 0 {
 		return nil, fmt.Errorf("an operator should be in at least one quorum to be useful")
 	}
-	quorumIdsToRegister, err := GetQuorumIdsNotRegistered(ctx, transactor, c.OperatorId, c.QuorumIDs)
+
+	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, c.OperatorId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get quorums to register an operator: %w", err)
+		return nil, fmt.Errorf("failed to get registered quorum ids for an operator: %w", err)
 	}
+
+	quorumIdsToRegister := make([]core.QuorumID, 0, len(c.QuorumIDs))
+	for _, quorumID := range c.QuorumIDs {
+		if !slices.Contains(registeredQuorumIds, quorumID) {
+			quorumIdsToRegister = append(quorumIdsToRegister, quorumID)
+		}
+	}
+
 	return quorumIdsToRegister, nil
 }
