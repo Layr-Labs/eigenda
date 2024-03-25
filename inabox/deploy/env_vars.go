@@ -64,6 +64,8 @@ type DisperserVars struct {
 	DISPERSER_SERVER_CLIENT_IP_HEADER string
 
 	DISPERSER_SERVER_ALLOWLIST string
+
+	DISPERSER_SERVER_ENABLE_DUAL_QUORUMS string
 }
 
 func (vars DisperserVars) getEnvMap() map[string]string {
