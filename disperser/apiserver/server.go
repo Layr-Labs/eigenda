@@ -603,6 +603,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
+	// Check blob rate limit
 	if s.ratelimiter != nil {
 		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
 			{
@@ -643,8 +644,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
 
-	// Check Ratelimit
-
+	// Check throughout rate limit
 	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
 
 	if s.ratelimiter != nil {
@@ -656,37 +656,6 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 				Info:        RetrievalThroughputType.String(),
 			},
 		})
-		if err != nil {
-			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
-		}
-		if !allowed {
-			s.metrics.HandleFailedRequest(codes.ResourceExhausted.String(), "", 0, "RetrieveBlob")
-			errorString := "request ratelimited"
-			info, ok := param.Info.(string)
-			if ok {
-				errorString += ": " + info
-			}
-			return nil, api.NewResourceExhaustedError(errorString)
-		}
-	}
-
-	if s.ratelimiter != nil {
-		params := []common.RequestParams{
-			{
-				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()),
-				BlobSize:    blobSize,
-				Rate:        s.rateConfig.RetrievalThroughput,
-				Info:        RetrievalThroughputType.String(),
-			},
-			{
-				RequesterID: fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()),
-				BlobSize:    blobRateMultiplier,
-				Rate:        s.rateConfig.RetrievalBlobRate,
-				Info:        RetrievalBlobRateType.String(),
-			},
-		}
-
-		allowed, param, err := s.ratelimiter.AllowRequest(ctx, params)
 		if err != nil {
 			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
 		}
