@@ -3,9 +3,6 @@
 
 ## Table of Contents
 
-- [common/common.proto](#common_common-proto)
-    - [G1Commitment](#common-G1Commitment)
-  
 - [node/node.proto](#node_node-proto)
     - [BatchHeader](#node-BatchHeader)
     - [Blob](#node-Blob)
@@ -24,39 +21,10 @@
     - [Dispersal](#node-Dispersal)
     - [Retrieval](#node-Retrieval)
   
+- [common/common.proto](#common_common-proto)
+    - [G1Commitment](#common-G1Commitment)
+  
 - [Scalar Value Types](#scalar-value-types)
-
-
-
-<a name="common_common-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## common/common.proto
-
-
-
-<a name="common-G1Commitment"></a>
-
-### G1Commitment
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-
-
-
-
-
- 
-
- 
-
- 
-
- 
 
 
 
@@ -97,7 +65,7 @@ single operator node.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | header | [BlobHeader](#node-BlobHeader) |  | Which (original) blob this is for. |
-| bundles | [Bundle](#node-Bundle) | repeated | Each bundle contains all chunks for a single quorum of the blob. The number of bundles must be equal to the total number of quorums associated with the blob, and the ordering must be the same as BlobHeader.quorum_headers. |
+| bundles | [Bundle](#node-Bundle) | repeated | Each bundle contains all chunks for a single quorum of the blob. The number of bundles must be equal to the total number of quorums associated with the blob, and the ordering must be the same as BlobHeader.quorum_headers. Note: an operator may be in some but not all of the quorums; in that case the bundle corresponding to that quorum will be empty. |
 
 
 
@@ -135,7 +103,7 @@ api/proto/disperser/disperser.proto
 | ----- | ---- | ----- | ----------- |
 | quorum_id | [uint32](#uint32) |  |  |
 | adversary_threshold | [uint32](#uint32) |  |  |
-| quorum_threshold | [uint32](#uint32) |  |  |
+| confirmation_threshold | [uint32](#uint32) |  |  |
 | chunk_length | [uint32](#uint32) |  |  |
 | ratelimit | [uint32](#uint32) |  |  |
 
@@ -315,6 +283,38 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node. |
 | GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | Similar to RetrieveChunks, this just returns the header of the blob. |
+
+ 
+
+
+
+<a name="common_common-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## common/common.proto
+
+
+
+<a name="common-G1Commitment"></a>
+
+### G1Commitment
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+
+
+
+
+
+ 
+
+ 
+
+ 
 
  
 
