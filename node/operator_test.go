@@ -23,13 +23,14 @@ func TestRegisterOperator(t *testing.T) {
 	assert.NoError(t, err)
 	// Create a new operator
 	operator := &node.Operator{
-		Address:    "0xB7Ad27737D88B07De48CDc2f379917109E993Be4",
-		Socket:     "localhost:50051",
-		Timeout:    10 * time.Second,
-		PrivKey:    nil,
-		KeyPair:    keyPair,
-		OperatorId: operatorID,
-		QuorumIDs:  []core.QuorumID{0, 1},
+		Address:             "0xB7Ad27737D88B07De48CDc2f379917109E993Be4",
+		Socket:              "localhost:50051",
+		Timeout:             10 * time.Second,
+		PrivKey:             nil,
+		KeyPair:             keyPair,
+		OperatorId:          operatorID,
+		QuorumIDs:           []core.QuorumID{0, 1},
+		RegisterNodeAtStart: false,
 	}
 	createMockTx := func(quorumIDs []uint8) *coremock.MockTransactor {
 		tx := &coremock.MockTransactor{}
@@ -53,7 +54,7 @@ func TestRegisterOperator(t *testing.T) {
 	tx2 := createMockTx([]uint8{0})
 	err = node.RegisterOperator(context.Background(), operator, tx2, churnerClient, logger)
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "the operator already registered for quorum 0"))
+	assert.True(t, strings.Contains(err.Error(), "quorums to register must be not registered yet"))
 }
 
 func TestRegisterOperatorWithChurn(t *testing.T) {
