@@ -803,7 +803,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > 256 {
-		return nil, errors.New("invalid request: number of custom_quorum_numbers must not exceed 256")
+		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
 	}
 
 	quorumConfig, err := s.updateQuorumConfig(ctx)
@@ -812,7 +812,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
-		return nil, errors.New("invalid request: number of custom_quorum_numbers must not exceed number of quorums")
+		return nil, errors.New("number of custom_quorum_numbers must not exceed number of quorums")
 	}
 
 	seenQuorums := make(map[uint8]struct{})
@@ -821,16 +821,16 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	for i := range req.GetCustomQuorumNumbers() {
 
 		if req.GetCustomQuorumNumbers()[i] > 254 {
-			return nil, fmt.Errorf("invalid request: quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
 		}
 
 		quorumID := uint8(req.GetCustomQuorumNumbers()[i])
 		if quorumID >= quorumConfig.QuorumCount {
-			return nil, fmt.Errorf("invalid request: the quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
 		}
 
 		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("invalid request: quorum_numbers must not contain duplicates")
+			return nil, fmt.Errorf("custom_quorum_numbers must not contain duplicates")
 		}
 		seenQuorums[quorumID] = struct{}{}
 
@@ -838,14 +838,22 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 
 	// Add the required quorums to the list of quorums to check
 	for _, quorumID := range quorumConfig.RequiredQuorums {
+		// Note: no matter if dual quorum staking is enabled or not, custom_quorum_numbers cannot
+		// use any required quorums that are defined onchain.
 		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("invalid request: custom_quorum_numbers should not include the required quorums %v, but required quorum %d was found", quorumConfig.RequiredQuorums, quorumID)
+			return nil, fmt.Errorf("custom_quorum_numbers should not include the required quorums %v, but required quorum %d was found", quorumConfig.RequiredQuorums, quorumID)
 		}
-		seenQuorums[quorumID] = struct{}{}
+		if s.serverConfig.EnableDualQuorums {
+			seenQuorums[quorumID] = struct{}{}
+		} else if quorumID == 0 {
+			// If dual quorum staking is not enabled, we only consider the quorum 0 as the
+			// required quorum.
+			seenQuorums[quorumID] = struct{}{}
+		}
 	}
 
 	if len(seenQuorums) == 0 {
-		return nil, fmt.Errorf("invalid request: the blob must be sent to at least one quorum")
+		return nil, fmt.Errorf("the blob must be sent to at least one quorum")
 	}
 
 	params := make([]*core.SecurityParam, len(seenQuorums))

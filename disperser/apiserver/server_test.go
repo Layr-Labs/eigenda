@@ -193,13 +193,13 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{2},
 	})
-	assert.ErrorContains(t, err, "invalid request: the quorum_numbers must be in range [0, 1], but found 2")
+	assert.ErrorContains(t, err, "custom_quorum_numbers must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 0},
 	})
-	assert.ErrorContains(t, err, "invalid request: quorum_numbers must not contain duplicates")
+	assert.ErrorContains(t, err, "custom_quorum_numbers must not contain duplicates")
 
 }
 

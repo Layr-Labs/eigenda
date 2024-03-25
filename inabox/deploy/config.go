@@ -186,6 +186,8 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
+
+		DISPERSER_SERVER_ENABLE_DUAL_QUORUMS: "true",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
