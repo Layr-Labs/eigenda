@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -14,13 +15,14 @@ import (
 )
 
 type Operator struct {
-	Address    string
-	Socket     string
-	Timeout    time.Duration
-	PrivKey    *ecdsa.PrivateKey
-	KeyPair    *core.KeyPair
-	OperatorId core.OperatorID
-	QuorumIDs  []core.QuorumID
+	Address             string
+	Socket              string
+	Timeout             time.Duration
+	PrivKey             *ecdsa.PrivateKey
+	KeyPair             *core.KeyPair
+	OperatorId          core.OperatorID
+	QuorumIDs           []core.QuorumID
+	RegisterNodeAtStart bool
 }
 
 // RegisterOperator operator registers the operator with the given public key for the given quorum IDs.
@@ -31,6 +33,12 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 	quorumsToRegister, err := operator.getQuorumIdsToRegister(ctx, transactor)
 	if err != nil {
 		return fmt.Errorf("failed to get quorum ids to register: %w", err)
+	}
+	if !operator.RegisterNodeAtStart {
+		// For operator-initiated registration, the supplied quorums must be not registered yet.
+		if len(quorumsToRegister) != len(operator.QuorumIDs) {
+			return errors.New("quorums to register must be not registered yet")
+		}
 	}
 	if len(quorumsToRegister) == 0 {
 		return nil
@@ -117,8 +125,6 @@ func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.T
 	for _, quorumID := range c.QuorumIDs {
 		if !slices.Contains(registeredQuorumIds, quorumID) {
 			quorumIdsToRegister = append(quorumIdsToRegister, quorumID)
-		} else {
-			return nil, fmt.Errorf("the operator already registered for quorum %d", quorumID)
 		}
 	}
 

@@ -118,13 +118,14 @@ func pluginOps(ctx *cli.Context) {
 	}
 
 	operator := &node.Operator{
-		Address:    sk.Address.Hex(),
-		Socket:     socket,
-		Timeout:    10 * time.Second,
-		PrivKey:    sk.PrivateKey,
-		KeyPair:    keyPair,
-		OperatorId: keyPair.GetPubKeyG1().GetOperatorID(),
-		QuorumIDs:  config.QuorumIDList,
+		Address:             sk.Address.Hex(),
+		Socket:              socket,
+		Timeout:             10 * time.Second,
+		PrivKey:             sk.PrivateKey,
+		KeyPair:             keyPair,
+		OperatorId:          keyPair.GetPubKeyG1().GetOperatorID(),
+		QuorumIDs:           config.QuorumIDList,
+		RegisterNodeAtStart: false,
 	}
 	churnerClient := node.NewChurnerClient(config.ChurnerUrl, true, operator.Timeout, logger)
 	if config.Operation == "opt-in" {
