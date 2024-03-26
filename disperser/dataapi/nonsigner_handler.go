@@ -223,8 +223,10 @@ func computeNumResponsible(batches []*BatchNonSigningInfo, operatorQuorumInterva
 	for op, val := range operatorQuorumIntervals {
 		for q, intervals := range val {
 			numBatches := 0
-			for _, interval := range intervals {
-				numBatches = numBatches + ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
+			if _, ok := quorumBatches[q]; ok {
+				for _, interval := range intervals {
+					numBatches = numBatches + ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
+				}
 			}
 			if _, ok := numResponsible[op]; !ok {
 				numResponsible[op] = make(map[uint8]int)
