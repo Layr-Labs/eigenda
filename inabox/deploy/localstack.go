@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -52,8 +53,8 @@ func StartDockertestWithLocalstackContainer(localStackPort string) (*dockertest.
 		config.AutoRemove = true
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
-	if err != nil {
-		fmt.Println("Could not start resource: %w", err)
+	if err != nil && err.Error() != "container already exists" {
+		fmt.Printf("Could not start resource: %w\n", err)
 		return nil, nil, err
 	}
 
@@ -118,14 +119,15 @@ func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, b
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		return err
 	}
 
 	_, err = test_utils.CreateTable(context.Background(), cfg, bucketTableName, store.GenerateTableSchema(10, 10, bucketTableName))
-
-	return err
-
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		return err
+	}
+	return nil
 }
 
 func PurgeDockertestResources(pool *dockertest.Pool, resource *dockertest.Resource) {
