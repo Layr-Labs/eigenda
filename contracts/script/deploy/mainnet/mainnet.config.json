@@ -5,11 +5,11 @@
   
     "permissions" : {
       "owner": "0xBE1685C81aA44FF9FB319dD389addd9374383e90",
-      "upgrader": "0x369e6F597e22EaB55fFb173C6d9cD234BD699111",
-      "churner": "0x0000000000000000000000000000000000000000",
+      "upgrader": "0xBE1685C81aA44FF9FB319dD389addd9374383e90",
+      "churner": "0xe0550117Cb066D3b330eBd764B0d75D3BA378734",
       "ejector": "0xBE1685C81aA44FF9FB319dD389addd9374383e90",
-      "batchConfirmer": "0x0000000000000000000000000000000000000000",
-      "deployer": "0x0000000000000000000000000000000000000000",
+      "batchConfirmer": "0x8ED83c6Bb12E441Ca2C3a544F525d4a3Fb6484D8",
+      "deployer": "0x45B866E099a790cbddA655Ca20Cb11168B2cD088",
       "initalPausedStatus": 0
     },
   
