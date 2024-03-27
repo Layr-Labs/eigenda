@@ -20,6 +20,8 @@ github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240322013921-268e19c1a25b h1:6rXV1Co
 github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240322013921-268e19c1a25b/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
 github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240323004904-d57bfdd5ab62 h1:0dZkkl3b6VA3W+JJ9jNQHWD9BdY289nqleobACJnXn0=
 github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240323004904-d57bfdd5ab62/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
+github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240325043411-952752534f30 h1:CPndbhgC5QKdAM9tq8FZLUFozqknKpz+Cy25sMU8lMM=
+github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240325043411-952752534f30/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 h1:TngWCqHvy9oXAN6lEVMRuU21PR1EtLVZJmdB18Gu3Rw=
