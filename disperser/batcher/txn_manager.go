@@ -261,7 +261,7 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			}
 			txID, err := t.wallet.SendTransaction(ctx, newTx)
 			if err != nil {
-				t.logger.Error("failed to send txn", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
+				t.logger.Warn("failed to send txn", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 				if retryFromFailure >= maxSpeedUpRetry {
 					t.metrics.IncrementTxnCount("failure")
 					return nil, err
