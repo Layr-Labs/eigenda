@@ -10,7 +10,7 @@
       "ejector": "0xBE1685C81aA44FF9FB319dD389addd9374383e90",
       "batchConfirmer": "0x0000000000000000000000000000000000000000",
       "deployer": "0x0000000000000000000000000000000000000000",
-      "initalPausedStatus": 1
+      "initalPausedStatus": 0
     },
   
     "minimumStakes": [
