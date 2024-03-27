@@ -152,6 +152,13 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
+	} else if config.Operation == "list-quorum" {
+		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
+		if err != nil {
+			log.Printf("Error: failed to get quorum(s) for operatorId %x, error: %v", operatorID, err)
+			return
+		}
+		log.Printf("Info: operator address: %x, current quorums: %v", sk.Address, quorumIds)
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
