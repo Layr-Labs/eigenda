@@ -11,11 +11,11 @@ type NumBatchesAtBlock struct {
 	NumBatches  int
 }
 
-// QueryBatches represents number of batches at different block numbers, as well
-// as accumulated number of batches from the first block in NumBatches.
+// QuorumBatches represents number of batches at different block numbers, as well
+// as accumulated number of batches from the first block in NumBatches, for a quorum.
 // The NumBatches is in ascending order by NumBatchesAtBlock.BlockNumber, and
 // AccuBatches[i] is corresponding to NumBatches[i].
-type QueryBatches struct {
+type QuorumBatches struct {
 	NumBatches  []*NumBatchesAtBlock
 	AccuBatches []int
 }
@@ -196,22 +196,22 @@ func validateQuorumEvents(added []*OperatorQuorum, removed []*OperatorQuorum, st
 }
 
 // ComputeNumBatches returns the number of batches in the block interval [startBlock, endBlock].
-func ComputeNumBatches(queryBatches *QueryBatches, startBlock, endBlock uint32) int {
-	start := getLowerBoundIndex(queryBatches.NumBatches, startBlock)
-	end := getUpperBoundIndex(queryBatches.NumBatches, endBlock)
+func ComputeNumBatches(quorumBatches *QuorumBatches, startBlock, endBlock uint32) int {
+	start := getLowerBoundIndex(quorumBatches.NumBatches, startBlock)
+	end := getUpperBoundIndex(quorumBatches.NumBatches, endBlock)
 	num := 0
 	if end > 0 {
-		num = queryBatches.AccuBatches[end-1]
+		num = quorumBatches.AccuBatches[end-1]
 	}
 	if start > 0 {
-		num = num - queryBatches.AccuBatches[start-1]
+		num = num - quorumBatches.AccuBatches[start-1]
 	}
 	return num
 }
 
 // CreatQuorumBatches returns quorumBatches, where quorumBatches[q] is a list of
-// QueryBatches in ascending order by block number.
-func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QueryBatches {
+// QuorumBatches in ascending order by block number.
+func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QuorumBatches {
 	quorumBatchMap := make(map[uint8]map[uint32]int)
 	for _, batch := range batches {
 		for _, q := range batch.QuorumNumbers {
@@ -221,7 +221,7 @@ func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QueryBatches 
 			quorumBatchMap[q][batch.ReferenceBlockNumber]++
 		}
 	}
-	quorumBatches := make(map[uint8]*QueryBatches)
+	quorumBatches := make(map[uint8]*QuorumBatches)
 	for q, s := range quorumBatchMap {
 		numBatches := make([]*NumBatchesAtBlock, 0)
 		for block, num := range s {
@@ -243,7 +243,7 @@ func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QueryBatches 
 		for i := 1; i < len(numBatches); i++ {
 			accuBatches[i] = numBatches[i].NumBatches + accuBatches[i-1]
 		}
-		quorumBatches[q] = &QueryBatches{
+		quorumBatches[q] = &QuorumBatches{
 			NumBatches:  numBatches,
 			AccuBatches: accuBatches,
 		}
