@@ -23,12 +23,12 @@ func NewChainState(tx core.Transactor, client common.EthClient) *ChainState {
 var _ core.ChainState = (*ChainState)(nil)
 
 func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
-	operatorsByQuorum, quorumIds, err := cs.Tx.GetOperatorStakes(ctx, operator, uint32(blockNumber))
+	operatorsByQuorum, _, err := cs.Tx.GetOperatorStakes(ctx, operator, uint32(blockNumber))
 	if err != nil {
 		return nil, err
 	}
 
-	return getOperatorState(operatorsByQuorum, quorumIds, uint32(blockNumber))
+	return getOperatorState(operatorsByQuorum, uint32(blockNumber))
 
 }
 
@@ -38,7 +38,7 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, err
 	}
 
-	return getOperatorState(operatorsByQuorum, quorums, uint32(blockNumber))
+	return getOperatorState(operatorsByQuorum, uint32(blockNumber))
 }
 
 func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
@@ -51,7 +51,7 @@ func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
 	return uint(header.Number.Uint64()), nil
 }
 
-func getOperatorState(operatorsByQuorum core.OperatorStakes, quorumIds []core.QuorumID, blockNumber uint32) (*core.OperatorState, error) {
+func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
 	totals := make(map[core.QuorumID]*core.OperatorInfo)
 

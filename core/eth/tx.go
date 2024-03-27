@@ -370,9 +370,11 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 		return nil, nil, err
 	}
 
+	quorumIds := BitmapToQuorumIds(quorumBitmap)
+
 	state := make(core.OperatorStakes, len(state_))
 	for i := range state_ {
-		quorumID := core.QuorumID(i)
+		quorumID := quorumIds[i]
 		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStake, len(state_[i]))
 		for j, op := range state_[i] {
 			operatorIndex := core.OperatorIndex(j)
@@ -382,8 +384,6 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 			}
 		}
 	}
-
-	quorumIds := BitmapToQuorumIds(quorumBitmap)
 
 	return state, quorumIds, nil
 }
