@@ -550,7 +550,7 @@
                 "operator_id": {
                     "type": "string"
                 },
-				"operator_address": {
+                "operator_address": {
                     "type": "string"
                 },
                 "percentage": {
