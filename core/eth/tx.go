@@ -370,6 +370,7 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 		return nil, nil, err
 	}
 
+	// BitmapToQuorumIds returns an ordered list of quorums in ascending order, which is the same order as the state_ returned by the contract
 	quorumIds := BitmapToQuorumIds(quorumBitmap)
 
 	state := make(core.OperatorStakes, len(state_))
