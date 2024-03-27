@@ -105,7 +105,7 @@ func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, b
 	changeDirectory(filepath.Join(rootPath, "inabox"))
 	if err := pool.Retry(func() error {
 		fmt.Println("Creating S3 bucket")
-		return execCmd("./create-s3-bucket.sh", []string{}, []string{fmt.Sprintf("AWS_URL=http://0.0.0.0:%s", localStackPort)})
+		return execCmd("./create-s3-bucket.sh", []string{}, []string{fmt.Sprintf("AWS_URL=http://localhost:%s", localStackPort)})
 	}); err != nil {
 		fmt.Println("Could not connect to docker:", err)
 		return err
@@ -115,7 +115,7 @@ func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, b
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://localhost:%s", localStackPort),
 	}
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
