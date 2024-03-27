@@ -116,6 +116,8 @@ definitions:
     properties:
       operator_id:
         type: string
+      operator_address:
+        type: string
       percentage:
         type: number
       total_batches:
