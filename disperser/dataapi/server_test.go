@@ -259,7 +259,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 	assert.Equal(t, uint64(1), response.TotalStakePerQuorum[1])
 }
 
-func TestFetchMetricsTroughputHandler(t *testing.T) {
+func TestFetchMetricsThroughputHandler(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
@@ -270,7 +270,7 @@ func TestFetchMetricsTroughputHandler(t *testing.T) {
 	matrix = append(matrix, s)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
-	r.GET("/v1/metrics/throughput", testDataApiServer.FetchMetricsTroughputHandler)
+	r.GET("/v1/metrics/throughput", testDataApiServer.FetchMetricsThroughputHandler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/throughput", nil)
@@ -349,6 +349,82 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(1), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+}
+
+func TestFetchDisperserServiceAvailabilityHandler(t *testing.T) {
+	r := setUpRouter()
+
+	mockHealthCheckService := NewMockHealthCheckService()
+	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
+		Status: grpc_health_v1.HealthCheckResponse_SERVING,
+	})
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, mockHealthCheckService)
+
+	r.GET("/v1/metrics/disperser-service-availability", testDataApiServer.FetchDisperserServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/disperser-service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	fmt.Printf("Response: %v\n", response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+
+	serviceData := response.Data[0]
+	assert.Equal(t, "Disperser", serviceData.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
+}
+
+func TestChurnerServiceAvailabilityHandler(t *testing.T) {
+	r := setUpRouter()
+
+	mockHealthCheckService := NewMockHealthCheckService()
+	mockHealthCheckService.AddResponse("Churner", &grpc_health_v1.HealthCheckResponse{
+		Status: grpc_health_v1.HealthCheckResponse_SERVING,
+	})
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, mockHealthCheckService)
+
+	r.GET("/v1/metrics/churner-service-availability", testDataApiServer.FetchChurnerServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/churner-service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	fmt.Printf("Response: %v\n", response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+
+	serviceData := response.Data[0]
+	assert.Equal(t, "Churner", serviceData.ServiceName)
+	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
 }
 
 func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
