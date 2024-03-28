@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	eigenmetrics "github.com/Layr-Labs/eigensdk-go/metrics"
 
@@ -150,7 +151,7 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalBatchSize))
 }
 
-func (g *Metrics) AcceptBlobs(quorumId uint8, blobSize int64) {
+func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize int64) {
 	quorum := strconv.Itoa(int(quorumId))
 	g.AccuBlobs.WithLabelValues("number", quorum).Inc()
 	g.AccuBlobs.WithLabelValues("size", quorum).Add(float64(blobSize))
