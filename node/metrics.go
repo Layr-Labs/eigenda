@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	eigenmetrics "github.com/Layr-Labs/eigensdk-go/metrics"
@@ -31,6 +32,8 @@ type Metrics struct {
 	AccuBatches *prometheus.CounterVec
 	// Accumulated number and size of batches that have been removed from the Node.
 	AccuRemovedBatches *prometheus.CounterVec
+	// Accumulated number and size of blobs processed by quorums.
+	AccuBlobs *prometheus.CounterVec
 	// Total number of changes in the node's socket address.
 	AccuSocketUpdates prometheus.Counter
 	// avs node spec eigen_ metrics: https://eigen.nethermind.io/docs/spec/metrics/metrics-prom-spec
@@ -81,6 +84,14 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Help:      "the total number and size of batches processed by the DA node",
 			},
 			[]string{"type", "status"},
+		),
+		AccuBlobs: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: Namespace,
+				Name:      "eigenda_blobs_total",
+				Help:      "the total number and size of blobs processed by the DA node",
+			},
+			[]string{"type", "quorum"},
 		),
 		// The "status" label has values: received, validated, stored, signed.
 		// These are the lifecycle of a batch at the DA Node.
@@ -137,6 +148,12 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 		g.AccuRemovedBatches.WithLabelValues("number").Inc()
 	}
 	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalBatchSize))
+}
+
+func (g *Metrics) AcceptBlobs(quorumId uint8, blobSize int64) {
+	quorum := strconv.Itoa(int(quorumId))
+	g.AccuBlobs.WithLabelValues("number", quorum).Inc()
+	g.AccuBlobs.WithLabelValues("size", quorum).Add(float64(blobSize))
 }
 
 func (g *Metrics) AcceptBatches(status string, batchSize int64) {
