@@ -121,7 +121,11 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	}
 
 	sigBytes := reply.GetSignature()
-	sig := &core.Signature{G1Point: new(core.Signature).Deserialize(sigBytes)}
+	point, err := new(core.Signature).Deserialize(sigBytes)
+	if err != nil {
+		return nil, err
+	}
+	sig := &core.Signature{G1Point: point}
 	return sig, nil
 }
 

@@ -1,6 +1,7 @@
 package bn254
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -106,11 +107,14 @@ func SerializeG1(p *bn254.G1Affine) []byte {
 	return b
 }
 
-func DeserializeG1(b []byte) *bn254.G1Affine {
+func DeserializeG1(b []byte) (*bn254.G1Affine, error) {
+	if len(b) != 64 {
+		return nil, errors.New("could not deserialize point, invalid length")
+	}
 	p := new(bn254.G1Affine)
 	p.X.SetBytes(b[0:32])
 	p.Y.SetBytes(b[32:64])
-	return p
+	return p, nil
 }
 
 func SerializeG2(p *bn254.G2Affine) []byte {
@@ -134,13 +138,16 @@ func SerializeG2(p *bn254.G2Affine) []byte {
 	return b
 }
 
-func DeserializeG2(b []byte) *bn254.G2Affine {
+func DeserializeG2(b []byte) (*bn254.G2Affine, error) {
+	if len(b) != 128 {
+		return nil, errors.New("could not deserialize point, invalid length")
+	}
 	p := new(bn254.G2Affine)
 	p.X.A0.SetBytes(b[0:32])
 	p.X.A1.SetBytes(b[32:64])
 	p.Y.A0.SetBytes(b[64:96])
 	p.Y.A1.SetBytes(b[96:128])
-	return p
+	return p, nil
 }
 
 func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Address) *bn254.G1Affine {
