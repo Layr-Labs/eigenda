@@ -87,7 +87,7 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RATE_BUCKET_STORE_SIZE"),
 		Required: false,
 	}
-	EnableDualQuorums = cli.BoolFlag{
+	EnableDualQuorums = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-dual-quorums"),
 		Usage:    "Whether to enable dual quorum staking. If false, only quorum 0 is used as required quorum",
 		Required: false,
