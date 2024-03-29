@@ -112,7 +112,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 		return nil, err
 	}
 
-	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 1024)
+	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
 	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize)
 	reply, err := gc.StoreChunks(ctx, request, opt)
 
