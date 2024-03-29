@@ -77,7 +77,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	request, err := createChurnRequest(req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
-		return nil, api.NewInvalidArgError(fmt.Sprintf("invalid request: %s", err.Error()))
+		return nil, api.NewInvalidArgError(err.Error())
 	}
 
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)

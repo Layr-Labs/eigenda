@@ -160,8 +160,8 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 
 			// Add to agg signature
 			if aggSigs[ind] == nil {
-				aggSigs[ind] = &Signature{sig.Copy()}
-				aggPubKeys[ind] = op.PubkeyG2.Copy()
+				aggSigs[ind] = &Signature{sig.Clone()}
+				aggPubKeys[ind] = op.PubkeyG2.Clone()
 			} else {
 				aggSigs[ind].Add(sig.G1Point)
 				aggPubKeys[ind].Add(op.PubkeyG2)
@@ -198,7 +198,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		quorumAggKey := state.AggKeys[id]
 		quorumAggPubKeys[ind] = quorumAggKey
 
-		signersAggKey := quorumAggKey.Copy()
+		signersAggKey := quorumAggKey.Clone()
 		for opInd, nsk := range nonSignerKeys {
 			ops := state.Operators[id]
 			if _, ok := ops[nonSignerOperatorIds[opInd]]; ok {
