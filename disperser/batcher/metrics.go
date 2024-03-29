@@ -184,7 +184,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Name:      "attestation",
 				Help:      "number of signers and non-signers for the batch",
 			},
-			[]string{"type"},
+			[]string{"type", "quorum"},
 		),
 		BatchError: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
@@ -201,13 +201,24 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	return metrics
 }
 
-func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int, quorumResults map[core.QuorumID]*core.QuorumResult) {
-	g.Attestation.WithLabelValues("signers").Set(float64(operatorCount - nonSignerCount))
-	g.Attestation.WithLabelValues("non_signers").Set(float64(nonSignerCount))
+func (g *Metrics) UpdateAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {
+	for quorumID, count := range operatorCount {
+		quorumStr := fmt.Sprintf("%d", quorumID)
+		signers, ok := signerCount[quorumID]
+		if !ok {
+			g.logger.Error("signer count not found for quorum", "quorum", quorumID)
+			continue
+		}
+		nonSigners := count - signers
+		quorumResult, ok := quorumResults[quorumID]
+		if !ok {
+			g.logger.Error("quorum result not found for quorum", "quorum", quorumID)
+			continue
+		}
 
-	for _, quorumResult := range quorumResults {
-		label := fmt.Sprintf("quorum_result_%d", quorumResult.QuorumID)
-		g.Attestation.WithLabelValues(label).Set(float64(quorumResult.PercentSigned))
+		g.Attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
+		g.Attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
+		g.Attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
 }
 
