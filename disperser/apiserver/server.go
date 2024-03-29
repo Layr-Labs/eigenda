@@ -510,7 +510,9 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	s.logger.Debug("metadataKey", "metadataKey", metadataKey.String())
 	metadata, err := s.blobStore.GetBlobMetadata(ctx, metadataKey)
 	if err != nil {
-		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		if errors.Is(err, disperser.ErrMetadataNotFound) {
+			return nil, api.NewInvalidArgError("no metadata found for the requestID")
+		}
 		return nil, api.NewInternalError(fmt.Sprintf("failed to get blob metadata, blobkey: %s", metadataKey.String()))
 	}
 
@@ -639,7 +641,10 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
-		// TODO: we need to distinguish NOT_FOUND from actual internal error.
+		if errors.Is(err, disperser.ErrMetadataNotFound) {
+			s.metrics.IncrementFailedBlobRequestNum(codes.NotFound.String(), "", "RetrieveBlob")
+			return nil, api.NewInvalidArgError("no metadata found for the given batch header hash and blob index")
+		}
 		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
