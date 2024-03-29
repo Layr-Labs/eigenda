@@ -116,7 +116,7 @@ func NewEncodingStreamer(
 		assignmentCoordinator:  assignmentCoordinator,
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
 		metrics:                metrics,
-		logger:                 logger,
+		logger:                 logger.With("component", "EncodingStreamer"),
 		exclusiveStartKey:      nil,
 	}, nil
 }
@@ -221,7 +221,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 		}
 	}
 
-	e.logger.Debug("[encodingstreamer] metadata in processing status", "numMetadata", len(metadatas))
+	e.logger.Debug("metadata in processing status", "numMetadata", len(metadatas))
 	metadatas = e.dedupRequests(metadatas, referenceBlockNumber)
 	if len(metadatas) == 0 {
 		e.logger.Info("no new metadatas to encode")
@@ -235,14 +235,14 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	}
 	if numMetadatastoProcess <= 0 {
 		// encoding queue is full
-		e.logger.Warn("[RequestEncoding] worker pool queue is full. skipping this round of encoding requests", "waitingQueueSize", waitingQueueSize, "encodingQueueLimit", e.EncodingQueueLimit)
+		e.logger.Warn("worker pool queue is full. skipping this round of encoding requests", "waitingQueueSize", waitingQueueSize, "encodingQueueLimit", e.EncodingQueueLimit)
 		return nil
 	}
 	// only process subset of blobs so it doesn't exceed the EncodingQueueLimit
 	// TODO: this should be done at the request time and keep the cursor so that we don't fetch the same metadata every time
 	metadatas = metadatas[:numMetadatastoProcess]
 
-	e.logger.Debug("[encodingstreamer] new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
+	e.logger.Debug("new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
 	// Get the operator state
 	state, err := e.getOperatorState(ctx, metadatas, referenceBlockNumber)
@@ -261,9 +261,9 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	if err != nil {
 		return fmt.Errorf("error getting blobs from blob store: %w", err)
 	}
-	e.logger.Debug("[RequestEncoding] retrieved blobs to encode", "numBlobs", len(blobs), "duration", time.Since(stageTimer))
+	e.logger.Debug("retrieved blobs to encode", "numBlobs", len(blobs), "duration", time.Since(stageTimer))
 
-	e.logger.Debug("[RequestEncoding] encoding blobs...", "numBlobs", len(blobs), "blockNumber", referenceBlockNumber)
+	e.logger.Debug("encoding blobs...", "numBlobs", len(blobs), "blockNumber", referenceBlockNumber)
 
 	for i := range metadatas {
 		metadata := metadatas[i]
@@ -301,7 +301,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, e.StreamerConfig.TargetNumChunks, quorum)
 		if err != nil {
-			e.logger.Error("[RequestEncodingForBlob] error calculating chunk length", "err", err)
+			e.logger.Error("error calculating chunk length", "err", err)
 			continue
 		}
 
@@ -316,7 +316,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		}
 		assignments, info, err := e.assignmentCoordinator.GetAssignments(state.OperatorState, blobLength, blobQuorumInfo)
 		if err != nil {
-			e.logger.Error("[RequestEncodingForBlob] error getting assignments", "err", err)
+			e.logger.Error("error getting assignments", "err", err)
 			continue
 		}
 
@@ -324,11 +324,11 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		err = encoding.ValidateEncodingParams(params, int(blobLength), e.SRSOrder)
 		if err != nil {
-			e.logger.Error("[RequestEncodingForBlob] invalid encoding params", "err", err)
+			e.logger.Error("invalid encoding params", "err", err)
 			// Cancel the blob
 			err := e.blobStore.MarkBlobFailed(ctx, blobKey)
 			if err != nil {
-				e.logger.Error("[RequestEncodingForBlob] error marking blob failed", "err", err)
+				e.logger.Error("error marking blob failed", "err", err)
 			}
 			return
 		}
@@ -422,7 +422,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	// Cancel outstanding encoding requests
 	// Assumption: `CreateBatch` will be called at an interval longer than time it takes to encode a single blob
 	if len(e.encodingCtxCancelFuncs) > 0 {
-		e.logger.Info("[CreateBatch] canceling outstanding encoding requests", "count", len(e.encodingCtxCancelFuncs))
+		e.logger.Info("canceling outstanding encoding requests", "count", len(e.encodingCtxCancelFuncs))
 		for _, cancel := range e.encodingCtxCancelFuncs {
 			cancel()
 		}
@@ -433,7 +433,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	if e.ReferenceBlockNumber == 0 {
 		blockNumber, err := e.chainState.GetCurrentBlockNumber()
 		if err != nil {
-			e.logger.Error("[CreateBatch] failed to get current block number. will not clean up the encoded blob store.", "err", err)
+			e.logger.Error("failed to get current block number. will not clean up the encoded blob store.", "err", err)
 		} else {
 			_ = e.EncodedBlobstore.GetNewAndDeleteStaleEncodingResults(blockNumber)
 		}
@@ -449,7 +449,7 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	e.EncodedSizeNotifier.active = true
 	e.EncodedSizeNotifier.mu.Unlock()
 
-	e.logger.Info("[CreateBatch] creating a batch...", "numBlobs", len(encodedResults), "refblockNumber", e.ReferenceBlockNumber)
+	e.logger.Info("creating a batch...", "numBlobs", len(encodedResults), "refblockNumber", e.ReferenceBlockNumber)
 	if len(encodedResults) == 0 {
 		return nil, errNoEncodedResults
 	}

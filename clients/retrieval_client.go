@@ -45,7 +45,7 @@ func NewRetrievalClient(
 ) (*retrievalClient, error) {
 
 	return &retrievalClient{
-		logger:                logger,
+		logger:                logger.With("component", "RetrievalClient"),
 		indexedChainState:     chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,

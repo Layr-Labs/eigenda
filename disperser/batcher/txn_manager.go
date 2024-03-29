@@ -83,7 +83,7 @@ func NewTxnManager(ethClient common.EthClient, wallet walletsdk.Wallet, numConfi
 		wallet:             wallet,
 		numConfirmations:   numConfirmations,
 		requestChan:        make(chan *TxnRequest, queueSize),
-		logger:             logger,
+		logger:             logger.With("component", "TxnManager"),
 		receiptChan:        make(chan *ReceiptOrErr, queueSize),
 		queueSize:          queueSize,
 		txnRefreshInterval: txnRefreshInterval,

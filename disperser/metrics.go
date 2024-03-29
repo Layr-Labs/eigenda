@@ -70,7 +70,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		),
 		registry: reg,
 		httpPort: httpPort,
-		logger:   logger,
+		logger:   logger.With("component", "disperser.Metrics"),
 	}
 	return metrics
 }

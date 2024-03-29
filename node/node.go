@@ -68,7 +68,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	// }
 
 	promReg := prometheus.NewRegistry()
-	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger)
+	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger.With("component", "EigenMetrics"))
 
 	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort)
 	rpcCallsCollector := rpccalls.NewCollector(AppName, promReg)
@@ -107,7 +107,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	cst := eth.NewChainState(tx, client)
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
+	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
@@ -152,7 +152,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 
 	return &Node{
 		Config:                  config,
-		Logger:                  logger,
+		Logger:                  logger.With("component", "Node"),
 		KeyPair:                 keyPair,
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,

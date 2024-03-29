@@ -34,7 +34,7 @@ type Server struct {
 func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
 	return &Server{
 		config:  config,
-		logger:  logger,
+		logger:  logger.With("component", "encoder.Server"),
 		prover:  prover,
 		metrics: metrics,
 
@@ -131,8 +131,6 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 }
 
 func (s *Server) Start() error {
-	s.logger.Debug("Entering Start function...")
-	defer s.logger.Debug("Exiting Start function...")
 
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)

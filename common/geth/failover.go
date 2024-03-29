@@ -15,7 +15,7 @@ type FailoverController struct {
 
 func NewFailoverController(logger logging.Logger) *FailoverController {
 	return &FailoverController{
-		Logger: logger,
+		Logger: logger.With("component", "FailoverController"),
 		mu:     &sync.RWMutex{},
 	}
 }

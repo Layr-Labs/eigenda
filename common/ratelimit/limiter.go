@@ -21,7 +21,7 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore,
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
-		logger:           logger,
+		logger:           logger.With("component", "RateLimiter"),
 	}
 }
 

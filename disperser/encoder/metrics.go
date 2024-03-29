@@ -33,7 +33,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	reg.MustRegister(collectors.NewGoCollector())
 
 	return &Metrics{
-		logger:   logger,
+		logger:   logger.With("component", "encoder.Metrics"),
 		registry: reg,
 		httpPort: httpPort,
 		NumEncodeBlobRequests: promauto.With(reg).NewCounterVec(

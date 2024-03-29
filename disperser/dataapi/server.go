@@ -162,7 +162,7 @@ func NewServer(
 	}
 
 	return &server{
-		logger:                logger,
+		logger:                logger.With("component", "dataapi.Server"),
 		serverMode:            config.ServerMode,
 		socketAddr:            config.SocketAddr,
 		allowOrigins:          config.AllowOrigins,

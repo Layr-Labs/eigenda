@@ -80,7 +80,7 @@ func NewClient(cfg commonaws.ClientConfig, logger logging.Logger) (*Client, erro
 			return
 		}
 		dynamoClient := dynamodb.NewFromConfig(awsConfig)
-		clientRef = &Client{dynamoClient: dynamoClient, logger: logger}
+		clientRef = &Client{dynamoClient: dynamoClient, logger: logger.With("component", "dynamodb.Client")}
 	})
 	return clientRef, err
 }

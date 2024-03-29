@@ -28,7 +28,7 @@ type dispatcher struct {
 func NewDispatcher(cfg *Config, logger logging.Logger) *dispatcher {
 	return &dispatcher{
 		Config: cfg,
-		logger: logger,
+		logger: logger.With("component", "Dispatcher"),
 	}
 }
 
