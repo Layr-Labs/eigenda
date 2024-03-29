@@ -186,6 +186,9 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 
 	n := len(samples)
 	fmt.Printf("Batch verify %v frames of %v symbols out of %v blobs \n", n, params.ChunkLength, m)
+	if n == 0 {
+		return errors.New("the number of samples (i.e. chunks) must not be empty")
+	}
 
 	// generate random field elements to aggregate equality check
 	randomsFr, err := CreateRandomnessVector(n)

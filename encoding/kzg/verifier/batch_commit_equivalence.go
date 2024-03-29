@@ -30,6 +30,9 @@ func GetRandomFr() (fr.Element, error) {
 }
 
 func CreateRandomnessVector(n int) ([]fr.Element, error) {
+	if n <= 0 {
+		return nil, errors.New("the length of vector must be positive")
+	}
 	r, err := GetRandomFr()
 	if err != nil {
 		return nil, err

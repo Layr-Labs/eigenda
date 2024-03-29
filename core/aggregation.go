@@ -78,8 +78,11 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*S
 var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
 func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SignerMessage) (*SignatureAggregation, error) {
-
 	// TODO: Add logging
+
+	if len(quorumIDs) == 0 {
+		return nil, errors.New("the number of quorums must be greater than zero")
+	}
 
 	// Ensure all quorums are found in state
 	for _, id := range quorumIDs {
