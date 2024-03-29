@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -88,6 +89,13 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))
 	for i, header := range h.GetQuorumHeaders() {
+		if header.GetQuorumId() > core.MaxQuorumID {
+			return nil, api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, header.GetQuorumId()))
+		}
+		if err := core.ValidateSecurityParam(header.GetConfirmationThreshold(), header.GetAdversaryThreshold()); err != nil {
+			return nil, err
+		}
+
 		quorumHeaders[i] = &core.BlobQuorumInfo{
 			SecurityParam: core.SecurityParam{
 				QuorumID:              core.QuorumID(header.GetQuorumId()),
