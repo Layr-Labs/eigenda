@@ -27,9 +27,6 @@ type Metrics struct {
 	// The latency (in ms) to process the request.
 	RequestLatency *prometheus.SummaryVec
 	// Accumulated number and size of batches processed by their statuses.
-	// TODO: this metrics should be removed in future release.
-	AccuBatchesDeprecated *prometheus.CounterVec
-	// Accumulated number and size of batches processed by their statuses.
 	AccuBatches *prometheus.CounterVec
 	// Accumulated number and size of batches that have been removed from the Node.
 	AccuRemovedBatches *prometheus.CounterVec
@@ -77,14 +74,6 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
 			[]string{"method", "stage"},
-		),
-		AccuBatchesDeprecated: promauto.With(reg).NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: Namespace,
-				Name:      "eigenda_batches_total",
-				Help:      "the total number and size of batches processed by the DA node",
-			},
-			[]string{"type", "status"},
 		),
 		AccuBlobs: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
@@ -158,8 +147,6 @@ func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize int64) {
 }
 
 func (g *Metrics) AcceptBatches(status string, batchSize int64) {
-	g.AccuBatchesDeprecated.WithLabelValues("number", status).Inc()
-	g.AccuBatchesDeprecated.WithLabelValues("size", status).Add(float64(batchSize))
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
 }
