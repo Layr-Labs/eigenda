@@ -74,7 +74,11 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 		return nil, api.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix()))
 	}
 
-	request := createChurnRequest(req)
+	request, err := createChurnRequest(req)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
+		return nil, api.NewInvalidArgError(err.Error())
+	}
 
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
@@ -171,8 +175,13 @@ func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest)
 
 }
 
-func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
-	signature := &core.Signature{G1Point: new(core.G1Point).Deserialize(req.GetOperatorRequestSignature())}
+func createChurnRequest(req *pb.ChurnRequest) (*ChurnRequest, error) {
+
+	sigPoint, err := new(core.G1Point).Deserialize(req.GetOperatorRequestSignature())
+	if err != nil {
+		return nil, err
+	}
+	signature := &core.Signature{G1Point: sigPoint}
 
 	address := gethcommon.HexToAddress(req.GetOperatorAddress())
 
@@ -184,14 +193,23 @@ func createChurnRequest(req *pb.ChurnRequest) *ChurnRequest {
 		quorumIDs[i] = core.QuorumID(id)
 	}
 
+	pubkeyG1, err := new(core.G1Point).Deserialize(req.GetOperatorToRegisterPubkeyG1())
+	if err != nil {
+		return nil, err
+	}
+	pubkeyG2, err := new(core.G2Point).Deserialize(req.GetOperatorToRegisterPubkeyG2())
+	if err != nil {
+		return nil, err
+	}
+
 	return &ChurnRequest{
 		OperatorAddress:            address,
-		OperatorToRegisterPubkeyG1: new(core.G1Point).Deserialize(req.GetOperatorToRegisterPubkeyG1()),
-		OperatorToRegisterPubkeyG2: new(core.G2Point).Deserialize(req.GetOperatorToRegisterPubkeyG2()),
+		OperatorToRegisterPubkeyG1: pubkeyG1,
+		OperatorToRegisterPubkeyG2: pubkeyG2,
 		OperatorRequestSignature:   signature,
 		Salt:                       salt,
 		QuorumIDs:                  quorumIDs,
-	}
+	}, nil
 }
 
 func convertToOperatorsToChurnGrpc(operatorsToChurn []core.OperatorToChurn) []*pb.OperatorToChurn {
