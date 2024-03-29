@@ -152,7 +152,7 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
-	} else if config.Operation == "list-quorum" {
+	} else if config.Operation == "list-quorums" {
 		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 		if err != nil {
 			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
