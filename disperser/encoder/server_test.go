@@ -136,9 +136,10 @@ func TestEncodeBlob(t *testing.T) {
 	}
 	assert.NotNil(t, chunksData)
 
-	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	// Indices obtained, since powerof2(64 * 10 / 55) = 16. The core assignment logic multiply by 2
+	indices := make([]encoding.ChunkNumber, 32)
+	for i := 0; i < 32; i++ {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
 	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
@@ -275,9 +276,10 @@ func TestEncoderPointsLoading(t *testing.T) {
 	}
 	assert.NotNil(t, chunksData)
 
-	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	// Indices obtained, since powerof2(64 * 10 / 55) = 16. The core assignment logic multiply by 2
+	indices := make([]encoding.ChunkNumber, 32)
+	for i := 0; i < 32; i++ {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
 	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10

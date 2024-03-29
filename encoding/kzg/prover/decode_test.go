@@ -11,6 +11,8 @@ import (
 
 func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 
+	
+
 	group, _ := prover.NewProver(kzgConfig, true)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

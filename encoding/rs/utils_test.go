@@ -48,6 +48,28 @@ func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	assert.Equal(t, rs.ToByteArray(dataFr, uint64(len(GETTYSBURG_ADDRESS_BYTES))), GETTYSBURG_ADDRESS_BYTES)
 }
 
+func TestToByteArrayAndToFrArray_AreInverses(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
+	numEle := rs.GetNumElement(1000, BYTES_PER_COEFFICIENT)
+	assert.Equal(t, numEle, uint64(33))
+
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	enc, _ := rs.NewEncoder(params, true)
+	require.NotNil(t, enc)
+
+	dataFr := rs.ToPaddedFrArray(GETTYSBURG_ADDRESS_BYTES)
+	require.NotNil(t, dataFr)
+
+	// start
+	b1 := rs.ToByteArray(dataFr, uint64(len(dataFr)*encoding.BYTES_PER_COEFFICIENT))
+	b2 := rs.ToPaddedFrArray(b1)
+	b3 := rs.ToByteArray(b2, uint64(len(dataFr)*encoding.BYTES_PER_COEFFICIENT))
+
+	assert.Equal(t, b1, b3)
+}
+
 func TestRoundUpDivision(t *testing.T) {
 	a := rs.RoundUpDivision(1, 5)
 	b := rs.RoundUpDivision(5, 1)

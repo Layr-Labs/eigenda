@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"slices"
@@ -20,6 +21,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -48,6 +51,8 @@ type DispersalServer struct {
 	authenticator core.BlobRequestAuthenticator
 
 	metrics *disperser.Metrics
+
+	transformer map[uint64]*fft.FFTSettings // eval to coeff
 
 	logger logging.Logger
 }
@@ -87,6 +92,7 @@ func NewDispersalServer(
 		logger:        logger,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
+		transformer:   make(map[uint64]*fft.FFTSettings),
 		mu:            &sync.RWMutex{},
 		quorumConfig:  QuorumConfig{},
 	}
@@ -245,6 +251,31 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			return nil, err
 		}
 	}
+
+	// convert the number padded field element with every 31 bytes as 1 element
+	paddedBlobFr := rs.ToPaddedFrArray(blob.Data)
+	blobLengthPowOf2 := uint64(len(paddedBlobFr))
+
+	// get FFT domain if not existing
+	tf, ok := s.transformer[blobLengthPowOf2]
+	if !ok {
+		n := uint8(math.Log2(float64(blobLengthPowOf2)))
+		s.transformer[blobLengthPowOf2] = fft.NewFFTSettings(n)
+		tf = s.transformer[blobLengthPowOf2]
+	}
+
+	// convert eval to coeff
+	coeffsFr, err := tf.ConvertEvalsToCoeffs(paddedBlobFr)
+	if err != nil {
+		return nil, api.NewInvalidArgError(err.Error())
+	}
+
+	// the input bytes to be feed into encoder streamer of eigenda, every element takes full
+	// 32 bytes, because after fft transformation, the resulting field element most likely
+	// will have leading bit non-zero
+	coeffsBytes := rs.FromFrTo32ByteArray(coeffsFr)
+
+	blob.Data = coeffsBytes
 
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
@@ -677,10 +708,33 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewInternalError("failed to get blob data, please retry")
 	}
 
+	// at disperseBlob functions, every Fr stored in shared storage contains full 32 bytes
+	blobLengthPowOf2 := uint64(len(data) / encoding.NUMBER_FR_SECURITY_BYTES)
+
+	tf, ok := s.transformer[blobLengthPowOf2]
+	if !ok {
+		n := uint8(math.Log2(float64(blobLengthPowOf2)))
+		s.transformer[blobLengthPowOf2] = fft.NewFFTSettings(n)
+		tf = s.transformer[blobLengthPowOf2]
+	}
+
+	// convert bytes to gnark
+	coeffsFr := rs.FromGnarkBytesToFrArray(data)
+
+	evalFr, err := tf.ConvertCoeffsToEvals(coeffsFr)
+	if err != nil {
+		s.logger.Error("Failed to IFFT during retrieve blob", "err", err)
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", len(data), "RetrieveBlob")
+		return nil, api.NewInternalError("failed to get blob data, please retry")
+	}
+
+	// back to the original data in evalutaion form, which has leading bit to be 0
+	evalBytes := rs.ToByteArray(evalFr, blobLengthPowOf2*encoding.BYTES_PER_COEFFICIENT)
+
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
 
 	return &pb.RetrieveBlobReply{
-		Data: data,
+		Data: evalBytes,
 	}, nil
 }
 

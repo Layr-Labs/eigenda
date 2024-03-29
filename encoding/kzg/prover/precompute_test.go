@@ -14,7 +14,7 @@ import (
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {
 
 	kzgConfig.CacheDir = "./data/SRSTable"
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytesFFT)))
 	require.NotNil(t, params)
 
 	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)

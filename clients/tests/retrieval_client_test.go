@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -62,12 +63,15 @@ var (
 		BlobHeader:        nil,
 		BundlesByOperator: make(map[core.OperatorID]core.Bundles),
 	}
-	batchHeaderHash        [32]byte
-	batchRoot              [32]byte
-	gettysburgAddressBytes = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	batchHeaderHash           [32]byte
+	batchRoot                 [32]byte
+	gettysburgAddressBytes    = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	gettysburgAddressBytesFFT = []byte("")
 )
 
 func setup(t *testing.T) {
+
+	gettysburgAddressBytesFFT, _ = rs.ConvertByteEvalToPaddedCoeffs(gettysburgAddressBytes)
 
 	var err error
 	chainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
@@ -120,7 +124,7 @@ func setup(t *testing.T) {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: gettysburgAddressBytesFFT,
 	}
 	operatorState, err = indexedChainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
 	if err != nil {
@@ -266,7 +270,7 @@ func TestValidBlobHeader(t *testing.T) {
 	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
 	recovered := bytes.TrimRight(data, "\x00")
-	assert.Len(t, data, 1488)
-	assert.Equal(t, gettysburgAddressBytes, recovered)
+	assert.Len(t, data, 64*31)
+	assert.Equal(t, gettysburgAddressBytes, recovered[:len(gettysburgAddressBytes)])
 
 }

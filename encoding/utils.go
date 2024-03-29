@@ -22,6 +22,11 @@ func GetEncodedBlobLength(blobLength uint, quorumThreshold, advThreshold uint8) 
 	return roundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
 }
 
+func GetPaddedInputLength(dataSize uint64) uint64 {
+	dataLen := roundUpDivide(dataSize, BYTES_PER_COEFFICIENT)
+	return NextPowerOf2(uint64(dataLen))
+}
+
 func NextPowerOf2(d uint64) uint64 {
 	nextPower := math.Ceil(math.Log2(float64(d)))
 	return uint64(math.Pow(2.0, nextPower))
