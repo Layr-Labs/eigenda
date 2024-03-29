@@ -6,7 +6,7 @@ toolchain go1.21.1
 
 require (
 	github.com/Layr-Labs/eigenda/api v0.0.0
-	github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240328213542-7b4145951c46
+	github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240329221113-a1f7ac9ed7d1
 	github.com/aws/aws-sdk-go-v2 v1.26.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.9
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
