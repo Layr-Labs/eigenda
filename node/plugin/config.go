@@ -136,7 +136,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	op := ctx.GlobalString(OperationFlag.Name)
-	if op != "opt-in" && op != "opt-out" && op != "list-quorumst " {
+	if op != "opt-in" && op != "opt-out" && op != "list-quorums " {
 		return nil, errors.New("unsupported operation type")
 	}
 
