@@ -20,7 +20,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, p)
 
-	_, _, _, frames, _, err := p.EncodeBytes(gettysburgAddressBytes)
+	_, _, _, frames, _, _, err := p.EncodeBytes(gettysburgAddressBytes)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 

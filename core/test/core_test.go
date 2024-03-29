@@ -122,7 +122,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			}
 
 			blobSize := uint(len(blob.Data))
-			blobLength := encoding.GetBlobLength(blobSize)
+			blobLength := encoding.GetBlobLengthToPowOf2(blobSize)
 
 			chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, securityParam)
 			if err != nil {

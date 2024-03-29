@@ -114,7 +114,7 @@ func TestRollupOpen(t *testing.T) {
 	evalFr := rs.ToPaddedFrArray(gettysburgAddressBytes)
 
 	// get commitment, analogous to 4844 commitment accessible in the EVM
-	commit, _, _, _, _, err := enc.Encode(evalFr)
+	commit, _, _, _, _, _, err := enc.Encode(evalFr)
 	require.Nil(t, err)
 
 	// get root of unit for blob

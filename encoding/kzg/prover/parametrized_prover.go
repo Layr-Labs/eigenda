@@ -36,27 +36,30 @@ type WorkerResult struct {
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
-	inputFr := rs.ToFrArray(inputBytes)
-	return g.Encode(inputFr)
+func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, uint64, error) {
+	evalFr := rs.ToPaddedFrArray(inputBytes)
+	return g.Encode(evalFr)
 }
 
-func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
+func (g *ParametrizedProver) Encode(evalFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, uint64, error) {
+	if rs.NextPowerOf2(uint64(len(evalFr))) != uint64(len(evalFr)) {
+		return nil, nil, nil, nil, nil, 0, fmt.Errorf("evaluation has to be power of 2")
+	}
 
 	startTime := time.Now()
-	poly, frames, indices, err := g.Encoder.Encode(inputFr)
+	poly, frames, indices, err := g.Encoder.EncodeAsEval(evalFr)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, 0, err
 	}
 
 	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
+		return nil, nil, nil, nil, nil, 0, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
 	}
 
 	// compute commit for the full poly
 	commit, err := g.Commit(poly.Coeffs)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, 0, err
 	}
 
 	config := ecc.MultiExpConfig{}
@@ -64,29 +67,28 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	var lengthCommitment bn254.G2Affine
 	_, err = lengthCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, 0, err
 	}
 
 	intermediate := time.Now()
 
-	chunkLength := uint64(len(inputFr))
-
+	polyLength := uint64(len(poly.Coeffs))
 	if g.Verbose {
 		log.Printf("    Commiting takes  %v\n", time.Since(intermediate))
 		intermediate = time.Now()
 
-		log.Printf("shift %v\n", g.SRSOrder-chunkLength)
+		log.Printf("shift %v\n", g.SRSOrder-polyLength)
 		log.Printf("order %v\n", len(g.Srs.G2))
 		log.Println("low degree verification info")
 	}
 
-	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-chunkLength:]
+	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-polyLength:]
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
 	var lengthProof bn254.G2Affine
 	_, err = lengthProof.MultiExp(shiftedSecret, poly.Coeffs, config)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, 0, err
 	}
 
 	if g.Verbose {
@@ -100,7 +102,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
+		return nil, nil, nil, nil, nil, 0, fmt.Errorf("could not generate proofs: %v", err)
 	}
 
 	if g.Verbose {
@@ -118,7 +120,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	if g.Verbose {
 		log.Printf("Total encoding took      %v\n", time.Since(startTime))
 	}
-	return &commit, &lengthCommitment, &lengthProof, kzgFrames, indices, nil
+	return &commit, &lengthCommitment, &lengthProof, kzgFrames, indices, uint64(len(poly.Coeffs)), nil
 }
 
 func (g *ParametrizedProver) Commit(polyFr []fr.Element) (bn254.G1Affine, error) {

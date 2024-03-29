@@ -12,6 +12,10 @@ func GetBlobLength(blobSize uint) uint {
 	return (blobSize + symSize - 1) / symSize
 }
 
+func GetBlobLengthToPowOf2(blobSize uint) uint {
+	return uint(NextPowerOf2(uint64(GetBlobLength(blobSize))))
+}
+
 // GetBlobSize converts from blob length in symbols to blob size in bytes. This is not an exact conversion.
 func GetBlobSize(blobLength uint) uint {
 	return blobLength * BYTES_PER_COEFFICIENT

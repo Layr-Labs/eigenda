@@ -21,8 +21,8 @@ func TestBatchEquivalence(t *testing.T) {
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
-	inputFr := rs.ToFrArray(gettysburgAddressBytes)
-	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+	inputFr := rs.ToPaddedFrArray(gettysburgAddressBytes)
+	commit, g2commit, _, _, _, _, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 
 	numBlob := 5

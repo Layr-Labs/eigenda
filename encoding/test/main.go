@@ -86,7 +86,7 @@ func TestKzgRs() {
 	printFr(inputFr)
 
 	//inputSize := uint64(len(inputFr))
-	commit, legnthCommit, legnthProof, frames, fIndices, err := enc.Encode(inputFr)
+	commit, legnthCommit, legnthProof, frames, fIndices, _, err := enc.Encode(inputFr)
 	_ = legnthProof
 	_ = legnthCommit
 	if err != nil {
@@ -109,7 +109,6 @@ func TestKzgRs() {
 			log.Fatal("leading coset inconsistency")
 		}
 
-		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
 		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)

@@ -25,7 +25,7 @@ func TestVerify(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, enc)
 
-	commit, _, _, frames, _, err := enc.EncodeBytes(gettysburgAddressBytes)
+	commit, _, _, frames, _, _, err := enc.EncodeBytes(gettysburgAddressBytes)
 	require.Nil(t, err)
 	require.NotNil(t, commit)
 	require.NotNil(t, frames)

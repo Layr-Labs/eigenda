@@ -180,7 +180,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		if totalStake.Cmp(big.NewInt(0)) == 0 {
 			return false, fmt.Errorf("total stake in quorum %d must be greater than 0", info.QuorumID)
 		}
-		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*percentMultiplier)), minStake)
+		num := new(big.Int).Mul(big.NewInt(int64(blobLength*percentMultiplier)), minStake)
 		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
 

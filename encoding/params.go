@@ -59,6 +59,11 @@ func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
 	return numSys
 }
 
+func GetPaddedInputLength(dataSize uint64) uint64 {
+	dataLen := roundUpDivide(dataSize, BYTES_PER_COEFFICIENT)
+	return NextPowerOf2(uint64(dataLen))
+}
+
 // ValidateEncodingParams takes in the encoding parameters and returns an error if they are invalid.
 func ValidateEncodingParams(params EncodingParams, blobLength, SRSOrder int) error {
 

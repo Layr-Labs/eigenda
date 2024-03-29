@@ -17,10 +17,29 @@ type GlobalPoly struct {
 	Values []fr.Element
 }
 
-// just a wrapper to take bytes not Fr Element
-func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32, error) {
-	inputFr := ToFrArray(inputBytes)
+// just a wrapper to take bytes not Fr Element for EncodeAsEval, padded to nearest power of 2
+func (g *Encoder) EncodeBytesAsEval(inputBytes []byte) (*GlobalPoly, []Frame, []uint32, error) {
+	inputFr := ToPaddedFrArray(inputBytes)
 	return g.Encode(inputFr)
+}
+
+// just a wrapper to take bytes not Fr Element, padded to nearest power of 2
+func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32, error) {
+	inputFr := ToPaddedFrArray(inputBytes)
+	return g.Encode(inputFr)
+}
+
+// EncodeAsEval treats input argument as evaluation of a polynomial, performs a conversion to
+// coefficients form, then pass it on to Encode
+// The conversion from Evals to Coeffs representation of a polynomial has to take place in the
+// rs module, because the domain used by the kzg Prover is much smaller than the data
+func (g *Encoder) EncodeAsEval(evalsFr []fr.Element) (*GlobalPoly, []Frame, []uint32, error) {
+
+	coeffsFr, err := g.Fs.ConvertEvalsToCoeffs(evalsFr)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return g.Encode(coeffsFr)
 }
 
 // Encode function takes input in unit of Fr Element, creates a kzg commit and a list of frames
