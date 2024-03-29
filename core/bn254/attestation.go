@@ -109,7 +109,7 @@ func SerializeG1(p *bn254.G1Affine) []byte {
 
 func DeserializeG1(b []byte) (*bn254.G1Affine, error) {
 	if len(b) != 64 {
-		return nil, errors.New("could not deserialize G1 point, length must be exactly 64")
+		return nil, errors.New("could not deserialize G1 point: length must be exactly 64")
 	}
 	p := new(bn254.G1Affine)
 	p.X.SetBytes(b[0:32])
