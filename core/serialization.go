@@ -223,9 +223,9 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 	qbp := make([]quorumBlobParams, len(h.QuorumInfos))
 	for i, q := range h.QuorumInfos {
 		qbp[i] = quorumBlobParams{
-			QuorumNumber:                 uint8(q.QuorumID),
-			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
+			QuorumNumber:                 q.QuorumID,
+			AdversaryThresholdPercentage: q.AdversaryThreshold,
+			QuorumThresholdPercentage:    q.ConfirmationThreshold,
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
@@ -316,9 +316,9 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 	qbp := make([]quorumBlobParams, len(h.QuorumInfos))
 	for i, q := range h.QuorumInfos {
 		qbp[i] = quorumBlobParams{
-			QuorumNumber:                 uint8(q.QuorumID),
-			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
+			QuorumNumber:                 q.QuorumID,
+			AdversaryThresholdPercentage: q.AdversaryThreshold,
+			QuorumThresholdPercentage:    q.ConfirmationThreshold,
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}

@@ -175,6 +175,9 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
+			if q.GetQuorumId() > core.MaxQuorumID {
+				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+			}
 			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
 				return err
 			}

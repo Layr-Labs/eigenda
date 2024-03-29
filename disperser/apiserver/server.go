@@ -820,7 +820,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	// to uint8, so it cannot be greater than 254.
 	for i := range req.GetCustomQuorumNumbers() {
 
-		if req.GetCustomQuorumNumbers()[i] > 254 {
+		if req.GetCustomQuorumNumbers()[i] > core.MaxQuorumID {
 			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
 		}
 

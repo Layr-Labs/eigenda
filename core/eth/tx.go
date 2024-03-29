@@ -239,6 +239,10 @@ func (t *Transactor) RegisterOperatorWithChurn(
 
 	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.OperatorsToChurn))
 	for i := range churnReply.OperatorsToChurn {
+		if churnReply.OperatorsToChurn[i].QuorumId >= core.MaxQuorumID {
+			return errors.New("quorum id is out of range")
+		}
+
 		operatorsToChurn[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
 			QuorumNumber: uint8(churnReply.OperatorsToChurn[i].QuorumId),
 			Operator:     gethcommon.BytesToAddress(churnReply.OperatorsToChurn[i].Operator),
