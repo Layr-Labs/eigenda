@@ -81,6 +81,7 @@ type (
 
 	OperatorNonsigningPercentageMetrics struct {
 		OperatorId           string  `json:"operator_id"`
+		OperatorAddress      string  `json:"operator_address"`
 		QuorumId             uint8   `json:"quorum_id"`
 		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 		TotalBatches         int     `json:"total_batches"`

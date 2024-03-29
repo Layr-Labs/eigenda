@@ -137,9 +137,13 @@ func (s *client) ListObjects(ctx context.Context, bucket string, prefix string) 
 
 	objects := make([]Object, 0, len(output.Contents))
 	for _, object := range output.Contents {
+		var size int64 = 0
+		if object.Size != nil {
+			size = *object.Size
+		}
 		objects = append(objects, Object{
 			Key:  *object.Key,
-			Size: object.Size,
+			Size: size,
 		})
 	}
 	return objects, nil

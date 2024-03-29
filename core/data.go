@@ -146,7 +146,7 @@ type EncodedBlob struct {
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
-type Bundle = []*encoding.Frame
+type Bundle []*encoding.Frame
 
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
@@ -155,6 +155,14 @@ type Bundles map[QuorumID]Bundle
 type BlobMessage struct {
 	BlobHeader *BlobHeader
 	Bundles    Bundles
+}
+
+func (b Bundle) Size() int64 {
+	size := int64(0)
+	for _, chunk := range b {
+		size += int64(chunk.Size())
+	}
+	return size
 }
 
 // Serialize encodes a batch of chunks into a byte array
@@ -176,9 +184,7 @@ func (cb Bundles) Serialize() (map[uint32][][]byte, error) {
 func (cb Bundles) Size() int64 {
 	size := int64(0)
 	for _, bundle := range cb {
-		for _, chunk := range bundle {
-			size += int64(chunk.Size())
-		}
+		size += bundle.Size()
 	}
 	return size
 }
