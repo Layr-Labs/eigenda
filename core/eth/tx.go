@@ -454,15 +454,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		// TODO: instead of recalculating the operator id, we should just pass it in from the caller
 		nonSignerOperatorIds[i] = HashPubKeyG1(signatureAggregation.NonSigners[i])
 	}
-	sigAgg, err := json.Marshal(signatureAggregation)
-	if err == nil {
-		t.Logger.Debug("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
-	}
 
-	t.Logger.Debug("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
-	for _, ns := range nonSignerOperatorIds {
-		t.Logger.Debug("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
-	}
 	checkSignaturesIndices, err := t.Bindings.OpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
 			Context: ctx,

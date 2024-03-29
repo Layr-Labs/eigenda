@@ -43,6 +43,8 @@ type SignatureAggregation struct {
 	AggSignature *Signature
 	// QuorumResults contains the quorum ID and the amount signed for each quorum
 	QuorumResults map[QuorumID]*QuorumResult
+	// SignerMap contains the operator IDs that signed the message
+	SignerMap map[OperatorID]bool
 }
 
 // SignatureAggregator is an interface for aggregating the signatures returned by DA nodes so that they can be verified by the DA contract
@@ -139,19 +141,18 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 			continue
 		}
 
-		a.Logger.Info("[AggregateSignatures] received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket)
-
+		operatorQuorums := make([]uint8, 0, len(quorumIDs))
 		for ind, id := range quorumIDs {
-
 			// Get stake amounts for operator
 			ops := state.Operators[id]
 			opInfo, ok := ops[r.Operator]
 
 			// If operator is not in quorum, skip
 			if !ok {
-				a.Logger.Error("Operator not found in quorum", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumID", id)
+				a.Logger.Debug("Operator not found in quorum", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumID", id)
 				continue
 			}
+			operatorQuorums = append(operatorQuorums, id)
 
 			signerMap[r.Operator] = true
 
@@ -167,6 +168,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 				aggPubKeys[ind].Add(op.PubkeyG2)
 			}
 		}
+		a.Logger.Info("[AggregateSignatures] received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", operatorQuorums)
 	}
 
 	// Aggregate Non signer Pubkey Id
@@ -250,6 +252,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		AggPubKey:        aggPubKeys[0],
 		AggSignature:     aggSigs[0],
 		QuorumResults:    quorumResults,
+		SignerMap:        signerMap,
 	}, nil
 
 }

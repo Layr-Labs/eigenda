@@ -437,7 +437,20 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 	log.Debug("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
-	b.Metrics.UpdateAttestation(len(batch.State.IndexedOperators), len(aggSig.NonSigners), aggSig.QuorumResults)
+	operatorCount := make(map[core.QuorumID]int)
+	signerCount := make(map[core.QuorumID]int)
+	for quorumID, opState := range batch.State.Operators {
+		operatorCount[quorumID] = len(opState)
+		if _, ok := signerCount[quorumID]; !ok {
+			signerCount[quorumID] = 0
+		}
+		for opID := range opState {
+			if _, ok := aggSig.SignerMap[opID]; ok {
+				signerCount[quorumID]++
+			}
+		}
+	}
+	b.Metrics.UpdateAttestation(operatorCount, signerCount, aggSig.QuorumResults)
 	for _, quorumResult := range aggSig.QuorumResults {
 		log.Info("[batcher] Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
