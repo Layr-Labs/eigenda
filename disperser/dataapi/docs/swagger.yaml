@@ -241,7 +241,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of public EigenDA services.
+      summary: Get status of EigenDA services.
       tags:
       - ServiceAvailability
   /feed/blobs:
@@ -361,7 +361,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of public EigenDA churner service.
+      summary: Get status of EigenDA churner service.
       tags:
       - Churner ServiceAvailability
   /metrics/disperser-service-availability:
@@ -385,7 +385,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of public EigenDA Disperser service.
+      summary: Get status of EigenDA Disperser service.
       tags:
       - ServiceAvailability
   /metrics/non-signers:

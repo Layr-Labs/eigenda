@@ -23,7 +23,7 @@ const docTemplate = `{
                 "tags": [
                     "ServiceAvailability"
                 ],
-                "summary": "Get status of public EigenDA services.",
+                "summary": "Get status of EigenDA services.",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -208,7 +208,7 @@ const docTemplate = `{
                 "tags": [
                     "Churner ServiceAvailability"
                 ],
-                "summary": "Get status of public EigenDA churner service.",
+                "summary": "Get status of EigenDA churner service.",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -245,7 +245,7 @@ const docTemplate = `{
                 "tags": [
                     "ServiceAvailability"
                 ],
-                "summary": "Get status of public EigenDA Disperser service.",
+                "summary": "Get status of EigenDA Disperser service.",
                 "responses": {
                     "200": {
                         "description": "OK",

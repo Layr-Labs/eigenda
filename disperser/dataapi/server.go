@@ -531,7 +531,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 
 // GetEigenDAServiceAvailability godoc
 //
-//	@Summary	Get status of public EigenDA services.
+//	@Summary	Get status of EigenDA services.
 //	@Tags		ServiceAvailability
 //	@Produce	json
 //	@Success	200	{object}	ServiceAvailabilityResponse
@@ -594,7 +594,7 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 
 // FetchDisperserServiceAvailability godoc
 //
-//	@Summary	Get status of public EigenDA Disperser service.
+//	@Summary	Get status of EigenDA Disperser service.
 //	@Tags		ServiceAvailability
 //	@Produce	json
 //	@Success	200	{object}	ServiceAvailabilityResponse
@@ -647,7 +647,7 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 // FetchChurnerServiceAvailability godoc
 //
-//	@Summary	Get status of public EigenDA churner service.
+//	@Summary	Get status of EigenDA churner service.
 //	@Tags		Churner ServiceAvailability
 //	@Produce	json
 //	@Success	200	{object}	ServiceAvailabilityResponse
