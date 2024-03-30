@@ -31,7 +31,7 @@ Note: The challenge files contains 2^29 G1 points and 2^28 G2 points with secret
 
 ### How to verify the parsed G1, G2 points
 
-`go run main.go parse --g1-path <Path to g1.point> --g2-path <Path to g2.point>`
+`go run main.go verify --g1-path <Path to g1.point> --g2-path <Path to g2.point>`
 
 The verification is based on method listed here (https://github.com/ethereum/kzg-ceremony-specs/blob/master/docs/sequencer/sequencer.md#pairing-checks)
 
