@@ -98,9 +98,7 @@ func (g *Encoder) DecodeAsEval(frames []Frame, indices []uint64, maxInputSize ui
 	}
 
 	// get length for Fr, anything wit eval, 32 is the unit
-	paddedInputLength := maxInputSize / 32
-
-	fmt.Println("maxInputSize", maxInputSize, "g.ChunkLength", g.ChunkLength)
+	paddedInputLength := maxInputSize / encoding.NUMBER_FR_SECURITY_BYTES
 
 	// if number of data is less than padded data length
 	if uint64(len(frames))*g.ChunkLength < paddedInputLength {
@@ -168,8 +166,6 @@ func (g *Encoder) DecodeAsEval(frames []Frame, indices []uint64, maxInputSize ui
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("maxInputSize", maxInputSize)
 
 	data := ToByteArray(evalsFr, maxInputSize)
 
