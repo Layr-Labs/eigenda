@@ -24,7 +24,7 @@ func NewLocalEncoderClient(prover encoding.Prover) *LocalEncoderClient {
 func (m *LocalEncoderClient) EncodeBlob(ctx context.Context, data []byte, encodingParams encoding.EncodingParams) (*encoding.BlobCommitments, []*encoding.Frame, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	commits, chunks, err := m.prover.EncodeAndProve(data, encodingParams)
+	commits, chunks, err := m.prover.EncodeAndProveSymbols(data, encodingParams)
 	if err != nil {
 		return nil, nil, err
 	}

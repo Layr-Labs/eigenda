@@ -12,6 +12,12 @@ func GetBlobLength(blobSize uint) uint {
 	return (blobSize + symSize - 1) / symSize
 }
 
+// All bytes after Apiserver treats every 32 bytes as a symbols
+func GetBlobLengthInternal(blobSize uint) uint {
+	symSize := uint(NUMBER_FR_SECURITY_BYTES)
+	return (blobSize + symSize - 1) / symSize
+}
+
 // GetBlobSize converts from blob length in symbols to blob size in bytes. This is not an exact conversion.
 func GetBlobSize(blobLength uint) uint {
 	return blobLength * BYTES_PER_COEFFICIENT

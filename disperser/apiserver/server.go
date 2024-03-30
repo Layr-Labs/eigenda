@@ -273,7 +273,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	// the input bytes to be feed into encoder streamer of eigenda, every element takes full
 	// 32 bytes, because after fft transformation, the resulting field element most likely
 	// will have leading bit non-zero
-	coeffsBytes := rs.FromFrTo32ByteArray(coeffsFr)
+	coeffsBytes := rs.ToByteArrayWith254Bits(coeffsFr)
 
 	blob.Data = coeffsBytes
 
@@ -429,6 +429,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 	requestParams := make([]common.RequestParams, 0)
 
 	blobSize := len(blob.Data)
+	// before IFFT, we still treats every 31 bytes as a field element
 	length := encoding.GetBlobLength(uint(blobSize))
 
 	for i, param := range blob.RequestHeader.SecurityParams {
@@ -719,7 +720,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}
 
 	// convert bytes to gnark
-	coeffsFr := rs.FromGnarkBytesToFrArray(data)
+	coeffsFr := rs.ToFrArrayWith254Bits(data)
 
 	evalFr, err := tf.ConvertCoeffsToEvals(coeffsFr)
 	if err != nil {

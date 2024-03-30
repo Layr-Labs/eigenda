@@ -82,7 +82,7 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		NumChunks:   uint64(req.EncodingParams.NumChunks),
 	}
 
-	commits, chunks, err := s.prover.EncodeAndProve(req.Data, encodingParams)
+	commits, chunks, err := s.prover.EncodeAndProveSymbols(req.Data, encodingParams)
 
 	if err != nil {
 		return nil, err

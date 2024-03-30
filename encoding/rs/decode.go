@@ -18,6 +18,10 @@ import (
 // maxInputSize is the upper bound of the original data size. This is needed because
 // the frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
+//
+// When asEval is false, the above description is the behavior. When asEval is true, the program proforms
+// an additional FFT to transform back to evaluation representation. Under which case, maxInputSize
+// must equal to the number of bytes after taking the IFFT, which has to be power of 2
 func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64, asEval bool) ([]byte, error) {
 	if asEval {
 		return g.DecodeAsEval(frames, indices, maxInputSize)
@@ -94,16 +98,16 @@ func (g *Encoder) DecodeAsEval(frames []Frame, indices []uint64, maxInputSize ui
 		return nil, errors.New("number of frame must be greater than 1")
 	}
 
-	// get length for Frs
-	paddedInputLength := encoding.GetPaddedInputLength(maxInputSize)
+	// get length for Fr, anything wit eval, 32 is the unit
+	paddedInputLength := maxInputSize / 32
 
-	numSys := paddedInputLength / g.ChunkLength
+	fmt.Println("maxInputSize", maxInputSize, "g.ChunkLength", g.ChunkLength)
 
 	// if number of data is less than padded data length
 	if uint64(len(frames))*g.ChunkLength < paddedInputLength {
 		// if the number of bytes is less than input size, then the number of points is insufficient
 		// in the else case, the there is sufficient number of points, we can still recover the data
-		if uint64(len(frames))*g.ChunkLength*encoding.BYTES_PER_COEFFICIENT < maxInputSize {
+		if uint64(len(frames))*g.ChunkLength*encoding.NUMBER_FR_SECURITY_BYTES < maxInputSize {
 			return nil, errors.New("number of frame must be sufficient")
 		}
 	}
@@ -161,20 +165,14 @@ func (g *Encoder) DecodeAsEval(frames []Frame, indices []uint64, maxInputSize ui
 		return nil, err
 	}
 
-	numPaddedEval := NextPowerOf2(uint64(numSys) * g.ChunkLength)
-
-	paddedBlobBytes := ToByteArray(reconstructedPoly[:numPaddedEval], uint64(len(reconstructedPoly)*31))
-	// reinterpret every 32 bytes
-	coeffFr := FromGnarkBytesToFrArray(paddedBlobBytes)
-
-	// since every 32 bytes are split into 31 and 1 bit
-	evalsFr, err := g.Fs.ConvertCoeffsToEvals(coeffFr[:numPaddedEval/2])
+	evalsFr, err := g.Fs.ConvertCoeffsToEvals(reconstructedPoly[:paddedInputLength])
 	if err != nil {
 		return nil, err
 	}
 
-	data := ToByteArray(evalsFr, maxInputSize)
 	fmt.Println("maxInputSize", maxInputSize)
+
+	data := ToByteArray(evalsFr, maxInputSize)
 
 	return data, nil
 }

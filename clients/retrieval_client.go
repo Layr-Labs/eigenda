@@ -160,7 +160,6 @@ func (r *retrievalClient) RetrieveBlob(
 		if !ok {
 			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
 		}
-
 		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID, "err", err)
@@ -173,5 +172,5 @@ func (r *retrievalClient) RetrieveBlob(
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
+	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.NUMBER_FR_SECURITY_BYTES)
 }

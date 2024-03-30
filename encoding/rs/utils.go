@@ -11,8 +11,9 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// ToFrArray converts a list of bytes to a list of field elements,
+// the implementation takes every 31 bytes out of the array list.
 func ToFrArray(data []byte) []fr.Element {
-	//numEle := int(math.Ceil(float64(len(data)) / float64(BYTES_PER_COEFFICIENT)))
 	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
 	eles := make([]fr.Element, numEle)
 
@@ -32,8 +33,11 @@ func ToFrArray(data []byte) []fr.Element {
 	return eles
 }
 
-// FromGnarkBytesToFrArray assumes every 32 bytes within the data is a valid field element
-func FromGnarkBytesToFrArray(data []byte) []fr.Element {
+// ToFrArrayWith254Bits converts a list of bytes to a list of field elements,
+// it takes every 32 bytes out of the byte array to construct the field elemement array,
+// it assumes every 32 byte contains at most 254 bits of information, so it is safe to
+// call SetBytes function
+func ToFrArrayWith254Bits(data []byte) []fr.Element {
 	numEle := GetNumElement(uint64(len(data)), encoding.NUMBER_FR_SECURITY_BYTES)
 	eles := make([]fr.Element, numEle)
 
@@ -50,20 +54,6 @@ func FromGnarkBytesToFrArray(data []byte) []fr.Element {
 		}
 	}
 	return eles
-}
-
-// FromFrTo32ByteArray takes
-func FromFrTo32ByteArray(dataFr []fr.Element) []byte {
-	n := len(dataFr)
-	dataSize := n * encoding.NUMBER_FR_SECURITY_BYTES
-	data := make([]byte, dataSize)
-	for i := 0; i < n; i++ {
-		v := dataFr[i].Bytes()
-		start := i * encoding.NUMBER_FR_SECURITY_BYTES
-		end := (i + 1) * encoding.NUMBER_FR_SECURITY_BYTES
-		copy(data[start:end], v[:])
-	}
-	return data
 }
 
 func ToPaddedFrArray(data []byte) []fr.Element {
@@ -92,7 +82,8 @@ func ToPaddedFrArray(data []byte) []fr.Element {
 	return eles
 }
 
-// ToByteArray converts a list of Fr to a byte array
+// ToByteArray converts a list of Fr to a byte array,
+// for every filed element, it takes only 31 bits and adds to the bytes array
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)
 	dataSize := int(math.Min(
@@ -102,7 +93,6 @@ func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	data := make([]byte, dataSize)
 	for i := 0; i < n; i++ {
 		v := dataFr[i].Bytes()
-		//fmt.Println(i, "v", v)
 		start := i * encoding.BYTES_PER_COEFFICIENT
 		end := (i + 1) * encoding.BYTES_PER_COEFFICIENT
 
@@ -114,6 +104,21 @@ func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 		}
 	}
 
+	return data
+}
+
+// ToByteArrayWith254Bits converts a list of Fr to a byte array,
+// for every field elemnt, it takes full 32 bits and adds to the bytes array
+func ToByteArrayWith254Bits(dataFr []fr.Element) []byte {
+	n := len(dataFr)
+	dataSize := n * encoding.NUMBER_FR_SECURITY_BYTES
+	data := make([]byte, dataSize)
+	for i := 0; i < n; i++ {
+		v := dataFr[i].Bytes()
+		start := i * encoding.NUMBER_FR_SECURITY_BYTES
+		end := (i + 1) * encoding.NUMBER_FR_SECURITY_BYTES
+		copy(data[start:end], v[:])
+	}
 	return data
 }
 
@@ -155,5 +160,5 @@ func ConvertByteEvalToPaddedCoeffs(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return FromFrTo32ByteArray(coeffsFr), nil
+	return ToByteArrayWith254Bits(coeffsFr), nil
 }
