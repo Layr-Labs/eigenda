@@ -157,10 +157,10 @@ type BlobMessage struct {
 	Bundles    Bundles
 }
 
-func (b Bundle) Size() int64 {
-	size := int64(0)
+func (b Bundle) Size() uint64 {
+	size := uint64(0)
 	for _, chunk := range b {
-		size += int64(chunk.Size())
+		size += chunk.Size()
 	}
 	return size
 }
@@ -181,8 +181,8 @@ func (cb Bundles) Serialize() (map[uint32][][]byte, error) {
 }
 
 // Returns the size of the bundles in bytes.
-func (cb Bundles) Size() int64 {
-	size := int64(0)
+func (cb Bundles) Size() uint64 {
+	size := uint64(0)
 	for _, bundle := range cb {
 		size += bundle.Size()
 	}

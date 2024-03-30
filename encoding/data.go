@@ -41,8 +41,9 @@ func (f *Frame) Length() int {
 }
 
 // Returns the size of chunk in bytes.
-func (f *Frame) Size() int {
-	return f.Length() * BYTES_PER_COEFFICIENT
+func (f *Frame) Size() uint64 {
+	proofSize := uint64(2 * 32)
+	return uint64(f.Length()*BYTES_PER_COEFFICIENT) + proofSize
 }
 
 // Sample is a chunk with associated metadata used by the Universal Batch Verifier
