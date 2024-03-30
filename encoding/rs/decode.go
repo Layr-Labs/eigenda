@@ -17,8 +17,8 @@ import (
 // recovery.
 // maxInputSize is the upper bound of the original data size. This is needed because
 // the frames and indices don't encode the length of the original data. If maxInputSize
-// is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
-//
+// is smaller than the original input size, decoded data will be trimmed to fit the
+// maxInputSize.
 // When asEval is false, the above description is the behavior. When asEval is true, the program proforms
 // an additional FFT to transform back to evaluation representation. Under which case, maxInputSize
 // must equal to the number of bytes after taking the IFFT, which has to be power of 2
@@ -55,7 +55,6 @@ func (g *Encoder) DecodeAsCoeff(frames []Frame, indices []uint64, maxInputSize u
 		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
 			samples[p] = new(fr.Element)
-
 			samples[p].Set(&evals[j])
 		}
 	}
