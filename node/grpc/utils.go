@@ -75,8 +75,8 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		Y: *commitY,
 	}
 
-	if !(*bn254.G1Affine)(commitment).IsOnCurve() {
-		return nil, errors.New("commitment is not on curve")
+	if !(*bn254.G1Affine)(commitment).IsInSubGroup() {
+		return nil, errors.New("commitment is not in the subgroup")
 	}
 
 	var lengthCommitment, lengthProof encoding.G2Commitment
@@ -87,8 +87,8 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		lengthCommitment.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA1())
 	}
 
-	if !(*bn254.G2Affine)(&lengthCommitment).IsOnCurve() {
-		return nil, errors.New("lengthCommitment is not on curve")
+	if !(*bn254.G2Affine)(&lengthCommitment).IsInSubGroup() {
+		return nil, errors.New("lengthCommitment is in the subgroup")
 	}
 
 	if h.GetLengthProof() != nil {
@@ -98,8 +98,8 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		lengthProof.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA1())
 	}
 
-	if !(*bn254.G2Affine)(&lengthProof).IsOnCurve() {
-		return nil, errors.New("lengthProof is not on curve")
+	if !(*bn254.G2Affine)(&lengthProof).IsInSubGroup() {
+		return nil, errors.New("lengthProof is not in the subgroup")
 	}
 
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))

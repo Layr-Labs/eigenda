@@ -61,8 +61,8 @@ func (c *G1Commitment) UnmarshalJSON(data []byte) error {
 	c.X = g1Point.X
 	c.Y = g1Point.Y
 
-	if !(*bn254.G1Affine)(c).IsOnCurve() {
-		return fmt.Errorf("G1Commitment not on the curve")
+	if !(*bn254.G1Affine)(c).IsInSubGroup() {
+		return fmt.Errorf("G1Commitment not in the subgroup")
 	}
 
 	return nil
@@ -90,8 +90,8 @@ func (c *G2Commitment) UnmarshalJSON(data []byte) error {
 	c.X = g2Point.X
 	c.Y = g2Point.Y
 
-	if !(*bn254.G2Affine)(c).IsOnCurve() {
-		return fmt.Errorf("G2Commitment not on the curve")
+	if !(*bn254.G2Affine)(c).IsInSubGroup() {
+		return fmt.Errorf("G2Commitment not in the subgroup")
 	}
 	return nil
 }

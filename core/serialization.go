@@ -364,16 +364,16 @@ func (h *BlobHeader) Serialize() ([]byte, error) {
 func (h *BlobHeader) Deserialize(data []byte) (*BlobHeader, error) {
 	err := decode(data, h)
 
-	if !(*bn254.G1Affine)(h.BlobCommitments.Commitment).IsOnCurve() {
-		return nil, fmt.Errorf("in BlobHeader Commitment is not on the curve")
+	if !(*bn254.G1Affine)(h.BlobCommitments.Commitment).IsInSubGroup() {
+		return nil, fmt.Errorf("in BlobHeader Commitment is in the subgroup")
 	}
 
-	if !(*bn254.G2Affine)(h.BlobCommitments.LengthCommitment).IsOnCurve() {
-		return nil, fmt.Errorf("in BlobHeader LengthCommitment is not on the curve")
+	if !(*bn254.G2Affine)(h.BlobCommitments.LengthCommitment).IsInSubGroup() {
+		return nil, fmt.Errorf("in BlobHeader LengthCommitment is not in the subgroup")
 	}
 
-	if !(*bn254.G2Affine)(h.BlobCommitments.LengthProof).IsOnCurve() {
-		return nil, fmt.Errorf("in BlobHeader LengthProof is not on the curve")
+	if !(*bn254.G2Affine)(h.BlobCommitments.LengthProof).IsInSubGroup() {
+		return nil, fmt.Errorf("in BlobHeader LengthProof is not in the subgroup")
 	}
 
 	return h, err
