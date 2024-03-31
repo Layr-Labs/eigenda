@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
@@ -73,6 +74,11 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		X: *commitX,
 		Y: *commitY,
 	}
+
+	if !(*bn254.G1Affine)(commitment).IsOnCurve() {
+		return nil, errors.New("commitment is not on curve")
+	}
+
 	var lengthCommitment, lengthProof encoding.G2Commitment
 	if h.GetLengthCommitment() != nil {
 		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
@@ -80,11 +86,20 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		lengthCommitment.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA0())
 		lengthCommitment.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA1())
 	}
+
+	if !(*bn254.G2Affine)(&lengthCommitment).IsOnCurve() {
+		return nil, errors.New("lengthCommitment is not on curve")
+	}
+
 	if h.GetLengthProof() != nil {
 		lengthProof.X.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA0())
 		lengthProof.X.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA1())
 		lengthProof.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA0())
 		lengthProof.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA1())
+	}
+
+	if !(*bn254.G2Affine)(&lengthProof).IsOnCurve() {
+		return nil, errors.New("lengthProof is not on curve")
 	}
 
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))
