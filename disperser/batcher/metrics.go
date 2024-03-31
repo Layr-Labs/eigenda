@@ -49,10 +49,15 @@ type FinalizerMetrics struct {
 	Latency                *prometheus.SummaryVec
 }
 
+type DispatcherMetrics struct {
+	Latency *prometheus.SummaryVec
+}
+
 type Metrics struct {
 	*EncodingStreamerMetrics
 	*TxnManagerMetrics
 	*FinalizerMetrics
+	*DispatcherMetrics
 
 	registry *prometheus.Registry
 
@@ -149,10 +154,23 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		),
 	}
 
+	dispatcherMatrics := DispatcherMetrics{
+		Latency: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "attestation_latency_ms",
+				Help:       "attestation latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			[]string{"status"},
+		),
+	}
+
 	metrics := &Metrics{
 		EncodingStreamerMetrics: &encodingStreamerMetrics,
 		TxnManagerMetrics:       &txnManagerMetrics,
 		FinalizerMetrics:        &finalizerMetrics,
+		DispatcherMetrics:       &dispatcherMatrics,
 		Blob: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -220,6 +238,14 @@ func (g *Metrics) UpdateAttestation(operatorCount map[core.QuorumID]int, signerC
 		g.Attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		g.Attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
+}
+
+func (t *DispatcherMetrics) ObserveLatency(success bool, latencyMS float64) {
+	label := "success"
+	if !success {
+		label = "failure"
+	}
+	t.Latency.WithLabelValues(label).Observe(latencyMS)
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.

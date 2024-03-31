@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -171,7 +172,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 				aggPubKeys[ind].Add(op.PubkeyG2)
 			}
 		}
-		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", operatorQuorums)
+		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums))
 	}
 
 	// Aggregate Non signer Pubkey Id

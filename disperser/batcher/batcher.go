@@ -349,7 +349,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 		b.logger.Error("failed to update confirmation info", "failed", len(blobsToRetry), "total", len(blobs))
 		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
 	}
-	b.logger.Debug("Update confirmation info took", "duration", time.Since(stageTimer))
+	b.logger.Debug("Update confirmation info took", "duration", time.Since(stageTimer).String())
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
 	batchSize := int64(0)
 	for _, blobMeta := range blobs {

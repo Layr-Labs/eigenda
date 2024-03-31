@@ -130,7 +130,8 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	dispatcherConfig := &dispatcher.Config{
 		Timeout: time.Second,
 	}
-	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger)
+	batcherMetrics := batcher.NewMetrics("9100", logger)
+	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger, batcherMetrics.DispatcherMetrics)
 
 	transactor := &coremock.MockTransactor{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
@@ -166,7 +167,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	finalizer := batchermock.NewFinalizer()
 
 	disperserMetrics := disperser.NewMetrics("9100", logger)
-	batcherMetrics := batcher.NewMetrics("9100", logger)
 	txnManager := batchermock.NewTxnManager()
 
 	batcher, err := batcher.NewBatcher(batcherConfig, timeoutConfig, store, dispatcher, cst, asn, encoderClient, agg, &commonmock.MockEthClient{}, finalizer, transactor, txnManager, logger, batcherMetrics, handleBatchLivenessChan)
