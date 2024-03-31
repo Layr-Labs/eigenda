@@ -94,7 +94,7 @@ func MulByGeneratorG2(a *fr.Element) *bn254.G2Affine {
 }
 
 func SerializeG1(p *bn254.G1Affine) []byte {
-	res := p.Bytes()
+	res := p.RawBytes()
 	return res[:]
 }
 
@@ -108,7 +108,7 @@ func DeserializeG1(b []byte) (*bn254.G1Affine, error) {
 }
 
 func SerializeG2(p *bn254.G2Affine) []byte {
-	res := p.Bytes()
+	res := p.RawBytes()
 	return res[:]
 }
 

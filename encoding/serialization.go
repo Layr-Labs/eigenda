@@ -15,6 +15,10 @@ func (c *Frame) Serialize() ([]byte, error) {
 
 func (c *Frame) Deserialize(data []byte) (*Frame, error) {
 	err := decode(data, c)
+	if !c.Proof.IsInSubGroup() {
+		return nil, fmt.Errorf("proof is in not the subgroup")
+	}
+
 	return c, err
 }
 
