@@ -19,6 +19,9 @@ func (c *Frame) Deserialize(data []byte) (*Frame, error) {
 		return nil, fmt.Errorf("proof is in not the subgroup")
 	}
 
+	if c.Proof.IsInfinity() {
+		return nil, fmt.Errorf("proof is infinity")
+	}
 	return c, err
 }
 
@@ -82,6 +85,7 @@ func (c *G2Commitment) Deserialize(data []byte) (*G2Commitment, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return c, err
 }
 
