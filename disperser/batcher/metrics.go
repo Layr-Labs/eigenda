@@ -196,7 +196,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		),
 		registry: reg,
 		httpPort: httpPort,
-		logger:   logger.With("component", "batcher.Metrics"),
+		logger:   logger.With("component", "BatcherMetrics"),
 	}
 	return metrics
 }

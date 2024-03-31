@@ -34,7 +34,7 @@ type Server struct {
 func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
 	return &Server{
 		config:  config,
-		logger:  logger.With("component", "encoder.Server"),
+		logger:  logger.With("component", "EncoderServer"),
 		prover:  prover,
 		metrics: metrics,
 

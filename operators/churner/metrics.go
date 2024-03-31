@@ -80,7 +80,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		),
 		registry: reg,
 		httpPort: httpPort,
-		logger:   logger.With("component", "churner.Metrics"),
+		logger:   logger.With("component", "ChurnerMetrics"),
 	}
 	return metrics
 }

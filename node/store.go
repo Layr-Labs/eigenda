@@ -49,7 +49,7 @@ func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, block
 
 	return &Store{
 		db:                  db,
-		logger:              logger.With("component", "node.Store"),
+		logger:              logger.With("component", "NodeStore"),
 		blockStaleMeasure:   blockStaleMeasure,
 		storeDurationBlocks: storeDurationBlocks,
 		metrics:             metrics,

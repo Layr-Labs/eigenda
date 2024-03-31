@@ -67,7 +67,7 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 		s3Client := s3.NewFromConfig(awsConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
 		})
-		ref = &client{s3Client: s3Client, logger: logger.With("component", "s3.Client")}
+		ref = &client{s3Client: s3Client, logger: logger.With("component", "S3Client")}
 	})
 	return ref, err
 }

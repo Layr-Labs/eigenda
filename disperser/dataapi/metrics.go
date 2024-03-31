@@ -55,7 +55,7 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 		),
 		registry: reg,
 		httpPort: httpPort,
-		logger:   logger.With("component", "dataapi.Metrics"),
+		logger:   logger.With("component", "DataAPIMetrics"),
 	}
 	return metrics
 }

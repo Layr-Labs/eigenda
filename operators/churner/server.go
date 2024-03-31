@@ -39,7 +39,7 @@ func NewServer(
 		churner:                     churner,
 		latestExpiry:                int64(0),
 		lastRequestTimeByOperatorID: make(map[core.OperatorID]time.Time),
-		logger:                      logger.With("component", "churner.Server"),
+		logger:                      logger.With("component", "ChurnerServer"),
 		metrics:                     metrics,
 	}
 }

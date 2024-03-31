@@ -266,13 +266,13 @@ func (c *EthClient) waitMined(ctx context.Context, txs []*types.Transaction) (*t
 				chainTip, err := c.BlockNumber(ctx)
 				if err == nil {
 					if receipt.BlockNumber.Uint64()+uint64(c.numConfirmations) > chainTip {
-						c.Logger.Debug("transaction has been mined but don't have enough confirmations at current chain tip", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
+						c.Logger.Debug("transaction has been mined but doesn't have enough confirmations at current chain head", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
 						break
 					} else {
 						return receipt, nil
 					}
 				} else {
-					c.Logger.Debug("failed to get chain tip while waiting for transaction to mine", "err", err)
+					c.Logger.Debug("failed to query block height while waiting for transaction to mine", "err", err)
 				}
 			}
 
