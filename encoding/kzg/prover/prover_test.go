@@ -76,7 +76,7 @@ func TestEncoder(t *testing.T) {
 	v, _ := verifier.NewVerifier(kzgConfig, true)
 
 	params := encoding.ParamsFromMins(5, 5)
-	commitments, chunks, err := p.EncodeAndProve(gettysburgAddressBytes, params)
+	commitments, chunks, err := p.EncodeAndProveDataAsEvals(gettysburgAddressBytes, params)
 	assert.NoError(t, err)
 
 	indices := []encoding.ChunkNumber{
@@ -90,7 +90,7 @@ func TestEncoder(t *testing.T) {
 	assert.Error(t, err)
 
 	maxInputSize := uint64(len(gettysburgAddressBytes))
-	decoded, err := p.Decode(chunks, indices, params, maxInputSize)
+	decoded, err := v.DecodeDataAsEvals(chunks, indices, params, maxInputSize)
 	assert.NoError(t, err)
 	assert.Equal(t, gettysburgAddressBytes, decoded)
 
@@ -105,7 +105,7 @@ func TestEncoder(t *testing.T) {
 	err = v.VerifyFrames(chunks, indices, commitments, params)
 	assert.NoError(t, err)
 
-	decoded, err = p.Decode(chunks, indices, params, maxInputSize)
+	decoded, err = v.DecodeDataAsEvals(chunks, indices, params, maxInputSize)
 	assert.NoError(t, err)
 	assert.Equal(t, gettysburgAddressBytes, decoded)
 }
@@ -134,10 +134,10 @@ func BenchmarkEncode(b *testing.B) {
 	}
 
 	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, _, _ = p.EncodeAndProve(blobs[0], params)
+	_, _, _ = p.EncodeAndProveDataAsCoeffs(blobs[0], params)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _, _ = p.EncodeAndProve(blobs[i%numSamples], params)
+		_, _, _ = p.EncodeAndProveDataAsCoeffs(blobs[i%numSamples], params)
 	}
 }

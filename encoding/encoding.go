@@ -2,15 +2,21 @@ package encoding
 
 type Decoder interface {
 	// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
-	Decode(chunks []*Frame, indices []ChunkNumber, params EncodingParams, inputSize uint64) ([]byte, error)
+	DecodeDataAsCoeffs(chunks []*Frame, indices []ChunkNumber, params EncodingParams, inputSize uint64) ([]byte, error)
+
+	DecodeDataAsEvals(chunks []*Frame, indices []ChunkNumber, params EncodingParams, inputSize uint64) ([]byte, error)
 }
 
 type Prover interface {
-	Decoder
 	// Encode takes in a blob and returns the commitments and encoded chunks. The encoding will satisfy the property that
 	// for any number M such that M*params.ChunkLength > BlobCommitments.Length, then any set of M chunks will be sufficient to
 	// reconstruct the blob.
-	EncodeAndProve(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
+
+	// EncodeAndProveDataAsCoeffs takes in a blob and returns the commitments and encoded chunks.
+	EncodeAndProveDataAsCoeffs(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
+
+	// EncodeAndProveDataAsEvals takes in a blob and returns the commitments and encoded chunks.
+	EncodeAndProveDataAsEvals(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
 }
 
 type Verifier interface {

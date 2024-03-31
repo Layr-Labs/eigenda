@@ -234,6 +234,9 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		securityParamsStrings[i] = sp.String()
 	}
 
+	// Pad blob data to power of 2
+	blob.Data = encoding.PadToPowerOf2Frames(blob.Data)
+
 	blobSize := len(blob.Data)
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)

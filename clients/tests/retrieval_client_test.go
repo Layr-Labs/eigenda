@@ -120,7 +120,7 @@ func setup(t *testing.T) {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: encoding.PadToPowerOf2Frames(gettysburgAddressBytes),
 	}
 	operatorState, err = indexedChainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
 	if err != nil {
@@ -151,7 +151,7 @@ func setup(t *testing.T) {
 
 	params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-	commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
+	commitments, chunks, err := p.EncodeAndProveDataAsEvals(blob.Data, params)
 	if err != nil {
 		t.Fatal(err)
 	}

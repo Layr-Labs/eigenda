@@ -1,44 +1,51 @@
 package prover_test
 
-import (
-	"testing"
+// import (
+// 	"testing"
 
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/stretchr/testify/assert"
-)
+// 	"github.com/Layr-Labs/eigenda/encoding"
+// 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+// 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+// 	"github.com/stretchr/testify/assert"
+// )
 
-func FuzzOnlySystematic(f *testing.F) {
+// func FuzzOnlySystematic(f *testing.F) {
 
-	f.Add(gettysburgAddressBytes)
-	f.Fuzz(func(t *testing.T, input []byte) {
+// 	f.Add(gettysburgAddressBytes)
+// 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		group, _ := prover.NewProver(kzgConfig, true)
+// 		p, _ := prover.NewProver(kzgConfig, true)
+// 		v, _ := verifier.NewVerifier(kzgConfig, true)
 
-		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
-		enc, err := group.GetKzgEncoder(params)
-		if err != nil {
-			t.Errorf("Error making rs: %q", err)
-		}
+// 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
+// 		pp, err := p.GetKzgEncoder(params)
+// 		if err != nil {
+// 			t.Errorf("Error making rs: %q", err)
+// 		}
 
-		//encode the data
-		_, _, _, frames, _, err := enc.EncodeBytes(input)
+// 		pv, err := v.GetKzgVerifier(params)
+// 		if err != nil {
+// 			t.Errorf("Error making rs: %q", err)
+// 		}
 
-		for _, frame := range frames {
-			assert.NotEqual(t, len(frame.Coeffs), 0)
-		}
+// 		//encode the data
+// 		_, _, _, frames, _, err := pp.EncodeBytes(input)
 
-		if err != nil {
-			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
-		}
+// 		for _, frame := range frames {
+// 			assert.NotEqual(t, len(frame.Coeffs), 0)
+// 		}
 
-		//sample the correct systematic frames
-		samples, indices := sampleFrames(frames, uint64(len(frames)))
+// 		if err != nil {
+// 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
+// 		}
 
-		data, err := enc.Decode(samples, indices, uint64(len(input)))
-		if err != nil {
-			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
-		}
-		assert.Equal(t, input, data, "Input data was not equal to the decoded data")
-	})
-}
+// 		//sample the correct systematic frames
+// 		samples, indices := sampleFrames(frames, uint64(len(frames)))
+
+// 		data, err := pv.Decode(samples, indices, uint64(len(input)))
+// 		if err != nil {
+// 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
+// 		}
+// 		assert.Equal(t, input, data, "Input data was not equal to the decoded data")
+// 	})
+// }

@@ -285,7 +285,7 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
-func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+func (v *Verifier) decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64, asEvals bool) ([]byte, error) {
 	frames := make([]rs.Frame, len(chunks))
 	for i := range chunks {
 		frames[i] = rs.Frame{
@@ -297,7 +297,28 @@ func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 		return nil, err
 	}
 
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+	symbols, err := encoder.DecodeSymbols(frames, toUint64Array(indices), maxInputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	if asEvals {
+		symbols, err = encoder.Fs.ConvertCoeffsToEvals(symbols)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return rs.ToByteArray(symbols, maxInputSize), nil
+}
+
+func (v *Verifier) DecodeDataAsCoeffs(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, inputSize uint64) ([]byte, error) {
+	return v.decode(chunks, indices, params, inputSize, false)
+}
+
+func (v *Verifier) DecodeDataAsEvals(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, inputSize uint64) ([]byte, error) {
+
+	return v.decode(chunks, indices, params, inputSize, true)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

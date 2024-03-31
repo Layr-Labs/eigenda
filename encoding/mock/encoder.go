@@ -17,7 +17,13 @@ var _ encoding.Prover = &MockEncoder{}
 
 var _ encoding.Verifier = &MockEncoder{}
 
-func (e *MockEncoder) EncodeAndProve(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+func (e *MockEncoder) EncodeAndProveDataAsCoeffs(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+	args := e.Called(data, params)
+	time.Sleep(e.Delay)
+	return args.Get(0).(encoding.BlobCommitments), args.Get(1).([]*encoding.Frame), args.Error(2)
+}
+
+func (e *MockEncoder) EncodeAndProveDataAsEvals(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
 	args := e.Called(data, params)
 	time.Sleep(e.Delay)
 	return args.Get(0).(encoding.BlobCommitments), args.Get(1).([]*encoding.Frame), args.Error(2)
@@ -47,7 +53,13 @@ func (e *MockEncoder) VerifyBlobLength(commitments encoding.BlobCommitments) err
 	return args.Error(0)
 }
 
-func (e *MockEncoder) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+func (e *MockEncoder) DecodeDataAsCoeffs(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+	args := e.Called(chunks, indices, params, maxInputSize)
+	time.Sleep(e.Delay)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
+func (e *MockEncoder) DecodeDataAsEvals(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
 	args := e.Called(chunks, indices, params, maxInputSize)
 	time.Sleep(e.Delay)
 	return args.Get(0).([]byte), args.Error(1)

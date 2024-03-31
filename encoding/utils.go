@@ -6,6 +6,20 @@ import (
 	"math"
 )
 
+func PadToPowerOf2Frames(data []byte) []byte {
+
+	// Pad data to the next power of 2
+	length := roundUpDivide[int](len(data), BYTES_PER_COEFFICIENT)
+
+	// Pad data to the next power of 2
+	padSize := NextPowerOf2(uint64(length)) * BYTES_PER_COEFFICIENT
+
+	paddedData := make([]byte, padSize)
+	copy(paddedData, data)
+
+	return paddedData
+}
+
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetBlobLength(blobSize uint) uint {
 	symSize := uint(BYTES_PER_COEFFICIENT)

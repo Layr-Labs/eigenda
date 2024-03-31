@@ -136,14 +136,34 @@ func (g *Prover) PreloadAllEncoders() error {
 	return nil
 }
 
-func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+func (p *Prover) EncodeAndProveDataAsCoeffs(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+
+	return p.encodeAndProve(data, params, false)
+
+}
+
+func (p *Prover) EncodeAndProveDataAsEvals(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+
+	return p.encodeAndProve(data, params, true)
+
+}
+
+func (e *Prover) encodeAndProve(data []byte, params encoding.EncodingParams, asEvals bool) (encoding.BlobCommitments, []*encoding.Frame, error) {
 
 	enc, err := e.GetKzgEncoder(params)
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err
 	}
 
-	commit, lengthCommit, lengthProof, kzgFrames, _, err := enc.EncodeBytes(data)
+	coeffs := rs.ToFrArray(data)
+	if asEvals {
+		coeffs, err = enc.Fs.ConvertEvalsToCoeffs(coeffs)
+		if err != nil {
+			return encoding.BlobCommitments{}, nil, err
+		}
+	}
+
+	commit, lengthCommit, lengthProof, kzgFrames, _, err := enc.Encode(coeffs)
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err
 	}
@@ -157,7 +177,7 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 		}
 	}
 
-	length := uint(len(rs.ToFrArray(data)))
+	length := uint(len(coeffs))
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
@@ -282,24 +302,6 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 		tables = append(tables, params)
 	}
 	return tables, nil
-}
-
-// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
-// The result is trimmed to the given maxInputSize.
-func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
-	frames := make([]encoding.Frame, len(chunks))
-	for i := range chunks {
-		frames[i] = encoding.Frame{
-			Proof:  chunks[i].Proof,
-			Coeffs: chunks[i].Coeffs,
-		}
-	}
-	encoder, err := p.GetKzgEncoder(params)
-	if err != nil {
-		return nil, err
-	}
-
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

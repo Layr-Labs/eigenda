@@ -84,7 +84,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 		_, err = rand.Read(blob)
 		assert.NoError(t, err)
 
-		commitments, chunks, err := p.EncodeAndProve(blob, params)
+		commitments, chunks, err := p.EncodeAndProveDataAsCoeffs(blob, params)
 		assert.NoError(t, err)
 
 		indices := make([]encoding.ChunkNumber, params.NumChunks)
@@ -128,7 +128,7 @@ func BenchmarkVerifyBlob(b *testing.B) {
 		blobs[i] = blob
 	}
 
-	commitments, _, err := p.EncodeAndProve(blobs[0], params)
+	commitments, _, err := p.EncodeAndProveDataAsCoeffs(blobs[0], params)
 	assert.NoError(b, err)
 
 	b.ResetTimer()
