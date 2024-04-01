@@ -268,7 +268,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	s.logger.Debug("received a new blob dispersal request", "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress)
+		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
 		if err != nil {
 			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
 			return nil, err
@@ -422,7 +422,7 @@ type limiterInfo struct {
 //
 // This information is currently passed to the DA nodes for their use is ratelimiting retrieval requests. This retrieval ratelimiting
 // is a temporary measure until the DA nodes are able to determine rates by themselves and will be simplified or replaced in the future.
-func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string) error {
+func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string, apiMethodName string) error {
 
 	requestParams := make([]common.RequestParams, 0)
 
@@ -433,13 +433,13 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
-			s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
+			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 			return api.NewInternalError(fmt.Sprintf("no configured rate exists for quorum %d", param.QuorumID))
 		}
 
 		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
-			s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
+			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 			return api.NewInternalError(err.Error())
 		}
 
@@ -503,19 +503,19 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 	allowed, params, err := s.ratelimiter.AllowRequest(ctx, requestParams)
 	if err != nil {
-		s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
-		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlobAuthenticated")
+		s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, apiMethodName)
 		return api.NewInternalError(err.Error())
 	}
 
 	if !allowed {
 		info, ok := params.Info.(limiterInfo)
 		if !ok {
-			s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
+			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 			return api.NewInternalError("failed to cast limiterInfo")
 		}
-		s.metrics.HandleSystemRateLimitedRpcRequest("DisperseBlobAuthenticated")
-		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlobAuthenticated")
+		s.metrics.HandleSystemRateLimitedRpcRequest(apiMethodName)
+		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
 		return api.NewResourceExhaustedError(errorString)
 	}
@@ -565,7 +565,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 
 	s.metrics.HandleSuccessfulRpcRequest("GetBlobStatus")
 
-	s.logger.Debug("isConfirmed", "metadata", metadata, "isConfirmed", isConfirmed)
+	s.logger.Debug("isConfirmed", "metadataKey", metadataKey, "isConfirmed", isConfirmed)
 	if isConfirmed {
 		confirmationInfo := metadata.ConfirmationInfo
 		dataLength := uint32(confirmationInfo.BlobCommitment.Length)
