@@ -78,11 +78,11 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	// Convert to core EncodingParams
 	var encodingParams = encoding.EncodingParams{
-		ChunkLength: uint64(req.EncodingParams.ChunkLength),
-		NumChunks:   uint64(req.EncodingParams.NumChunks),
+		ChunkLength: uint64(req.GetEncodingParams().GetChunkLength()),
+		NumChunks:   uint64(req.GetEncodingParams().GetNumChunks()),
 	}
 
-	commits, chunks, err := s.prover.EncodeAndProve(req.Data, encodingParams)
+	commits, chunks, err := s.prover.EncodeAndProve(req.GetData(), encodingParams)
 
 	if err != nil {
 		return nil, err

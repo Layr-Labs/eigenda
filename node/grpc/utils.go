@@ -46,7 +46,7 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 
 		bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
 		for j, chunks := range blob.GetBundles() {
-			quorumID := blob.GetHeader().GetQuorumHeaders()[j].QuorumId
+			quorumID := blob.GetHeader().GetQuorumHeaders()[j].GetQuorumId()
 			bundles[uint8(quorumID)] = make([]*encoding.Frame, len(chunks.GetChunks()))
 			for k, data := range chunks.GetChunks() {
 				chunk, err := new(encoding.Frame).Deserialize(data)

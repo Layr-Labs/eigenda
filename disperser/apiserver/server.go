@@ -187,7 +187,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	blob.RequestHeader.Nonce = challenge
-	blob.RequestHeader.AuthenticationData = challengeReply.AuthenticationData.AuthenticationData
+	blob.RequestHeader.AuthenticationData = challengeReply.AuthenticationData.GetAuthenticationData()
 
 	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
 	if err != nil {
