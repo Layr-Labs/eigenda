@@ -207,9 +207,11 @@ func (s *server) Start() error {
 		metrics := v1.Group("/metrics")
 		{
 			metrics.GET("/", s.FetchMetricsHandler)
-			metrics.GET("/throughput", s.FetchMetricsTroughputHandler)
+			metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
 			metrics.GET("/non-signers", s.FetchNonSigners)
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
+			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
+			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -375,7 +377,7 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, metric)
 }
 
-// FetchMetricsTroughputHandler godoc
+// FetchMetricsThroughputHandler godoc
 //
 //	@Summary	Fetch throughput time series
 //	@Tags		Metrics
@@ -387,7 +389,7 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/throughput  [get]
-func (s *server) FetchMetricsTroughputHandler(c *gin.Context) {
+func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchMetricsTroughput", f*1000) // make milliseconds
 	}))
@@ -529,7 +531,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 
 // GetEigenDAServiceAvailability godoc
 //
-//	@Summary	Get status of public EigenDA services.
+//	@Summary	Get status of EigenDA services.
 //	@Tags		ServiceAvailability
 //	@Produce	json
 //	@Success	200	{object}	ServiceAvailabilityResponse
@@ -566,6 +568,112 @@ func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
+
+	// Set the status code to 503 if any of the services are not serving
+	availabilityStatus := http.StatusOK
+	for _, status := range availabilityStatuses {
+		if status.ServiceStatus == "NOT_SERVING" {
+			availabilityStatus = http.StatusServiceUnavailable
+			break
+		}
+
+		if status.ServiceStatus == "UNKNOWN" {
+			availabilityStatus = http.StatusInternalServerError
+			break
+		}
+
+	}
+
+	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+		Meta: Meta{
+			Size: len(availabilityStatuses),
+		},
+		Data: availabilityStatuses,
+	})
+}
+
+// FetchDisperserServiceAvailability godoc
+//
+//	@Summary	Get status of EigenDA Disperser service.
+//	@Tags		ServiceAvailability
+//	@Produce	json
+//	@Success	200	{object}	ServiceAvailabilityResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/disperser-service-availability [get]
+func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchDisperserServiceAvailability", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Check Disperser
+	services := []string{"Disperser"}
+
+	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
+
+	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchDisperserServiceAvailability")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchDisperserServiceAvailability")
+
+	// Set the status code to 503 if any of the services are not serving
+	availabilityStatus := http.StatusOK
+	for _, status := range availabilityStatuses {
+		if status.ServiceStatus == "NOT_SERVING" {
+			availabilityStatus = http.StatusServiceUnavailable
+			break
+		}
+
+		if status.ServiceStatus == "UNKNOWN" {
+			availabilityStatus = http.StatusInternalServerError
+			break
+		}
+
+	}
+
+	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+		Meta: Meta{
+			Size: len(availabilityStatuses),
+		},
+		Data: availabilityStatuses,
+	})
+}
+
+// FetchChurnerServiceAvailability godoc
+//
+//	@Summary	Get status of EigenDA churner service.
+//	@Tags		Churner ServiceAvailability
+//	@Produce	json
+//	@Success	200	{object}	ServiceAvailabilityResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/churner-service-availability [get]
+func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Check Disperser
+	services := []string{"Churner"}
+
+	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
+
+	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchChurnerServiceAvailability")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchChurnerServiceAvailability")
 
 	// Set the status code to 503 if any of the services are not serving
 	availabilityStatus := http.StatusOK

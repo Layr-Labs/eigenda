@@ -1,23 +1,23 @@
 definitions:
   core.SecurityParam:
     properties:
-      adversary_threshold:
+      adversaryThreshold:
         description: AdversaryThreshold is the maximum amount of stake that can be
           controlled by an adversary in the quorum as a percentage of the total stake
           in the quorum
         type: integer
-      quorum_id:
+      confirmationThreshold:
+        description: ConfirmationThreshold is the amount of stake that must sign a
+          message for it to be considered valid as a percentage of the total stake
+          in the quorum
         type: integer
-      quorum_rate:
+      quorumID:
+        type: integer
+      quorumRate:
         description: |-
           Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used
           for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
           data was posted to the DA node.
-        type: integer
-      quorum_threshold:
-        description: QuorumThreshold is the amount of stake that must sign a message
-          for it to be considered valid as a percentage of the total stake in the
-          quorum
         type: integer
     type: object
   dataapi.BlobMetadataResponse:
@@ -103,7 +103,13 @@ definitions:
       throughput:
         type: number
       total_stake:
+        description: 'deprecated: use TotalStakePerQuorum instead. Remove when the
+          frontend is updated.'
         type: integer
+      total_stake_per_quorum:
+        additionalProperties:
+          type: integer
+        type: object
     type: object
   dataapi.NonSigner:
     properties:
@@ -114,12 +120,14 @@ definitions:
     type: object
   dataapi.OperatorNonsigningPercentageMetrics:
     properties:
-      operator_id:
-        type: string
       operator_address:
+        type: string
+      operator_id:
         type: string
       percentage:
         type: number
+      quorum_id:
+        type: integer
       total_batches:
         type: integer
       total_unsigned_batches:
@@ -233,7 +241,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of public EigenDA services.
+      summary: Get status of EigenDA services.
       tags:
       - ServiceAvailability
   /feed/blobs:
@@ -332,6 +340,54 @@ paths:
       summary: Fetch metrics
       tags:
       - Metrics
+  /metrics/churner-service-availability:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Get status of EigenDA churner service.
+      tags:
+      - Churner ServiceAvailability
+  /metrics/disperser-service-availability:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Get status of EigenDA Disperser service.
+      tags:
+      - ServiceAvailability
   /metrics/non-signers:
     get:
       parameters:
