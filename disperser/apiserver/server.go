@@ -199,6 +199,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	// Disperse the blob
 	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated")
 	if err != nil {
+		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
 		return err
 	}
@@ -230,12 +231,16 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob")
 	if err != nil {
+		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
+	} else {
+		s.metrics.HandleSuccessfulRpcRequest("DisperseBlob")
 	}
-	s.metrics.HandleSuccessfulRpcRequest("DisperseBlob")
 	return reply, err
 }
 
+// Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
+// to track the error again.
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
@@ -265,6 +270,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress)
 		if err != nil {
+			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
 			return nil, err
 		}
 	}
@@ -286,7 +292,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		s.metrics.HandleSuccessfulRequest(quorumId, blobSize, apiMethodName)
 	}
 
-	s.logger.Info("successfully received a new blob: ", "key", metadataKey.String())
 	return &pb.DisperseBlobReply{
 		Result:    pb.BlobStatus_PROCESSING,
 		RequestId: []byte(metadataKey.String()),
@@ -428,11 +433,13 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
+			s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
 			return api.NewInternalError(fmt.Sprintf("no configured rate exists for quorum %d", param.QuorumID))
 		}
 
 		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
+			s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
 			return api.NewInternalError(err.Error())
 		}
 
@@ -496,18 +503,19 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 	allowed, params, err := s.ratelimiter.AllowRequest(ctx, requestParams)
 	if err != nil {
-		s.metrics.HandleInternalFailureRpcRequest("DisperseBlob")
-		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlob")
+		s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
+		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, "DisperseBlobAuthenticated")
 		return api.NewInternalError(err.Error())
 	}
 
 	if !allowed {
 		info, ok := params.Info.(limiterInfo)
 		if !ok {
+			s.metrics.HandleInternalFailureRpcRequest("DisperseBlobAuthenticated")
 			return api.NewInternalError("failed to cast limiterInfo")
 		}
-		s.metrics.HandleSystemRateLimitedRpcRequest("DisperseBlob")
-		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlob")
+		s.metrics.HandleSystemRateLimitedRpcRequest("DisperseBlobAuthenticated")
+		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, "DisperseBlobAuthenticated")
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
 		return api.NewResourceExhaustedError(errorString)
 	}
@@ -654,6 +662,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			},
 		})
 		if err != nil {
+			s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
 		}
 		if !allowed {
