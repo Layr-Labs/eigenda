@@ -83,7 +83,7 @@ func NewTxnManager(ethClient common.EthClient, wallet walletsdk.Wallet, numConfi
 		wallet:             wallet,
 		numConfirmations:   numConfirmations,
 		requestChan:        make(chan *TxnRequest, queueSize),
-		logger:             logger,
+		logger:             logger.With("component", "TxnManager"),
 		receiptChan:        make(chan *ReceiptOrErr, queueSize),
 		queueSize:          queueSize,
 		txnRefreshInterval: txnRefreshInterval,
@@ -261,10 +261,12 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			}
 			txID, err := t.wallet.SendTransaction(ctx, newTx)
 			if err != nil {
-				t.logger.Error("failed to send txn", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 				if retryFromFailure >= maxSpeedUpRetry {
+					t.logger.Warn("failed to send txn - retries exhausted", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 					t.metrics.IncrementTxnCount("failure")
 					return nil, err
+				} else {
+					t.logger.Warn("failed to send txn - retrying", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
 				}
 				retryFromFailure++
 				continue

@@ -39,7 +39,7 @@ func NewServer(
 		retrievalClient: retrievalClient,
 		chainClient:     chainClient,
 		indexedState:    indexedState,
-		logger:          logger,
+		logger:          logger.With("component", "RetrieverServer"),
 		metrics:         metrics,
 	}
 }

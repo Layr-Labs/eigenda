@@ -91,7 +91,7 @@ func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger log
 	return &indexedChainState{
 		ChainState: cs,
 		querier:    querier,
-		logger:     logger,
+		logger:     logger.With("component", "IndexedChainState"),
 	}
 }
 

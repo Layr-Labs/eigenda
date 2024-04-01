@@ -73,7 +73,7 @@ func NewChurner(
 		QuorumCount: 0,
 
 		privateKey: privateKey,
-		logger:     logger,
+		logger:     logger.With("component", "Churner"),
 		metrics:    metrics,
 	}, nil
 }

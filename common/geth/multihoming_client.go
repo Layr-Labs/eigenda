@@ -41,7 +41,7 @@ func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Addre
 		NumRetries:         config.NumRetries,
 		FailoverController: FailoverController,
 		lastRPCIndex:       0,
-		Logger:             logger,
+		Logger:             logger.With("component", "MultiHomingClient"),
 		mu:                 sync.Mutex{},
 	}
 

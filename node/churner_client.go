@@ -36,7 +36,7 @@ func NewChurnerClient(churnerURL string, useSecureGrpc bool, timeout time.Durati
 		churnerURL:    churnerURL,
 		useSecureGrpc: useSecureGrpc,
 		timeout:       timeout,
-		logger:        logger,
+		logger:        logger.With("component", "ChurnerClient"),
 	}
 }
 

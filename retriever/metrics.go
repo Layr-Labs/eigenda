@@ -44,7 +44,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 		),
 		httpPort: httpPort,
-		logger:   logger,
+		logger:   logger.With("component", "RetrieverMetrics"),
 	}
 	return metrics
 }

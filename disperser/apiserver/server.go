@@ -65,11 +65,12 @@ func NewDispersalServer(
 	serverConfig disperser.ServerConfig,
 	store disperser.BlobStore,
 	tx core.Transactor,
-	logger logging.Logger,
+	_logger logging.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
 ) *DispersalServer {
+	logger := _logger.With("component", "DispersalServer")
 	for ip, rateInfoByQuorum := range rateConfig.Allowlist {
 		for quorumID, rateInfo := range rateInfoByQuorum {
 			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)

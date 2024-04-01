@@ -194,12 +194,12 @@ func RunBatcher(ctx *cli.Context) error {
 			[]byte(secretKey),
 			config.FireblocksConfig.BaseURL,
 			config.TimeoutConfig.ChainReadTimeout,
-			logger,
+			logger.With("component", "FireblocksClient"),
 		)
 		if err != nil {
 			return err
 		}
-		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger)
+		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger.With("component", "FireblocksWallet"))
 		if err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger)
+		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger.With("component", "PrivateKeyWallet"))
 		if err != nil {
 			return err
 		}

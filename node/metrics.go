@@ -109,7 +109,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 		),
 		EigenMetrics: eigenMetrics,
-		logger:       logger,
+		logger:       logger.With("component", "NodeMetrics"),
 		registry:     reg,
 		socketAddr:   socketAddr,
 	}

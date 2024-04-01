@@ -13,8 +13,8 @@ type EncoderGRPCServer struct {
 	Server *encoder.Server
 }
 
-func NewEncoderGRPCServer(config Config, logger logging.Logger) (*EncoderGRPCServer, error) {
-
+func NewEncoderGRPCServer(config Config, _logger logging.Logger) (*EncoderGRPCServer, error) {
+	logger := _logger.With("component", "EncoderGRPCServer")
 	p, err := prover.NewProver(&config.EncoderConfig, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %w", err)
