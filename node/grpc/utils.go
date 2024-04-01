@@ -80,10 +80,6 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		return nil, errors.New("commitment is not in the subgroup")
 	}
 
-	if (*bn254.G1Affine)(commitment).IsInfinity() {
-		return nil, fmt.Errorf("commitment is infinity")
-	}
-
 	var lengthCommitment, lengthProof encoding.G2Commitment
 	if h.GetLengthCommitment() != nil {
 		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
@@ -96,10 +92,6 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		return nil, errors.New("lengthCommitment is in the subgroup")
 	}
 
-	if (*bn254.G2Affine)(&lengthCommitment).IsInfinity() {
-		return nil, fmt.Errorf("commitment is infinity")
-	}
-
 	if h.GetLengthProof() != nil {
 		lengthProof.X.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA0())
 		lengthProof.X.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA1())
@@ -109,10 +101,6 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 
 	if !(*bn254.G2Affine)(&lengthProof).IsInSubGroup() {
 		return nil, errors.New("lengthProof is not in the subgroup")
-	}
-
-	if (*bn254.G2Affine)(&lengthProof).IsInfinity() {
-		return nil, fmt.Errorf("commitment is infinity")
 	}
 
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))
