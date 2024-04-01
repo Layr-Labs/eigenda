@@ -541,7 +541,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	metadata, err := s.blobStore.GetBlobMetadata(ctx, metadataKey)
 	if err != nil {
 		if errors.Is(err, disperser.ErrMetadataNotFound) {
-			s.metrics.HandleNotFoundArgRpcRequest("GetBlobStatus")
+			s.metrics.HandleNotFoundRpcRequest("GetBlobStatus")
 			s.metrics.HandleNotFoundRequest("GetBlobStatus")
 			return nil, api.NewNotFoundError("no metadata found for the requestID")
 		}
@@ -638,6 +638,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
+		s.metrics.HandleInvalidArgRpcRequest("RetrieveBlob")
 		s.metrics.HandleInvalidArgRequest("RetrieveBlob")
 		return nil, api.NewInvalidArgError(err.Error())
 	}
@@ -656,6 +657,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
 		}
 		if !allowed {
+			s.metrics.HandleRateLimitedRpcRequest("RetrieveBlob")
 			s.metrics.HandleFailedRequest(codes.ResourceExhausted.String(), "", 0, "RetrieveBlob")
 			errorString := "request ratelimited"
 			info, ok := param.Info.(string)
@@ -679,9 +681,11 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
 		if errors.Is(err, disperser.ErrMetadataNotFound) {
+			s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 			s.metrics.HandleNotFoundRequest("RetrieveBlob")
 			return nil, api.NewNotFoundError("no metadata found for the given batch header hash and blob index")
 		}
+		s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
@@ -699,9 +703,11 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			},
 		})
 		if err != nil {
+			s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
 		}
 		if !allowed {
+			s.metrics.HandleRateLimitedRpcRequest("RetrieveBlob")
 			s.metrics.HandleFailedRequest(codes.ResourceExhausted.String(), "", 0, "RetrieveBlob")
 			errorString := "request ratelimited"
 			info, ok := param.Info.(string)
@@ -715,10 +721,11 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob", "err", err)
+		s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 		s.metrics.HandleFailedRequest(codes.Internal.String(), "", len(data), "RetrieveBlob")
 		return nil, api.NewInternalError("failed to get blob data, please retry")
 	}
-
+	s.metrics.HandleSuccessfulRpcRequest("RetrieveBlob")
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
 
 	return &pb.RetrieveBlobReply{

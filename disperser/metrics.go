@@ -91,10 +91,10 @@ func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
 	g.Latency.WithLabelValues(method).Observe(latencyMs)
 }
 
-func (g *Metrics) HandleSuccessfulRpcRequest(statusDetail string, method string) {
+func (g *Metrics) HandleSuccessfulRpcRequest(method string) {
 	g.NumRpcRequests.With(prometheus.Labels{
 		"status_code":   codes.OK.String(),
-		"status_detail": "success",
+		"status_detail": "",
 		"method":        method,
 	}).Inc()
 }
@@ -126,7 +126,15 @@ func (g *Metrics) HandleSystemRateLimitedRpcRequest(method string) {
 func (g *Metrics) HandleAccountRateLimitedRpcRequest(method string) {
 	g.NumRpcRequests.With(prometheus.Labels{
 		"status_code":   codes.ResourceExhausted.String(),
-		"status_detail": SystemRateLimitedFailure,
+		"status_detail": AccountRateLimitedFailure,
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleRateLimitedRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.ResourceExhausted.String(),
+		"status_detail": "",
 		"method":        method,
 	}).Inc()
 }
