@@ -441,7 +441,7 @@ func TestPartialBlob(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(46)) // size divides 32 because encoder accepts 32 bytes as a unit
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
@@ -669,7 +669,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(46))
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
 		{
@@ -702,7 +702,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(46))
 	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{

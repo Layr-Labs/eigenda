@@ -11,6 +11,9 @@ type Prover interface {
 	// for any number M such that M*params.ChunkLength > BlobCommitments.Length, then any set of M chunks will be sufficient to
 	// reconstruct the blob.
 	EncodeAndProve(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
+
+	// EncodeAndProveSymbols behaves the same way as EncodeAndProve, except it takes bytes (every 32 byts is a symbol) as inputs
+	EncodeAndProveSymbols(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
 }
 
 type Verifier interface {

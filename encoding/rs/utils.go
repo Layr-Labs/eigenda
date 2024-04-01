@@ -5,13 +5,15 @@ import (
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	rb "github.com/Layr-Labs/eigenda/encoding/utils/reverseBits"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// ToFrArray converts a list of bytes to a list of field elements,
+// the implementation takes every 31 bytes out of the array list.
 func ToFrArray(data []byte) []fr.Element {
-	//numEle := int(math.Ceil(float64(len(data)) / float64(BYTES_PER_COEFFICIENT)))
 	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
 	eles := make([]fr.Element, numEle)
 
@@ -31,7 +33,57 @@ func ToFrArray(data []byte) []fr.Element {
 	return eles
 }
 
-// ToByteArray converts a list of Fr to a byte array
+// ToFrArrayWith254Bits converts a list of bytes to a list of field elements,
+// it takes every 32 bytes out of the byte array to construct the field elemement array,
+// it assumes every 32 byte contains at most 254 bits of information, so it is safe to
+// call SetBytes function
+func ToFrArrayWith254Bits(data []byte) []fr.Element {
+	numEle := GetNumElement(uint64(len(data)), encoding.NUMBER_FR_SECURITY_BYTES)
+	eles := make([]fr.Element, numEle)
+
+	for i := uint64(0); i < numEle; i++ {
+		start := i * uint64(encoding.NUMBER_FR_SECURITY_BYTES)
+		end := (i + 1) * uint64(encoding.NUMBER_FR_SECURITY_BYTES)
+		if end >= uint64(len(data)) {
+			var padded [32]byte
+			copy(padded[:], data[start:])
+			eles[i].SetBytes(padded[:])
+
+		} else {
+			eles[i].SetBytes(data[start:end])
+		}
+	}
+	return eles
+}
+
+func ToPaddedFrArray(data []byte) []fr.Element {
+	//numEle := int(math.Ceil(float64(len(data)) / float64(BYTES_PER_COEFFICIENT)))
+	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
+	numElePadded := NextPowerOf2(numEle)
+	eles := make([]fr.Element, numElePadded)
+
+	for i := uint64(0); i < numElePadded; i++ {
+		if i < numEle {
+			start := i * uint64(encoding.BYTES_PER_COEFFICIENT)
+			end := (i + 1) * uint64(encoding.BYTES_PER_COEFFICIENT)
+			if end >= uint64(len(data)) {
+				var padded [32]byte
+				copy(padded[1:], data[start:])
+				eles[i].SetBytes(padded[:])
+
+			} else {
+				eles[i].SetBytes(data[start:end])
+			}
+		} else {
+			eles[i].SetZero()
+		}
+	}
+
+	return eles
+}
+
+// ToByteArray converts a list of Fr to a byte array,
+// for every filed element, it takes only 31 bits and adds to the bytes array
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)
 	dataSize := int(math.Min(
@@ -41,7 +93,6 @@ func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	data := make([]byte, dataSize)
 	for i := 0; i < n; i++ {
 		v := dataFr[i].Bytes()
-
 		start := i * encoding.BYTES_PER_COEFFICIENT
 		end := (i + 1) * encoding.BYTES_PER_COEFFICIENT
 
@@ -53,6 +104,21 @@ func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 		}
 	}
 
+	return data
+}
+
+// ToByteArrayWith254Bits converts a list of Fr to a byte array,
+// for every field elemnt, it takes full 32 bits and adds to the bytes array
+func ToByteArrayWith254Bits(dataFr []fr.Element) []byte {
+	n := len(dataFr)
+	dataSize := n * encoding.NUMBER_FR_SECURITY_BYTES
+	data := make([]byte, dataSize)
+	for i := 0; i < n; i++ {
+		v := dataFr[i].Bytes()
+		start := i * encoding.NUMBER_FR_SECURITY_BYTES
+		end := (i + 1) * encoding.NUMBER_FR_SECURITY_BYTES
+		copy(data[start:end], v[:])
+	}
 	return data
 }
 
@@ -80,4 +146,19 @@ func GetLeadingCosetIndex(i uint64, numChunks uint64) (uint32, error) {
 	} else {
 		return 0, errors.New("cannot create number of frame higher than possible")
 	}
+}
+
+func ConvertByteEvalToPaddedCoeffs(data []byte) ([]byte, error) {
+	paddedBlobFr := ToPaddedFrArray(data)
+	blobLengthPowOf2 := uint64(len(paddedBlobFr))
+
+	n := uint8(math.Log2(float64(blobLengthPowOf2)))
+	tf := fft.NewFFTSettings(n)
+
+	coeffsFr, err := tf.ConvertEvalsToCoeffs(paddedBlobFr)
+	if err != nil {
+		return nil, err
+	}
+
+	return ToByteArrayWith254Bits(coeffsFr), nil
 }

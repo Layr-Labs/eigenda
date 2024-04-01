@@ -325,7 +325,7 @@ func TestRetrieveBlob(t *testing.T) {
 		retrieveData, err := retrieveBlob(t, dispersalServer, requestID, 1)
 		assert.NoError(t, err)
 
-		assert.Equal(t, data, retrieveData)
+		assert.Equal(t, data, retrieveData[:len(data)])
 	}
 
 }

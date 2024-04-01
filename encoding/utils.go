@@ -12,6 +12,12 @@ func GetBlobLength(blobSize uint) uint {
 	return (blobSize + symSize - 1) / symSize
 }
 
+// All bytes after Apiserver treats every 32 bytes as a symbols
+func GetBlobLengthInternal(blobSize uint) uint {
+	symSize := uint(NUMBER_FR_SECURITY_BYTES)
+	return (blobSize + symSize - 1) / symSize
+}
+
 // GetBlobSize converts from blob length in symbols to blob size in bytes. This is not an exact conversion.
 func GetBlobSize(blobLength uint) uint {
 	return blobLength * BYTES_PER_COEFFICIENT
@@ -20,6 +26,11 @@ func GetBlobSize(blobLength uint) uint {
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetEncodedBlobLength(blobLength uint, quorumThreshold, advThreshold uint8) uint {
 	return roundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
+}
+
+func GetPaddedInputLength(dataSize uint64) uint64 {
+	dataLen := roundUpDivide(dataSize, BYTES_PER_COEFFICIENT)
+	return NextPowerOf2(uint64(dataLen))
 }
 
 func NextPowerOf2(d uint64) uint64 {

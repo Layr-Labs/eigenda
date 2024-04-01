@@ -30,7 +30,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		operatorState, err := chainState.GetOperatorState(context.Background(), 0, []core.QuorumID{0})
 		assert.NoError(t, err)
 
-		chunkLength, err := asn.CalculateChunkLength(operatorState, encoding.GetBlobLength(uint(blobSize)), 0, &core.SecurityParam{
+		chunkLength, err := asn.CalculateChunkLength(operatorState, encoding.GetBlobLengthInternal(uint(blobSize)), 0, &core.SecurityParam{
 			QuorumID:              0,
 			AdversaryThreshold:    uint8(advThreshold),
 			ConfirmationThreshold: uint8(quorumThreshold),
@@ -48,7 +48,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		// encode data
 
-		assignments, info, err := asn.GetAssignments(operatorState, encoding.GetBlobLength(uint(blobSize)), blobQuorumInfo)
+		assignments, info, err := asn.GetAssignments(operatorState, encoding.GetBlobLengthInternal(uint(blobSize)), blobQuorumInfo)
 		assert.NoError(t, err)
 		quorumInfo := batcher.QuorumInfo{
 			Assignments:        assignments,

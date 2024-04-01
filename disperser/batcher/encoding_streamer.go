@@ -297,7 +297,8 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			continue
 		}
 
-		blobLength := encoding.GetBlobLength(metadata.RequestMetadata.BlobSize)
+		// After api server, the every 32 bytes is a field element, use internal function
+		blobLength := encoding.GetBlobLengthInternal(metadata.RequestMetadata.BlobSize)
 
 		chunkLength, err := e.assignmentCoordinator.CalculateChunkLength(state.OperatorState, blobLength, e.StreamerConfig.TargetNumChunks, quorum)
 		if err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
@@ -59,9 +60,10 @@ var (
 	v   encoding.Verifier
 	asn core.AssignmentCoordinator
 
-	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
-	serviceManagerAddress   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
-	handleBatchLivenessChan = make(chan time.Time, 1)
+	gettysburgAddressBytes      = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	gettysburgAddressBytes_IFFT = []byte{}
+	serviceManagerAddress       = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
+	handleBatchLivenessChan     = make(chan time.Time, 1)
 )
 
 const (
@@ -99,6 +101,8 @@ func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 		log.Fatal(err)
 	}
 
+	gettysburgAddressBytes_IFFT, _ = rs.ConvertByteEvalToPaddedCoeffs(gettysburgAddressBytes)
+
 	return p, v
 }
 
@@ -113,7 +117,7 @@ func mustMakeTestBlob() core.Blob {
 				},
 			},
 		},
-		Data: gettysburgAddressBytes,
+		Data: gettysburgAddressBytes_IFFT,
 	}
 	return blob
 }
@@ -480,7 +484,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	assert.NoError(t, err)
 
-	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
+	blobLength := encoding.GetBlobLengthInternal(uint(len(blob.Data)))
 	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
 	assert.NoError(t, err)
 
@@ -560,7 +564,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
-	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
+	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(len(gettysburgAddressBytes_IFFT)))
 	assert.NoError(t, err)
 	recovered = bytes.TrimRight(recovered, "\x00")
 	assert.Equal(t, gettysburgAddressBytes, recovered)

@@ -5,12 +5,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/assert"
 )
 
 func FuzzOnlySystematic(f *testing.F) {
-
-	f.Add(gettysburgAddressBytes)
+	f.Add(gettysburgAddressBytesIFFT)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
 		group, _ := prover.NewProver(kzgConfig, true)
@@ -21,8 +21,10 @@ func FuzzOnlySystematic(f *testing.F) {
 			t.Errorf("Error making rs: %q", err)
 		}
 
+		inputFr := rs.ToFrArrayWith254Bits(input)
+
 		//encode the data
-		_, _, _, frames, _, err := enc.EncodeBytes(input)
+		_, _, _, frames, _, err := enc.Encode(inputFr)
 
 		for _, frame := range frames {
 			assert.NotEqual(t, len(frame.Coeffs), 0)
@@ -39,6 +41,6 @@ func FuzzOnlySystematic(f *testing.F) {
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}
-		assert.Equal(t, input, data, "Input data was not equal to the decoded data")
+		assert.Equal(t, gettysburgAddressBytes, data[:len(gettysburgAddressBytes)], "Input data was not equal to the decoded data")
 	})
 }

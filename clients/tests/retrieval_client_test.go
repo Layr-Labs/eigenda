@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -69,6 +70,7 @@ var (
 
 func setup(t *testing.T) {
 
+	gettysburgAddressBytesIFFT, _ := rs.ConvertByteEvalToPaddedCoeffs(gettysburgAddressBytes)
 	var err error
 	chainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
 	if err != nil {
@@ -120,7 +122,7 @@ func setup(t *testing.T) {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: gettysburgAddressBytesIFFT,
 	}
 	operatorState, err = indexedChainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
 	if err != nil {
@@ -128,7 +130,7 @@ func setup(t *testing.T) {
 	}
 
 	blobSize := uint(len(blob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobLength := encoding.GetBlobLengthInternal(uint(blobSize))
 
 	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
@@ -151,7 +153,7 @@ func setup(t *testing.T) {
 
 	params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-	commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
+	commitments, chunks, err := p.EncodeAndProveSymbols(blob.Data, params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +268,6 @@ func TestValidBlobHeader(t *testing.T) {
 	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
 	recovered := bytes.TrimRight(data, "\x00")
-	assert.Len(t, data, 1488)
+	assert.Len(t, data, 64*31) // ifft 48 -> 64, when it is first encoded to 48, each field element contains 31 bytes
 	assert.Equal(t, gettysburgAddressBytes, recovered)
-
 }

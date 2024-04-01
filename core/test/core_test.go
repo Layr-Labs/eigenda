@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
@@ -73,11 +74,16 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 		t.Fatal(err)
 	}
 
+	dataIFFT, err := rs.ConvertByteEvalToPaddedCoeffs(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	blob := core.Blob{
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: data,
+		Data: dataIFFT,
 	}
 	return blob
 }
@@ -122,7 +128,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			}
 
 			blobSize := uint(len(blob.Data))
-			blobLength := encoding.GetBlobLength(blobSize)
+			blobLength := encoding.GetBlobLengthInternal(blobSize)
 
 			chunkLength, err := asn.CalculateChunkLength(state, blobLength, 0, securityParam)
 			if err != nil {
@@ -145,7 +151,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 			params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-			commitments, chunks, err := p.EncodeAndProve(blob.Data, params)
+			commitments, chunks, err := p.EncodeAndProveSymbols(blob.Data, params)
 			if err != nil {
 				t.Fatal(err)
 			}
