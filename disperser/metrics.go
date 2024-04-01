@@ -145,6 +145,16 @@ func (g *Metrics) HandleInvalidArgRequest(method string) {
 	}).Inc()
 }
 
+// HandleInvalidArgRequest updates the number of invalid argument requests
+func (g *Metrics) HandleNotFoundRequest(method string) {
+	g.NumBlobRequests.With(prometheus.Labels{
+		"status_code": codes.NotFound.String(),
+		"status":      "failed",
+		"quorum":      "",
+		"method":      method,
+	}).Inc()
+}
+
 // HandleSystemRateLimitedRequest updates the number of system rate limited requests and the size of the blob
 func (g *Metrics) HandleSystemRateLimitedRequest(quorum string, blobBytes int, method string) {
 	g.NumBlobRequests.With(prometheus.Labels{

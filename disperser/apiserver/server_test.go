@@ -350,7 +350,7 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	// Try to retrieve the blob before it is confirmed
 	_, err = retrieveBlob(t, dispersalServer, requestID, 2)
 	assert.NotNil(t, err)
-	assert.Equal(t, "rpc error: code = InvalidArgument desc = no metadata found for the given batch header hash and blob index", err.Error())
+	assert.Equal(t, "rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index", err.Error())
 
 }
 
