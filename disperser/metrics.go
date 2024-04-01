@@ -22,6 +22,7 @@ type Metrics struct {
 	registry *prometheus.Registry
 
 	NumBlobRequests *prometheus.CounterVec
+	NumRpcRequests  *prometheus.CounterVec
 	BlobSize        *prometheus.GaugeVec
 	Latency         *prometheus.SummaryVec
 
@@ -43,6 +44,8 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	reg.MustRegister(collectors.NewGoCollector())
 
 	metrics := &Metrics{
+		// TODO: revamp this metric -- it'll focus on quorum tracking, which is relevant
+		// only for the Disperser.DisperserBlob API.
 		NumBlobRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -50,6 +53,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Help:      "the number of blob requests",
 			},
 			[]string{"status_code", "status", "quorum", "method"},
+		),
+		NumRpcRequests: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "grpc_requests_total",
+				Help:      "the number of gRPC requests",
+			},
+			[]string{"status_code", "status_detail", "method"},
 		),
 		BlobSize: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -78,6 +89,62 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 // ObserveLatency observes the latency of a stage in 'stage
 func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
 	g.Latency.WithLabelValues(method).Observe(latencyMs)
+}
+
+func (g *Metrics) HandleSuccessfulRpcRequest(statusDetail string, method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.OK.String(),
+		"status_detail": "success",
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleInvalidArgRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.InvalidArgument.String(),
+		"status_detail": "",
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleNotFoundRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.NotFound.String(),
+		"status_detail": "",
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleSystemRateLimitedRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.ResourceExhausted.String(),
+		"status_detail": SystemRateLimitedFailure,
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleAccountRateLimitedRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.ResourceExhausted.String(),
+		"status_detail": SystemRateLimitedFailure,
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleInternalFailureRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.Internal.String(),
+		"status_detail": "",
+		"method":        method,
+	}).Inc()
+}
+
+func (g *Metrics) HandleStoreFailureRpcRequest(method string) {
+	g.NumRpcRequests.With(prometheus.Labels{
+		"status_code":   codes.Internal.String(),
+		"status_detail": StoreBlobFailure,
+		"method":        method,
+	}).Inc()
 }
 
 // IncrementSuccessfulBlobRequestNum increments the number of successful blob requests
