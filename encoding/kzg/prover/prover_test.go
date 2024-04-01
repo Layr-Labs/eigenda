@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -57,14 +58,16 @@ func teardown() {
 	os.RemoveAll("./data")
 }
 
-func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
-	samples := make([]encoding.Frame, num)
+func sampleFrames(frames []encoding.Frame, num uint64) ([]rs.Frame, []uint64) {
+	samples := make([]rs.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 
 	frameIndices := make([]uint64, num)
 	for i, j := range indices {
-		samples[i] = frames[j]
+		samples[i] = rs.Frame{
+			Coeffs: frames[j].Coeffs,
+		}
 		frameIndices[i] = uint64(j)
 	}
 	return samples, frameIndices
