@@ -207,6 +207,11 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 }
 
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+	if req == nil {
+		s.metrics.HandleInvalidArgRequest("DisperseBlob Request")
+		return nil, api.NewInvalidArgError("request must not be nil")
+	}
+
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
 		for _, quorumID := range req.CustomQuorumNumbers {
@@ -504,6 +509,11 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	}))
 	defer timer.ObserveDuration()
 
+	if req == nil {
+		s.metrics.HandleInvalidArgRequest("GetBlobStatus")
+		return nil, api.NewInvalidArgError("request must not be nil")
+	}
+
 	requestID := req.GetRequestId()
 	if len(requestID) == 0 {
 		s.metrics.HandleInvalidArgRequest("GetBlobStatus")
@@ -609,6 +619,11 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.metrics.ObserveLatency("RetrieveBlob", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
+
+	if req == nil {
+		s.metrics.HandleInvalidArgRequest("RetrieveBlob")
+		return nil, api.NewInvalidArgError("request must not be nil")
+	}
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
