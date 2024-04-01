@@ -99,9 +99,11 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
+	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout: config.TimeoutConfig.AttestationTimeout,
-	}, logger)
+	}, logger, metrics.DispatcherMetrics)
 	asgn := &core.StdAssignmentCoordinator{}
 
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
@@ -159,8 +161,6 @@ func RunBatcher(ctx *cli.Context) error {
 			return err
 		}
 	}
-
-	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
 		return errors.New("encoder socket must be specified")

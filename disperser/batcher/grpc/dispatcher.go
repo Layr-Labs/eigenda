@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"google.golang.org/grpc"
@@ -22,13 +23,15 @@ type Config struct {
 type dispatcher struct {
 	*Config
 
-	logger logging.Logger
+	logger  logging.Logger
+	metrics *batcher.DispatcherMetrics
 }
 
-func NewDispatcher(cfg *Config, logger logging.Logger) *dispatcher {
+func NewDispatcher(cfg *Config, logger logging.Logger, metrics *batcher.DispatcherMetrics) *dispatcher {
 	return &dispatcher{
-		Config: cfg,
-		logger: logger.With("component", "Dispatcher"),
+		Config:  cfg,
+		logger:  logger.With("component", "Dispatcher"),
+		metrics: metrics,
 	}
 }
 
@@ -68,6 +71,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 				return
 			}
 
+			requestedAt := time.Now()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
 				update <- core.SignerMessage{
@@ -75,12 +79,14 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					Signature: nil,
 					Operator:  id,
 				}
+				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
 				update <- core.SignerMessage{
 					Signature: sig,
 					Operator:  id,
 					Err:       nil,
 				}
+				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
 			}
 
 		}(core.IndexedOperatorInfo{
