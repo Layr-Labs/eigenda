@@ -64,7 +64,7 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: encoding.PadToPowerOf2Frames(gettysburgAddressBytes),
 	}
 	return blob
 }

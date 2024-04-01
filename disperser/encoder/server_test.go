@@ -104,6 +104,8 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 
 	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
+	fmt.Println("Chunk Length: ", testEncodingParams.ChunkLength, "Num Chunks: ", testEncodingParams.NumChunks)
+
 	return testBlob, testEncodingParams
 }
 

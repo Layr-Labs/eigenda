@@ -266,7 +266,7 @@ func TestValidBlobHeader(t *testing.T) {
 	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
 	recovered := bytes.TrimRight(data, "\x00")
-	assert.Len(t, data, 1488)
+	assert.Len(t, data, 1984)
 	assert.Equal(t, gettysburgAddressBytes, recovered)
 
 }

@@ -157,7 +157,13 @@ func (e *Prover) encodeAndProve(data []byte, params encoding.EncodingParams, asE
 
 	coeffs := rs.ToFrArray(data)
 	if asEvals {
-		coeffs, err = enc.Fs.ConvertEvalsToCoeffs(coeffs)
+
+		// Ensure that the number of evaluations is a power of 2
+		if encoding.NextPowerOf2(uint64(len(coeffs))) != uint64(len(coeffs)) {
+			return encoding.BlobCommitments{}, nil, fmt.Errorf("the number of evaluations must be a power of 2. Got %d", len(coeffs))
+		}
+
+		coeffs, err = enc.Encoder.Fs.ConvertEvalsToCoeffs(coeffs)
 		if err != nil {
 			return encoding.BlobCommitments{}, nil, err
 		}

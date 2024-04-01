@@ -285,7 +285,7 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
-func (v *Verifier) decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64, asEvals bool) ([]byte, error) {
+func (v *Verifier) decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, inputSize uint64, asEvals bool) ([]byte, error) {
 	frames := make([]rs.Frame, len(chunks))
 	for i := range chunks {
 		frames[i] = rs.Frame{
@@ -297,19 +297,25 @@ func (v *Verifier) decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 		return nil, err
 	}
 
-	symbols, err := encoder.DecodeSymbols(frames, toUint64Array(indices), maxInputSize)
+	symbols, err := encoder.DecodeSymbols(frames, toUint64Array(indices), inputSize)
 	if err != nil {
 		return nil, err
 	}
 
 	if asEvals {
-		symbols, err = encoder.Fs.ConvertCoeffsToEvals(symbols)
+		numSymbols := encoding.GetPaddedBlobLength(uint(inputSize))
+		if numSymbols > uint(len(symbols)) {
+			return nil, errors.New("not enough symbols to decode, got " + fmt.Sprint(len(symbols)) + " expected " + fmt.Sprint(numSymbols) + " symbols")
+		}
+
+		symbols, err = encoder.Encoder.Fs.ConvertCoeffsToEvals(symbols[:numSymbols])
 		if err != nil {
 			return nil, err
 		}
+
 	}
 
-	return rs.ToByteArray(symbols, maxInputSize), nil
+	return rs.ToByteArray(symbols, inputSize), nil
 }
 
 func (v *Verifier) DecodeDataAsCoeffs(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, inputSize uint64) ([]byte, error) {

@@ -6,15 +6,28 @@ import (
 	"math"
 )
 
+func GetPaddedBlobLength(size uint) uint {
+	length := roundUpDivide[uint](size, BYTES_PER_COEFFICIENT)
+
+	// Pad data to the next power of 2
+	paddedLength := uint(NextPowerOf2(uint64(length)))
+
+	return paddedLength
+}
+
+func GetPaddedBlobSize(size uint) uint {
+
+	paddedLength := GetPaddedBlobLength(size)
+
+	return paddedLength * BYTES_PER_COEFFICIENT
+
+}
+
 func PadToPowerOf2Frames(data []byte) []byte {
 
-	// Pad data to the next power of 2
-	length := roundUpDivide[int](len(data), BYTES_PER_COEFFICIENT)
+	paddedSize := GetPaddedBlobSize(uint(len(data)))
 
-	// Pad data to the next power of 2
-	padSize := NextPowerOf2(uint64(length)) * BYTES_PER_COEFFICIENT
-
-	paddedData := make([]byte, padSize)
+	paddedData := make([]byte, paddedSize)
 	copy(paddedData, data)
 
 	return paddedData
