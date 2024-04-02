@@ -168,8 +168,6 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 		if blob.GetHeader() == nil {
 			return api.NewInvalidArgError("missing blob header in request")
 		}
-		GetBlobHeaderFromProto(blob.GetHeader())
-
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
 			return api.NewInvalidArgError("missing quorum headers in request")
 		}
