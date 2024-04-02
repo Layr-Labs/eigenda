@@ -113,7 +113,7 @@ func mustMakeTestBlob() core.Blob {
 				},
 			},
 		},
-		Data: gettysburgAddressBytes,
+		Data: encoding.PadToPowerOf2Frames(gettysburgAddressBytes),
 	}
 	return blob
 }
@@ -560,7 +560,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
-	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
+	recovered, err := v.DecodeDataAsEvals(chunks, indices, encodingParams, uint64(len(blob.Data)))
 	assert.NoError(t, err)
 	recovered = bytes.TrimRight(recovered, "\x00")
 	assert.Equal(t, gettysburgAddressBytes, recovered)

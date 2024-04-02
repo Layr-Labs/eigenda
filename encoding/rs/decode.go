@@ -18,6 +18,18 @@ import (
 // the frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
 func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
+
+	reconstructedPoly, err := g.DecodeSymbols(frames, indices, maxInputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	data := ToByteArray(reconstructedPoly, maxInputSize)
+
+	return data, nil
+}
+
+func (g *Encoder) DecodeSymbols(frames []Frame, indices []uint64, maxInputSize uint64) ([]encoding.Symbol, error) {
 	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
 
 	if uint64(len(frames)) < numSys {
@@ -42,7 +54,7 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
 			samples[p] = new(fr.Element)
-			
+
 			samples[p].Set(&evals[j])
 		}
 	}
@@ -73,7 +85,5 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		return nil, err
 	}
 
-	data := ToByteArray(reconstructedPoly, maxInputSize)
-
-	return data, nil
+	return reconstructedPoly, nil
 }

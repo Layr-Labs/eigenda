@@ -58,7 +58,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		params := encoding.ParamsFromMins(chunkLength, quorumInfo.Info.TotalChunks)
 		t.Logf("Encoding params: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
-		commits, chunks, err := p.EncodeAndProve(data, params)
+		commits, chunks, err := p.EncodeAndProveDataAsCoeffs(data, params)
 		assert.NoError(t, err)
 		blobChunks[i] = chunks
 

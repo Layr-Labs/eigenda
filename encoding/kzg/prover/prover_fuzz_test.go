@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,16 +14,22 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Add(gettysburgAddressBytes)
 	f.Fuzz(func(t *testing.T, input []byte) {
 
-		group, _ := prover.NewProver(kzgConfig, true)
+		p, _ := prover.NewProver(kzgConfig, true)
+		v, _ := verifier.NewVerifier(kzgConfig, true)
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
-		enc, err := group.GetKzgEncoder(params)
+		pp, err := p.GetKzgEncoder(params)
+		if err != nil {
+			t.Errorf("Error making rs: %q", err)
+		}
+
+		pv, err := v.GetKzgVerifier(params)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)
 		}
 
 		//encode the data
-		_, _, _, frames, _, err := enc.EncodeBytes(input)
+		_, _, _, frames, _, err := pp.EncodeBytes(input)
 
 		for _, frame := range frames {
 			assert.NotEqual(t, len(frame.Coeffs), 0)
@@ -35,7 +42,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		data, err := enc.Decode(samples, indices, uint64(len(input)))
+		data, err := pv.Decode(samples, indices, uint64(len(input)))
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}

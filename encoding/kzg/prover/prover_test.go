@@ -2,6 +2,7 @@ package prover_test
 
 import (
 	cryptorand "crypto/rand"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -57,14 +59,16 @@ func teardown() {
 	os.RemoveAll("./data")
 }
 
-func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
-	samples := make([]encoding.Frame, num)
+func sampleFrames(frames []encoding.Frame, num uint64) ([]rs.Frame, []uint64) {
+	samples := make([]rs.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 
 	frameIndices := make([]uint64, num)
 	for i, j := range indices {
-		samples[i] = frames[j]
+		samples[i] = rs.Frame{
+			Coeffs: frames[j].Coeffs,
+		}
 		frameIndices[i] = uint64(j)
 	}
 	return samples, frameIndices
@@ -75,24 +79,26 @@ func TestEncoder(t *testing.T) {
 	p, _ := prover.NewProver(kzgConfig, true)
 	v, _ := verifier.NewVerifier(kzgConfig, true)
 
-	params := encoding.ParamsFromMins(5, 5)
-	commitments, chunks, err := p.EncodeAndProve(gettysburgAddressBytes, params)
+	fmt.Println("Len:", len(gettysburgAddressBytes)/31)
+
+	params := encoding.ParamsFromMins(32, 32)
+	commitments, chunks, err := p.EncodeAndProveDataAsEvals(encoding.PadToPowerOf2Frames(gettysburgAddressBytes), params)
 	assert.NoError(t, err)
 
 	indices := []encoding.ChunkNumber{
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
-	err = v.VerifyFrames(chunks, indices, commitments, params)
+	err = v.VerifyFrames(chunks[:len(indices)], indices, commitments, params)
 	assert.NoError(t, err)
-	err = v.VerifyFrames(chunks, []encoding.ChunkNumber{
+	err = v.VerifyFrames(chunks[:len(indices)], []encoding.ChunkNumber{
 		7, 6, 5, 4, 3, 2, 1, 0,
 	}, commitments, params)
 	assert.Error(t, err)
 
-	maxInputSize := uint64(len(gettysburgAddressBytes))
-	decoded, err := p.Decode(chunks, indices, params, maxInputSize)
+	maxInputSize := uint64(len(encoding.PadToPowerOf2Frames(gettysburgAddressBytes)))
+	decoded, err := v.DecodeDataAsEvals(chunks, indices, params, maxInputSize)
 	assert.NoError(t, err)
-	assert.Equal(t, gettysburgAddressBytes, decoded)
+	assert.Equal(t, encoding.PadToPowerOf2Frames(gettysburgAddressBytes), decoded)
 
 	// shuffle chunks
 	tmp := chunks[2]
@@ -102,12 +108,12 @@ func TestEncoder(t *testing.T) {
 		0, 1, 5, 3, 4, 2, 6, 7,
 	}
 
-	err = v.VerifyFrames(chunks, indices, commitments, params)
+	err = v.VerifyFrames(chunks[:len(indices)], indices, commitments, params)
 	assert.NoError(t, err)
 
-	decoded, err = p.Decode(chunks, indices, params, maxInputSize)
+	decoded, err = v.DecodeDataAsEvals(chunks, indices, params, maxInputSize)
 	assert.NoError(t, err)
-	assert.Equal(t, gettysburgAddressBytes, decoded)
+	assert.Equal(t, encoding.PadToPowerOf2Frames(gettysburgAddressBytes), decoded)
 }
 
 // Ballpark number for 400KiB blob encoding
@@ -134,10 +140,10 @@ func BenchmarkEncode(b *testing.B) {
 	}
 
 	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, _, _ = p.EncodeAndProve(blobs[0], params)
+	_, _, _ = p.EncodeAndProveDataAsCoeffs(blobs[0], params)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _, _ = p.EncodeAndProve(blobs[i%numSamples], params)
+		_, _, _ = p.EncodeAndProveDataAsCoeffs(blobs[i%numSamples], params)
 	}
 }

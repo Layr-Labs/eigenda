@@ -24,6 +24,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 )
 
 var (
@@ -32,7 +33,7 @@ var (
 
 var logger = logging.NewNoopLogger()
 
-func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
+func makeTestProver(numPoint uint64) (encoding.Prover, encoding.Verifier, ServerConfig) {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
 		G2Path:          "../../inabox/resources/kzg/g2.point",
@@ -43,16 +44,19 @@ func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
 	}
 
 	p, _ := prover.NewProver(kzgConfig, true)
+
+	v, _ := verifier.NewVerifier(kzgConfig, true)
+
 	encoderServerConfig := ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
 	}
 
-	return p, encoderServerConfig
+	return p, v, encoderServerConfig
 }
 
-var testProver, testServerConfig = makeTestProver(3000)
+var testProver, testVerifier, testServerConfig = makeTestProver(3000)
 
 func getTestData() (core.Blob, encoding.EncodingParams) {
 	var quorumID core.QuorumID = 0
@@ -70,7 +74,7 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: encoding.PadToPowerOf2Frames(gettysburgAddressBytes),
 	}
 
 	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
@@ -99,6 +103,8 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 	}
 
 	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
+
+	fmt.Println("Chunk Length: ", testEncodingParams.ChunkLength, "Num Chunks: ", testEncodingParams.NumChunks)
 
 	return testBlob, testEncodingParams
 }
@@ -137,15 +143,16 @@ func TestEncodeBlob(t *testing.T) {
 	assert.NotNil(t, chunksData)
 
 	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	indices := make([]encoding.ChunkNumber, 32)
+	for i := 0; i < 32; i++ {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
-	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
-	decoded, err := testProver.Decode(chunksData, indices, testEncodingParams, maxInputSize)
+	maxInputSize := uint64(len(testBlobData.Data))
+	decoded, err := testVerifier.DecodeDataAsEvals(chunksData, indices, testEncodingParams, maxInputSize)
 	assert.Nil(t, err)
 	recovered := bytes.TrimRight(decoded, "\x00")
-	assert.Equal(t, recovered, gettysburgAddressBytes)
+	assert.Equal(t, gettysburgAddressBytes, recovered)
 }
 
 func TestThrottling(t *testing.T) {
@@ -188,7 +195,7 @@ func TestThrottling(t *testing.T) {
 		Length:           10,
 	}
 
-	encoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
+	encoder.On("EncodeAndProveDataAsEvals", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
 	encoderServerConfig := ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: concurrentRequests,
@@ -245,7 +252,7 @@ func TestThrottling(t *testing.T) {
 
 func TestEncoderPointsLoading(t *testing.T) {
 	// encoder 1 only loads 1500 points
-	prover1, config1 := makeTestProver(1500)
+	prover1, _, config1 := makeTestProver(1500)
 	metrics := NewMetrics("9000", logger)
 	server1 := NewServer(config1, logger, prover1, metrics)
 
@@ -281,14 +288,14 @@ func TestEncoderPointsLoading(t *testing.T) {
 	}
 
 	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
-	decoded, err := testProver.Decode(chunksData, indices, testEncodingParams, maxInputSize)
+	decoded, err := testVerifier.DecodeDataAsEvals(chunksData, indices, testEncodingParams, maxInputSize)
 	assert.Nil(t, err)
 	recovered := bytes.TrimRight(decoded, "\x00")
-	assert.Equal(t, recovered, gettysburgAddressBytes)
+	assert.Equal(t, gettysburgAddressBytes, recovered)
 
 	// encoder 2 only loads 2900 points
-	encoder2, config2 := makeTestProver(2900)
-	server2 := NewServer(config2, logger, encoder2, metrics)
+	prover2, _, config2 := makeTestProver(2900)
+	server2 := NewServer(config2, logger, prover2, metrics)
 
 	reply2, err := server2.EncodeBlob(context.Background(), encodeBlobRequestProto)
 	assert.NoError(t, err)
