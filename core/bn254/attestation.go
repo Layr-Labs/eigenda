@@ -1,7 +1,6 @@
 package bn254
 
 import (
-	"errors"
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -92,62 +91,6 @@ func MulByGeneratorG1(a *fr.Element) *bn254.G1Affine {
 func MulByGeneratorG2(a *fr.Element) *bn254.G2Affine {
 	g2Gen := GetG2Generator()
 	return new(bn254.G2Affine).ScalarMultiplication(g2Gen, a.BigInt(new(big.Int)))
-}
-
-func SerializeG1(p *bn254.G1Affine) []byte {
-	b := make([]byte, 0)
-	tmp := p.X.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.Y.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	return b
-}
-
-func DeserializeG1(b []byte) (*bn254.G1Affine, error) {
-	if len(b) != 64 {
-		return nil, errors.New("could not deserialize G1 point: length must be exactly 64")
-	}
-	p := new(bn254.G1Affine)
-	p.X.SetBytes(b[0:32])
-	p.Y.SetBytes(b[32:64])
-	return p, nil
-}
-
-func SerializeG2(p *bn254.G2Affine) []byte {
-	b := make([]byte, 0)
-	tmp := p.X.A0.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.X.A1.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.Y.A0.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.Y.A1.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	return b
-}
-
-func DeserializeG2(b []byte) (*bn254.G2Affine, error) {
-	if len(b) != 128 {
-		return nil, errors.New("could not deserialize G2 point: length must be exactly 128")
-	}
-	p := new(bn254.G2Affine)
-	p.X.A0.SetBytes(b[0:32])
-	p.X.A1.SetBytes(b[32:64])
-	p.Y.A0.SetBytes(b[64:96])
-	p.Y.A1.SetBytes(b[96:128])
-	return p, nil
 }
 
 func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Address) *bn254.G1Affine {

@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
@@ -37,6 +38,7 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
 	for i, blob := range in.GetBlobs() {
 		blobHeader, err := GetBlobHeaderFromProto(blob.GetHeader())
+
 		if err != nil {
 			return nil, err
 		}
@@ -65,6 +67,43 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 	return blobs, nil
 }
 
+func ValidatePointsFromBlobHeader(h *pb.BlobHeader) error {
+	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
+	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
+	commitment := &encoding.G1Commitment{
+		X: *commitX,
+		Y: *commitY,
+	}
+
+	if !(*bn254.G1Affine)(commitment).IsInSubGroup() {
+		return errors.New("commitment is not in the subgroup")
+	}
+
+	var lengthCommitment, lengthProof encoding.G2Commitment
+	if h.GetLengthCommitment() != nil {
+		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
+		lengthCommitment.X.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA1())
+		lengthCommitment.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA0())
+		lengthCommitment.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA1())
+	}
+
+	if !(*bn254.G2Affine)(&lengthCommitment).IsInSubGroup() {
+		return errors.New("lengthCommitment is not in the subgroup")
+	}
+
+	if h.GetLengthProof() != nil {
+		lengthProof.X.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA0())
+		lengthProof.X.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA1())
+		lengthProof.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA0())
+		lengthProof.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA1())
+	}
+
+	if !(*bn254.G2Affine)(&lengthProof).IsInSubGroup() {
+		return errors.New("lengthProof is not in the subgroup")
+	}
+	return nil
+}
+
 // GetBlobHeaderFromProto constructs a core.BlobHeader from a proto of pb.BlobHeader.
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
@@ -73,6 +112,11 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		X: *commitX,
 		Y: *commitY,
 	}
+
+	if !(*bn254.G1Affine)(commitment).IsInSubGroup() {
+		return nil, errors.New("commitment is not in the subgroup")
+	}
+
 	var lengthCommitment, lengthProof encoding.G2Commitment
 	if h.GetLengthCommitment() != nil {
 		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
@@ -80,11 +124,20 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		lengthCommitment.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA0())
 		lengthCommitment.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA1())
 	}
+
+	if !(*bn254.G2Affine)(&lengthCommitment).IsInSubGroup() {
+		return nil, errors.New("lengthCommitment is not in the subgroup")
+	}
+
 	if h.GetLengthProof() != nil {
 		lengthProof.X.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA0())
 		lengthProof.X.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA1())
 		lengthProof.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA0())
 		lengthProof.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA1())
+	}
+
+	if !(*bn254.G2Affine)(&lengthProof).IsInSubGroup() {
+		return nil, errors.New("lengthProof is not in the subgroup")
 	}
 
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))
