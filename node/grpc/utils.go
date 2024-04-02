@@ -89,7 +89,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	}
 
 	if !(*bn254.G2Affine)(&lengthCommitment).IsInSubGroup() {
-		return nil, errors.New("lengthCommitment is in the subgroup")
+		return nil, errors.New("lengthCommitment is not in the subgroup")
 	}
 
 	if h.GetLengthProof() != nil {

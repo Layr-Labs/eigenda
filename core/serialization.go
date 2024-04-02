@@ -365,7 +365,7 @@ func (h *BlobHeader) Deserialize(data []byte) (*BlobHeader, error) {
 	err := decode(data, h)
 
 	if !(*bn254.G1Affine)(h.BlobCommitments.Commitment).IsInSubGroup() {
-		return nil, fmt.Errorf("in BlobHeader Commitment is in the subgroup")
+		return nil, fmt.Errorf("in BlobHeader Commitment is not in the subgroup")
 	}
 
 	if !(*bn254.G2Affine)(h.BlobCommitments.LengthCommitment).IsInSubGroup() {

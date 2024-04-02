@@ -48,15 +48,17 @@ func (p *G1Point) VerifyEquivalence(p2 *G2Point) (bool, error) {
 }
 
 func (p *G1Point) Serialize() []byte {
-	return bn254utils.SerializeG1(p.G1Affine)
+	res := p.RawBytes()
+	return res[:]
 }
 
 func (p *G1Point) Deserialize(data []byte) (*G1Point, error) {
-	point, err := bn254utils.DeserializeG1(data)
+	var point bn254.G1Affine
+	_, err := point.SetBytes(data)
 	if err != nil {
 		return nil, err
 	}
-	return &G1Point{point}, nil
+	return &G1Point{&point}, nil
 }
 
 func (p *G1Point) Clone() *G1Point {
