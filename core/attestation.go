@@ -87,15 +87,17 @@ func (p *G2Point) Sub(p2 *G2Point) {
 }
 
 func (p *G2Point) Serialize() []byte {
-	return bn254utils.SerializeG2(p.G2Affine)
+	res := p.RawBytes()
+	return res[:]
 }
 
 func (p *G2Point) Deserialize(data []byte) (*G2Point, error) {
-	point, err := bn254utils.DeserializeG2(data)
+	var point bn254.G2Affine
+	_, err := point.SetBytes(data)
 	if err != nil {
 		return nil, err
 	}
-	return &G2Point{point}, nil
+	return &G2Point{&point}, nil
 }
 
 func (p *G2Point) Clone() *G2Point {

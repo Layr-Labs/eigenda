@@ -93,34 +93,6 @@ func MulByGeneratorG2(a *fr.Element) *bn254.G2Affine {
 	return new(bn254.G2Affine).ScalarMultiplication(g2Gen, a.BigInt(new(big.Int)))
 }
 
-func SerializeG1(p *bn254.G1Affine) []byte {
-	res := p.RawBytes()
-	return res[:]
-}
-
-func DeserializeG1(b []byte) (*bn254.G1Affine, error) {
-	var p bn254.G1Affine
-	_, err := p.SetBytes(b)
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-func SerializeG2(p *bn254.G2Affine) []byte {
-	res := p.RawBytes()
-	return res[:]
-}
-
-func DeserializeG2(b []byte) (*bn254.G2Affine, error) {
-	var p bn254.G2Affine
-	_, err := p.SetBytes(b)
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
 func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Address) *bn254.G1Affine {
 	toHash := make([]byte, 0)
 	toHash = append(toHash, crypto.Keccak256([]byte("BN254PubkeyRegistration(address operator)"))...)
