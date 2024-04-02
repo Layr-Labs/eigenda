@@ -129,7 +129,6 @@ func (s *Server) serveRetrieval() error {
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
-
 	// Get batch header hash
 	batchHeader, err := GetBatchHeader(in)
 	if err != nil {
@@ -194,11 +193,6 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 	}))
 	defer timer.ObserveDuration()
 
-	if in == nil {
-		s.node.Metrics.RecordRPCRequest("StoreChunks", "failure")
-		return nil, api.NewInvalidArgError("StoreChunks: request is nil")
-	}
-
 	// Validate the request.
 	if err := s.validateStoreChunkRequest(in); err != nil {
 		return nil, err
@@ -223,11 +217,6 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		s.node.Metrics.ObserveLatency("RetrieveChunks", "total", sec*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
-
-	if in == nil {
-		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure")
-		return nil, api.NewInvalidArgError("RetrieveChunks: request is nil")
-	}
 
 	if in.GetQuorumId() > core.MaxQuorumID {
 		return nil, fmt.Errorf("invalid request: quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, in.GetQuorumId())
@@ -281,12 +270,6 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 }
 
 func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest) (*pb.GetBlobHeaderReply, error) {
-
-	if in == nil {
-		s.node.Metrics.RecordRPCRequest("GetBlobHeader", "failure")
-		return nil, api.NewInvalidArgError("GetBlobHeader: request is nil")
-	}
-
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], in.GetBatchHeaderHash())
 
