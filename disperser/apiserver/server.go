@@ -514,8 +514,13 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 			return api.NewInternalError("failed to cast limiterInfo")
 		}
-		s.metrics.HandleSystemRateLimitedRpcRequest(apiMethodName)
-		s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
+		if info.RateType == SystemThroughputType || info.RateType == SystemBlobRateType {
+			s.metrics.HandleSystemRateLimitedRpcRequest(apiMethodName)
+			s.metrics.HandleSystemRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
+		} else if info.RateType == AccountThroughputType || info.RateType == AccountBlobRateType {
+			s.metrics.HandleAccountRateLimitedRpcRequest(apiMethodName)
+			s.metrics.HandleAccountRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
+		}
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
 		return api.NewResourceExhaustedError(errorString)
 	}
