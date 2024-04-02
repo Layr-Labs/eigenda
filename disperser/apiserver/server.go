@@ -209,7 +209,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	if req == nil {
 		s.metrics.HandleInvalidArgRequest("DisperseBlob Request")
-		return nil, api.NewInvalidArgError("request must not be nil")
+		return nil, api.NewInvalidArgError("DisperseBlob: Request must not be nil")
 	}
 
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
@@ -511,13 +511,13 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 
 	if req == nil {
 		s.metrics.HandleInvalidArgRequest("GetBlobStatus")
-		return nil, api.NewInvalidArgError("request must not be nil")
+		return nil, api.NewInvalidArgError("GetBlobStatus: Request must not be nil")
 	}
 
 	requestID := req.GetRequestId()
 	if len(requestID) == 0 {
 		s.metrics.HandleInvalidArgRequest("GetBlobStatus")
-		return nil, api.NewInvalidArgError("request_id must not be empty")
+		return nil, api.NewInvalidArgError("GetBlobStatus: request_id must not be empty")
 	}
 
 	s.logger.Info("received a new blob status request", "requestID", string(requestID))
@@ -622,7 +622,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 
 	if req == nil {
 		s.metrics.HandleInvalidArgRequest("RetrieveBlob")
-		return nil, api.NewInvalidArgError("request must not be nil")
+		return nil, api.NewInvalidArgError("RetrieveBlob: Request must not be nil")
 	}
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)

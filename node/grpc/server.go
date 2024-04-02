@@ -196,7 +196,7 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 
 	if in == nil {
 		s.node.Metrics.RecordRPCRequest("StoreChunks", "failure")
-		return nil, api.NewInvalidArgError("missing storechunks request")
+		return nil, api.NewInvalidArgError("StoreChunks: request is nil")
 	}
 
 	// Validate the request.
@@ -226,7 +226,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 
 	if in == nil {
 		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure")
-		return nil, api.NewInvalidArgError("missing retrieverchunks request")
+		return nil, api.NewInvalidArgError("RetrieveChunks: request is nil")
 	}
 
 	if in.GetQuorumId() > core.MaxQuorumID {
@@ -284,7 +284,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 
 	if in == nil {
 		s.node.Metrics.RecordRPCRequest("GetBlobHeader", "failure")
-		return nil, api.NewInvalidArgError("missing request")
+		return nil, api.NewInvalidArgError("GetBlobHeader: request is nil")
 	}
 
 	var batchHeaderHash [32]byte
