@@ -256,13 +256,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		}
 	}
 
-	// validate every 32 bytes is a valid field element
-	_, err = rs.ToFrArray(blob.Data)
-	if err != nil {
-		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
-		return nil, api.NewInvalidArgError("failed to convert bytes into a valid field element, please use a correct format which every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
-	}
-
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
 	if err != nil {
@@ -830,6 +823,14 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 
 	if len(req.GetCustomQuorumNumbers()) > 256 {
 		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
+	}
+
+	// validate every 32 bytes is a valid field element
+	_, err := rs.ToFrArray(data)
+	if err != nil {
+		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
+		s.metrics.HandleInvalidArgRequest("DisperseBlob")
+		return nil, api.NewInvalidArgError("failed to convert bytes into a valid field element, please use a correct format which every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
 	}
 
 	quorumConfig, err := s.updateQuorumConfig(ctx)
