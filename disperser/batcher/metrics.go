@@ -200,7 +200,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		BatchProcLatencyHistogram: promauto.With(reg).NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace: namespace,
-				Name:      "batch_process_latency_ms",
+				Name:      "batch_process_latency_histogram_ms",
 				Help:      "batch process latency histogram in milliseconds",
 				// In minutes: 1, 2, 3, 5, 8, 10, 13, 15, 21, 34, 55, 89
 				Buckets: []float64{60_000, 120_000, 180_000, 300_000, 480_000, 600_000, 780_000, 900_000, 1_260_000, 2_040_000, 3_300_000, 5_340_000},
