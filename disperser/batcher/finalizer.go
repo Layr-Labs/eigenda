@@ -179,7 +179,7 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 		confirmationBlockNumber, err := f.getTransactionBlockNumber(ctx, confirmationMetadata.ConfirmationInfo.ConfirmationTxnHash)
 		if errors.Is(err, ethereum.NotFound) {
 			// The confirmed block is finalized, but the transaction is not found. It means the transaction should be considered forked/invalid and the blob should be considered as failed.
-			err := f.blobStore.HandleBlobFailure(ctx, m, f.maxNumRetriesPerBlob)
+			_, err := f.blobStore.HandleBlobFailure(ctx, m, f.maxNumRetriesPerBlob)
 			if err != nil {
 				f.logger.Error("error marking blob as failed", "blobKey", blobKey.String(), "err", err)
 			}

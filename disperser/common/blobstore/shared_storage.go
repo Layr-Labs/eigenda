@@ -233,11 +233,11 @@ func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey dispe
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
 }
 
-func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) error {
+func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {
 	if metadata.NumRetries < maxRetry {
-		return s.IncrementBlobRetryCount(ctx, metadata)
+		return true, s.IncrementBlobRetryCount(ctx, metadata)
 	} else {
-		return s.MarkBlobFailed(ctx, metadata.GetBlobKey())
+		return false, s.MarkBlobFailed(ctx, metadata.GetBlobKey())
 	}
 }
 
