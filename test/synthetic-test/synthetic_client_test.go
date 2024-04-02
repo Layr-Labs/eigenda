@@ -621,7 +621,7 @@ func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingPa
 	coordinator := &core.StdAssignmentCoordinator{}
 
 	blobSize := uint(len(testBlob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobLength := encoding.GetBlobLengthToPowOf2(uint(blobSize))
 
 	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, param)
 	if err != nil {

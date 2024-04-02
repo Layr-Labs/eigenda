@@ -231,14 +231,14 @@ func TestStreamingEncoding(t *testing.T) {
 			AdversaryThreshold:    80,
 			ConfirmationThreshold: 100,
 		},
-		ChunkLength: 16,
+		ChunkLength: 8,
 	}, encodedResult.BlobQuorumInfo)
 	assert.NotNil(t, encodedResult.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.Commitment)
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
 	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
-	assert.Len(t, encodedResult.Chunks, 32)
+	assert.Len(t, encodedResult.Chunks, 64)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
@@ -441,7 +441,7 @@ func TestPartialBlob(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(64)) //after padding
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
@@ -669,7 +669,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(64)) // becomes power of 2
 	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
 	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
 		{
@@ -678,7 +678,7 @@ func TestGetBatch(t *testing.T) {
 				AdversaryThreshold:    80,
 				ConfirmationThreshold: 100,
 			},
-			ChunkLength: 16,
+			ChunkLength: 8,
 		},
 		{
 			SecurityParam: core.SecurityParam{
@@ -702,7 +702,7 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
 	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
+	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(64))
 	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
 	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{

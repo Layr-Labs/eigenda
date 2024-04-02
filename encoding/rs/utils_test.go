@@ -42,7 +42,24 @@ func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 
-	dataFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	dataFr := rs.ToPaddedFrArray(GETTYSBURG_ADDRESS_BYTES)
+	require.NotNil(t, dataFr)
+
+	assert.Equal(t, rs.ToByteArray(dataFr, uint64(len(GETTYSBURG_ADDRESS_BYTES))), GETTYSBURG_ADDRESS_BYTES)
+}
+
+func TestToPaddedFrArrayAndToByteArray_AreInverses(t *testing.T) {
+	teardownSuite := setupSuite(t)
+	defer teardownSuite(t)
+
+	numEle := rs.GetNumElement(1000, BYTES_PER_COEFFICIENT)
+	assert.Equal(t, numEle, uint64(33))
+
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	enc, _ := rs.NewEncoder(params, true)
+	require.NotNil(t, enc)
+
+	dataFr := rs.ToPaddedFrArray(GETTYSBURG_ADDRESS_BYTES)
 	require.NotNil(t, dataFr)
 
 	assert.Equal(t, rs.ToByteArray(dataFr, uint64(len(GETTYSBURG_ADDRESS_BYTES))), GETTYSBURG_ADDRESS_BYTES)

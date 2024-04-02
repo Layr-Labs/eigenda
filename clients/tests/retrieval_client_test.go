@@ -20,6 +20,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
 )
@@ -128,7 +129,7 @@ func setup(t *testing.T) {
 	}
 
 	blobSize := uint(len(blob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobLength := encoding.GetBlobLengthToPowOf2(uint(blobSize))
 
 	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
@@ -264,9 +265,10 @@ func TestValidBlobHeader(t *testing.T) {
 	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
 
 	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
-	assert.NoError(t, err)
+	require.Nil(t, err)
+
 	recovered := bytes.TrimRight(data, "\x00")
-	assert.Len(t, data, 1488)
+	assert.Len(t, data, 1984) // 31*64
 	assert.Equal(t, gettysburgAddressBytes, recovered)
 
 }

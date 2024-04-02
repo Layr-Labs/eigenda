@@ -23,9 +23,9 @@ func TestLengthProof(t *testing.T) {
 	for z := 0; z < numBlob; z++ {
 		extra := make([]byte, z*31*2)
 		inputBytes := append(gettysburgAddressBytes, extra...)
-		inputFr := rs.ToFrArray(inputBytes)
+		inputFr := rs.ToPaddedFrArray(inputBytes)
 
-		_, legnthCommitment, legnthProof, _, _, err := enc.Encode(inputFr)
+		_, legnthCommitment, legnthProof, _, _, _, err := enc.Encode(inputFr)
 		require.Nil(t, err)
 
 		length := len(inputFr)

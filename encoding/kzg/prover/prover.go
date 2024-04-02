@@ -143,7 +143,7 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 		return encoding.BlobCommitments{}, nil, err
 	}
 
-	commit, lengthCommit, lengthProof, kzgFrames, _, err := enc.EncodeBytes(data)
+	commit, lengthCommit, lengthProof, kzgFrames, _, paddedLength, err := enc.EncodeBytes(data)
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err
 	}
@@ -157,12 +157,11 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 		}
 	}
 
-	length := uint(len(rs.ToFrArray(data)))
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           length,
+		Length:           uint(paddedLength),
 	}
 
 	return commitments, chunks, nil
@@ -299,7 +298,7 @@ func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber
 		return nil, err
 	}
 
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+	return encoder.DecodeBytes(frames, toUint64Array(indices), maxInputSize)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

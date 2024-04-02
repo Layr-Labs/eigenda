@@ -2,6 +2,7 @@ package rs
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 
@@ -17,11 +18,23 @@ import (
 // maxInputSize is the upper bound of the original data size. This is needed because
 // the frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
-func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
-	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
+func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]fr.Element, error) {
+	if len(frames) == 0 {
+		return nil, errors.New("number of frame must be greater than 1")
+	}
 
-	if uint64(len(frames)) < numSys {
-		return nil, errors.New("number of frame must be sufficient")
+	paddedInputLength := encoding.GetPaddedInputLength(maxInputSize)
+
+	numSys := paddedInputLength / g.ChunkLength
+
+	if uint64(len(frames))*g.ChunkLength < paddedInputLength {
+		if uint64(len(frames))*g.ChunkLength*encoding.BYTES_PER_COEFFICIENT < maxInputSize {
+			return nil, errors.New("number of frame must be sufficient")
+		}
+	}
+
+	if len(frames) != len(indices) {
+		return nil, fmt.Errorf("inconsistent number of frames and indices %d %d", len(frames), len(indices))
 	}
 
 	samples := make([]*fr.Element, g.NumEvaluations())
@@ -42,7 +55,7 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
 			samples[p] = new(fr.Element)
-			
+
 			samples[p].Set(&evals[j])
 		}
 	}
@@ -73,7 +86,43 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		return nil, err
 	}
 
-	data := ToByteArray(reconstructedPoly, maxInputSize)
+	numPaddedEval := NextPowerOf2(uint64(numSys) * g.ChunkLength)
 
+	return reconstructedPoly[:numPaddedEval], nil
+
+}
+
+// just a wraper to Decode, that returns bytes as opposed to array of Fr element
+func (g *Encoder) DecodeBytes(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
+	reconstructedPoly, err := g.Decode(frames, indices, maxInputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	data := ToByteArray(reconstructedPoly, maxInputSize)
+	return data, nil
+}
+
+func (g *Encoder) DecodeAsEval(frames []Frame, indices []uint64, maxInputSize uint64) ([]fr.Element, error) {
+	coeffsFr, err := g.Decode(frames, indices, maxInputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	evalsFr, err := g.Fs.ConvertCoeffsToEvals(coeffsFr)
+	if err != nil {
+		return nil, err
+	}
+	return evalsFr, nil
+}
+
+// just a wraper to Decode, that returns bytes as opposed to array of Fr element
+func (g *Encoder) DecodeBytesAsEval(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
+	evalsFr, err := g.DecodeAsEval(frames, indices, maxInputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	data := ToByteArray(evalsFr, maxInputSize)
 	return data, nil
 }

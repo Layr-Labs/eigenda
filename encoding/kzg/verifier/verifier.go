@@ -297,7 +297,12 @@ func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 		return nil, err
 	}
 
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+	evals, err := encoder.DecodeBytesAsEval(frames, toUint64Array(indices), maxInputSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return evals, nil
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

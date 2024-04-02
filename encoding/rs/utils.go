@@ -31,6 +31,32 @@ func ToFrArray(data []byte) []fr.Element {
 	return eles
 }
 
+func ToPaddedFrArray(data []byte) []fr.Element {
+	//numEle := int(math.Ceil(float64(len(data)) / float64(BYTES_PER_COEFFICIENT)))
+	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
+	numElePadded := NextPowerOf2(numEle)
+	eles := make([]fr.Element, numElePadded)
+
+	for i := uint64(0); i < numElePadded; i++ {
+		if i < numEle {
+			start := i * uint64(encoding.BYTES_PER_COEFFICIENT)
+			end := (i + 1) * uint64(encoding.BYTES_PER_COEFFICIENT)
+			if end >= uint64(len(data)) {
+				var padded [32]byte
+				copy(padded[1:], data[start:])
+				eles[i].SetBytes(padded[:])
+
+			} else {
+				eles[i].SetBytes(data[start:end])
+			}
+		} else {
+			eles[i].SetZero()
+		}
+	}
+
+	return eles
+}
+
 // ToByteArray converts a list of Fr to a byte array
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)

@@ -81,7 +81,7 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 	coordinator := &core.StdAssignmentCoordinator{}
 
 	blobSize := uint(len(testBlob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobLength := encoding.GetBlobLengthToPowOf2(uint(blobSize))
 
 	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
 	if err != nil {
@@ -137,8 +137,9 @@ func TestEncodeBlob(t *testing.T) {
 	assert.NotNil(t, chunksData)
 
 	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	indices := make([]encoding.ChunkNumber, 64)
+	for i := 0; i < 64; i++ {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
 	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
@@ -276,8 +277,9 @@ func TestEncoderPointsLoading(t *testing.T) {
 	assert.NotNil(t, chunksData)
 
 	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	indices := make([]encoding.ChunkNumber, 64)
+	for i := 0; i < 64; i++ {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
 	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
