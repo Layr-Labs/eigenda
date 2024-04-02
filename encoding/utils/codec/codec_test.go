@@ -45,7 +45,7 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 			_, err = rs.ToFrArray(paddedData)
 			require.Nil(t, err)
 			restored := codec.RemoveEmptyByteFromPaddedBytes(paddedData)
-			require.Equal(t, data, restored[:len(data)])
+			require.Equal(t, data, restored)
 		}
 	}
 }
