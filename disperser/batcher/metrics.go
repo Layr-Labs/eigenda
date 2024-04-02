@@ -61,11 +61,12 @@ type Metrics struct {
 
 	registry *prometheus.Registry
 
-	Blob             *prometheus.CounterVec
-	Batch            *prometheus.CounterVec
-	BatchProcLatency *prometheus.SummaryVec
-	Attestation      *prometheus.GaugeVec
-	BatchError       *prometheus.CounterVec
+	Blob                      *prometheus.CounterVec
+	Batch                     *prometheus.CounterVec
+	BatchProcLatency          *prometheus.SummaryVec
+	BatchProcLatencyHistogram *prometheus.HistogramVec
+	Attestation               *prometheus.GaugeVec
+	BatchError                *prometheus.CounterVec
 
 	httpPort string
 	logger   logging.Logger
@@ -196,6 +197,16 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"stage"},
 		),
+		BatchProcLatencyHistogram: promauto.With(reg).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Name:      "batch_process_latency_ms",
+				Help:      "batch process latency histogram in milliseconds",
+				// In minutes: 1, 2, 3, 5, 8, 10, 13, 15, 21, 34, 55, 89
+				Buckets: []float64{60_000, 120_000, 180_000, 300_000, 480_000, 600_000, 780_000, 900_000, 1_260_000, 2_040_000, 3_300_000, 5_340_000},
+			},
+			[]string{"stage"},
+		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -279,6 +290,7 @@ func (g *Metrics) UpdateBatchError(errType FailReason, numBlobs int) {
 
 func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 	g.BatchProcLatency.WithLabelValues(stage).Observe(latencyMs)
+	g.BatchProcLatencyHistogram.WithLabelValues(stage).Observe(latencyMs)
 }
 
 func (g *Metrics) Start(ctx context.Context) {
