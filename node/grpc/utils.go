@@ -67,6 +67,12 @@ func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
 
 // GetBlobHeaderFromProto constructs a core.BlobHeader from a proto of pb.BlobHeader.
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
+
+	if h == nil {
+		return nil, api.NewInvalidArgError("GetBlobHeaderFromProto: blob header is nil")
+
+	}
+
 	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
 	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
 	commitment := &encoding.G1Commitment{

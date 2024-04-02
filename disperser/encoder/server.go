@@ -76,6 +76,20 @@ func (s *Server) popRequest() {
 func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	begin := time.Now()
 
+	if req == nil {
+		return nil, errors.New("handleEncoding: missing encode request")
+
+	}
+
+	if len(req.Data) == 0 {
+		return nil, errors.New("handleEncoding: missing data")
+
+	}
+
+	if req.EncodingParams == nil {
+		return nil, errors.New("handleEncoding: missing encoding parameters")
+	}
+
 	// Convert to core EncodingParams
 	var encodingParams = encoding.EncodingParams{
 		ChunkLength: uint64(req.EncodingParams.ChunkLength),
