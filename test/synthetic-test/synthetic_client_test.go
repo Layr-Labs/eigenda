@@ -262,6 +262,9 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	data := make([]byte, dataSize[rand.Intn(len(dataSize))])
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	disperseBlobStartTime := time.Now()
 	ctx := context.Background()
 
