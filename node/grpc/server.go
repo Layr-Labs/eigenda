@@ -168,6 +168,9 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 		if blob.GetHeader() == nil {
 			return api.NewInvalidArgError("missing blob header in request")
 		}
+		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
+			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
 			return api.NewInvalidArgError("missing quorum headers in request")
 		}
