@@ -39,9 +39,10 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 	for i := 0; i < numFuzz; i++ {
 		for j := 0; j < len(dataSizeList); j++ {
 			data := make([]byte, dataSizeList[j])
-			rand.Read(data)
+			_, err := rand.Read(data)
+			require.Nil(t, err)
 			paddedData := codec.ConvertByPaddingEmptyByte(data)
-			_, err := rs.ToFrArray(paddedData)
+			_, err = rs.ToFrArray(paddedData)
 			require.Nil(t, err)
 			restored := codec.RemoveEmptyByteFromPaddedBytes(paddedData)
 			require.Equal(t, data, restored[:len(data)])
