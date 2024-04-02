@@ -163,7 +163,8 @@ var _ = Describe("Inabox Integration", func() {
 			1, // retrieve from quorum 1
 		)
 		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+		restored = codec.RemoveEmptyByteFromPaddedBytes(retrieved)
+		Expect(bytes.TrimRight(restored, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 	})
 })
 
