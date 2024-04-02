@@ -60,7 +60,7 @@ func NewFinalizer(
 		maxNumRetriesPerBlob: maxNumRetriesPerBlob,
 		numBlobsPerFetch:     numBlobsPerFetch,
 		numWorkers:           numWorkers,
-		logger:               logger,
+		logger:               logger.With("component", "Finalizer"),
 		metrics:              metrics,
 	}
 }
@@ -103,7 +103,7 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 
 	for len(metadatas) > 0 {
 		metas := metadatas
-		f.logger.Info("FinalizeBlobs: finalizing blobs", "numBlobs", len(metas), "finalizedBlockNumber", lastFinalBlock)
+		f.logger.Info("finalizing blobs", "numBlobs", len(metas), "finalizedBlockNumber", lastFinalBlock)
 		pool.Submit(func() {
 			f.updateBlobs(ctx, metas, lastFinalBlock)
 		})
@@ -114,7 +114,7 @@ func (f *finalizer) FinalizeBlobs(ctx context.Context) error {
 		}
 		metadatas, exclusiveStartKey, err = f.blobStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Confirmed, f.numBlobsPerFetch, exclusiveStartKey)
 		if err != nil {
-			f.logger.Error("FinalizeBlobs: error getting blob headers on subsequent call", "err", err)
+			f.logger.Error("error getting blob headers on subsequent call", "err", err)
 			break
 		}
 	}
@@ -132,14 +132,14 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 	defer func() {
 		if r := recover(); r != nil {
 			// Log panic
-			f.logger.Error("FinalizeBlobs: encountered panic", "recovered", r)
+			f.logger.Error("encountered panic", "recovered", r)
 		}
 	}()
 
 	for _, m := range metadatas {
 		// Check if metadata is nil before proceeding
 		if m == nil {
-			f.logger.Error("FinalizeBlobs: encountered nil metadata in loop")
+			f.logger.Error("encountered nil metadata in loop")
 			continue
 		}
 
@@ -147,26 +147,26 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 		blobKey := m.GetBlobKey()
 
 		if m.BlobStatus != disperser.Confirmed {
-			f.logger.Error("FinalizeBlobs: the blob retrieved by status Confirmed is actually", m.BlobStatus.String(), "blobKey", blobKey.String())
+			f.logger.Error("the blob retrieved by status Confirmed is actually", m.BlobStatus.String(), "blobKey", blobKey.String())
 			continue
 		}
 
 		confirmationMetadata, err := f.blobStore.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
-			f.logger.Error("FinalizeBlobs: error getting confirmed metadata", "blobKey", blobKey.String(), "err", err)
+			f.logger.Error("error getting confirmed metadata", "blobKey", blobKey.String(), "err", err)
 			continue
 		}
 
 		// Noticed minor issue where ProcessConfirmedBatch goroutine probably set this to failed status after updateBlobs was called to finalize the blobs.
 		// For Failed blobs, it is expected that ConfirmationInfo will be null.
 		if confirmationMetadata != nil && confirmationMetadata.BlobStatus != disperser.Confirmed {
-			f.logger.Error("FinalizeBlobs: the blob retrieved is actually", confirmationMetadata.BlobStatus.String(), "blobKey", blobKey.String())
+			f.logger.Error("the blob retrieved is actually", confirmationMetadata.BlobStatus.String(), "blobKey", blobKey.String())
 			continue
 		}
 
 		// Additional checks for confirmationMetadata and its nested fields
 		if confirmationMetadata == nil || confirmationMetadata.ConfirmationInfo == nil {
-			f.logger.Error("FinalizeBlobs: received nil confirmationMetadata or ConfirmationInfo", "blobKey", blobKey.String())
+			f.logger.Error("received nil confirmationMetadata or ConfirmationInfo", "blobKey", blobKey.String())
 			continue
 		}
 
@@ -181,13 +181,13 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 			// The confirmed block is finalized, but the transaction is not found. It means the transaction should be considered forked/invalid and the blob should be considered as failed.
 			err := f.blobStore.HandleBlobFailure(ctx, m, f.maxNumRetriesPerBlob)
 			if err != nil {
-				f.logger.Error("FinalizeBlobs: error marking blob as failed", "blobKey", blobKey.String(), "err", err)
+				f.logger.Error("error marking blob as failed", "blobKey", blobKey.String(), "err", err)
 			}
 			f.metrics.IncrementNumBlobs("failed")
 			continue
 		}
 		if err != nil {
-			f.logger.Error("FinalizeBlobs: error getting transaction block number", "err", err)
+			f.logger.Error("error getting transaction block number", "err", err)
 			f.metrics.IncrementNumBlobs("failed")
 			continue
 		}
@@ -200,7 +200,7 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 		confirmationMetadata.ConfirmationInfo.ConfirmationBlockNumber = uint32(confirmationBlockNumber)
 		err = f.blobStore.MarkBlobFinalized(ctx, blobKey)
 		if err != nil {
-			f.logger.Error("FinalizeBlobs: error marking blob as finalized", "blobKey", blobKey.String(), "err", err)
+			f.logger.Error("error marking blob as finalized", "blobKey", blobKey.String(), "err", err)
 			f.metrics.IncrementNumBlobs("failed")
 			continue
 		}
@@ -235,7 +235,7 @@ func (f *finalizer) getTransactionBlockNumber(ctx context.Context, hash gcommon.
 		}
 
 		retrySec := math.Pow(2, float64(i))
-		f.logger.Error("Finalizer: error getting transaction", "err", err, "retrySec", retrySec, "hash", hash.Hex())
+		f.logger.Error("error getting transaction", "err", err, "retrySec", retrySec, "hash", hash.Hex())
 		time.Sleep(time.Duration(retrySec) * baseDelay)
 	}
 
@@ -265,7 +265,7 @@ func (f *finalizer) getLatestFinalizedBlock(ctx context.Context) (*types.Header,
 			break
 		}
 		retrySec := math.Pow(2, float64(i))
-		f.logger.Error("Finalizer: error getting latest finalized block", "err", err, "retrySec", retrySec)
+		f.logger.Error("error getting latest finalized block", "err", err, "retrySec", retrySec)
 		time.Sleep(time.Duration(retrySec) * baseDelay)
 	}
 

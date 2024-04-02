@@ -34,7 +34,7 @@ type Server struct {
 func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
 	return &Server{
 		config:  config,
-		logger:  logger,
+		logger:  logger.With("component", "EncoderServer"),
 		prover:  prover,
 		metrics: metrics,
 
@@ -92,11 +92,11 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	// Convert to core EncodingParams
 	var encodingParams = encoding.EncodingParams{
-		ChunkLength: uint64(req.EncodingParams.ChunkLength),
-		NumChunks:   uint64(req.EncodingParams.NumChunks),
+		ChunkLength: uint64(req.GetEncodingParams().GetChunkLength()),
+		NumChunks:   uint64(req.GetEncodingParams().GetNumChunks()),
 	}
 
-	commits, chunks, err := s.prover.EncodeAndProve(req.Data, encodingParams)
+	commits, chunks, err := s.prover.EncodeAndProve(req.GetData(), encodingParams)
 
 	if err != nil {
 		return nil, err
@@ -145,8 +145,6 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 }
 
 func (s *Server) Start() error {
-	s.logger.Debug("Entering Start function...")
-	defer s.logger.Debug("Exiting Start function...")
 
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -69,7 +70,7 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*S
 	}
 
 	return &StdSignatureAggregator{
-		Logger:            logger,
+		Logger:            logger.With("component", "SignatureAggregator"),
 		Transactor:        transactor,
 		OperatorAddresses: operatorAddrs,
 	}, nil
@@ -112,7 +113,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		if !ok && a.Transactor != nil {
 			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
 			if err != nil {
-				a.Logger.Error("Failed to get operator address from registry", "operatorID", operatorIDHex)
+				a.Logger.Error("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
 				a.OperatorAddresses.Add(r.Operator, operatorAddr)
@@ -126,7 +127,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 			socket = op.Socket
 		}
 		if r.Err != nil {
-			a.Logger.Warn("[AggregateSignatures] error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "err", r.Err)
+			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "err", r.Err)
 			continue
 		}
 
@@ -140,7 +141,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		sig := r.Signature
 		ok = sig.Verify(op.PubkeyG2, message)
 		if !ok {
-			a.Logger.Error("Signature is not valid", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
+			a.Logger.Error("signature is not valid", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
 			continue
 		}
 
@@ -171,7 +172,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 				aggPubKeys[ind].Add(op.PubkeyG2)
 			}
 		}
-		a.Logger.Info("[AggregateSignatures] received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", operatorQuorums)
+		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums))
 	}
 
 	// Aggregate Non signer Pubkey Id

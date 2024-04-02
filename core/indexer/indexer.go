@@ -16,9 +16,9 @@ func CreateNewIndexer(
 	gethClient dacommon.EthClient,
 	rpcClient dacommon.RPCEthClient,
 	eigenDAServiceManagerAddr string,
-	logger logging.Logger,
+	_logger logging.Logger,
 ) (indexer.Indexer, error) {
-
+	logger := _logger.With("component", "Indexer")
 	eigenDAServiceManager := common.HexToAddress(eigenDAServiceManagerAddr)
 
 	pubKeyFilterer, err := NewOperatorPubKeysFilterer(eigenDAServiceManager, gethClient)

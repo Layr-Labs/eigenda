@@ -99,9 +99,11 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
+	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout: config.TimeoutConfig.AttestationTimeout,
-	}, logger)
+	}, logger, metrics.DispatcherMetrics)
 	asgn := &core.StdAssignmentCoordinator{}
 
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
@@ -160,8 +162,6 @@ func RunBatcher(ctx *cli.Context) error {
 		}
 	}
 
-	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
 		return errors.New("encoder socket must be specified")
 	}
@@ -194,12 +194,12 @@ func RunBatcher(ctx *cli.Context) error {
 			[]byte(secretKey),
 			config.FireblocksConfig.BaseURL,
 			config.TimeoutConfig.ChainReadTimeout,
-			logger,
+			logger.With("component", "FireblocksClient"),
 		)
 		if err != nil {
 			return err
 		}
-		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger)
+		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger.With("component", "FireblocksWallet"))
 		if err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger)
+		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger.With("component", "PrivateKeyWallet"))
 		if err != nil {
 			return err
 		}
@@ -283,8 +283,10 @@ func heartbeatMonitor(filePath string, maxStallDuration time.Duration) {
 			stallTimer.Reset(maxStallDuration) // Reset timer on new heartbeat
 
 		case <-stallTimer.C:
-			log.Println("No heartbeat received within max stall duration, stopping health probe")
-			return
+			// Instead of stopping the function, log a warning
+			log.Println("Warning: No heartbeat received within max stall duration.")
+			// Reset the timer to continue monitoring
+			stallTimer.Reset(maxStallDuration)
 		}
 	}
 }

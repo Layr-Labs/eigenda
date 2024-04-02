@@ -25,7 +25,7 @@ type chainClient struct {
 func NewChainClient(ethClient common.EthClient, logger logging.Logger) ChainClient {
 	return &chainClient{
 		ethClient: ethClient,
-		logger:    logger,
+		logger:    logger.With("component", "ChainClient"),
 	}
 }
 

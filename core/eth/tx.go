@@ -75,7 +75,7 @@ func NewTransactor(
 
 	e := &Transactor{
 		EthClient: client,
-		Logger:    logger,
+		Logger:    logger.With("component", "Transactor"),
 	}
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
@@ -486,7 +486,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		SignedStakeForQuorums: signedStakeForQuorums,
 		ReferenceBlockNumber:  uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Debug("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
+	t.Logger.Debug("batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -509,7 +509,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigChecker, err := json.Marshal(signatureChecker)
 	if err == nil {
-		t.Logger.Debug("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
+		t.Logger.Debug("signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()

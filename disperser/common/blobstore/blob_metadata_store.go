@@ -37,7 +37,7 @@ func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
-		logger:         logger,
+		logger:         logger.With("component", "BlobMetadataStore"),
 		tableName:      tableName,
 		ttl:            ttl,
 	}

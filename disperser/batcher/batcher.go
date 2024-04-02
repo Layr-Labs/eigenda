@@ -139,7 +139,7 @@ func NewBatcher(
 
 		ethClient:     ethClient,
 		finalizer:     finalizer,
-		logger:        logger,
+		logger:        logger.With("component", "Batcher"),
 		HeartbeatChan: heartbeatChan,
 	}, nil
 }
@@ -349,7 +349,7 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 		b.logger.Error("failed to update confirmation info", "failed", len(blobsToRetry), "total", len(blobs))
 		_ = b.handleFailure(ctx, blobsToRetry, FailUpdateConfirmationInfo)
 	}
-	b.logger.Debug("[batcher] Update confirmation info took", "duration", time.Since(stageTimer))
+	b.logger.Debug("Update confirmation info took", "duration", time.Since(stageTimer).String())
 	b.Metrics.ObserveLatency("UpdateConfirmationInfo", float64(time.Since(stageTimer).Milliseconds()))
 	batchSize := int64(0)
 	for _, blobMeta := range blobs {
@@ -403,16 +403,16 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Debug("[batcher] CreateBatch took", "duration", time.Since(stageTimer))
+	log.Debug("CreateBatch took", "duration", time.Since(stageTimer))
 
 	// Dispatch encoded batch
-	log.Debug("[batcher] Dispatching encoded batch...")
+	log.Debug("Dispatching encoded batch...")
 	stageTimer = time.Now()
 	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
-	log.Debug("[batcher] DisperseBatch took", "duration", time.Since(stageTimer))
+	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer))
 
 	// Get the batch header hash
-	log.Debug("[batcher] Getting batch header hash...")
+	log.Debug("Getting batch header hash...")
 	headerHash, err := batch.BatchHeader.GetBatchHeaderHash()
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailBatchHeaderHash)
@@ -420,7 +420,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	// Aggregate the signatures
-	log.Debug("[batcher] Aggregating signatures...")
+	log.Debug("Aggregating signatures...")
 
 	// construct quorumParams
 	quorumIDs := make([]core.QuorumID, 0, len(batch.State.AggKeys))
@@ -435,7 +435,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
 	}
-	log.Debug("[batcher] AggregateSignatures took", "duration", time.Since(stageTimer))
+	log.Debug("AggregateSignatures took", "duration", time.Since(stageTimer))
 	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
 	operatorCount := make(map[core.QuorumID]int)
 	signerCount := make(map[core.QuorumID]int)
@@ -452,7 +452,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 	b.Metrics.UpdateAttestation(operatorCount, signerCount, aggSig.QuorumResults)
 	for _, quorumResult := range aggSig.QuorumResults {
-		log.Info("[batcher] Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
+		log.Info("Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
 
 	numPassed := numBlobsAttested(aggSig.QuorumResults, batch.BlobHeaders)
@@ -463,7 +463,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	// Confirm the batch
-	log.Debug("[batcher] Confirming batch...")
+	log.Debug("Confirming batch...")
 
 	txn, err := b.Transactor.BuildConfirmBatchTxn(ctx, batch.BatchHeader, aggSig.QuorumResults, aggSig)
 	if err != nil {

@@ -109,7 +109,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 		),
 		EigenMetrics: eigenMetrics,
-		logger:       logger,
+		logger:       logger.With("component", "NodeMetrics"),
 		registry:     reg,
 		socketAddr:   socketAddr,
 	}
@@ -140,13 +140,13 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalBatchSize))
 }
 
-func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize int64) {
+func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize uint64) {
 	quorum := strconv.Itoa(int(quorumId))
 	g.AccuBlobs.WithLabelValues("number", quorum).Inc()
 	g.AccuBlobs.WithLabelValues("size", quorum).Add(float64(blobSize))
 }
 
-func (g *Metrics) AcceptBatches(status string, batchSize int64) {
+func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
 }
