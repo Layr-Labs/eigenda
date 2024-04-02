@@ -20,7 +20,7 @@ import (
 var (
 	gasPricePercentageMultiplier = big.NewInt(10)
 	hundred                      = big.NewInt(100)
-	maxSpeedUpRetry              = 3
+	maxSendTransactionRetry      = 3
 )
 
 // TxnManager receives transactions from the caller, sends them to the chain, and monitors their status.
@@ -141,21 +141,38 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.logger.Debug("new transaction", "component", "TxnManager", "method", "ProcessTransaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
-	gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get latest gas caps: %w", err)
+
+	var txn *types.Transaction
+	var txID walletsdk.TxID
+	var err error
+	retryFromFailure := 0
+	for retryFromFailure < maxSendTransactionRetry {
+		gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get latest gas caps: %w", err)
+		}
+
+		txn, err = t.ethClient.UpdateGas(ctx, req.Tx, req.Value, gasTipCap, gasFeeCap)
+		if err != nil {
+			return fmt.Errorf("failed to update gas price: %w", err)
+		}
+		txID, err = t.wallet.SendTransaction(ctx, txn)
+		if errors.Is(err, context.DeadlineExceeded) {
+			t.logger.Warn("failed to send txn due to timeout", "tag", req.Tag, "hash", req.Tx.Hash().Hex(), "numRetries", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
+			retryFromFailure++
+			continue
+		} else if err != nil {
+			return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
+		} else {
+			t.logger.Debug("successfully sent txn", "component", "TxnManager", "method", "ProcessTransaction", "tag", req.Tag, "txID", txID, "txHash", txn.Hash().Hex())
+			break
+		}
 	}
 
-	txn, err := t.ethClient.UpdateGas(ctx, req.Tx, req.Value, gasTipCap, gasFeeCap)
-	if err != nil {
-		return fmt.Errorf("failed to update gas price: %w", err)
-	}
-	txID, err := t.wallet.SendTransaction(ctx, txn)
-	if err != nil {
+	if txn == nil || txID == "" {
 		return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
-	} else {
-		t.logger.Debug("successfully sent txn", "component", "TxnManager", "method", "ProcessTransaction", "tag", req.Tag, "txID", txID, "txHash", txn.Hash().Hex())
 	}
+
 	req.Tx = txn
 	req.txAttempts = append(req.txAttempts, &transaction{
 		TxID:        txID,
@@ -261,12 +278,12 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			}
 			txID, err := t.wallet.SendTransaction(ctx, newTx)
 			if err != nil {
-				if retryFromFailure >= maxSpeedUpRetry {
-					t.logger.Warn("failed to send txn - retries exhausted", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
+				if retryFromFailure >= maxSendTransactionRetry {
+					t.logger.Warn("failed to send txn - retries exhausted", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
 					t.metrics.IncrementTxnCount("failure")
 					return nil, err
 				} else {
-					t.logger.Warn("failed to send txn - retrying", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
+					t.logger.Warn("failed to send txn - retrying", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
 				}
 				retryFromFailure++
 				continue
