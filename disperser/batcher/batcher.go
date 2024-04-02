@@ -370,7 +370,11 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 			// Append the error
 			result = multierror.Append(result, err)
 		}
-		b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
+		if reason == FailNoSignatures {
+			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
+		} else {
+			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
+		}
 	}
 	b.Metrics.UpdateBatchError(reason, len(blobMetadatas))
 
