@@ -10,8 +10,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-func ToFrArray(data []byte) []fr.Element {
-	//numEle := int(math.Ceil(float64(len(data)) / float64(BYTES_PER_COEFFICIENT)))
+func ToFrArray(data []byte) ([]fr.Element, error) {
 	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
 	eles := make([]fr.Element, numEle)
 
@@ -20,15 +19,20 @@ func ToFrArray(data []byte) []fr.Element {
 		end := (i + 1) * uint64(encoding.BYTES_PER_COEFFICIENT)
 		if end >= uint64(len(data)) {
 			var padded [32]byte
-			copy(padded[1:], data[start:])
-			eles[i].SetBytes(padded[:])
-
+			copy(padded[:], data[start:])
+			err := eles[i].SetBytesCanonical(padded[:])
+			if err != nil {
+				return nil, err
+			}
 		} else {
-			eles[i].SetBytes(data[start:end])
+			err := eles[i].SetBytesCanonical(data[start:end])
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return eles
+	return eles, nil
 }
 
 // ToByteArray converts a list of Fr to a byte array
@@ -46,10 +50,10 @@ func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 		end := (i + 1) * encoding.BYTES_PER_COEFFICIENT
 
 		if uint64(end) > maxDataSize {
-			copy(data[start:maxDataSize], v[1:])
+			copy(data[start:maxDataSize], v[:])
 			break
 		} else {
-			copy(data[start:end], v[1:])
+			copy(data[start:end], v[:])
 		}
 	}
 

@@ -152,7 +152,7 @@ func TestBatchTrigger(t *testing.T) {
 	assert.Nil(t, err)
 	count, size := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(15872))
+	assert.Equal(t, size, uint64(16384)) //Robert checks it
 
 	// try encode the same blobs again at different block (this happens when the blob is retried)
 	encodingStreamer.ReferenceBlockNumber = 11
@@ -163,7 +163,7 @@ func TestBatchTrigger(t *testing.T) {
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(15872))
+	assert.Equal(t, size, uint64(16384)) //Robert checks it
 
 	// don't notify yet
 	select {
@@ -182,7 +182,7 @@ func TestBatchTrigger(t *testing.T) {
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 2)
-	assert.Equal(t, size, uint64(15872)*2)
+	assert.Equal(t, size, uint64(16384)*2) //Robert checks it
 
 	// notify
 	select {
@@ -243,7 +243,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(15872))
+	assert.Equal(t, size, uint64(16384)) //Robert checks it
 
 	// Cancel previous blob so it doesn't get reencoded.
 	err = c.blobStore.MarkBlobFailed(ctx, metadataKey)
@@ -273,7 +273,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(15872))
+	assert.Equal(t, size, uint64(16384)) //Robert checks it
 
 	// Request the same blob, which should be dedupped
 	_, err = c.blobStore.StoreBlob(ctx, &blob, requestedAt)
@@ -284,7 +284,7 @@ func TestStreamingEncoding(t *testing.T) {
 	// It should not have been added to the encoded blob store
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(15872))
+	assert.Equal(t, size, uint64(16384)) //Robert checks it
 }
 
 func TestEncodingFailure(t *testing.T) {

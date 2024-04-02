@@ -37,7 +37,10 @@ type WorkerResult struct {
 
 // just a wrapper to take bytes not Fr Element
 func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
-	inputFr := rs.ToFrArray(inputBytes)
+	inputFr, err := rs.ToFrArray(inputBytes)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
+	}
 	return g.Encode(inputFr)
 }
 

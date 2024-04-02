@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -62,6 +63,8 @@ func TestDisperseBlob(t *testing.T) {
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	status, _, key := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
 	assert.NotNil(t, key)
@@ -72,6 +75,8 @@ func TestDisperseBlobAuth(t *testing.T) {
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
 	assert.NoError(t, err)
+
+	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
 
 	// Use an unauthenticated signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
@@ -92,6 +97,8 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
 	assert.NoError(t, err)
+
+	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
 
 	// Use an unauthenticated signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
@@ -128,6 +135,8 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
@@ -181,6 +190,8 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
@@ -207,6 +218,8 @@ func TestGetBlobStatus(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
@@ -287,6 +300,8 @@ func TestRetrieveBlob(t *testing.T) {
 		_, err := rand.Read(data)
 		assert.NoError(t, err)
 
+		data = codec.ConvertByPaddingEmptyByte(data)
+
 		// Disperse the random data
 		status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
 		assert.Equal(t, status, pb.BlobStatus_PROCESSING)
@@ -336,6 +351,8 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	// Disperse the random data
 	status, _, requestID := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
@@ -358,6 +375,8 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	data := make([]byte, 2*1024*1024+10)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{

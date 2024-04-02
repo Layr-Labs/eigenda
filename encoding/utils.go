@@ -29,5 +29,4 @@ func NextPowerOf2(d uint64) uint64 {
 
 func roundUpDivide[T constraints.Integer](a, b T) T {
 	return (a + b - 1) / b
-
 }

@@ -157,7 +157,12 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 		}
 	}
 
-	length := uint(len(rs.ToFrArray(data)))
+	symbols, err := rs.ToFrArray(data)
+	if err != nil {
+		return encoding.BlobCommitments{}, nil, err
+	}
+
+	length := uint(len(symbols))
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),

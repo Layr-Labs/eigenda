@@ -158,7 +158,7 @@ message BlobInfo {
 message BlobHeader {
 	// KZG commitment of the blob.
 	common.G1Commitment commitment = 1;
-	// The length of the blob in symbols (each symbol is 31 bytes).
+	// The length of the blob in symbols (each symbol is 32 bytes).
 	uint32 data_length = 2;
 	// The params of the quorums that this blob participates in.
 	repeated BlobQuorumParam blob_quorum_params = 3;

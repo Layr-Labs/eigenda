@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
@@ -72,6 +73,8 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	blob := core.Blob{
 		RequestHeader: core.BlobRequestHeader{

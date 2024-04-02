@@ -19,7 +19,10 @@ type GlobalPoly struct {
 
 // just a wrapper to take bytes not Fr Element
 func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32, error) {
-	inputFr := ToFrArray(inputBytes)
+	inputFr, err := ToFrArray(inputBytes)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
+	}
 	return g.Encode(inputFr)
 }
 
