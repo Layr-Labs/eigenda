@@ -830,7 +830,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
 		s.metrics.HandleInvalidArgRequest("DisperseBlob")
-		return nil, api.NewInvalidArgError("failed to convert bytes into a valid field element, please use a correct format which every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
+		return nil, api.NewInvalidArgError("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
 	}
 
 	quorumConfig, err := s.updateQuorumConfig(ctx)
