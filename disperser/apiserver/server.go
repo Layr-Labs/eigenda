@@ -260,7 +260,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	_, err = rs.ToFrArray(blob.Data)
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
-		return nil, api.NewInternalError("failed to convert bytes into a valid field element, please use a correct format which every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
+		return nil, api.NewInvalidArgError("failed to convert bytes into a valid field element, please use a correct format which every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
 	}
 
 	requestedAt := uint64(time.Now().UnixNano())

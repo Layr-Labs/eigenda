@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -47,13 +48,15 @@ var _ = Describe("Inabox Integration", func() {
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, data, []uint8{})
+		paddedData := codec.ConvertByPaddingEmptyByte(data)
+
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData, []uint8{})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(disperser.Processing))
 
-		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, data, []uint8{})
+		blobStatus2, key2, err := disp.DisperseBlobAuthenticated(ctx, paddedData, []uint8{})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -127,7 +130,9 @@ var _ = Describe("Inabox Integration", func() {
 			0, // retrieve blob 1 from quorum 0
 		)
 		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+
+		restored := codec.RemoveEmptyByteFromPaddedBytes(retrieved)
+		Expect(bytes.TrimRight(restored, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
@@ -137,7 +142,8 @@ var _ = Describe("Inabox Integration", func() {
 			1, // retrieve blob 1 from quorum 1
 		)
 		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+		restored = codec.RemoveEmptyByteFromPaddedBytes(retrieved)
+		Expect(bytes.TrimRight(restored, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
@@ -147,7 +153,8 @@ var _ = Describe("Inabox Integration", func() {
 			0, // retrieve from quorum 0
 		)
 		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+		restored = codec.RemoveEmptyByteFromPaddedBytes(retrieved)
+		Expect(bytes.TrimRight(restored, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),

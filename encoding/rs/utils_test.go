@@ -27,7 +27,7 @@ func TestGetLeadingCoset(t *testing.T) {
 }
 
 func TestGetNumElement(t *testing.T) {
-	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_COEFFICIENT)
+	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
 	assert.Equal(t, numEle, uint64(32))
 }
 
@@ -35,7 +35,7 @@ func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_COEFFICIENT)
+	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
 	assert.Equal(t, numEle, uint64(32))
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))

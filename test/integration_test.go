@@ -561,7 +561,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
-	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
+	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
 	assert.NoError(t, err)
 
 	restored := codec.RemoveEmptyByteFromPaddedBytes(recovered)

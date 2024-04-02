@@ -8,13 +8,13 @@ import (
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetBlobLength(blobSize uint) uint {
-	symSize := uint(BYTES_PER_COEFFICIENT)
+	symSize := uint(BYTES_PER_SYMBOL)
 	return (blobSize + symSize - 1) / symSize
 }
 
 // GetBlobSize converts from blob length in symbols to blob size in bytes. This is not an exact conversion.
 func GetBlobSize(blobLength uint) uint {
-	return blobLength * BYTES_PER_COEFFICIENT
+	return blobLength * BYTES_PER_SYMBOL
 }
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols

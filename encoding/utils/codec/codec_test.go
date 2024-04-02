@@ -32,7 +32,7 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 	numFuzz := 100
 
 	dataSizeList := make([]int, 0)
-	for i := 33; i < 3000; i = i + 10 {
+	for i := 32; i < 3000; i = i + 10 {
 		dataSizeList = append(dataSizeList, i)
 	}
 

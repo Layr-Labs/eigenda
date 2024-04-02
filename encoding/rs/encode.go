@@ -61,7 +61,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	}
 
 	log.Printf("  SUMMARY: RSEncode %v byte among %v numChunks with chunkLength %v takes %v\n",
-		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, g.ChunkLength, time.Since(start))
+		len(inputFr)*encoding.BYTES_PER_SYMBOL, g.NumChunks, g.ChunkLength, time.Since(start))
 
 	return poly, frames, indices, nil
 }

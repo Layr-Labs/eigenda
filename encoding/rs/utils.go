@@ -11,16 +11,16 @@ import (
 )
 
 func ToFrArray(data []byte) ([]fr.Element, error) {
-	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_COEFFICIENT)
+	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_SYMBOL)
 	eles := make([]fr.Element, numEle)
 
 	for i := uint64(0); i < numEle; i++ {
-		start := i * uint64(encoding.BYTES_PER_COEFFICIENT)
-		end := (i + 1) * uint64(encoding.BYTES_PER_COEFFICIENT)
+		start := i * uint64(encoding.BYTES_PER_SYMBOL)
+		end := (i + 1) * uint64(encoding.BYTES_PER_SYMBOL)
 		if end >= uint64(len(data)) {
-			var padded [32]byte
-			copy(padded[:], data[start:])
-			err := eles[i].SetBytesCanonical(padded[:])
+			padded := make([]byte, encoding.BYTES_PER_SYMBOL)
+			copy(padded, data[start:])
+			err := eles[i].SetBytesCanonical(padded)
 			if err != nil {
 				return nil, err
 			}
@@ -39,15 +39,15 @@ func ToFrArray(data []byte) ([]fr.Element, error) {
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)
 	dataSize := int(math.Min(
-		float64(n*encoding.BYTES_PER_COEFFICIENT),
+		float64(n*encoding.BYTES_PER_SYMBOL),
 		float64(maxDataSize),
 	))
 	data := make([]byte, dataSize)
 	for i := 0; i < n; i++ {
 		v := dataFr[i].Bytes()
 
-		start := i * encoding.BYTES_PER_COEFFICIENT
-		end := (i + 1) * encoding.BYTES_PER_COEFFICIENT
+		start := i * encoding.BYTES_PER_SYMBOL
+		end := (i + 1) * encoding.BYTES_PER_SYMBOL
 
 		if uint64(end) > maxDataSize {
 			copy(data[start:maxDataSize], v[:])
