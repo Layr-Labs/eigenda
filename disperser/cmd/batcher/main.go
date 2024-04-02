@@ -283,8 +283,10 @@ func heartbeatMonitor(filePath string, maxStallDuration time.Duration) {
 			stallTimer.Reset(maxStallDuration) // Reset timer on new heartbeat
 
 		case <-stallTimer.C:
-			log.Println("No heartbeat received within max stall duration, stopping health probe")
-			return
+			// Instead of stopping the function, log a warning
+			log.Println("Warning: No heartbeat received within max stall duration.")
+			// Reset the timer to continue monitoring
+			stallTimer.Reset(maxStallDuration)
 		}
 	}
 }
