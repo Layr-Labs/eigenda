@@ -611,7 +611,7 @@ func (e *EncodingStreamer) validateMetadataQuorums(metadatas []*disperser.BlobMe
 		if valid {
 			validMetadata = append(validMetadata, metadata)
 		} else {
-			err := e.blobStore.HandleBlobFailure(context.Background(), metadata, 0)
+			_, err := e.blobStore.HandleBlobFailure(context.Background(), metadata, 0)
 			if err != nil {
 				e.logger.Error("error handling blob failure", "err", err)
 			}

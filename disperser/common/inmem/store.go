@@ -260,11 +260,11 @@ func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobK
 	return nil, disperser.ErrBlobNotFound
 }
 
-func (q *BlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) error {
+func (q *BlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {
 	if metadata.NumRetries < maxRetry {
-		return q.IncrementBlobRetryCount(ctx, metadata)
+		return true, q.IncrementBlobRetryCount(ctx, metadata)
 	} else {
-		return q.MarkBlobFailed(ctx, metadata.GetBlobKey())
+		return false, q.MarkBlobFailed(ctx, metadata.GetBlobKey())
 	}
 }
 

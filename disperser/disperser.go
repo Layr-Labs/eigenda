@@ -165,7 +165,8 @@ type BlobStore interface {
 	// GetBlobMetadata returns a blob metadata given a metadata key
 	GetBlobMetadata(ctx context.Context, blobKey BlobKey) (*BlobMetadata, error)
 	// HandleBlobFailure handles a blob failure by either incrementing the retry count or marking the blob as failed
-	HandleBlobFailure(ctx context.Context, metadata *BlobMetadata, maxRetry uint) error
+	// Returns a boolean indicating whether the blob should be retried and an error
+	HandleBlobFailure(ctx context.Context, metadata *BlobMetadata, maxRetry uint) (bool, error)
 }
 
 type Dispatcher interface {

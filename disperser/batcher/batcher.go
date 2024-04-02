@@ -362,21 +362,28 @@ func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *Recei
 
 func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata, reason FailReason) error {
 	var result *multierror.Error
+	numPermanentFailures := 0
 	for _, metadata := range blobMetadatas {
 		b.EncodingStreamer.RemoveEncodedBlob(metadata)
-		err := b.Queue.HandleBlobFailure(ctx, metadata, b.MaxNumRetriesPerBlob)
+		retry, err := b.Queue.HandleBlobFailure(ctx, metadata, b.MaxNumRetriesPerBlob)
 		if err != nil {
 			b.logger.Error("HandleSingleBatch: error handling blob failure", "err", err)
 			// Append the error
 			result = multierror.Append(result, err)
 		}
+
+		if retry {
+			continue
+		}
+
 		if reason == FailNoSignatures {
 			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
 		} else {
 			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
 		}
+		numPermanentFailures++
 	}
-	b.Metrics.UpdateBatchError(reason, len(blobMetadatas))
+	b.Metrics.UpdateBatchError(reason, numPermanentFailures)
 
 	// Return the error(s)
 	return result.ErrorOrNil()
