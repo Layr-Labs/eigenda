@@ -38,6 +38,10 @@ type EigenDAGRPCServiceChecker interface {
 	CloseConnections() error
 }
 
+type EigenDAHttpServiceChecker interface {
+	CheckHealth(serviceName string) (string, error)
+}
+
 type (
 	BlobMetadataResponse struct {
 		BlobKey                 string                    `json:"blob_key"`
@@ -135,7 +139,8 @@ type (
 		disperserHostName         string
 		churnerHostName           string
 		batcherHealthUrl          string
-		EigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
+		eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
+		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
 	}
 )
 
@@ -149,7 +154,8 @@ func NewServer(
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
-	EigenDAGRPCServiceChecker EigenDAGRPCServiceChecker,
+	eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker,
+	eigenDAHttpServiceChecker EigenDAHttpServiceChecker,
 
 ) *server {
 	// Initialize the health checker service for EigenDA services
@@ -157,9 +163,13 @@ func NewServer(
 		grpcConn = &GRPCDialerSkipTLS{}
 	}
 
-	if EigenDAGRPCServiceChecker == nil {
+	if eigenDAGRPCServiceChecker == nil {
 
-		EigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+		eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+	}
+
+	if eigenDAHttpServiceChecker == nil {
+		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
 
 	return &server{
@@ -176,7 +186,8 @@ func NewServer(
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthUrl:          config.BatcherHealthUrl,
-		EigenDAGRPCServiceChecker: EigenDAGRPCServiceChecker,
+		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
+		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
 	}
 }
 
@@ -255,8 +266,8 @@ func (s *server) Start() error {
 
 func (s *server) Shutdown() error {
 
-	if s.EigenDAGRPCServiceChecker != nil {
-		err := s.EigenDAGRPCServiceChecker.CloseConnections()
+	if s.eigenDAGRPCServiceChecker != nil {
+		err := s.eigenDAGRPCServiceChecker.CloseConnections()
 
 		if err != nil {
 			s.logger.Error("Failed to close connections", "error", err)

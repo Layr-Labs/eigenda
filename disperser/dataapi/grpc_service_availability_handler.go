@@ -33,7 +33,7 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 		var availabilityStatus *ServiceAvailability
 		s.logger.Info("checking service health", "service", serviceName)
 
-		response, err := s.EigenDAGRPCServiceChecker.CheckHealth(ctx, serviceName)
+		response, err := s.eigenDAGRPCServiceChecker.CheckHealth(ctx, serviceName)
 		if err != nil {
 
 			if err.Error() == "disperser connection is nil" {
