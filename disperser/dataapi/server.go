@@ -214,7 +214,7 @@ func (s *server) Start() error {
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
 			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
 			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
-			metrics.GET("/batcher-service-availability", s.FetchBactherAvailability)
+			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -701,7 +701,7 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 	})
 }
 
-// FetchBactherAvailability godoc
+// FetchBatcherAvailability godoc
 //
 //	@Summary	Get status of EigenDA batcher.
 //	@Tags		Batcher Availability
@@ -711,9 +711,9 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/batcher-service-availability [get]
-func (s *server) FetchBactherAvailability(c *gin.Context) {
+func (s *server) FetchBatcherAvailability(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBactherAvailability", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("FetchBatcherAvailability", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
@@ -725,12 +725,12 @@ func (s *server) FetchBactherAvailability(c *gin.Context) {
 
 	availabilityStatuses, err := s.getServiceHealth(c.Request.Context(), services)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBactherAvailability")
+		s.metrics.IncrementFailedRequestNum("FetchBatcherAvailability")
 		errorResponse(c, err)
 		return
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchBactherAvailability")
+	s.metrics.IncrementSuccessfulRequestNum("FetchBatcherAvailability")
 
 	// Set the status code to 503 if any of the services are not serving
 	availabilityStatus := http.StatusOK
