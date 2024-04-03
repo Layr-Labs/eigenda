@@ -138,7 +138,7 @@ type (
 		metrics                   *Metrics
 		disperserHostName         string
 		churnerHostName           string
-		batcherHealthUrl          string
+		batcherHealthEndpt        string
 		eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
 		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
 	}
@@ -185,7 +185,7 @@ func NewServer(
 		metrics:                   metrics,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
-		batcherHealthUrl:          config.BatcherHealthUrl,
+		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
 	}
@@ -730,7 +730,7 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	// Check Disperser
 	services := make([]HttpServiceAvailabilityCheck, 1)
-	services[0] = HttpServiceAvailabilityCheck{"Batcher", s.batcherHealthUrl}
+	services[0] = HttpServiceAvailabilityCheck{"Batcher", s.batcherHealthEndpt}
 
 	s.logger.Info("Getting service availability for", "services", services[0].ServiceName)
 
