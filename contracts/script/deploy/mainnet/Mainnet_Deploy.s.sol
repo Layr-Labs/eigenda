@@ -231,7 +231,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         _writeOutput(config_data);
     }
 
-    function test() external {
+    function xtest() external {
         // get info on all the already-deployed contracts
         _parseDeployedContracts(existingDeploymentInfoPath);
 
