@@ -368,14 +368,6 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 func TestCheckBatcherHealthExpectServing(t *testing.T) {
 	r := setUpRouter()
 
-	// Create a mock HTTP server
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Respond with a mock response
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Service OK"))
-	}))
-	defer mockServer.Close()
-
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, &MockHttpClient{ShouldSucceed: true})
 
 	r.GET("/v1/metrics/batcher-service-availability", testDataApiServer.FetchBatcherAvailability)
@@ -408,14 +400,6 @@ func TestCheckBatcherHealthExpectServing(t *testing.T) {
 
 func TestCheckBatcherHealthExpectNotServing(t *testing.T) {
 	r := setUpRouter()
-
-	// Create a mock HTTP server
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Respond with a mock response
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Service OK"))
-	}))
-	defer mockServer.Close()
 
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, &MockHttpClient{ShouldSucceed: false})
 
