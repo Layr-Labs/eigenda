@@ -14,17 +14,23 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/peer"
 )
 
 func TestRatelimit(t *testing.T) {
-	data50KiB := make([]byte, 50*1024)
+	data50KiB := make([]byte, 49600) // 50*1024/32*31
 	_, err := rand.Read(data50KiB)
+
+	data50KiB = codec.ConvertByPaddingEmptyByte(data50KiB)
+
 	assert.NoError(t, err)
-	data1KiB := make([]byte, 1024)
+	data1KiB := make([]byte, 1024) // 1024/32*31
 	_, err = rand.Read(data1KiB)
 	assert.NoError(t, err)
+
+	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
 
 	// Try with a non-allowlisted IP
 	p := &peer.Peer{
@@ -85,12 +91,17 @@ func TestRatelimit(t *testing.T) {
 
 func TestAuthRatelimit(t *testing.T) {
 
-	data50KiB := make([]byte, 50*1024)
+	data50KiB := make([]byte, 49600)
 	_, err := rand.Read(data50KiB)
 	assert.NoError(t, err)
-	data1KiB := make([]byte, 1024)
+
+	data50KiB = codec.ConvertByPaddingEmptyByte(data50KiB)
+
+	data1KiB := make([]byte, 992)
 	_, err = rand.Read(data1KiB)
 	assert.NoError(t, err)
+
+	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
 
 	// Use an unauthenticated signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
@@ -145,9 +156,11 @@ func TestAuthRatelimit(t *testing.T) {
 func TestRetrievalRateLimit(t *testing.T) {
 
 	// Create random data
-	data := make([]byte, 1024)
+	data := make([]byte, 992)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	// Disperse the random data
 	status, blobSize, requestID := disperseBlob(t, dispersalServer, data)

@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
@@ -113,7 +114,7 @@ func mustMakeTestBlob() core.Blob {
 				},
 			},
 		},
-		Data: gettysburgAddressBytes,
+		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
 	}
 	return blob
 }
@@ -560,8 +561,11 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 	assert.NoError(t, err)
-	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_COEFFICIENT)
+	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
 	assert.NoError(t, err)
-	recovered = bytes.TrimRight(recovered, "\x00")
-	assert.Equal(t, gettysburgAddressBytes, recovered)
+
+	restored := codec.RemoveEmptyByteFromPaddedBytes(recovered)
+
+	restored = bytes.TrimRight(restored, "\x00")
+	assert.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 }

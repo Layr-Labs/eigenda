@@ -14,10 +14,10 @@ func TestGetEncodingParams(t *testing.T) {
 	params := encoding.ParamsFromSysPar(1, 4, 1000)
 
 	require.NotNil(t, params)
-	assert.Equal(t, params.ChunkLength, uint64(64))
+	assert.Equal(t, params.ChunkLength, uint64(32)) // 1000/32/1 => 32
 	// assert.Equal(t, params.DataLen, uint64(1000))
 	assert.Equal(t, params.NumChunks, uint64(8))
-	assert.Equal(t, params.NumEvaluations(), uint64(512))
+	assert.Equal(t, params.NumEvaluations(), uint64(256))
 }
 
 func TestGetLeadingCoset(t *testing.T) {
@@ -27,22 +27,23 @@ func TestGetLeadingCoset(t *testing.T) {
 }
 
 func TestGetNumElement(t *testing.T) {
-	numEle := rs.GetNumElement(1000, BYTES_PER_COEFFICIENT)
-	assert.Equal(t, numEle, uint64(33))
+	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
+	assert.Equal(t, numEle, uint64(32))
 }
 
 func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	numEle := rs.GetNumElement(1000, BYTES_PER_COEFFICIENT)
-	assert.Equal(t, numEle, uint64(33))
+	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
+	assert.Equal(t, numEle, uint64(32))
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 
-	dataFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	dataFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	require.Nil(t, err)
 	require.NotNil(t, dataFr)
 
 	assert.Equal(t, rs.ToByteArray(dataFr, uint64(len(GETTYSBURG_ADDRESS_BYTES))), GETTYSBURG_ADDRESS_BYTES)

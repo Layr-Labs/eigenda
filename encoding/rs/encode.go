@@ -19,7 +19,10 @@ type GlobalPoly struct {
 
 // just a wrapper to take bytes not Fr Element
 func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32, error) {
-	inputFr := ToFrArray(inputBytes)
+	inputFr, err := ToFrArray(inputBytes)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
+	}
 	return g.Encode(inputFr)
 }
 
@@ -58,7 +61,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	}
 
 	log.Printf("  SUMMARY: RSEncode %v byte among %v numChunks with chunkLength %v takes %v\n",
-		len(inputFr)*encoding.BYTES_PER_COEFFICIENT, g.NumChunks, g.ChunkLength, time.Since(start))
+		len(inputFr)*encoding.BYTES_PER_SYMBOL, g.NumChunks, g.ChunkLength, time.Since(start))
 
 	return poly, frames, indices, nil
 }

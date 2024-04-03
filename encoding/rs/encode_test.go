@@ -20,7 +20,8 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 
-	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	assert.Nil(t, err)
 	_, frames, _, err := enc.Encode(inputFr)
 	assert.Nil(t, err)
 
@@ -42,7 +43,8 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 
-	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	assert.Nil(t, err)
 	_, frames, _, err := enc.Encode(inputFr)
 	assert.Nil(t, err)
 
@@ -66,7 +68,8 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 
 	fmt.Println("Num Chunks: ", enc.NumChunks)
 
-	inputFr := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
+	assert.Nil(t, err)
 	_, frames, _, err := enc.Encode(inputFr)
 	assert.Nil(t, err)
 

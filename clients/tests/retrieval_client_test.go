@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -120,7 +121,7 @@ func setup(t *testing.T) {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
 	}
 	operatorState, err = indexedChainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
 	if err != nil {
@@ -265,8 +266,10 @@ func TestValidBlobHeader(t *testing.T) {
 
 	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
-	recovered := bytes.TrimRight(data, "\x00")
-	assert.Len(t, data, 1488)
-	assert.Equal(t, gettysburgAddressBytes, recovered)
+
+	restored := codec.RemoveEmptyByteFromPaddedBytes(data)
+	assert.Len(t, restored, 1488) // 48*31
+	restored = bytes.TrimRight(restored, "\x00")
+	assert.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 
 }
