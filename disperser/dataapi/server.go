@@ -728,9 +728,8 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	// Check Disperser
-	services := make([]HttpServiceAvailabilityCheck, 1)
-	services[0] = HttpServiceAvailabilityCheck{"Batcher", s.batcherHealthEndpt}
+	// Check Batcher
+	services := []HttpServiceAvailabilityCheck{{"Batcher", s.batcherHealthEndpt}}
 
 	s.logger.Info("Getting service availability for", "services", services[0].ServiceName)
 
