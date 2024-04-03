@@ -102,9 +102,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	testMode := ctx.GlobalBool(flags.EnableTestModeFlag.Name)
 
 	// Decrypt ECDSA key
+	ecdsaFilePath := ctx.GlobalString(flags.EcdsaKeyFileFlag.Name)
 	var ethClientConfig geth.EthClientConfig
-	if !testMode {
-		keyContents, err := os.ReadFile(ctx.GlobalString(flags.EcdsaKeyFileFlag.Name))
+	if !testMode && len(ecdsaFilePath) > 0 {
+		keyContents, err := os.ReadFile(ecdsaFilePath)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ECDSA key file: %v", err)
 		}
