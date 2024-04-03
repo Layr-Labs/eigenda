@@ -221,6 +221,8 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 }
 
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+
+	fmt.Println("req", req.Data, string(req.Data))
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
 		for _, quorumID := range req.CustomQuorumNumbers {
