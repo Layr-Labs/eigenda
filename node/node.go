@@ -271,10 +271,6 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, errors.New("ProcessBatch: number of blobs must be greater than zero")
 	}
 
-	if len(rawBlobs) == 0 {
-		return nil, errors.New("ProcessBatch: number of raw blobs must be greater than zero")
-	}
-
 	if len(blobs) != len(rawBlobs) {
 		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
 	}
