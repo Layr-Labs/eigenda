@@ -101,6 +101,7 @@ func RunDataApi(ctx *cli.Context) error {
 				AllowOrigins:      config.AllowOrigins,
 				DisperserHostname: config.DisperserHostname,
 				ChurnerHostname:   config.ChurnerHostname,
+				BatcherHealthUrl:  config.BatcherHealthUrl,
 			},
 			sharedStorage,
 			promClient,

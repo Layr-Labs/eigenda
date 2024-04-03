@@ -33,7 +33,7 @@ const (
 
 var errNotFound = errors.New("not found")
 
-type EigenDAServiceChecker interface {
+type EigenDAGRPCServiceChecker interface {
 	CheckHealth(ctx context.Context, serviceName string) (*grpc_health_v1.HealthCheckResponse, error)
 	CloseConnections() error
 }
@@ -131,10 +131,11 @@ type (
 		transactor     core.Transactor
 		chainState     core.ChainState
 
-		metrics               *Metrics
-		disperserHostName     string
-		churnerHostName       string
-		eigenDAServiceChecker EigenDAServiceChecker
+		metrics                   *Metrics
+		disperserHostName         string
+		churnerHostName           string
+		batcherHealthUrl          string
+		EigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
 	}
 )
 
@@ -148,7 +149,7 @@ func NewServer(
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
-	eigenDAServiceChecker EigenDAServiceChecker,
+	EigenDAGRPCServiceChecker EigenDAGRPCServiceChecker,
 
 ) *server {
 	// Initialize the health checker service for EigenDA services
@@ -156,25 +157,26 @@ func NewServer(
 		grpcConn = &GRPCDialerSkipTLS{}
 	}
 
-	if eigenDAServiceChecker == nil {
+	if EigenDAGRPCServiceChecker == nil {
 
-		eigenDAServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+		EigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
 	}
 
 	return &server{
-		logger:                logger.With("component", "DataAPIServer"),
-		serverMode:            config.ServerMode,
-		socketAddr:            config.SocketAddr,
-		allowOrigins:          config.AllowOrigins,
-		blobstore:             blobstore,
-		promClient:            promClient,
-		subgraphClient:        subgraphClient,
-		transactor:            transactor,
-		chainState:            chainState,
-		metrics:               metrics,
-		disperserHostName:     config.DisperserHostname,
-		churnerHostName:       config.ChurnerHostname,
-		eigenDAServiceChecker: eigenDAServiceChecker,
+		logger:                    logger.With("component", "DataAPIServer"),
+		serverMode:                config.ServerMode,
+		socketAddr:                config.SocketAddr,
+		allowOrigins:              config.AllowOrigins,
+		blobstore:                 blobstore,
+		promClient:                promClient,
+		subgraphClient:            subgraphClient,
+		transactor:                transactor,
+		chainState:                chainState,
+		metrics:                   metrics,
+		disperserHostName:         config.DisperserHostname,
+		churnerHostName:           config.ChurnerHostname,
+		batcherHealthUrl:          config.BatcherHealthUrl,
+		EigenDAGRPCServiceChecker: EigenDAGRPCServiceChecker,
 	}
 }
 
@@ -212,6 +214,7 @@ func (s *server) Start() error {
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
 			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
 			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
+			metrics.GET("/batcher-service-availability", s.FetchBactherAvailability)
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -252,8 +255,8 @@ func (s *server) Start() error {
 
 func (s *server) Shutdown() error {
 
-	if s.eigenDAServiceChecker != nil {
-		err := s.eigenDAServiceChecker.CloseConnections()
+	if s.EigenDAGRPCServiceChecker != nil {
+		err := s.EigenDAGRPCServiceChecker.CloseConnections()
 
 		if err != nil {
 			s.logger.Error("Failed to close connections", "error", err)
@@ -674,6 +677,60 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchChurnerServiceAvailability")
+
+	// Set the status code to 503 if any of the services are not serving
+	availabilityStatus := http.StatusOK
+	for _, status := range availabilityStatuses {
+		if status.ServiceStatus == "NOT_SERVING" {
+			availabilityStatus = http.StatusServiceUnavailable
+			break
+		}
+
+		if status.ServiceStatus == "UNKNOWN" {
+			availabilityStatus = http.StatusInternalServerError
+			break
+		}
+
+	}
+
+	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+		Meta: Meta{
+			Size: len(availabilityStatuses),
+		},
+		Data: availabilityStatuses,
+	})
+}
+
+// FetchBactherAvailability godoc
+//
+//	@Summary	Get status of EigenDA batcher.
+//	@Tags		Batcher Availability
+//	@Produce	json
+//	@Success	200	{object}	ServiceAvailabilityResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/batcher-service-availability [get]
+func (s *server) FetchBactherAvailability(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchBactherAvailability", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Check Disperser
+	services := make([]HttpServiceAvailabilityCheck, 1)
+	services[0] = HttpServiceAvailabilityCheck{"Batcher", s.batcherHealthUrl}
+
+	s.logger.Info("Getting service availability for", "services", services[0].ServiceName)
+
+	availabilityStatuses, err := s.getServiceHealth(c.Request.Context(), services)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBactherAvailability")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchBactherAvailability")
 
 	// Set the status code to 503 if any of the services are not serving
 	availabilityStatus := http.StatusOK

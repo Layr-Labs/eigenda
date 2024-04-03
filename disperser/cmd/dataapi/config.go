@@ -31,6 +31,7 @@ type Config struct {
 
 	DisperserHostname string
 	ChurnerHostname   string
+	BatcherHealthUrl  string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -65,6 +66,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		DisperserHostname: ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:   ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
+		BatcherHealthUrl:  ctx.GlobalString(flags.BatcherHealthUrlFlag.Name),
 	}
 	return config, nil
 }

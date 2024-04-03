@@ -33,7 +33,7 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 		var availabilityStatus *ServiceAvailability
 		s.logger.Info("checking service health", "service", serviceName)
 
-		response, err := s.eigenDAServiceChecker.CheckHealth(ctx, serviceName)
+		response, err := s.EigenDAGRPCServiceChecker.CheckHealth(ctx, serviceName)
 		if err != nil {
 
 			if err.Error() == "disperser connection is nil" {
@@ -74,7 +74,7 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 	return availabilityStatuses, nil
 }
 
-func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, churnerHostName string) EigenDAServiceChecker {
+func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, churnerHostName string) EigenDAGRPCServiceChecker {
 
 	// Create Pre-configured connections to the services
 	// Saves from having to create new connection on each request

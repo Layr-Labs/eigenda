@@ -6,4 +6,5 @@ type Config struct {
 	AllowOrigins      []string
 	DisperserHostname string
 	ChurnerHostname   string
+	BatcherHealthUrl  string
 }
