@@ -118,10 +118,10 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
 	BatcherHealthEndptFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-batcher-health-endpt"),
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-batcher-health-endpoint"),
 		Usage:    "Endpt of EigenDA Batcher Health Sidecar",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_BATCHER_HEALTH_ENDPT"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_BATCHER_HEALTH_ENDPOINT"),
 	}
 	/* Optional Flags*/
 	MetricsHTTPPort = cli.StringFlag{
