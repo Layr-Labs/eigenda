@@ -351,6 +351,47 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
 }
 
+func TestCheckBatcherServiceHealth(t *testing.T) {
+	r := setUpRouter()
+
+	// Create a mock HTTP server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Respond with a mock response
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Service OK"))
+	}))
+	defer mockServer.Close()
+
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil)
+
+	r.GET("/v1/metrics/batcher-service-availability", testDataApiServer.FetchBatcherAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/batcher-service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	fmt.Printf("Response: %v\n", response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, 1, len(response.Data))
+
+	serviceData := response.Data[0]
+	assert.Equal(t, "Batcher", serviceData.ServiceName)
+	assert.Equal(t, "SERVING", serviceData.ServiceStatus)
+}
+
 func TestFetchDisperserServiceAvailabilityHandler(t *testing.T) {
 	r := setUpRouter()
 
