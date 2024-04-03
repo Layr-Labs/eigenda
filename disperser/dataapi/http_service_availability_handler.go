@@ -5,10 +5,10 @@ import (
 	"net/http"
 )
 
-// Service represents a simple struct with a service name and its URL.
+// Simple struct with a Service Name and its HealthEndPt.
 type HttpServiceAvailabilityCheck struct {
 	ServiceName string
-	URL         string
+	HealthEndPt string
 }
 
 type HttpServiceAvailability struct{}
@@ -20,7 +20,7 @@ func (s *server) getServiceHealth(ctx context.Context, services []HttpServiceAva
 		var availabilityStatus *ServiceAvailability
 		s.logger.Info("checking service health", "service", service.ServiceName)
 
-		resp, err := s.eigenDAHttpServiceChecker.CheckHealth(service.URL)
+		resp, err := s.eigenDAHttpServiceChecker.CheckHealth(service.HealthEndPt)
 		if err != nil {
 			s.logger.Error("Error querying service health:", "err", err)
 		}
