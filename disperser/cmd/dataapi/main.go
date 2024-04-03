@@ -112,6 +112,7 @@ func RunDataApi(ctx *cli.Context) error {
 			metrics,
 			nil,
 			nil,
+			nil,
 		)
 	)
 
