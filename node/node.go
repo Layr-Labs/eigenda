@@ -268,10 +268,11 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	log.Debug("Processing batch", "num of blobs", len(blobs))
 
 	if len(blobs) == 0 {
-		return nil, errors.New("the number of blobs must be greater than zero")
+		return nil, errors.New("ProcessBatch: number of blobs must be greater than zero")
 	}
+
 	if len(blobs) != len(rawBlobs) {
-		return nil, errors.New("the number of parsed blobs must be the same as number of blobs from protobuf request")
+		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
 	}
 
 	// Measure num batches received and its size in bytes

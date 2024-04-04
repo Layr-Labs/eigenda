@@ -340,6 +340,30 @@ paths:
       summary: Fetch metrics
       tags:
       - Metrics
+  /metrics/batcher-service-availability:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Get status of EigenDA batcher.
+      tags:
+      - Batcher Availability
   /metrics/churner-service-availability:
     get:
       produces:

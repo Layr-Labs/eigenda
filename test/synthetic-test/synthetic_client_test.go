@@ -125,13 +125,16 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 
 	pk = strings.TrimPrefix(pk, "0X")
 	pk = strings.TrimPrefix(pk, "0x")
-	ethClient, err := geth.NewClient(geth.EthClientConfig{
-		RPCURL:           rpcUrl,
-		PrivateKeyString: pk,
-	}, ethLogger)
 
+	ethConfig := geth.EthClientConfig{
+		RPCURLs:          []string{rpcUrl},
+		PrivateKeyString: pk,
+		NumConfirmations: 0,
+	}
+	ethClient, err := geth.NewClient(ethConfig, gcommon.Address{}, 0, ethLogger)
+	log.Printf("Error: failed to create eth client: %v", err)
 	if err != nil {
-		logger.Printf("Error: %v", err)
+		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
 	mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
@@ -172,6 +175,7 @@ func TestMain(m *testing.M) {
 	retrieverG1Path := os.Getenv("RETRIEVER_G1_PATH")
 	retrieverG2Path := os.Getenv("RETRIEVER_G2_PATH")
 	retrieverCachePath := os.Getenv("RETRIEVER_CACHE_PATH")
+	batcherPullInterval := os.Getenv("BATCHER_PULL_INTERVAL")
 
 	// Retriever Config
 	retrieverClientConfig := &RetrieverClientConfig{
@@ -287,7 +291,8 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	logger.Printf("Time to Disperse Blob %s", disperseBlobStopTime.String())
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
-	confirmationDeadline := time.Now().Add(240 * time.Second)
+	// Update this to a minute over Batcher_Pull_Interval
+	confirmationDeadline := time.Now().Add(batcherPullInterval * time.Second)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
