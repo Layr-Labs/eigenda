@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"errors"
+	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
@@ -65,8 +66,8 @@ type (
 		Throughput float64 `json:"throughput"`
 		CostInGas  float64 `json:"cost_in_gas"`
 		// deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.
-		TotalStake          uint64                   `json:"total_stake"`
-		TotalStakePerQuorum map[core.QuorumID]uint64 `json:"total_stake_per_quorum"`
+		TotalStake          *big.Int                   `json:"total_stake"`
+		TotalStakePerQuorum map[core.QuorumID]*big.Int `json:"total_stake_per_quorum"`
 	}
 
 	Throughput struct {
@@ -375,12 +376,8 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 	if err != nil || end == 0 {
 		end = now.Unix()
 	}
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	if err != nil || limit == 0 {
-		limit = 10
-	}
 
-	metric, err := s.getMetric(c.Request.Context(), start, end, limit)
+	metric, err := s.getMetric(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetrics")
 		errorResponse(c, err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -14,7 +15,7 @@ const (
 	maxWorkersGetOperatorState = 10  // The maximum number of workers to use when querying operator state.
 )
 
-func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, limit int) (*Metric, error) {
+func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) (*Metric, error) {
 	blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
@@ -28,6 +29,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	for i := 0; i < int(quorumCount); i++ {
 		quorumIDs[i] = core.QuorumID(i)
 	}
+
 	operatorState, err := s.chainState.GetOperatorState(ctx, uint(blockNumber), quorumIDs)
 	if err != nil {
 		return nil, err
@@ -35,10 +37,14 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64, 
 	if len(operatorState.Operators) != int(quorumCount) {
 		return nil, fmt.Errorf("Requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
 	}
-	totalStakePerQuorum := map[core.QuorumID]uint64{}
+	totalStakePerQuorum := map[core.QuorumID]*big.Int{}
 	for quorumID, opInfoByID := range operatorState.Operators {
 		for _, opInfo := range opInfoByID {
-			totalStakePerQuorum[quorumID] += opInfo.Stake.Uint64()
+			if s, ok := totalStakePerQuorum[quorumID]; !ok {
+				totalStakePerQuorum[quorumID] = new(big.Int).Set(opInfo.Stake)
+			} else {
+				s.Add(s, opInfo.Stake)
+			}
 		}
 	}
 
