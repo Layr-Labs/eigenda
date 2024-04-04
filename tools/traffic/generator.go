@@ -63,7 +63,7 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 		return err
 	}
 
-	data = codec.ConvertByPaddingEmptyByte(data)
+	paddedData := codec.ConvertByPaddingEmptyByte(data)
 
 	ticker := time.NewTicker(g.Config.RequestInterval)
 	for {
@@ -76,12 +76,20 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
-				data = codec.ConvertByPaddingEmptyByte(data)
+				paddedData = codec.ConvertByPaddingEmptyByte(data)
+
+				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				if err != nil {
+					g.Logger.Error("failed to send blob request", "err:", err)
+				}
+				paddedData = nil
+			} else {
+				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				if err != nil {
+					g.Logger.Error("failed to send blob request", "err:", err)
+				}
 			}
-			err := g.sendRequest(ctx, data[:g.Config.DataSize])
-			if err != nil {
-				g.Logger.Error("failed to send blob request", "err:", err)
-			}
+
 		}
 	}
 }
