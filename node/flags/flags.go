@@ -100,7 +100,7 @@ var (
 	}
 	EcdsaKeyFileFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ecdsa-key-file"),
-		Required: true,
+		Required: false,
 		Usage:    "Path to the encrypted ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_FILE"),
 	}
@@ -113,7 +113,7 @@ var (
 	}
 	EcdsaKeyPasswordFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ecdsa-key-password"),
-		Required: true,
+		Required: false,
 		Usage:    "Password to decrypt ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_PASSWORD"),
 	}
@@ -244,9 +244,7 @@ var requiredFlags = []cli.Flag{
 	QuorumIDListFlag,
 	DbPathFlag,
 	BlsKeyFileFlag,
-	EcdsaKeyFileFlag,
 	BlsKeyPasswordFlag,
-	EcdsaKeyPasswordFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	PubIPProviderFlag,
@@ -266,6 +264,8 @@ var optionalFlags = []cli.Flag{
 	InternalRetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
+	EcdsaKeyFileFlag,
+	EcdsaKeyPasswordFlag,
 }
 
 func init() {
