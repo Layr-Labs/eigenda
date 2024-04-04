@@ -149,6 +149,7 @@ var requiredFlags = []cli.Flag{
 	EnableMetricsFlag,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
+	BatcherHealthEndptFlag,
 }
 
 var optionalFlags = []cli.Flag{

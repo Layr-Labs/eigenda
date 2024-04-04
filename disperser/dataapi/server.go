@@ -731,7 +731,7 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 	// Check Batcher
 	services := []HttpServiceAvailabilityCheck{{"Batcher", s.batcherHealthEndpt}}
 
-	s.logger.Info("Getting service availability for", "services", services[0].ServiceName)
+	s.logger.Info("Getting service availability for", "service", services[0].ServiceName, "endpoint", services[0].HealthEndPt)
 
 	availabilityStatuses, err := s.getServiceHealth(c.Request.Context(), services)
 	if err != nil {
