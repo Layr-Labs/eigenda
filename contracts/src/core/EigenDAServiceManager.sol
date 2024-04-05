@@ -28,7 +28,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
     modifier onlyBatchConfirmer() {
-        require(msg.sender == batchConfirmer, "onlyBatchConfirmer: not from batch confirmer");
+        require(isBatchConfirmer[msg.sender], "onlyBatchConfirmer: not from batch confirmer");
         _;
     }
 
@@ -47,14 +47,16 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IPauserRegistry _pauserRegistry,
         uint256 _initialPausedStatus,
         address _initialOwner,
-        address _batchConfirmer
+        address[] memory _batchConfirmers
     )
         public
         initializer
     {
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
-        _setBatchConfirmer(_batchConfirmer);
+        for (uint i = 0; i < _batchConfirmers.length; ++i) {
+            _setBatchConfirmer(_batchConfirmers[i]);
+        }
     }
 
     /**
@@ -128,9 +130,8 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /// @notice changes the batch confirmer
     function _setBatchConfirmer(address _batchConfirmer) internal {
-        address previousBatchConfirmer = batchConfirmer;
-        batchConfirmer = _batchConfirmer;
-        emit BatchConfirmerChanged(previousBatchConfirmer, batchConfirmer);
+        isBatchConfirmer[_batchConfirmer] = !isBatchConfirmer[_batchConfirmer];
+        emit BatchConfirmerStatusChanged(_batchConfirmer, isBatchConfirmer[_batchConfirmer]);
     }
 
     /// @notice Returns the current batchId

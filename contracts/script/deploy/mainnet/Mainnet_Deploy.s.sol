@@ -32,6 +32,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
     address public eigenDAOwner;
     address public eigenDAUpgrader;
     address public batchConfirmer;
+    address public fallbackBatchConfirmer;
     address public pauser;
     uint256 public initalPausedStatus;
     address public deployer;
@@ -67,6 +68,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
         eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
         batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
+        fallbackBatchConfirmer = stdJson.readAddress(config_data, ".permissions.fallbackBatchConfirmer");   
         initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
 
         pauser = address(eigenLayerPauserReg);
@@ -182,6 +184,10 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
             stakeRegistry
         );
 
+        address[] memory batchConfirmers = new address[](2);
+        batchConfirmers[0] = batchConfirmer;
+        batchConfirmers[1] = fallbackBatchConfirmer;
+
         //upgrade the eigenDA service manager proxy to implementation
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
@@ -191,7 +197,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
                 IPauserRegistry(pauser),
                 initalPausedStatus,
                 deployer,
-                batchConfirmer
+                batchConfirmers
             )
         );
 
@@ -248,8 +254,8 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
         eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
         batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
+        fallbackBatchConfirmer = stdJson.readAddress(config_data, ".permissions.fallbackBatchConfirmer");   
         initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
-
 
         pauser = address(eigenLayerPauserReg);
 
@@ -361,6 +367,10 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
             stakeRegistry
         );
 
+        address[] memory batchConfirmers = new address[](2);
+        batchConfirmers[0] = batchConfirmer;
+        batchConfirmers[1] = fallbackBatchConfirmer;
+
         //upgrade the eigenDA service manager proxy to implementation
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
@@ -370,7 +380,7 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
                 IPauserRegistry(pauser),
                 initalPausedStatus,
                 deployer,
-                batchConfirmer
+                batchConfirmers
             )
         );
 
@@ -462,7 +472,8 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
 
         require(eigenDAServiceManager.owner() == eigenDAOwner, "eigenDAServiceManager.owner() != eigenDAOwner");
         require(eigenDAServiceManager.pauserRegistry() == IPauserRegistry(pauser), "eigenDAServiceManager: pauser registry not set correctly");
-        require(eigenDAServiceManager.batchConfirmer() == batchConfirmer, "eigenDAServiceManager.batchConfirmer() != batchConfirmer");
+        require(eigenDAServiceManager.isBatchConfirmer(batchConfirmer) == true, "eigenDAServiceManager.batchConfirmer() != batchConfirmer");
+        require(eigenDAServiceManager.isBatchConfirmer(fallbackBatchConfirmer) == true, "eigenDAServiceManager.fallbackBatchConfirmer() != fallbackBatchConfirmer");
         require(eigenDAServiceManager.paused() == initalPausedStatus, "eigenDAServiceManager: init paused status set incorrectly");
 
         require(registryCoordinator.owner() == eigenDAOwner, "registryCoordinator.owner() != eigenDAOwner");
