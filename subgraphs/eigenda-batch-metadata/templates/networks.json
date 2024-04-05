@@ -37,8 +37,8 @@
   },
   "mainnet": {
     "EigenDAServiceManager": {
-      "address": "0x4C4707E6DCC52494dAbeC4f5662D7092bA802264",
-      "startBlock": 19578578
+      "address": "0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0",
+      "startBlock": 19592322
     }
   }
 }
