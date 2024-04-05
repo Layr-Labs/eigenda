@@ -292,6 +292,31 @@ func TestGetBlobStatus(t *testing.T) {
 	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetQuorumIndexes(), quorumIndexes)
 }
 
+func TestGetBlobConfirmingStatus(t *testing.T) {
+	data := make([]byte, 1024)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+
+	status, _, requestID := disperseBlob(t, dispersalServer, data)
+	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
+	assert.NotNil(t, requestID)
+	blobKey, err := disperser.ParseBlobKey(string(requestID))
+	assert.NoError(t, err)
+	err = queue.MarkBlobConfirming(context.Background(), blobKey)
+	assert.NoError(t, err)
+	meta, err := queue.GetBlobMetadata(context.Background(), blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, meta.BlobStatus, disperser.Confirming)
+
+	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+		RequestId: requestID,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+}
+
 func TestRetrieveBlob(t *testing.T) {
 
 	for i := 0; i < 3; i++ {

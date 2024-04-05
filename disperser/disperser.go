@@ -26,6 +26,7 @@ const (
 	Failed
 	Finalized
 	InsufficientSignatures
+	Confirming
 )
 
 var enumStrings = map[BlobStatus]string{
@@ -34,6 +35,7 @@ var enumStrings = map[BlobStatus]string{
 	Failed:                 "Failed",
 	Finalized:              "Finalized",
 	InsufficientSignatures: "InsufficientSignatures",
+	Confirming:             "Confirming",
 }
 
 func (bs BlobStatus) String() string {
@@ -140,6 +142,8 @@ type BlobStore interface {
 	// MarkBlobConfirmed updates blob metadata to Confirmed status with confirmation info
 	// Returns the updated metadata and error
 	MarkBlobConfirmed(ctx context.Context, existingMetadata *BlobMetadata, confirmationInfo *ConfirmationInfo) (*BlobMetadata, error)
+	// MarkBlobConfirming updates blob metadata to Confirming status
+	MarkBlobConfirming(ctx context.Context, blobKey BlobKey) error
 	// MarkBlobInsufficientSignatures updates blob metadata to InsufficientSignatures status with confirmation info
 	// Returns the updated metadata and error
 	MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *BlobMetadata, confirmationInfo *ConfirmationInfo) (*BlobMetadata, error)
@@ -201,6 +205,12 @@ func FromBlobStatusProto(status disperser_rpc.BlobStatus) (*BlobStatus, error) {
 		return &res, nil
 	case disperser_rpc.BlobStatus_FINALIZED:
 		res = Finalized
+		return &res, nil
+	case disperser_rpc.BlobStatus_INSUFFICIENT_SIGNATURES:
+		res = InsufficientSignatures
+		return &res, nil
+	case disperser_rpc.BlobStatus_CONFIRMING:
+		res = Confirming
 		return &res, nil
 	}
 
