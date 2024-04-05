@@ -9,6 +9,7 @@
       "churner": "0xe0550117Cb066D3b330eBd764B0d75D3BA378734",
       "ejector": "0xBE1685C81aA44FF9FB319dD389addd9374383e90",
       "batchConfirmer": "0x8ED83c6Bb12E441Ca2C3a544F525d4a3Fb6484D8",
+      "fallbackBatchConfirmer": "0x5A49Bf6c5690E22dFff3eB37F7dd18254eC361ED",
       "deployer": "0x45B866E099a790cbddA655Ca20Cb11168B2cD088",
       "initalPausedStatus": 0
     },

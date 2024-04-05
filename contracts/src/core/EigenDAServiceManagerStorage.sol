@@ -53,8 +53,8 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
     mapping(uint32 => bytes32) public batchIdToBatchMetadataHash;
 
-    /// @notice address that is permissioned to confirm batches
-    address public batchConfirmer;
+    /// @notice mapping of addressed that are permissioned to confirm batches
+    mapping(address => bool) public isBatchConfirmer;
 
     // storage gap for upgradeability
     // slither-disable-next-line shadowing-state

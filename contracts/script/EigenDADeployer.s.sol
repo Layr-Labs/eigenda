@@ -191,6 +191,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             stakeRegistry
         );
 
+        address[] memory confirmers = new address[](1);
+        confirmers[0] = addressConfig.eigenDACommunityMultisig;
+
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
@@ -200,7 +203,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 eigenDAPauserReg,
                 0,
                 addressConfig.eigenDACommunityMultisig,
-                addressConfig.eigenDACommunityMultisig
+                confirmers
             )
         );
 
