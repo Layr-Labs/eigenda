@@ -3,7 +3,6 @@ package encoder
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
@@ -13,14 +12,12 @@ import (
 )
 
 type client struct {
-	addr    string
-	timeout time.Duration
+	addr string
 }
 
-func NewEncoderClient(addr string, timeout time.Duration) (disperser.EncoderClient, error) {
+func NewEncoderClient(addr string) (disperser.EncoderClient, error) {
 	return client{
-		addr:    addr,
-		timeout: timeout,
+		addr: addr,
 	}, nil
 }
 

@@ -66,7 +66,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
-			EncodingTimeout:    ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
 			AttestationTimeout: ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
 			ChainReadTimeout:   ctx.GlobalDuration(flags.ChainReadTimeoutFlag.Name),
 			ChainWriteTimeout:  ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),

@@ -165,7 +165,7 @@ func RunBatcher(ctx *cli.Context) error {
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
 		return errors.New("encoder socket must be specified")
 	}
-	encoderClient, err := encoder.NewEncoderClient(config.BatcherConfig.EncoderSocket, config.TimeoutConfig.EncodingTimeout)
+	encoderClient, err := encoder.NewEncoderClient(config.BatcherConfig.EncoderSocket)
 	if err != nil {
 		return err
 	}

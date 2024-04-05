@@ -91,13 +91,6 @@ var (
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "INDEXER_DATA_DIR"),
 		Value:  "./data/",
 	}
-	EncodingTimeoutFlag = cli.DurationFlag{
-		Name:     "encoding-timeout",
-		Usage:    "connection timeout from grpc call to encoder",
-		Required: false,
-		Value:    10 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENCODING_TIMEOUT"),
-	}
 	AttestationTimeoutFlag = cli.DurationFlag{
 		Name:     "attestation-timeout",
 		Usage:    "connection timeout from grpc call to DA nodes for attestation",
@@ -203,7 +196,6 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	IndexerDataDirFlag,
-	EncodingTimeoutFlag,
 	AttestationTimeoutFlag,
 	ChainReadTimeoutFlag,
 	ChainWriteTimeoutFlag,
