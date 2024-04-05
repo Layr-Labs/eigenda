@@ -144,7 +144,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 		if err != nil {
 			return nil, 0, err
 		}
-		totalSize += blob.BlobHeader.EncodedSizeAllQuorums()
+		totalSize += int64(blob.Bundles.Size())
 	}
 
 	request := &node.StoreChunksRequest{
