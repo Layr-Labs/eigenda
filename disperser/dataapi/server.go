@@ -91,6 +91,7 @@ type (
 		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 		TotalBatches         int     `json:"total_batches"`
 		Percentage           float64 `json:"percentage"`
+		StakePercentage      float64 `json:"stake_percentage"`
 	}
 
 	OperatorsNonsigningPercentage struct {
