@@ -588,81 +588,41 @@ func (t *Transactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, ope
 }
 
 func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
-	// Get the bitmap indices for all the given operators.
-	type BitmapIndexOrError struct {
-		bitmapIndex int
-		// The index is referring to the position of operator in operatorIds slice,
-		// i.e. the bitmapIndex here is for operatorIds[index].
-		index int
-		err   error
+	quorumCount, err := t.GetQuorumCount(ctx, blockNumber)
+	if err != nil {
+		return nil, err
 	}
-	indexChan := make(chan BitmapIndexOrError, len(operatorIds))
-	indexPool := workerpool.New(maxNumWorkerPoolThreads)
-	for i, id := range operatorIds {
-		i := i
-		byteId := [32]byte(id)
-		indexPool.Submit(func() {
-			result, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
-				Context: ctx,
-			}, blockNumber, [][32]byte{byteId})
-			if err != nil || len(result) != 1 {
-				// If the bitmap index isn't found for an operator, instead of erroring out,
-				// set the bitmap index to -1, so we could continue to get results for other
-				// operators.
-				indexChan <- BitmapIndexOrError{bitmapIndex: -1, index: i, err: err}
-				t.Logger.Info("Failed to get bitmap index for operator", "operatorId", id.Hex(), "err", err)
-			} else {
-				indexChan <- BitmapIndexOrError{bitmapIndex: int(result[0]), index: i, err: err}
+
+	quorumNumbers := make([]byte, quorumCount)
+	for i := 0; i < len(quorumNumbers); i++ {
+		quorumNumbers[i] = byte(uint8(i))
+	}
+	operatorsByQuorum, err := t.Bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
+		Context: ctx,
+	}, t.Bindings.RegCoordinatorAddr, quorumNumbers, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	quorumsByOperator := make(map[core.OperatorID]map[uint8]bool)
+	for i := range operatorsByQuorum {
+		for _, op := range operatorsByQuorum[i] {
+			if _, ok := quorumsByOperator[op.OperatorId]; !ok {
+				quorumsByOperator[op.OperatorId] = make(map[uint8]bool)
 			}
-		})
-	}
-	indexPool.StopWait()
-	close(indexChan)
-	// quorumBitmapIndices[i] is the bitmap index for operatorIds[i].
-	quorumBitmapIndices := make([]int, len(operatorIds))
-	for result := range indexChan {
-		if result.err != nil {
-			quorumBitmapIndices[result.index] = -1
-		} else {
-			quorumBitmapIndices[result.index] = result.bitmapIndex
+			quorumsByOperator[op.OperatorId][uint8(i)] = true
 		}
 	}
-
-	// Get bitmaps in N RPCs, but in parallel.
-	type BitmapOrError struct {
-		bitmap *big.Int
-		// The index is referring to the position of operator in operatorIds slice,
-		// i.e. the bitmap here (if err is nil) is for operatorIds[index].
-		index int
-		err   error
-	}
-	resultChan := make(chan BitmapOrError, len(quorumBitmapIndices))
-	pool := workerpool.New(maxNumWorkerPoolThreads)
-	for i, bitmapIndex := range quorumBitmapIndices {
-		i := i
-		bitmapIndex := bitmapIndex
-		op := operatorIds[i]
-		pool.Submit(func() {
-			if bitmapIndex == -1 {
-				resultChan <- BitmapOrError{bitmap: nil, index: i, err: fmt.Errorf("no bitmap index found for operator: %s", op.Hex())}
-				return
+	bitmaps := make([]*big.Int, len(operatorIds))
+	for i, op := range operatorIds {
+		if quorums, ok := quorumsByOperator[op]; ok {
+			bm := big.NewInt(0)
+			for id := range quorums {
+				bm.SetBit(bm, int(id), 1)
 			}
-			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
-				Context: ctx,
-			}, op, blockNumber, big.NewInt(int64(bitmapIndex)))
-			resultChan <- BitmapOrError{bitmap: bm, index: i, err: err}
-		})
-	}
-	pool.StopWait()
-	close(resultChan)
-
-	bitmaps := make([]*big.Int, len(quorumBitmapIndices))
-	for result := range resultChan {
-		if result.err != nil {
-			// For operators not found bitmap, set the bitmap to empty.
-			bitmaps[result.index] = big.NewInt(0)
+			bitmaps[i] = bm
 		} else {
-			bitmaps[result.index] = result.bitmap
+			bitmaps[i] = big.NewInt(0)
 		}
 	}
 	return bitmaps, nil
