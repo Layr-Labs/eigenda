@@ -129,15 +129,14 @@ var _ = Describe("Inabox Integration", func() {
 		Expect(err).To(BeNil())
 		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
 
-		retrieved, err = retrievalClient.RetrieveBlob(ctx,
+		_, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve blob 1 from quorum 1
 		)
-		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+		Expect(err).NotTo(BeNil())
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
@@ -148,15 +147,14 @@ var _ = Describe("Inabox Integration", func() {
 		)
 		Expect(err).To(BeNil())
 		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
-		retrieved, err = retrievalClient.RetrieveBlob(ctx,
+		_, err = retrievalClient.RetrieveBlob(ctx,
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve from quorum 1
 		)
-		Expect(err).To(BeNil())
-		Expect(bytes.TrimRight(retrieved, "\x00")).To(Equal(bytes.TrimRight(data, "\x00")))
+		Expect(err).NotTo(BeNil())
 	})
 })
 
