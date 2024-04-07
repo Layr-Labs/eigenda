@@ -21,17 +21,18 @@ func TestLengthProof(t *testing.T) {
 
 	numBlob := 5
 	for z := 0; z < numBlob; z++ {
-		extra := make([]byte, z*31*2)
+		extra := make([]byte, z*32*2)
 		inputBytes := append(gettysburgAddressBytes, extra...)
-		inputFr := rs.ToFrArray(inputBytes)
+		inputFr, err := rs.ToFrArray(inputBytes)
+		require.Nil(t, err)
 
-		_, lowDegreeCommitment, lowDegreeProof, _, _, err := enc.Encode(inputFr)
+		_, legnthCommitment, legnthProof, _, _, err := enc.Encode(inputFr)
 		require.Nil(t, err)
 
 		length := len(inputFr)
-		assert.NoError(t, v.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
+		assert.NoError(t, v.VerifyCommit(legnthCommitment, legnthProof, uint64(length)), "low degree verification failed\n")
 
 		length = len(inputFr) - 10
-		assert.Error(t, v.VerifyCommit(lowDegreeCommitment, lowDegreeProof, uint64(length)), "low degree verification failed\n")
+		assert.Error(t, v.VerifyCommit(legnthCommitment, legnthProof, uint64(length)), "low degree verification failed\n")
 	}
 }

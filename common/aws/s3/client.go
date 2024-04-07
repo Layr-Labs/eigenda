@@ -67,7 +67,7 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 		s3Client := s3.NewFromConfig(awsConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
 		})
-		ref = &client{s3Client: s3Client, logger: logger}
+		ref = &client{s3Client: s3Client, logger: logger.With("component", "S3Client")}
 	})
 	return ref, err
 }
@@ -137,9 +137,13 @@ func (s *client) ListObjects(ctx context.Context, bucket string, prefix string) 
 
 	objects := make([]Object, 0, len(output.Contents))
 	for _, object := range output.Contents {
+		var size int64 = 0
+		if object.Size != nil {
+			size = *object.Size
+		}
 		objects = append(objects, Object{
 			Key:  *object.Key,
-			Size: object.Size,
+			Size: size,
 		})
 	}
 	return objects, nil

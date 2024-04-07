@@ -19,7 +19,6 @@ export const BATCH_PREFIX_BYTES = Bytes.fromHexString("0x0007")
 export function handleConfirmBatchCall(confirmBatchCall: ConfirmBatchCall): void {
   let batchHeader = new BatchHeader(BATCH_HEADER_PREFIX_BYTES.concat(confirmBatchCall.transaction.hash))
   batchHeader.blobHeadersRoot = confirmBatchCall.inputs.batchHeader.blobHeadersRoot
-  batchHeader.blobHeadersRoot = confirmBatchCall.inputs.batchHeader.blobHeadersRoot
   batchHeader.quorumNumbers = bytesToBigIntArray(confirmBatchCall.inputs.batchHeader.quorumNumbers)
   batchHeader.signedStakeForQuorums = bytesToBigIntArray(confirmBatchCall.inputs.batchHeader.signedStakeForQuorums)
   batchHeader.referenceBlockNumber = confirmBatchCall.inputs.batchHeader.referenceBlockNumber

@@ -3,7 +3,9 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"slices"
 
@@ -73,7 +75,7 @@ func NewTransactor(
 
 	e := &Transactor{
 		EthClient: client,
-		Logger:    logger,
+		Logger:    logger.With("component", "Transactor"),
 	}
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
@@ -237,6 +239,10 @@ func (t *Transactor) RegisterOperatorWithChurn(
 
 	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.OperatorsToChurn))
 	for i := range churnReply.OperatorsToChurn {
+		if churnReply.OperatorsToChurn[i].QuorumId >= core.MaxQuorumID {
+			return errors.New("quorum id is out of range")
+		}
+
 		operatorsToChurn[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
 			QuorumNumber: uint8(churnReply.OperatorsToChurn[i].QuorumId),
 			Operator:     gethcommon.BytesToAddress(churnReply.OperatorsToChurn[i].Operator),
@@ -280,12 +286,18 @@ func (t *Transactor) RegisterOperatorWithChurn(
 	return nil
 }
 
-// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
+// DeregisterOperator deregisters an operator with the given public key from the specified the quorums that it is
 // registered with at the supplied block number. To fully deregister an operator, this function should be called
 // with the current block number.
-func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32) error {
+// If the operator isn't registered with any of the specified quorums, this function will return error, and
+// no quorum will be deregistered.
+func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32, quorumIds []core.QuorumID) error {
+	if len(quorumIds) == 0 {
+		return errors.New("no quorum is specified to deregister from")
+	}
+	// Make sure the operator is registered in all the quorums it tries to deregister.
 	operatorId := HashPubKeyG1(pubkeyG1)
-	quorumBitmap, opStates, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
+	quorumBitmap, _, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operatorId, blockNumber)
 	if err != nil {
@@ -293,13 +305,19 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 		return err
 	}
 
-	operatorIdsToSwap := make([][32]byte, len(opStates))
-	for i := range opStates {
-		quorum := opStates[i]
-		operatorIdsToSwap[i] = quorum[len(opStates[i])-1].OperatorId
-	}
-
 	quorumNumbers := bitmapToBytesArray(quorumBitmap)
+	for _, quorumToDereg := range quorumIds {
+		found := false
+		for _, currentQuorum := range quorumNumbers {
+			if quorumToDereg == currentQuorum {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("operatorId %s is not registered in quorum %d at block %d", hex.EncodeToString(operatorId[:]), quorumToDereg, blockNumber)
+		}
+	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
 	if err != nil {
@@ -308,7 +326,7 @@ func (t *Transactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Po
 	}
 	tx, err := t.Bindings.RegistryCoordinator.DeregisterOperator(
 		opts,
-		quorumNumbers,
+		quorumIds,
 	)
 	if err != nil {
 		t.Logger.Error("Failed to deregister operator", "err", err)
@@ -356,9 +374,12 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 		return nil, nil, err
 	}
 
+	// BitmapToQuorumIds returns an ordered list of quorums in ascending order, which is the same order as the state_ returned by the contract
+	quorumIds := BitmapToQuorumIds(quorumBitmap)
+
 	state := make(core.OperatorStakes, len(state_))
 	for i := range state_ {
-		quorumID := core.QuorumID(i)
+		quorumID := quorumIds[i]
 		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStake, len(state_[i]))
 		for j, op := range state_[i] {
 			operatorIndex := core.OperatorIndex(j)
@@ -368,8 +389,6 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 			}
 		}
 	}
-
-	quorumIds := BitmapToQuorumIds(quorumBitmap)
 
 	return state, quorumIds, nil
 }
@@ -439,15 +458,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		// TODO: instead of recalculating the operator id, we should just pass it in from the caller
 		nonSignerOperatorIds[i] = HashPubKeyG1(signatureAggregation.NonSigners[i])
 	}
-	sigAgg, err := json.Marshal(signatureAggregation)
-	if err == nil {
-		t.Logger.Debug("[BuildConfirmBatchTxn]", "signatureAggregation", string(sigAgg))
-	}
 
-	t.Logger.Debug("[GetCheckSignaturesIndices]", "regCoordinatorAddr", t.Bindings.RegCoordinatorAddr.Hex(), "refBlockNumber", batchHeader.ReferenceBlockNumber, "quorumNumbers", gethcommon.Bytes2Hex(quorumNumbers))
-	for _, ns := range nonSignerOperatorIds {
-		t.Logger.Debug("[GetCheckSignaturesIndices]", "nonSignerOperatorId", gethcommon.Bytes2Hex(ns[:]))
-	}
 	checkSignaturesIndices, err := t.Bindings.OpStateRetriever.GetCheckSignaturesIndices(
 		&bind.CallOpts{
 			Context: ctx,
@@ -475,7 +486,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 		SignedStakeForQuorums: signedStakeForQuorums,
 		ReferenceBlockNumber:  uint32(batchHeader.ReferenceBlockNumber),
 	}
-	t.Logger.Debug("[ConfirmBatch] batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
+	t.Logger.Debug("batch header", "batchHeaderReferenceBlock", batchH.ReferenceBlockNumber, "batchHeaderRoot", gethcommon.Bytes2Hex(batchH.BlobHeadersRoot[:]), "quorumNumbers", gethcommon.Bytes2Hex(batchH.QuorumNumbers), "quorumThresholdPercentages", gethcommon.Bytes2Hex(batchH.SignedStakeForQuorums))
 
 	sigma := signatureToBN254G1Point(signatureAggregation.AggSignature)
 
@@ -498,7 +509,7 @@ func (t *Transactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core
 	}
 	sigChecker, err := json.Marshal(signatureChecker)
 	if err == nil {
-		t.Logger.Debug("[ConfirmBatch] signature checker", "signatureChecker", string(sigChecker))
+		t.Logger.Debug("signature checker", "signatureChecker", string(sigChecker))
 	}
 
 	opts, err := t.EthClient.GetNoSendTransactOpts()
@@ -577,48 +588,42 @@ func (t *Transactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, ope
 }
 
 func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
-	// Get indices in batch (1 RPC).
-	byteOperatorIds := make([][32]byte, len(operatorIds))
-	for i := range operatorIds {
-		byteOperatorIds[i] = [32]byte(operatorIds[i])
-	}
-	quorumBitmapIndices, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapIndicesAtBlockNumber(&bind.CallOpts{
-		Context: ctx,
-	}, blockNumber, byteOperatorIds)
+	quorumCount, err := t.GetQuorumCount(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get bitmaps in N RPCs, but in parallel.
-	type BitmapOrError struct {
-		bitmap *big.Int
-		// The index is referring to the position of operator in operatorIds slice,
-		// i.e. the bitmap here (if err is nil) is for operatorIds[index].
-		index int
-		err   error
+	quorumNumbers := make([]byte, quorumCount)
+	for i := 0; i < len(quorumNumbers); i++ {
+		quorumNumbers[i] = byte(uint8(i))
 	}
-	resultChan := make(chan BitmapOrError, len(quorumBitmapIndices))
-	pool := workerpool.New(maxNumWorkerPoolThreads)
-	for i, bitmapIndex := range quorumBitmapIndices {
-		i := i
-		bitmapIndex := bitmapIndex
-		op := operatorIds[i]
-		pool.Submit(func() {
-			bm, err := t.Bindings.RegistryCoordinator.GetQuorumBitmapAtBlockNumberByIndex(&bind.CallOpts{
-				Context: ctx,
-			}, op, blockNumber, big.NewInt(int64(bitmapIndex)))
-			resultChan <- BitmapOrError{bitmap: bm, index: i, err: err}
-		})
+	operatorsByQuorum, err := t.Bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
+		Context: ctx,
+	}, t.Bindings.RegCoordinatorAddr, quorumNumbers, blockNumber)
+	if err != nil {
+		return nil, err
 	}
-	pool.StopWait()
-	close(resultChan)
 
-	bitmaps := make([]*big.Int, len(quorumBitmapIndices))
-	for result := range resultChan {
-		if result.err != nil {
-			return nil, result.err
+	quorumsByOperator := make(map[core.OperatorID]map[uint8]bool)
+	for i := range operatorsByQuorum {
+		for _, op := range operatorsByQuorum[i] {
+			if _, ok := quorumsByOperator[op.OperatorId]; !ok {
+				quorumsByOperator[op.OperatorId] = make(map[uint8]bool)
+			}
+			quorumsByOperator[op.OperatorId][uint8(i)] = true
 		}
-		bitmaps[result.index] = result.bitmap
+	}
+	bitmaps := make([]*big.Int, len(operatorIds))
+	for i, op := range operatorIds {
+		if quorums, ok := quorumsByOperator[op]; ok {
+			bm := big.NewInt(0)
+			for id := range quorums {
+				bm.SetBit(bm, int(id), 1)
+			}
+			bitmaps[i] = bm
+		} else {
+			bitmaps[i] = big.NewInt(0)
+		}
 	}
 	return bitmaps, nil
 }

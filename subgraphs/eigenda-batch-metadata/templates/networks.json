@@ -34,5 +34,11 @@
       "address": "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
       "startBlock": 1168409
     }
+  },
+  "mainnet": {
+    "EigenDAServiceManager": {
+      "address": "0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0",
+      "startBlock": 19592322
+    }
   }
 }

@@ -191,11 +191,7 @@ func getRequestID(key disperser.BlobKey, quorumID core.QuorumID) requestID {
 	return requestID(fmt.Sprintf("%s-%d", key.String(), quorumID))
 }
 
+// getChunksSize returns the total size of all the chunks in the encoded result in bytes
 func getChunksSize(result *EncodingResult) uint64 {
-	var size uint64
-
-	for _, chunk := range result.Chunks {
-		size += uint64(len(chunk.Coeffs) * 256) // 256 bytes per symbol
-	}
-	return size + 256*2 // + 256 * 2 bytes for proof
+	return core.Bundle(result.Chunks).Size()
 }

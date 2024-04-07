@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,9 +25,12 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 	blobMessagesByOp := make(map[core.OperatorID][]*core.BlobMessage)
 	for i := 0; i < numBlobs; i++ {
 		// create data
-		data := make([]byte, blobSize)
-		_, err := rand.Read(data)
+		ranData := make([]byte, blobSize)
+		_, err := rand.Read(ranData)
 		assert.NoError(t, err)
+
+		data := codec.ConvertByPaddingEmptyByte(ranData)
+		data = data[:blobSize]
 
 		operatorState, err := chainState.GetOperatorState(context.Background(), 0, []core.QuorumID{0})
 		assert.NoError(t, err)
@@ -92,15 +97,16 @@ func TestStoreChunks(t *testing.T) {
 
 	server := newTestServer(t, false)
 	// 50 X 200 KiB blobs
-	batchHeader, blobMessagesByOp := makeBatch(t, 200*1024, 50, 80, 100, 0)
+	batchHeader, blobMessagesByOp := makeBatch(t, 200*1024, 50, 80, 100, 1)
 	numTotalChunks := 0
 	for i := range blobMessagesByOp[opID] {
 		numTotalChunks += len(blobMessagesByOp[opID][i].Bundles[0])
 	}
 	t.Logf("Batch numTotalChunks: %d", numTotalChunks)
 	req, totalSize, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader)
+	fmt.Println("totalSize", totalSize)
 	assert.NoError(t, err)
-	assert.Equal(t, 50790400, totalSize)
+	assert.Equal(t, int64(26214400), totalSize)
 
 	timer := time.Now()
 	reply, err := server.StoreChunks(context.Background(), req)

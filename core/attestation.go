@@ -48,11 +48,24 @@ func (p *G1Point) VerifyEquivalence(p2 *G2Point) (bool, error) {
 }
 
 func (p *G1Point) Serialize() []byte {
-	return bn254utils.SerializeG1(p.G1Affine)
+	res := p.RawBytes()
+	return res[:]
 }
 
-func (p *G1Point) Deserialize(data []byte) *G1Point {
-	return &G1Point{bn254utils.DeserializeG1(data)}
+func (p *G1Point) Deserialize(data []byte) (*G1Point, error) {
+	var point bn254.G1Affine
+	_, err := point.SetBytes(data)
+	if err != nil {
+		return nil, err
+	}
+	return &G1Point{&point}, nil
+}
+
+func (p *G1Point) Clone() *G1Point {
+	return &G1Point{&bn254.G1Affine{
+		X: newFpElement(p.X.BigInt(new(big.Int))),
+		Y: newFpElement(p.Y.BigInt(new(big.Int))),
+	}}
 }
 
 func (p *G1Point) Hash() [32]byte {
@@ -74,11 +87,34 @@ func (p *G2Point) Sub(p2 *G2Point) {
 }
 
 func (p *G2Point) Serialize() []byte {
-	return bn254utils.SerializeG2(p.G2Affine)
+	res := p.RawBytes()
+	return res[:]
 }
 
-func (p *G2Point) Deserialize(data []byte) *G2Point {
-	return &G2Point{bn254utils.DeserializeG2(data)}
+func (p *G2Point) Deserialize(data []byte) (*G2Point, error) {
+	var point bn254.G2Affine
+	_, err := point.SetBytes(data)
+	if err != nil {
+		return nil, err
+	}
+	return &G2Point{&point}, nil
+}
+
+func (p *G2Point) Clone() *G2Point {
+	return &G2Point{&bn254.G2Affine{
+		X: struct {
+			A0, A1 fp.Element
+		}{
+			A0: newFpElement(p.X.A0.BigInt(new(big.Int))),
+			A1: newFpElement(p.X.A1.BigInt(new(big.Int))),
+		},
+		Y: struct {
+			A0, A1 fp.Element
+		}{
+			A0: newFpElement(p.Y.A0.BigInt(new(big.Int))),
+			A1: newFpElement(p.Y.A1.BigInt(new(big.Int))),
+		},
+	}}
 }
 
 type Signature struct {

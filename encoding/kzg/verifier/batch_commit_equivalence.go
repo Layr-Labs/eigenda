@@ -1,8 +1,7 @@
 package verifier
 
 import (
-	"bytes"
-	"encoding/gob"
+	"crypto/rand"
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -18,46 +17,25 @@ type CommitmentPair struct {
 	LengthCommitment bn254.G2Affine
 }
 
-// generate a random value using Fiat Shamir transform
-// we can also pseudo randomness generated locally, but we have to ensure no adversary can manipulate it
-// Hashing everything takes about 1ms, so Fiat Shamir transform does not incur much cost
-func GenRandomFactorForEquivalence(g1commits []bn254.G1Affine, g2commits []bn254.G2Affine) (fr.Element, error) {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-
-	for _, commit := range g1commits {
-		err := enc.Encode(commit)
-		if err != nil {
-			return fr.Element{}, err
-		}
-	}
-
-	for _, commit := range g2commits {
-		err := enc.Encode(commit)
-		if err != nil {
-			return fr.Element{}, err
-		}
-	}
-
-	var randomFr fr.Element
-
-	err := kzg.HashToSingleField(&randomFr, buffer.Bytes())
+// Create a random number with crypto/rand.
+// Gnark provides SetRandom() function, but the implementation below is for explicity
+func GetRandomFr() (fr.Element, error) {
+	r, err := rand.Int(rand.Reader, fr.Modulus())
 	if err != nil {
 		return fr.Element{}, err
 	}
-
-	return randomFr, nil
+	var rElement fr.Element
+	rElement.SetBigInt(r)
+	return rElement, nil
 }
 
-func CreateRandomnessVector(g1commits []bn254.G1Affine, g2commits []bn254.G2Affine) ([]fr.Element, error) {
-	r, err := GenRandomFactorForEquivalence(g1commits, g2commits)
+func CreateRandomnessVector(n int) ([]fr.Element, error) {
+	if n <= 0 {
+		return nil, errors.New("the length of vector must be positive")
+	}
+	r, err := GetRandomFr()
 	if err != nil {
 		return nil, err
-	}
-	n := len(g1commits)
-
-	if len(g1commits) != len(g2commits) {
-		return nil, errors.New("inconsistent number of blobs for g1 and g2")
 	}
 
 	randomsFr := make([]fr.Element, n)
@@ -93,7 +71,7 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 		g2commits[i] = commitmentsPair[i].LengthCommitment
 	}
 
-	randomsFr, err := CreateRandomnessVector(g1commits, g2commits)
+	randomsFr, err := CreateRandomnessVector(len(g1commits))
 	if err != nil {
 		return err
 	}
@@ -117,6 +95,6 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 	if err == nil {
 		return nil
 	} else {
-		return errors.New("Universal Verify Incorrect paring")
+		return errors.New("incorrect universal batch verification")
 	}
 }

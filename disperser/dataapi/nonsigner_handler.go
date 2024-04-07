@@ -51,8 +51,11 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 
 	// Create a mapping from address to operatorID.
 	nonsignerAddressToId := make(map[string]core.OperatorID)
+	nonsignerIdToAddress := make(map[string]string)
 	for i := range nonsigners {
-		nonsignerAddressToId[nonsignerAddresses[i].Hex()] = nonsigners[i]
+		addr := strings.ToLower(nonsignerAddresses[i].Hex())
+		nonsignerAddressToId[addr] = nonsigners[i]
+		nonsignerIdToAddress[nonsigners[i].Hex()] = addr
 	}
 
 	// Create operators' quorum intervals.
@@ -84,6 +87,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 				}
 				nonsignerMetric := OperatorNonsigningPercentageMetrics{
 					OperatorId:           fmt.Sprintf("0x%s", op),
+					OperatorAddress:      nonsignerIdToAddress[op],
 					QuorumId:             q,
 					TotalUnsignedBatches: unsignedCount,
 					TotalBatches:         totalCount,
@@ -223,8 +227,10 @@ func computeNumResponsible(batches []*BatchNonSigningInfo, operatorQuorumInterva
 	for op, val := range operatorQuorumIntervals {
 		for q, intervals := range val {
 			numBatches := 0
-			for _, interval := range intervals {
-				numBatches = numBatches + ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
+			if _, ok := quorumBatches[q]; ok {
+				for _, interval := range intervals {
+					numBatches = numBatches + ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
+				}
 			}
 			if _, ok := numResponsible[op]; !ok {
 				numResponsible[op] = make(map[uint8]int)

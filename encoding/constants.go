@@ -6,7 +6,9 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-const BYTES_PER_COEFFICIENT = 31
+const BYTES_PER_SYMBOL = 32
+
+const NUMBER_FR_SECURITY_BYTES = 32
 
 func init() {
 	initGlobals()

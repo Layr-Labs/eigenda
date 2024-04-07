@@ -38,14 +38,23 @@ type EthClient struct {
 
 var _ common.EthClient = (*EthClient)(nil)
 
-func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error) {
-	chainClient, err := ethclient.Dial(config.RPCURL)
+// NewClient creates a new Ethereum client.
+// If PrivateKeyString in the config is empty, the client will not be able to send transactions, and it will use the senderAddress to create transactions.
+// If PrivateKeyString in the config is not empty, the client will be able to send transactions, and the senderAddress is ignored.
+func NewClient(config EthClientConfig, senderAddress gethcommon.Address, rpcIndex int, _logger logging.Logger) (*EthClient, error) {
+	if rpcIndex >= len(config.RPCURLs) {
+		return nil, fmt.Errorf("NewClient: index out of bound, array size is %v, requested is %v", len(config.RPCURLs), rpcIndex)
+	}
+	logger := _logger.With("component", "EthClient")
+
+	rpcUrl := config.RPCURLs[rpcIndex]
+	chainClient, err := ethclient.Dial(rpcUrl)
 	if err != nil {
 		return nil, fmt.Errorf("NewClient: cannot connect to provider: %w", err)
 	}
-	var accountAddress gethcommon.Address
 	var privateKey *ecdsa.PrivateKey
 
+	accountAddress := senderAddress
 	if len(config.PrivateKeyString) != 0 {
 		privateKey, err = crypto.HexToECDSA(config.PrivateKeyString)
 		if err != nil {
@@ -55,7 +64,7 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 
 		if !ok {
-			logger.Error("NewClient: cannot get publicKeyECDSA")
+			logger.Error("cannot get publicKeyECDSA")
 			return nil, ErrCannotGetECDSAPubKey
 		}
 		accountAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
@@ -67,7 +76,7 @@ func NewClient(config EthClientConfig, logger logging.Logger) (*EthClient, error
 	}
 
 	c := &EthClient{
-		RPCURL:           config.RPCURL,
+		RPCURL:           rpcUrl,
 		privateKey:       privateKey,
 		chainID:          chainIDBigInt,
 		AccountAddress:   accountAddress,
@@ -84,14 +93,30 @@ func (c *EthClient) GetAccountAddress() gethcommon.Address {
 	return c.AccountAddress
 }
 
-func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
-	opts, err := bind.NewKeyedTransactorWithChainID(c.privateKey, c.chainID)
-	if err != nil {
-		return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
-	}
-	opts.NoSend = true
+func NoopSigner(addr gethcommon.Address, tx *types.Transaction) (*types.Transaction, error) {
+	return tx, nil
+}
 
-	return opts, nil
+func (c *EthClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
+	if c.privateKey != nil {
+		opts, err := bind.NewKeyedTransactorWithChainID(c.privateKey, c.chainID)
+		if err != nil {
+			return nil, fmt.Errorf("NewClient: cannot create NoSendTransactOpts: %w", err)
+		}
+		opts.NoSend = true
+
+		return opts, nil
+	}
+
+	if c.AccountAddress.Cmp(gethcommon.Address{}) != 0 {
+		return &bind.TransactOpts{
+			From:   c.AccountAddress,
+			Signer: NoopSigner,
+			NoSend: true,
+		}, nil
+	}
+
+	return nil, errors.New("NewClient: cannot create NoSendTransactOpts: private key and account address are both empty")
 }
 
 func (c *EthClient) GetLatestGasCaps(ctx context.Context) (gasTipCap, gasFeeCap *big.Int, err error) {
@@ -200,7 +225,7 @@ func (c *EthClient) EstimateGasPriceAndLimitAndSendTx(
 func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Transaction, tag string) (*types.Receipt, error) {
 	receipt, err := c.waitMined(ctx, []*types.Transaction{tx})
 	if err != nil {
-		return receipt, fmt.Errorf("EnsureTransactionEvaled: failed to wait for transaction (%s) to mine: %w", tag, err)
+		return receipt, fmt.Errorf("failed to wait for transaction (%s) to mine: %w", tag, err)
 	}
 	if receipt.Status != 1 {
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
@@ -241,13 +266,13 @@ func (c *EthClient) waitMined(ctx context.Context, txs []*types.Transaction) (*t
 				chainTip, err := c.BlockNumber(ctx)
 				if err == nil {
 					if receipt.BlockNumber.Uint64()+uint64(c.numConfirmations) > chainTip {
-						c.Logger.Debug("EnsureTransactionEvaled: transaction has been mined but don't have enough confirmations at current chain tip", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
+						c.Logger.Debug("transaction has been mined but doesn't have enough confirmations at current chain head", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", c.numConfirmations, "chainTip", chainTip)
 						break
 					} else {
 						return receipt, nil
 					}
 				} else {
-					c.Logger.Debug("EnsureTransactionEvaled: failed to get chain tip while waiting for transaction to mine", "err", err)
+					c.Logger.Debug("failed to query block height while waiting for transaction to mine", "err", err)
 				}
 			}
 

@@ -93,56 +93,6 @@ func MulByGeneratorG2(a *fr.Element) *bn254.G2Affine {
 	return new(bn254.G2Affine).ScalarMultiplication(g2Gen, a.BigInt(new(big.Int)))
 }
 
-func SerializeG1(p *bn254.G1Affine) []byte {
-	b := make([]byte, 0)
-	tmp := p.X.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.Y.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	return b
-}
-
-func DeserializeG1(b []byte) *bn254.G1Affine {
-	p := new(bn254.G1Affine)
-	p.X.SetBytes(b[0:32])
-	p.Y.SetBytes(b[32:64])
-	return p
-}
-
-func SerializeG2(p *bn254.G2Affine) []byte {
-	b := make([]byte, 0)
-	tmp := p.X.A0.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.X.A1.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.Y.A0.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	tmp = p.Y.A1.Bytes()
-	for i := 0; i < 32; i++ {
-		b = append(b, tmp[i])
-	}
-	return b
-}
-
-func DeserializeG2(b []byte) *bn254.G2Affine {
-	p := new(bn254.G2Affine)
-	p.X.A0.SetBytes(b[0:32])
-	p.X.A1.SetBytes(b[32:64])
-	p.Y.A0.SetBytes(b[64:96])
-	p.Y.A1.SetBytes(b[96:128])
-	return p
-}
-
 func MakePubkeyRegistrationData(privKey *fr.Element, operatorAddress common.Address) *bn254.G1Affine {
 	toHash := make([]byte, 0)
 	toHash = append(toHash, crypto.Keccak256([]byte("BN254PubkeyRegistration(address operator)"))...)

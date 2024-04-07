@@ -37,7 +37,7 @@ const (
 var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
-		"5": "https://goerli.eigenlayer.xyz/avs/eigenda",
+		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda",
 	}
 )
 
@@ -68,7 +68,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	// }
 
 	promReg := prometheus.NewRegistry()
-	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger)
+	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger.With("component", "EigenMetrics"))
 
 	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort)
 	rpcCallsCollector := rpccalls.NewCollector(AppName, promReg)
@@ -107,7 +107,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	cst := eth.NewChainState(tx, client)
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger)
+	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
@@ -152,7 +152,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 
 	return &Node{
 		Config:                  config,
-		Logger:                  logger,
+		Logger:                  logger.With("component", "Node"),
 		KeyPair:                 keyPair,
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
@@ -192,15 +192,17 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
 		}
 		operator := &Operator{
-			Address:    crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
-			Socket:     socket,
-			Timeout:    10 * time.Second,
-			PrivKey:    privateKey,
-			KeyPair:    n.KeyPair,
-			OperatorId: n.Config.ID,
-			QuorumIDs:  n.Config.QuorumIDList,
+			Address:             crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
+			Socket:              socket,
+			Timeout:             10 * time.Second,
+			PrivKey:             privateKey,
+			KeyPair:             n.KeyPair,
+			OperatorId:          n.Config.ID,
+			QuorumIDs:           n.Config.QuorumIDList,
+			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 		}
-		err = RegisterOperator(ctx, operator, n.Transactor, n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Logger)
+		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Config.Timeout, n.Logger)
+		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
@@ -211,7 +213,6 @@ func (n *Node) Start(ctx context.Context) error {
 		} else {
 			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet", n.ChainID.String())
 		}
-
 	}
 
 	n.CurrentSocket = socket
@@ -264,9 +265,22 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	start := time.Now()
 	log := n.Logger
 
+	log.Debug("Processing batch", "num of blobs", len(blobs))
+
+	if len(blobs) == 0 {
+		return nil, errors.New("ProcessBatch: number of blobs must be greater than zero")
+	}
+
+	if len(blobs) != len(rawBlobs) {
+		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
+	}
+
 	// Measure num batches received and its size in bytes
-	batchSize := int64(0)
+	batchSize := uint64(0)
 	for _, blob := range blobs {
+		for quorumID, bundle := range blob.Bundles {
+			n.Metrics.AcceptBlobs(quorumID, bundle.Size())
+		}
 		batchSize += blob.Bundles.Size()
 	}
 	n.Metrics.AcceptBatches("received", batchSize)
@@ -318,8 +332,8 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// revert all the keys for that batch.
 		result := <-storeChan
 		if result.keys != nil {
-			if !n.Store.DeleteKeys(ctx, result.keys) {
-				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHash)
+			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
+				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHash, "err", deleteKeysErr)
 			}
 		}
 		return nil, fmt.Errorf("failed to validate batch: %w", err)

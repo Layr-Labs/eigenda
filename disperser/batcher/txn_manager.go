@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -18,7 +20,7 @@ import (
 var (
 	gasPricePercentageMultiplier = big.NewInt(10)
 	hundred                      = big.NewInt(100)
-	maxSpeedUpRetry              = 3
+	maxSendTransactionRetry      = 3
 )
 
 // TxnManager receives transactions from the caller, sends them to the chain, and monitors their status.
@@ -31,6 +33,11 @@ type TxnManager interface {
 	ReceiptChan() chan *ReceiptOrErr
 }
 
+type transaction struct {
+	*types.Transaction
+	TxID walletsdk.TxID
+}
+
 type TxnRequest struct {
 	Tx       *types.Transaction
 	Tag      string
@@ -41,7 +48,7 @@ type TxnRequest struct {
 	// txAttempts are the transactions that have been attempted to be mined for this request.
 	// If a transaction hasn't been confirmed within the timeout and a replacement transaction is sent,
 	// the original transaction hash will be kept in this slice
-	txAttempts []*types.Transaction
+	txAttempts []*transaction
 }
 
 // ReceiptOrErr is a wrapper for a transaction receipt or an error.
@@ -56,9 +63,11 @@ type ReceiptOrErr struct {
 type txnManager struct {
 	mu sync.Mutex
 
-	ethClient   common.EthClient
-	requestChan chan *TxnRequest
-	logger      logging.Logger
+	ethClient        common.EthClient
+	wallet           walletsdk.Wallet
+	numConfirmations int
+	requestChan      chan *TxnRequest
+	logger           logging.Logger
 
 	receiptChan        chan *ReceiptOrErr
 	queueSize          int
@@ -68,11 +77,13 @@ type txnManager struct {
 
 var _ TxnManager = (*txnManager)(nil)
 
-func NewTxnManager(ethClient common.EthClient, queueSize int, txnRefreshInterval time.Duration, logger logging.Logger, metrics *TxnManagerMetrics) TxnManager {
+func NewTxnManager(ethClient common.EthClient, wallet walletsdk.Wallet, numConfirmations, queueSize int, txnRefreshInterval time.Duration, logger logging.Logger, metrics *TxnManagerMetrics) TxnManager {
 	return &txnManager{
 		ethClient:          ethClient,
+		wallet:             wallet,
+		numConfirmations:   numConfirmations,
 		requestChan:        make(chan *TxnRequest, queueSize),
-		logger:             logger,
+		logger:             logger.With("component", "TxnManager"),
 		receiptChan:        make(chan *ReceiptOrErr, queueSize),
 		queueSize:          queueSize,
 		txnRefreshInterval: txnRefreshInterval,
@@ -88,7 +99,7 @@ func NewTxnRequest(tx *types.Transaction, tag string, value *big.Int, metadata i
 		Metadata: metadata,
 
 		requestedAt: time.Now(),
-		txAttempts:  make([]*types.Transaction, 0),
+		txAttempts:  make([]*transaction, 0),
 	}
 }
 
@@ -129,24 +140,44 @@ func (t *txnManager) Start(ctx context.Context) {
 func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.logger.Debug("[TxnManager] new transaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
-	gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get latest gas caps: %w", err)
+	t.logger.Debug("new transaction", "component", "TxnManager", "method", "ProcessTransaction", "tag", req.Tag, "nonce", req.Tx.Nonce(), "gasFeeCap", req.Tx.GasFeeCap(), "gasTipCap", req.Tx.GasTipCap())
+
+	var txn *types.Transaction
+	var txID walletsdk.TxID
+	var err error
+	retryFromFailure := 0
+	for retryFromFailure < maxSendTransactionRetry {
+		gasTipCap, gasFeeCap, err := t.ethClient.GetLatestGasCaps(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get latest gas caps: %w", err)
+		}
+
+		txn, err = t.ethClient.UpdateGas(ctx, req.Tx, req.Value, gasTipCap, gasFeeCap)
+		if err != nil {
+			return fmt.Errorf("failed to update gas price: %w", err)
+		}
+		txID, err = t.wallet.SendTransaction(ctx, txn)
+		if errors.Is(err, context.DeadlineExceeded) {
+			t.logger.Warn("failed to send txn due to timeout", "tag", req.Tag, "hash", req.Tx.Hash().Hex(), "numRetries", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
+			retryFromFailure++
+			continue
+		} else if err != nil {
+			return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
+		} else {
+			t.logger.Debug("successfully sent txn", "component", "TxnManager", "method", "ProcessTransaction", "tag", req.Tag, "txID", txID, "txHash", txn.Hash().Hex())
+			break
+		}
 	}
 
-	txn, err := t.ethClient.UpdateGas(ctx, req.Tx, req.Value, gasTipCap, gasFeeCap)
-	if err != nil {
-		return fmt.Errorf("failed to update gas price: %w", err)
-	}
-	err = t.ethClient.SendTransaction(ctx, txn)
-	if err != nil {
+	if txn == nil || txID == "" {
 		return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
-	} else {
-		t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", txn.Hash().Hex())
 	}
+
 	req.Tx = txn
-	req.txAttempts = append(req.txAttempts, txn)
+	req.txAttempts = append(req.txAttempts, &transaction{
+		TxID:        txID,
+		Transaction: txn,
+	})
 
 	t.requestChan <- req
 	t.metrics.UpdateTxQueue(len(t.requestChan))
@@ -157,22 +188,76 @@ func (t *txnManager) ReceiptChan() chan *ReceiptOrErr {
 	return t.receiptChan
 }
 
+func (t *txnManager) ensureAnyTransactionEvaled(ctx context.Context, txs []*transaction) (*types.Receipt, error) {
+	queryTicker := time.NewTicker(3 * time.Second)
+	defer queryTicker.Stop()
+	var receipt *types.Receipt
+	var err error
+	// transactions that need to be queried. Some transactions will be removed from this map depending on their status.
+	txnsToQuery := make(map[walletsdk.TxID]*types.Transaction, len(txs))
+	for _, tx := range txs {
+		txnsToQuery[tx.TxID] = tx.Transaction
+	}
+
+	for {
+		for txID, tx := range txnsToQuery {
+			receipt, err = t.wallet.GetTransactionReceipt(ctx, txID)
+			if err == nil {
+				chainTip, err := t.ethClient.BlockNumber(ctx)
+				if err == nil {
+					if receipt.BlockNumber.Uint64()+uint64(t.numConfirmations) > chainTip {
+						t.logger.Debug("transaction has been mined but don't have enough confirmations at current chain tip", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "txnBlockNumber", receipt.BlockNumber.Uint64(), "numConfirmations", t.numConfirmations, "chainTip", chainTip)
+						break
+					} else {
+						return receipt, nil
+					}
+				} else {
+					t.logger.Debug("failed to get chain tip while waiting for transaction to mine", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "err", err)
+				}
+			}
+
+			if errors.Is(err, ethereum.NotFound) || errors.Is(err, walletsdk.ErrReceiptNotYetAvailable) {
+				t.logger.Debug("Transaction not yet mined", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "txID", txID, "txHash", tx.Hash().Hex(), "err", err)
+			} else if errors.Is(err, walletsdk.ErrTransactionFailed) {
+				t.logger.Debug("Transaction failed", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "txID", txID, "txHash", tx.Hash().Hex(), "err", err)
+				delete(txnsToQuery, txID)
+			} else if err != nil {
+				t.logger.Debug("Transaction receipt retrieval failed", "component", "TxnManager", "method", "ensureAnyTransactionEvaled", "err", err)
+			}
+		}
+		// Wait for the next round.
+		select {
+		case <-ctx.Done():
+			return receipt, ctx.Err()
+		case <-queryTicker.C:
+		}
+	}
+}
+
 // monitorTransaction waits until the transaction is confirmed (or failed) and resends it with a higher gas price if it is not mined without a timeout.
 // It returns the receipt once the transaction has been confirmed.
 // It returns an error if the transaction fails to be sent for reasons other than timeouts.
 func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*types.Receipt, error) {
 	numSpeedUps := 0
 	retryFromFailure := 0
-	for {
+
+	var receipt *types.Receipt
+	var err error
+
+	rpcCallAttempt := func() error {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, t.txnRefreshInterval)
 		defer cancel()
+		t.logger.Debug("monitoring transaction", "component", "TxnManager", "method", "monitorTransaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
 
-		t.logger.Debug("[TxnManager] monitoring transaction", "txHash", req.Tx.Hash().Hex(), "tag", req.Tag, "nonce", req.Tx.Nonce())
-		receipt, err := t.ethClient.EnsureAnyTransactionEvaled(
+		receipt, err = t.ensureAnyTransactionEvaled(
 			ctxWithTimeout,
 			req.txAttempts,
-			req.Tag,
 		)
+		return err
+	}
+
+	for {
+		err = rpcCallAttempt()
 		if err == nil {
 			t.metrics.UpdateSpeedUps(numSpeedUps)
 			t.metrics.IncrementTxnCount("success")
@@ -181,33 +266,38 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 
 		if errors.Is(err, context.DeadlineExceeded) {
 			if receipt != nil {
-				t.logger.Warn("[TxnManager] transaction has been mined, but hasn't accumulated the required number of confirmations", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
+				t.logger.Warn("transaction has been mined, but hasn't accumulated the required number of confirmations", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
 				continue
 			}
-			t.logger.Warn("[TxnManager] transaction not mined within timeout, resending with higher gas price", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
+			t.logger.Warn("transaction not mined within timeout, resending with higher gas price", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "nonce", req.Tx.Nonce())
 			newTx, err := t.speedUpTxn(ctx, req.Tx, req.Tag)
 			if err != nil {
-				t.logger.Error("[TxnManager] failed to speed up transaction", "err", err)
+				t.logger.Error("failed to speed up transaction", "component", "TxnManager", "method", "monitorTransaction", "err", err)
 				t.metrics.IncrementTxnCount("failure")
 				return nil, err
 			}
-			err = t.ethClient.SendTransaction(ctx, newTx)
+			txID, err := t.wallet.SendTransaction(ctx, newTx)
 			if err != nil {
-				t.logger.Error("[TxnManager] failed to send txn", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSpeedUpRetry, "err", err)
-				if retryFromFailure >= maxSpeedUpRetry {
+				if retryFromFailure >= maxSendTransactionRetry {
+					t.logger.Warn("failed to send txn - retries exhausted", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
 					t.metrics.IncrementTxnCount("failure")
 					return nil, err
+				} else {
+					t.logger.Warn("failed to send txn - retrying", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txn", req.Tx.Hash().Hex(), "attempt", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
 				}
 				retryFromFailure++
 				continue
 			}
 
-			t.logger.Debug("[TxnManager] successfully sent txn", "tag", req.Tag, "txn", newTx.Hash().Hex())
+			t.logger.Debug("successfully sent txn", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txID", txID, "txHash", newTx.Hash().Hex())
 			req.Tx = newTx
-			req.txAttempts = append(req.txAttempts, newTx)
+			req.txAttempts = append(req.txAttempts, &transaction{
+				TxID:        txID,
+				Transaction: newTx,
+			})
 			numSpeedUps++
 		} else {
-			t.logger.Error("[TxnManager] transaction failed", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
+			t.logger.Error("transaction failed", "component", "TxnManager", "method", "monitorTransaction", "tag", req.Tag, "txHash", req.Tx.Hash().Hex(), "err", err)
 			t.metrics.IncrementTxnCount("failure")
 			return nil, err
 		}
@@ -239,7 +329,7 @@ func (t *txnManager) speedUpTxn(ctx context.Context, tx *types.Transaction, tag 
 		newGasFeeCap = increasedGasFeeCap
 	}
 
-	t.logger.Info("[TxnManager] increasing gas price", "tag", tag, "txHash", tx.Hash().Hex(), "nonce", tx.Nonce(), "prevGasTipCap", prevGasTipCap, "prevGasFeeCap", prevGasFeeCap, "newGasTipCap", newGasTipCap, "newGasFeeCap", newGasFeeCap)
+	t.logger.Info("increasing gas price", "component", "TxnManager", "method", "speedUpTxn", "tag", tag, "txHash", tx.Hash().Hex(), "nonce", tx.Nonce(), "prevGasTipCap", prevGasTipCap, "prevGasFeeCap", prevGasFeeCap, "newGasTipCap", newGasTipCap, "newGasFeeCap", newGasFeeCap)
 	return t.ethClient.UpdateGas(ctx, tx, tx.Value(), newGasTipCap, newGasFeeCap)
 }
 

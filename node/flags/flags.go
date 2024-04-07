@@ -81,7 +81,7 @@ var (
 	}
 	QuorumIDListFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "quorum-id-list"),
-		Usage:    "Comma separated list of quorum IDs that the node will participate in",
+		Usage:    "Comma separated list of quorum IDs that the node will participate in. There should be at least one quorum ID. This list must not contain quorums node is already registered with.",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "QUORUM_ID_LIST"),
 	}
@@ -100,7 +100,7 @@ var (
 	}
 	EcdsaKeyFileFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ecdsa-key-file"),
-		Required: true,
+		Required: false,
 		Usage:    "Path to the encrypted ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_FILE"),
 	}
@@ -113,7 +113,7 @@ var (
 	}
 	EcdsaKeyPasswordFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ecdsa-key-password"),
-		Required: true,
+		Required: false,
 		Usage:    "Password to decrypt ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_PASSWORD"),
 	}
@@ -244,9 +244,7 @@ var requiredFlags = []cli.Flag{
 	QuorumIDListFlag,
 	DbPathFlag,
 	BlsKeyFileFlag,
-	EcdsaKeyFileFlag,
 	BlsKeyPasswordFlag,
-	EcdsaKeyPasswordFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	PubIPProviderFlag,
@@ -266,6 +264,8 @@ var optionalFlags = []cli.Flag{
 	InternalRetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
+	EcdsaKeyFileFlag,
+	EcdsaKeyPasswordFlag,
 }
 
 func init() {

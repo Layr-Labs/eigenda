@@ -8,6 +8,7 @@ import (
 
 	"net"
 
+	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -86,7 +87,7 @@ func (s *Server) serveDispersal() error {
 		s.logger.Fatalf("Could not start tcp listener: %v", err)
 	}
 
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 1024) // 1 GiB
+	opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
 	gs := grpc.NewServer(opt)
 
 	// Register reflection service on gRPC server
@@ -149,12 +150,56 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 	return &pb.StoreChunksReply{Signature: sigData[:]}, nil
 }
 
+func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
+	if in.GetBatchHeader() == nil {
+		return api.NewInvalidArgError("missing batch_header in request")
+	}
+	if in.GetBatchHeader().GetBatchRoot() == nil {
+		return api.NewInvalidArgError("missing batch_root in request")
+	}
+	if in.GetBatchHeader().GetReferenceBlockNumber() == 0 {
+		return api.NewInvalidArgError("missing reference_block_number in request")
+	}
+
+	if len(in.GetBlobs()) == 0 {
+		return api.NewInvalidArgError("missing blobs in request")
+	}
+	for _, blob := range in.Blobs {
+		if blob.GetHeader() == nil {
+			return api.NewInvalidArgError("missing blob header in request")
+		}
+		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
+			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
+			return api.NewInvalidArgError("missing quorum headers in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
+			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+		}
+		for _, q := range blob.GetHeader().GetQuorumHeaders() {
+			if q.GetQuorumId() > core.MaxQuorumID {
+				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+			}
+			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // StoreChunks is called by dispersers to store data.
 func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(sec float64) {
 		s.node.Metrics.ObserveLatency("StoreChunks", "total", sec*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
+
+	// Validate the request.
+	if err := s.validateStoreChunkRequest(in); err != nil {
+		return nil, err
+	}
 
 	// Process the request.
 	reply, err := s.handleStoreChunksRequest(ctx, in)
@@ -183,7 +228,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], in.GetBatchHeaderHash())
 
-	blobHeader, _, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.BlobIndex), uint8(in.GetQuorumId()))
+	blobHeader, _, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.GetBlobIndex()))
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +245,15 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	encodedBlobSize := encoding.GetBlobSize(encoding.GetEncodedBlobLength(blobHeader.Length, quorumInfo.ConfirmationThreshold, quorumInfo.AdversaryThreshold))
 	rate := quorumInfo.QuorumRate
 
+	params := []common.RequestParams{
+		{
+			RequesterID: retrieverID,
+			BlobSize:    encodedBlobSize,
+			Rate:        rate,
+		},
+	}
 	s.mu.Lock()
-	allow, err := s.ratelimiter.AllowRequest(ctx, retrieverID, encodedBlobSize, rate)
+	allow, _, err := s.ratelimiter.AllowRequest(ctx, params)
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err
@@ -224,7 +276,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], in.GetBatchHeaderHash())
 
-	blobHeader, protoBlobHeader, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.BlobIndex), uint8(in.GetQuorumId()))
+	blobHeader, protoBlobHeader, err := s.getBlobHeader(ctx, batchHeaderHash, int(in.GetBlobIndex()))
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +286,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 		return nil, err
 	}
 
-	tree, err := s.rebuildMerkleTree(batchHeaderHash, uint8(in.GetQuorumId()))
+	tree, err := s.rebuildMerkleTree(batchHeaderHash)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +305,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 	}, nil
 }
 
-func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumId uint8) (*core.BlobHeader, *pb.BlobHeader, error) {
+func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blobIndex int) (*core.BlobHeader, *pb.BlobHeader, error) {
 
 	blobHeaderBytes, err := s.node.Store.GetBlobHeader(ctx, batchHeaderHash, blobIndex)
 	if err != nil {

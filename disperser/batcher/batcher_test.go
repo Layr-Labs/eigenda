@@ -25,13 +25,14 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	gettysburgAddressBytes  = codec.ConvertByPaddingEmptyByte([]byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth."))
 	handleBatchLivenessChan = make(chan time.Time, 1)
 )
 
@@ -73,10 +74,12 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	// Common Components
 	logger := logging.NewNoopLogger()
 
+	finalizationBlockDelay := uint(75)
+
 	// Core Components
 	cst, err := coremock.MakeChainDataMock(10)
 	assert.NoError(t, err)
-	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	cst.On("GetCurrentBlockNumber").Return(uint(10)+finalizationBlockDelay, nil)
 	asgn := &core.StdAssignmentCoordinator{}
 	transactor := &coremock.MockTransactor{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
@@ -99,6 +102,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 		BatchSizeMBLimit:         100,
 		SRSOrder:                 3000,
 		MaxNumRetriesPerBlob:     2,
+		FinalizationBlockDelay:   finalizationBlockDelay,
 	}
 	timeoutConfig := bat.TimeoutConfig{
 		EncodingTimeout:    10 * time.Second,
@@ -210,7 +214,7 @@ func TestBatcherIterations(t *testing.T) {
 	assert.NoError(t, err)
 	count, size := components.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, 2, count)
-	assert.Equal(t, uint64(197632), size)
+	assert.Equal(t, uint64(24576), size) // Robert checks it
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)

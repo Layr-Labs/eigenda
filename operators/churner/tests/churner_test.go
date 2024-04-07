@@ -17,7 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	indexermock "github.com/Layr-Labs/eigenda/core/thegraph/mock"
+	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
@@ -44,6 +44,7 @@ var (
 	operatorAddr                   = ""
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
+	numRetries                     = 0
 )
 
 func TestMain(m *testing.M) {
@@ -188,12 +189,13 @@ func TestChurner(t *testing.T) {
 
 func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Transactor, error) {
 	ethClientCfg := geth.EthClientConfig{
-		RPCURL:           rpcURL,
+		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
+		NumRetries:       numRetries,
 	}
 
-	gethClient, err := geth.NewClient(ethClientCfg, logger)
+	gethClient, err := geth.NewMultiHomingClient(ethClientCfg, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
@@ -205,8 +207,9 @@ func newTestServer(t *testing.T) *churner.Server {
 	var err error
 	config := &churner.Config{
 		EthClientConfig: geth.EthClientConfig{
-			RPCURL:           rpcURL,
+			RPCURLs:          []string{rpcURL},
 			PrivateKeyString: churnerPrivateKeyHex,
+			NumRetries:       numRetries,
 		},
 		LoggerConfig:                  common.DefaultLoggerConfig(),
 		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetreiver,

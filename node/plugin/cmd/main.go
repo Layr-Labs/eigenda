@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
 
@@ -83,11 +84,11 @@ func pluginOps(ctx *cli.Context) {
 	}
 
 	ethConfig := geth.EthClientConfig{
-		RPCURL:           config.ChainRpcUrl,
+		RPCURLs:          []string{config.ChainRpcUrl},
 		PrivateKeyString: *privateKey,
 		NumConfirmations: config.NumConfirmations,
 	}
-	client, err := geth.NewClient(ethConfig, logger)
+	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	if err != nil {
 		log.Printf("Error: failed to create eth client: %v", err)
 		return
@@ -117,17 +118,19 @@ func pluginOps(ctx *cli.Context) {
 	}
 
 	operator := &node.Operator{
-		Address:    sk.Address.Hex(),
-		Socket:     socket,
-		Timeout:    10 * time.Second,
-		PrivKey:    sk.PrivateKey,
-		KeyPair:    keyPair,
-		OperatorId: keyPair.GetPubKeyG1().GetOperatorID(),
-		QuorumIDs:  config.QuorumIDList,
+		Address:             sk.Address.Hex(),
+		Socket:              socket,
+		Timeout:             10 * time.Second,
+		PrivKey:             sk.PrivateKey,
+		KeyPair:             keyPair,
+		OperatorId:          keyPair.GetPubKeyG1().GetOperatorID(),
+		QuorumIDs:           config.QuorumIDList,
+		RegisterNodeAtStart: false,
 	}
+	churnerClient := node.NewChurnerClient(config.ChurnerUrl, true, operator.Timeout, logger)
 	if config.Operation == "opt-in" {
 		log.Printf("Info: Operator with Operator Address: %x is opting in to EigenDA", sk.Address)
-		err = node.RegisterOperator(context.Background(), operator, tx, config.ChurnerUrl, true, logger)
+		err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger.With("component", "NodeOperator"))
 		if err != nil {
 			log.Printf("Error: failed to opt-in EigenDA Node Network for operator ID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
 			return
@@ -135,9 +138,9 @@ func pluginOps(ctx *cli.Context) {
 		log.Printf("Info: successfully opt-in the EigenDA, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
 	} else if config.Operation == "opt-out" {
 		log.Printf("Info: Operator with Operator Address: %x and OperatorID: %x is opting out of EigenDA", sk.Address, operatorID)
-		err = node.DeregisterOperator(context.Background(), keyPair, tx)
+		err = node.DeregisterOperator(context.Background(), operator, keyPair, tx)
 		if err != nil {
-			log.Printf("Error: failed to opt-out EigenDA Node Network for operator ID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
+			log.Printf("Error: failed to opt-out EigenDA Node Network for operator ID: %x, operator address: %x, quorums: %v, error: %v", operatorID, sk.Address, config.QuorumIDList, err)
 			return
 		}
 		log.Printf("Info: successfully opt-out the EigenDA, for operator ID: %x, operator address: %x", operatorID, sk.Address)
@@ -149,6 +152,13 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
+	} else if config.Operation == "list-quorums" {
+		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
+		if err != nil {
+			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
+			return
+		}
+		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, sk.Address, quorumIds)
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}

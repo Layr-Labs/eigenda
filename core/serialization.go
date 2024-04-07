@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/wealdtech/go-merkletree"
@@ -223,9 +224,9 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 	qbp := make([]quorumBlobParams, len(h.QuorumInfos))
 	for i, q := range h.QuorumInfos {
 		qbp[i] = quorumBlobParams{
-			QuorumNumber:                 uint8(q.QuorumID),
-			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
+			QuorumNumber:                 q.QuorumID,
+			AdversaryThresholdPercentage: q.AdversaryThreshold,
+			QuorumThresholdPercentage:    q.ConfirmationThreshold,
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
@@ -316,9 +317,9 @@ func (h *BlobHeader) Encode() ([]byte, error) {
 	qbp := make([]quorumBlobParams, len(h.QuorumInfos))
 	for i, q := range h.QuorumInfos {
 		qbp[i] = quorumBlobParams{
-			QuorumNumber:                 uint8(q.QuorumID),
-			AdversaryThresholdPercentage: uint8(q.AdversaryThreshold),
-			QuorumThresholdPercentage:    uint8(q.ConfirmationThreshold),
+			QuorumNumber:                 q.QuorumID,
+			AdversaryThresholdPercentage: q.AdversaryThreshold,
+			QuorumThresholdPercentage:    q.ConfirmationThreshold,
 			ChunkLength:                  uint32(q.ChunkLength),
 		}
 	}
@@ -362,6 +363,19 @@ func (h *BlobHeader) Serialize() ([]byte, error) {
 
 func (h *BlobHeader) Deserialize(data []byte) (*BlobHeader, error) {
 	err := decode(data, h)
+
+	if !(*bn254.G1Affine)(h.BlobCommitments.Commitment).IsInSubGroup() {
+		return nil, fmt.Errorf("in BlobHeader Commitment is not in the subgroup")
+	}
+
+	if !(*bn254.G2Affine)(h.BlobCommitments.LengthCommitment).IsInSubGroup() {
+		return nil, fmt.Errorf("in BlobHeader LengthCommitment is not in the subgroup")
+	}
+
+	if !(*bn254.G2Affine)(h.BlobCommitments.LengthProof).IsInSubGroup() {
+		return nil, fmt.Errorf("in BlobHeader LengthProof is not in the subgroup")
+	}
+
 	return h, err
 }
 

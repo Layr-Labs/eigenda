@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -62,6 +63,8 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 		return err
 	}
 
+	paddedData := codec.ConvertByPaddingEmptyByte(data)
+
 	ticker := time.NewTicker(g.Config.RequestInterval)
 	for {
 		select {
@@ -73,11 +76,20 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
+				paddedData = codec.ConvertByPaddingEmptyByte(data)
+
+				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				if err != nil {
+					g.Logger.Error("failed to send blob request", "err:", err)
+				}
+				paddedData = nil
+			} else {
+				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				if err != nil {
+					g.Logger.Error("failed to send blob request", "err:", err)
+				}
 			}
-			err := g.sendRequest(ctx, data)
-			if err != nil {
-				g.Logger.Error("failed to send blob request", "err:", err)
-			}
+
 		}
 	}
 }

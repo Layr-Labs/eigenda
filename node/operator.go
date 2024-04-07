@@ -3,55 +3,53 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"time"
 
-	grpcchurner "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Operator struct {
-	Address    string
-	Socket     string
-	Timeout    time.Duration
-	PrivKey    *ecdsa.PrivateKey
-	KeyPair    *core.KeyPair
-	OperatorId core.OperatorID
-	QuorumIDs  []core.QuorumID
+	Address             string
+	Socket              string
+	Timeout             time.Duration
+	PrivKey             *ecdsa.PrivateKey
+	KeyPair             *core.KeyPair
+	OperatorId          core.OperatorID
+	QuorumIDs           []core.QuorumID
+	RegisterNodeAtStart bool
 }
 
 // RegisterOperator operator registers the operator with the given public key for the given quorum IDs.
-func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerUrl string, useSecureGrpc bool, logger logging.Logger) error {
-	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, operator.OperatorId)
-	if err != nil {
-		return fmt.Errorf("failed to get registered quorum ids for an operator: %w", err)
+func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerClient ChurnerClient, logger logging.Logger) error {
+	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
+		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
 	}
-
-	logger.Debug("Registered quorum ids", "registeredQuorumIds", registeredQuorumIds)
-	if len(registeredQuorumIds) != 0 {
+	quorumsToRegister, err := operator.getQuorumIdsToRegister(ctx, transactor)
+	if err != nil {
+		return fmt.Errorf("failed to get quorum ids to register: %w", err)
+	}
+	if !operator.RegisterNodeAtStart {
+		// For operator-initiated registration, the supplied quorums must be not registered yet.
+		if len(quorumsToRegister) != len(operator.QuorumIDs) {
+			return errors.New("quorums to register must be not registered yet")
+		}
+	}
+	if len(quorumsToRegister) == 0 {
 		return nil
 	}
 
-	logger.Info("Quorums to register for", "quorums", operator.QuorumIDs)
-
-	if len(operator.QuorumIDs) == 0 {
-		return errors.New("an operator should be in at least one quorum to be useful")
-	}
+	logger.Info("Quorums to register for", "quorums", quorumsToRegister)
 
 	// register for quorums
 	shouldCallChurner := false
 	// check if one of the quorums to register for is full
-	for _, quorumID := range operator.QuorumIDs {
+	for _, quorumID := range quorumsToRegister {
 		operatorSetParams, err := transactor.GetOperatorSetParams(ctx, quorumID)
 		if err != nil {
 			return err
@@ -75,32 +73,36 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 
 	privateKeyBytes := []byte(operator.KeyPair.PrivKey.String())
 	salt := [32]byte{}
-	copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), operator.QuorumIDs[:], privateKeyBytes))
+	copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumsToRegister, privateKeyBytes))
 
 	// Get the current block number
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
 
 	// if we should call the churner, call it
 	if shouldCallChurner {
-		churnReply, err := requestChurnApproval(ctx, operator, churnerUrl, useSecureGrpc, logger)
+		churnReply, err := churnerClient.Churn(ctx, operator.Address, operator.KeyPair, quorumsToRegister)
 		if err != nil {
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
 
-		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, operator.PrivKey, salt, expiry, churnReply)
+		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
 	} else {
 		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Socket, operator.QuorumIDs, operator.PrivKey, salt, expiry)
+		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
 	}
 }
 
-// DeregisterOperator deregisters the operator with the given public key from the all the quorums that it is registered with at the supplied block number.
-func DeregisterOperator(ctx context.Context, KeyPair *core.KeyPair, transactor core.Transactor) error {
+// DeregisterOperator deregisters the operator with the given public key from the specified quorums that it is registered with at the supplied block number.
+// If the operator isn't registered with any of the specified quorums, this function will return error, and no quorum will be deregistered.
+func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.KeyPair, transactor core.Transactor) error {
+	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
+		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
+	}
 	blockNumber, err := transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber)
+	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber, operator.QuorumIDs)
 }
 
 // UpdateOperatorSocket updates the socket for the given operator
@@ -108,67 +110,23 @@ func UpdateOperatorSocket(ctx context.Context, transactor core.Transactor, socke
 	return transactor.UpdateOperatorSocket(ctx, socket)
 }
 
-func requestChurnApproval(ctx context.Context, operator *Operator, churnerUrl string, useSecureGrpc bool, logger logging.Logger) (*grpcchurner.ChurnReply, error) {
-	logger.Info("churner url", "url", churnerUrl)
-
-	credential := insecure.NewCredentials()
-	if useSecureGrpc {
-		config := &tls.Config{}
-		credential = credentials.NewTLS(config)
+// getQuorumIdsToRegister returns the quorum ids that the operator is not registered in.
+func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.Transactor) ([]core.QuorumID, error) {
+	if len(c.QuorumIDs) == 0 {
+		return nil, fmt.Errorf("an operator should be in at least one quorum to be useful")
 	}
 
-	conn, err := grpc.Dial(
-		churnerUrl,
-		grpc.WithTransportCredentials(credential),
-	)
+	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, c.OperatorId)
 	if err != nil {
-		logger.Error("Node cannot connect to churner", "err", err)
-		return nil, err
-	}
-	defer conn.Close()
-
-	gc := grpcchurner.NewChurnerClient(conn)
-	ctx, cancel := context.WithTimeout(ctx, operator.Timeout)
-	defer cancel()
-
-	request := newChurnRequest(operator.Address, operator.KeyPair, operator.QuorumIDs)
-	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 300)
-
-	return gc.Churn(ctx, request, opt)
-}
-
-func newChurnRequest(address string, KeyPair *core.KeyPair, QuorumIDs []core.QuorumID) *grpcchurner.ChurnRequest {
-
-	// generate salt
-	privateKeyBytes := []byte(KeyPair.PrivKey.String())
-	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), QuorumIDs[:], privateKeyBytes)
-
-	churnRequest := &churner.ChurnRequest{
-		OperatorAddress:            gethcommon.HexToAddress(address),
-		OperatorToRegisterPubkeyG1: KeyPair.PubKey,
-		OperatorToRegisterPubkeyG2: KeyPair.GetPubKeyG2(),
-		OperatorRequestSignature:   &core.Signature{},
-		QuorumIDs:                  QuorumIDs,
+		return nil, fmt.Errorf("failed to get registered quorum ids for an operator: %w", err)
 	}
 
-	copy(churnRequest.Salt[:], salt)
-
-	// sign the request
-	churnRequest.OperatorRequestSignature = KeyPair.SignMessage(churner.CalculateRequestHash(churnRequest))
-
-	// convert to protobuf
-	churnRequestPb := &grpcchurner.ChurnRequest{
-		OperatorToRegisterPubkeyG1: churnRequest.OperatorToRegisterPubkeyG1.Serialize(),
-		OperatorToRegisterPubkeyG2: churnRequest.OperatorToRegisterPubkeyG2.Serialize(),
-		OperatorRequestSignature:   churnRequest.OperatorRequestSignature.Serialize(),
-		Salt:                       salt[:],
-		OperatorAddress:            address,
+	quorumIdsToRegister := make([]core.QuorumID, 0, len(c.QuorumIDs))
+	for _, quorumID := range c.QuorumIDs {
+		if !slices.Contains(registeredQuorumIds, quorumID) {
+			quorumIdsToRegister = append(quorumIdsToRegister, quorumID)
+		}
 	}
 
-	churnRequestPb.QuorumIds = make([]uint32, len(QuorumIDs))
-	for i, quorumID := range QuorumIDs {
-		churnRequestPb.QuorumIds[i] = uint32(quorumID)
-	}
-
-	return churnRequestPb
+	return quorumIdsToRegister, nil
 }

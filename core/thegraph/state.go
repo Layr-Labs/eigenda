@@ -48,8 +48,17 @@ type (
 		SocketUpdates []SocketUpdates `graphql:"socketUpdates(first: 1, orderBy: blockNumber, orderDirection: desc)"`
 	}
 
+	// The indexed operator state consists of both mutable properties (socket) and  immutable properties
+	// (everyhing else: pubkeyG1, pubkeyG2, id). For the socket, we always want the latest value, irrespective
+	// of the reference block number. For the immutable properties, we can also use the value from the latest block
+	// since value cannot change. Thus, we always pull the state from the latest block indexed by the subgraph.
+	//
+	// Note that the deregistrationBlockNumber will only be set if the operator has deregistered from all quorums. By using
+	// the latest block, we allow the false-positive case where an operator was deregistered from all quorums at the reference
+	// block, but then re-registered afterward. Note that this can over-fetch operators but never under-fetch.  We filter out
+	// any extra operators in GetIndexedOperatorState.
 	QueryOperatorsGql struct {
-		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, where: {deregistrationBlockNumber_gt: $blockNumber}, block: {number: $blockNumber})"`
+		Operators []IndexedOperatorInfoGql `graphql:"operators(first: $first, skip: $skip, orderBy: id, orderDirection: desc, where: {deregistrationBlockNumber_gt: $blockNumber})"`
 	}
 
 	QueryOperatorByIdGql struct {
@@ -82,7 +91,7 @@ func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger log
 	return &indexedChainState{
 		ChainState: cs,
 		querier:    querier,
-		logger:     logger,
+		logger:     logger.With("component", "IndexedChainState"),
 	}
 }
 
@@ -123,12 +132,31 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		}
 	}
 	if len(aggKeys) == 0 {
-		return nil, errors.New("no aggregate public keys found for any of the specified quorums")
+		return nil, fmt.Errorf("no aggregate public keys found for any of the specified quorums at block number %d", blockNumber)
 	}
 
 	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
 	if err != nil {
 		return nil, err
+	}
+
+	// Detect missing operators
+	operatorSeen := make(map[core.OperatorID]struct{})
+	for _, quorumOperators := range operatorState.Operators {
+		for operatorID := range quorumOperators {
+			if indexedOperators[operatorID] == nil {
+				return nil, fmt.Errorf("operator %s not found in indexed state", operatorID.Hex())
+			}
+			operatorSeen[operatorID] = struct{}{}
+		}
+	}
+
+	// Filter out the operators who are not part of any quorum. This can happen if the operator registers or re-registers
+	// after the reference block number.
+	for operatorID := range indexedOperators {
+		if _, ok := operatorSeen[operatorID]; !ok {
+			delete(indexedOperators, operatorID)
+		}
 	}
 
 	state := &core.IndexedOperatorState{
@@ -149,7 +177,7 @@ func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Con
 	)
 	err := ics.querier.Query(context.Background(), &query, variables)
 	if err != nil {
-		ics.logger.Error("Error requesting for operator", "err", err)
+		ics.logger.Error("Error requesting info for operator", "err", err, "operatorId", operatorId.Hex(), "blockNumber", blockNumber)
 		return nil, err
 	}
 

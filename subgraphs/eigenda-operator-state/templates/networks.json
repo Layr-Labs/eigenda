@@ -130,5 +130,27 @@
       "address": "0x066cF95c1bf0927124DFB8B02B401bc23A79730D",
       "startBlock": 1168409
     }
+  },
+  "mainnet": {
+    "RegistryCoordinator": {
+      "address": "0x0BAAc79acD45A023E19345c352d8a7a83C4e5656",
+      "startBlock": 19592322
+    },
+    "BLSApkRegistry": {
+      "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
+      "startBlock": 19592322
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
+      "startBlock": 19592322
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0x0BAAc79acD45A023E19345c352d8a7a83C4e5656",
+      "startBlock": 19592322
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
+      "startBlock": 19592322
+    }
   }
 }

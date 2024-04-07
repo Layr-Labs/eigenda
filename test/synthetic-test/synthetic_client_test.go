@@ -36,6 +36,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -124,13 +125,16 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 
 	pk = strings.TrimPrefix(pk, "0X")
 	pk = strings.TrimPrefix(pk, "0x")
-	ethClient, err := geth.NewClient(geth.EthClientConfig{
-		RPCURL:           rpcUrl,
-		PrivateKeyString: pk,
-	}, ethLogger)
 
+	ethConfig := geth.EthClientConfig{
+		RPCURLs:          []string{rpcUrl},
+		PrivateKeyString: pk,
+		NumConfirmations: 0,
+	}
+	ethClient, err := geth.NewClient(ethConfig, gcommon.Address{}, 0, ethLogger)
+	log.Printf("Error: failed to create eth client: %v", err)
 	if err != nil {
-		logger.Printf("Error: %v", err)
+		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
 	mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
@@ -171,6 +175,7 @@ func TestMain(m *testing.M) {
 	retrieverG1Path := os.Getenv("RETRIEVER_G1_PATH")
 	retrieverG2Path := os.Getenv("RETRIEVER_G2_PATH")
 	retrieverCachePath := os.Getenv("RETRIEVER_CACHE_PATH")
+	batcherPullInterval := os.Getenv("BATCHER_PULL_INTERVAL")
 
 	// Retriever Config
 	retrieverClientConfig := &RetrieverClientConfig{
@@ -262,6 +267,9 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	data := make([]byte, dataSize[rand.Intn(len(dataSize))])
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	disperseBlobStartTime := time.Now()
 	ctx := context.Background()
 
@@ -283,7 +291,8 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	logger.Printf("Time to Disperse Blob %s", disperseBlobStopTime.String())
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
-	confirmationDeadline := time.Now().Add(240 * time.Second)
+	// Update this to a minute over Batcher_Pull_Interval
+	confirmationDeadline := time.Now().Add(batcherPullInterval * time.Second)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -549,7 +558,7 @@ func TestEncodeBlob(t *testing.T) {
 	t.Skip("Skipping this test")
 
 	var (
-		gettysburgAddressBytes = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+		gettysburgAddressBytes = codec.ConvertByPaddingEmptyByte([]byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth."))
 	)
 	encoderReply, encodingParams, err := encodeBlob(gettysburgAddressBytes)
 	assert.NoError(t, err)

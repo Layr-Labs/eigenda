@@ -21,15 +21,64 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore,
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
-		logger:           logger,
+		logger:           logger.With("component", "RateLimiter"),
 	}
 }
 
-// Checks whether a request from the given requesterID is allowed
-func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.RequesterID, blobSize uint, rate common.RateParam) (bool, error) {
-	// Retrieve bucket params for the requester ID
-	// This will be from dynamo for Disperser and from local storage for DA node
-	bucketParams, err := d.bucketStore.GetItem(ctx, requesterID)
+// AllowRequest checks whether the request should be allowed. If the request is allowed, the function returns true.
+// If the request is not allowed, the function returns false and the RequestParams of the request that was not allowed.
+// In order to for the request to be allowed, all of the requests represented by the RequestParams slice must be allowed.
+// Each RequestParams object represents a single request. Each request is subjected to the same GlobalRateParams, but the
+// individual parameters of the request can differ.
+//
+// If CountFailed is set to true in the GlobalRateParams, AllowRequest will count failed requests towards the rate limit.
+// If CountFailed is set to false, the rate limiter will stop processing requests as soon as it encounters a request that
+// is not allowed.
+func (d *rateLimiter) AllowRequest(ctx context.Context, params []common.RequestParams) (bool, *common.RequestParams, error) {
+
+	updatedBucketParams := make([]*common.RateBucketParams, len(params))
+
+	allowed := true
+
+	var limitedParam *common.RequestParams
+
+	for i, param := range params {
+		allowedForParam, bucketParams := d.checkAllowed(ctx, param)
+		updatedBucketParams[i] = bucketParams
+		if !allowedForParam {
+			allowed = false
+			limitedParam = &param
+
+			if !d.globalRateParams.CountFailed {
+				break
+			}
+		}
+	}
+
+	if allowed || d.globalRateParams.CountFailed {
+		err := d.updateBucketParams(ctx, params, updatedBucketParams)
+		if err != nil {
+			return false, nil, err
+		}
+	}
+
+	return allowed, limitedParam, nil
+
+}
+
+func (d *rateLimiter) updateBucketParams(ctx context.Context, params []common.RequestParams, updatedBucketParams []*common.RateBucketParams) error {
+	for i, param := range params {
+		err := d.bucketStore.UpdateItem(ctx, param.RequesterID, updatedBucketParams[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestParams) (bool, *common.RateBucketParams) {
+
+	bucketParams, err := d.bucketStore.GetItem(ctx, params.RequesterID)
 	if err != nil {
 
 		bucketLevels := make([]time.Duration, len(d.globalRateParams.BucketSizes))
@@ -52,7 +101,7 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 	for i, size := range d.globalRateParams.BucketSizes {
 
 		// Determine bucket deduction
-		deduction := time.Microsecond * time.Duration(1e6*float32(blobSize)/float32(rate)/d.globalRateParams.Multipliers[i])
+		deduction := time.Microsecond * time.Duration(1e6*float32(params.BlobSize)/float32(params.Rate)/d.globalRateParams.Multipliers[i])
 
 		prevLevel := bucketParams.BucketLevels[i]
 
@@ -60,22 +109,11 @@ func (d *rateLimiter) AllowRequest(ctx context.Context, requesterID common.Reque
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 
-		d.logger.Debug("Bucket level", "key", requesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
+		d.logger.Debug("Bucket level", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
 	}
 
-	// Update the bucket based on blob size and current rate
-	if allowed || d.globalRateParams.CountFailed {
-		// Update bucket params
-		err := d.bucketStore.UpdateItem(ctx, requesterID, bucketParams)
-		if err != nil {
-			return allowed, err
-		}
+	return allowed, bucketParams
 
-	}
-
-	return allowed, nil
-
-	// (DA Node) Store the rate params and account ID along with the blob
 }
 
 func getBucketLevel(bucketLevel, bucketSize, interval, deduction time.Duration) time.Duration {

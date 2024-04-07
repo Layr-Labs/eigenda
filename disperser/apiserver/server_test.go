@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -60,9 +63,60 @@ func TestDisperseBlob(t *testing.T) {
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	status, _, key := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
 	assert.NotNil(t, key)
+}
+
+func TestDisperseBlobAuth(t *testing.T) {
+
+	data1KiB := make([]byte, 1024)
+	_, err := rand.Read(data1KiB)
+	assert.NoError(t, err)
+
+	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
+
+	// Use an unauthenticated signer
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
+	signer := auth.NewSigner(privateKeyHex)
+
+	errorChan := make(chan error, 10)
+
+	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
+	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 0, errorChan, false)
+
+	err = <-errorChan
+	assert.NoError(t, err)
+
+}
+
+func TestDisperseBlobAuthTimeout(t *testing.T) {
+
+	data1KiB := make([]byte, 1024)
+	_, err := rand.Read(data1KiB)
+	assert.NoError(t, err)
+
+	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
+
+	// Use an unauthenticated signer
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
+	signer := auth.NewSigner(privateKeyHex)
+
+	errorChan := make(chan error, 10)
+
+	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 2*time.Second, errorChan, false)
+
+	err = <-errorChan
+	assert.ErrorContains(t, err, "context deadline exceeded")
+
+	errorChan = make(chan error, 10)
+	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 0, errorChan, false)
+
+	err = <-errorChan
+	assert.NoError(t, err)
+
 }
 
 func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
@@ -81,6 +135,8 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
@@ -134,6 +190,8 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
+	data = codec.ConvertByPaddingEmptyByte(data)
+
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
@@ -146,13 +204,13 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{2},
 	})
-	assert.ErrorContains(t, err, "invalid request: the quorum_numbers must be in range [0, 1], but found 2")
+	assert.ErrorContains(t, err, "custom_quorum_numbers must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 0},
 	})
-	assert.ErrorContains(t, err, "invalid request: quorum_numbers must not contain duplicates")
+	assert.ErrorContains(t, err, "custom_quorum_numbers must not contain duplicates")
 
 }
 
@@ -160,6 +218,8 @@ func TestGetBlobStatus(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
@@ -233,48 +293,56 @@ func TestGetBlobStatus(t *testing.T) {
 }
 
 func TestRetrieveBlob(t *testing.T) {
-	// Create random data
-	data := make([]byte, 1024)
-	_, err := rand.Read(data)
-	assert.NoError(t, err)
 
-	// Disperse the random data
-	status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
-	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
-	assert.NotNil(t, requestID)
+	for i := 0; i < 3; i++ {
+		// Create random data
+		data := make([]byte, 1024)
+		_, err := rand.Read(data)
+		assert.NoError(t, err)
 
-	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
-		RequestId: requestID,
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+		data = codec.ConvertByPaddingEmptyByte(data)
 
-	// Simulate blob confirmation so that we can retrieve the blob
-	securityParams := []*core.SecurityParam{
-		{
-			QuorumID:              0,
-			AdversaryThreshold:    80,
-			ConfirmationThreshold: 100,
-		},
-		{
-			QuorumID:              1,
-			AdversaryThreshold:    80,
-			ConfirmationThreshold: 100,
-		},
+		// Disperse the random data
+		status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
+		assert.Equal(t, status, pb.BlobStatus_PROCESSING)
+		assert.NotNil(t, requestID)
+
+		reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+			RequestId: requestID,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+
+		fmt.Println("requestID", requestID)
+
+		// Simulate blob confirmation so that we can retrieve the blob
+		securityParams := []*core.SecurityParam{
+			{
+				QuorumID:              0,
+				AdversaryThreshold:    80,
+				ConfirmationThreshold: 100,
+			},
+			{
+				QuorumID:              1,
+				AdversaryThreshold:    80,
+				ConfirmationThreshold: 100,
+			},
+		}
+		_ = simulateBlobConfirmation(t, requestID, blobSize, securityParams, 1)
+
+		reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+			RequestId: requestID,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
+
+		// Retrieve the blob and compare it with the original data
+		retrieveData, err := retrieveBlob(t, dispersalServer, requestID, 1)
+		assert.NoError(t, err)
+
+		assert.Equal(t, data, retrieveData)
 	}
-	_ = simulateBlobConfirmation(t, requestID, blobSize, securityParams, 1)
 
-	reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
-		RequestId: requestID,
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
-
-	// Retrieve the blob and compare it with the original data
-	retrieveData, err := retrieveBlob(t, dispersalServer, 1)
-	assert.NoError(t, err)
-
-	assert.Equal(t, data, retrieveData)
 }
 
 func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
@@ -282,6 +350,8 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	// Disperse the random data
 	status, _, requestID := disperseBlob(t, dispersalServer, data)
@@ -295,9 +365,9 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
 	// Try to retrieve the blob before it is confirmed
-	_, err = retrieveBlob(t, dispersalServer, 2)
+	_, err = retrieveBlob(t, dispersalServer, requestID, 2)
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "rpc error: code = Internal desc = failed to get blob metadata, please retry")
+	assert.Equal(t, "rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index", err.Error())
 
 }
 
@@ -305,6 +375,8 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	data := make([]byte, 2*1024*1024+10)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
 
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
@@ -434,12 +506,15 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 				},
 			},
 		},
+		RetrievalBlobRate:   3 * 1e6,
+		RetrievalThroughput: 20 * 1024,
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
-		GrpcPort: "51001",
+		GrpcPort:    "51001",
+		GrpcTimeout: 1 * time.Second,
 	}, queue, transactor, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
 }
 
@@ -460,7 +535,7 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()
 }
 
-func retrieveBlob(t *testing.T, server *apiserver.DispersalServer, blobIndex uint32) ([]byte, error) {
+func retrieveBlob(t *testing.T, server *apiserver.DispersalServer, requestID []byte, blobIndex uint32) ([]byte, error) {
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
@@ -469,8 +544,9 @@ func retrieveBlob(t *testing.T, server *apiserver.DispersalServer, blobIndex uin
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
+	batchHeaderHash := crypto.Keccak256(requestID)
 	reply, err := server.RetrieveBlob(ctx, &pb.RetrieveBlobRequest{
-		BatchHeaderHash: []byte{1, 2, 3},
+		BatchHeaderHash: batchHeaderHash,
 		BlobIndex:       blobIndex,
 	})
 	if err != nil {
@@ -491,7 +567,8 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	assert.NoError(t, err)
 
 	// simulate blob confirmation
-	batchHeaderHash := [32]byte{1, 2, 3}
+	batchHeaderHash := crypto.Keccak256Hash(requestID)
+
 	requestedAt := uint64(time.Now().Nanosecond())
 	var commitX, commitY fp.Element
 	_, err = commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")

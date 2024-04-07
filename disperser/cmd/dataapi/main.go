@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
 
@@ -75,7 +76,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	client, err := geth.NewClient(config.EthClientConfig, logger)
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		return err
 	}
@@ -95,11 +96,12 @@ func RunDataApi(ctx *cli.Context) error {
 		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{
-				ServerMode:        config.ServerMode,
-				SocketAddr:        config.SocketAddr,
-				AllowOrigins:      config.AllowOrigins,
-				DisperserHostname: config.DisperserHostname,
-				ChurnerHostname:   config.ChurnerHostname,
+				ServerMode:         config.ServerMode,
+				SocketAddr:         config.SocketAddr,
+				AllowOrigins:       config.AllowOrigins,
+				DisperserHostname:  config.DisperserHostname,
+				ChurnerHostname:    config.ChurnerHostname,
+				BatcherHealthEndpt: config.BatcherHealthEndpt,
 			},
 			sharedStorage,
 			promClient,
@@ -108,6 +110,7 @@ func RunDataApi(ctx *cli.Context) error {
 			chainState,
 			logger,
 			metrics,
+			nil,
 			nil,
 			nil,
 		)

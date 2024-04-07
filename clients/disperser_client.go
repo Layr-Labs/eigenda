@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -81,6 +82,11 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 		quorumNumbers[i] = uint32(q)
 	}
 
+	// check every 32 bytes of data are within the valid range for a bn254 field element
+	_, err = rs.ToFrArray(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
+	}
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
@@ -117,7 +123,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 
 	stream, err := disperserClient.DisperseBlobAuthenticated(ctxTimeout)
 	if err != nil {
-		return nil, nil, fmt.Errorf("frror while calling DisperseBlobAuthenticated: %v", err)
+		return nil, nil, fmt.Errorf("error while calling DisperseBlobAuthenticated: %w", err)
 	}
 
 	quorumNumbers := make([]uint32, len(quorums))
@@ -125,6 +131,11 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		quorumNumbers[i] = uint32(q)
 	}
 
+	// check every 32 bytes of data are within the valid range for a bn254 field element
+	_, err = rs.ToFrArray(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
+	}
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
@@ -137,13 +148,13 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}})
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to send request: %v", err)
+		return nil, nil, fmt.Errorf("failed to send request: %w", err)
 	}
 
 	// Get the Challenge
 	reply, err := stream.Recv()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error while receiving: %v", err)
+		return nil, nil, fmt.Errorf("error while receiving: %w", err)
 	}
 	authHeaderReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_BlobAuthHeader)
 	if !ok {
@@ -168,12 +179,12 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		},
 	}})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to send challenge reply: %v", err)
+		return nil, nil, fmt.Errorf("failed to send challenge reply: %w", err)
 	}
 
 	reply, err = stream.Recv()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error while receiving final reply: %v", err)
+		return nil, nil, fmt.Errorf("error while receiving final reply: %w", err)
 	}
 	disperseReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_DisperseReply) // Process the final disperse_reply
 	if !ok {

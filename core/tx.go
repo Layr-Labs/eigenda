@@ -63,7 +63,9 @@ type Transactor interface {
 	// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
 	// registered with at the supplied block number. To fully deregister an operator, this function should be called
 	// with the current block number.
-	DeregisterOperator(ctx context.Context, pubkeyG1 *G1Point, blockNumber uint32) error
+	// If the operator isn't registered with any of the specified quorums, this function will return error, and
+	// no quorum will be deregistered.
+	DeregisterOperator(ctx context.Context, pubkeyG1 *G1Point, blockNumber uint32, quorumIds []QuorumID) error
 
 	// UpdateOperatorSocket updates the socket of the operator in all the quorums that it is registered with.
 	UpdateOperatorSocket(ctx context.Context, socket string) error
@@ -101,9 +103,10 @@ type Transactor interface {
 	// GetCurrentQuorumBitmapByOperatorId returns the current quorum bitmap for the operator.
 	GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId OperatorID) (*big.Int, error)
 
-	// GetQuorumBitmapForOperatorsAtBlockNumber returns the quorum bitmaps for the operators
-	// at the given block number.
-	GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorId []OperatorID, blockNumber uint32) ([]*big.Int, error)
+	// GetQuorumBitmapForOperatorsAtBlockNumber returns the quorum bitmaps for the operators at the given block number.
+	// The result slice will be of same length as "operatorIds", with the i-th entry be the result for the operatorIds[i].
+	// If an operator failed to find bitmap, the corresponding result entry will be an empty bitmap.
+	GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []OperatorID, blockNumber uint32) ([]*big.Int, error)
 
 	// GetOperatorSetParams returns operator set params for the quorum.
 	GetOperatorSetParams(ctx context.Context, quorumID QuorumID) (*OperatorSetParam, error)

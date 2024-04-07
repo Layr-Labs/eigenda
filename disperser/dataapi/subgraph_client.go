@@ -95,7 +95,7 @@ type (
 var _ SubgraphClient = (*subgraphClient)(nil)
 
 func NewSubgraphClient(api subgraph.Api, logger logging.Logger) *subgraphClient {
-	return &subgraphClient{api: api, logger: logger}
+	return &subgraphClient{api: api, logger: logger.With("component", "SubgraphClient")}
 }
 
 func (sc *subgraphClient) QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error) {

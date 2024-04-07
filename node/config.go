@@ -23,7 +23,7 @@ const (
 	// Min number of seconds for the ExpirationPollIntervalSecFlag.
 	minExpirationPollIntervalSec = 3
 	AppName                      = "da-node"
-	SemVer                       = "0.4.0"
+	SemVer                       = "0.6.0"
 	GitCommit                    = ""
 	GitDate                      = ""
 )
@@ -90,6 +90,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 		ids = append(ids, core.QuorumID(val))
 	}
+	if len(ids) == 0 {
+		return nil, errors.New("no quorum ids provided")
+	}
 
 	expirationPollIntervalSec := ctx.GlobalUint64(flags.ExpirationPollIntervalSecFlag.Name)
 	if expirationPollIntervalSec <= minExpirationPollIntervalSec {
@@ -98,19 +101,32 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	testMode := ctx.GlobalBool(flags.EnableTestModeFlag.Name)
 
-	// Decrypt ECDSA key
+	// Configuration options that require the Node Operator ECDSA key at runtime
+	registerNodeAtStart := ctx.GlobalBool(flags.RegisterAtNodeStartFlag.Name)
+	pubIPCheckInterval := ctx.GlobalDuration(flags.PubIPCheckIntervalFlag.Name)
+	needECDSAKey := registerNodeAtStart || pubIPCheckInterval > 0
+	if registerNodeAtStart && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
+		return nil, fmt.Errorf("%s and %s are required if %s is enabled", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.RegisterAtNodeStartFlag.Name)
+	}
+	if pubIPCheckInterval > 0 && (ctx.GlobalString(flags.EcdsaKeyFileFlag.Name) == "" || ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name) == "") {
+		return nil, fmt.Errorf("%s and %s are required if %s is > 0", flags.EcdsaKeyFileFlag.Name, flags.EcdsaKeyPasswordFlag.Name, flags.PubIPCheckIntervalFlag.Name)
+	}
+
 	var ethClientConfig geth.EthClientConfig
 	if !testMode {
-		keyContents, err := os.ReadFile(ctx.GlobalString(flags.EcdsaKeyFileFlag.Name))
-		if err != nil {
-			return nil, fmt.Errorf("could not read ECDSA key file: %v", err)
-		}
-		sk, err := keystore.DecryptKey(keyContents, ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name))
-		if err != nil {
-			return nil, fmt.Errorf("could not decrypt the ECDSA file: %s", ctx.GlobalString(flags.EcdsaKeyFileFlag.Name))
-		}
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
-		ethClientConfig.PrivateKeyString = fmt.Sprintf("%x", crypto.FromECDSA(sk.PrivateKey))
+		if needECDSAKey {
+			// Decrypt ECDSA key
+			keyContents, err := os.ReadFile(ctx.GlobalString(flags.EcdsaKeyFileFlag.Name))
+			if err != nil {
+				return nil, fmt.Errorf("could not read ECDSA key file: %v", err)
+			}
+			sk, err := keystore.DecryptKey(keyContents, ctx.GlobalString(flags.EcdsaKeyPasswordFlag.Name))
+			if err != nil {
+				return nil, fmt.Errorf("could not decrypt the ECDSA file: %s", ctx.GlobalString(flags.EcdsaKeyFileFlag.Name))
+			}
+			ethClientConfig.PrivateKeyString = fmt.Sprintf("%x", crypto.FromECDSA(sk.PrivateKey))
+		}
 	} else {
 		ethClientConfig = geth.ReadEthClientConfig(ctx)
 	}
@@ -152,7 +168,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnableMetrics:                 ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		MetricsPort:                   ctx.GlobalString(flags.MetricsPortFlag.Name),
 		Timeout:                       timeout,
-		RegisterNodeAtStart:           ctx.GlobalBool(flags.RegisterAtNodeStartFlag.Name),
+		RegisterNodeAtStart:           registerNodeAtStart,
 		ExpirationPollIntervalSec:     expirationPollIntervalSec,
 		EnableTestMode:                testMode,
 		OverrideBlockStaleMeasure:     ctx.GlobalInt64(flags.OverrideBlockStaleMeasureFlag.Name),
@@ -166,7 +182,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProvider:                 ctx.GlobalString(flags.PubIPProviderFlag.Name),
-		PubIPCheckInterval:            ctx.GlobalDuration(flags.PubIPCheckIntervalFlag.Name),
+		PubIPCheckInterval:            pubIPCheckInterval,
 		ChurnerUrl:                    ctx.GlobalString(flags.ChurnerUrlFlag.Name),
 		NumBatchValidators:            ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
 		ClientIPHeader:                ctx.GlobalString(flags.ClientIPHeaderFlag.Name),

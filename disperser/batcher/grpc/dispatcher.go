@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"google.golang.org/grpc"
@@ -22,13 +23,15 @@ type Config struct {
 type dispatcher struct {
 	*Config
 
-	logger logging.Logger
+	logger  logging.Logger
+	metrics *batcher.DispatcherMetrics
 }
 
-func NewDispatcher(cfg *Config, logger logging.Logger) *dispatcher {
+func NewDispatcher(cfg *Config, logger logging.Logger, metrics *batcher.DispatcherMetrics) *dispatcher {
 	return &dispatcher{
-		Config: cfg,
-		logger: logger,
+		Config:  cfg,
+		logger:  logger.With("component", "Dispatcher"),
+		metrics: metrics,
 	}
 }
 
@@ -47,13 +50,28 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
 			blobMessages := make([]*core.BlobMessage, 0)
+			hasAnyBundles := false
 			for _, blob := range blobs {
+				if _, ok := blob.BundlesByOperator[id]; ok {
+					hasAnyBundles = true
+				}
 				blobMessages = append(blobMessages, &core.BlobMessage{
 					BlobHeader: blob.BlobHeader,
 					// Bundles will be empty if the operator is not in the quorums blob is dispersed on
 					Bundles: blob.BundlesByOperator[id],
 				})
 			}
+			if !hasAnyBundles {
+				// Operator is not part of any quorum, no need to send chunks
+				update <- core.SignerMessage{
+					Err:       errors.New("operator is not part of any quorum"),
+					Signature: nil,
+					Operator:  id,
+				}
+				return
+			}
+
+			requestedAt := time.Now()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
 				update <- core.SignerMessage{
@@ -61,12 +79,14 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					Signature: nil,
 					Operator:  id,
 				}
+				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
 				update <- core.SignerMessage{
 					Signature: sig,
 					Operator:  id,
 					Err:       nil,
 				}
+				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
 			}
 
 		}(core.IndexedOperatorInfo{
@@ -98,7 +118,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 		return nil, err
 	}
 
-	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 1024)
+	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
 	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize)
 	reply, err := gc.StoreChunks(ctx, request, opt)
 
@@ -107,7 +127,11 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	}
 
 	sigBytes := reply.GetSignature()
-	sig := &core.Signature{G1Point: new(core.Signature).Deserialize(sigBytes)}
+	point, err := new(core.Signature).Deserialize(sigBytes)
+	if err != nil {
+		return nil, err
+	}
+	sig := &core.Signature{G1Point: point}
 	return sig, nil
 }
 
@@ -120,7 +144,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 		if err != nil {
 			return nil, 0, err
 		}
-		totalSize += blob.BlobHeader.EncodedSizeAllQuorums()
+		totalSize += int64(blob.Bundles.Size())
 	}
 
 	request := &node.StoreChunksRequest{

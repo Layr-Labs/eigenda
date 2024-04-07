@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/common"
+
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	"github.com/urfave/cli"
 )

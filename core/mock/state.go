@@ -88,7 +88,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 	for ind := core.OperatorIndex(0); ind < d.NumOperators; ind++ {
 		if ind == 0 {
 			key := d.KeyPairs[ind].GetPubKeyG1()
-			aggPubKey = key.Deserialize(key.Serialize())
+			aggPubKey = key.Clone()
 		} else {
 			aggPubKey.Add(d.KeyPairs[ind].GetPubKeyG1())
 		}

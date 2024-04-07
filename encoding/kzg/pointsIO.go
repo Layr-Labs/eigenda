@@ -40,7 +40,7 @@ func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, erro
 
 // Read the n-th G1 point from SRS.
 func ReadG1Point(n uint64, g *KzgConfig) (bn254.G1Affine, error) {
-	if n > g.SRSOrder {
+	if n >= g.SRSOrder {
 		return bn254.G1Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
 
@@ -54,7 +54,7 @@ func ReadG1Point(n uint64, g *KzgConfig) (bn254.G1Affine, error) {
 
 // Read the n-th G2 point from SRS.
 func ReadG2Point(n uint64, g *KzgConfig) (bn254.G2Affine, error) {
-	if n > g.SRSOrder {
+	if n >= g.SRSOrder {
 		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
 	}
 
@@ -166,7 +166,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 // from is inclusive, to is exclusive
 func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	if to <= from {
-		return nil, fmt.Errorf("The range to read is invalid, from: %v, to: %v", from, to)
+		return nil, fmt.Errorf("the range to read is invalid, from: %v, to: %v", from, to)
 	}
 	g1f, err := os.Open(filepath)
 	if err != nil {

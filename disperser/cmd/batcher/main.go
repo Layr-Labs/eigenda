@@ -16,6 +16,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/aws/secretmanager"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -24,6 +25,11 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
+	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
+	"github.com/Layr-Labs/eigensdk-go/signerv2"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 )
@@ -93,17 +99,20 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
+	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout: config.TimeoutConfig.AttestationTimeout,
-	}, logger)
+	}, logger, metrics.DispatcherMetrics)
 	asgn := &core.StdAssignmentCoordinator{}
 
-	client, err := geth.NewClient(config.EthClientConfig, logger)
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURL)
+	// used by non graph indexer
+	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
 	if err != nil {
 		return err
 	}
@@ -153,8 +162,6 @@ func RunBatcher(ctx *cli.Context) error {
 		}
 	}
 
-	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
 		return errors.New("encoder socket must be specified")
 	}
@@ -163,7 +170,70 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
-	txnManager := batcher.NewTxnManager(client, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
+	var wallet walletsdk.Wallet
+	if !config.FireblocksConfig.Disable {
+		validConfigflag := len(config.FireblocksConfig.APIKeyName) > 0 &&
+			len(config.FireblocksConfig.SecretKeyName) > 0 &&
+			len(config.FireblocksConfig.BaseURL) > 0 &&
+			len(config.FireblocksConfig.VaultAccountName) > 0 &&
+			len(config.FireblocksConfig.WalletAddress) > 0 &&
+			len(config.FireblocksConfig.Region) > 0
+		if !validConfigflag {
+			return errors.New("fireblocks config is either invalid or incomplete")
+		}
+		apiKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.APIKeyName, config.FireblocksConfig.Region)
+		if err != nil {
+			return fmt.Errorf("cannot read fireblocks api key %s from secret manager: %w", config.FireblocksConfig.APIKeyName, err)
+		}
+		secretKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.SecretKeyName, config.FireblocksConfig.Region)
+		if err != nil {
+			return fmt.Errorf("cannot read fireblocks secret key %s from secret manager: %w", config.FireblocksConfig.SecretKeyName, err)
+		}
+		fireblocksClient, err := fireblocks.NewClient(
+			apiKey,
+			[]byte(secretKey),
+			config.FireblocksConfig.BaseURL,
+			config.TimeoutConfig.ChainReadTimeout,
+			logger.With("component", "FireblocksClient"),
+		)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger.With("component", "FireblocksWallet"))
+		if err != nil {
+			return err
+		}
+		sender, err := wallet.SenderAddress(context.Background())
+		if err != nil {
+			return err
+		}
+		if sender.Cmp(gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress)) != 0 {
+			return fmt.Errorf("configured wallet address %s does not match derived address %s", config.FireblocksConfig.WalletAddress, sender.Hex())
+		}
+		logger.Info("Initialized Fireblocks wallet", "vaultAccountName", config.FireblocksConfig.VaultAccountName, "address", sender.Hex())
+	} else if len(config.EthClientConfig.PrivateKeyString) > 0 {
+		privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+		chainID, err := client.ChainID(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get chain ID: %w", err)
+		}
+		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: privateKey}, chainID)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger.With("component", "PrivateKeyWallet"))
+		if err != nil {
+			return err
+		}
+		logger.Info("Initialized PrivateKey wallet", "address", address.Hex())
+	} else {
+		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
+	}
+
+	txnManager := batcher.NewTxnManager(client, wallet, config.EthClientConfig.NumConfirmations, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
 	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
 	if err != nil {
 		return err
@@ -213,8 +283,10 @@ func heartbeatMonitor(filePath string, maxStallDuration time.Duration) {
 			stallTimer.Reset(maxStallDuration) // Reset timer on new heartbeat
 
 		case <-stallTimer.C:
-			log.Println("No heartbeat received within max stall duration, stopping health probe")
-			return
+			// Instead of stopping the function, log a warning
+			log.Println("Warning: No heartbeat received within max stall duration.")
+			// Reset the timer to continue monitoring
+			stallTimer.Reset(maxStallDuration)
 		}
 	}
 }

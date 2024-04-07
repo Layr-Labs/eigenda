@@ -11,11 +11,11 @@ type NumBatchesAtBlock struct {
 	NumBatches  int
 }
 
-// QueryBatches represents number of batches at different block numbers, as well
-// as accumulated number of batches from the first block in NumBatches.
+// QuorumBatches represents number of batches at different block numbers, as well
+// as accumulated number of batches from the first block in NumBatches, for a quorum.
 // The NumBatches is in ascending order by NumBatchesAtBlock.BlockNumber, and
 // AccuBatches[i] is corresponding to NumBatches[i].
-type QueryBatches struct {
+type QuorumBatches struct {
 	NumBatches  []*NumBatchesAtBlock
 	AccuBatches []int
 }
@@ -112,7 +112,7 @@ func CreateOperatorQuorumIntervals(
 				}
 				i++
 			} else {
-				if err := removeQuorums(removed[j], openQuorum, operatorQuorumIntervals); err != nil {
+				if err := removeQuorums(op, removed[j], openQuorum, operatorQuorumIntervals); err != nil {
 					return nil, err
 				}
 				j++
@@ -127,7 +127,7 @@ func CreateOperatorQuorumIntervals(
 			}
 		}
 		for ; j < len(removed); j++ {
-			if err := removeQuorums(removed[j], openQuorum, operatorQuorumIntervals); err != nil {
+			if err := removeQuorums(op, removed[j], openQuorum, operatorQuorumIntervals); err != nil {
 				return nil, err
 			}
 		}
@@ -148,29 +148,28 @@ func CreateOperatorQuorumIntervals(
 
 // removeQuorums handles a quorum removal event, which marks the end of membership in a quorum,
 // so it'll form a block interval.
-func removeQuorums(operatorQuorum *OperatorQuorum, openQuorum map[uint8]uint32, result OperatorQuorumIntervals) error {
-	op := operatorQuorum.Operator
+func removeQuorums(operatorId string, operatorQuorum *OperatorQuorum, openQuorum map[uint8]uint32, result OperatorQuorumIntervals) error {
 	for _, q := range operatorQuorum.QuorumNumbers {
 		start, ok := openQuorum[q]
 		if !ok {
 			msg := "cannot remove a quorum %d, the operator %s is not yet in the quorum " +
 				"at block number %d"
-			return fmt.Errorf(msg, q, op, operatorQuorum.BlockNumber)
+			return fmt.Errorf(msg, q, operatorId, operatorQuorum.BlockNumber)
 		}
 		if start >= operatorQuorum.BlockNumber {
 			msg := "deregistration block number %d must be strictly greater than its " +
 				"registration block number %d, for operator %s, quorum %d"
-			return fmt.Errorf(msg, operatorQuorum.BlockNumber, start, op, q)
+			return fmt.Errorf(msg, operatorQuorum.BlockNumber, start, operatorId, q)
 		}
 		interval := BlockInterval{
 			StartBlock: start,
 			// The operator is NOT live at the block it's deregistered.
 			EndBlock: operatorQuorum.BlockNumber - 1,
 		}
-		if _, ok = result[op][q]; !ok {
-			result[op][q] = make([]BlockInterval, 0)
+		if _, ok = result[operatorId][q]; !ok {
+			result[operatorId][q] = make([]BlockInterval, 0)
 		}
-		result[op][q] = append(result[op][q], interval)
+		result[operatorId][q] = append(result[operatorId][q], interval)
 		delete(openQuorum, q)
 	}
 	return nil
@@ -197,22 +196,22 @@ func validateQuorumEvents(added []*OperatorQuorum, removed []*OperatorQuorum, st
 }
 
 // ComputeNumBatches returns the number of batches in the block interval [startBlock, endBlock].
-func ComputeNumBatches(queryBatches *QueryBatches, startBlock, endBlock uint32) int {
-	start := getLowerBoundIndex(queryBatches.NumBatches, startBlock)
-	end := getUpperBoundIndex(queryBatches.NumBatches, endBlock)
+func ComputeNumBatches(quorumBatches *QuorumBatches, startBlock, endBlock uint32) int {
+	start := getLowerBoundIndex(quorumBatches.NumBatches, startBlock)
+	end := getUpperBoundIndex(quorumBatches.NumBatches, endBlock)
 	num := 0
 	if end > 0 {
-		num = queryBatches.AccuBatches[end-1]
+		num = quorumBatches.AccuBatches[end-1]
 	}
 	if start > 0 {
-		num = num - queryBatches.AccuBatches[start-1]
+		num = num - quorumBatches.AccuBatches[start-1]
 	}
 	return num
 }
 
 // CreatQuorumBatches returns quorumBatches, where quorumBatches[q] is a list of
-// QueryBatches in ascending order by block number.
-func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QueryBatches {
+// QuorumBatches in ascending order by block number.
+func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QuorumBatches {
 	quorumBatchMap := make(map[uint8]map[uint32]int)
 	for _, batch := range batches {
 		for _, q := range batch.QuorumNumbers {
@@ -222,7 +221,7 @@ func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QueryBatches 
 			quorumBatchMap[q][batch.ReferenceBlockNumber]++
 		}
 	}
-	quorumBatches := make(map[uint8]*QueryBatches)
+	quorumBatches := make(map[uint8]*QuorumBatches)
 	for q, s := range quorumBatchMap {
 		numBatches := make([]*NumBatchesAtBlock, 0)
 		for block, num := range s {
@@ -244,7 +243,7 @@ func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QueryBatches 
 		for i := 1; i < len(numBatches); i++ {
 			accuBatches[i] = numBatches[i].NumBatches + accuBatches[i-1]
 		}
-		quorumBatches[q] = &QueryBatches{
+		quorumBatches[q] = &QuorumBatches{
 			NumBatches:  numBatches,
 			AccuBatches: accuBatches,
 		}

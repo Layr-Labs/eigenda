@@ -24,6 +24,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 )
 
 var (
@@ -70,7 +71,7 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
 		},
-		Data: gettysburgAddressBytes,
+		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
 	}
 
 	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
@@ -141,11 +142,14 @@ func TestEncodeBlob(t *testing.T) {
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
 
-	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
+	maxInputSize := uint64(len(testBlobData.Data)) + 10
 	decoded, err := testProver.Decode(chunksData, indices, testEncodingParams, maxInputSize)
 	assert.Nil(t, err)
-	recovered := bytes.TrimRight(decoded, "\x00")
-	assert.Equal(t, recovered, gettysburgAddressBytes)
+
+	recovered := codec.RemoveEmptyByteFromPaddedBytes(decoded)
+
+	restored := bytes.TrimRight(recovered, "\x00")
+	assert.Equal(t, restored, gettysburgAddressBytes)
 }
 
 func TestThrottling(t *testing.T) {
@@ -280,11 +284,14 @@ func TestEncoderPointsLoading(t *testing.T) {
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
 
-	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
+	maxInputSize := uint64(len(testBlobData.Data)) + 10
 	decoded, err := testProver.Decode(chunksData, indices, testEncodingParams, maxInputSize)
 	assert.Nil(t, err)
-	recovered := bytes.TrimRight(decoded, "\x00")
-	assert.Equal(t, recovered, gettysburgAddressBytes)
+
+	recovered := codec.RemoveEmptyByteFromPaddedBytes(decoded)
+
+	restored := bytes.TrimRight(recovered, "\x00")
+	assert.Equal(t, restored, gettysburgAddressBytes)
 
 	// encoder 2 only loads 2900 points
 	encoder2, config2 := makeTestProver(2900)

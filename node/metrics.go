@@ -2,7 +2,9 @@ package node
 
 import (
 	"context"
+	"strconv"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	eigenmetrics "github.com/Layr-Labs/eigensdk-go/metrics"
 
@@ -25,12 +27,11 @@ type Metrics struct {
 	// The latency (in ms) to process the request.
 	RequestLatency *prometheus.SummaryVec
 	// Accumulated number and size of batches processed by their statuses.
-	// TODO: this metrics should be removed in future release.
-	AccuBatchesDeprecated *prometheus.CounterVec
-	// Accumulated number and size of batches processed by their statuses.
 	AccuBatches *prometheus.CounterVec
 	// Accumulated number and size of batches that have been removed from the Node.
 	AccuRemovedBatches *prometheus.CounterVec
+	// Accumulated number and size of blobs processed by quorums.
+	AccuBlobs *prometheus.CounterVec
 	// Total number of changes in the node's socket address.
 	AccuSocketUpdates prometheus.Counter
 	// avs node spec eigen_ metrics: https://eigen.nethermind.io/docs/spec/metrics/metrics-prom-spec
@@ -74,13 +75,13 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 			[]string{"method", "stage"},
 		),
-		AccuBatchesDeprecated: promauto.With(reg).NewCounterVec(
+		AccuBlobs: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: Namespace,
-				Name:      "eigenda_batches_total",
-				Help:      "the total number and size of batches processed by the DA node",
+				Name:      "eigenda_blobs_total",
+				Help:      "the total number and size of blobs processed by the DA node",
 			},
-			[]string{"type", "status"},
+			[]string{"type", "quorum"},
 		),
 		// The "status" label has values: received, validated, stored, signed.
 		// These are the lifecycle of a batch at the DA Node.
@@ -108,7 +109,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 		),
 		EigenMetrics: eigenMetrics,
-		logger:       logger,
+		logger:       logger.With("component", "NodeMetrics"),
 		registry:     reg,
 		socketAddr:   socketAddr,
 	}
@@ -139,9 +140,13 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalBatchSize))
 }
 
-func (g *Metrics) AcceptBatches(status string, batchSize int64) {
-	g.AccuBatchesDeprecated.WithLabelValues("number", status).Inc()
-	g.AccuBatchesDeprecated.WithLabelValues("size", status).Add(float64(batchSize))
+func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize uint64) {
+	quorum := strconv.Itoa(int(quorumId))
+	g.AccuBlobs.WithLabelValues("number", quorum).Inc()
+	g.AccuBlobs.WithLabelValues("size", quorum).Add(float64(blobSize))
+}
+
+func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
 }

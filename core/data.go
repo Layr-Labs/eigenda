@@ -75,17 +75,21 @@ type BlobRequestHeader struct {
 	SecurityParams []*SecurityParam `json:"security_params"`
 }
 
-func (sp *SecurityParam) Validate() error {
-	if sp.ConfirmationThreshold < sp.AdversaryThreshold || sp.ConfirmationThreshold-sp.AdversaryThreshold < 10 {
-		return errors.New("invalid request: quorum threshold must be >= 10 + adversary threshold")
+func ValidateSecurityParam(confirmationThreshold, adversaryThreshold uint32) error {
+	if confirmationThreshold > 100 {
+		return errors.New("confimration threshold exceeds 100")
 	}
-	if sp.ConfirmationThreshold > 100 {
-		return errors.New("invalid request: quorum threshold exceeds 100")
+	if adversaryThreshold == 0 {
+		return errors.New("adversary threshold equals 0")
 	}
-	if sp.AdversaryThreshold == 0 {
-		return errors.New("invalid request: adversary threshold equals 0")
+	if confirmationThreshold < adversaryThreshold || confirmationThreshold-adversaryThreshold < 10 {
+		return errors.New("confirmation threshold must be >= 10 + adversary threshold")
 	}
 	return nil
+}
+
+func (sp *SecurityParam) Validate() error {
+	return ValidateSecurityParam(uint32(sp.ConfirmationThreshold), uint32(sp.AdversaryThreshold))
 }
 
 // BlobQuorumInfo contains the quorum IDs and parameters for a blob specific to a given quorum
@@ -119,7 +123,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_COEFFICIENT, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -142,7 +146,7 @@ type EncodedBlob struct {
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
-type Bundle = []*encoding.Frame
+type Bundle []*encoding.Frame
 
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
@@ -151,6 +155,14 @@ type Bundles map[QuorumID]Bundle
 type BlobMessage struct {
 	BlobHeader *BlobHeader
 	Bundles    Bundles
+}
+
+func (b Bundle) Size() uint64 {
+	size := uint64(0)
+	for _, chunk := range b {
+		size += chunk.Size()
+	}
+	return size
 }
 
 // Serialize encodes a batch of chunks into a byte array
@@ -169,12 +181,10 @@ func (cb Bundles) Serialize() (map[uint32][][]byte, error) {
 }
 
 // Returns the size of the bundles in bytes.
-func (cb Bundles) Size() int64 {
-	size := int64(0)
+func (cb Bundles) Size() uint64 {
+	size := uint64(0)
 	for _, bundle := range cb {
-		for _, chunk := range bundle {
-			size += int64(chunk.Size())
-		}
+		size += bundle.Size()
 	}
 	return size
 }

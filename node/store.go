@@ -49,7 +49,7 @@ func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, block
 
 	return &Store{
 		db:                  db,
-		logger:              logger,
+		logger:              logger.With("component", "NodeStore"),
 		blockStaleMeasure:   blockStaleMeasure,
 		storeDurationBlocks: storeDurationBlocks,
 		metrics:             metrics,
@@ -301,7 +301,7 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 }
 
 // GetChunks returns the list of byte arrays stored for given blobKey along with a boolean
-// indicating if the read was usuccessful or the chunks were serialized correctly
+// indicating if the read was unsuccessful or the chunks were serialized correctly
 func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, bool) {
 	log := s.logger
 
@@ -332,8 +332,8 @@ func (s *Store) HasKey(ctx context.Context, key []byte) bool {
 //
 // Note: caller should ensure these keys are exactly all the data items for a single batch
 // to maintain the integrity of the store.
-func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) bool {
-	return s.db.DeleteBatch(*keys) == nil
+func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
+	return s.db.DeleteBatch(*keys)
 }
 
 // Flattens an array of byte arrays (chunks) into a single byte array

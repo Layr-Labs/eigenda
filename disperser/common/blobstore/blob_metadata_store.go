@@ -37,7 +37,7 @@ func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
-		logger:         logger,
+		logger:         logger.With("component", "BlobMetadataStore"),
 		tableName:      tableName,
 		ttl:            ttl,
 	}
@@ -61,6 +61,11 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, metadataKey dis
 			Value: metadataKey.MetadataHash,
 		},
 	})
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: metadata not found for key %s", disperser.ErrMetadataNotFound, metadataKey)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +204,7 @@ func (s *BlobMetadataStore) GetBlobMetadataInBatch(ctx context.Context, batchHea
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("there is no metadata for batch %s and blob index %d", batchHeaderHash, blobIndex)
+		return nil, fmt.Errorf("%w: there is no metadata for batch %s and blob index %d", disperser.ErrMetadataNotFound, batchHeaderHash, blobIndex)
 	}
 
 	if len(items) > 1 {

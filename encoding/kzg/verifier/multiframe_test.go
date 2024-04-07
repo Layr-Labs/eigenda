@@ -23,7 +23,8 @@ func TestUniversalVerify(t *testing.T) {
 	numBlob := 5
 	samples := make([]verifier.Sample, 0)
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(gettysburgAddressBytes)
+		inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
+		require.Nil(t, err)
 
 		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 		require.Nil(t, err)
@@ -69,7 +70,8 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	numBlob := 5
 	samples := make([]verifier.Sample, 0)
 	for z := 0; z < numBlob; z++ {
-		inputFr := rs.ToFrArray(gettysburgAddressBytes)
+		inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
+		require.Nil(t, err)
 
 		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 		require.Nil(t, err)

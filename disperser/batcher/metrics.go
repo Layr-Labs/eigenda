@@ -49,18 +49,24 @@ type FinalizerMetrics struct {
 	Latency                *prometheus.SummaryVec
 }
 
+type DispatcherMetrics struct {
+	Latency *prometheus.SummaryVec
+}
+
 type Metrics struct {
 	*EncodingStreamerMetrics
 	*TxnManagerMetrics
 	*FinalizerMetrics
+	*DispatcherMetrics
 
 	registry *prometheus.Registry
 
-	Blob             *prometheus.CounterVec
-	Batch            *prometheus.CounterVec
-	BatchProcLatency *prometheus.SummaryVec
-	Attestation      *prometheus.GaugeVec
-	BatchError       *prometheus.CounterVec
+	Blob                      *prometheus.CounterVec
+	Batch                     *prometheus.CounterVec
+	BatchProcLatency          *prometheus.SummaryVec
+	BatchProcLatencyHistogram *prometheus.HistogramVec
+	Attestation               *prometheus.GaugeVec
+	BatchError                *prometheus.CounterVec
 
 	httpPort string
 	logger   logging.Logger
@@ -149,10 +155,23 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		),
 	}
 
+	dispatcherMatrics := DispatcherMetrics{
+		Latency: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "attestation_latency_ms",
+				Help:       "attestation latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			[]string{"status"},
+		),
+	}
+
 	metrics := &Metrics{
 		EncodingStreamerMetrics: &encodingStreamerMetrics,
 		TxnManagerMetrics:       &txnManagerMetrics,
 		FinalizerMetrics:        &finalizerMetrics,
+		DispatcherMetrics:       &dispatcherMatrics,
 		Blob: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -178,13 +197,23 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"stage"},
 		),
+		BatchProcLatencyHistogram: promauto.With(reg).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Name:      "batch_process_latency_histogram_ms",
+				Help:      "batch process latency histogram in milliseconds",
+				// In minutes: 1, 2, 3, 5, 8, 10, 13, 15, 21, 34, 55, 89
+				Buckets: []float64{60_000, 120_000, 180_000, 300_000, 480_000, 600_000, 780_000, 900_000, 1_260_000, 2_040_000, 3_300_000, 5_340_000},
+			},
+			[]string{"stage"},
+		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "attestation",
 				Help:      "number of signers and non-signers for the batch",
 			},
-			[]string{"type"},
+			[]string{"type", "quorum"},
 		),
 		BatchError: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
@@ -196,19 +225,38 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		),
 		registry: reg,
 		httpPort: httpPort,
-		logger:   logger,
+		logger:   logger.With("component", "BatcherMetrics"),
 	}
 	return metrics
 }
 
-func (g *Metrics) UpdateAttestation(operatorCount, nonSignerCount int, quorumResults map[core.QuorumID]*core.QuorumResult) {
-	g.Attestation.WithLabelValues("signers").Set(float64(operatorCount - nonSignerCount))
-	g.Attestation.WithLabelValues("non_signers").Set(float64(nonSignerCount))
+func (g *Metrics) UpdateAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {
+	for quorumID, count := range operatorCount {
+		quorumStr := fmt.Sprintf("%d", quorumID)
+		signers, ok := signerCount[quorumID]
+		if !ok {
+			g.logger.Error("signer count not found for quorum", "quorum", quorumID)
+			continue
+		}
+		nonSigners := count - signers
+		quorumResult, ok := quorumResults[quorumID]
+		if !ok {
+			g.logger.Error("quorum result not found for quorum", "quorum", quorumID)
+			continue
+		}
 
-	for _, quorumResult := range quorumResults {
-		label := fmt.Sprintf("quorum_result_%d", quorumResult.QuorumID)
-		g.Attestation.WithLabelValues(label).Set(float64(quorumResult.PercentSigned))
+		g.Attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
+		g.Attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
+		g.Attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
+}
+
+func (t *DispatcherMetrics) ObserveLatency(success bool, latencyMS float64) {
+	label := "success"
+	if !success {
+		label = "failure"
+	}
+	t.Latency.WithLabelValues(label).Observe(latencyMS)
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.
@@ -242,6 +290,7 @@ func (g *Metrics) UpdateBatchError(errType FailReason, numBlobs int) {
 
 func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 	g.BatchProcLatency.WithLabelValues(stage).Observe(latencyMs)
+	g.BatchProcLatencyHistogram.WithLabelValues(stage).Observe(latencyMs)
 }
 
 func (g *Metrics) Start(ctx context.Context) {

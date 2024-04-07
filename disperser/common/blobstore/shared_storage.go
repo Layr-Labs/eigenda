@@ -68,7 +68,7 @@ func NewSharedStorage(bucketName string, s3Client s3.Client, blobMetadataStore *
 		bucketName:        bucketName,
 		s3Client:          s3Client,
 		blobMetadataStore: blobMetadataStore,
-		logger:            logger,
+		logger:            logger.With("component", "SharedBlobStore"),
 	}
 }
 
@@ -173,7 +173,7 @@ func (s *SharedBlobStore) MarkBlobProcessing(ctx context.Context, metadataKey di
 
 func (s *SharedBlobStore) MarkBlobFailed(ctx context.Context, metadataKey disperser.BlobKey) error {
 	// Log failed blob
-	s.logger.Info("MarkBlobFailed: marking blob as failed", "blobKey", metadataKey.String())
+	s.logger.Info("marking blob as failed", "blobKey", metadataKey.String())
 	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Failed)
 }
 
@@ -233,11 +233,11 @@ func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey dispe
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
 }
 
-func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) error {
+func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {
 	if metadata.NumRetries < maxRetry {
-		return s.IncrementBlobRetryCount(ctx, metadata)
+		return true, s.IncrementBlobRetryCount(ctx, metadata)
 	} else {
-		return s.MarkBlobFailed(ctx, metadata.GetBlobKey())
+		return false, s.MarkBlobFailed(ctx, metadata.GetBlobKey())
 	}
 }
 
