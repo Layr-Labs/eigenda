@@ -18,7 +18,7 @@ library EigenDARollupUtils {
     // STRUCTS
     struct BlobVerificationProof {
         uint32 batchId;
-        uint8 blobIndex;
+        uint256 blobIndex;
         IEigenDAServiceManager.BatchMetadata batchMetadata;
         bytes inclusionProof;
         bytes quorumIndices;
