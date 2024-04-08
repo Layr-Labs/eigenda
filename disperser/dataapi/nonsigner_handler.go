@@ -13,6 +13,30 @@ import (
 )
 
 func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds int64) (*OperatorsNonsigningPercentage, error) {
+
+	blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+
+	// Get the number of quorums.
+	quorumCount, err := s.transactor.GetQuorumCount(ctx, blockNumber)
+
+	// assume quorum IDs are consequent integers starting from 0
+	quorumIDs := make([]core.QuorumID, quorumCount)
+	for i := 0; i < int(quorumCount); i++ {
+		quorumIDs[i] = core.QuorumID(i)
+	}
+
+	// Get OperatorState for the block.
+	operatorState, err := s.chainState.GetOperatorState(ctx, uint(blockNumber), quorumIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(operatorState.Operators) != int(quorumCount) {
+		return nil, fmt.Errorf("Requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
+	}
+
 	batches, err := s.subgraphClient.QueryBatchNonSigningInfoInInterval(ctx, intervalSeconds)
 	if err != nil {
 		return nil, err
@@ -42,9 +66,25 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 		return &OperatorsNonsigningPercentage{}, nil
 	}
 
+	nonSignersToCheck := []core.OperatorID{}
+
+	// Iterate over each nonsigner
+	for _, nonsigner := range nonsigners {
+		// Check if the nonsigner is in any quorum
+		for quorumID := 0; uint8(quorumID) < quorumCount; quorumID++ {
+			if quorumOperators, exists := operatorState.Operators[core.QuorumID(quorumID)]; exists {
+				if _, exists := quorumOperators[nonsigner]; exists {
+					// Nonsigner found within this quorum
+					nonSignersToCheck = append(nonSignersToCheck, nonsigner)
+					break // Stop checking other quorums for this nonsigner
+				}
+			}
+		}
+	}
+
 	// Get the address for the nonsigners (from their operatorIDs).
 	// nonsignerAddresses[i] is the address for nonsigners[i].
-	nonsignerAddresses, err := s.transactor.BatchOperatorIDToAddress(ctx, nonsigners)
+	nonsignerAddresses, err := s.transactor.BatchOperatorIDToAddress(ctx, nonSignersToCheck)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +99,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	}
 
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, err := s.createOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
+	operatorQuorumIntervals, err := s.createOperatorQuorumIntervals(ctx, nonSignersToCheck, nonsignerAddressToId, startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
