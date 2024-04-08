@@ -43,6 +43,7 @@ build:
 	cd node && make build
 	cd retriever && make build
 	cd tools/traffic && make build
+	cd tools/kzgpad && make build
 
 dataapi-build:
 	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
