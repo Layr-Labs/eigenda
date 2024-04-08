@@ -70,7 +70,7 @@ type ISignatureUtilsSignatureWithSaltAndExpiry struct {
 
 // ContractIEigenDAServiceManagerMetaData contains all meta data concerning the ContractIEigenDAServiceManager contract.
 var ContractIEigenDAServiceManagerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"BLOCK_STALE_MEASURE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"avsDirectory\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"batchIdToBatchMetadataHash\",\"inputs\":[{\"name\":\"batchId\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"confirmBatch\",\"inputs\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"signedStakeForQuorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deregisterOperatorFromAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOperatorRestakedStrategies\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRestakeableStrategies\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"latestServeUntilBlock\",\"inputs\":[{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumAdversaryThresholdPercentages\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumConfirmationThresholdPercentages\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumNumbersRequired\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registerOperatorToAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setBatchConfirmer\",\"inputs\":[{\"name\":\"_batchConfirmer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"taskNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"updateAVSMetadataURI\",\"inputs\":[{\"name\":\"_metadataURI\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"BatchConfirmed\",\"inputs\":[{\"name\":\"batchHeaderHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"batchId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"BatchConfirmerChanged\",\"inputs\":[{\"name\":\"previousAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newAddress\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"BLOCK_STALE_MEASURE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"avsDirectory\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"batchIdToBatchMetadataHash\",\"inputs\":[{\"name\":\"batchId\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"confirmBatch\",\"inputs\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structIEigenDAServiceManager.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"signedStakeForQuorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structIBLSSignatureChecker.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deregisterOperatorFromAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOperatorRestakedStrategies\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRestakeableStrategies\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"latestServeUntilBlock\",\"inputs\":[{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumAdversaryThresholdPercentages\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumConfirmationThresholdPercentages\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumNumbersRequired\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registerOperatorToAVS\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setBatchConfirmer\",\"inputs\":[{\"name\":\"_batchConfirmer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"taskNumber\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"updateAVSMetadataURI\",\"inputs\":[{\"name\":\"_metadataURI\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"BatchConfirmed\",\"inputs\":[{\"name\":\"batchHeaderHash\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"batchId\",\"type\":\"uint32\",\"indexed\":false,\"internalType\":\"uint32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"BatchConfirmerStatusChanged\",\"inputs\":[{\"name\":\"batchConfirmer\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"status\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"}],\"anonymous\":false}]",
 }
 
 // ContractIEigenDAServiceManagerABI is the input ABI used to generate the binding from.
@@ -779,9 +779,9 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) P
 	return event, nil
 }
 
-// ContractIEigenDAServiceManagerBatchConfirmerChangedIterator is returned from FilterBatchConfirmerChanged and is used to iterate over the raw logs and unpacked data for BatchConfirmerChanged events raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerBatchConfirmerChangedIterator struct {
-	Event *ContractIEigenDAServiceManagerBatchConfirmerChanged // Event containing the contract specifics and raw log
+// ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator is returned from FilterBatchConfirmerStatusChanged and is used to iterate over the raw logs and unpacked data for BatchConfirmerStatusChanged events raised by the ContractIEigenDAServiceManager contract.
+type ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator struct {
+	Event *ContractIEigenDAServiceManagerBatchConfirmerStatusChanged // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -795,7 +795,7 @@ type ContractIEigenDAServiceManagerBatchConfirmerChangedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Next() bool {
+func (it *ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -804,7 +804,7 @@ func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Next() bo
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
+			it.Event = new(ContractIEigenDAServiceManagerBatchConfirmerStatusChanged)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -819,7 +819,7 @@ func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Next() bo
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
+		it.Event = new(ContractIEigenDAServiceManagerBatchConfirmerStatusChanged)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -835,42 +835,42 @@ func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Next() bo
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Error() error {
+func (it *ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractIEigenDAServiceManagerBatchConfirmerChangedIterator) Close() error {
+func (it *ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractIEigenDAServiceManagerBatchConfirmerChanged represents a BatchConfirmerChanged event raised by the ContractIEigenDAServiceManager contract.
-type ContractIEigenDAServiceManagerBatchConfirmerChanged struct {
-	PreviousAddress common.Address
-	NewAddress      common.Address
-	Raw             types.Log // Blockchain specific contextual infos
+// ContractIEigenDAServiceManagerBatchConfirmerStatusChanged represents a BatchConfirmerStatusChanged event raised by the ContractIEigenDAServiceManager contract.
+type ContractIEigenDAServiceManagerBatchConfirmerStatusChanged struct {
+	BatchConfirmer common.Address
+	Status         bool
+	Raw            types.Log // Blockchain specific contextual infos
 }
 
-// FilterBatchConfirmerChanged is a free log retrieval operation binding the contract event 0xf024af0387e1367ceb1c6a3b6a00db4e9917e56bfb22a289808100f8e2b2c085.
+// FilterBatchConfirmerStatusChanged is a free log retrieval operation binding the contract event 0x5c3265f5fb462ef4930fe47beaa183647c97f19ba545b761f41bc8cd4621d414.
 //
-// Solidity: event BatchConfirmerChanged(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterBatchConfirmerChanged(opts *bind.FilterOpts) (*ContractIEigenDAServiceManagerBatchConfirmerChangedIterator, error) {
+// Solidity: event BatchConfirmerStatusChanged(address batchConfirmer, bool status)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) FilterBatchConfirmerStatusChanged(opts *bind.FilterOpts) (*ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator, error) {
 
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.FilterLogs(opts, "BatchConfirmerChanged")
+	logs, sub, err := _ContractIEigenDAServiceManager.contract.FilterLogs(opts, "BatchConfirmerStatusChanged")
 	if err != nil {
 		return nil, err
 	}
-	return &ContractIEigenDAServiceManagerBatchConfirmerChangedIterator{contract: _ContractIEigenDAServiceManager.contract, event: "BatchConfirmerChanged", logs: logs, sub: sub}, nil
+	return &ContractIEigenDAServiceManagerBatchConfirmerStatusChangedIterator{contract: _ContractIEigenDAServiceManager.contract, event: "BatchConfirmerStatusChanged", logs: logs, sub: sub}, nil
 }
 
-// WatchBatchConfirmerChanged is a free log subscription operation binding the contract event 0xf024af0387e1367ceb1c6a3b6a00db4e9917e56bfb22a289808100f8e2b2c085.
+// WatchBatchConfirmerStatusChanged is a free log subscription operation binding the contract event 0x5c3265f5fb462ef4930fe47beaa183647c97f19ba545b761f41bc8cd4621d414.
 //
-// Solidity: event BatchConfirmerChanged(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchBatchConfirmerChanged(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerBatchConfirmerChanged) (event.Subscription, error) {
+// Solidity: event BatchConfirmerStatusChanged(address batchConfirmer, bool status)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) WatchBatchConfirmerStatusChanged(opts *bind.WatchOpts, sink chan<- *ContractIEigenDAServiceManagerBatchConfirmerStatusChanged) (event.Subscription, error) {
 
-	logs, sub, err := _ContractIEigenDAServiceManager.contract.WatchLogs(opts, "BatchConfirmerChanged")
+	logs, sub, err := _ContractIEigenDAServiceManager.contract.WatchLogs(opts, "BatchConfirmerStatusChanged")
 	if err != nil {
 		return nil, err
 	}
@@ -880,8 +880,8 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) W
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
-				if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmerChanged", log); err != nil {
+				event := new(ContractIEigenDAServiceManagerBatchConfirmerStatusChanged)
+				if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmerStatusChanged", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -902,12 +902,12 @@ func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) W
 	}), nil
 }
 
-// ParseBatchConfirmerChanged is a log parse operation binding the contract event 0xf024af0387e1367ceb1c6a3b6a00db4e9917e56bfb22a289808100f8e2b2c085.
+// ParseBatchConfirmerStatusChanged is a log parse operation binding the contract event 0x5c3265f5fb462ef4930fe47beaa183647c97f19ba545b761f41bc8cd4621d414.
 //
-// Solidity: event BatchConfirmerChanged(address previousAddress, address newAddress)
-func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParseBatchConfirmerChanged(log types.Log) (*ContractIEigenDAServiceManagerBatchConfirmerChanged, error) {
-	event := new(ContractIEigenDAServiceManagerBatchConfirmerChanged)
-	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmerChanged", log); err != nil {
+// Solidity: event BatchConfirmerStatusChanged(address batchConfirmer, bool status)
+func (_ContractIEigenDAServiceManager *ContractIEigenDAServiceManagerFilterer) ParseBatchConfirmerStatusChanged(log types.Log) (*ContractIEigenDAServiceManagerBatchConfirmerStatusChanged, error) {
+	event := new(ContractIEigenDAServiceManagerBatchConfirmerStatusChanged)
+	if err := _ContractIEigenDAServiceManager.contract.UnpackLog(event, "BatchConfirmerStatusChanged", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
