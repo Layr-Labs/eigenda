@@ -16,11 +16,11 @@ interface IEigenDAServiceManager is IServiceManager {
     event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
 
     /**
-     * @notice Emitted when the batch confirmer is changed.
-     * @param previousAddress The address of the previous batch confirmer
-     * @param newAddress The address of the new batch confirmer
+     * @notice Emitted when a batch confirmer status is updated.
+     * @param batchConfirmer The address of the batch confirmer
+     * @param status The new status of the batch confirmer
      */
-    event BatchConfirmerChanged(address previousAddress, address newAddress);
+    event BatchConfirmerStatusChanged(address batchConfirmer, bool status);
 
     // STRUCTS
 

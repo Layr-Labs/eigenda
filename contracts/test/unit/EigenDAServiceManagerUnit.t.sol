@@ -37,6 +37,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             stakeRegistry
         );
 
+        address[] memory confirmers = new address[](1);
+        confirmers[0] = confirmer;
+
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         eigenDAServiceManager = EigenDAServiceManager(
             address(
@@ -48,7 +51,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                         pauserRegistry,
                         0,
                         registryCoordinatorOwner,
-                        confirmer
+                        confirmers
                     )
                 )
             )

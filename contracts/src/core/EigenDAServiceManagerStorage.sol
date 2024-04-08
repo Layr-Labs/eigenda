@@ -41,21 +41,21 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
      * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
-    bytes public constant quorumAdversaryThresholdPercentages = hex"2121";
+    bytes public constant quorumAdversaryThresholdPercentages = hex"21";
 
     /**
      * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
      * this is the percentage of the total stake needed to confirm a blob.
      * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
-    bytes public constant quorumConfirmationThresholdPercentages = hex"3737";
+    bytes public constant quorumConfirmationThresholdPercentages = hex"37";
 
     /**
      * @notice The quorum numbers required for confirmation stored as an ordered bytes array
      * these quorum numbers have respective canonical thresholds in the
      * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
      */
-    bytes public constant quorumNumbersRequired = hex"0001";
+    bytes public constant quorumNumbersRequired = hex"00";
 
     /// @notice The current batchId
     uint32 public batchId;
@@ -63,8 +63,8 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
     mapping(uint32 => bytes32) public batchIdToBatchMetadataHash;
 
-    /// @notice address that is permissioned to confirm batches
-    address public batchConfirmer;
+    /// @notice mapping of addressed that are permissioned to confirm batches
+    mapping(address => bool) public isBatchConfirmer;
 
     // storage gap for upgradeability
     // slither-disable-next-line shadowing-state

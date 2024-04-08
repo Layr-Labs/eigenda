@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: BUSL-1.1
-/*
 pragma solidity =0.8.12;
 
 import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
@@ -17,31 +16,26 @@ import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {OperatorStateRetriever} from "eigenlayer-middleware/OperatorStateRetriever.sol";
 import {ServiceManagerRouter} from "eigenlayer-middleware/ServiceManagerRouter.sol";
-import {MockRollup, BN254, IEigenDAServiceManager} from "src/rollup/MockRollup.sol";
 
 import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
-
-//forge script script/deploy/goerliv2/GoerliV2_Deploy.s.sol:Deployer_GV2 --rpc-url $RPC_URL  --private-key $PRIVATE_KEY -vvvv //--broadcast 
-contract Deployer_Holesky is ExistingDeploymentParser {
-    using BN254 for BN254.G1Point;
-
-    //string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/Holesky_preprod.json"));
-    //string public deployConfigPath = string(bytes("./script/deploy/holesky/config/preprod.config.json"));
-    //string public outputPath = string.concat("script/deploy/holesky/output/holesky_preprod_deployment_data.json");
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/existing/Holesky_testnet.json"));
-    string public deployConfigPath = string(bytes("./script/deploy/holesky/config/testnet.config.json"));
-    string public outputPath = string.concat("script/deploy/holesky/output/holesky_testnet_deployment_data.json");
+contract Deployer_Mainnet is ExistingDeploymentParser {
+    
+    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/mainnet/mainnet_addresses.json"));
+    string public deployConfigPath = string(bytes("./script/deploy/mainnet/mainnet.config.json"));
+    string public outputPath = string(bytes("script/deploy/mainnet/mainnet_deployment_data.json"));
 
     ProxyAdmin public eigenDAProxyAdmin;
     address public eigenDAOwner;
     address public eigenDAUpgrader;
     address public batchConfirmer;
+    address public fallbackBatchConfirmer;
     address public pauser;
     uint256 public initalPausedStatus;
+    address public deployer;
 
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
@@ -50,7 +44,6 @@ contract Deployer_Holesky is ExistingDeploymentParser {
     StakeRegistry public stakeRegistry;
     OperatorStateRetriever public operatorStateRetriever;
     ServiceManagerRouter public serviceManagerRouter;
-    MockRollup public mockRollup;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -75,22 +68,27 @@ contract Deployer_Holesky is ExistingDeploymentParser {
         eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
         eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
         batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
-        pauser = stdJson.readAddress(config_data, ".permissions.pauser");
+        fallbackBatchConfirmer = stdJson.readAddress(config_data, ".permissions.fallbackBatchConfirmer");   
         initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
 
-        if(pauser == address(0)) {
-            pauser = address(eigenLayerPauserReg);
-        }
+        pauser = address(eigenLayerPauserReg);
+
+        deployer = stdJson.readAddress(config_data, ".permissions.deployer");
+        require(deployer == tx.origin, "Deployer address must be the same as the tx.origin");
+        emit log_named_address("You are deploying from", deployer);
 
         vm.startBroadcast();
 
         // deploy proxy admin for ability to upgrade proxy contracts
         eigenDAProxyAdmin = new ProxyAdmin();
 
+        //deploy service manager router
+        serviceManagerRouter = new ServiceManagerRouter();
+
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         *//*
+         */
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -186,6 +184,10 @@ contract Deployer_Holesky is ExistingDeploymentParser {
             stakeRegistry
         );
 
+        address[] memory batchConfirmers = new address[](2);
+        batchConfirmers[0] = batchConfirmer;
+        batchConfirmers[1] = fallbackBatchConfirmer;
+
         //upgrade the eigenDA service manager proxy to implementation
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
@@ -194,22 +196,17 @@ contract Deployer_Holesky is ExistingDeploymentParser {
                 EigenDAServiceManager.initialize.selector,
                 IPauserRegistry(pauser),
                 initalPausedStatus,
-                eigenDAOwner,
-                batchConfirmer
+                deployer,
+                batchConfirmers
             )
         );
 
+        string memory metadataURI = stdJson.readString(config_data, ".uri");
+        eigenDAServiceManager.updateAVSMetadataURI(metadataURI);
+        eigenDAServiceManager.transferOwnership(eigenDAOwner);
+
         //deploy the operator state retriever
         operatorStateRetriever = new OperatorStateRetriever();
-
-        //deploy service manager router
-        serviceManagerRouter = new ServiceManagerRouter();
-
-        //deploy mock rollup
-        mockRollup = new MockRollup(
-            IEigenDAServiceManager(eigenDAServiceManager),
-            BN254.generatorG1().scalar_mul(2)
-        );
 
         // transfer ownership of proxy admin to upgrader
         eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
@@ -240,6 +237,186 @@ contract Deployer_Holesky is ExistingDeploymentParser {
         _writeOutput(config_data);
     }
 
+    function xtest() external {
+        // get info on all the already-deployed contracts
+        _parseDeployedContracts(existingDeploymentInfoPath);
+
+        // READ JSON CONFIG DATA
+        string memory config_data = vm.readFile(deployConfigPath);
+
+        // check that the chainID matches the one in the config
+        uint256 currentChainId = block.chainid;
+        uint256 configChainId = stdJson.readUint(config_data, ".chainInfo.chainId");
+        emit log_named_uint("You are deploying on ChainID", currentChainId);
+        require(configChainId == currentChainId, "You are on the wrong chain for this config");
+
+        // parse the addresses of permissioned roles
+        eigenDAOwner = stdJson.readAddress(config_data, ".permissions.owner");
+        eigenDAUpgrader = stdJson.readAddress(config_data, ".permissions.upgrader");
+        batchConfirmer = stdJson.readAddress(config_data, ".permissions.batchConfirmer");
+        fallbackBatchConfirmer = stdJson.readAddress(config_data, ".permissions.fallbackBatchConfirmer");   
+        initalPausedStatus = stdJson.readUint(config_data, ".permissions.initalPausedStatus");
+
+        pauser = address(eigenLayerPauserReg);
+
+        deployer = stdJson.readAddress(config_data, ".permissions.deployer");
+        vm.startPrank(deployer);
+
+        // deploy proxy admin for ability to upgrade proxy contracts
+        eigenDAProxyAdmin = new ProxyAdmin();
+
+        //deploy service manager router
+        serviceManagerRouter = new ServiceManagerRouter();
+
+        /**
+         * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
+         * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
+         */
+        eigenDAServiceManager = EigenDAServiceManager(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        registryCoordinator = RegistryCoordinator(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        indexRegistry = IndexRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        stakeRegistry = StakeRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        apkRegistry = BLSApkRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+
+        //deploy index registry implementation
+        indexRegistryImplementation = new IndexRegistry(
+            registryCoordinator
+        );
+
+        //upgrade index registry proxy to implementation
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(indexRegistry))),
+            address(indexRegistryImplementation)
+        );
+
+        //deploy stake registry implementation
+        stakeRegistryImplementation = new StakeRegistry(
+            registryCoordinator,
+            delegationManager
+        );
+
+        //upgrade stake registry proxy to implementation
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(stakeRegistry))),
+            address(stakeRegistryImplementation)
+        );
+
+        //deploy apk registry implementation
+        apkRegistryImplementation = new BLSApkRegistry(
+            registryCoordinator
+        );
+
+        //upgrade apk registry proxy to implementation
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(apkRegistry))),
+            address(apkRegistryImplementation)
+        );
+
+        //deploy the registry coordinator implementation.
+        registryCoordinatorImplementation = new RegistryCoordinator(
+            IServiceManager(address(eigenDAServiceManager)),
+            stakeRegistry,
+            apkRegistry,
+            indexRegistry
+        );
+
+        {
+        // parse initalization params and permissions from config data
+        (
+            uint96[] memory minimumStakeForQuourm, 
+            IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers
+        ) = _parseStakeRegistryParams(config_data);
+        (
+            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams, 
+            address churner, 
+            address ejector
+        ) = _parseRegistryCoordinatorParams(config_data);
+
+        //upgrade the registry coordinator proxy to implementation
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(registryCoordinator))),
+            address(registryCoordinatorImplementation),
+            abi.encodeWithSelector(
+                RegistryCoordinator.initialize.selector,
+                eigenDAOwner,
+                churner,
+                ejector,
+                IPauserRegistry(pauser),
+                initalPausedStatus, 
+                operatorSetParams, 
+                minimumStakeForQuourm,
+                strategyAndWeightingMultipliers 
+            )
+        );
+        }
+
+        //deploy the eigenDA service manager implementation
+        eigenDAServiceManagerImplementation = new EigenDAServiceManager(
+            avsDirectory,
+            registryCoordinator,
+            stakeRegistry
+        );
+
+        address[] memory batchConfirmers = new address[](2);
+        batchConfirmers[0] = batchConfirmer;
+        batchConfirmers[1] = fallbackBatchConfirmer;
+
+        //upgrade the eigenDA service manager proxy to implementation
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
+            address(eigenDAServiceManagerImplementation),
+            abi.encodeWithSelector(
+                EigenDAServiceManager.initialize.selector,
+                IPauserRegistry(pauser),
+                initalPausedStatus,
+                deployer,
+                batchConfirmers
+            )
+        );
+
+        string memory metadataURI = stdJson.readString(config_data, ".uri");
+        eigenDAServiceManager.updateAVSMetadataURI(metadataURI);
+        eigenDAServiceManager.transferOwnership(eigenDAOwner);
+
+        //deploy the operator state retriever
+        operatorStateRetriever = new OperatorStateRetriever();
+
+        // transfer ownership of proxy admin to upgrader
+        eigenDAProxyAdmin.transferOwnership(eigenDAUpgrader);
+
+        vm.stopPrank();
+
+        // sanity checks
+        __verifyContractPointers(
+            apkRegistry,
+            eigenDAServiceManager,
+            registryCoordinator,
+            indexRegistry,
+            stakeRegistry
+        );
+
+        __verifyContractPointers(
+            apkRegistryImplementation,
+            eigenDAServiceManagerImplementation,
+            registryCoordinatorImplementation,
+            indexRegistryImplementation,
+            stakeRegistryImplementation
+        );
+
+        __verifyImplementations();
+        __verifyInitalizations(config_data);
+    }
+
     function __verifyContractPointers(
         BLSApkRegistry _apkRegistry,
         EigenDAServiceManager _eigenDAServiceManager,
@@ -256,6 +433,7 @@ contract Deployer_Holesky is ExistingDeploymentParser {
 
         require(address(_eigenDAServiceManager.registryCoordinator()) == address(registryCoordinator), "eigenDAServiceManager.registryCoordinator() != registryCoordinator");
         require(address(_eigenDAServiceManager.stakeRegistry()) == address(stakeRegistry), "eigenDAServiceManager.stakeRegistry() != stakeRegistry");
+        require(address(_eigenDAServiceManager.avsDirectory()) == address(avsDirectory), "eigenDAServiceManager.avsDirectory() != avsDirectory");
 
         require(address(_registryCoordinator.serviceManager()) == address(eigenDAServiceManager), "registryCoordinator.eigenDAServiceManager() != eigenDAServiceManager");
         require(address(_registryCoordinator.stakeRegistry()) == address(stakeRegistry), "registryCoordinator.stakeRegistry() != stakeRegistry");
@@ -294,7 +472,8 @@ contract Deployer_Holesky is ExistingDeploymentParser {
 
         require(eigenDAServiceManager.owner() == eigenDAOwner, "eigenDAServiceManager.owner() != eigenDAOwner");
         require(eigenDAServiceManager.pauserRegistry() == IPauserRegistry(pauser), "eigenDAServiceManager: pauser registry not set correctly");
-        require(eigenDAServiceManager.batchConfirmer() == batchConfirmer, "eigenDAServiceManager.batchConfirmer() != batchConfirmer");
+        require(eigenDAServiceManager.isBatchConfirmer(batchConfirmer) == true, "eigenDAServiceManager.batchConfirmer() != batchConfirmer");
+        require(eigenDAServiceManager.isBatchConfirmer(fallbackBatchConfirmer) == true, "eigenDAServiceManager.fallbackBatchConfirmer() != fallbackBatchConfirmer");
         require(eigenDAServiceManager.paused() == initalPausedStatus, "eigenDAServiceManager: init paused status set incorrectly");
 
         require(registryCoordinator.owner() == eigenDAOwner, "registryCoordinator.owner() != eigenDAOwner");
@@ -339,7 +518,6 @@ contract Deployer_Holesky is ExistingDeploymentParser {
         vm.serializeAddress(deployed_addresses, "stakeRegistry", address(stakeRegistry));
         vm.serializeAddress(deployed_addresses, "stakeRegistryImplementation", address(stakeRegistryImplementation));
         vm.serializeAddress(deployed_addresses, "serviceManagerRouter", address(serviceManagerRouter));
-        vm.serializeAddress(deployed_addresses, "mockRollup", address(mockRollup));
         string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "stakeRegistryImplementation", address(stakeRegistryImplementation));
 
         string memory chain_info = "chainInfo";
@@ -378,4 +556,3 @@ contract Deployer_Holesky is ExistingDeploymentParser {
         ejector = stdJson.readAddress(config_data, ".permissions.ejector");
     }
 }
-*/
