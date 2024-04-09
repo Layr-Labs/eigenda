@@ -194,7 +194,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		for opID := range operatorsByID {
 			if aggPubKeys[quorumID] == nil {
 				key := privateOperators[opID].KeyPair.GetPubKeyG1()
-				aggPubKeys[quorumID] = key.Deserialize(key.Serialize())
+				aggPubKeys[quorumID] = key.Clone()
 			} else {
 				aggPubKeys[quorumID].Add(privateOperators[opID].KeyPair.GetPubKeyG1())
 			}
