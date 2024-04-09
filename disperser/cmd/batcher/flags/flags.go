@@ -128,6 +128,13 @@ var (
 		Value:    10 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FIREBLOCKS_API_TIMEOUT"),
 	}
+	TransactionBroadcastTimeoutFlag = cli.DurationFlag{
+		Name:     "transaction-broadcast-timeout",
+		Usage:    "timeout to broadcast transaction",
+		Required: false,
+		Value:    10 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRANSACTION_BROADCAST_TIMEOUT"),
+	}
 	NumConnectionsFlag = cli.IntFlag{
 		Name:     "num-connections",
 		Usage:    "maximum number of connections to encoders (defaults to 256)",
@@ -217,6 +224,7 @@ var optionalFlags = []cli.Flag{
 	ChainWriteTimeoutFlag,
 	ChainStateTimeoutFlag,
 	FireblocksAPITimeoutFlag,
+	TransactionBroadcastTimeoutFlag,
 	NumConnectionsFlag,
 	FinalizerIntervalFlag,
 	FinalizerPoolSizeFlag,

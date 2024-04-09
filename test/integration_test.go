@@ -147,10 +147,11 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		SRSOrder:                 3000,
 	}
 	timeoutConfig := batcher.TimeoutConfig{
-		EncodingTimeout:    10 * time.Second,
-		AttestationTimeout: 10 * time.Second,
-		ChainReadTimeout:   10 * time.Second,
-		ChainWriteTimeout:  10 * time.Second,
+		EncodingTimeout:     10 * time.Second,
+		AttestationTimeout:  10 * time.Second,
+		ChainReadTimeout:    10 * time.Second,
+		ChainWriteTimeout:   10 * time.Second,
+		TxnBroadcastTimeout: 10 * time.Second,
 	}
 
 	p0, _ := mustMakeTestComponents()

@@ -109,10 +109,11 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 		FinalizationBlockDelay:   finalizationBlockDelay,
 	}
 	timeoutConfig := bat.TimeoutConfig{
-		EncodingTimeout:    10 * time.Second,
-		AttestationTimeout: 10 * time.Second,
-		ChainReadTimeout:   10 * time.Second,
-		ChainWriteTimeout:  10 * time.Second,
+		EncodingTimeout:     10 * time.Second,
+		AttestationTimeout:  10 * time.Second,
+		ChainReadTimeout:    10 * time.Second,
+		ChainWriteTimeout:   10 * time.Second,
+		TxnBroadcastTimeout: 10 * time.Second,
 	}
 
 	metrics := bat.NewMetrics("9100", logger)
