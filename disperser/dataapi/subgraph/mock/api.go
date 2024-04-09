@@ -68,7 +68,7 @@ func (m *MockSubgraphApi) QueryOperators(ctx context.Context, first int) ([]*sub
 }
 
 func (m *MockSubgraphApi) QueryBatchNonSigningInfo(ctx context.Context, startTime, endTime int64) ([]*subgraph.BatchNonSigningInfo, error) {
-	args := m.Called()
+	args := m.Called(startTime, endTime)
 
 	var value []*subgraph.BatchNonSigningInfo
 	if args.Get(0) != nil {
