@@ -487,7 +487,7 @@ func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 
 func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
-	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
+	mockSubgraphApi.On("QueryBatchNonSigningInfo", int64(0), int64(1)).Return(batchNonSigningInfo, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	result, err := subgraphClient.QueryBatchNonSigningInfoInInterval(context.Background(), 0, 1)
 	assert.NoError(t, err)
