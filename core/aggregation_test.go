@@ -93,7 +93,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			meetsQuorum:    []bool{true},
 		},
 		{
-			name: "Succeeds when 9/10 operators sign at quorum threshold 70",
+			name: "Succeeds when 5/6 operators sign at quorum threshold 70",
 			quorums: []core.QuorumResult{
 				{
 					QuorumID:      0,
@@ -105,7 +105,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			meetsQuorum:    []bool{true},
 		},
 		{
-			name: "Fails when 8/10 operators sign at quorum threshold 90",
+			name: "Fails when 4/6 operators sign at quorum threshold 90",
 			quorums: []core.QuorumResult{
 				{
 					QuorumID:      0,
@@ -117,7 +117,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			meetsQuorum:    []bool{false},
 		},
 		{
-			name: "Fails when 9/10 operators sign at quorum threshold 80 for 2 quorums",
+			name: "Fails when 5/6 operators sign at quorum threshold 80 for 2 quorums",
 			quorums: []core.QuorumResult{
 				{
 					QuorumID:      0,
@@ -133,7 +133,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 			meetsQuorum:    []bool{false, true},
 		},
 		{
-			name: "Succeeds when 9/10 operators sign at quorum threshold 70 and 100",
+			name: "Succeeds when 5/6 operators sign at quorum threshold 70 and 100",
 			quorums: []core.QuorumResult{
 				{
 					QuorumID:      0,

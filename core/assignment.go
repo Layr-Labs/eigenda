@@ -104,7 +104,7 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 		num := new(big.Int).Mul(big.NewInt(int64(blobLength*percentMultiplier)), r.Stake)
 
 		gammaChunkLength := big.NewInt(int64(info.ChunkLength) * int64((info.ConfirmationThreshold - info.AdversaryThreshold)))
-		if gammaChunkLength.Cmp(big.NewInt(0)) == 0 {
+		if gammaChunkLength.Cmp(big.NewInt(0)) <= 0 {
 			return nil, AssignmentInfo{}, fmt.Errorf("gammaChunkLength must be greater than 0")
 		}
 		if totalStakes.Cmp(big.NewInt(0)) == 0 {

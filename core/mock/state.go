@@ -2,9 +2,9 @@ package mock
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/mock"
@@ -13,16 +13,15 @@ import (
 type ChainDataMock struct {
 	mock.Mock
 
-	KeyPairs     map[core.OperatorID]*core.KeyPair
-	NumOperators uint8
-	Stakes       map[core.QuorumID]map[core.OperatorID]int
+	KeyPairs  map[core.OperatorID]*core.KeyPair
+	Operators []core.OperatorID
+	Stakes    map[core.QuorumID]map[core.OperatorID]int
 }
 
 var _ core.ChainState = (*ChainDataMock)(nil)
 var _ core.IndexedChainState = (*ChainDataMock)(nil)
 
 type PrivateOperatorInfo struct {
-	*core.OperatorInfo
 	*core.IndexedOperatorInfo
 	KeyPair       *core.KeyPair
 	Host          string
@@ -42,31 +41,39 @@ func MakeOperatorId(id int) core.OperatorID {
 }
 
 func NewChainDataMock(stakes map[core.QuorumID]map[core.OperatorID]int) (*ChainDataMock, error) {
-	numOperators := 0
-	keyPairs := make(map[core.OperatorID]*core.KeyPair)
+
+	seenOperators := make(map[core.OperatorID]struct{})
 	for _, oprStakes := range stakes {
-		if len(oprStakes) > 255 {
-			return nil, errors.New("too many operators")
-		}
-		if len(oprStakes) > numOperators {
-			numOperators = len(oprStakes)
-		}
 		for opID := range oprStakes {
-			if _, ok := keyPairs[opID]; ok {
+			if _, ok := seenOperators[opID]; ok {
 				continue
 			}
-			keyPair, err := core.GenRandomBlsKeys()
-			if err != nil {
-				return nil, err
-			}
-			keyPairs[opID] = keyPair
+			seenOperators[opID] = struct{}{}
 		}
 	}
 
+	operators := make([]core.OperatorID, 0, len(seenOperators))
+	for opID := range seenOperators {
+		operators = append(operators, opID)
+	}
+
+	sort.Slice(operators, func(i, j int) bool {
+		return operators[i].Hex() < operators[j].Hex()
+	})
+
+	keyPairs := make(map[core.OperatorID]*core.KeyPair)
+	for _, opID := range operators {
+		keyPair, err := core.GenRandomBlsKeys()
+		if err != nil {
+			return nil, err
+		}
+		keyPairs[opID] = keyPair
+	}
+
 	return &ChainDataMock{
-		KeyPairs:     keyPairs,
-		NumOperators: uint8(numOperators),
-		Stakes:       stakes,
+		KeyPairs:  keyPairs,
+		Operators: operators,
+		Stakes:    stakes,
 	}, nil
 }
 
@@ -117,20 +124,12 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		}
 	}
 
-	indexedOperators := make(map[core.OperatorID]*core.IndexedOperatorInfo, d.NumOperators)
-	storedOperators := make(map[core.OperatorID]*core.OperatorInfo)
-	privateOperators := make(map[core.OperatorID]*PrivateOperatorInfo, d.NumOperators)
+	indexedOperators := make(map[core.OperatorID]*core.IndexedOperatorInfo, len(d.Operators))
+	privateOperators := make(map[core.OperatorID]*PrivateOperatorInfo, len(d.Operators))
 
 	aggPubKeys := make(map[core.QuorumID]*core.G1Point)
-	for i := 0; i < int(d.NumOperators); i++ {
-		id := MakeOperatorId(i)
-		stake := 0
-		for _, stakesByOp := range d.Stakes {
-			if s, ok := stakesByOp[id]; ok {
-				stake = s
-				break
-			}
-		}
+	for i, id := range d.Operators {
+
 		host := "0.0.0.0"
 		dispersalPort := fmt.Sprintf("3%03v", 2*i)
 		retrievalPort := fmt.Sprintf("3%03v", 2*i+1)
@@ -142,13 +141,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			PubkeyG2: d.KeyPairs[id].GetPubKeyG2(),
 		}
 
-		stored := &core.OperatorInfo{
-			Stake: big.NewInt(int64(stake)),
-			Index: uint(i),
-		}
-
 		private := &PrivateOperatorInfo{
-			OperatorInfo:        stored,
 			IndexedOperatorInfo: indexed,
 			KeyPair:             d.KeyPairs[id],
 			Host:                host,
@@ -156,42 +149,48 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			RetrievalPort:       retrievalPort,
 		}
 
-		storedOperators[id] = stored
 		indexedOperators[id] = indexed
 		privateOperators[id] = private
 	}
 
+	storedOperators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo, len(d.Stakes))
 	totals := make(map[core.QuorumID]*core.OperatorInfo)
+
 	for _, quorumID := range quorums {
-		stakesByOp := d.Stakes[quorumID]
+
+		storedOperators[quorumID] = make(map[core.OperatorID]*core.OperatorInfo, len(d.Stakes[quorumID]))
+
+		index := uint(0)
+		for _, opID := range d.Operators {
+			stake, ok := d.Stakes[quorumID][opID]
+			if !ok {
+				continue
+			}
+
+			storedOperators[quorumID][opID] = &core.OperatorInfo{
+				Stake: big.NewInt(int64(stake)),
+				Index: index,
+			}
+			index++
+		}
+
 		quorumStake := 0
-		for _, stake := range stakesByOp {
+		for _, stake := range d.Stakes[quorumID] {
 			quorumStake += stake
 		}
 		totals[quorumID] = &core.OperatorInfo{
 			Stake: big.NewInt(int64(quorumStake)),
-			Index: uint(len(stakesByOp)),
+			Index: uint(len(d.Stakes[quorumID])),
 		}
-	}
-
-	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
-	for _, quorumID := range quorums {
-		stakesByOp := d.Stakes[quorumID]
-
-		quorumOperators := make(map[core.OperatorID]*core.OperatorInfo)
-		for oprID := range stakesByOp {
-			quorumOperators[oprID] = storedOperators[oprID]
-		}
-		operators[quorumID] = quorumOperators
 	}
 
 	operatorState := &core.OperatorState{
-		Operators:   operators,
+		Operators:   storedOperators,
 		Totals:      totals,
 		BlockNumber: blockNumber,
 	}
 
-	for quorumID, operatorsByID := range operators {
+	for quorumID, operatorsByID := range storedOperators {
 		for opID := range operatorsByID {
 			if aggPubKeys[quorumID] == nil {
 				key := privateOperators[opID].KeyPair.GetPubKeyG1()
