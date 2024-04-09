@@ -38,6 +38,7 @@ var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
 		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda",
+		"1":     "https://app.eigenlayer.xyz/avs/eigenda",
 	}
 )
 
