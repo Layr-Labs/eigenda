@@ -28,7 +28,11 @@ func (m mockGraphQLQuerier) Query(ctx context.Context, q any, variables map[stri
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	logger := logging.NewNoopLogger()
 
-	chainState, _ := mock.MakeChainDataMock(1)
+	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+		0: 1,
+		1: 1,
+		2: 1,
+	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
@@ -91,7 +95,11 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) {
 	logger := logging.NewNoopLogger()
 
-	chainState, _ := mock.MakeChainDataMock(2)
+	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+		0: 2,
+		1: 2,
+		2: 2,
+	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
@@ -154,7 +162,11 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	logger := logging.NewNoopLogger()
 
-	chainState, _ := mock.MakeChainDataMock(1)
+	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+		0: 1,
+		1: 1,
+		2: 1,
+	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
@@ -233,7 +245,11 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	logger := logging.NewNoopLogger()
 
-	chainState, _ := mock.MakeChainDataMock(1)
+	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+		0: 1,
+		1: 1,
+		2: 1,
+	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
