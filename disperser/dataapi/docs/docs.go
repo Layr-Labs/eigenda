@@ -374,6 +374,18 @@ const docTemplate = `{
                         "description": "Interval to query for operators nonsigning percentage [default: 3600]",
                         "name": "interval",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start time (UTC) to query for operators nonsigning percentage",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End time (UTC) to query for operators nonsigning percentage",
+                        "name": "stop",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -497,6 +509,9 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "big.Int": {
+            "type": "object"
+        },
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -645,12 +660,16 @@ const docTemplate = `{
                 },
                 "total_stake": {
                     "description": "deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.",
-                    "type": "integer"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/big.Int"
+                        }
+                    ]
                 },
                 "total_stake_per_quorum": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer"
+                        "$ref": "#/definitions/big.Int"
                     }
                 }
             }

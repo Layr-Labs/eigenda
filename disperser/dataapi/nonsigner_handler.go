@@ -12,8 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 )
 
-func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds int64) (*OperatorsNonsigningPercentage, error) {
-	batches, err := s.subgraphClient.QueryBatchNonSigningInfoInInterval(ctx, intervalSeconds)
+func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTime int64) (*OperatorsNonsigningPercentage, error) {
+	batches, err := s.subgraphClient.QueryBatchNonSigningInfoInInterval(ctx, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}

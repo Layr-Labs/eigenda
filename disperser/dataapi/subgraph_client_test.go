@@ -489,7 +489,7 @@ func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
-	result, err := subgraphClient.QueryBatchNonSigningInfoInInterval(context.Background(), int64(1))
+	result, err := subgraphClient.QueryBatchNonSigningInfoInInterval(context.Background(), 0, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(result))
 

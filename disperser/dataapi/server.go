@@ -465,7 +465,9 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Summary	Fetch operators non signing percentage
 //	@Tags		Metrics
 //	@Produce	json
-//	@Param		interval	query		int	false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		start		query		string	false	"Start time (UTC) to query for operators nonsigning percentage"
+//	@Param		stop		query		string	false	"End time (UTC) to query for operators nonsigning percentage"
 //	@Success	200			{object}	OperatorsNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -477,11 +479,35 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
-	if err != nil || interval == 0 {
-		interval = 3600
+	var start, stop int64
+	if c.Query("start") != "" || c.Query("stop") != "" {
+
+		startTime, err := time.Parse("2006-01-02T15:04:05Z", c.Query("start"))
+		if err != nil {
+			errorResponse(c, err)
+			return
+		}
+		start = startTime.Unix()
+
+		endTime, err := time.Parse("2006-01-02T15:04:05Z", c.Query("stop"))
+		if err != nil {
+			errorResponse(c, err)
+			return
+		}
+		stop = endTime.Unix()
+	} else {
+
+		interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
+		if err != nil || interval == 0 {
+			interval = 3600
+		}
+
+		start = time.Now().Add(-time.Duration(interval) * time.Second).Unix()
+		stop = time.Now().Unix()
+
 	}
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), interval)
+
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), start, stop)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)
