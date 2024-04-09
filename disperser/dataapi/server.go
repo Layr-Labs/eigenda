@@ -466,8 +466,7 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Tags		Metrics
 //	@Produce	json
 //	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
-//	@Param		start		query		string	false	"Start time (UTC) to query for operators nonsigning percentage"
-//	@Param		stop		query		string	false	"End time (UTC) to query for operators nonsigning percentage"
+//	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
 //	@Success	200			{object}	OperatorsNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -479,35 +478,25 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	var start, stop int64
-	if c.Query("start") != "" || c.Query("stop") != "" {
+	endTime := time.Now()
+	if c.Query("end") != "" {
 
-		startTime, err := time.Parse("2006-01-02T15:04:05Z", c.Query("start"))
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
 		if err != nil {
 			errorResponse(c, err)
 			return
 		}
-		start = startTime.Unix()
-
-		endTime, err := time.Parse("2006-01-02T15:04:05Z", c.Query("stop"))
-		if err != nil {
-			errorResponse(c, err)
-			return
-		}
-		stop = endTime.Unix()
-	} else {
-
-		interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
-		if err != nil || interval == 0 {
-			interval = 3600
-		}
-
-		start = time.Now().Add(-time.Duration(interval) * time.Second).Unix()
-		stop = time.Now().Unix()
-
 	}
 
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), start, stop)
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 3600
+	}
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix())
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)

@@ -377,14 +377,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Start time (UTC) to query for operators nonsigning percentage",
-                        "name": "start",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
                         "description": "End time (UTC) to query for operators nonsigning percentage",
-                        "name": "stop",
+                        "name": "end",
                         "in": "query"
                     }
                 ],

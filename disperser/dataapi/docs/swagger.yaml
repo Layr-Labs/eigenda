@@ -454,13 +454,9 @@ paths:
         in: query
         name: interval
         type: integer
-      - description: Start time (UTC) to query for operators nonsigning percentage
-        in: query
-        name: start
-        type: string
       - description: End time (UTC) to query for operators nonsigning percentage
         in: query
-        name: stop
+        name: end
         type: string
       produces:
       - application/json
