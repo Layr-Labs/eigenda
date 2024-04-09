@@ -55,10 +55,17 @@ var (
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
 	mockTx            = &coremock.MockTransactor{}
-	mockChainState, _ = coremock.MakeChainDataMock(map[uint8]int{
-		0: 1,
-		1: 1,
-		2: 1,
+	opId0, _          = dataapi.OperatorIDFromString("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
+	opId1, _          = dataapi.OperatorIDFromString("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
+		0: {
+			opId0: 1,
+			opId1: 1,
+		},
+		1: {
+			opId0: 1,
+			opId1: 3,
+		},
 	})
 	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
@@ -271,10 +278,10 @@ func TestFetchMetricsHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.Throughput)
 	assert.Equal(t, float64(85.14485344239945), response.CostInGas)
-	assert.Equal(t, big.NewInt(1), response.TotalStake)
+	assert.Equal(t, big.NewInt(2), response.TotalStake)
 	assert.Len(t, response.TotalStakePerQuorum, 2)
-	assert.Equal(t, big.NewInt(1), response.TotalStakePerQuorum[0])
-	assert.Equal(t, big.NewInt(1), response.TotalStakePerQuorum[1])
+	assert.Equal(t, big.NewInt(2), response.TotalStakePerQuorum[0])
+	assert.Equal(t, big.NewInt(4), response.TotalStakePerQuorum[1])
 }
 
 func TestFetchMetricsThroughputHandler(t *testing.T) {
@@ -359,6 +366,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(0), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+	assert.Equal(t, float64(0.5), responseData.StakePercentage)
 
 	responseData = response.Data[1]
 	operatorId = responseData.OperatorId
@@ -367,6 +375,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(1), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+	assert.Equal(t, float64(0.25), responseData.StakePercentage)
 }
 
 func TestCheckBatcherHealthExpectServing(t *testing.T) {

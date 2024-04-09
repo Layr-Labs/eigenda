@@ -92,12 +92,10 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 					return nil, err
 				}
 
-				opID := [32]byte{}
-				opIDslice, err := hex.DecodeString(op[2:])
+				opID, err := OperatorIDFromString(op)
 				if err != nil {
 					return nil, err
 				}
-				copy(opID[:], opIDslice)
 
 				const multipler = 10000
 				stakePercentage := float64(0)
