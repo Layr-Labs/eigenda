@@ -1435,25 +1435,3 @@ func getOperatorData(operatorMetadtas []*dataapi.DeregisteredOperatorMetadata, o
 	return dataapi.DeregisteredOperatorMetadata{}
 
 }
-
-// processResponse processes a single http.Response and closes its body.
-func processResponse(t *testing.T, res *http.Response) {
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response dataapi.ServiceAvailabilityResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.GreaterOrEqual(t, response.Meta.Size, 1)
-	assert.GreaterOrEqual(t, len(response.Data), 1)
-
-	if len(response.Data) > 0 {
-		serviceData := response.Data[0]
-		assert.Equal(t, "Disperser", serviceData.ServiceName)
-		assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
-	}
-}
