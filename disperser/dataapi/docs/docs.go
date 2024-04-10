@@ -681,6 +681,9 @@ const docTemplate = `{
                 "quorum_id": {
                     "type": "integer"
                 },
+                "stake_percentage": {
+                    "type": "number"
+                },
                 "total_batches": {
                     "type": "integer"
                 },
