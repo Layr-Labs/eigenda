@@ -327,7 +327,11 @@ func TestFetchMetricsThroughputHandler(t *testing.T) {
 func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	r := setUpRouter()
 
-	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
+	stopTime := time.Now()
+	interval := 3600
+	startTime := stopTime.Add(-time.Duration(interval) * time.Second)
+
+	mockSubgraphApi.On("QueryBatchNonSigningInfo", startTime.Unix(), stopTime.Unix()).Return(batchNonSigningInfo, nil)
 	addr1 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
 	addr2 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
 	mockTx.On("BatchOperatorIDToAddress").Return([]gethcommon.Address{addr1, addr2}, nil)
@@ -338,7 +342,8 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	r.GET("/v1/metrics/operator-nonsigning-percentage", testDataApiServer.FetchOperatorsNonsigningPercentageHandler)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/operator-nonsigning-percentage", nil)
+	reqStr := fmt.Sprintf("/v1/metrics/operator-nonsigning-percentage?interval=%v&end=%s", interval, stopTime.Format("2006-01-02T15:04:05Z"))
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
 	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
 
