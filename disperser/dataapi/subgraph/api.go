@@ -23,7 +23,7 @@ type (
 		QueryBatchesByBlockTimestampRange(ctx context.Context, start, end uint64) ([]*Batches, error)
 		QueryOperators(ctx context.Context, first int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningOperatorIds, error)
-		QueryBatchNonSigningInfo(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error)
+		QueryBatchNonSigningInfo(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error)
 		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
@@ -112,10 +112,11 @@ func (a *api) QueryOperators(ctx context.Context, first int) ([]*Operator, error
 	return result.OperatorRegistereds, nil
 }
 
-func (a *api) QueryBatchNonSigningInfo(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error) {
-	nonSigningAfter := time.Now().Add(-time.Duration(intervalSeconds) * time.Second).Unix()
+func (a *api) QueryBatchNonSigningInfo(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error) {
+
 	variables := map[string]any{
-		"blockTimestamp_gt": graphql.Int(nonSigningAfter),
+		"blockTimestamp_gt": graphql.Int(startTime),
+		"blockTimestamp_lt": graphql.Int(endTime),
 	}
 	skip := 0
 

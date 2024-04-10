@@ -24,7 +24,7 @@ type (
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
 		QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error)
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
-		QueryBatchNonSigningInfoInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error)
+		QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error)
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error)
 	}
@@ -126,8 +126,8 @@ func (sc *subgraphClient) QueryOperatorsWithLimit(ctx context.Context, limit int
 	return operators, nil
 }
 
-func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context, intervalSeconds int64) ([]*BatchNonSigningInfo, error) {
-	batchNonSigningInfoGql, err := sc.api.QueryBatchNonSigningInfo(ctx, intervalSeconds)
+func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error) {
+	batchNonSigningInfoGql, err := sc.api.QueryBatchNonSigningInfo(ctx, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,6 @@
 definitions:
+  big.Int:
+    type: object
   core.SecurityParam:
     properties:
       adversaryThreshold:
@@ -103,12 +105,13 @@ definitions:
       throughput:
         type: number
       total_stake:
+        allOf:
+        - $ref: '#/definitions/big.Int'
         description: 'deprecated: use TotalStakePerQuorum instead. Remove when the
           frontend is updated.'
-        type: integer
       total_stake_per_quorum:
         additionalProperties:
-          type: integer
+          $ref: '#/definitions/big.Int'
         type: object
     type: object
   dataapi.NonSigner:
@@ -453,6 +456,10 @@ paths:
         in: query
         name: interval
         type: integer
+      - description: End time (UTC) to query for operators nonsigning percentage
+        in: query
+        name: end
+        type: string
       produces:
       - application/json
       responses:

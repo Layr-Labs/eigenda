@@ -92,7 +92,7 @@ type (
 		BatchNonSigningOperatorIds []*BatchNonSigningOperatorIds `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
 	}
 	queryBatchNonSigningInfo struct {
-		BatchNonSigningInfo []*BatchNonSigningInfo `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
+		BatchNonSigningInfo []*BatchNonSigningInfo `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt, blockTimestamp_lt: $blockTimestamp_lt})"`
 	}
 	queryOperatorRegisteredsGTBlockTimestamp struct {
 		OperatorRegistereds []*Operator `graphql:"operatorRegistereds(orderBy: blockTimestamp, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
