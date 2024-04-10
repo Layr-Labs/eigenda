@@ -163,10 +163,13 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	if len(config.BatcherConfig.EncoderSocket) == 0 {
-		return errors.New("encoder socket must be specified")
+		err := errors.New("encoder socket must be specified")
+		logger.Error(err.Error())
+		return err
 	}
 	encoderClient, err := encoder.NewEncoderClient(config.BatcherConfig.EncoderSocket, config.TimeoutConfig.EncodingTimeout)
 	if err != nil {
+		logger.Error("Failed to create encode client", "err", err)
 		return err
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
@@ -179,7 +182,9 @@ func RunBatcher(ctx *cli.Context) error {
 			len(config.FireblocksConfig.WalletAddress) > 0 &&
 			len(config.FireblocksConfig.Region) > 0
 		if !validConfigflag {
-			return errors.New("fireblocks config is either invalid or incomplete")
+			err := errors.New("fireblocks config is either invalid or incomplete")
+			logger.Error(err.Error(), "config", config.FireblocksConfig)
+			return err
 		}
 		apiKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.APIKeyName, config.FireblocksConfig.Region)
 		if err != nil {
@@ -230,7 +235,9 @@ func RunBatcher(ctx *cli.Context) error {
 		}
 		logger.Info("Initialized PrivateKey wallet", "address", address.Hex())
 	} else {
-		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
+		err := errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
+		logger.Error(err.Error())
+		return err
 	}
 
 	txnManager := batcher.NewTxnManager(client, wallet, config.EthClientConfig.NumConfirmations, 20, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
@@ -248,6 +255,7 @@ func RunBatcher(ctx *cli.Context) error {
 
 	err = batcher.Start(context.Background())
 	if err != nil {
+		logger.Error("Failed to start batcher", "err", err)
 		return err
 	}
 
