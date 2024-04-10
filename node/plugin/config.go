@@ -11,6 +11,13 @@ import (
 	"github.com/urfave/cli"
 )
 
+const (
+	OperationOptIn        = "opt-in"
+	OperationOptOut       = "opt-out"
+	OperationUpdateSocket = "update-socket"
+	OperationListQuorums  = "list-quorums"
+)
+
 var (
 	/* Required Flags */
 
@@ -25,7 +32,7 @@ var (
 	OperationFlag = cli.StringFlag{
 		Name:     "operation",
 		Required: true,
-		Usage:    "Supported operations: opt-in, opt-out, list-quorums",
+		Usage:    "Supported operations: opt-in, opt-out, update-socket, list-quorums",
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "OPERATION"),
 	}
 
@@ -136,7 +143,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	op := ctx.GlobalString(OperationFlag.Name)
-	if op != "opt-in" && op != "opt-out" && op != "list-quorums" {
+	if len(op) == 0 {
+		return nil, errors.New("operation type not provided")
+	}
+	if op != OperationOptIn && op != OperationOptOut && op != OperationUpdateSocket && op != OperationListQuorums {
 		return nil, errors.New("unsupported operation type")
 	}
 
