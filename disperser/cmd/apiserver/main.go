@@ -69,11 +69,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 	}
 	blockStaleMeasure, err := transactor.GetBlockStaleMeasure(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
+		return fmt.Errorf("failed to get BLOCK_STALE_MEASURE from transactor: %w", err)
 	}
 	storeDurationBlocks, err := transactor.GetStoreDurationBlocks(context.Background())
 	if err != nil || storeDurationBlocks == 0 {
-		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
+		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS from transactor: %w", err)
 	}
 
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
