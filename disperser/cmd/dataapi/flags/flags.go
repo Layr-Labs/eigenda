@@ -74,7 +74,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
 		Usage:    "Address of the BLS Operator State Retriever",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
