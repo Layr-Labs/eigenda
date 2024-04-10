@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -78,6 +79,7 @@ func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, ch
 
 	// Create Pre-configured connections to the services
 	// Saves from having to create new connection on each request
+
 	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
 
 	if err != nil {
@@ -98,7 +100,12 @@ func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, ch
 
 // Create Connection to the service
 func (rc *GRPCDialerSkipTLS) Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	return grpc.Dial(serviceName, opts...)
+
+	// TODO: make this a configurable option
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel() // Ensure the context is cancelled to free resources
+
+	return grpc.DialContext(ctx, serviceName, opts...)
 }
 
 // CheckServiceHealth matches the HealthCheckService interface
