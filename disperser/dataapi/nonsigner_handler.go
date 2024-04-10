@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,7 +60,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	}
 
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, err := s.createOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
+	operatorQuorumIntervals, quorumIDs, err := s.createOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +72,11 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
 	// that operator "op" and quorum "q" are responsible for.
 	numResponsible := computeNumResponsible(batches, operatorQuorumIntervals)
+
+	state, err := s.chainState.GetOperatorState(ctx, uint(endBlock), quorumIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	// Compute the nonsigning rate for each <operator, quorum> pair.
 	nonsignerMetrics := make([]*OperatorNonsigningPercentageMetrics, 0)
@@ -85,6 +91,19 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 				if err != nil {
 					return nil, err
 				}
+
+				opID, err := OperatorIDFromString(op)
+				if err != nil {
+					return nil, err
+				}
+
+				const multipler = 10000
+				stakePercentage := float64(0)
+				if stake, ok := state.Operators[q][opID]; ok {
+					p, _ := new(big.Int).Div(new(big.Int).Mul(stake.Stake, big.NewInt(multipler)), state.Totals[q].Stake).Float64()
+					stakePercentage = p / multipler
+				}
+
 				nonsignerMetric := OperatorNonsigningPercentageMetrics{
 					OperatorId:           fmt.Sprintf("0x%s", op),
 					OperatorAddress:      nonsignerIdToAddress[op],
@@ -92,6 +111,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 					TotalUnsignedBatches: unsignedCount,
 					TotalBatches:         totalCount,
 					Percentage:           pf,
+					StakePercentage:      stakePercentage,
 				}
 				nonsignerMetrics = append(nonsignerMetrics, &nonsignerMetric)
 			}
@@ -117,30 +137,42 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, intervalSeconds 
 	}, nil
 }
 
-func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (OperatorQuorumIntervals, error) {
+func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (OperatorQuorumIntervals, []uint8, error) {
 	// Get operators' initial quorums (at startBlock).
+	quorumSeen := make(map[uint8]struct{}, 0)
+
 	bitmaps, err := s.transactor.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, nonsigners, startBlock)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	operatorInitialQuorum := make(map[string][]uint8)
 	for i := range bitmaps {
-		operatorInitialQuorum[nonsigners[i].Hex()] = eth.BitmapToQuorumIds(bitmaps[i])
+		opQuorumIDs := eth.BitmapToQuorumIds(bitmaps[i])
+		operatorInitialQuorum[nonsigners[i].Hex()] = opQuorumIDs
+		for _, q := range opQuorumIDs {
+			quorumSeen[q] = struct{}{}
+		}
+	}
+
+	// Get all quorums.
+	allQuorums := make([]uint8, 0)
+	for q := range quorumSeen {
+		allQuorums = append(allQuorums, q)
 	}
 
 	// Get operators' quorum change events from [startBlock+1, endBlock].
 	addedToQuorum, removedFromQuorum, err := s.getOperatorQuorumEvents(ctx, startBlock, endBlock, nonsignerAddressToId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Create operators' quorum intervals.
 	operatorQuorumIntervals, err := CreateOperatorQuorumIntervals(startBlock, endBlock, operatorInitialQuorum, addedToQuorum, removedFromQuorum)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return operatorQuorumIntervals, nil
+	return operatorQuorumIntervals, allQuorums, nil
 }
 
 func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
