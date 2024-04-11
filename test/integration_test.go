@@ -161,7 +161,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		RequestPoolSize:       32,
 	}, logger, p0, metrics)
 
-	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket, 10*time.Second)
+	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket)
 	if err != nil {
 		t.Fatal(err)
 	}
