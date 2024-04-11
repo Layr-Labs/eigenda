@@ -23,8 +23,9 @@ func NewRetryQuerier(q GraphQLQuerier, interval time.Duration, maxRetries int) *
 }
 
 func (q *RetryQuerier) Query(ctx context.Context, query any, variables map[string]any) error {
+
+	retryCount := 0
 	for {
-		retryCount := 0
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
