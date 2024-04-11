@@ -25,7 +25,7 @@ const (
 func (f *FailoverController) handleHttpError(httpRespError rpc.HTTPError) (NextEndpoint, ImmediateAction) {
 	sc := httpRespError.StatusCode
 	// Default to rotation the current RPC, because it allows a higher chance to get the query completed.
-	f.Logger.Info("[HTTP Response Error]", "Curr Rpc Fault", f.numberRpcFault, "Status Code", sc, "Error", httpRespError)
+	f.Logger.Info("[HTTP Response Error]", "numRPCFfault", f.numberRpcFault, "statusCode", sc, "err", httpRespError)
 
 	if sc >= 200 && sc < 300 {
 		// 2xx error, however it should not be reachable
@@ -66,7 +66,7 @@ func (f *FailoverController) handleError(err error) (NextEndpoint, ImmediateActi
 		var rpcError rpc.Error
 		if errors.As(err, &rpcError) {
 			ec := rpcError.ErrorCode()
-			f.Logger.Warn("[JSON RPC Response Error]", "Curr Rpc Fault", f.numberRpcFault, "Error Code", ec, "Error", rpcError)
+			f.Logger.Warn("[JSON RPC Response Error]", "numRPCFfault", f.numberRpcFault, "errorCode", ec, "err", rpcError)
 			// we always attribute JSON RPC error as receiver's fault, i.e new connection rotation
 			return NewRPC, Return
 		}
@@ -74,7 +74,7 @@ func (f *FailoverController) handleError(err error) (NextEndpoint, ImmediateActi
 		// If no http response or no rpc response is returned, it is a connection issue,
 		// since we can't accurately attribute the network issue to neither sender nor receiver
 		// side. Optimistically, switch rpc client
-		f.Logger.Warn("[Default Response Error]", "Curr Rpc Fault", f.numberRpcFault, "error", err)
+		f.Logger.Warn("[Default Response Error]", "numRPCFfault", f.numberRpcFault, "err", err)
 		return NewRPC, Retry
 	}
 
