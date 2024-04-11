@@ -70,9 +70,18 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 			return nil, err
 		}
 	} else {
-		// todo, there are better ways to handle it
 		if len(config.G2PowerOf2Path) == 0 {
 			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
+		}
+
+		if config.SRSOrder == 0 {
+			return nil, errors.New("SRS order cannot be 0")
+		}
+
+		maxPower := uint64(math.Log2(float64(config.SRSOrder)))
+		_, err := kzg.ReadG2PointSection(config.G2PowerOf2Path, 0, maxPower, 1)
+		if err != nil {
+			return nil, fmt.Errorf("file located at %v is invalid", config.G2PowerOf2Path)
 		}
 	}
 

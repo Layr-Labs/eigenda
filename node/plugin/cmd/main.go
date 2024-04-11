@@ -128,7 +128,7 @@ func pluginOps(ctx *cli.Context) {
 		RegisterNodeAtStart: false,
 	}
 	churnerClient := node.NewChurnerClient(config.ChurnerUrl, true, operator.Timeout, logger)
-	if config.Operation == "opt-in" {
+	if config.Operation == plugin.OperationOptIn {
 		log.Printf("Info: Operator with Operator Address: %x is opting in to EigenDA", sk.Address)
 		err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger.With("component", "NodeOperator"))
 		if err != nil {
@@ -136,7 +136,7 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully opt-in the EigenDA, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
-	} else if config.Operation == "opt-out" {
+	} else if config.Operation == plugin.OperationOptOut {
 		log.Printf("Info: Operator with Operator Address: %x and OperatorID: %x is opting out of EigenDA", sk.Address, operatorID)
 		err = node.DeregisterOperator(context.Background(), operator, keyPair, tx)
 		if err != nil {
@@ -144,7 +144,7 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully opt-out the EigenDA, for operator ID: %x, operator address: %x", operatorID, sk.Address)
-	} else if config.Operation == "update-socket" {
+	} else if config.Operation == plugin.OperationUpdateSocket {
 		log.Printf("Info: Operator with Operator Address: %x is updating its socket: %s", sk.Address, config.Socket)
 		err = node.UpdateOperatorSocket(context.Background(), tx, config.Socket)
 		if err != nil {
@@ -152,7 +152,7 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
-	} else if config.Operation == "list-quorums" {
+	} else if config.Operation == plugin.OperationListQuorums {
 		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 		if err != nil {
 			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)

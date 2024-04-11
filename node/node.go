@@ -38,6 +38,7 @@ var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
 		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda",
+		"1":     "https://app.eigenlayer.xyz/avs/eigenda",
 	}
 )
 
@@ -184,7 +185,7 @@ func (n *Node) Start(ctx context.Context) error {
 	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
-			n.Config.ID, "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
+			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
 			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", n.Config.QuorumIDList)
 		socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
