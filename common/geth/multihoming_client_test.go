@@ -122,7 +122,7 @@ func TestMultihomingClientSenderFaultZeroRetry(t *testing.T) {
 
 	// given num retry is 0, when failure arises above, current rpc should becomes the next one
 	index, _ = client.GetRPCInstance()
-	require.Equal(t, index, 0)
+	require.Equal(t, index, 1)
 
 }
 
