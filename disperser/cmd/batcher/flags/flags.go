@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -58,12 +59,6 @@ var (
 		Usage:    "start metrics server",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
-	}
-	GraphUrlFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "graph-url"),
-		Usage:    "The url of the graph node",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRAPH_URL"),
 	}
 	UseGraphFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
@@ -194,7 +189,6 @@ var requiredFlags = []cli.Flag{
 	EigenDAServiceManagerFlag,
 	EncoderSocket,
 	EnableMetrics,
-	GraphUrlFlag,
 	BatchSizeLimitFlag,
 	UseGraphFlag,
 	SRSOrderFlag,
@@ -227,4 +221,5 @@ func init() {
 	Flags = append(Flags, indexer.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, common.FireblocksCLIFlags(envVarPrefix, FlagPrefix)...)
+	Flags = append(Flags, thegraph.CLIFlags(envVarPrefix)...)
 }

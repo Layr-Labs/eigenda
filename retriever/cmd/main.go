@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/clients"
@@ -23,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -108,13 +106,9 @@ func RetrieverMain(ctx *cli.Context) error {
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")
-		querier := graphql.NewClient(config.GraphUrl, nil)
 
-		// RetryQuerier is a wrapper around the GraphQLQuerier that retries queries on failure
-		retryQuerier := thegraph.NewRetryQuerier(querier, 100*time.Millisecond, config.EthClientConfig.NumRetries)
-
-		logger.Info("Connecting to subgraph", "url", config.GraphUrl)
-		ics = thegraph.NewIndexedChainState(cs, retryQuerier, logger)
+		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 	} else {
 		logger.Info("Using built-in indexer")
 

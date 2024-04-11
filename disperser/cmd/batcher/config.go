@@ -4,6 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -23,7 +24,7 @@ type Config struct {
 	MetricsConfig    batcher.MetricsConfig
 	IndexerConfig    indexer.Config
 	FireblocksConfig common.FireblocksConfig
-	GraphUrl         string
+	ChainStateConfig thegraph.Config
 	UseGraph         bool
 
 	IndexerDataDir string
@@ -75,8 +76,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
+		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
-		GraphUrl:                      ctx.GlobalString(flags.GraphUrlFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),

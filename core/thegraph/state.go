@@ -87,6 +87,17 @@ type (
 
 var _ IndexedChainState = (*indexedChainState)(nil)
 
+func MakeIndexedChainState(config Config, cs core.ChainState, logger logging.Logger) *indexedChainState {
+
+	logger.Info("Using graph node")
+	querier := graphql.NewClient(config.Endpoint, nil)
+
+	// RetryQuerier is a wrapper around the GraphQLQuerier that retries queries on failure
+	retryQuerier := NewRetryQuerier(querier, config.PullInterval, config.MaxRetries)
+
+	return NewIndexedChainState(cs, retryQuerier, logger)
+}
+
 func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger logging.Logger) *indexedChainState {
 	return &indexedChainState{
 		ChainState: cs,
