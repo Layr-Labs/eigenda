@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/url"
 	"sync"
 	"time"
 
@@ -157,7 +158,12 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 			return fmt.Errorf("failed to update gas price: %w", err)
 		}
 		txID, err = t.wallet.SendTransaction(ctx, txn)
-		if errors.Is(err, context.DeadlineExceeded) {
+		var urlErr *url.Error
+		didTimeout := false
+		if errors.As(err, &urlErr) {
+			didTimeout = urlErr.Timeout()
+		}
+		if didTimeout || errors.Is(err, context.DeadlineExceeded) {
 			t.logger.Warn("failed to send txn due to timeout", "tag", req.Tag, "hash", req.Tx.Hash().Hex(), "numRetries", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
 			retryFromFailure++
 			continue
