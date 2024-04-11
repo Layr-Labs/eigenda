@@ -16,6 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+const (
+	// Ethereum RPC Node is not synced message.
+	ethRPCNodeNotSynced = "the RPC node is not synced. The node will not be able to process batches successfully until it is synced"
+)
+
 // InstrumentedEthClient is a wrapper around our EthClient that instruments all underlying json-rpc calls.
 // It counts each eth_ call made to it, as well as its duration, and exposes them as prometheus metrics
 //
@@ -40,6 +45,16 @@ func NewInstrumentedEthClient(config EthClientConfig, rpcCallsCollector *rpccall
 		EthClient:         ethClient,
 		rpcCallsCollector: rpcCallsCollector,
 		clientAndVersion:  getClientAndVersion(ethClient),
+	}
+
+	// Check if the client is online
+	online, err := c.IsSynced(context.Background())
+	logger.Info("Checking if eth client is online", "online", online, "err", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if eth client is online: %w", err)
+	}
+	if !online {
+		return nil, fmt.Errorf(ethRPCNodeNotSynced)
 	}
 
 	return c, err

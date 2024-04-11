@@ -223,3 +223,8 @@ func (d *ChainDataMock) GetCurrentBlockNumber() (uint, error) {
 func (d *ChainDataMock) Start(context.Context) error {
 	return nil
 }
+
+func (d *ChainDataMock) EthClientOnline() (bool, error) {
+	args := d.Called()
+	return args.Get(0).(bool), args.Error(1)
+}

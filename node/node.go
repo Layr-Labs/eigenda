@@ -32,12 +32,18 @@ import (
 const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
+	// Ethereum RPC Node is not synced message.
+	ethRPCNodeNotSynced = "the RPC node is not synced. The node will not be able to process batches successfully until it is synced"
 )
 
 var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
 		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda",
+	}
+	chainIDToNetworkName = map[string]string{
+		"17000": "Holesky",
+		"1":     "Mainnet",
 	}
 )
 
@@ -97,6 +103,10 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
+	// Log the network name based on the chainID so operators can double check
+	// that they using a RPC endpoint on the correct network.
+	logger.Info("Detected network of configured RPC Node", "network", chainIDToNetworkName[chainID.String()])
+
 	// Create Transactor
 	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
@@ -105,6 +115,15 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 
 	// Create ChainState Client
 	cst := eth.NewChainState(tx, client)
+
+	// Check if the RPC node is synced
+	synced, err := cst.EthClientOnline()
+	if err != nil {
+		logger.Error("failed to check if the RPC node is synced", "err", err)
+	}
+	if !synced {
+		logger.Warn(ethRPCNodeNotSynced)
+	}
 
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
@@ -221,6 +240,8 @@ func (n *Node) Start(ctx context.Context) error {
 		go n.checkRegisteredNodeIpOnChain(ctx)
 		go n.checkCurrentNodeIp(ctx)
 	}
+	// Check if the RPC node is synced every minute.
+	go n.checkRPCNodeSynced(ctx)
 
 	return nil
 }
@@ -370,6 +391,15 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
 	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, header.ReferenceBlockNumber, n.Config.ID)
 	if err != nil {
+		// This is for EigenDA team. We can uncomment this when we want to check if the error is due to the RPC node not being online.
+		// // Check if the error is due to the RPC node not being synced.
+		// synced, err := n.ChainState.EthClientOnline()
+		// if err != nil {
+		// 	n.Logger.Error("failed to check if the RPC node is synced", "err", err)
+		// }
+		// if !synced {
+		// 	return fmt.Errorf("%s:%w", ethRPCNodeNotSynced, err)
+		// }
 		return err
 	}
 
@@ -432,6 +462,25 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 				continue
 			}
 			n.updateSocketAddress(ctx, newSocketAddr)
+		}
+	}
+}
+
+func (n *Node) checkRPCNodeSynced(ctx context.Context) {
+	n.Logger.Info("Start checkRPCNodeSynced goroutine in background to periodically check if the RPC node is synced and online")
+	t := time.NewTicker(1 * time.Minute)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			synced, err := n.ChainState.EthClientOnline()
+			if err != nil {
+				n.Logger.Error("failed to check if the RPC node is synced", "err", err)
+			}
+			if !synced {
+				n.Logger.Warn(ethRPCNodeNotSynced)
+			}
 		}
 	}
 }

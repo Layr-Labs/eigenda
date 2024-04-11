@@ -2,6 +2,7 @@ package geth
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -830,4 +831,13 @@ func (m *MultiHomingClient) EnsureAnyTransactionEvaled(ctx context.Context, txs 
 func (m *MultiHomingClient) GetNoSendTransactOpts() (*bind.TransactOpts, error) {
 	_, instance := m.GetRPCInstance()
 	return instance.GetNoSendTransactOpts()
+}
+
+// IsSynced returns true if the client is synced with the network.
+func (c *MultiHomingClient) IsSynced(ctx context.Context) (bool, error) {
+	syncProgress, err := c.SyncProgress(ctx)
+	if err != nil {
+		return false, fmt.Errorf("IsSynced: failed to get sync progress: %w", err)
+	}
+	return syncProgress == nil, nil
 }

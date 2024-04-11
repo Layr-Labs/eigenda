@@ -85,6 +85,7 @@ type ChainState interface {
 	GetCurrentBlockNumber() (uint, error)
 	GetOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
 	GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator OperatorID) (*OperatorState, error)
+	EthClientOnline() (bool, error)
 	// GetOperatorQuorums(blockNumber uint, operator OperatorId) ([]uint, error)
 }
 
