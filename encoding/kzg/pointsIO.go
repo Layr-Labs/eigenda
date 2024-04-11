@@ -33,7 +33,7 @@ func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, erro
 	// Note that ReadFull() guarantees the bytes read is len(buf) IFF err is nil.
 	// See https://pkg.go.dev/io#ReadFull.
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read file %w", err)
 	}
 	return buf, nil
 }
@@ -46,7 +46,7 @@ func ReadG1Point(n uint64, g *KzgConfig) (bn254.G1Affine, error) {
 
 	g1point, err := ReadG1PointSection(g.G1Path, n, n+1, 1)
 	if err != nil {
-		return bn254.G1Affine{}, err
+		return bn254.G1Affine{}, fmt.Errorf("error read g1 point section %w", err)
 	}
 
 	return g1point[0], nil
@@ -60,7 +60,7 @@ func ReadG2Point(n uint64, g *KzgConfig) (bn254.G2Affine, error) {
 
 	g2point, err := ReadG2PointSection(g.G2Path, n, n+1, 1)
 	if err != nil {
-		return bn254.G2Affine{}, err
+		return bn254.G2Affine{}, fmt.Errorf("error read g2 point section %w", err)
 	}
 	return g2point[0], nil
 }
@@ -92,7 +92,7 @@ func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bn254.G2Affine, error
 
 	g2point, err := ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
 	if err != nil {
-		return bn254.G2Affine{}, err
+		return bn254.G2Affine{}, fmt.Errorf("error read g2 point on power of 2 %w", err)
 	}
 	return g2point[0], nil
 }
@@ -101,7 +101,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 	g1f, err := os.Open(filepath)
 	if err != nil {
 		log.Println("Cannot ReadG1Points", filepath, err)
-		return nil, err
+		return nil, fmt.Errorf("error cannot open g1 points file %w", err)
 	}
 
 	defer func() {
