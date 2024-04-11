@@ -114,6 +114,13 @@ var (
 		Value:    90 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_WRITE_TIMEOUT"),
 	}
+	ChainStateTimeoutFlag = cli.DurationFlag{
+		Name:     "chain-state-timeout",
+		Usage:    "connection timeout to read state from chain",
+		Required: false,
+		Value:    15 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_STATE_TIMEOUT"),
+	}
 	NumConnectionsFlag = cli.IntFlag{
 		Name:     "num-connections",
 		Usage:    "maximum number of connections to encoders (defaults to 256)",
@@ -201,6 +208,7 @@ var optionalFlags = []cli.Flag{
 	AttestationTimeoutFlag,
 	ChainReadTimeoutFlag,
 	ChainWriteTimeoutFlag,
+	ChainStateTimeoutFlag,
 	NumConnectionsFlag,
 	FinalizerIntervalFlag,
 	FinalizerPoolSizeFlag,
