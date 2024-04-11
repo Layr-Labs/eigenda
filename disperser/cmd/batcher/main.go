@@ -141,8 +141,12 @@ func RunBatcher(ctx *cli.Context) error {
 	if config.UseGraph {
 		logger.Info("Using graph node")
 		querier := graphql.NewClient(config.GraphUrl, nil)
+
+		// RetryQuerier is a wrapper around the GraphQLQuerier that retries queries on failure
+		retryQuerier := thegraph.NewRetryQuerier(querier, 100*time.Millisecond, config.EthClientConfig.NumRetries)
+
 		logger.Info("Connecting to subgraph", "url", config.GraphUrl)
-		ics = thegraph.NewIndexedChainState(cs, querier, logger)
+		ics = thegraph.NewIndexedChainState(cs, retryQuerier, logger)
 	} else {
 		logger.Info("Using built-in indexer")
 

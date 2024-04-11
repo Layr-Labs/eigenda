@@ -114,6 +114,7 @@ func NewBatcher(
 		TargetNumChunks:          config.TargetNumChunks,
 		MaxBlobsToFetchFromStore: config.MaxBlobsToFetchFromStore,
 		FinalizationBlockDelay:   config.FinalizationBlockDelay,
+		ChainStateTimeout:        timeoutConfig.ChainReadTimeout, // TODO: Pass in a new param
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
 	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)

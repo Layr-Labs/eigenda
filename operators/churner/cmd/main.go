@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
@@ -83,7 +84,11 @@ func run(ctx *cli.Context) error {
 	cs := coreeth.NewChainState(tx, gethClient)
 
 	querier := graphql.NewClient(config.GraphUrl, nil)
-	indexer := thegraph.NewIndexedChainState(cs, querier, logger)
+
+	// RetryQuerier is a wrapper around the GraphQLQuerier that retries queries on failure
+	retryQuerier := thegraph.NewRetryQuerier(querier, 100*time.Millisecond, config.EthClientConfig.NumRetries)
+
+	indexer := thegraph.NewIndexedChainState(cs, retryQuerier, logger)
 	metrics := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	cn, err := churner.NewChurner(config, indexer, tx, logger, metrics)
