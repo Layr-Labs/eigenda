@@ -54,8 +54,8 @@ var (
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
 	mockTx            = &coremock.MockTransactor{}
-	opId0, _          = dataapi.OperatorIDFromString("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
-	opId1, _          = dataapi.OperatorIDFromString("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
+	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
 	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
 		0: {
 			opId0: 1,

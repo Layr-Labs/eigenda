@@ -1,11 +1,8 @@
 package dataapi
 
 import (
-	"encoding/hex"
 	"fmt"
 	"sort"
-
-	"github.com/Layr-Labs/eigenda/core"
 )
 
 // NumBatchesAtBlock represents the number of batches at current block.
@@ -282,15 +279,4 @@ func getUpperBoundIndex(intervals []*NumBatchesAtBlock, blockNum uint32) int {
 		}
 	}
 	return high + 1
-}
-
-func OperatorIDFromString(op string) (core.OperatorID, error) {
-	opID := [32]byte{}
-	opIDslice, err := hex.DecodeString(op)
-	if err != nil {
-		return opID, err
-	}
-	copy(opID[:], opIDslice)
-
-	return opID, nil
 }
