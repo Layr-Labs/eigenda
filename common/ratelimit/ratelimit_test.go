@@ -38,11 +38,11 @@ func TestRatelimit(t *testing.T) {
 
 	ctx := context.Background()
 
-	retrieverID := "testRetriever"
+	retreiverID := "testRetriever"
 
 	params := []common.RequestParams{
 		{
-			RequesterID: retrieverID,
+			RequesterID: retreiverID,
 			BlobSize:    10,
 			Rate:        100,
 		},
