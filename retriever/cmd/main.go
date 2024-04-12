@@ -22,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -107,9 +106,9 @@ func RetrieverMain(ctx *cli.Context) error {
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")
-		querier := graphql.NewClient(config.GraphUrl, nil)
-		logger.Info("Connecting to subgraph", "url", config.GraphUrl)
-		ics = thegraph.NewIndexedChainState(cs, querier, logger)
+
+		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 	} else {
 		logger.Info("Using built-in indexer")
 

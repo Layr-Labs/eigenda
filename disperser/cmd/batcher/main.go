@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/shurcooL/graphql"
-
 	"github.com/Layr-Labs/eigenda/common"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
@@ -140,9 +138,9 @@ func RunBatcher(ctx *cli.Context) error {
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")
-		querier := graphql.NewClient(config.GraphUrl, nil)
-		logger.Info("Connecting to subgraph", "url", config.GraphUrl)
-		ics = thegraph.NewIndexedChainState(cs, querier, logger)
+
+		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 	} else {
 		logger.Info("Using built-in indexer")
 

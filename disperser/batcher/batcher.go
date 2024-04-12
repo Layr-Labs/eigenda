@@ -44,6 +44,7 @@ type TimeoutConfig struct {
 	AttestationTimeout time.Duration
 	ChainReadTimeout   time.Duration
 	ChainWriteTimeout  time.Duration
+	ChainStateTimeout  time.Duration
 }
 
 type Config struct {
@@ -114,6 +115,7 @@ func NewBatcher(
 		TargetNumChunks:          config.TargetNumChunks,
 		MaxBlobsToFetchFromStore: config.MaxBlobsToFetchFromStore,
 		FinalizationBlockDelay:   config.FinalizationBlockDelay,
+		ChainStateTimeout:        timeoutConfig.ChainStateTimeout,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
 	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
