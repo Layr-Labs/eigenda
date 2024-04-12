@@ -2,6 +2,7 @@ package geth_test
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -15,7 +16,7 @@ import (
 
 var (
 	privateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	rpcURLs    = []string{"127.0.0.1", "127.0.0.2", "127.0.0.3"}
+	rpcURLs    = []string{"http://127.0.0.1/abcd", "https://www.da:9000/abcd", "https://a-b-c.A.B.C/dddd"}
 )
 
 type JsonError struct{}
@@ -34,7 +35,10 @@ func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.Mul
 	}
 
 	mockClient := geth.MultiHomingClient{}
-	controller := geth.NewFailoverController(logger)
+	controller, err := geth.NewFailoverController(logger, rpcURLs)
+	if err != nil {
+		return nil, err
+	}
 
 	mockClient.Logger = logger
 	mockClient.NumRetries = ethClientCfg.NumRetries
@@ -63,6 +67,16 @@ func make500Error() error {
 		Status:     "INTERNAL_ERROR",
 		Body:       []byte{},
 	}
+}
+
+func TestMultihomingClient_UrlDomain(t *testing.T) {
+	client, err := makeTestMultihomingClient(2, nil)
+	require.Nil(t, err)
+	urlDomains := client.FailoverController.UrlDomains
+	fmt.Println("urlDomains", urlDomains)
+	require.Equal(t, urlDomains[0], "127.0.0.1")
+	require.Equal(t, urlDomains[1], "www.da")
+	require.Equal(t, urlDomains[2], "a-b-c.A.B.C")
 }
 
 func TestMultihomingClientSenderFaultZeroRetry(t *testing.T) {
