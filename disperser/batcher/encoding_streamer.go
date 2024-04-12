@@ -38,7 +38,7 @@ type StreamerConfig struct {
 	// EncodingRequestTimeout is the timeout for each encoding request
 	EncodingRequestTimeout time.Duration
 
-	// RPCRequestTimeout is the timeout used for getting the chainstate
+	// ChainStateTimeout is the timeout used for getting the chainstate
 	ChainStateTimeout time.Duration
 
 	// EncodingQueueLimit is the maximum number of encoding requests that can be queued

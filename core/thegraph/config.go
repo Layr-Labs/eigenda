@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	EndpointFlagName     = "thegraph.endpoint"
-	PullIntervalFlagName = "thegraph.pull_interval"
-	MaxRetriesFlagName   = "thegraph.max_retries"
+	EndpointFlagName   = "thegraph.endpoint"
+	BackoffFlagName    = "thegraph.backoff"
+	MaxRetriesFlagName = "thegraph.max_retries"
 )
 
 type Config struct {
@@ -28,10 +28,10 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVar:   common.PrefixEnvVar(envPrefix, "GRAPH_URL"),
 		},
 		cli.DurationFlag{
-			Name:   PullIntervalFlagName,
-			Usage:  "Pull interval for retries",
+			Name:   BackoffFlagName,
+			Usage:  "Backoff for retries",
 			Value:  100 * time.Millisecond,
-			EnvVar: common.PrefixEnvVar(envPrefix, "GRAPH_PULL_INTERVAL"),
+			EnvVar: common.PrefixEnvVar(envPrefix, "GRAPH_BACKOFF"),
 		},
 		cli.UintFlag{
 			Name:   MaxRetriesFlagName,
@@ -46,7 +46,7 @@ func ReadCLIConfig(ctx *cli.Context) Config {
 
 	return Config{
 		Endpoint:     ctx.String(EndpointFlagName),
-		PullInterval: ctx.Duration(PullIntervalFlagName),
+		PullInterval: ctx.Duration(BackoffFlagName),
 		MaxRetries:   ctx.Int(MaxRetriesFlagName),
 	}
 

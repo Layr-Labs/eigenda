@@ -8,16 +8,16 @@ import (
 
 type RetryQuerier struct {
 	GraphQLQuerier
-	PullInterval time.Duration
-	MaxRetries   int
+	Backoff    time.Duration
+	MaxRetries int
 }
 
 var _ GraphQLQuerier = (*RetryQuerier)(nil)
 
-func NewRetryQuerier(q GraphQLQuerier, interval time.Duration, maxRetries int) *RetryQuerier {
+func NewRetryQuerier(q GraphQLQuerier, backoff time.Duration, maxRetries int) *RetryQuerier {
 	return &RetryQuerier{
 		GraphQLQuerier: q,
-		PullInterval:   interval,
+		Backoff:        backoff,
 		MaxRetries:     maxRetries,
 	}
 }
@@ -25,6 +25,7 @@ func NewRetryQuerier(q GraphQLQuerier, interval time.Duration, maxRetries int) *
 func (q *RetryQuerier) Query(ctx context.Context, query any, variables map[string]any) error {
 
 	retryCount := 0
+	backoff := q.Backoff
 	for {
 		select {
 		case <-ctx.Done():
@@ -39,8 +40,9 @@ func (q *RetryQuerier) Query(ctx context.Context, query any, variables map[strin
 			if err == nil {
 				return nil
 			}
-			// Optionally, add a delay before retrying
-			time.Sleep(q.PullInterval)
+
+			time.Sleep(backoff)
+			backoff *= 2
 		}
 	}
 }
