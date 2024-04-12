@@ -428,7 +428,7 @@ func (t *Transactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator state", err)
+		t.Logger.Error("Failed to fetch operator state", "err", err)
 		return nil, err
 	}
 

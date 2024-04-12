@@ -54,8 +54,19 @@ var (
 
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
-	mockTx                          = &coremock.MockTransactor{}
-	mockChainState, _               = coremock.MakeChainDataMock(core.OperatorIndex(1))
+	mockTx            = &coremock.MockTransactor{}
+	opId0, _          = dataapi.OperatorIDFromString("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
+	opId1, _          = dataapi.OperatorIDFromString("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
+		0: {
+			opId0: 1,
+			opId1: 1,
+		},
+		1: {
+			opId0: 1,
+			opId1: 3,
+		},
+	})
 	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
 	expectedBlobIndex               = uint32(1)
@@ -267,10 +278,10 @@ func TestFetchMetricsHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.Throughput)
 	assert.Equal(t, float64(85.14485344239945), response.CostInGas)
-	assert.Equal(t, big.NewInt(1), response.TotalStake)
+	assert.Equal(t, big.NewInt(2), response.TotalStake)
 	assert.Len(t, response.TotalStakePerQuorum, 2)
-	assert.Equal(t, big.NewInt(1), response.TotalStakePerQuorum[0])
-	assert.Equal(t, big.NewInt(1), response.TotalStakePerQuorum[1])
+	assert.Equal(t, big.NewInt(2), response.TotalStakePerQuorum[0])
+	assert.Equal(t, big.NewInt(4), response.TotalStakePerQuorum[1])
 }
 
 func TestFetchMetricsThroughputHandler(t *testing.T) {
@@ -316,7 +327,11 @@ func TestFetchMetricsThroughputHandler(t *testing.T) {
 func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	r := setUpRouter()
 
-	mockSubgraphApi.On("QueryBatchNonSigningInfo").Return(batchNonSigningInfo, nil)
+	stopTime := time.Now()
+	interval := 3600
+	startTime := stopTime.Add(-time.Duration(interval) * time.Second)
+
+	mockSubgraphApi.On("QueryBatchNonSigningInfo", startTime.Unix(), stopTime.Unix()).Return(batchNonSigningInfo, nil)
 	addr1 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
 	addr2 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
 	mockTx.On("BatchOperatorIDToAddress").Return([]gethcommon.Address{addr1, addr2}, nil)
@@ -327,7 +342,8 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	r.GET("/v1/metrics/operator-nonsigning-percentage", testDataApiServer.FetchOperatorsNonsigningPercentageHandler)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/operator-nonsigning-percentage", nil)
+	reqStr := fmt.Sprintf("/v1/metrics/operator-nonsigning-percentage?interval=%v&end=%s", interval, stopTime.Format("2006-01-02T15:04:05Z"))
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
 	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
 
@@ -355,6 +371,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(0), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+	assert.Equal(t, float64(0.5), responseData.StakePercentage)
 
 	responseData = response.Data[1]
 	operatorId = responseData.OperatorId
@@ -363,6 +380,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(1), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
+	assert.Equal(t, float64(0.25), responseData.StakePercentage)
 }
 
 func TestCheckBatcherHealthExpectServing(t *testing.T) {

@@ -137,7 +137,11 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 						// ignore canceled errors because canceled encoding requests are normal
 						continue
 					}
-					e.logger.Error("error processing encoded blobs", "err", err)
+					if strings.Contains(err.Error(), "too many requests") {
+						e.logger.Warn("encoding request ratelimited", "err", err)
+					} else {
+						e.logger.Error("error processing encoded blobs", "err", err)
+					}
 				}
 			}
 		}

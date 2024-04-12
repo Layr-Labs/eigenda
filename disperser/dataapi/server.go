@@ -91,6 +91,7 @@ type (
 		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 		TotalBatches         int     `json:"total_batches"`
 		Percentage           float64 `json:"percentage"`
+		StakePercentage      float64 `json:"stake_percentage"`
 	}
 
 	OperatorsNonsigningPercentage struct {
@@ -465,7 +466,8 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Summary	Fetch operators non signing percentage
 //	@Tags		Metrics
 //	@Produce	json
-//	@Param		interval	query		int	false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
 //	@Success	200			{object}	OperatorsNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -477,11 +479,25 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
+	endTime := time.Now()
+	if c.Query("end") != "" {
+
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			errorResponse(c, err)
+			return
+		}
+	}
+
 	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
 	if err != nil || interval == 0 {
 		interval = 3600
 	}
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), interval)
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix())
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)
