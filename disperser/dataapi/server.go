@@ -215,10 +215,6 @@ func (s *server) Start() error {
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 		}
-		serviceAvailability := v1.Group("/eigenda")
-		{
-			serviceAvailability.GET("/service-availability", s.GetEigenDAServiceAvailability)
-		}
 		metrics := v1.Group("/metrics")
 		{
 			metrics.GET("/", s.FetchMetricsHandler)
@@ -553,69 +549,6 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
-	})
-}
-
-// GetEigenDAServiceAvailability godoc
-//
-//	@Summary	Get status of EigenDA services.
-//	@Tags		ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/eigenda/service-availability [get]
-func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("GetEigenDAServiceAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
-	// Get query parameters to filter services
-	serviceName := c.DefaultQuery("service-name", "") // If not specified, default to return all services
-
-	// If service name is not specified, return all services
-	services := []string{}
-
-	if serviceName == "disperser" {
-		services = append(services, "Disperser")
-	} else if serviceName == "churner" {
-		services = append(services, "Churner")
-	} else if serviceName == "" {
-		services = append(services, "Disperser", "Churner")
-	}
-	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
-
-	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("GetEigenDAServiceAvailability")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
-
-	// Set the status code to 503 if any of the services are not serving
-	availabilityStatus := http.StatusOK
-	for _, status := range availabilityStatuses {
-		if status.ServiceStatus == "NOT_SERVING" {
-			availabilityStatus = http.StatusServiceUnavailable
-			break
-		}
-
-		if status.ServiceStatus == "UNKNOWN" {
-			availabilityStatus = http.StatusInternalServerError
-			break
-		}
-
-	}
-
-	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
-			Size: len(availabilityStatuses),
-		},
-		Data: availabilityStatuses,
 	})
 }
 
