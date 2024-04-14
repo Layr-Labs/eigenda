@@ -92,7 +92,7 @@ func TestChurn(t *testing.T) {
 	// retry prior to expiry should fail
 	_, err = s.Churn(ctx, request)
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 3600")
+	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 3600 seconds")
 }
 
 func TestChurnWithInvalidQuorum(t *testing.T) {
