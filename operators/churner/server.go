@@ -71,7 +71,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	// Global rate limiting: check that we are after the previous approval's expiry
 	if now.Unix() < s.latestExpiry {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
-		return nil, api.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d", s.latestExpiry-now.Unix()))
+		return nil, api.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d seconds", s.latestExpiry-now.Unix()))
 	}
 
 	request, err := createChurnRequest(req)
