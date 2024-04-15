@@ -70,21 +70,24 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 			return nil, err
 		}
 	} else {
-		if len(config.G2PowerOf2Path) == 0 {
-			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
+		if len(config.G2PowerOf2Path) == 0 && len(config.G2Path) == 0 {
+			return nil, errors.New("both G2Path and G2PowerOf2Path are empty. However, object needs to load G2Points")
 		}
 
-		if config.SRSOrder == 0 {
-			return nil, errors.New("SRS order cannot be 0")
-		}
+		if len(config.G2PowerOf2Path) != 0 {
+			if config.SRSOrder == 0 {
+				return nil, errors.New("SRS order cannot be 0")
+			}
 
-		maxPower := uint64(math.Log2(float64(config.SRSOrder)))
-		_, err := kzg.ReadG2PointSection(config.G2PowerOf2Path, 0, maxPower, 1)
-		if err != nil {
-			return nil, fmt.Errorf("file located at %v is invalid", config.G2PowerOf2Path)
+			maxPower := uint64(math.Log2(float64(config.SRSOrder)))
+			_, err := kzg.ReadG2PointSection(config.G2PowerOf2Path, 0, maxPower, 1)
+			if err != nil {
+				return nil, fmt.Errorf("file located at %v is invalid", config.G2PowerOf2Path)
+			}
+		} else {
+			log.Println("verifier requires accesses to entire g2 points. It is a legacy usage. For most operators, it is likely because G2_POWER_OF_2_PATH is improperly configured.")
 		}
 	}
-
 	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
 		log.Println("Could not create srs", err)
