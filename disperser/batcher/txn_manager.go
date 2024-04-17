@@ -169,11 +169,11 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 			didTimeout = urlErr.Timeout()
 		}
 		if didTimeout || errors.Is(err, context.DeadlineExceeded) {
-			t.logger.Warn("failed to send txn due to timeout", "tag", req.Tag, "hash", req.Tx.Hash().Hex(), "numRetries", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
+			t.logger.Warn("failed to send txn due to timeout", "tag", req.Tag, "hash", txn.Hash().Hex(), "numRetries", retryFromFailure, "maxRetry", maxSendTransactionRetry, "err", err)
 			retryFromFailure++
 			continue
 		} else if err != nil {
-			return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, req.Tx.Hash().Hex(), err)
+			return fmt.Errorf("failed to send txn (%s) %s: %w", req.Tag, txn.Hash().Hex(), err)
 		} else {
 			t.logger.Debug("successfully sent txn", "tag", req.Tag, "txID", txID, "txHash", txn.Hash().Hex())
 			break
@@ -314,6 +314,9 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 				}
 			}
 			return ErrTransactionNotBroadcasted
+		} else if err != nil {
+			t.logger.Error("unexpected error while waiting for Fireblocks transaction to broadcast", "txHash", req.Tx.Hash().Hex(), "err", err)
+			return err
 		}
 
 		ctxWithTimeout, cancelEvaluationTimeout := context.WithTimeout(ctx, t.txnRefreshInterval)
