@@ -128,10 +128,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
-	mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
-	if err != nil {
-		logger.Printf("Error: %v", err)
-		return nil
+	if validateOnchainTransaction {
+		log.Printf("Create instance of MockRollUp to validate OnChain Transactions")
+		mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
+		if err != nil {
+			logger.Printf("Error: %v", err)
+			return nil
+		}
 	}
 
 	if isRetrieverClientEnabled {
