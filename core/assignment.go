@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 )
 
 const (
@@ -33,6 +34,21 @@ type OperatorID [32]byte
 
 func (id OperatorID) Hex() string {
 	return hex.EncodeToString(id[:])
+}
+
+// The "s" is an operatorId in hex string format, which may or may not have the "0x" prefix.
+func OperatorIDFromHex(s string) (OperatorID, error) {
+	opID := [32]byte{}
+	s = strings.TrimPrefix(s, "0x")
+	if len(s) != 64 {
+		return OperatorID(opID), errors.New("operatorID hex string must be 64 bytes, or 66 bytes if starting with 0x")
+	}
+	opIDslice, err := hex.DecodeString(s)
+	if err != nil {
+		return OperatorID(opID), err
+	}
+	copy(opID[:], opIDslice)
+	return OperatorID(opID), nil
 }
 
 type OperatorIndex = uint

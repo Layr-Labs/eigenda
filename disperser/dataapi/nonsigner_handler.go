@@ -2,7 +2,6 @@ package dataapi
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sort"
@@ -92,7 +91,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 					return nil, err
 				}
 
-				opID, err := OperatorIDFromString(op)
+				opID, err := core.OperatorIDFromHex(op)
 				if err != nil {
 					return nil, err
 				}
@@ -209,12 +208,11 @@ func getNonSigners(batches []*BatchNonSigningInfo) ([]core.OperatorID, error) {
 	}
 	nonsigners := make([]core.OperatorID, 0)
 	for op := range nonsignerSet {
-		hexstr := strings.TrimPrefix(op, "0x")
-		b, err := hex.DecodeString(hexstr)
+		id, err := core.OperatorIDFromHex(op)
 		if err != nil {
 			return nil, err
 		}
-		nonsigners = append(nonsigners, core.OperatorID(b))
+		nonsigners = append(nonsigners, id)
 	}
 	sort.Slice(nonsigners, func(i, j int) bool {
 		for k := range nonsigners[i] {

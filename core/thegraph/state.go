@@ -2,11 +2,9 @@ package thegraph
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -282,16 +280,12 @@ func (ics *indexedChainState) getRegisteredIndexedOperatorInfo(ctx context.Conte
 			return nil, err
 		}
 
-		id := strings.TrimPrefix(string(operator.Id), "0x")
-		operatorIdBytes, err := hex.DecodeString(id)
+		// convert graphql.String to [32]byte
+		// example: "0x0000000000000000000000000000000000000000000000000000000000000001" -> [32]byte{0x01}
+		operatorId, err := core.OperatorIDFromHex(string(operator.Id))
 		if err != nil {
 			return nil, err
 		}
-
-		// convert graphql.String to [32]byte
-		// example: "0x0000000000000000000000000000000000000000000000000000000000000001" -> [32]byte{0x01}
-		var operatorId [32]byte
-		copy(operatorId[:], operatorIdBytes)
 		operators[operatorId] = operatorIndexedInfo
 	}
 	return operators, nil
