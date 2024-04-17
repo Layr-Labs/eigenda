@@ -99,6 +99,17 @@ type (
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
+	EjectedOperator struct {
+		OperatorId      string `json:"operator_id"`
+		OperatorAddress string `json:"operator_address"`
+		QuorumId        uint8  `json:"quorum_id"`
+	}
+
+	EjectionResponse struct {
+		Meta      Meta               `json:"meta"`
+		Operators []*EjectedOperator `json:"operators"`
+	}
+
 	DeregisteredOperatorMetadata struct {
 		OperatorId           string `json:"operator_id"`
 		BlockNumber          uint   `json:"block_number"`
@@ -136,6 +147,7 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
+		ejector        *Ejector
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -174,6 +186,8 @@ func NewServer(
 		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
 
+	ejector := NewEjector(logger, transactor, metrics)
+
 	return &server{
 		logger:                    logger.With("component", "DataAPIServer"),
 		serverMode:                config.ServerMode,
@@ -185,6 +199,7 @@ func NewServer(
 		transactor:                transactor,
 		chainState:                chainState,
 		metrics:                   metrics,
+		ejector:                   ejector,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
@@ -274,6 +289,58 @@ func (s *server) Shutdown() error {
 	}
 
 	return nil
+}
+
+// EjectOperatorsHandler godoc
+//
+//	@Summary	Eject operators who violate the SLAs during the given time interval
+//	@Tags		Ejector
+//	@Produce	json
+//	@Param		interval query int false "Lookback window for operator ejection [default: 86400]"
+//	@Param		end  query int false "End time for evaluating operator ejection [default: now]"
+//	@Param		mode query string "Whether it's periodic or urgent ejection request [default: periodic]"
+//	@Success	200			{object}	BlobMetadataResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/ejector/ejection [get]
+func (s *server) EjectOperatorsHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			errorResponse(c, err)
+			return
+		}
+	}
+
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "86400"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 86400
+	}
+
+	mode := "periodic"
+	if c.Query("mode") != "" {
+		mode = c.Query("mode")
+	}
+
+	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix())
+	if err != nil {
+		err = s.ejector.eject(c.Request.Context(), nonSigningRate, mode)
+	}
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("EjectOperators")
+		errorResponse(c, err)
+		return
+	}
+	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
+	c.Status(http.StatusOK)
 }
 
 // FetchBlobHandler godoc

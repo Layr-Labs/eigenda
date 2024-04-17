@@ -25,6 +25,9 @@ type Metrics struct {
 	NumRequests *prometheus.CounterVec
 	Latency     *prometheus.SummaryVec
 
+	EjectionRequests *prometheus.CounterVec
+	Operators        *prometheus.CounterVec
+
 	httpPort string
 	logger   logging.Logger
 }
@@ -53,6 +56,33 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 			},
 			[]string{"method"},
 		),
+		// EjectionRequests is a more detailed metric than NumRequests, specifically for tracking
+		// the ejection calls.
+		// The "mode" could be:
+		// - "periodic": periodically initiated ejection; or
+		// - "urgent": urgently invoked ejection in case of bad network health condition.
+		// The "status" indicates the final processing result of the ejection request.
+		EjectionRequests: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "ejection_requests_total",
+				Help:      "the total number of ejection requests",
+			},
+			[]string{"status", "mode"},
+		),
+
+		// The "state" could be:
+		// - "requested": operator is requested for ejection; or
+		// - "ejected": operator is actually ejected
+		// The  "type" could be "number" or "stake", for the number of operators as well as the
+		// total stake share they represent.
+		Operators: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "operators_total",
+				Help:      "the total number of operators to be ejected or actually ejected",
+			}, []string{"quorum", "state", "type"},
+		),
 		registry: reg,
 		httpPort: httpPort,
 		logger:   logger.With("component", "DataAPIMetrics"),
@@ -78,6 +108,20 @@ func (g *Metrics) IncrementFailedRequestNum(method string) {
 	g.NumRequests.With(prometheus.Labels{
 		"status": "failed",
 		"method": method,
+	}).Inc()
+}
+
+func (g *Metrics) IncrementSuccessfulEjection(mode string) {
+	g.EjectionRequests.With(prometheus.Labels{
+		"status": "success",
+		"mode":   mode,
+	}).Inc()
+}
+
+func (g *Metrics) IncrementFailedEjection(mode string) {
+	g.EjectionRequests.With(prometheus.Labels{
+		"status": "failed",
+		"mode":   mode,
 	}).Inc()
 }
 
