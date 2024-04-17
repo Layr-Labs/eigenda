@@ -29,9 +29,7 @@ import (
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -47,7 +45,6 @@ type ClientType string
 const (
 	Disperser ClientType = "Disperser"
 	Retriever ClientType = "Retriever"
-	Encoder   ClientType = "Encoder"
 )
 
 type GrpcClient struct {
@@ -103,11 +100,6 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		Retriever: {
 			Hostname: "retriever.retriever.svc.cluster.local",
 			GrpcPort: "retriever-port",
-			Timeout:  10 * time.Second,
-		},
-		Encoder: {
-			Hostname: "encoder.encoder.svc.cluster.local",
-			GrpcPort: "34000",
 			Timeout:  10 * time.Second,
 		},
 	})
@@ -557,80 +549,12 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	}
 }
 
-func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingParams, error) {
-	logger := testSuite.Logger
-	var adversaryThreshold uint8 = 80
-	var quorumThreshold uint8 = 90
-
-	encoderTestClient := testSuite.Clients.Clients[Encoder]
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Duration(10*float64(time.Second)))
-	defer cancel()
-
-	var quorumID core.QuorumID = 0
-
-	param := &core.SecurityParam{
-		QuorumID:              quorumID,
-		ConfirmationThreshold: quorumThreshold,
-		AdversaryThreshold:    adversaryThreshold,
-	}
-
-	testBlob := core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			SecurityParams: []*core.SecurityParam{param},
-		},
-		Data: data,
-	}
-	// TODO: Refactor this code using indexed chain state by using retrieval client
-	// Issue: https://github.com/Layr-Labs/eigenda-internal/issues/220
-	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
-	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
-	if err != nil {
-		logger.Printf("failed to get operator state: %s", err)
-	}
-	coordinator := &core.StdAssignmentCoordinator{}
-
-	blobSize := uint(len(testBlob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
-
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, param)
-	if err != nil {
-		logger.Printf("failed to calculate chunk length: %s", err)
-	}
-
-	quorumInfo := &core.BlobQuorumInfo{
-		SecurityParam: *param,
-		ChunkLength:   chunkLength,
-	}
-
-	_, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
-	if err != nil {
-		logger.Printf("failed to get assignments: %s", err)
-	}
-	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
-
-	testEncodingParamsProto := &encoder_rpc.EncodingParams{
-		ChunkLength: uint32(testEncodingParams.ChunkLength),
-		NumChunks:   uint32(testEncodingParams.NumChunks),
-	}
-
-	encodeBlobRequestProto := &encoder_rpc.EncodeBlobRequest{
-		Data:           []byte(testBlob.Data),
-		EncodingParams: testEncodingParamsProto,
-	}
-	encoderClient := encoderTestClient.Client.(encoder_rpc.EncoderClient)
-
-	reply, err := encoderClient.EncodeBlob(ctxTimeout, encodeBlobRequestProto)
-	return reply, &testEncodingParams, err
-}
-
 func createClient(conn *grpc.ClientConn, clientType ClientType) interface{} {
 	switch clientType {
 	case Disperser:
 		return disperser_rpc.NewDisperserClient(conn)
 	case Retriever:
 		return retriever_rpc.NewRetrieverClient(conn)
-	case Encoder:
-		return encoder_rpc.NewEncoderClient(conn)
 	default:
 		return nil
 	}
