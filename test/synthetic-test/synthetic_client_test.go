@@ -12,7 +12,6 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -84,7 +83,7 @@ type SyntheticTestSuite struct {
 
 var (
 	testSuite                  *SyntheticTestSuite
-	isRetrieverClientDeployed  bool = false
+	isRetrieverClientEnabled   bool = false
 	validateOnchainTransaction bool = false
 	retrievalClient            clients.RetrievalClient
 	logger                     logging.Logger
@@ -143,11 +142,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		return nil
 	}
 
-	err = setupRetrievalClient(ethClient, &retrieverClientConfig, ethLogger)
+	if isRetrieverClientEnabled {
+		err = setupRetrievalClient(ethClient, &retrieverClientConfig, ethLogger)
 
-	if err != nil {
-		logger.Printf("Error: %v", err)
-		return nil
+		if err != nil {
+			logger.Printf("Error: %v", err)
+			return nil
+		}
 	}
 
 	// Assign client connections to pointers in TestClients struct
@@ -166,7 +167,7 @@ func TestMain(m *testing.M) {
 	privateKey := os.Getenv("ETHCLIENT_PRIVATE_KEY")
 	rpcUrl := os.Getenv("ETHCLIENT_RPC_URL")
 	mockRollUpContractAddress := os.Getenv("MOCKROLLUP_CONTRACT_ADDRESS")
-	isRetrieverClientDeployed = os.Getenv("RETRIEVER_CLIENT_DEPLOYED") == strings.ToLower("true")
+	isRetrieverClientEnabled = os.Getenv("RETRIEVER_CLIENT_ENABLE") == strings.ToLower("true")
 	validateOnchainTransaction = os.Getenv("VALIDATE_ONCHAIN_TRANSACTION") == strings.ToLower("true")
 	blsOperatorStateRetriever := os.Getenv("BLS_OPERATOR_STATE_RETRIEVER")
 	eigenDAServiceManagerRetreiever := os.Getenv("EIGENDA_SERVICE_MANAGER_RETRIEVER")
@@ -199,7 +200,7 @@ func TestMain(m *testing.M) {
 	}
 	logger.Println("RPC_URL for Chain...", rpcUrl)
 	logger.Println("Mock RollUp Contract Address...", mockRollUpContractAddress)
-	logger.Println("Retriever Client Deployed...", isRetrieverClientDeployed)
+	logger.Println("Retriever Client Deployed...", isRetrieverClientEnabled)
 
 	logger.Println("Running Test Client...")
 	// Run the tests and get the exit code
@@ -229,14 +230,16 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		return err
 	}
 	v, err := verifier.NewVerifier(&kzg.KzgConfig{
-		G1Path:         retrievalClientConfig.RetrieverG1Path,
-		G2Path:         retrievalClientConfig.RetrieverG2Path,
-		CacheDir:       retrievalClientConfig.RetrieverCachePath,
-		NumWorker:      1,
-		SRSOrder:       uint64(srsOrder),
-		Verbose:        true,
-		PreloadEncoder: true,
-	}, true)
+		G1Path:          retrievalClientConfig.RetrieverG1Path,
+		G2Path:          retrievalClientConfig.RetrieverG2Path,
+		G2PowerOf2Path:  retrievalClientConfig.RetrieverG2PointPowerOf2Path,
+		CacheDir:        retrievalClientConfig.RetrieverCachePath,
+		NumWorker:       1,
+		SRSOrder:        uint64(srsOrder),
+		SRSNumberToLoad: uint64(srsOrder),
+		Verbose:         true,
+		PreloadEncoder:  false,
+	}, false)
 	if err != nil {
 		return err
 	}
@@ -353,7 +356,7 @@ loop:
 
 				// Retrieve Blob from Retriever Client
 				// Retrieval Client Iterates Over Operators to get the specific Blob
-				if isRetrieverClientDeployed {
+				if isRetrieverClientEnabled {
 					logger.Printf("Try Blob using Retrieval Client %v", blobReply)
 					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
@@ -552,49 +555,6 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 		InclusionProof: verificationProof.GetInclusionProof(),
 		QuorumIndices:  verificationProof.GetQuorumIndexes(),
 	}
-}
-
-func TestEncodeBlob(t *testing.T) {
-	t.Skip("Skipping this test")
-
-	var (
-		gettysburgAddressBytes = codec.ConvertByPaddingEmptyByte([]byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth."))
-	)
-	encoderReply, encodingParams, err := encodeBlob(gettysburgAddressBytes)
-	assert.NoError(t, err)
-	assert.NotNil(t, encoderReply.Chunks)
-
-	// Decode Server Data
-	var chunksData []*encoding.Frame
-
-	for i := range encoderReply.Chunks {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(encoderReply.GetChunks()[i])
-		// perform an operation
-		chunksData = append(chunksData, chunkSerialized)
-	}
-	assert.NotNil(t, chunksData)
-
-	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
-	}
-
-	// Test Assumes below params set for Encoder
-	kzgConfig := kzg.KzgConfig{
-		G1Path:          "/data/kzg/g1.point",
-		G2Path:          "/data/kzg/g2.point",
-		CacheDir:        "/data/kzg/SRSTables",
-		SRSOrder:        300000,
-		SRSNumberToLoad: 300000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-	}
-
-	v, _ := verifier.NewVerifier(&kzgConfig, false)
-
-	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
-	decoded, err := v.Decode(chunksData, indices, *encodingParams, maxInputSize)
-	assert.Nil(t, err)
-	assert.Equal(t, decoded, gettysburgAddressBytes)
 }
 
 func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingParams, error) {
