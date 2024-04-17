@@ -292,7 +292,7 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
 	// Update this to a minute over Batcher_Pull_Interval
-	confirmationDeadline := time.Now().Add(batcherPullInterval * time.Second)
+	confirmationDeadline := time.ParseDuration(batcherPullInterval)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
