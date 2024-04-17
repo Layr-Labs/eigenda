@@ -80,10 +80,15 @@ func (e *Ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 		return err
 	}
 
-	_, err = e.Transactor.EjectOperators(ctx, operatorsByQuorum)
-	return err
+	if _, err = e.Transactor.EjectOperators(ctx, operatorsByQuorum); err != nil {
+		e.Logger.Error("Ejection transaction failed", "err", err)
+		return err
+	}
+	e.Logger.Info("Ejection transaction succeeded")
 
 	// TODO: get the txn response and update the metrics.
+
+	return nil
 }
 
 func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMetrics) ([][]core.OperatorID, error) {
@@ -94,6 +99,9 @@ func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMet
 		}
 	}
 
+	numOperatorByQuorum := make(map[uint8]int)
+	stakeShareByQuorum := make(map[uint8]float64)
+
 	result := make([][]core.OperatorID, maxQuorumId+1)
 	for _, metric := range nonsigners {
 		id, err := core.OperatorIDFromHex(metric.OperatorId)
@@ -101,7 +109,11 @@ func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMet
 			return nil, err
 		}
 		result[metric.QuorumId] = append(result[metric.QuorumId], id)
+		numOperatorByQuorum[metric.QuorumId]++
+		stakeShareByQuorum[metric.QuorumId] += metric.StakePercentage
 	}
+
+	e.Metrics.UpdateRequestedOperatorMetric(numOperatorByQuorum, stakeShareByQuorum)
 
 	return result, nil
 }

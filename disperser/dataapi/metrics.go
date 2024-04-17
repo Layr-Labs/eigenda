@@ -70,7 +70,6 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 			},
 			[]string{"status", "mode"},
 		),
-
 		// The "state" could be:
 		// - "requested": operator is requested for ejection; or
 		// - "ejected": operator is actually ejected
@@ -123,6 +122,25 @@ func (g *Metrics) IncrementFailedEjection(mode string) {
 		"status": "failed",
 		"mode":   mode,
 	}).Inc()
+}
+
+func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]int, stakeShareByQuorum map[uint8]float64) {
+	for q, count := range numOperatorsByQuorum {
+		for i := 0; i < count; i++ {
+			g.Operators.With(prometheus.Labels{
+				"quorum": string(q),
+				"state":  "requested",
+				"type":   "number",
+			}).Inc()
+		}
+	}
+	for q, stakeShare := range stakeShareByQuorum {
+		g.Operators.With(prometheus.Labels{
+			"quorum": string(q),
+			"state":  "requested",
+			"type":   "stake",
+		}).Add(stakeShare)
+	}
 }
 
 // Start starts the metrics server

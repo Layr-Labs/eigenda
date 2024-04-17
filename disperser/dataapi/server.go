@@ -240,6 +240,8 @@ func (s *server) Start() error {
 			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
+		ejection := v1.Group("/ejection")
+		ejection.GET("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
@@ -331,7 +333,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}
 
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix())
-	if err != nil {
+	if err == nil {
 		err = s.ejector.eject(c.Request.Context(), nonSigningRate, mode)
 	}
 	if err != nil {

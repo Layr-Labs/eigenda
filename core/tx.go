@@ -71,7 +71,7 @@ type Transactor interface {
 	UpdateOperatorSocket(ctx context.Context, socket string) error
 
 	// EjectOperators ejects operators from AVS registryCoordinator.
-	// The operatorsByQuorum provides the a list of operators for each quorum. Within a quorum,
+	// The operatorsByQuorum provides a list of operators for each quorum. Within a quorum,
 	// the operators are ordered; in case of rate limiting, the first operators will be ejected.
 	EjectOperators(ctx context.Context, operatorsByQuorum [][]OperatorID) (*types.Transaction, error)
 
