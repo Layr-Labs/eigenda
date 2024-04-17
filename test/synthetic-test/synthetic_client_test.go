@@ -167,6 +167,7 @@ func TestMain(m *testing.M) {
 	retrieverSrsOrder := os.Getenv("RETRIEVER_SRS_ORDER")
 	retrieverG1Path := os.Getenv("RETRIEVER_G1_PATH")
 	retrieverG2Path := os.Getenv("RETRIEVER_G2_PATH")
+	retrieverG2PoinPowerOf2Path := os.Getenv("RETRIEVER_G2_POINT_POWER_OF_2_PATH")
 	retrieverCachePath := os.Getenv("RETRIEVER_CACHE_PATH")
 	batcherPullInterval := os.Getenv("BATCHER_PULL_INTERVAL")
 
@@ -178,6 +179,7 @@ func TestMain(m *testing.M) {
 		RetrieverSrsOrder:                retrieverSrsOrder,
 		RetrieverG1Path:                  retrieverG1Path,
 		RetrieverG2Path:                  retrieverG2Path,
+		RetrieverG2PointPowerOf2Path:     retrieverG2PoinPowerOf2Path,
 		RetrieverCachePath:               retrieverCachePath,
 	}
 
