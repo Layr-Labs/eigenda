@@ -483,6 +483,15 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("HandleSingleBatch: error building confirmBatch transaction: %w", err)
 	}
+
+	// Get Current Block Number
+	currentBlockNumber, err := b.Transactor.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		log.Warn("HandleSingleBatch: error getting current block number", "err", err)
+	}
+	log.Debug("HandleSingleBatch: Current block number", "blockNumber", currentBlockNumber)
+	log.Debug("HandleSingleBatch: Reference block number", "blockNumber", batch.BatchHeader.ReferenceBlockNumber)
+
 	err = b.TransactionManager.ProcessTransaction(ctx, NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
 		batchHeader: batch.BatchHeader,
 		blobs:       batch.BlobMetadata,
