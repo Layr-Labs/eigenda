@@ -402,7 +402,7 @@ func TestBlobRetry(t *testing.T) {
 
 	encodedResult, err := components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
 	assert.NoError(t, err)
-	assert.Equal(t, encodedResult.Status, bat.PendingDispersal)
+	assert.NotNil(t, encodedResult)
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
@@ -411,12 +411,13 @@ func TestBlobRetry(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 
+	// ConfirmBatch transaction has been sent. Waiting for transaction to be confirmed onchain
 	meta, err := blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
-	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+	assert.Equal(t, disperser.Confirming, meta.BlobStatus)
 	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
-	assert.NoError(t, err)
-	assert.Equal(t, encodedResult.Status, bat.PendingConfirmation)
+	assert.ErrorContains(t, err, "no such key")
+	assert.Nil(t, encodedResult)
 
 	err = components.encodingStreamer.RequestEncoding(ctx, out)
 	assert.NoError(t, err)
@@ -444,12 +445,10 @@ func TestBlobRetry(t *testing.T) {
 	batch, err = components.encodingStreamer.CreateBatch()
 	assert.ErrorContains(t, err, "no encoded results")
 	assert.Nil(t, batch)
-	_, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
-	assert.NoError(t, err)
 
 	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
-	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+	assert.Equal(t, disperser.Confirming, meta.BlobStatus)
 
 	// Trigger a retry
 	confirmationErr := errors.New("error")
@@ -459,6 +458,10 @@ func TestBlobRetry(t *testing.T) {
 		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
 	})
 	assert.ErrorIs(t, err, confirmationErr)
+	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Processing, meta.BlobStatus)
+	assert.Equal(t, uint(1), meta.NumRetries)
 
 	components.encodingStreamer.ReferenceBlockNumber = 14
 	// Should pick up the blob to encode
@@ -475,7 +478,7 @@ func TestBlobRetry(t *testing.T) {
 	assert.NoError(t, err)
 	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
 	assert.NoError(t, err)
-	assert.Equal(t, encodedResult.Status, bat.PendingDispersal)
+	assert.NotNil(t, encodedResult)
 }
 
 func TestRetryTxnReceipt(t *testing.T) {

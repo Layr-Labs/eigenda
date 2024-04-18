@@ -441,6 +441,8 @@ type Blob struct {
 	// Each bundle contains all chunks for a single quorum of the blob.
 	// The number of bundles must be equal to the total number of quorums associated
 	// with the blob, and the ordering must be the same as BlobHeader.quorum_headers.
+	// Note: an operator may be in some but not all of the quorums; in that case the
+	// bundle corresponding to that quorum will be empty.
 	Bundles []*Bundle `protobuf:"bytes,2,rep,name=bundles,proto3" json:"bundles,omitempty"`
 }
 

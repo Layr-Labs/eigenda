@@ -299,14 +299,10 @@ func (b *Batcher) updateConfirmationInfo(
 		if status == disperser.Confirmed {
 			if _, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
 				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
-				// remove encoded blob from storage so we don't disperse it again
-				b.EncodingStreamer.RemoveEncodedBlob(metadata)
 			}
 		} else if status == disperser.InsufficientSignatures {
 			if _, updateConfirmationInfoErr = b.Queue.MarkBlobInsufficientSignatures(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
 				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
-				// remove encoded blob from storage so we don't disperse it again
-				b.EncodingStreamer.RemoveEncodedBlob(metadata)
 			}
 		} else {
 			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
@@ -390,6 +386,17 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 
 	// Return the error(s)
 	return result.ErrorOrNil()
+}
+
+func (b *Batcher) transitionBlobToConfirming(ctx context.Context, metadata *disperser.BlobMetadata) error {
+	err := b.Queue.MarkBlobConfirming(ctx, metadata.GetBlobKey())
+	if err != nil {
+		b.logger.Error("error marking blob as confirming", "err", err)
+		return err
+	}
+	// remove encoded blob from storage so we don't disperse it again
+	b.EncodingStreamer.RemoveEncodedBlob(metadata)
+	return nil
 }
 
 type confirmationMetadata struct {
@@ -494,13 +501,10 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("HandleSingleBatch: error sending confirmBatch transaction: %w", err)
-	} else {
-		for _, metadata := range batch.BlobMetadata {
-			err = b.EncodingStreamer.MarkBlobPendingConfirmation(metadata)
-			if err != nil {
-				log.Error("HandleSingleBatch: error marking blob as pending confirmation", "err", err)
-			}
-		}
+	}
+
+	for _, metadata := range batch.BlobMetadata {
+		_ = b.transitionBlobToConfirming(ctx, metadata)
 	}
 
 	return nil

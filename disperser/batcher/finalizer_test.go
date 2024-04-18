@@ -260,27 +260,11 @@ func TestNoReceipt(t *testing.T) {
 	assert.Len(t, metadatas, 0)
 	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Failed)
 	assert.NoError(t, err)
-	assert.Len(t, metadatas, 0)
-	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
-	assert.NoError(t, err)
 	assert.Len(t, metadatas, 1)
-	// num retries should be incremented
-	assert.Equal(t, metadatas[0].NumRetries, uint(1))
-
-	// try again
-	err = finalizer.FinalizeBlobs(context.Background())
-	assert.NoError(t, err)
-
-	// status should be transitioned to failed
-	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Finalized)
-	assert.NoError(t, err)
-	assert.Len(t, metadatas, 0)
 	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
 	assert.NoError(t, err)
 	assert.Len(t, metadatas, 0)
-	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Failed)
+	metadatas, err = queue.GetBlobMetadataByStatus(ctx, disperser.Processing)
 	assert.NoError(t, err)
-	assert.Len(t, metadatas, 1)
-	// num retries should be the same
-	assert.Equal(t, metadatas[0].NumRetries, uint(1))
+	assert.Len(t, metadatas, 0)
 }
