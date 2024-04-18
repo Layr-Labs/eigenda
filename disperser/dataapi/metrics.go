@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc/codes"
 )
 
 type MetricsConfig struct {
@@ -110,16 +111,9 @@ func (g *Metrics) IncrementFailedRequestNum(method string) {
 	}).Inc()
 }
 
-func (g *Metrics) IncrementSuccessfulEjection(mode string) {
+func (g *Metrics) IncrementEjectionRequest(mode string, status codes.Code) {
 	g.EjectionRequests.With(prometheus.Labels{
-		"status": "success",
-		"mode":   mode,
-	}).Inc()
-}
-
-func (g *Metrics) IncrementFailedEjection(mode string) {
-	g.EjectionRequests.With(prometheus.Labels{
-		"status": "failed",
+		"status": status.String(),
 		"mode":   mode,
 	}).Inc()
 }

@@ -37,9 +37,9 @@ func computePerfScore(metric *OperatorNonsigningPercentageMetrics) float64 {
 }
 
 type Ejector struct {
-	Logger     logging.Logger
-	Transactor core.Transactor
-	Metrics    *Metrics
+	logger     logging.Logger
+	transactor core.Transactor
+	metrics    *Metrics
 
 	// For serializing the ejection requests.
 	mu sync.Mutex
@@ -47,9 +47,9 @@ type Ejector struct {
 
 func NewEjector(logger logging.Logger, tx core.Transactor, metrics *Metrics) *Ejector {
 	return &Ejector{
-		Logger:     logger.With("component", "Ejector"),
-		Transactor: tx,
-		Metrics:    metrics,
+		logger:     logger.With("component", "Ejector"),
+		transactor: tx,
+		metrics:    metrics,
 	}
 }
 
@@ -70,6 +70,9 @@ func (e *Ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	// rate limiting.
 	sort.Slice(nonsigners, func(i, j int) bool {
 		if nonsigners[i].QuorumId == nonsigners[j].QuorumId {
+			if computePerfScore(nonsigners[i]) == computePerfScore(nonsigners[j]) {
+				return float64(nonsigners[i].TotalUnsignedBatches)*nonsigners[i].StakePercentage > float64(nonsigners[j].TotalUnsignedBatches)*nonsigners[j].StakePercentage
+			}
 			return computePerfScore(nonsigners[i]) < computePerfScore(nonsigners[j])
 		}
 		return nonsigners[i].QuorumId < nonsigners[j].QuorumId
@@ -80,11 +83,12 @@ func (e *Ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 		return err
 	}
 
-	if _, err = e.Transactor.EjectOperators(ctx, operatorsByQuorum); err != nil {
-		e.Logger.Error("Ejection transaction failed", "err", err)
+	receipt, err := e.transactor.EjectOperators(ctx, operatorsByQuorum)
+	if err != nil {
+		e.logger.Error("Ejection transaction failed", "err", err)
 		return err
 	}
-	e.Logger.Info("Ejection transaction succeeded")
+	e.logger.Info("Ejection transaction succeeded", "receipt", receipt)
 
 	// TODO: get the txn response and update the metrics.
 
@@ -113,7 +117,7 @@ func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMet
 		stakeShareByQuorum[metric.QuorumId] += metric.StakePercentage
 	}
 
-	e.Metrics.UpdateRequestedOperatorMetric(numOperatorByQuorum, stakeShareByQuorum)
+	e.metrics.UpdateRequestedOperatorMetric(numOperatorByQuorum, stakeShareByQuorum)
 
 	return result, nil
 }

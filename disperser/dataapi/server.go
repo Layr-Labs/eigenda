@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -312,11 +313,18 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
+	mode := "periodic"
+	if c.Query("mode") != "" {
+		mode = c.Query("mode")
+	}
+
 	endTime := time.Now()
 	if c.Query("end") != "" {
 		var err error
 		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
 		if err != nil {
+			s.metrics.IncrementFailedRequestNum("EjectOperators")
+			s.metrics.IncrementEjectionRequest(mode, codes.InvalidArgument)
 			errorResponse(c, err)
 			return
 		}
@@ -327,21 +335,18 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 		interval = 86400
 	}
 
-	mode := "periodic"
-	if c.Query("mode") != "" {
-		mode = c.Query("mode")
-	}
-
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix())
 	if err == nil {
 		err = s.ejector.eject(c.Request.Context(), nonSigningRate, mode)
 	}
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("EjectOperators")
+		s.metrics.IncrementEjectionRequest(mode, codes.Internal)
 		errorResponse(c, err)
 		return
 	}
 	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
+	s.metrics.IncrementEjectionRequest(mode, codes.OK)
 	c.Status(http.StatusOK)
 }
 
