@@ -38,6 +38,9 @@ type StreamerConfig struct {
 	// EncodingRequestTimeout is the timeout for each encoding request
 	EncodingRequestTimeout time.Duration
 
+	// ChainStateTimeout is the timeout used for getting the chainstate
+	ChainStateTimeout time.Duration
+
 	// EncodingQueueLimit is the maximum number of encoding requests that can be queued
 	EncodingQueueLimit int
 
@@ -137,7 +140,11 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 						// ignore canceled errors because canceled encoding requests are normal
 						continue
 					}
-					e.logger.Error("error processing encoded blobs", "err", err)
+					if strings.Contains(err.Error(), "too many requests") {
+						e.logger.Warn("encoding request ratelimited", "err", err)
+					} else {
+						e.logger.Error("error processing encoded blobs", "err", err)
+					}
 				}
 			}
 		}
@@ -245,7 +252,10 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	e.logger.Debug("new metadatas to encode", "numMetadata", len(metadatas), "duration", time.Since(stageTimer))
 
 	// Get the operator state
-	state, err := e.getOperatorState(ctx, metadatas, referenceBlockNumber)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, e.ChainStateTimeout)
+	defer cancel()
+	state, err := e.getOperatorState(timeoutCtx, metadatas, referenceBlockNumber)
 	if err != nil {
 		return fmt.Errorf("error getting operator state: %w", err)
 	}
@@ -528,7 +538,10 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		i++
 	}
 
-	state, err := e.getOperatorState(context.Background(), metadatas, e.ReferenceBlockNumber)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), e.ChainStateTimeout)
+	defer cancel()
+
+	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
 		return nil, err
 	}

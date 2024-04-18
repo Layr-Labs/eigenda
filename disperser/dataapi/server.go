@@ -91,6 +91,7 @@ type (
 		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 		TotalBatches         int     `json:"total_batches"`
 		Percentage           float64 `json:"percentage"`
+		StakePercentage      float64 `json:"stake_percentage"`
 	}
 
 	OperatorsNonsigningPercentage struct {
@@ -213,10 +214,6 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
-		}
-		serviceAvailability := v1.Group("/eigenda")
-		{
-			serviceAvailability.GET("/service-availability", s.GetEigenDAServiceAvailability)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -465,7 +462,8 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Summary	Fetch operators non signing percentage
 //	@Tags		Metrics
 //	@Produce	json
-//	@Param		interval	query		int	false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
 //	@Success	200			{object}	OperatorsNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -477,11 +475,25 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
+	endTime := time.Now()
+	if c.Query("end") != "" {
+
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			errorResponse(c, err)
+			return
+		}
+	}
+
 	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
 	if err != nil || interval == 0 {
 		interval = 3600
 	}
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), interval)
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix())
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)
@@ -537,69 +549,6 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
-	})
-}
-
-// GetEigenDAServiceAvailability godoc
-//
-//	@Summary	Get status of EigenDA services.
-//	@Tags		ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/eigenda/service-availability [get]
-func (s *server) GetEigenDAServiceAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("GetEigenDAServiceAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
-	// Get query parameters to filter services
-	serviceName := c.DefaultQuery("service-name", "") // If not specified, default to return all services
-
-	// If service name is not specified, return all services
-	services := []string{}
-
-	if serviceName == "disperser" {
-		services = append(services, "Disperser")
-	} else if serviceName == "churner" {
-		services = append(services, "Churner")
-	} else if serviceName == "" {
-		services = append(services, "Disperser", "Churner")
-	}
-	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
-
-	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("GetEigenDAServiceAvailability")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("GetEigenDAServiceAvailability")
-
-	// Set the status code to 503 if any of the services are not serving
-	availabilityStatus := http.StatusOK
-	for _, status := range availabilityStatuses {
-		if status.ServiceStatus == "NOT_SERVING" {
-			availabilityStatus = http.StatusServiceUnavailable
-			break
-		}
-
-		if status.ServiceStatus == "UNKNOWN" {
-			availabilityStatus = http.StatusInternalServerError
-			break
-		}
-
-	}
-
-	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
-			Size: len(availabilityStatuses),
-		},
-		Data: availabilityStatuses,
 	})
 }
 

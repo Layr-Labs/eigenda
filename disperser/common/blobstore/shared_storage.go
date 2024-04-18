@@ -137,12 +137,12 @@ func (s *SharedBlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadat
 	// TODO (ian-shim): remove this check once we are sure that the metadata is never overwritten
 	refreshedMetadata, err := s.GetBlobMetadata(ctx, existingMetadata.GetBlobKey())
 	if err != nil {
-		s.logger.Error("[MarkBlobConfirmed] error getting blob metadata", "err", err)
+		s.logger.Error("error getting blob metadata", "err", err)
 		return nil, err
 	}
 	alreadyConfirmed, _ := refreshedMetadata.IsConfirmed()
 	if alreadyConfirmed {
-		s.logger.Warn("[MarkBlobConfirmed] trying to confirm blob already marked as confirmed", "blobKey", existingMetadata.GetBlobKey().String())
+		s.logger.Warn("trying to confirm blob already marked as confirmed", "blobKey", existingMetadata.GetBlobKey().String())
 		return refreshedMetadata, nil
 	}
 	newMetadata := *existingMetadata

@@ -15,43 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/eigenda/service-availability": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ServiceAvailability"
-                ],
-                "summary": "Get status of EigenDA services.",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -374,6 +337,12 @@ const docTemplate = `{
                         "description": "Interval to query for operators nonsigning percentage [default: 3600]",
                         "name": "interval",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]",
+                        "name": "end",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -497,6 +466,9 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "big.Int": {
+            "type": "object"
+        },
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -645,12 +617,16 @@ const docTemplate = `{
                 },
                 "total_stake": {
                     "description": "deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.",
-                    "type": "integer"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/big.Int"
+                        }
+                    ]
                 },
                 "total_stake_per_quorum": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer"
+                        "$ref": "#/definitions/big.Int"
                     }
                 }
             }
@@ -680,6 +656,9 @@ const docTemplate = `{
                 },
                 "quorum_id": {
                     "type": "integer"
+                },
+                "stake_percentage": {
+                    "type": "number"
                 },
                 "total_batches": {
                     "type": "integer"

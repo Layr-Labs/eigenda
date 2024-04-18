@@ -146,17 +146,15 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		}
 
 		operatorQuorums := make([]uint8, 0, len(quorumIDs))
-		for ind, id := range quorumIDs {
+		for ind, quorumID := range quorumIDs {
 			// Get stake amounts for operator
-			ops := state.Operators[id]
+			ops := state.Operators[quorumID]
 			opInfo, ok := ops[r.Operator]
-
 			// If operator is not in quorum, skip
 			if !ok {
-				a.Logger.Debug("Operator not found in quorum", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumID", id)
 				continue
 			}
-			operatorQuorums = append(operatorQuorums, id)
+			operatorQuorums = append(operatorQuorums, quorumID)
 
 			signerMap[r.Operator] = true
 
@@ -192,21 +190,21 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 	// Validate the amount signed and aggregate signatures for each quorum
 	quorumResults := make(map[QuorumID]*QuorumResult)
 
-	for ind, id := range quorumIDs {
+	for ind, quorumID := range quorumIDs {
 		// Check that quorum has sufficient stake
-		percent := GetSignedPercentage(state.OperatorState, id, stakeSigned[ind])
-		quorumResults[id] = &QuorumResult{
-			QuorumID:      id,
+		percent := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[ind])
+		quorumResults[quorumID] = &QuorumResult{
+			QuorumID:      quorumID,
 			PercentSigned: percent,
 		}
 
 		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key sans non-signers of the quorum
-		quorumAggKey := state.AggKeys[id]
+		quorumAggKey := state.AggKeys[quorumID]
 		quorumAggPubKeys[ind] = quorumAggKey
 
 		signersAggKey := quorumAggKey.Clone()
 		for opInd, nsk := range nonSignerKeys {
-			ops := state.Operators[id]
+			ops := state.Operators[quorumID]
 			if _, ok := ops[nonSignerOperatorIds[opInd]]; ok {
 				signersAggKey.Sub(nsk)
 			}

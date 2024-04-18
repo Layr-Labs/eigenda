@@ -3,6 +3,7 @@ package flags
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
@@ -67,12 +68,6 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
-	GraphUrlFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "graph-url"),
-		Usage:    "The url of the graph node",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "GRAPH_URL"),
-	}
 	UseGraphFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
 		Usage:    "Whether to use the graph node",
@@ -93,7 +88,6 @@ var optionalFlags = []cli.Flag{
 	NumConnectionsFlag,
 	IndexerDataDirFlag,
 	MetricsHTTPPortFlag,
-	GraphUrlFlag,
 	UseGraphFlag,
 }
 
@@ -106,4 +100,5 @@ func init() {
 	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
 	Flags = append(Flags, indexer.CLIFlags(envPrefix)...)
+	Flags = append(Flags, thegraph.CLIFlags(envPrefix)...)
 }

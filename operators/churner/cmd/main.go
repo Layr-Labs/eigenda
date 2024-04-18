@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/shurcooL/graphql"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -82,8 +81,11 @@ func run(ctx *cli.Context) error {
 
 	cs := coreeth.NewChainState(tx, gethClient)
 
-	querier := graphql.NewClient(config.GraphUrl, nil)
-	indexer := thegraph.NewIndexedChainState(cs, querier, logger)
+	logger.Info("Using graph node")
+
+	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+	indexer := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+
 	metrics := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	cn, err := churner.NewChurner(config, indexer, tx, logger, metrics)

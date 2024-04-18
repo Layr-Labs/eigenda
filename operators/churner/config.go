@@ -5,15 +5,16 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
 	"github.com/urfave/cli"
 )
 
 type Config struct {
-	EthClientConfig geth.EthClientConfig
-	LoggerConfig    common.LoggerConfig
-	GraphUrl        string
-	MetricsConfig   MetricsConfig
+	EthClientConfig  geth.EthClientConfig
+	LoggerConfig     common.LoggerConfig
+	MetricsConfig    MetricsConfig
+	ChainStateConfig thegraph.Config
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -29,7 +30,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	return &Config{
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		LoggerConfig:                  *loggerConfig,
-		GraphUrl:                      ctx.GlobalString(flags.GraphUrlFlag.Name),
+		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),

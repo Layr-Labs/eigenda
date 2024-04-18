@@ -62,7 +62,11 @@ func newTestServer(t *testing.T) *retriever.Server {
 
 	logger := logging.NewNoopLogger()
 
-	indexedChainState, err = coremock.MakeChainDataMock(core.OperatorIndex(numOperators))
+	indexedChainState, err = coremock.MakeChainDataMock(map[uint8]int{
+		0: numOperators,
+		1: numOperators,
+		2: numOperators,
+	})
 	if err != nil {
 		log.Fatalf("failed to create new mocked chain data: %s", err)
 	}

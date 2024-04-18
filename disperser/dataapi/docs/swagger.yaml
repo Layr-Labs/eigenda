@@ -1,4 +1,6 @@
 definitions:
+  big.Int:
+    type: object
   core.SecurityParam:
     properties:
       adversaryThreshold:
@@ -103,12 +105,13 @@ definitions:
       throughput:
         type: number
       total_stake:
+        allOf:
+        - $ref: '#/definitions/big.Int'
         description: 'deprecated: use TotalStakePerQuorum instead. Remove when the
           frontend is updated.'
-        type: integer
       total_stake_per_quorum:
         additionalProperties:
-          type: integer
+          $ref: '#/definitions/big.Int'
         type: object
     type: object
   dataapi.NonSigner:
@@ -128,6 +131,8 @@ definitions:
         type: number
       quorum_id:
         type: integer
+      stake_percentage:
+        type: number
       total_batches:
         type: integer
       total_unsigned_batches:
@@ -220,30 +225,6 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
-  /eigenda/service-availability:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of EigenDA services.
-      tags:
-      - ServiceAvailability
   /feed/blobs:
     get:
       parameters:
@@ -451,6 +432,11 @@ paths:
         in: query
         name: interval
         type: integer
+      - description: 'End time (2006-01-02T15:04:05Z) to query for operators nonsigning
+          percentage [default: now]'
+        in: query
+        name: end
+        type: string
       produces:
       - application/json
       responses:

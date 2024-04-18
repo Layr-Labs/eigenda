@@ -77,7 +77,11 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	finalizationBlockDelay := uint(75)
 
 	// Core Components
-	cst, err := coremock.MakeChainDataMock(10)
+	cst, err := coremock.MakeChainDataMock(map[uint8]int{
+		0: 10,
+		1: 10,
+		2: 10,
+	})
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10)+finalizationBlockDelay, nil)
 	asgn := &core.StdAssignmentCoordinator{}
