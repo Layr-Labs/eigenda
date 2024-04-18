@@ -46,6 +46,7 @@ type TimeoutConfig struct {
 	ChainWriteTimeout    time.Duration
 	ChainStateTimeout    time.Duration
 	FireblocksAPITimeout time.Duration
+	TxnBroadcastTimeout  time.Duration
 }
 
 type Config struct {

@@ -73,6 +73,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			ChainWriteTimeout:    ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),
 			ChainStateTimeout:    ctx.GlobalDuration(flags.ChainStateTimeoutFlag.Name),
 			FireblocksAPITimeout: ctx.GlobalDuration(flags.FireblocksAPITimeoutFlag.Name),
+			TxnBroadcastTimeout:  ctx.GlobalDuration(flags.TransactionBroadcastTimeoutFlag.Name),
 		},
 		MetricsConfig: batcher.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
