@@ -148,7 +148,7 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
-		ejector        *Ejector
+		ejector        *ejector
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -187,7 +187,7 @@ func NewServer(
 		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
 
-	ejector := NewEjector(logger, transactor, metrics)
+	ejector := newEjector(logger, transactor, metrics)
 
 	return &server{
 		logger:                    logger.With("component", "DataAPIServer"),
@@ -335,6 +335,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 		interval = 86400
 	}
 
+	// TODO: only need the live nonsigners
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix())
 	if err == nil {
 		err = s.ejector.eject(c.Request.Context(), nonSigningRate, mode)

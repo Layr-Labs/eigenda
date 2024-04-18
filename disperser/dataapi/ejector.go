@@ -36,7 +36,7 @@ func computePerfScore(metric *OperatorNonsigningPercentageMetrics) float64 {
 	return operatorPerfScore(metric.StakePercentage, metric.Percentage/100.0)
 }
 
-type Ejector struct {
+type ejector struct {
 	logger     logging.Logger
 	transactor core.Transactor
 	metrics    *Metrics
@@ -45,15 +45,15 @@ type Ejector struct {
 	mu sync.Mutex
 }
 
-func NewEjector(logger logging.Logger, tx core.Transactor, metrics *Metrics) *Ejector {
-	return &Ejector{
+func newEjector(logger logging.Logger, tx core.Transactor, metrics *Metrics) *ejector {
+	return &ejector{
 		logger:     logger.With("component", "Ejector"),
 		transactor: tx,
 		metrics:    metrics,
 	}
 }
 
-func (e *Ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage, mode string) error {
+func (e *ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage, mode string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -95,7 +95,7 @@ func (e *Ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	return nil
 }
 
-func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMetrics) ([][]core.OperatorID, error) {
+func (e *ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMetrics) ([][]core.OperatorID, error) {
 	var maxQuorumId uint8
 	for _, metric := range nonsigners {
 		if metric.QuorumId > maxQuorumId {
@@ -116,7 +116,6 @@ func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMet
 		numOperatorByQuorum[metric.QuorumId]++
 		stakeShareByQuorum[metric.QuorumId] += metric.StakePercentage
 	}
-
 	e.metrics.UpdateRequestedOperatorMetric(numOperatorByQuorum, stakeShareByQuorum)
 
 	return result, nil
