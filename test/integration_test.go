@@ -401,6 +401,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	dis.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	dis.transactor.On("GetCurrentBlockNumber").Return(uint(10), nil)
 	dis.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = dis.batcher.HandleSingleBatch(ctx)
