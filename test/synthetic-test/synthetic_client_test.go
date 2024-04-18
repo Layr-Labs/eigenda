@@ -12,7 +12,6 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -30,9 +29,7 @@ import (
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	encoder_rpc "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -48,7 +45,6 @@ type ClientType string
 const (
 	Disperser ClientType = "Disperser"
 	Retriever ClientType = "Retriever"
-	Encoder   ClientType = "Encoder"
 )
 
 type GrpcClient struct {
@@ -84,7 +80,7 @@ type SyntheticTestSuite struct {
 
 var (
 	testSuite                  *SyntheticTestSuite
-	isRetrieverClientDeployed  bool = false
+	isRetrieverClientEnabled   bool = false
 	validateOnchainTransaction bool = false
 	retrievalClient            clients.RetrievalClient
 	logger                     logging.Logger
@@ -104,11 +100,6 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		Retriever: {
 			Hostname: "retriever.retriever.svc.cluster.local",
 			GrpcPort: "retriever-port",
-			Timeout:  10 * time.Second,
-		},
-		Encoder: {
-			Hostname: "encoder.encoder.svc.cluster.local",
-			GrpcPort: "34000",
 			Timeout:  10 * time.Second,
 		},
 	})
@@ -137,17 +128,22 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
-	mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
-	if err != nil {
-		logger.Printf("Error: %v", err)
-		return nil
+	if validateOnchainTransaction {
+		log.Printf("Create instance of MockRollUp to validate OnChain Transactions")
+		mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
+		if err != nil {
+			logger.Printf("Error: %v", err)
+			return nil
+		}
 	}
 
-	err = setupRetrievalClient(ethClient, &retrieverClientConfig, ethLogger)
+	if isRetrieverClientEnabled {
+		err = setupRetrievalClient(ethClient, &retrieverClientConfig, ethLogger)
 
-	if err != nil {
-		logger.Printf("Error: %v", err)
-		return nil
+		if err != nil {
+			logger.Printf("Error: %v", err)
+			return nil
+		}
 	}
 
 	// Assign client connections to pointers in TestClients struct
@@ -166,7 +162,7 @@ func TestMain(m *testing.M) {
 	privateKey := os.Getenv("ETHCLIENT_PRIVATE_KEY")
 	rpcUrl := os.Getenv("ETHCLIENT_RPC_URL")
 	mockRollUpContractAddress := os.Getenv("MOCKROLLUP_CONTRACT_ADDRESS")
-	isRetrieverClientDeployed = os.Getenv("RETRIEVER_CLIENT_DEPLOYED") == strings.ToLower("true")
+	isRetrieverClientEnabled = os.Getenv("RETRIEVER_CLIENT_ENABLE") == strings.ToLower("true")
 	validateOnchainTransaction = os.Getenv("VALIDATE_ONCHAIN_TRANSACTION") == strings.ToLower("true")
 	blsOperatorStateRetriever := os.Getenv("BLS_OPERATOR_STATE_RETRIEVER")
 	eigenDAServiceManagerRetreiever := os.Getenv("EIGENDA_SERVICE_MANAGER_RETRIEVER")
@@ -174,6 +170,7 @@ func TestMain(m *testing.M) {
 	retrieverSrsOrder := os.Getenv("RETRIEVER_SRS_ORDER")
 	retrieverG1Path := os.Getenv("RETRIEVER_G1_PATH")
 	retrieverG2Path := os.Getenv("RETRIEVER_G2_PATH")
+	retrieverG2PoinPowerOf2Path := os.Getenv("RETRIEVER_G2_POINT_POWER_OF_2_PATH")
 	retrieverCachePath := os.Getenv("RETRIEVER_CACHE_PATH")
 	batcherPullInterval := os.Getenv("BATCHER_PULL_INTERVAL")
 
@@ -185,6 +182,7 @@ func TestMain(m *testing.M) {
 		RetrieverSrsOrder:                retrieverSrsOrder,
 		RetrieverG1Path:                  retrieverG1Path,
 		RetrieverG2Path:                  retrieverG2Path,
+		RetrieverG2PointPowerOf2Path:     retrieverG2PoinPowerOf2Path,
 		RetrieverCachePath:               retrieverCachePath,
 	}
 
@@ -199,7 +197,7 @@ func TestMain(m *testing.M) {
 	}
 	logger.Println("RPC_URL for Chain...", rpcUrl)
 	logger.Println("Mock RollUp Contract Address...", mockRollUpContractAddress)
-	logger.Println("Retriever Client Deployed...", isRetrieverClientDeployed)
+	logger.Println("Retriever Client Deployed...", isRetrieverClientEnabled)
 
 	logger.Println("Running Test Client...")
 	// Run the tests and get the exit code
@@ -229,14 +227,16 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		return err
 	}
 	v, err := verifier.NewVerifier(&kzg.KzgConfig{
-		G1Path:         retrievalClientConfig.RetrieverG1Path,
-		G2Path:         retrievalClientConfig.RetrieverG2Path,
-		CacheDir:       retrievalClientConfig.RetrieverCachePath,
-		NumWorker:      1,
-		SRSOrder:       uint64(srsOrder),
-		Verbose:        true,
-		PreloadEncoder: true,
-	}, true)
+		G1Path:          retrievalClientConfig.RetrieverG1Path,
+		G2Path:          retrievalClientConfig.RetrieverG2Path,
+		G2PowerOf2Path:  retrievalClientConfig.RetrieverG2PointPowerOf2Path,
+		CacheDir:        retrievalClientConfig.RetrieverCachePath,
+		NumWorker:       1,
+		SRSOrder:        uint64(srsOrder),
+		SRSNumberToLoad: uint64(srsOrder),
+		Verbose:         true,
+		PreloadEncoder:  false,
+	}, false)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
 	// Update this to a minute over Batcher_Pull_Interval
-	confirmationDeadline := time.Now().Add(batcherPullInterval * time.Second)
+	confirmationDeadline := time.ParseDuration(batcherPullInterval)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -353,7 +353,7 @@ loop:
 
 				// Retrieve Blob from Retriever Client
 				// Retrieval Client Iterates Over Operators to get the specific Blob
-				if isRetrieverClientDeployed {
+				if isRetrieverClientEnabled {
 					logger.Printf("Try Blob using Retrieval Client %v", blobReply)
 					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
@@ -554,123 +554,12 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 	}
 }
 
-func TestEncodeBlob(t *testing.T) {
-	t.Skip("Skipping this test")
-
-	var (
-		gettysburgAddressBytes = codec.ConvertByPaddingEmptyByte([]byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth."))
-	)
-	encoderReply, encodingParams, err := encodeBlob(gettysburgAddressBytes)
-	assert.NoError(t, err)
-	assert.NotNil(t, encoderReply.Chunks)
-
-	// Decode Server Data
-	var chunksData []*encoding.Frame
-
-	for i := range encoderReply.Chunks {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(encoderReply.GetChunks()[i])
-		// perform an operation
-		chunksData = append(chunksData, chunkSerialized)
-	}
-	assert.NotNil(t, chunksData)
-
-	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
-	}
-
-	// Test Assumes below params set for Encoder
-	kzgConfig := kzg.KzgConfig{
-		G1Path:          "/data/kzg/g1.point",
-		G2Path:          "/data/kzg/g2.point",
-		CacheDir:        "/data/kzg/SRSTables",
-		SRSOrder:        300000,
-		SRSNumberToLoad: 300000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-	}
-
-	v, _ := verifier.NewVerifier(&kzgConfig, false)
-
-	maxInputSize := uint64(len(gettysburgAddressBytes)) + 10
-	decoded, err := v.Decode(chunksData, indices, *encodingParams, maxInputSize)
-	assert.Nil(t, err)
-	assert.Equal(t, decoded, gettysburgAddressBytes)
-}
-
-func encodeBlob(data []byte) (*encoder_rpc.EncodeBlobReply, *encoding.EncodingParams, error) {
-	logger := testSuite.Logger
-	var adversaryThreshold uint8 = 80
-	var quorumThreshold uint8 = 90
-
-	encoderTestClient := testSuite.Clients.Clients[Encoder]
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Duration(10*float64(time.Second)))
-	defer cancel()
-
-	var quorumID core.QuorumID = 0
-
-	param := &core.SecurityParam{
-		QuorumID:              quorumID,
-		ConfirmationThreshold: quorumThreshold,
-		AdversaryThreshold:    adversaryThreshold,
-	}
-
-	testBlob := core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			SecurityParams: []*core.SecurityParam{param},
-		},
-		Data: data,
-	}
-	// TODO: Refactor this code using indexed chain state by using retrieval client
-	// Issue: https://github.com/Layr-Labs/eigenda-internal/issues/220
-	indexedChainState, _ := coremock.MakeChainDataMock(core.OperatorIndex(10))
-	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
-	if err != nil {
-		logger.Printf("failed to get operator state: %s", err)
-	}
-	coordinator := &core.StdAssignmentCoordinator{}
-
-	blobSize := uint(len(testBlob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
-
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, param)
-	if err != nil {
-		logger.Printf("failed to calculate chunk length: %s", err)
-	}
-
-	quorumInfo := &core.BlobQuorumInfo{
-		SecurityParam: *param,
-		ChunkLength:   chunkLength,
-	}
-
-	_, info, err := coordinator.GetAssignments(operatorState, blobLength, quorumInfo)
-	if err != nil {
-		logger.Printf("failed to get assignments: %s", err)
-	}
-	testEncodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
-
-	testEncodingParamsProto := &encoder_rpc.EncodingParams{
-		ChunkLength: uint32(testEncodingParams.ChunkLength),
-		NumChunks:   uint32(testEncodingParams.NumChunks),
-	}
-
-	encodeBlobRequestProto := &encoder_rpc.EncodeBlobRequest{
-		Data:           []byte(testBlob.Data),
-		EncodingParams: testEncodingParamsProto,
-	}
-	encoderClient := encoderTestClient.Client.(encoder_rpc.EncoderClient)
-
-	reply, err := encoderClient.EncodeBlob(ctxTimeout, encodeBlobRequestProto)
-	return reply, &testEncodingParams, err
-}
-
 func createClient(conn *grpc.ClientConn, clientType ClientType) interface{} {
 	switch clientType {
 	case Disperser:
 		return disperser_rpc.NewDisperserClient(conn)
 	case Retriever:
 		return retriever_rpc.NewRetrieverClient(conn)
-	case Encoder:
-		return encoder_rpc.NewEncoderClient(conn)
 	default:
 		return nil
 	}
