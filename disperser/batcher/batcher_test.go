@@ -298,6 +298,7 @@ func TestBlobFailures(t *testing.T) {
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("GetCurrentBlockNumber").Return(uint32(10), nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	// Test with receipt response with error
@@ -407,6 +408,7 @@ func TestBlobRetry(t *testing.T) {
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("GetCurrentBlockNumber").Return(uint32(10), nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = batcher.HandleSingleBatch(ctx)
@@ -532,6 +534,7 @@ func TestRetryTxnReceipt(t *testing.T) {
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("GetCurrentBlockNumber").Return(uint32(10), nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = batcher.HandleSingleBatch(ctx)
