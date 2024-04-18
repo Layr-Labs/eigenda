@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 )
 
-func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTime int64) (*OperatorsNonsigningPercentage, error) {
+func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTime int64, liveOnly bool) (*OperatorsNonsigningPercentage, error) {
 	batches, err := s.subgraphClient.QueryBatchNonSigningInfoInInterval(ctx, startTime, endTime)
 	if err != nil {
 		return nil, err
@@ -101,6 +101,9 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 				if stake, ok := state.Operators[q][opID]; ok {
 					p, _ := new(big.Int).Div(new(big.Int).Mul(stake.Stake, big.NewInt(multipler)), state.Totals[q].Stake).Float64()
 					stakePercentage = p / multipler
+				} else if liveOnly {
+					// Operator "opID" isn't live at "endBlock", skip it.
+					continue
 				}
 
 				nonsignerMetric := OperatorNonsigningPercentageMetrics{
