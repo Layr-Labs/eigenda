@@ -77,7 +77,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-metrics-interval"),
 		Usage:    "The interval in seconds at which the node polls the onchain state of the operator and update metrics. <=0 means no poll",
 		Required: false,
-		Value:    "60",
+		Value:    "180",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ONCHAIN_METRICS_INTERVAL"),
 	}
 	TimeoutFlag = cli.StringFlag{
