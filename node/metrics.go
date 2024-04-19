@@ -58,8 +58,8 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 	reg.MustRegister(collectors.NewGoCollector())
 
 	metrics := &Metrics{
-		// The "type" label have values: stake, rank. The "stake" is stake share (in basis point),
-		// and the "rank" is operator's ranking by stake share in the quorum.
+		// The "type" label have values: stake_share, rank. The "stake_share" is stake share (in basis point),
+		// and the "rank" is operator's ranking (the operator with highest amount of stake ranked as 1) by stake share in the quorum.
 		Registered: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
@@ -184,17 +184,17 @@ func (g *Metrics) collectOnchainMetrics() {
 		}
 		bitmaps, err := g.tx.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, []core.OperatorID{g.operatorId}, blockNum)
 		if err != nil {
-			g.logger.Error("Failed to query chain RPC for quorum bitmap", "err", err)
+			g.logger.Error("Failed to query chain RPC for quorum bitmap", "blockNumber", blockNum, "err", err)
 			continue
 		}
-		quorums := eth.BitmapToQuorumIds(bitmaps[0])
-		if len(quorums) == 0 {
-			g.logger.Info("Warning: this node is no longer in any quorum", "blockNumber", blockNum, "operatorId", g.operatorId.Hex())
+		quorumIds := eth.BitmapToQuorumIds(bitmaps[0])
+		if len(quorumIds) == 0 {
+			g.logger.Warn("This node is currently not in any quorum", "blockNumber", blockNum, "operatorId", g.operatorId.Hex())
 			continue
 		}
-		state, err := g.chainState.GetOperatorState(ctx, uint(blockNum), quorums)
+		state, err := g.chainState.GetOperatorState(ctx, uint(blockNum), quorumIds)
 		if err != nil {
-			g.logger.Error("Failed to query chain RPC for operator state", "blockNumber", blockNum, "quorumIds", quorums, "err", err)
+			g.logger.Error("Failed to query chain RPC for operator state", "blockNumber", blockNum, "quorumIds", quorumIds, "err", err)
 			continue
 		}
 		type OperatorStakeShare struct {
@@ -207,6 +207,7 @@ func (g *Metrics) collectOnchainMetrics() {
 				share, _ := new(big.Int).Div(new(big.Int).Mul(opInfo.Stake, big.NewInt(10000)), state.Totals[q].Stake).Float64()
 				operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{operatorId: opId, stakeShare: share})
 			}
+			// Descending order by stake share in the quorum.
 			sort.Slice(operatorStakeShares, func(i, j int) bool {
 				if operatorStakeShares[i].stakeShare == operatorStakeShares[j].stakeShare {
 					return operatorStakeShares[i].operatorId.Hex() < operatorStakeShares[j].operatorId.Hex()
@@ -215,9 +216,9 @@ func (g *Metrics) collectOnchainMetrics() {
 			})
 			for i, op := range operatorStakeShares {
 				if op.operatorId == g.operatorId {
-					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare", op.stakeShare, "rank", i+1)
-					g.Registered.WithLabelValues(string(q), "stake").Set(op.stakeShare)
+					g.Registered.WithLabelValues(string(q), "stake_share").Set(op.stakeShare)
 					g.Registered.WithLabelValues(string(q), "rank").Set(float64(i + 1))
+					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare (basis point)", op.stakeShare, "rank", i+1)
 					break
 				}
 			}
