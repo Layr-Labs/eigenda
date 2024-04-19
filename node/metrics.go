@@ -3,8 +3,10 @@ package node
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	eigenmetrics "github.com/Layr-Labs/eigensdk-go/metrics"
 
@@ -20,8 +22,8 @@ const (
 type Metrics struct {
 	logger logging.Logger
 
-	// Whether the node is registered.
-	Registered prometheus.Gauge
+	// The quorums the node is registered.
+	RegisteredQuorums *prometheus.GaugeVec
 	// Accumulated number of RPC requests received.
 	AccNumRequests *prometheus.CounterVec
 	// The latency (in ms) to process the request.
@@ -40,22 +42,26 @@ type Metrics struct {
 	registry *prometheus.Registry
 	// socketAddr is the address at which the metrics server will be listening.
 	// should be in format ip:port
-	socketAddr string
+	socketAddr             string
+	operatorId             core.OperatorID
+	onchainMetricsInterval int64
+	tx                     core.Transactor
 }
 
-func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string) *Metrics {
+func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Transactor) *Metrics {
 
 	// Add Go module collectors
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
 	metrics := &Metrics{
-		Registered: promauto.With(reg).NewGauge(
+		RegisteredQuorums: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
-				Name:      "registered",
-				Help:      "indicator about if DA node is registered",
+				Name:      "registered_quorums",
+				Help:      "the quorums the DA node is registered",
 			},
+			[]string{"quorum"},
 		),
 		// The "status" label has values: success, failure.
 		AccNumRequests: promauto.With(reg).NewCounterVec(
@@ -108,10 +114,13 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Help:      "the total number of node's socket address updates",
 			},
 		),
-		EigenMetrics: eigenMetrics,
-		logger:       logger.With("component", "NodeMetrics"),
-		registry:     reg,
-		socketAddr:   socketAddr,
+		EigenMetrics:           eigenMetrics,
+		logger:                 logger.With("component", "NodeMetrics"),
+		registry:               reg,
+		socketAddr:             socketAddr,
+		operatorId:             operatorId,
+		onchainMetricsInterval: onchainMetricsInterval,
+		tx:                     tx,
 	}
 
 	return metrics
@@ -119,6 +128,10 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 
 func (g *Metrics) Start() {
 	_ = g.EigenMetrics.Start(context.Background(), g.registry)
+
+	if g.onchainMetricsInterval > 0 {
+		go g.collectOnchainMetrics()
+	}
 }
 
 func (g *Metrics) RecordRPCRequest(method string, status string) {
@@ -149,4 +162,24 @@ func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize uint64) {
 func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
+}
+
+func (g *Metrics) collectOnchainMetrics() {
+	ticker := time.NewTicker(time.Duration(uint64(g.onchainMetricsInterval)))
+	defer ticker.Stop()
+	for range ticker.C {
+		bitmap, err := g.tx.GetCurrentQuorumBitmapByOperatorId(context.Background(), g.operatorId)
+		if err != nil {
+			g.logger.Error("Failed to GetOperatorStakes from the Chain for metrics", "err", err)
+			continue
+		}
+		quorums := eth.BitmapToQuorumIds(bitmap)
+		if len(quorums) == 0 {
+			g.logger.Info("Warning: this node is no longer in any quorum")
+			continue
+		}
+		for _, q := range quorums {
+			g.RegisteredQuorums.WithLabelValues(string(q)).Set(float64(1.0))
+		}
+	}
 }

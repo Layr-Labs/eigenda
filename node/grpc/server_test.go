@@ -16,6 +16,7 @@ import (
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	core_mock "github.com/Layr-Labs/eigenda/core/mock"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -101,7 +102,8 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 	}
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
-	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090")
+	tx := &coremock.MockTransactor{}
+	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx)
 	store, err := node.NewLevelDBStore(dbPath, logger, metrics, 1e9, 1e9)
 	if err != nil {
 		panic("failed to create a new levelDB store")

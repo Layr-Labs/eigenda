@@ -9,7 +9,9 @@ import (
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -177,7 +179,9 @@ func TestStoringBlob(t *testing.T) {
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
 	logger := logging.NewNoopLogger()
-	s, _ := node.NewLevelDBStore(t.TempDir(), logger, node.NewMetrics(noopMetrics, reg, logger, ":9090"), staleMeasure, storeDuration)
+	operatorId := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
+	tx := &coremock.MockTransactor{}
+	s, _ := node.NewLevelDBStore(t.TempDir(), logger, node.NewMetrics(noopMetrics, reg, logger, ":9090", operatorId, -1, tx), staleMeasure, storeDuration)
 	ctx := context.Background()
 
 	// Empty store

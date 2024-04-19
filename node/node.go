@@ -70,8 +70,6 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 
 	promReg := prometheus.NewRegistry()
 	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger.With("component", "EigenMetrics"))
-
-	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort)
 	rpcCallsCollector := rpccalls.NewCollector(AppName, promReg)
 
 	// Generate BLS keys
@@ -109,6 +107,8 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
+
+	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx)
 
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
