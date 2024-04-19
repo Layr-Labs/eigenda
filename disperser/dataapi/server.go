@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"os"
@@ -30,6 +31,21 @@ import (
 const (
 	maxWorkerPoolLimit   = 10
 	maxQueryBatchesLimit = 2
+
+	cacheControlParam = "Cache-Control"
+
+	// Cache control for responses.
+	// The time unit is second for max age.
+	maxOperatorsNonsigningPercentageAge = 10
+	maxNonSignerAge                     = 10
+	maxDeregisteredOperatorAage         = 10
+	maxThroughputAge                    = 10
+	maxMetricAage                       = 10
+	maxFeedBlobsAge                     = 10
+	maxFeedBlobAage                     = 300 // this is completely static
+	maxDisperserAvailabilityAge         = 3
+	maxChurnerAvailabilityAge           = 3
+	maxBatcherAvailabilityAge           = 3
 )
 
 var errNotFound = errors.New("not found")
@@ -303,6 +319,7 @@ func (s *server) FetchBlobHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAage))
 	c.JSON(http.StatusOK, metadata)
 }
 
@@ -336,6 +353,7 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobs")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobsAge))
 	c.JSON(http.StatusOK, BlobsResponse{
 		Meta: Meta{
 			Size: len(metadatas),
@@ -382,6 +400,7 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetrics")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAage))
 	c.JSON(http.StatusOK, metric)
 }
 
@@ -422,6 +441,7 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsTroughput")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
 	c.JSON(http.StatusOK, ths)
 }
 
@@ -454,6 +474,7 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchNonSigners")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxNonSignerAge))
 	c.JSON(http.StatusOK, metric)
 }
 
@@ -501,6 +522,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsNonsigningPercentageAge))
 	c.JSON(http.StatusOK, metric)
 }
 
@@ -544,6 +566,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
 	c.JSON(http.StatusOK, DeregisteredOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
@@ -597,6 +620,7 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 	}
 
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDisperserAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
 		Meta: Meta{
 			Size: len(availabilityStatuses),
@@ -650,6 +674,7 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 	}
 
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxChurnerAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
 		Meta: Meta{
 			Size: len(availabilityStatuses),
@@ -703,6 +728,7 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	}
 
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatcherAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
 		Meta: Meta{
 			Size: len(availabilityStatuses),
