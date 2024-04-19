@@ -600,7 +600,7 @@ func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Contex
 			Context: ctx,
 		}, t.Bindings.RegCoordinatorAddr, [][32]byte{byteId}, blockNumber)
 		if err != nil {
-			if err.Error() == "RegistryCoordinator.getQuorumBitmapIndexAtBlockNumber: no bitmap update found for operatorId at block number" {
+			if err.Error() == "execution reverted: RegistryCoordinator.getQuorumBitmapIndexAtBlockNumber: no bitmap update found for operatorId at block number" {
 				return []*big.Int{big.NewInt(0)}, nil
 			} else {
 				return nil, err
