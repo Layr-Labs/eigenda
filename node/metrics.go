@@ -65,7 +65,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
 				Name:      "registered_quorums",
-				Help:      "the quorums the DA node is registered",
+				Help:      "the quorums the DA node is registered, breakdown by quorum's ID and the type of information about the quorum. The type can be `stake_share`, representing the operator's stake share (in basis points); and `rank`, representing the operator's ranking (1 being the highest) by stake share within the quorum",
 			},
 			[]string{"quorum", "type"},
 		),
