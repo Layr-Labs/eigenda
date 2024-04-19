@@ -12,11 +12,10 @@ type PolyTranform struct {
 	transformer *fft.FFTSettings
 }
 
-// NewPolyTranform takes an input such that l**2 represents the
-// max number of data required to represent a field element.
-// The max number can be computed as num_byte / 32.
-// This number is suggestive, reinitiallization happens when
-// encountering data with more bytes,
+// NewPolyTranform takes an input uint8(l). It is a suggestive parameter that 2**l is the
+// largest possible field elements to be used on the object. If larger data (number of field element)
+// is used with methods of this object, the object reinitializes its capacity.
+// If data size is unknown when creating this object, use a small number like 4
 func NewPolyTranform(l uint8) (*PolyTranform, error) {
 	// the max number data supported by bn254 curve is 2**28
 	if l >= 28 {
