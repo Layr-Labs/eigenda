@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
@@ -216,8 +217,8 @@ func (g *Metrics) collectOnchainMetrics() {
 			})
 			for i, op := range operatorStakeShares {
 				if op.operatorId == g.operatorId {
-					g.RegisteredQuorums.WithLabelValues(string(q), "stake_share").Set(op.stakeShare)
-					g.RegisteredQuorums.WithLabelValues(string(q), "rank").Set(float64(i + 1))
+					g.RegisteredQuorums.WithLabelValues(fmt.Sprintf("%d", q), "stake_share").Set(op.stakeShare)
+					g.RegisteredQuorums.WithLabelValues(fmt.Sprintf("%d", q), "rank").Set(float64(i + 1))
 					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare (basis point)", op.stakeShare, "rank", i+1)
 					break
 				}
