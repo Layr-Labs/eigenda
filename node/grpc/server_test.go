@@ -103,12 +103,6 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
 	tx := &coremock.MockTransactor{}
-	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx)
-	store, err := node.NewLevelDBStore(dbPath, logger, metrics, 1e9, 1e9)
-	if err != nil {
-		panic("failed to create a new levelDB store")
-	}
-	defer os.Remove(dbPath)
 
 	ratelimiter := &commonmock.NoopRatelimiter{}
 
@@ -139,6 +133,13 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 
 		val = core.NewShardValidator(v, asn, cst, opID)
 	}
+
+	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
+	store, err := node.NewLevelDBStore(dbPath, logger, metrics, 1e9, 1e9)
+	if err != nil {
+		panic("failed to create a new levelDB store")
+	}
+	defer os.Remove(dbPath)
 
 	node := &node.Node{
 		Config:     config,

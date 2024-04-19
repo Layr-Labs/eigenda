@@ -2,6 +2,8 @@ package node
 
 import (
 	"context"
+	"math/big"
+	"sort"
 	"strconv"
 	"time"
 
@@ -23,7 +25,7 @@ type Metrics struct {
 	logger logging.Logger
 
 	// The quorums the node is registered.
-	RegisteredQuorums *prometheus.GaugeVec
+	Registered *prometheus.GaugeVec
 	// Accumulated number of RPC requests received.
 	AccNumRequests *prometheus.CounterVec
 	// The latency (in ms) to process the request.
@@ -46,22 +48,25 @@ type Metrics struct {
 	operatorId             core.OperatorID
 	onchainMetricsInterval int64
 	tx                     core.Transactor
+	chainState             core.ChainState
 }
 
-func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Transactor) *Metrics {
+func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Transactor, chainState core.ChainState) *Metrics {
 
 	// Add Go module collectors
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
 	metrics := &Metrics{
-		RegisteredQuorums: promauto.With(reg).NewGaugeVec(
+		// The "type" label have values: stake, rank. The "stake" is stake share (in basis point),
+		// and the "rank" is operator's ranking by stake share in the quorum.
+		Registered: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
-				Name:      "registered_quorums",
+				Name:      "registered",
 				Help:      "the quorums the DA node is registered",
 			},
-			[]string{"quorum"},
+			[]string{"quorum", "type"},
 		),
 		// The "status" label has values: success, failure.
 		AccNumRequests: promauto.With(reg).NewCounterVec(
@@ -121,6 +126,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 		operatorId:             operatorId,
 		onchainMetricsInterval: onchainMetricsInterval,
 		tx:                     tx,
+		chainState:             chainState,
 	}
 
 	return metrics
@@ -167,19 +173,54 @@ func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 func (g *Metrics) collectOnchainMetrics() {
 	ticker := time.NewTicker(time.Duration(uint64(g.onchainMetricsInterval)))
 	defer ticker.Stop()
+
+	// 3 chain RPC calls in each cycle.
 	for range ticker.C {
-		bitmap, err := g.tx.GetCurrentQuorumBitmapByOperatorId(context.Background(), g.operatorId)
+		ctx := context.Background()
+		blockNum, err := g.tx.GetCurrentBlockNumber(ctx)
 		if err != nil {
-			g.logger.Error("Failed to GetOperatorStakes from the Chain for metrics", "err", err)
+			g.logger.Error("Failed to query chain RPC for current block number", "err", err)
 			continue
 		}
-		quorums := eth.BitmapToQuorumIds(bitmap)
+		bitmaps, err := g.tx.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, []core.OperatorID{g.operatorId}, blockNum)
+		if err != nil {
+			g.logger.Error("Failed to query chain RPC for quorum bitmap", "err", err)
+			continue
+		}
+		quorums := eth.BitmapToQuorumIds(bitmaps[0])
 		if len(quorums) == 0 {
-			g.logger.Info("Warning: this node is no longer in any quorum")
+			g.logger.Info("Warning: this node is no longer in any quorum", "blockNumber", blockNum, "operatorId", g.operatorId.Hex())
 			continue
 		}
-		for _, q := range quorums {
-			g.RegisteredQuorums.WithLabelValues(string(q)).Set(float64(1.0))
+		state, err := g.chainState.GetOperatorState(ctx, uint(blockNum), quorums)
+		if err != nil {
+			g.logger.Error("Failed to query chain RPC for operator state", "blockNumber", blockNum, "quorumIds", quorums, "err", err)
+			continue
+		}
+		type OperatorStakeShare struct {
+			operatorId core.OperatorID
+			stakeShare float64
+		}
+		for q, operators := range state.Operators {
+			operatorStakeShares := make([]*OperatorStakeShare, 0)
+			for opId, opInfo := range operators {
+				share, _ := new(big.Int).Div(new(big.Int).Mul(opInfo.Stake, big.NewInt(10000)), state.Totals[q].Stake).Float64()
+				operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{operatorId: opId, stakeShare: share})
+			}
+			sort.Slice(operatorStakeShares, func(i, j int) bool {
+				if operatorStakeShares[i].stakeShare == operatorStakeShares[j].stakeShare {
+					return operatorStakeShares[i].operatorId.Hex() < operatorStakeShares[j].operatorId.Hex()
+				}
+				return operatorStakeShares[i].stakeShare > operatorStakeShares[j].stakeShare
+			})
+			for i, op := range operatorStakeShares {
+				if op.operatorId == g.operatorId {
+					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare", op.stakeShare, "rank", i+1)
+					g.Registered.WithLabelValues(string(q), "stake").Set(op.stakeShare)
+					g.Registered.WithLabelValues(string(q), "rank").Set(float64(i + 1))
+					break
+				}
+			}
 		}
 	}
 }

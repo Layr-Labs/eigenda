@@ -276,7 +276,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()
-		metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", config.ID, -1, tx)
+		metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", config.ID, -1, tx, cst)
 		store, err := node.NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, 1e9, 1e9)
 		if err != nil {
 			t.Fatal(err)

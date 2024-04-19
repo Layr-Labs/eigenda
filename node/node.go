@@ -108,7 +108,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
-	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx)
+	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
