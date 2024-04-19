@@ -64,7 +64,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 		RegisteredQuorums: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
-				Name:      "registered",
+				Name:      "registered_quorums",
 				Help:      "the quorums the DA node is registered",
 			},
 			[]string{"quorum", "type"},
