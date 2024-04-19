@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -76,7 +77,6 @@ func (s *Server) Start() {
 			s.logger.Error("retrieval server failed; restarting.", "err", err)
 		}
 	}()
-
 }
 
 func (s *Server) serveDispersal() error {
@@ -95,6 +95,7 @@ func (s *Server) serveDispersal() error {
 	reflection.Register(gs)
 
 	pb.RegisterDispersalServer(gs, s)
+	healthcheck.RegisterHealthServer("node.Dispersal", gs)
 
 	s.logger.Info("port", s.config.InternalDispersalPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
@@ -119,6 +120,7 @@ func (s *Server) serveRetrieval() error {
 	reflection.Register(gs)
 
 	pb.RegisterRetrievalServer(gs, s)
+	healthcheck.RegisterHealthServer("node.Retrieval", gs)
 
 	s.logger.Info("port", s.config.InternalRetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
 	if err := gs.Serve(listener); err != nil {
