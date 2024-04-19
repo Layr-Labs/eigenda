@@ -79,7 +79,6 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 	var isOnline bool
 	var socket string
 	if operatorStatus.IndexedOperatorInfo != nil {
-		logger.Error("IndexedOperatorInfo is nil for operator %v", operatorStatus.OperatorInfo)
 		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
 		isOnline = checkIsOperatorOnline(socket)
 	}
@@ -102,6 +101,35 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 
 	// Send the metadata to the results channel
 	operatorOnlineStatusresultsChan <- metadata
+}
+
+func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
+	operatorInfo, err := s.subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), operatorId)
+	if err != nil {
+		s.logger.Error("Failed to fetch operator", "error", err)
+		return &OperatorPortCheckResponse{}, err
+	}
+
+	retrieverSocket := core.OperatorSocket(operatorInfo.Socket).GetRetrievalSocket()
+	retrieverStatus := checkIsOperatorOnline(retrieverSocket)
+
+	disperserSocket := core.OperatorSocket(operatorInfo.Socket).GetDispersalSocket()
+	disperserStatus := checkIsOperatorOnline(disperserSocket)
+
+	// Log the online status
+	s.logger.Info("Operator port status", "retrieval", retrieverStatus, "retrieverSocket", retrieverSocket, "disperser", disperserStatus, "disperserSocket", disperserSocket)
+
+	// Create the metadata regardless of online status
+	portCheckResponse := &OperatorPortCheckResponse{
+		OperatorId:      operatorId,
+		DisperserSocket: disperserSocket,
+		RetrieverSocket: retrieverSocket,
+		DisperserStatus: disperserStatus,
+		RetrieverStatus: retrieverStatus,
+	}
+
+	// Send the metadata to the results channel
+	return portCheckResponse, nil
 }
 
 // method to check if operator is online

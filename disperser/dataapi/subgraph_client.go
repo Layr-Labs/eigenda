@@ -27,6 +27,7 @@ type (
 		QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error)
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error)
+		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -124,6 +125,22 @@ func (sc *subgraphClient) QueryOperatorsWithLimit(ctx context.Context, limit int
 		operators[i] = operator
 	}
 	return operators, nil
+}
+
+func (sc *subgraphClient) QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error) {
+	operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, 0)
+	if err != nil {
+		sc.logger.Error(fmt.Sprintf("failed to query operator info for operator %s", operatorId))
+		return nil, err
+	}
+
+	indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
+	if err != nil {
+		errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info for operator %s", operatorId)
+		sc.logger.Error(errorMessage)
+		return nil, err
+	}
+	return indexedOperatorInfo, nil
 }
 
 func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error) {
