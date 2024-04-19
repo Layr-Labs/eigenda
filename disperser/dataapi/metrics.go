@@ -122,7 +122,7 @@ func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]i
 	for q, count := range numOperatorsByQuorum {
 		for i := 0; i < count; i++ {
 			g.Operators.With(prometheus.Labels{
-				"quorum": string(q),
+				"quorum": fmt.Sprintf("%d", q),
 				"state":  "requested",
 				"type":   "number",
 			}).Inc()
@@ -130,7 +130,7 @@ func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]i
 	}
 	for q, stakeShare := range stakeShareByQuorum {
 		g.Operators.With(prometheus.Labels{
-			"quorum": string(q),
+			"quorum": fmt.Sprintf("%d", q),
 			"state":  "requested",
 			"type":   "stake",
 		}).Add(stakeShare)
