@@ -266,14 +266,6 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		_, v0 := mustMakeTestComponents()
 		val := core.NewShardValidator(v0, asn, cst, id)
 
-		noopMetrics := metrics.NewNoopMetrics()
-		reg := prometheus.NewRegistry()
-		metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090")
-		store, err := node.NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, 1e9, 1e9)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		tx := &coremock.MockTransactor{}
 		tx.On("RegisterBLSPublicKey").Return(nil)
 		tx.On("RegisterOperator").Return(nil)
@@ -281,6 +273,14 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		tx.On("UpdateOperatorSocket").Return(nil)
 		tx.On("GetBlockStaleMeasure").Return(nil)
 		tx.On("GetStoreDurationBlocks").Return(nil)
+
+		noopMetrics := metrics.NewNoopMetrics()
+		reg := prometheus.NewRegistry()
+		metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", config.ID, -1, tx, cst)
+		store, err := node.NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, 1e9, 1e9)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		mockOperatorSocketsFilterer := &coremock.MockOperatorSocketsFilterer{}
 
