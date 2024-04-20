@@ -113,7 +113,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 					TotalUnsignedBatches: unsignedCount,
 					TotalBatches:         totalCount,
 					Percentage:           pf,
-					StakePercentage:      stakePercentage,
+					StakePercentage:      100 * stakePercentage,
 				}
 				nonsignerMetrics = append(nonsignerMetrics, &nonsignerMetric)
 			}
