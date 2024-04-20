@@ -72,9 +72,9 @@ func NewDispersalServer(
 	rateConfig RateConfig,
 ) *DispersalServer {
 	logger := _logger.With("component", "DispersalServer")
-	for ip, rateInfoByQuorum := range rateConfig.Allowlist {
+	for account, rateInfoByQuorum := range rateConfig.Allowlist {
 		for quorumID, rateInfo := range rateInfoByQuorum {
-			logger.Info("[Allowlist]", "ip", ip, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
+			logger.Info("[Allowlist]", "account", account, "name", rateInfo.Name, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
 		}
 	}
 
@@ -306,6 +306,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 	}
 
 	rates := &PerUserRateInfo{
+		Name:       "",
 		Throughput: unauthRates.PerUserUnauthThroughput,
 		BlobRate:   unauthRates.PerUserUnauthBlobRate,
 	}
@@ -323,6 +324,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 				if rateInfo.BlobRate > 0 {
 					rates.BlobRate = rateInfo.BlobRate
 				}
+				rates.Name = rateInfo.Name
 				return rates, key, nil
 			}
 		}
@@ -429,7 +431,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 
 	blobSize := len(blob.Data)
 	length := encoding.GetBlobLength(uint(blobSize))
-
+	requesterName := ""
 	for i, param := range blob.RequestHeader.SecurityParams {
 
 		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
@@ -443,6 +445,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 			return api.NewInternalError(err.Error())
 		}
+		requesterName = accountRates.Name
 
 		// Update the quorum rate
 		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
@@ -521,6 +524,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		} else if info.RateType == AccountThroughputType || info.RateType == AccountBlobRateType {
 			s.metrics.HandleAccountRateLimitedRpcRequest(apiMethodName)
 			s.metrics.HandleAccountRateLimitedRequest(fmt.Sprint(info.QuorumID), blobSize, apiMethodName)
+			s.logger.Info("request ratelimited", "requesterName", requesterName, "requesterID", params.RequesterID, "rateType", info.RateType.String(), "quorum", info.QuorumID)
 		}
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
 		return api.NewResourceExhaustedError(errorString)
