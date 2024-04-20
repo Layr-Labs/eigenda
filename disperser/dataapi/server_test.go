@@ -554,7 +554,7 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -610,7 +610,7 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -671,7 +671,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -716,7 +716,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *tes
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -779,7 +779,7 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -837,7 +837,7 @@ func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -890,7 +890,7 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1036,7 +1036,7 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1101,7 +1101,7 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1157,7 +1157,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1231,7 +1231,7 @@ func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1292,7 +1292,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.DeregisteredOperatorsResponse
+	var response dataapi.QueriedStateOperatorsResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1425,13 +1425,13 @@ func startTestGRPCServer(address string) (stopFunc func(), err error) {
 }
 
 // Helper to get OperatorData from response
-func getOperatorData(operatorMetadtas []*dataapi.DeregisteredOperatorMetadata, operatorId string) dataapi.DeregisteredOperatorMetadata {
+func getOperatorData(operatorMetadtas []*dataapi.QueriedStateOperatorMetadata, operatorId string) dataapi.QueriedStateOperatorMetadata {
 
 	for _, operatorMetadata := range operatorMetadtas {
 		if operatorMetadata.OperatorId == operatorId {
 			return *operatorMetadata
 		}
 	}
-	return dataapi.DeregisteredOperatorMetadata{}
+	return dataapi.QueriedStateOperatorMetadata{}
 
 }

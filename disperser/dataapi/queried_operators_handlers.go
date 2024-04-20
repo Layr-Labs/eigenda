@@ -21,10 +21,10 @@ var (
 	// TODO: Poolsize should be configurable
 	// Observe performance and tune accordingly
 	poolSize                        = 50
-	operatorOnlineStatusresultsChan chan *DeregisteredOperatorMetadata
+	operatorOnlineStatusresultsChan chan *QueriedStateOperatorMetadata
 )
 
-func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*DeregisteredOperatorMetadata, error) {
+func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
 	// Track time taken to get deregistered operators
 	startTime := time.Now()
 
@@ -36,11 +36,11 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	// Convert the map to a slice.
 	operators := indexedDeregisteredOperatorState.Operators
 
-	operatorOnlineStatusresultsChan = make(chan *DeregisteredOperatorMetadata, len(operators))
+	operatorOnlineStatusresultsChan = make(chan *QueriedStateOperatorMetadata, len(operators))
 	processOperatorOnlineCheck(indexedDeregisteredOperatorState, operatorOnlineStatusresultsChan, s.logger)
 
 	// Collect results of work done
-	DeregisteredOperatorMetadata := make([]*DeregisteredOperatorMetadata, 0, len(operators))
+	DeregisteredOperatorMetadata := make([]*QueriedStateOperatorMetadata, 0, len(operators))
 	for range operators {
 		metadata := <-operatorOnlineStatusresultsChan
 		DeregisteredOperatorMetadata = append(DeregisteredOperatorMetadata, metadata)
@@ -55,7 +55,38 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	return DeregisteredOperatorMetadata, nil
 }
 
-func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger logging.Logger) {
+func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
+	// Track time taken to get deregistered operators
+	startTime := time.Now()
+
+	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(ctx, days)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the map to a slice.
+	operators := indexedRegisteredOperatorState.Operators
+
+	operatorOnlineStatusresultsChan = make(chan *QueriedStateOperatorMetadata, len(operators))
+	processOperatorOnlineCheck(indexedRegisteredOperatorState, operatorOnlineStatusresultsChan, s.logger)
+
+	// Collect results of work done
+	RegisteredOperatorMetadata := make([]*QueriedStateOperatorMetadata, 0, len(operators))
+	for range operators {
+		metadata := <-operatorOnlineStatusresultsChan
+		RegisteredOperatorMetadata = append(RegisteredOperatorMetadata, metadata)
+	}
+
+	// Log the time taken
+	s.logger.Info("Time taken to get registered operators for days", "duration", time.Since(startTime))
+	sort.Slice(RegisteredOperatorMetadata, func(i, j int) bool {
+		return RegisteredOperatorMetadata[i].BlockNumber < RegisteredOperatorMetadata[j].BlockNumber
+	})
+
+	return RegisteredOperatorMetadata, nil
+}
+
+func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
 	operators := deregisteredOperatorState.Operators
 	wp := workerpool.New(poolSize)
 
@@ -75,7 +106,7 @@ func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOp
 	wp.StopWait() // Wait for all submitted tasks to complete and stop the pool
 }
 
-func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *DeregisteredOperatorMetadata, logger logging.Logger) {
+func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
 	var isOnline bool
 	var socket string
 	if operatorStatus.IndexedOperatorInfo != nil {
@@ -92,7 +123,7 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 	}
 
 	// Create the metadata regardless of online status
-	metadata := &DeregisteredOperatorMetadata{
+	metadata := &QueriedStateOperatorMetadata{
 		OperatorId:           string(operatorStatus.OperatorInfo.OperatorId[:]),
 		BlockNumber:          uint(operatorStatus.OperatorInfo.BlockNumber),
 		Socket:               socket,

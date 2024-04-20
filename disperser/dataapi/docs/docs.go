@@ -440,7 +440,44 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.DeregisteredOperatorsResponse"
+                            "$ref": "#/definitions/dataapi.QueriedStateOperatorsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators-info/registered-operators": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Fetch list of operators that have been registered for days. Days is a query parameter with a default value of 14 and max value of 30.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.QueriedStateOperatorsResponse"
                         }
                     },
                     "400": {
@@ -556,40 +593,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dataapi.DeregisteredOperatorMetadata": {
-            "type": "object",
-            "properties": {
-                "block_number": {
-                    "type": "integer"
-                },
-                "is_online": {
-                    "type": "boolean"
-                },
-                "operator_id": {
-                    "type": "string"
-                },
-                "operator_process_error": {
-                    "type": "string"
-                },
-                "socket": {
-                    "type": "string"
-                }
-            }
-        },
-        "dataapi.DeregisteredOperatorsResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dataapi.DeregisteredOperatorMetadata"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/dataapi.Meta"
-                }
-            }
-        },
         "dataapi.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -675,6 +678,40 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.QueriedStateOperatorMetadata": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "is_online": {
+                    "type": "boolean"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "operator_process_error": {
+                    "type": "string"
+                },
+                "socket": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.QueriedStateOperatorsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.QueriedStateOperatorMetadata"
                     }
                 },
                 "meta": {
@@ -769,14 +806,16 @@ const docTemplate = `{
                 1,
                 2,
                 3,
-                4
+                4,
+                5
             ],
             "x-enum-varnames": [
                 "Processing",
                 "Confirmed",
                 "Failed",
                 "Finalized",
-                "InsufficientSignatures"
+                "InsufficientSignatures",
+                "Confirming"
             ]
         },
         "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
