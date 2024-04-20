@@ -172,7 +172,7 @@ func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 }
 
 func (g *Metrics) collectOnchainMetrics() {
-	ticker := time.NewTicker(time.Duration(uint64(g.onchainMetricsInterval)))
+	ticker := time.NewTicker(time.Duration(uint64(g.onchainMetricsInterval) * time.Second))
 	defer ticker.Stop()
 
 	// 3 chain RPC calls in each cycle.
