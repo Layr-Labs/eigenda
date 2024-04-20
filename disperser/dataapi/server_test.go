@@ -370,7 +370,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(0), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
-	assert.Equal(t, float64(0.5), responseData.StakePercentage)
+	assert.Equal(t, float64(50), responseData.StakePercentage)
 
 	responseData = response.Data[1]
 	operatorId = responseData.OperatorId
@@ -379,7 +379,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	assert.Equal(t, uint8(1), responseData.QuorumId)
 	assert.Equal(t, float64(100), responseData.Percentage)
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operatorId)
-	assert.Equal(t, float64(0.25), responseData.StakePercentage)
+	assert.Equal(t, float64(25), responseData.StakePercentage)
 }
 
 func TestCheckBatcherHealthExpectServing(t *testing.T) {
