@@ -349,19 +349,6 @@ var (
 		},
 	}
 
-	subgraphregisteredOperatorInfo = &subgraph.QueriedStateOperatorInfo{
-		IndexedOperatorInfo: subgraphIndexedOperatorInfo1,
-		BlockNumber:         22,
-		Metadata: &subgraph.Operator{
-			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
-			OperatorId:      "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
-			Operator:        "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
-			BlockTimestamp:  "1702666046",
-			BlockNumber:     "22",
-			TransactionHash: "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
-		},
-	}
-
 	subgraphDeregisteredOperatorInfo = &subgraph.QueriedStateOperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo1,
 		BlockNumber:         22,
