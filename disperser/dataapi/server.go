@@ -230,6 +230,7 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 		}
 		metrics := v1.Group("/metrics")
 		{
