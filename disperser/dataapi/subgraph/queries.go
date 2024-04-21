@@ -69,14 +69,14 @@ type (
 		// Socket is the socket address of the operator, in the form "host:port"
 		SocketUpdates []SocketUpdates `graphql:"socketUpdates(first: 1, orderBy: blockNumber, orderDirection: desc)"`
 	}
-	DeregisteredOperatorInfo struct {
+	QueriedStateOperatorInfo struct {
 		IndexedOperatorInfo *IndexedOperatorInfo
 		// BlockNumber is the block number at which the operator was deregistered.
 		BlockNumber uint
 		Metadata    *Operator
 	}
 	IndexedDeregisteredOperatorState struct {
-		Operators map[core.OperatorID]*DeregisteredOperatorInfo
+		Operators map[core.OperatorID]*QueriedStateOperatorInfo
 	}
 
 	queryBatches struct {

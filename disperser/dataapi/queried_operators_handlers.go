@@ -28,7 +28,7 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	// Track time taken to get deregistered operators
 	startTime := time.Now()
 
-	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(ctx, days)
+	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Deregistered)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 	// Track time taken to get deregistered operators
 	startTime := time.Now()
 
-	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(ctx, days)
+	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Registered)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 	return RegisteredOperatorMetadata, nil
 }
 
-func processOperatorOnlineCheck(deregisteredOperatorState *IndexedDeregisteredOperatorState, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
+func processOperatorOnlineCheck(deregisteredOperatorState *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
 	operators := deregisteredOperatorState.Operators
 	wp := workerpool.New(poolSize)
 

@@ -19,6 +19,14 @@ const (
 	maxWorkerPoolSize = 10
 )
 
+// Define the type for the enum.
+type OperatorState int
+
+const (
+	Deregistered OperatorState = iota // iota starts at 0
+	Registered
+)
+
 type (
 	SubgraphClient interface {
 		QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error)
@@ -26,8 +34,9 @@ type (
 		QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error)
 		QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error)
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
-		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error)
-		QueryIndexedRegisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedRegisteredOperatorState, error)
+		QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedQueriedOperatorInfo, error)
+		QueryIndexedRegisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedQueriedOperatorInfo, error)
+		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -73,12 +82,12 @@ type (
 		Metadata             *Operator
 		OperatorProcessError string
 	}
-	IndexedDeregisteredOperatorState struct {
+	IndexedQueriedOperatorInfo struct {
 		Operators map[core.OperatorID]*QueriedOperatorInfo
 	}
-	IndexedRegisteredOperatorState struct {
-		Operators map[core.OperatorID]*QueriedOperatorInfo
-	}
+	// IndexedRegisteredOperatorState struct {
+	// 	Operators map[core.OperatorID]*QueriedOperatorInfo
+	// }
 	NonSigner struct {
 		OperatorId string
 		Count      int
@@ -221,7 +230,39 @@ func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlo
 	}, nil
 }
 
-func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedDeregisteredOperatorState, error) {
+func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error) {
+	// Query all deregistered operators in the last N days.
+	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
+	var operators map[core.OperatorID]*QueriedOperatorInfo
+	if state == Deregistered {
+		deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
+		if err != nil {
+			return nil, err
+		}
+
+		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(deregisteredOperators))
+		// Get OpeatroInfo for DeRegistered Operators
+		getOperatorInfoForQueriedOperators(sc, ctx, operators, deregisteredOperators)
+	} else if state == Registered {
+		registeredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
+		if err != nil {
+			return nil, err
+		}
+
+		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
+		// Get OpeatroInfo for DeRegistered Operators
+		getOperatorInfoForQueriedOperators(sc, ctx, operators, registeredOperators)
+
+	} else {
+		return nil, fmt.Errorf("invalid operator state: %d", state)
+	}
+
+	return &IndexedQueriedOperatorInfo{
+		Operators: operators,
+	}, nil
+}
+
+func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedQueriedOperatorInfo, error) {
 	// Query all deregistered operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
@@ -230,51 +271,15 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx con
 	}
 
 	operators := make(map[core.OperatorID]*QueriedOperatorInfo, len(deregisteredOperators))
+	// Get OpeatroInfo for DeRegistered Operators
 	getOperatorInfoForQueriedOperators(sc, ctx, operators, deregisteredOperators)
-	// for i := range deregisteredOperators {
-	// 	deregisteredOperator := deregisteredOperators[i]
-	// 	operator, err := convertOperator(deregisteredOperator)
-	// 	var operatorId [32]byte
 
-	// 	if err != nil && operator == nil {
-	// 		sc.logger.Warn("failed to convert", "err", err, "operator", deregisteredOperator)
-	// 		continue
-	// 	}
-
-	// 	// Copy the operator id to a 32 byte array.
-	// 	copy(operatorId[:], operator.OperatorId)
-
-	// 	operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
-	// 	if err != nil {
-	// 		operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
-	// 		errorMessage := fmt.Sprintf("query operator info by operator id at block number failed: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
-	// 		addOperatorWithErrorDetail(operators, operator, operatorId, errorMessage)
-	// 		sc.logger.Warn(errorMessage)
-	// 		continue
-	// 	}
-	// 	indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
-	// 	if err != nil {
-	// 		operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
-	// 		errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info at blocknumber: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
-	// 		addOperatorWithErrorDetail(operators, operator, operatorId, errorMessage)
-	// 		sc.logger.Warn(errorMessage)
-	// 		continue
-	// 	}
-
-	// 	operators[operatorId] = &QueriedOperatorInfo{
-	// 		IndexedOperatorInfo:  indexedOperatorInfo,
-	// 		BlockNumber:          uint(operator.BlockNumber),
-	// 		Metadata:             operator,
-	// 		OperatorProcessError: "",
-	// 	}
-	// }
-
-	return &IndexedDeregisteredOperatorState{
+	return &IndexedQueriedOperatorInfo{
 		Operators: operators,
 	}, nil
 }
 
-func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedRegisteredOperatorState, error) {
+func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedQueriedOperatorInfo, error) {
 	// Query all registered operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 	registeredOperators, err := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
@@ -283,46 +288,11 @@ func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx conte
 	}
 
 	operators := make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
+
+	// Get OpeatroInfo for Registered Operators
 	getOperatorInfoForQueriedOperators(sc, ctx, operators, registeredOperators)
-	// for i := range registeredOperators {
-	// 	registeredOperator := registeredOperators[i]
-	// 	operator, err := convertOperator(registeredOperator)
-	// 	var operatorId [32]byte
 
-	// 	if err != nil && operator == nil {
-	// 		sc.logger.Warn("failed to convert", "err", err, "operator", registeredOperator)
-	// 		continue
-	// 	}
-
-	// 	// Copy the operator id to a 32 byte array.
-	// 	copy(operatorId[:], operator.OperatorId)
-
-	// 	operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
-	// 	if err != nil {
-	// 		operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
-	// 		errorMessage := fmt.Sprintf("query operator info by operator id at block number failed: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
-	// 		addOperatorWithErrorDetail(operators, operator, operatorId, errorMessage)
-	// 		sc.logger.Warn(errorMessage)
-	// 		continue
-	// 	}
-	// 	indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
-	// 	if err != nil {
-	// 		operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
-	// 		errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info at blocknumber: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
-	// 		addOperatorWithErrorDetail(operators, operator, operatorId, errorMessage)
-	// 		sc.logger.Warn(errorMessage)
-	// 		continue
-	// 	}
-
-	// 	operators[operatorId] = &QueriedOperatorInfo{
-	// 		IndexedOperatorInfo:  indexedOperatorInfo,
-	// 		BlockNumber:          uint(operator.BlockNumber),
-	// 		Metadata:             operator,
-	// 		OperatorProcessError: "",
-	// 	}
-	// }
-
-	return &IndexedRegisteredOperatorState{
+	return &IndexedQueriedOperatorInfo{
 		Operators: operators,
 	}, nil
 

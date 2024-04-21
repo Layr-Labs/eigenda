@@ -530,17 +530,16 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoNoSocketInfo
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfoNoSocketInfo, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -577,11 +576,10 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoNoSocketInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 
 	// Set up the mock calls for the two operators
@@ -589,7 +587,7 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	// Start test server for Operator
 	closeServer, err := startTestGRPCServer("localhost:32009") // Let the OS assign a free port
@@ -647,17 +645,16 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoInvalidTimeStamp
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregisteredInvalidTimeStamp, nil)
 
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -691,18 +688,17 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *tes
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoInvalidTimeStamp
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregisteredInvalidTimeStampTwoOperator, nil)
 
 	// Set up the mock calls for the two operators
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -746,11 +742,10 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 
 	// Set up the mock calls for the two operators
@@ -758,7 +753,7 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	// Start the test server for Operator 2
 	closeServer, err := startTestGRPCServer("localhost:32009")
@@ -815,15 +810,14 @@ func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorState, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -864,11 +858,10 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 
 	// Set up the mock calls for the two operators
@@ -876,7 +869,7 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators/", testDataApiServer.FetchDeregisteredOperators)
 
@@ -925,16 +918,15 @@ func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -968,15 +960,14 @@ func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorState, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -1010,11 +1001,10 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 
 	// Set up the mock calls for the two operators
@@ -1022,7 +1012,7 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
@@ -1072,15 +1062,14 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorState, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorState, nil)
 
 	// Start test server for Operator
 	closeServer, err := startTestGRPCServer("localhost:32007") // Let the OS assign a free port
@@ -1124,11 +1113,10 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 
 	// Set up the mock calls for the two operators
@@ -1136,7 +1124,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	// Start the test server for Operator 2
 	closeServer, err := startTestGRPCServer("localhost:32009")
@@ -1193,17 +1181,16 @@ func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphTwoOperatorsDeregistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil).Once()
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo2, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	// Start test server for Operator 1
 	closeServer1, err := startTestGRPCServer("localhost:32007") // Let the OS assign a free port
@@ -1264,12 +1251,11 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.DeregisteredOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 	indexedOperatorStates[core.OperatorID{2}] = subgraphDeregisteredOperatorInfo3
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphThreeOperatorsDeregistered, nil)
 
 	// Set up the mock calls for the three operators
@@ -1278,7 +1264,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo3, nil).Once()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	mockSubgraphApi.On("QueryIndexedDeregisteredOperatorsForTimeWindow").Return(indexedOperatorStates, nil)
+	mockSubgraphApi.On("QueryIndexedOperatorsWithStateForTimeWindow").Return(indexedOperatorStates, nil)
 
 	r.GET("/v1/operators-info/deregistered-operators", testDataApiServer.FetchDeregisteredOperators)
 
