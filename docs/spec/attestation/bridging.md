@@ -6,7 +6,7 @@
 
 Bridging a DA attestion for a specific blob requires the following stages:
 - *Bridging the batch attestation*. This involves checking the aggregate signature of the DA nodes for the batch, and tallying up the total amount of stake the signing nodes.
-- *Verifying the blob inclusion*. Each batch contains a the root of a a Merkle tree whose leaves correspond to the blob headers contained in the batch. To verify blob inclusion, the associate Merkle proof must be supplied and evaluated. Furthermore, the specific quorum threshold requirement for the blob must be checked against the total amount of signing stake for the batch. 
+- *Verifying the blob inclusion*. Each batch contains a the root of a Merkle tree whose leaves correspond to the blob headers contained in the batch. To verify blob inclusion, the associate Merkle proof must be supplied and evaluated. Furthermore, the specific quorum threshold requirement for the blob must be checked against the total amount of signing stake for the batch. 
 
 For the first stage, EigenDA makes use of the EigenLayer's default utilities for managing operator state, verifying aggregate BLS signatures, and checking the total stake held by the signing operators.
 
