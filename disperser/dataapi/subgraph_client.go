@@ -83,9 +83,6 @@ type (
 	IndexedQueriedOperatorInfo struct {
 		Operators map[core.OperatorID]*QueriedOperatorInfo
 	}
-	// IndexedRegisteredOperatorState struct {
-	// 	Operators map[core.OperatorID]*QueriedOperatorInfo
-	// }
 	NonSigner struct {
 		OperatorId string
 		Count      int
