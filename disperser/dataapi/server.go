@@ -480,16 +480,17 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 
 // FetchOperatorsNonsigningPercentageHandler godoc
 //
-//	@Summary	Fetch operators non signing percentage
-//	@Tags		Metrics
-//	@Produce	json
-//	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
-//	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
-//	@Success	200			{object}	OperatorsNonsigningPercentage
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/operator-nonsigning-percentage  [get]
+//		@Summary	Fetch operators non signing percentage
+//		@Tags		Metrics
+//		@Produce	json
+//		@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//		@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
+//	 @Param      live_only   query       string false   "Whether return only live nonsigners [default: true]"
+//		@Success	200			{object}	OperatorsNonsigningPercentage
+//		@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//		@Failure	404			{object}	ErrorResponse	"error: Not found"
+//		@Failure	500			{object}	ErrorResponse	"error: Server error"
+//		@Router		/metrics/operator-nonsigning-percentage  [get]
 func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
@@ -512,9 +513,18 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 		interval = 3600
 	}
 
+	liveOnly := "true"
+	if c.Query("live_only") != "" {
+		liveOnly = c.Query("live_only")
+		if liveOnly != "true" && liveOnly != "false" {
+			errorResponse(c, errors.New("the live_only param must be \"true\" or \"false\""))
+			return
+		}
+	}
+
 	startTime := endTime.Add(-time.Duration(interval) * time.Second)
 
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix())
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix(), liveOnly == "true")
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)
