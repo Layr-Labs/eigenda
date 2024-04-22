@@ -23,7 +23,7 @@ const (
 	// Min number of seconds for the ExpirationPollIntervalSecFlag.
 	minExpirationPollIntervalSec = 3
 	AppName                      = "da-node"
-	SemVer                       = "0.6.2-rc.0"
+	SemVer                       = "0.6.2"
 	GitCommit                    = ""
 	GitDate                      = ""
 )
