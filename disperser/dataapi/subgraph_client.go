@@ -239,7 +239,7 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx con
 		// Copy the operator id to a 32 byte array.
 		copy(operatorId[:], operator.OperatorId)
 
-		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
+		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operator.OperatorId, uint32(operator.BlockNumber))
 		if err != nil {
 			operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
 			errorMessage := fmt.Sprintf("query operator info by operator id at block number failed: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
