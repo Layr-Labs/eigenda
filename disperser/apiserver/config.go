@@ -3,11 +3,12 @@ package apiserver
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -15,14 +16,14 @@ import (
 )
 
 const (
-	RegisteredQuorumFlagName        = "auth.registered-quorum"
-	TotalUnauthThroughputFlagName   = "auth.total-unauth-byte-rate"
-	PerUserUnauthThroughputFlagName = "auth.per-user-unauth-byte-rate"
-	TotalUnauthBlobRateFlagName     = "auth.total-unauth-blob-rate"
-	PerUserUnauthBlobRateFlagName   = "auth.per-user-unauth-blob-rate"
-	ClientIPHeaderFlagName          = "auth.client-ip-header"
-	AllowlistFlagName               = "auth.allowlist"
-	AllowlistFileFlagName           = "auth.allowlist-file"
+	RegisteredQuorumFlagName         = "auth.registered-quorum"
+	TotalUnauthThroughputFlagName    = "auth.total-unauth-byte-rate"
+	PerUserUnauthThroughputFlagName  = "auth.per-user-unauth-byte-rate"
+	TotalUnauthBlobRateFlagName      = "auth.total-unauth-blob-rate"
+	PerUserUnauthBlobRateFlagName    = "auth.per-user-unauth-blob-rate"
+	ClientIPHeaderFlagName           = "auth.client-ip-header"
+	AllowlistFileFlagName            = "auth.allowlist-file"
+	AllowlistRefreshIntervalFlagName = "auth.allowlist-refresh-interval"
 
 	RetrievalBlobRateFlagName   = "auth.retrieval-blob-rate"
 	RetrievalThroughputFlagName = "auth.retrieval-throughput"
@@ -62,18 +63,11 @@ type RateConfig struct {
 
 	RetrievalBlobRate   common.RateParam
 	RetrievalThroughput common.RateParam
+
+	AllowlistFile            string
+	AllowlistRefreshInterval time.Duration
 }
 
-// Deprecated: use AllowlistFileFlagName instead
-func AllowlistFlag(envPrefix string) cli.Flag {
-	return cli.StringSliceFlag{
-		Name:     AllowlistFlagName,
-		Usage:    "Allowlist of IPs or ethereum addresses (including initial \"0x\") and corresponding blob/byte rates to bypass rate limiting. Format: [<IP>||<ETH ADDRESS>]/<quorum ID>/<blob rate>/<byte rate>. Example: 127.0.0.1/0/10/10485760",
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST"),
-		Required: false,
-		Value:    &cli.StringSlice{},
-	}
-}
 func AllowlistFileFlag(envPrefix string) cli.Flag {
 	return cli.StringFlag{
 		Name:     AllowlistFileFlagName,
@@ -122,8 +116,14 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Value:    "",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CLIENT_IP_HEADER"),
 		},
-		AllowlistFlag(envPrefix),
 		AllowlistFileFlag(envPrefix),
+		cli.DurationFlag{
+			Name:     AllowlistRefreshIntervalFlagName,
+			Usage:    "The interval at which to refresh the allowlist from the file",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "ALLOWLIST_REFRESH_INTERVAL"),
+			Value:    5 * time.Minute,
+		},
 		cli.IntFlag{
 			Name:     RetrievalBlobRateFlagName,
 			Usage:    "The blob rate limit for retrieval requests (Blobs/sec)",
@@ -139,90 +139,50 @@ func CLIFlags(envPrefix string) []cli.Flag {
 	}
 }
 
-func parseAllowlistEntry(c *cli.Context) Allowlist {
-	// Parse from AllowlistFlagName
-	// Remove when AllowlistFlagName is deprecated and no longer used
+func ReadAllowlistFromFile(f string) (Allowlist, error) {
 	allowlist := make(Allowlist)
-	for _, allowlistEntry := range c.StringSlice(AllowlistFlagName) {
-		allowlistEntrySplit := strings.Split(allowlistEntry, "/")
-		if len(allowlistEntrySplit) != 4 {
-			log.Printf("invalid allowlist entry: entry should contain exactly 4 elements: %s", allowlistEntry)
-			continue
-		}
-		ip := allowlistEntrySplit[0]
-		quorumID, err := strconv.Atoi(allowlistEntrySplit[1])
-		if err != nil {
-			log.Printf("invalid allowlist entry: failed to convert quorum ID from string: %s", allowlistEntry)
-			continue
-		}
-		blobRate, err := strconv.ParseFloat(allowlistEntrySplit[2], 64)
-		if err != nil {
-			log.Printf("invalid allowlist entry: failed to convert blob rate from string: %s", allowlistEntry)
-			continue
-		}
-		byteRate, err := strconv.ParseFloat(allowlistEntrySplit[3], 64)
-		if err != nil {
-			log.Printf("invalid allowlist entry: failed to convert throughput from string: %s", allowlistEntry)
-			continue
-		}
-		rateInfoByQuorum, ok := allowlist[ip]
-		if !ok {
-			allowlist[ip] = map[core.QuorumID]PerUserRateInfo{
-				core.QuorumID(quorumID): {
-					Throughput: common.RateParam(byteRate),
-					BlobRate:   common.RateParam(blobRate * blobRateMultiplier),
-				},
-			}
-		} else {
-			rateInfoByQuorum[core.QuorumID(quorumID)] = PerUserRateInfo{
-				Throughput: common.RateParam(byteRate),
-				BlobRate:   common.RateParam(blobRate * blobRateMultiplier),
-			}
-		}
+	if f == "" {
+		return allowlist, nil
 	}
 
-	// Parse from AllowlistFileFlagName
-	allowlistFileName := c.String(AllowlistFileFlagName)
-	if allowlistFileName != "" {
-		allowlistFile, err := os.Open(allowlistFileName)
-		if err != nil {
-			log.Printf("failed to read allowlist file: %s", err)
-			return allowlist
-		}
-		defer allowlistFile.Close()
-		var allowlistEntries []AllowlistEntry
-		content, err := io.ReadAll(allowlistFile)
-		if err != nil {
-			log.Printf("failed to load allowlist file content: %s", err)
-			return allowlist
-		}
-		err = json.Unmarshal(content, &allowlistEntries)
-		if err != nil {
-			log.Printf("failed to parse allowlist file content: %s", err)
-			return allowlist
-		}
+	allowlistFile, err := os.Open(f)
+	if err != nil {
+		log.Printf("failed to read allowlist file: %s", err)
+		return allowlist, err
+	}
+	defer allowlistFile.Close()
+	var allowlistEntries []AllowlistEntry
+	content, err := io.ReadAll(allowlistFile)
+	if err != nil {
+		log.Printf("failed to load allowlist file content: %s", err)
+		return allowlist, err
+	}
+	err = json.Unmarshal(content, &allowlistEntries)
+	if err != nil {
+		log.Printf("failed to parse allowlist file content: %s", err)
+		return allowlist, err
+	}
 
-		for _, entry := range allowlistEntries {
-			rateInfoByQuorum, ok := allowlist[entry.Account]
-			if !ok {
-				allowlist[entry.Account] = map[core.QuorumID]PerUserRateInfo{
-					core.QuorumID(entry.QuorumID): {
-						Name:       entry.Name,
-						Throughput: common.RateParam(entry.ByteRate),
-						BlobRate:   common.RateParam(entry.BlobRate * blobRateMultiplier),
-					},
-				}
-			} else {
-				rateInfoByQuorum[core.QuorumID(entry.QuorumID)] = PerUserRateInfo{
+	for _, entry := range allowlistEntries {
+		rateInfoByQuorum, ok := allowlist[entry.Account]
+		if !ok {
+			allowlist[entry.Account] = map[core.QuorumID]PerUserRateInfo{
+				core.QuorumID(entry.QuorumID): {
 					Name:       entry.Name,
 					Throughput: common.RateParam(entry.ByteRate),
 					BlobRate:   common.RateParam(entry.BlobRate * blobRateMultiplier),
-				}
+				},
+			}
+		} else {
+			rateInfoByQuorum[core.QuorumID(entry.QuorumID)] = PerUserRateInfo{
+				Name:       entry.Name,
+				Throughput: common.RateParam(entry.ByteRate),
+				BlobRate:   common.RateParam(entry.BlobRate * blobRateMultiplier),
 			}
 		}
 	}
 
-	return allowlist
+	return allowlist, nil
 }
 
 func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
@@ -261,13 +221,23 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		}
 	}
 
-	allowlist := parseAllowlistEntry(c)
+	allowlist := make(Allowlist)
+	allowlistFileName := c.String(AllowlistFileFlagName)
+	if allowlistFileName != "" {
+		var err error
+		allowlist, err = ReadAllowlistFromFile(allowlistFileName)
+		if err != nil {
+			return RateConfig{}, fmt.Errorf("failed to read allowlist file %s: %w", allowlistFileName, err)
+		}
+	}
 
 	return RateConfig{
-		QuorumRateInfos:     quorumRateInfos,
-		ClientIPHeader:      c.String(ClientIPHeaderFlagName),
-		Allowlist:           allowlist,
-		RetrievalBlobRate:   common.RateParam(c.Int(RetrievalBlobRateFlagName) * blobRateMultiplier),
-		RetrievalThroughput: common.RateParam(c.Int(RetrievalThroughputFlagName)),
+		QuorumRateInfos:          quorumRateInfos,
+		ClientIPHeader:           c.String(ClientIPHeaderFlagName),
+		Allowlist:                allowlist,
+		RetrievalBlobRate:        common.RateParam(c.Int(RetrievalBlobRateFlagName) * blobRateMultiplier),
+		RetrievalThroughput:      common.RateParam(c.Int(RetrievalThroughputFlagName)),
+		AllowlistFile:            c.String(AllowlistFileFlagName),
+		AllowlistRefreshInterval: c.Duration(AllowlistRefreshIntervalFlagName),
 	}, nil
 }

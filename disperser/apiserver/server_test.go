@@ -51,10 +51,11 @@ var (
 
 	deployLocalStack bool
 	localStackPort   = "4568"
+	allowlistFile    *os.File
 )
 
 func TestMain(m *testing.M) {
-	setup(m)
+	setup()
 	code := m.Run()
 	teardown()
 	os.Exit(code)
@@ -423,21 +424,10 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 
 func TestParseAllowlist(t *testing.T) {
 	fs := flag.NewFlagSet("disperser", flag.ContinueOnError)
-	allowlistFlag := apiserver.AllowlistFlag("disperser")
-	allowlistFlag.Apply(fs)
 	allowlistFileFlag := apiserver.AllowlistFileFlag("disperser")
 	allowlistFileFlag.Apply(fs)
-	err := fs.Parse([]string{"--auth.allowlist", "52.202.222.39/0/100/52428800"})
-	assert.NoError(t, err)
-	err = fs.Parse([]string{"--auth.allowlist", "52.202.222.39/1/100/52428800"})
-	assert.NoError(t, err)
-	err = fs.Parse([]string{"--auth.allowlist", "3.225.189.232/0/1/1024"})
-	assert.NoError(t, err)
 
-	f, err := os.CreateTemp("", "allowlist.*.json")
-	assert.NoError(t, err)
-	defer os.Remove(f.Name())
-	_, err = f.WriteString(`
+	overwriteFile(t, allowlistFile, `
 [
   {
     "name": "eigenlabs",
@@ -462,24 +452,11 @@ func TestParseAllowlist(t *testing.T) {
   }
 ]
 	`)
-	assert.NoError(t, err)
-	err = fs.Parse([]string{"--auth.allowlist-file", f.Name()})
+	err := fs.Parse([]string{"--auth.allowlist-file", allowlistFile.Name()})
 	assert.NoError(t, err)
 	c := cli.NewContext(nil, fs, nil)
 	rateConfig, err := apiserver.ReadCLIConfig(c)
 	assert.NoError(t, err)
-	assert.Contains(t, rateConfig.Allowlist, "52.202.222.39")
-	assert.Contains(t, rateConfig.Allowlist, "3.225.189.232")
-	assert.Contains(t, rateConfig.Allowlist["52.202.222.39"], uint8(0))
-	assert.Contains(t, rateConfig.Allowlist["52.202.222.39"], uint8(1))
-	assert.Contains(t, rateConfig.Allowlist["3.225.189.232"], uint8(0))
-	assert.NotContains(t, rateConfig.Allowlist["3.225.189.232"], uint8(1))
-	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][0].BlobRate, uint32(100*1e6))
-	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][0].Throughput, uint32(52428800))
-	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][1].BlobRate, uint32(100*1e6))
-	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][1].Throughput, uint32(52428800))
-	assert.Equal(t, rateConfig.Allowlist["3.225.189.232"][0].BlobRate, uint32(1e6))
-	assert.Equal(t, rateConfig.Allowlist["3.225.189.232"][0].Throughput, uint32(1024))
 
 	assert.Contains(t, rateConfig.Allowlist, "0.1.2.3")
 	assert.Contains(t, rateConfig.Allowlist, "5.5.5.5")
@@ -498,7 +475,100 @@ func TestParseAllowlist(t *testing.T) {
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Throughput, uint32(4092))
 }
 
-func setup(m *testing.M) {
+func TestLoadAllowlistFromFile(t *testing.T) {
+	overwriteFile(t, allowlistFile, `
+[
+  {
+    "name": "eigenlabs",
+    "account": "0.1.2.3",
+    "quorumID": 0,
+    "blobRate": 0.01,
+    "byteRate": 1024
+  },
+  {
+    "name": "eigenlabs",
+    "account": "0.1.2.3",
+    "quorumID": 1,
+    "blobRate": 1,
+    "byteRate": 1048576
+  },
+  {
+    "name": "foo",
+    "account": "5.5.5.5",
+    "quorumID": 1,
+    "blobRate": 0.1,
+    "byteRate": 4092
+  }
+]
+	`)
+	dispersalServer.LoadAllowlist()
+	al := dispersalServer.GetRateConfig().Allowlist
+	assert.Contains(t, al, "0.1.2.3")
+	assert.Contains(t, al, "5.5.5.5")
+	assert.Contains(t, al["0.1.2.3"], uint8(0))
+	assert.Contains(t, al["0.1.2.3"], uint8(1))
+	assert.Contains(t, al["5.5.5.5"], uint8(1))
+	assert.NotContains(t, al["5.5.5.5"], uint8(0))
+	assert.Equal(t, al["0.1.2.3"][0].Name, "eigenlabs")
+	assert.Equal(t, al["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
+	assert.Equal(t, al["0.1.2.3"][0].Throughput, uint32(1024))
+	assert.Equal(t, al["0.1.2.3"][1].Name, "eigenlabs")
+	assert.Equal(t, al["0.1.2.3"][1].BlobRate, uint32(1e6))
+	assert.Equal(t, al["0.1.2.3"][1].Throughput, uint32(1048576))
+	assert.Equal(t, al["5.5.5.5"][1].Name, "foo")
+	assert.Equal(t, al["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, al["5.5.5.5"][1].Throughput, uint32(4092))
+
+	overwriteFile(t, allowlistFile, `
+[
+  {
+    "name": "hello",
+    "account": "0.0.0.0",
+    "quorumID": 0,
+    "blobRate": 0.1,
+    "byteRate": 100
+  },
+  {
+    "name": "world",
+    "account": "7.7.7.7",
+    "quorumID": 1,
+    "blobRate": 1,
+    "byteRate": 1234
+  }
+]
+	`)
+	dispersalServer.LoadAllowlist()
+	al = dispersalServer.GetRateConfig().Allowlist
+	assert.NotContains(t, al, "0.1.2.3")
+	assert.NotContains(t, al, "5.5.5.5")
+	assert.Contains(t, al, "0.0.0.0")
+	assert.Contains(t, al, "7.7.7.7")
+	assert.Contains(t, al["0.0.0.0"], uint8(0))
+	assert.Equal(t, al["0.0.0.0"][0].Name, "hello")
+	assert.Equal(t, al["0.0.0.0"][0].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, al["0.0.0.0"][0].Throughput, uint32(100))
+
+	assert.Contains(t, al["7.7.7.7"], uint8(1))
+	assert.Equal(t, al["7.7.7.7"][1].Name, "world")
+	assert.Equal(t, al["7.7.7.7"][1].BlobRate, uint32(1*1e6))
+	assert.Equal(t, al["7.7.7.7"][1].Throughput, uint32(1234))
+}
+
+func overwriteFile(t *testing.T, f *os.File, content string) {
+	err := f.Truncate(0)
+	assert.NoError(t, err)
+	_, err = f.Seek(0, 0)
+	assert.NoError(t, err)
+	_, err = f.WriteString(content)
+	assert.NoError(t, err)
+}
+
+func setup() {
+	var err error
+	allowlistFile, err = os.CreateTemp("", "allowlist.*.json")
+	if err != nil {
+		panic("failed to create allowlist file")
+	}
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 	if !deployLocalStack {
@@ -506,8 +576,6 @@ func setup(m *testing.M) {
 	}
 
 	if deployLocalStack {
-
-		var err error
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
@@ -516,7 +584,7 @@ func setup(m *testing.M) {
 
 	}
 
-	err := deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
+	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
@@ -538,6 +606,9 @@ func setup(m *testing.M) {
 func teardown() {
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	}
+	if allowlistFile != nil {
+		_ = os.Remove(allowlistFile.Name())
 	}
 }
 
@@ -612,6 +683,9 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		},
 		RetrievalBlobRate:   3 * 1e6,
 		RetrievalThroughput: 20 * 1024,
+
+		AllowlistFile:            allowlistFile.Name(),
+		AllowlistRefreshInterval: 10 * time.Minute,
 	}
 
 	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
