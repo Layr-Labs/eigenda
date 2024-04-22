@@ -370,7 +370,7 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operator, blockNumber)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator state", "err", err)
+		t.Logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", operator.Hex())
 		return nil, nil, err
 	}
 
