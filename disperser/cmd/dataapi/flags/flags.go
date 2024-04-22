@@ -101,6 +101,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	EnableAvailabilityCheckFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-availability-check"),
+		Usage:    "start availability check",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHECK_AVAILABILITY"),
+	}
 	// EigenDA Disperser and Churner Hostnames to check Server Availability
 	// ex:
 	// disperser-goerli.eigenda.eigenops.xyz,
@@ -147,6 +153,7 @@ var requiredFlags = []cli.Flag{
 	PrometheusMetricsClusterLabelFlag,
 	AllowOriginsFlag,
 	EnableMetricsFlag,
+	EnableAvailabilityCheckFlag,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,

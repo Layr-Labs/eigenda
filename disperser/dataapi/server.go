@@ -181,13 +181,16 @@ func NewServer(
 		grpcConn = &GRPCDialerSkipTLS{}
 	}
 
-	if eigenDAGRPCServiceChecker == nil {
+	if config.AvailabilityCheck {
 
-		eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
-	}
+		if eigenDAGRPCServiceChecker == nil {
 
-	if eigenDAHttpServiceChecker == nil {
-		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
+			eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+		}
+
+		if eigenDAHttpServiceChecker == nil {
+			eigenDAHttpServiceChecker = &HttpServiceAvailability{}
+		}
 	}
 
 	return &server{
@@ -237,9 +240,11 @@ func (s *server) Start() error {
 			metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
 			metrics.GET("/non-signers", s.FetchNonSigners)
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
-			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
-			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
+			if s.eigenDAHttpServiceChecker != nil {
+				metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
+				metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
+				metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
+			}
 		}
 		swagger := v1.Group("/swagger")
 		{
@@ -586,6 +591,11 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/disperser-service-availability [get]
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
+
+	if s.eigenDAGRPCServiceChecker == nil {
+		errorResponse(c, errors.New("service availability check is not enabled"))
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchDisperserServiceAvailability", f*1000) // make milliseconds
 	}))
@@ -640,6 +650,11 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/churner-service-availability [get]
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
+
+	if s.eigenDAGRPCServiceChecker == nil {
+		errorResponse(c, errors.New("service availability check is not enabled"))
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", f*1000) // make milliseconds
 	}))
@@ -694,6 +709,11 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/batcher-service-availability [get]
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
+
+	if s.eigenDAHttpServiceChecker == nil {
+		errorResponse(c, errors.New("service availability check is not enabled"))
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchBatcherAvailability", f*1000) // make milliseconds
 	}))

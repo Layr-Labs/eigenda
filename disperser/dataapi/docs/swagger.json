@@ -765,14 +765,16 @@
                 1,
                 2,
                 3,
-                4
+                4,
+                5
             ],
             "x-enum-varnames": [
                 "Processing",
                 "Confirmed",
                 "Failed",
                 "Finalized",
-                "InsufficientSignatures"
+                "InsufficientSignatures",
+                "Confirming"
             ]
         },
         "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {

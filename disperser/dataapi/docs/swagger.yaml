@@ -205,6 +205,7 @@ definitions:
     - 2
     - 3
     - 4
+    - 5
     type: integer
     x-enum-varnames:
     - Processing
@@ -212,6 +213,7 @@ definitions:
     - Failed
     - Finalized
     - InsufficientSignatures
+    - Confirming
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:

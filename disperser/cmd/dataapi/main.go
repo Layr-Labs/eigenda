@@ -99,6 +99,7 @@ func RunDataApi(ctx *cli.Context) error {
 				ServerMode:         config.ServerMode,
 				SocketAddr:         config.SocketAddr,
 				AllowOrigins:       config.AllowOrigins,
+				AvailabilityCheck:  config.AvailabilityCheck,
 				DisperserHostname:  config.DisperserHostname,
 				ChurnerHostname:    config.ChurnerHostname,
 				BatcherHealthEndpt: config.BatcherHealthEndpt,
