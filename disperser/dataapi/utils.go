@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -41,6 +42,9 @@ func ConvertOperatorInfoGqlToIndexedOperatorInfo(operator *subgraph.IndexedOpera
 	if operator == nil {
 		return nil, errors.New("operator is nil")
 	}
+
+	// Temporary Debug Log for conversion error
+	log.Printf("Operator data: %+v", operator)
 
 	if len(operator.SocketUpdates) == 0 {
 		return nil, errors.New("no socket updates found for operator")
