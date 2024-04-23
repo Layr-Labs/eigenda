@@ -382,7 +382,6 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					Commitment:           commits,
 					Chunks:               chunks,
 					Assignments:          res.Assignments,
-					Status:               PendingDispersal,
 				},
 				Err: nil,
 			}
@@ -575,16 +574,6 @@ func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {
 	}
 }
 
-func (e *EncodingStreamer) MarkBlobPendingConfirmation(metadata *disperser.BlobMetadata) error {
-	for _, sp := range metadata.RequestMetadata.SecurityParams {
-		err := e.EncodedBlobstore.MarkEncodedResultPendingConfirmation(metadata.GetBlobKey(), sp.QuorumID)
-		if err != nil {
-			return fmt.Errorf("error marking blob pending confirmation: %w", err)
-		}
-	}
-	return nil
-}
-
 // getOperatorState returns the operator state for the blobs that have valid quorums
 func (e *EncodingStreamer) getOperatorState(ctx context.Context, metadatas []*disperser.BlobMetadata, blockNumber uint) (*core.IndexedOperatorState, error) {
 
@@ -617,7 +606,7 @@ func (e *EncodingStreamer) validateMetadataQuorums(metadatas []*disperser.BlobMe
 		valid := true
 		for _, quorum := range metadata.RequestMetadata.SecurityParams {
 			if aggKey, ok := state.AggKeys[quorum.QuorumID]; !ok || aggKey == nil {
-				e.logger.Warn("got blob with a quorum without APK. Will skip.", "quorum", quorum.QuorumID)
+				e.logger.Warn("got blob with a quorum without APK. Will skip.", "blobKey", metadata.GetBlobKey(), "quorum", quorum.QuorumID)
 				valid = false
 			}
 		}

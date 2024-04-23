@@ -99,6 +99,16 @@ func (q *BlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadata *dis
 	return &newMetadata, nil
 }
 
+func (q *BlobStore) MarkBlobConfirming(ctx context.Context, blobKey disperser.BlobKey) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if _, ok := q.Metadata[blobKey]; !ok {
+		return disperser.ErrBlobNotFound
+	}
+	q.Metadata[blobKey].BlobStatus = disperser.Confirming
+	return nil
+}
+
 func (q *BlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -262,6 +272,9 @@ func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobK
 
 func (q *BlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {
 	if metadata.NumRetries < maxRetry {
+		if err := q.MarkBlobProcessing(ctx, metadata.GetBlobKey()); err != nil {
+			return true, err
+		}
 		return true, q.IncrementBlobRetryCount(ctx, metadata)
 	} else {
 		return false, q.MarkBlobFailed(ctx, metadata.GetBlobKey())

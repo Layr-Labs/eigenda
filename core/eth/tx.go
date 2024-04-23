@@ -397,7 +397,7 @@ func (t *Transactor) GetOperatorStakes(ctx context.Context, operator core.Operat
 		Context: ctx,
 	}, t.Bindings.RegCoordinatorAddr, operator, blockNumber)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator state", "err", err)
+		t.Logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", operator.Hex())
 		return nil, nil, err
 	}
 
@@ -615,6 +615,27 @@ func (t *Transactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, ope
 }
 
 func (t *Transactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
+	if len(operatorIds) == 0 {
+		return []*big.Int{}, nil
+	}
+	// When there is just one operator, we can get result by a single RPC with
+	// getQuorumBitmapsAtBlockNumber() in OperatorStateRetrievercontract (v.s. 2
+	// RPCs in the general case)
+	if len(operatorIds) == 1 {
+		byteId := [32]byte(operatorIds[0])
+		bitmap, err := t.Bindings.OpStateRetriever.GetQuorumBitmapsAtBlockNumber(&bind.CallOpts{
+			Context: ctx,
+		}, t.Bindings.RegCoordinatorAddr, [][32]byte{byteId}, blockNumber)
+		if err != nil {
+			if err.Error() == "execution reverted: RegistryCoordinator.getQuorumBitmapIndexAtBlockNumber: no bitmap update found for operatorId at block number" {
+				return []*big.Int{big.NewInt(0)}, nil
+			} else {
+				return nil, err
+			}
+		}
+		return bitmap, nil
+	}
+
 	quorumCount, err := t.GetQuorumCount(ctx, blockNumber)
 	if err != nil {
 		return nil, err

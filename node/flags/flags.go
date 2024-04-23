@@ -73,6 +73,13 @@ var (
 		Value:    "9091",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "METRICS_PORT"),
 	}
+	OnchainMetricsIntervalFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-metrics-interval"),
+		Usage:    "The interval in seconds at which the node polls the onchain state of the operator and update metrics. <=0 means no poll",
+		Required: false,
+		Value:    "180",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ONCHAIN_METRICS_INTERVAL"),
+	}
 	TimeoutFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
 		Usage:    "Amount of time to wait for GPRC",
@@ -238,6 +245,7 @@ var requiredFlags = []cli.Flag{
 	RetrievalPortFlag,
 	EnableMetricsFlag,
 	MetricsPortFlag,
+	OnchainMetricsIntervalFlag,
 	EnableNodeApiFlag,
 	NodeApiPortFlag,
 	TimeoutFlag,

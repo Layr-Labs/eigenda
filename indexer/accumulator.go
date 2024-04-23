@@ -11,6 +11,6 @@ type Accumulator interface {
 	// Serialize object takes the accummulator object, and serializes it using the rules for the specified fork.
 	SerializeObject(object AccumulatorObject, fork UpgradeFork) ([]byte, error)
 
-	// DeSerialize object deserializes an accumulator object using the the rules for the specified fork.
+	// DeSerialize object deserializes an accumulator object using the rules for the specified fork.
 	DeserializeObject(data []byte, fork UpgradeFork) (AccumulatorObject, error)
 }

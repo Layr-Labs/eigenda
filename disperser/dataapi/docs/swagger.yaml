@@ -437,6 +437,10 @@ paths:
         in: query
         name: end
         type: string
+      - description: 'Whether return only live nonsigners [default: true]'
+        in: query
+        name: live_only
+        type: string
       produces:
       - application/json
       responses:

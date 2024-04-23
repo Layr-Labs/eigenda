@@ -67,11 +67,13 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
-			EncodingTimeout:    ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
-			AttestationTimeout: ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
-			ChainReadTimeout:   ctx.GlobalDuration(flags.ChainReadTimeoutFlag.Name),
-			ChainWriteTimeout:  ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),
-			ChainStateTimeout:  ctx.GlobalDuration(flags.ChainStateTimeoutFlag.Name),
+			EncodingTimeout:      ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
+			AttestationTimeout:   ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			ChainReadTimeout:     ctx.GlobalDuration(flags.ChainReadTimeoutFlag.Name),
+			ChainWriteTimeout:    ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),
+			ChainStateTimeout:    ctx.GlobalDuration(flags.ChainStateTimeoutFlag.Name),
+			FireblocksAPITimeout: ctx.GlobalDuration(flags.FireblocksAPITimeoutFlag.Name),
+			TxnBroadcastTimeout:  ctx.GlobalDuration(flags.TransactionBroadcastTimeoutFlag.Name),
 		},
 		MetricsConfig: batcher.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),

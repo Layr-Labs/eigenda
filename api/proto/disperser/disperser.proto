@@ -149,6 +149,9 @@ enum BlobStatus {
 	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
 	// for at least one quorum.
 	INSUFFICIENT_SIGNATURES = 5;
+
+	// CONFIRMING means that the blob has been dispersed to DA nodes and it's waiting for the confirmation onchain
+	CONFIRMING = 6;
 }
 
 // Types below correspond to the types necessary to verify a blob

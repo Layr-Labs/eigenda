@@ -36,7 +36,7 @@ type EncodingStreamerMetrics struct {
 }
 
 type TxnManagerMetrics struct {
-	Latency  prometheus.Summary
+	Latency  *prometheus.SummaryVec
 	GasUsed  prometheus.Gauge
 	SpeedUps prometheus.Gauge
 	TxQueue  prometheus.Gauge
@@ -89,13 +89,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	}
 
 	txnManagerMetrics := TxnManagerMetrics{
-		Latency: promauto.With(reg).NewSummary(
+		Latency: promauto.With(reg).NewSummaryVec(
 			prometheus.SummaryOpts{
 				Namespace:  namespace,
 				Name:       "txn_manager_latency_ms",
 				Help:       "transaction confirmation latency summary in milliseconds",
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
+			[]string{"stage"},
 		),
 		GasUsed: promauto.With(reg).NewGauge(
 			prometheus.GaugeOpts{
@@ -313,8 +314,8 @@ func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
 	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
 }
 
-func (t *TxnManagerMetrics) ObserveLatency(latencyMs float64) {
-	t.Latency.Observe(latencyMs)
+func (t *TxnManagerMetrics) ObserveLatency(stage string, latencyMs float64) {
+	t.Latency.WithLabelValues(stage).Observe(latencyMs)
 }
 
 func (t *TxnManagerMetrics) UpdateGasUsed(gasUsed uint64) {

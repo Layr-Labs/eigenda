@@ -309,6 +309,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_PUBLIC_IP_PROVIDER:          "mockip",
 		NODE_PUBLIC_IP_CHECK_INTERVAL:    "10s",
 		NODE_NUM_CONFIRMATIONS:           "0",
+		NODE_ONCHAIN_METRICS_INTERVAL:    "-1",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
