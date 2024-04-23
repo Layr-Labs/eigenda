@@ -116,17 +116,6 @@ type (
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
-	EjectedOperator struct {
-		OperatorId      string `json:"operator_id"`
-		OperatorAddress string `json:"operator_address"`
-		QuorumId        uint8  `json:"quorum_id"`
-	}
-
-	EjectionResponse struct {
-		Meta      Meta               `json:"meta"`
-		Operators []*EjectedOperator `json:"operators"`
-	}
-
 	DeregisteredOperatorMetadata struct {
 		OperatorId           string `json:"operator_id"`
 		BlockNumber          uint   `json:"block_number"`
@@ -351,8 +340,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 		interval = 86400
 	}
 
-	// TODO: only need the live nonsigners
-	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix())
+	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
 	if err == nil {
 		err = s.ejector.eject(c.Request.Context(), nonSigningRate, mode)
 	}
