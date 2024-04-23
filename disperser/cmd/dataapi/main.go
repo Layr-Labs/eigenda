@@ -144,5 +144,5 @@ func RunDataApi(ctx *cli.Context) error {
 		logger.Errorf("Failed to shutdown server: %v", err)
 	}
 
-	return server.Start()
+	return err
 }
