@@ -114,7 +114,7 @@ func (m *MockSubgraphApi) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ct
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId []byte, blockNumber uint32) (*subgraph.IndexedOperatorInfo, error) {
+func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*subgraph.IndexedOperatorInfo, error) {
 	args := m.Called()
 
 	var value *subgraph.IndexedOperatorInfo

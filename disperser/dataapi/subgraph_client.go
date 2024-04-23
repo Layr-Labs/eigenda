@@ -44,12 +44,12 @@ type (
 		TxFee    uint64
 	}
 	Operator struct {
-		Id              []byte
-		OperatorId      []byte
-		Operator        []byte
+		Id              string
+		OperatorId      string
+		Operator        string
 		BlockTimestamp  uint64
 		BlockNumber     uint64
-		TransactionHash []byte
+		TransactionHash string
 	}
 	OperatorQuorum struct {
 		Operator       string
@@ -334,12 +334,12 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	}
 
 	return &Operator{
-		Id:              []byte(operator.Id),
-		OperatorId:      []byte(operator.OperatorId),
-		Operator:        []byte(operator.Operator),
+		Id:              string(operator.Id),
+		OperatorId:      string(operator.OperatorId),
+		Operator:        string(operator.Operator),
 		BlockTimestamp:  timestamp,
 		BlockNumber:     blockNum,
-		TransactionHash: []byte(operator.TransactionHash),
+		TransactionHash: string(operator.TransactionHash),
 	}, nil
 }
 
