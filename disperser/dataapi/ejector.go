@@ -90,6 +90,8 @@ func (e *ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	}
 	e.logger.Info("Ejection transaction succeeded", "receipt", receipt)
 
+	e.metrics.UpdateEjectionGasUsed(receipt.GasUsed)
+
 	// TODO: get the txn response and update the metrics.
 
 	return nil

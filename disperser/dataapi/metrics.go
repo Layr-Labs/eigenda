@@ -28,6 +28,7 @@ type Metrics struct {
 
 	EjectionRequests *prometheus.CounterVec
 	Operators        *prometheus.CounterVec
+	EjectionGasUsed  prometheus.Gauge
 
 	httpPort string
 	logger   logging.Logger
@@ -83,6 +84,13 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 				Help:      "the total number of operators to be ejected or actually ejected",
 			}, []string{"quorum", "state", "type"},
 		),
+		EjectionGasUsed: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "ejection_gas_used",
+				Help:      "Gas used for operator ejection",
+			},
+		),
 		registry: reg,
 		httpPort: httpPort,
 		logger:   logger.With("component", "DataAPIMetrics"),
@@ -135,6 +143,10 @@ func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]i
 			"type":   "stake",
 		}).Add(stakeShare)
 	}
+}
+
+func (g *Metrics) UpdateEjectionGasUsed(gasUsed uint64) {
+	g.EjectionGasUsed.Set(float64(gasUsed))
 }
 
 // Start starts the metrics server
