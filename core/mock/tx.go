@@ -110,6 +110,12 @@ func (t *MockTransactor) OperatorIDToAddress(ctx context.Context, operatorId cor
 	return result.(gethcommon.Address), args.Error(1)
 }
 
+func (t *MockTransactor) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (core.OperatorID, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(core.OperatorID), args.Error(1)
+}
+
 func (t *MockTransactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
