@@ -23,8 +23,6 @@ const (
 	// Min number of seconds for the ExpirationPollIntervalSecFlag.
 	minExpirationPollIntervalSec = 3
 	AppName                      = "da-node"
-	GitCommit                    = ""
-	GitDate                      = ""
 )
 
 var (
@@ -34,7 +32,9 @@ var (
 		0: "eth_quorum",
 		1: "permissioned_quorum",
 	}
-	SemVer = "v0.0.0"
+	SemVer    = "v0.0.0"
+	GitCommit = ""
+	GitDate   = ""
 )
 
 // Config contains all of the configuration information for a DA node.

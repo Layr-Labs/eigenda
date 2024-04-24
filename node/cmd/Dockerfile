@@ -1,6 +1,8 @@
 FROM golang:1.21.1-alpine3.18 as builder
 
 ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 
 RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
@@ -18,7 +20,7 @@ COPY go.sum /app
 
 WORKDIR /app/node
 
-RUN go build -ldflags="-X 'node.SemVer=${SEMVER}'" -o ./bin/node ./cmd
+RUN go build -ldflags="-X 'node.SemVer=${SEMVER}' -X 'node.GitCommit=${GITCOMMIT}' -X 'node.GitDate=${GITDATE}'" -o ./bin/node ./cmd
 
 FROM alpine:3.18
 
