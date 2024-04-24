@@ -6,6 +6,9 @@ on:
       commit_sha:
         description: 'Specific Commit SHA (Required)'
         required: true
+      version:
+        description: 'Version (Required)'
+        required: true
       release_tag:
         description: 'Release Tag (Optional)'
         required: false
@@ -64,6 +67,7 @@ jobs:
         tags: ${{ env.REGISTRY }}/layr-labs/eigenda/opr-node:${{ steps.set_tag.outputs.tag }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new
+        build-args: SEMVER=${{ github.event.inputs.version }}
       if: ${{ success() }}
 
     - name: Build and Push NodePlugin Image
