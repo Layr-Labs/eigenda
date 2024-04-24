@@ -843,7 +843,7 @@ func (s *DispersalServer) updateQuorumConfig(ctx context.Context) (QuorumConfig,
 
 func getResponseStatus(status disperser.BlobStatus) pb.BlobStatus {
 	switch status {
-	case disperser.Confirming, disperser.Processing:
+	case disperser.Dispersing, disperser.Processing:
 		return pb.BlobStatus_PROCESSING
 	case disperser.Confirmed:
 		return pb.BlobStatus_CONFIRMED

@@ -424,7 +424,7 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 // If successful, it returns a batch, and updates the reference block number for next batch to use.
 // Otherwise, it returns an error and keeps the blobs in the encoded blob store.
 // This function is meant to be called periodically in a single goroutine as it resets the state of the encoded blob store.
-func (e *EncodingStreamer) CreateBatch() (*batch, error) {
+func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 	// lock to update e.ReferenceBlockNumber
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -531,6 +531,10 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
 	i := 0
 	for key := range metadataByKey {
+		err := e.transitionBlobToDispersing(ctx, metadataByKey[key])
+		if err != nil {
+			continue
+		}
 		encodedBlobs[i] = encodedBlobByKey[key]
 		blobHeaders[i] = blobHeaderByKey[key]
 		metadatas[i] = metadataByKey[key]
@@ -566,6 +570,18 @@ func (e *EncodingStreamer) CreateBatch() (*batch, error) {
 		State:        state,
 		MerkleTree:   tree,
 	}, nil
+}
+
+func (e *EncodingStreamer) transitionBlobToDispersing(ctx context.Context, metadata *disperser.BlobMetadata) error {
+	blobKey := metadata.GetBlobKey()
+	err := e.blobStore.MarkBlobDispersing(ctx, blobKey)
+	if err != nil {
+		e.logger.Error("error marking blob as dispersing", "err", err, "blobKey", blobKey.String())
+		return err
+	}
+	// remove encoded blob from storage so we don't disperse it again
+	e.RemoveEncodedBlob(metadata)
+	return nil
 }
 
 func (e *EncodingStreamer) RemoveEncodedBlob(metadata *disperser.BlobMetadata) {

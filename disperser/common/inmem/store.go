@@ -99,13 +99,13 @@ func (q *BlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadata *dis
 	return &newMetadata, nil
 }
 
-func (q *BlobStore) MarkBlobConfirming(ctx context.Context, blobKey disperser.BlobKey) error {
+func (q *BlobStore) MarkBlobDispersing(ctx context.Context, blobKey disperser.BlobKey) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[blobKey]; !ok {
 		return disperser.ErrBlobNotFound
 	}
-	q.Metadata[blobKey].BlobStatus = disperser.Confirming
+	q.Metadata[blobKey].BlobStatus = disperser.Dispersing
 	return nil
 }
 
