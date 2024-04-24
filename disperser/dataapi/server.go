@@ -270,7 +270,7 @@ func (s *server) Start() error {
 		Handler:           router,
 		ReadTimeout:       5 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      10 * time.Second,
+		WriteTimeout:      20 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 
@@ -570,6 +570,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 
 	operatorMetadatas, err := s.getDeregisteredOperatorForDays(c.Request.Context(), int32(daysInt))
 	if err != nil {
+		s.logger.Error("Failed to fetch deregistered operators", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
 		errorResponse(c, err)
 		return

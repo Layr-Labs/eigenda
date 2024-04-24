@@ -5,7 +5,6 @@ import (
 	"context"
 	"slices"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	"github.com/stretchr/testify/mock"
 )
@@ -115,7 +114,7 @@ func (m *MockSubgraphApi) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ct
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*subgraph.IndexedOperatorInfo, error) {
+func (m *MockSubgraphApi) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*subgraph.IndexedOperatorInfo, error) {
 	args := m.Called()
 
 	var value *subgraph.IndexedOperatorInfo
