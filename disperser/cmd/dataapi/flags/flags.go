@@ -95,6 +95,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ALLOW_ORIGINS"),
 		Required: true,
 	}
+	EjectionTokenFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-token"),
+		Usage:    "The token used for authorizing the ejection requests",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EJECTION_TOKEN"),
+	}
 	EnableMetricsFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
 		Usage:    "start metrics server",
@@ -146,6 +152,7 @@ var requiredFlags = []cli.Flag{
 	PrometheusServerSecretFlag,
 	PrometheusMetricsClusterLabelFlag,
 	AllowOriginsFlag,
+	EjectionTokenFlag,
 	EnableMetricsFlag,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,

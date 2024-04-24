@@ -154,6 +154,7 @@ type (
 		transactor     core.Transactor
 		chainState     core.ChainState
 		ejector        *ejector
+		ejectionToken  string
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -206,6 +207,7 @@ func NewServer(
 		chainState:                chainState,
 		metrics:                   metrics,
 		ejector:                   ejector,
+		ejectionToken:             config.EjectionToken,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
@@ -317,6 +319,12 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
+
+	token := c.GetHeader("ejection_token")
+	if token != s.ejectionToken {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
 	mode := "periodic"
 	if c.Query("mode") != "" {
