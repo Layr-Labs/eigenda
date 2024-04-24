@@ -18,7 +18,7 @@ COPY go.sum /app
 
 WORKDIR /app/node
 
-RUN go build -ldflags="-X 'node.SEMVER=${SEMVER}'" -o ./bin/node ./cmd
+RUN go build -ldflags="-X 'node.SemVer=${SEMVER}'" -o ./bin/node ./cmd
 
 FROM alpine:3.18
 
