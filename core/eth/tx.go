@@ -550,6 +550,12 @@ func (t *Transactor) OperatorIDToAddress(ctx context.Context, operatorId core.Op
 	}, operatorId)
 }
 
+func (t *Transactor) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (core.OperatorID, error) {
+	return t.Bindings.BLSApkRegistry.GetOperatorId(&bind.CallOpts{
+		Context: ctx,
+	}, address)
+}
+
 func (t *Transactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
 	type AddressOrError struct {
 		address gethcommon.Address

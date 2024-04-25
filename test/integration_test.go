@@ -273,6 +273,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		tx.On("UpdateOperatorSocket").Return(nil)
 		tx.On("GetBlockStaleMeasure").Return(nil)
 		tx.On("GetStoreDurationBlocks").Return(nil)
+		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()

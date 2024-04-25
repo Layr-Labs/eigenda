@@ -97,6 +97,9 @@ type Transactor interface {
 	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)
 
+	// OperatorAddressToID returns the operator id from the operator address.
+	OperatorAddressToID(ctx context.Context, operatorAddress gethcommon.Address) (OperatorID, error)
+
 	// BatchOperatorIDToAddress returns the addresses of the operators from the operator id.
 	BatchOperatorIDToAddress(ctx context.Context, operatorIds []OperatorID) ([]gethcommon.Address, error)
 
