@@ -125,12 +125,17 @@ func pluginOps(ctx *cli.Context) {
 	}
 
 	if config.Operation == plugin.OperationListQuorums {
+		operatorAddress, err := tx.OperatorIDToAddress(context.Background(), operatorID)
+		if err != nil {
+			log.Printf("Error: failed to get operator address for operatorID: %x, error: %v", operatorID, err)
+			return
+		}
 		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 		if err != nil {
 			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
 			return
 		}
-		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, sk.Address, quorumIds)
+		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, operatorAddress, quorumIds)
 		return
 	}
 
