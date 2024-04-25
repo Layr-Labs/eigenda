@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	"log"
 	"os"
 	"strings"
@@ -15,6 +16,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
@@ -69,12 +72,16 @@ func pluginOps(ctx *cli.Context) {
 
 	operatorID := keyPair.GetPubKeyG1().GetOperatorID()
 
-	sk, privateKey, err := plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
-	if err != nil {
-		log.Printf("Error: failed to read or decrypt the ECDSA private key: %v", err)
-		return
+	var sk *keystore.Key
+	var privateKey *string
+	if config.Operation != plugin.OperationListQuorums {
+		sk, privateKey, err = plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
+		if err != nil {
+			log.Printf("Error: failed to read or decrypt the ECDSA private key: %v", err)
+			return
+		}
+		log.Printf("Info: ECDSA key read and decrypted from %s", config.EcdsaKeyFile)
 	}
-	log.Printf("Info: ECDSA key read and decrypted from %s", config.EcdsaKeyFile)
 
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
@@ -117,6 +124,16 @@ func pluginOps(ctx *cli.Context) {
 		}
 	}
 
+	if config.Operation == plugin.OperationListQuorums {
+		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
+		if err != nil {
+			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
+			return
+		}
+		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, sk.Address, quorumIds)
+		return
+	}
+
 	operator := &node.Operator{
 		Address:             sk.Address.Hex(),
 		Socket:              socket,
@@ -152,13 +169,6 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
-	} else if config.Operation == plugin.OperationListQuorums {
-		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-		if err != nil {
-			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
-			return
-		}
-		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, sk.Address, quorumIds)
 	} else {
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
