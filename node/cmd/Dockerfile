@@ -1,8 +1,8 @@
 FROM golang:1.21.1-alpine3.18 as builder
 
-ARG SEMVER="v0.x.y.z"
-ARG GITCOMMIT="da48cbe1fd7ae96fe1f8fb2cce4f939459d97565"
-ARG GITDATE="2024-04-24T00:00:00Z"
+ARG SEMVER=""
+ARG GITCOMMIT=""
+ARG GITDATE=""
 
 RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
