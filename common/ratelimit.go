@@ -63,7 +63,7 @@ type RateBucketParams struct {
 }
 
 // GetClientAddress returns the client address from the context. If the header is not empty, it will
-// take the ip address located at the `numProxies“ position from the end of the header. If the ip address cannot be
+// take the ip address located at the "numProxies" position from the end of the header. If the ip address cannot be
 // found in the header, it will use the connection ip if `allowDirectConnectionFallback` is true. Otherwise, it will return
 // an error.
 func GetClientAddress(ctx context.Context, header string, numProxies int, allowDirectConnectionFallback bool) (string, error) {
