@@ -65,7 +65,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
 				Name:      "registered_quorums_rank",
-				Help:      "the rank of operator by TVL in that quorum",
+				Help:      "the rank of operator by TVL in that quorum (1 being the highest)",
 			},
 			[]string{"quorum"},
 		),
