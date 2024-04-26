@@ -52,6 +52,7 @@ type Metrics struct {
 	onchainMetricsInterval int64
 	tx                     core.Transactor
 	chainState             core.ChainState
+	allQuorumCache         map[core.QuorumID]bool
 }
 
 func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Transactor, chainState core.ChainState) *Metrics {
@@ -136,6 +137,7 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 		onchainMetricsInterval: onchainMetricsInterval,
 		tx:                     tx,
 		chainState:             chainState,
+		allQuorumCache:         make(map[core.QuorumID]bool),
 	}
 
 	return metrics
@@ -198,6 +200,7 @@ func (g *Metrics) collectOnchainMetrics() {
 		}
 		quorumIds := eth.BitmapToQuorumIds(bitmaps[0])
 		if len(quorumIds) == 0 {
+			g.ResetQuorumMetrics(blockNum)
 			g.logger.Warn("This node is currently not in any quorum", "blockNumber", blockNum, "operatorId", g.operatorId.Hex())
 			continue
 		}
@@ -225,6 +228,7 @@ func (g *Metrics) collectOnchainMetrics() {
 			})
 			for i, op := range operatorStakeShares {
 				if op.operatorId == g.operatorId {
+					g.allQuorumCache[q] = true
 					g.RegisteredQuorumsStakeShare.WithLabelValues(fmt.Sprintf("%d", q)).Set(op.stakeShare)
 					g.RegisteredQuorumsRank.WithLabelValues(fmt.Sprintf("%d", q)).Set(float64(i + 1))
 					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare (basis point)", op.stakeShare, "rank", i+1)
@@ -232,5 +236,21 @@ func (g *Metrics) collectOnchainMetrics() {
 				}
 			}
 		}
+		// Check if operator deregistered for an existing quorum, set the stake share and rank to 0
+		g.ResetQuorumMetrics(blockNum)
+	}
+}
+
+func (g *Metrics) ResetQuorumMetrics(blockNum uint32) {
+	// Check if operator deregistered for an existing quorum, set the stake share and rank to 0
+	for q := range g.allQuorumCache {
+		// If this quorum was deregistered then set the stake share and rank to 0
+		if !g.allQuorumCache[q] {
+			g.RegisteredQuorumsStakeShare.WithLabelValues(fmt.Sprintf("%d", q)).Set(0)
+			g.RegisteredQuorumsRank.WithLabelValues(fmt.Sprintf("%d", q)).Set(0)
+			g.logger.Info("Current operator deregistration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q)
+		}
+		// Reset the cache to false for all quorum for next cycle
+		g.allQuorumCache[q] = false
 	}
 }
