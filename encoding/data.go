@@ -14,7 +14,7 @@ type G2Commitment bn254.G2Affine
 // LengthProof is a polynomial commitment on G2 (e.g. a kzg commitment) used for low degree proof
 type LengthProof = G2Commitment
 
-// The proof used to open a commitment. In the case of Kzg, this is also a kzg commitment, and is different from a Commitment only semantically.
+// Proof is used to open a commitment. In the case of Kzg, this is also a kzg commitment, and is different from a Commitment only semantically.
 type Proof = bn254.G1Affine
 
 // Symbol is a symbol in the field used for polynomial commitments

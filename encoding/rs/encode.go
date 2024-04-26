@@ -66,7 +66,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	return poly, frames, indices, nil
 }
 
-// This Function takes extended evaluation data and bundles relevant information into Frame.
+// MakeFrames function takes extended evaluation data and bundles relevant information into Frame.
 // Every frame is verifiable to the commitment.
 func (g *Encoder) MakeFrames(
 	polyEvals []fr.Element,
