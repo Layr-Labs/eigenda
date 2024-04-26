@@ -26,10 +26,11 @@ type Metrics struct {
 	NumRequests *prometheus.CounterVec
 	Latency     *prometheus.SummaryVec
 
-	EjectionRequests *prometheus.CounterVec
-	OperatorsEjected *prometheus.CounterVec
-	StakeEjected     *prometheus.CounterVec
-	EjectionGasUsed  prometheus.Gauge
+	PeriodicEjectionRequests *prometheus.CounterVec
+	UrgentEjectionRequests   *prometheus.CounterVec
+	OperatorsToEject         *prometheus.CounterVec
+	StakeShareToEject        *prometheus.GaugeVec
+	EjectionGasUsed          prometheus.Gauge
 
 	httpPort string
 	logger   logging.Logger
@@ -59,37 +60,48 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 			},
 			[]string{"method"},
 		),
-		// EjectionRequests is a more detailed metric than NumRequests, specifically for tracking
-		// the ejection calls.
-		// The "mode" could be:
-		// - "periodic": periodically initiated ejection; or
-		// - "urgent": urgently invoked ejection in case of bad network health condition.
-		// The "status" indicates the final processing result of the ejection request.
-		EjectionRequests: promauto.With(reg).NewCounterVec(
+		// PeriodicEjectionRequests is a more detailed metric than NumRequests, specifically for
+		// tracking  the ejection calls that are periodically initiated according to the SLA
+		// evaluation time window.
+		PeriodicEjectionRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "ejection_requests_total",
-				Help:      "the total number of ejection requests",
+				Name:      "periodic_ejection_requests_total",
+				Help:      "the total number of periodic ejection requests",
 			},
-			[]string{"status", "mode"},
+			[]string{"status"},
 		),
-		// The "state" could be:
-		// - "requested": operator is requested for ejection; or
-		// - "ejected": operator is actually ejected
-		OperatorsEjected: promauto.With(reg).NewCounterVec(
+		// UrgentEjectionRequests is a more detailed metric than NumRequests, specifically for
+		// tracking the ejection calls that are urgently initiated due to bad network health
+		// condition.
+		UrgentEjectionRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "operators_total",
-				Help:      "the total number of operators to be ejected or actually ejected",
-			}, []string{"quorum", "state"},
+				Name:      "urgent_ejection_requests_total",
+				Help:      "the total number of urgent ejection requests",
+			},
+			[]string{"status"},
 		),
-		StakeEjected: promauto.With(reg).NewCounterVec(
+		// The number of operators requested to eject. Note this may be different than the
+		// actual number of operators ejected as EjectionManager contract may perform rate
+		// limiting.
+		OperatorsToEject: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "stake_ejected",
-				Help:      "the total amount of stake to be ejected or actually ejected",
-			}, []string{"quorum", "state"},
+				Name:      "operators_to_eject",
+				Help:      "the total number of operators requested to eject",
+			}, []string{"quorum"},
 		),
+		// The total stake share requested to eject. Note this may be different than the
+		// actual stake share ejected as EjectionManager contract may perform rate limiting.
+		StakeShareToEject: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "stake_share_to_eject",
+				Help:      "the total stake share requested to eject",
+			}, []string{"quorum"},
+		),
+		// The gas used by EjectionManager contract for operator ejection.
 		EjectionGasUsed: promauto.With(reg).NewGauge(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -126,26 +138,30 @@ func (g *Metrics) IncrementFailedRequestNum(method string) {
 }
 
 func (g *Metrics) IncrementEjectionRequest(mode string, status codes.Code) {
-	g.EjectionRequests.With(prometheus.Labels{
-		"status": status.String(),
-		"mode":   mode,
-	}).Inc()
+	switch mode {
+	case "periodic":
+		g.PeriodicEjectionRequests.With(prometheus.Labels{
+			"status": status.String(),
+		}).Inc()
+	case "urgent":
+		g.UrgentEjectionRequests.With(prometheus.Labels{
+			"status": status.String(),
+		}).Inc()
+	}
 }
 
 func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]int, stakeShareByQuorum map[uint8]float64) {
 	for q, count := range numOperatorsByQuorum {
 		for i := 0; i < count; i++ {
-			g.OperatorsEjected.With(prometheus.Labels{
+			g.OperatorsToEject.With(prometheus.Labels{
 				"quorum": fmt.Sprintf("%d", q),
-				"state":  "requested",
 			}).Inc()
 		}
 	}
 	for q, stakeShare := range stakeShareByQuorum {
-		g.StakeEjected.With(prometheus.Labels{
+		g.StakeShareToEject.With(prometheus.Labels{
 			"quorum": fmt.Sprintf("%d", q),
-			"state":  "requested",
-		}).Add(stakeShare)
+		}).Set(stakeShare)
 	}
 }
 
