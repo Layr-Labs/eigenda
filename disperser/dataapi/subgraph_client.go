@@ -296,12 +296,12 @@ func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx conte
 func getOperatorInfoForQueriedOperators(sc *subgraphClient, ctx context.Context, operators map[core.OperatorID]*QueriedOperatorInfo, queriedOperators []*subgraph.Operator) {
 
 	for i := range queriedOperators {
-		registeredOperator := queriedOperators[i]
-		operator, err := convertOperator(registeredOperator)
+		queriedOperator := queriedOperators[i]
+		operator, err := convertOperator(queriedOperator)
 		var operatorId [32]byte
 
 		if err != nil && operator == nil {
-			sc.logger.Warn("failed to convert", "err", err, "operator", registeredOperator)
+			sc.logger.Warn("failed to convert", "err", err, "operator", queriedOperator)
 			continue
 		}
 
