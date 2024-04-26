@@ -132,10 +132,10 @@ func pluginOps(ctx *cli.Context) {
 		}
 		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 		if err != nil {
-			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
+			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, operatorAddress.Hex(), err)
 			return
 		}
-		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, operatorAddress, quorumIds)
+		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, operatorAddress.Hex(), quorumIds)
 		return
 	}
 

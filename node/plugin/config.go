@@ -150,7 +150,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, errors.New("unsupported operation type")
 	}
 
-	if op != OperationListQuorums && len(ctx.GlobalString(EcdsaKeyFileFlag.Name)) == 0 && len(ctx.GlobalString(EcdsaKeyPasswordFlag.Name)) == 0 {
+	// ECDSA key is only required for opt-in, opt-out and update-socket operations
+	if (op == OperationOptIn || op == OperationOptOut || op == OperationUpdateSocket) &&
+		len(ctx.GlobalString(EcdsaKeyFileFlag.Name)) == 0 &&
+		len(ctx.GlobalString(EcdsaKeyPasswordFlag.Name)) == 0 {
 		return nil, errors.New("opt-in, opt-out and update-socket operations require ECDSA key file and password")
 	}
 
