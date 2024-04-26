@@ -25,8 +25,10 @@ const (
 type Metrics struct {
 	logger logging.Logger
 
-	// The quorums the node is registered.
-	RegisteredQuorums *prometheus.GaugeVec
+	// Rank of the operator in a particular registered quorum.
+	RegisteredQuorumsRank *prometheus.GaugeVec
+	// Stake share of the operator in a particular registered quorum.
+	RegisteredQuorumsStakeShare *prometheus.GaugeVec
 	// Accumulated number of RPC requests received.
 	AccNumRequests *prometheus.CounterVec
 	// The latency (in ms) to process the request.
@@ -59,15 +61,21 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 	reg.MustRegister(collectors.NewGoCollector())
 
 	metrics := &Metrics{
-		// The "type" label have values: stake_share, rank. The "stake_share" is stake share (in basis point),
-		// and the "rank" is operator's ranking (the operator with highest amount of stake ranked as 1) by stake share in the quorum.
-		RegisteredQuorums: promauto.With(reg).NewGaugeVec(
+		RegisteredQuorumsRank: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: Namespace,
-				Name:      "registered_quorums",
-				Help:      "the quorums the DA node is registered, breakdown by quorum's ID and the type of information about the quorum. The type can be `stake_share`, representing the operator's stake share (in basis points); and `rank`, representing the operator's ranking (1 being the highest) by stake share within the quorum",
+				Name:      "registered_quorums_rank",
+				Help:      "the rank of operator by TVL in that quorum (1 being the highest)",
 			},
-			[]string{"quorum", "type"},
+			[]string{"quorum"},
+		),
+		RegisteredQuorumsStakeShare: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Name:      "registered_quorums_stake_share",
+				Help:      "the stake share of operator in basis points in that quorum",
+			},
+			[]string{"quorum"},
 		),
 		// The "status" label has values: success, failure.
 		AccNumRequests: promauto.With(reg).NewCounterVec(
@@ -217,8 +225,8 @@ func (g *Metrics) collectOnchainMetrics() {
 			})
 			for i, op := range operatorStakeShares {
 				if op.operatorId == g.operatorId {
-					g.RegisteredQuorums.WithLabelValues(fmt.Sprintf("%d", q), "stake_share").Set(op.stakeShare)
-					g.RegisteredQuorums.WithLabelValues(fmt.Sprintf("%d", q), "rank").Set(float64(i + 1))
+					g.RegisteredQuorumsStakeShare.WithLabelValues(fmt.Sprintf("%d", q)).Set(op.stakeShare)
+					g.RegisteredQuorumsRank.WithLabelValues(fmt.Sprintf("%d", q)).Set(float64(i + 1))
 					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare (basis point)", op.stakeShare, "rank", i+1)
 					break
 				}
