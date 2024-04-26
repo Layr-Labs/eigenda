@@ -167,6 +167,13 @@ func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]i
 
 func (g *Metrics) UpdateEjectionGasUsed(gasUsed uint64) {
 	g.EjectionGasUsed.Set(float64(gasUsed))
+
+// IncrementNotFoundRequestNum increments the number of not found requests
+func (g *Metrics) IncrementNotFoundRequestNum(method string) {
+	g.NumRequests.With(prometheus.Labels{
+		"status": "not found",
+		"method": method,
+	}).Inc()
 }
 
 // Start starts the metrics server

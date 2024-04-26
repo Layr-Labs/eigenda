@@ -2,6 +2,7 @@ package dataapi
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sort"
 	"time"
@@ -106,26 +107,26 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
 	operatorInfo, err := s.subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), operatorId)
 	if err != nil {
-		s.logger.Error("Failed to fetch operator", "error", err)
-		return &OperatorPortCheckResponse{}, err
+		s.logger.Warn("Failed to fetch operator info", "error", err)
+		return &OperatorPortCheckResponse{}, errors.New("not found")
 	}
 
 	retrieverSocket := core.OperatorSocket(operatorInfo.Socket).GetRetrievalSocket()
-	retrieverStatus := checkIsOperatorOnline(retrieverSocket)
+	retrieverOnline := checkIsOperatorOnline(retrieverSocket)
 
 	disperserSocket := core.OperatorSocket(operatorInfo.Socket).GetDispersalSocket()
-	disperserStatus := checkIsOperatorOnline(disperserSocket)
+	disperserOnline := checkIsOperatorOnline(disperserSocket)
 
 	// Log the online status
-	s.logger.Info("Operator port status", "retrieval", retrieverStatus, "retrieverSocket", retrieverSocket, "disperser", disperserStatus, "disperserSocket", disperserSocket)
+	s.logger.Info("Operator port status", "retrieverOnline", retrieverOnline, "retrieverSocket", retrieverSocket, "disperserOnline", disperserOnline, "disperserSocket", disperserSocket)
 
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
 		OperatorId:      operatorId,
 		DisperserSocket: disperserSocket,
 		RetrieverSocket: retrieverSocket,
-		DisperserStatus: disperserStatus,
-		RetrieverStatus: retrieverStatus,
+		DisperserOnline: disperserOnline,
+		RetrieverOnline: retrieverOnline,
 	}
 
 	// Send the metadata to the results channel
