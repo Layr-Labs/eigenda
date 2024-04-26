@@ -246,7 +246,6 @@ func (g *Metrics) collectOnchainMetrics() {
 				// Reset the cache to false for all quorum for next cycle
 				g.allQuorumCache[q] = false
 			}
-
 		}
 	}
 }
