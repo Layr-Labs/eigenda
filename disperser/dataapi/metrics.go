@@ -61,7 +61,7 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 			[]string{"method"},
 		),
 		// PeriodicEjectionRequests is a more detailed metric than NumRequests, specifically for
-		// tracking  the ejection calls that are periodically initiated according to the SLA
+		// tracking the ejection calls that are periodically initiated according to the SLA
 		// evaluation time window.
 		PeriodicEjectionRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
