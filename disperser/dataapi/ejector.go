@@ -9,11 +9,14 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// stakeShareToSLA returns the SLA for a given stake share in a quorum.
 // The caller should ensure "stakeShare" is in range (0, 1].
 func stakeShareToSLA(stakeShare float64) float64 {
 	switch {
+	case stakeShare > 0.15:
+		return 0.995
 	case stakeShare > 0.1:
-		return 0.975
+		return 0.98
 	case stakeShare > 0.05:
 		return 0.95
 	default:
@@ -27,13 +30,13 @@ func operatorPerfScore(stakeShare float64, nonsigningRate float64) float64 {
 	if nonsigningRate == 0 {
 		return 1.0
 	}
-	sla := stakeShareToSLA(stakeShare)
+	sla := stakeShareToSLA(stakeShare / 100.0)
 	perf := (1 - sla) / nonsigningRate
 	return perf / (1.0 + perf)
 }
 
 func computePerfScore(metric *OperatorNonsigningPercentageMetrics) float64 {
-	return operatorPerfScore(metric.StakePercentage, metric.Percentage/100.0)
+	return operatorPerfScore(metric.StakePercentage, metric.Percentage)
 }
 
 type ejector struct {
@@ -60,7 +63,7 @@ func (e *ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	nonsigners := make([]*OperatorNonsigningPercentageMetrics, 0)
 	for _, metric := range nonsigningRate.Data {
 		// Collect only the nonsigners who violate the SLA.
-		if metric.Percentage/100.0 > 1-stakeShareToSLA(metric.StakePercentage) {
+		if metric.Percentage/100.0 > 1-stakeShareToSLA(metric.StakePercentage/100.0) {
 			nonsigners = append(nonsigners, metric)
 		}
 	}
