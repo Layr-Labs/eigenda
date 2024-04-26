@@ -153,7 +153,7 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
-		ejector        *ejector
+		ejector        *Ejector
 		ejectionToken  string
 
 		metrics                   *Metrics
@@ -172,6 +172,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
+	ejector *Ejector,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -192,8 +193,6 @@ func NewServer(
 	if eigenDAHttpServiceChecker == nil {
 		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
-
-	ejector := newEjector(logger, transactor, metrics)
 
 	return &server{
 		logger:                    logger.With("component", "DataAPIServer"),
@@ -350,7 +349,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
 	if err == nil {
-		err = s.ejector.eject(c.Request.Context(), nonSigningRate)
+		err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
 	}
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("EjectOperators")
