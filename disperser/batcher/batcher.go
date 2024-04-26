@@ -80,7 +80,7 @@ type Batcher struct {
 	Aggregator            core.SignatureAggregator
 	EncodingStreamer      *EncodingStreamer
 	Transactor            core.Transactor
-	TransactionManager    TxnManager
+	TransactionManager    common.TxnManager
 	Metrics               *Metrics
 	HeartbeatChan         chan time.Time
 
@@ -101,7 +101,7 @@ func NewBatcher(
 	ethClient common.EthClient,
 	finalizer Finalizer,
 	transactor core.Transactor,
-	txnManager TxnManager,
+	txnManager common.TxnManager,
 	logger logging.Logger,
 	metrics *Metrics,
 	heartbeatChan chan time.Time,
@@ -319,7 +319,7 @@ func (b *Batcher) updateConfirmationInfo(
 	return blobsToRetry, nil
 }
 
-func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *ReceiptOrErr) error {
+func (b *Batcher) ProcessConfirmedBatch(ctx context.Context, receiptOrErr *common.ReceiptOrErr) error {
 	if receiptOrErr.Metadata == nil {
 		return errors.New("failed to process confirmed batch: no metadata from transaction manager response")
 	}
@@ -492,7 +492,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("HandleSingleBatch: error building confirmBatch transaction: %w", err)
 	}
-	err = b.TransactionManager.ProcessTransaction(ctx, NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
+	err = b.TransactionManager.ProcessTransaction(ctx, common.NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
 		batchHeader: batch.BatchHeader,
 		blobs:       batch.BlobMetadata,
 		blobHeaders: batch.BlobHeaders,

@@ -124,7 +124,7 @@ type TestDisperser struct {
 	server        *apiserver.DispersalServer
 	encoderServer *encoder.Server
 	transactor    *coremock.MockTransactor
-	txnManager    *batchermock.MockTxnManager
+	txnManager    *commonmock.MockTxnManager
 }
 
 func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger logging.Logger) TestDisperser {
@@ -169,7 +169,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	finalizer := batchermock.NewFinalizer()
 
 	disperserMetrics := disperser.NewMetrics("9100", logger)
-	txnManager := batchermock.NewTxnManager()
+	txnManager := commonmock.NewTxnManager()
 
 	batcher, err := batcher.NewBatcher(batcherConfig, timeoutConfig, store, dispatcher, cst, asn, encoderClient, agg, &commonmock.MockEthClient{}, finalizer, transactor, txnManager, logger, batcherMetrics, handleBatchLivenessChan)
 	if err != nil {
@@ -423,7 +423,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		},
 		BlockNumber: big.NewInt(123),
 	}
-	err = dis.batcher.ProcessConfirmedBatch(ctx, &batcher.ReceiptOrErr{
+	err = dis.batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt:  receipt,
 		Err:      nil,
 		Metadata: dis.txnManager.Requests[len(dis.txnManager.Requests)-1].Metadata,
