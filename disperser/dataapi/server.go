@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -152,6 +153,8 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
+		ejector        *ejector
+		ejectionToken  string
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -190,6 +193,8 @@ func NewServer(
 		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
 
+	ejector := newEjector(logger, transactor, metrics)
+
 	return &server{
 		logger:                    logger.With("component", "DataAPIServer"),
 		serverMode:                config.ServerMode,
@@ -201,6 +206,8 @@ func NewServer(
 		transactor:                transactor,
 		chainState:                chainState,
 		metrics:                   metrics,
+		ejector:                   ejector,
+		ejectionToken:             config.EjectionToken,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
@@ -241,6 +248,8 @@ func (s *server) Start() error {
 			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
+		ejection := v1.Group("/ejection")
+		ejection.GET("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
@@ -290,6 +299,68 @@ func (s *server) Shutdown() error {
 	}
 
 	return nil
+}
+
+// EjectOperatorsHandler godoc
+//
+//	@Summary	Eject operators who violate the SLAs during the given time interval
+//	@Tags		Ejector
+//	@Produce	json
+//	@Param		interval query int false "Lookback window for operator ejection [default: 86400]"
+//	@Param		end  query int false "End time for evaluating operator ejection [default: now]"
+//	@Param		mode query string "Whether it's periodic or urgent ejection request [default: periodic]"
+//	@Success	200			{object}	BlobMetadataResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/ejector/ejection [get]
+func (s *server) EjectOperatorsHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	token := c.GetHeader("ejection_token")
+	if token != s.ejectionToken {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	mode := "periodic"
+	if c.Query("mode") != "" {
+		mode = c.Query("mode")
+	}
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("EjectOperators")
+			s.metrics.IncrementEjectionRequest(mode, codes.InvalidArgument)
+			errorResponse(c, err)
+			return
+		}
+	}
+
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "86400"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 86400
+	}
+
+	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
+	if err == nil {
+		err = s.ejector.eject(c.Request.Context(), nonSigningRate)
+	}
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("EjectOperators")
+		s.metrics.IncrementEjectionRequest(mode, codes.Internal)
+		errorResponse(c, err)
+		return
+	}
+	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
+	s.metrics.IncrementEjectionRequest(mode, codes.OK)
+	c.Status(http.StatusOK)
 }
 
 // FetchBlobHandler godoc

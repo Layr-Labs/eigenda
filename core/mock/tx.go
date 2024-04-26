@@ -70,6 +70,12 @@ func (t *MockTransactor) UpdateOperatorSocket(ctx context.Context, socket string
 	return args.Error(0)
 }
 
+func (t *MockTransactor) EjectOperators(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Receipt, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(*types.Receipt), args.Error(1)
+}
+
 func (t *MockTransactor) GetOperatorStakes(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (core.OperatorStakes, []core.QuorumID, error) {
 	args := t.Called()
 	result0 := args.Get(0)

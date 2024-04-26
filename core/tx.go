@@ -70,6 +70,11 @@ type Transactor interface {
 	// UpdateOperatorSocket updates the socket of the operator in all the quorums that it is registered with.
 	UpdateOperatorSocket(ctx context.Context, socket string) error
 
+	// EjectOperators ejects operators from AVS registryCoordinator.
+	// The operatorsByQuorum provides a list of operators for each quorum. Within a quorum,
+	// the operators are ordered; in case of rate limiting, the first operators will be ejected.
+	EjectOperators(ctx context.Context, operatorsByQuorum [][]OperatorID) (*types.Receipt, error)
+
 	// GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
 	//  is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 	// are also returned.

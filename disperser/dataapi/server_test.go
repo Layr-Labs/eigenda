@@ -28,6 +28,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +52,7 @@ var (
 	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
 	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
 
-	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
+	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009", EjectionToken: "deadbeef"}
 
 	mockTx            = &coremock.MockTransactor{}
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
@@ -321,6 +322,45 @@ func TestFetchMetricsThroughputHandler(t *testing.T) {
 	assert.Equal(t, float64(11666.666666666666), response[0].Throughput)
 	assert.Equal(t, uint64(1701292800), response[0].Timestamp)
 	assert.Equal(t, float64(3.599722666666646e+07), totalThroughput)
+}
+
+func TestEjectOperatorHandler(t *testing.T) {
+	r := setUpRouter()
+
+	stopTime := time.Now()
+	interval := 3600
+	startTime := stopTime.Add(-time.Duration(interval) * time.Second)
+
+	mockSubgraphApi.On("QueryBatchNonSigningInfo", startTime.Unix(), stopTime.Unix()).Return(batchNonSigningInfo, nil)
+	addr1 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
+	addr2 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+	mockTx.On("BatchOperatorIDToAddress").Return([]gethcommon.Address{addr1, addr2}, nil)
+	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return([]*big.Int{big.NewInt(3), big.NewInt(0)}, nil)
+	mockTx.On("EjectOperators").Return(&types.Receipt{
+		GasUsed: uint64(10),
+	}, nil)
+	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
+	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
+
+	r.GET("/v1/ejector/operator", testDataApiServer.EjectOperatorsHandler)
+
+	w := httptest.NewRecorder()
+	reqStr := fmt.Sprintf("/v1/ejector/operator?interval=%v&end=%s", interval, stopTime.Format("2006-01-02T15:04:05Z"))
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
+	defer cancel()
+	req = req.WithContext(ctxWithDeadline)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, w.Code, http.StatusUnauthorized)
+
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, reqStr, nil)
+	req2.Header.Set("ejection_token", "deadbeef")
+	ctxWithDeadline2, cancel2 := context.WithTimeout(req2.Context(), 500*time.Microsecond)
+	defer cancel2()
+	req2 = req2.WithContext(ctxWithDeadline2)
+	r.ServeHTTP(w, req2)
+	assert.Equal(t, w2.Code, http.StatusOK)
 }
 
 func TestFetchUnsignedBatchesHandler(t *testing.T) {
