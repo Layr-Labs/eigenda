@@ -128,18 +128,25 @@ message RetrieveBlobReply {
 
 // Data Types
 
+// BlobStatus represents the status of a blob.
+// The status of a blob is updated as the blob is processed by the disperser.
+// The status of a blob can be queried by the client using the GetBlobStatus API.
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// - PROCESSING
+// - DISPERSING
+// - CONFIRMED
+// Terminal states are states that will not be updated to a different state:
+// - FAILED
+// - FINALIZED
+// - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
 	UNKNOWN = 0;
-
-	// Intermediate states
 
 	// PROCESSING means that the blob is currently being processed by the disperser
 	PROCESSING = 1;
 	// CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed
 	// batch containing the blob has been confirmed onchain
 	CONFIRMED = 2;
-
-	// Terminal states
 
 	// FAILED means that the blob has failed permanently (for reasons other than insufficient
 	// signatures, which is a separate state)
@@ -150,8 +157,8 @@ enum BlobStatus {
 	// for at least one quorum.
 	INSUFFICIENT_SIGNATURES = 5;
 
-	// CONFIRMING means that the blob has been dispersed to DA nodes and it's waiting for the confirmation onchain
-	CONFIRMING = 6;
+	// DISPERSING means that the blob is currently being dispersed to DA Nodes and being confirmed onchain
+	DISPERSING = 6;
 }
 
 // Types below correspond to the types necessary to verify a blob
