@@ -56,7 +56,7 @@ func newEjector(logger logging.Logger, tx core.Transactor, metrics *Metrics) *ej
 	}
 }
 
-func (e *ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage, mode string) error {
+func (e *ejector) eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

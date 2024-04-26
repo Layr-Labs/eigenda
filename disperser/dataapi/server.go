@@ -350,7 +350,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
 	if err == nil {
-		err = s.ejector.eject(c.Request.Context(), nonSigningRate, mode)
+		err = s.ejector.eject(c.Request.Context(), nonSigningRate)
 	}
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("EjectOperators")

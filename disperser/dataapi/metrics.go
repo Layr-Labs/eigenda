@@ -27,7 +27,8 @@ type Metrics struct {
 	Latency     *prometheus.SummaryVec
 
 	EjectionRequests *prometheus.CounterVec
-	Operators        *prometheus.CounterVec
+	OperatorsEjected *prometheus.CounterVec
+	StakeEjected     *prometheus.CounterVec
 	EjectionGasUsed  prometheus.Gauge
 
 	httpPort string
@@ -75,14 +76,19 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 		// The "state" could be:
 		// - "requested": operator is requested for ejection; or
 		// - "ejected": operator is actually ejected
-		// The  "type" could be "number" or "stake", for the number of operators as well as the
-		// total stake share they represent.
-		Operators: promauto.With(reg).NewCounterVec(
+		OperatorsEjected: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "operators_total",
 				Help:      "the total number of operators to be ejected or actually ejected",
-			}, []string{"quorum", "state", "type"},
+			}, []string{"quorum", "state"},
+		),
+		StakeEjected: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "stake_ejected",
+				Help:      "the total amount of stake to be ejected or actually ejected",
+			}, []string{"quorum", "state"},
 		),
 		EjectionGasUsed: promauto.With(reg).NewGauge(
 			prometheus.GaugeOpts{
@@ -129,18 +135,16 @@ func (g *Metrics) IncrementEjectionRequest(mode string, status codes.Code) {
 func (g *Metrics) UpdateRequestedOperatorMetric(numOperatorsByQuorum map[uint8]int, stakeShareByQuorum map[uint8]float64) {
 	for q, count := range numOperatorsByQuorum {
 		for i := 0; i < count; i++ {
-			g.Operators.With(prometheus.Labels{
+			g.OperatorsEjected.With(prometheus.Labels{
 				"quorum": fmt.Sprintf("%d", q),
 				"state":  "requested",
-				"type":   "number",
 			}).Inc()
 		}
 	}
 	for q, stakeShare := range stakeShareByQuorum {
-		g.Operators.With(prometheus.Labels{
+		g.StakeEjected.With(prometheus.Labels{
 			"quorum": fmt.Sprintf("%d", q),
 			"state":  "requested",
-			"type":   "stake",
 		}).Add(stakeShare)
 	}
 }
