@@ -546,7 +546,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
+                            "$ref": "#/definitions/dataapi.OperatorPortCheckResponse"
                         }
                     },
                     "400": {
@@ -771,6 +771,26 @@ const docTemplate = `{
                 },
                 "total_unsigned_batches": {
                     "type": "integer"
+                }
+            }
+        },
+        "dataapi.OperatorPortCheckResponse": {
+            "type": "object",
+            "properties": {
+                "disperser_online": {
+                    "type": "boolean"
+                },
+                "disperser_socket": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "retriever_online": {
+                    "type": "boolean"
+                },
+                "retriever_socket": {
+                    "type": "string"
                 }
             }
         },

@@ -138,6 +138,19 @@ definitions:
       total_unsigned_batches:
         type: integer
     type: object
+  dataapi.OperatorPortCheckResponse:
+    properties:
+      disperser_online:
+        type: boolean
+      disperser_socket:
+        type: string
+      operator_id:
+        type: string
+      retriever_online:
+        type: boolean
+      retriever_socket:
+        type: string
+    type: object
   dataapi.OperatorsNonsigningPercentage:
     properties:
       data:
@@ -575,7 +588,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
         "400":
           description: 'error: Bad request'
           schema:

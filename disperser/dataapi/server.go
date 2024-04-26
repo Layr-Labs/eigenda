@@ -675,7 +675,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		operator_id	query		string	true	"Operator ID"
-//	@Success	200			{object}	ServiceAvailabilityResponse
+//	@Success	200			{object}	OperatorPortCheckResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
