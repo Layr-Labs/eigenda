@@ -455,6 +455,52 @@ func getEjector(t *testing.T) *ejectorComponents {
 	}
 }
 
+func TestPortCheckIpValidation(t *testing.T) {
+	assert.Equal(t, false, dataapi.ValidOperatorIP("", mockLogger))
+	assert.Equal(t, false, dataapi.ValidOperatorIP("0.0.0.0:32005", mockLogger))
+	assert.Equal(t, false, dataapi.ValidOperatorIP("10.0.0.1:32005", mockLogger))
+	assert.Equal(t, false, dataapi.ValidOperatorIP("::ffff:192.0.2.1:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("localhost:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("127.0.0.1:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("23.93.76.1:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("google.com:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("google.com", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("2606:4700:4400::ac40:98f1:32005", mockLogger))
+}
+
+func TestPortCheck(t *testing.T) {
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+	r := setUpRouter()
+	operator_id := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfo, nil)
+	r.GET("/v1/operators-info/port-check", testDataApiServer.OperatorPortCheck)
+	w := httptest.NewRecorder()
+	reqStr := fmt.Sprintf("/v1/operators-info/port-check?operator_id=%v", operator_id)
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
+	defer cancel()
+	req = req.WithContext(ctxWithDeadline)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.OperatorPortCheckResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
+	assert.Equal(t, false, response.DispersalOnline)
+	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
+	assert.Equal(t, false, response.RetrievalOnline)
+}
+
 func TestCheckBatcherHealthExpectServing(t *testing.T) {
 	r := setUpRouter()
 	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, nil, mockLogger, metrics, &MockGRPCConnection{}, nil, &MockHttpClient{ShouldSucceed: true})
@@ -597,6 +643,9 @@ func TestChurnerServiceAvailabilityHandler(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
 
 	defer goleak.VerifyNone(t)
 

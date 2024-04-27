@@ -146,10 +146,10 @@ type (
 
 	OperatorPortCheckResponse struct {
 		OperatorId      string `json:"operator_id"`
-		DisperserSocket string `json:"disperser_socket"`
-		RetrieverSocket string `json:"retriever_socket"`
-		DisperserOnline bool   `json:"disperser_online"`
-		RetrieverOnline bool   `json:"retriever_online"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
 	}
 	ErrorResponse struct {
 		Error string `json:"error"`
@@ -687,15 +687,15 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	operatorId := c.DefaultQuery("operator_id", "")
-	s.logger.Info("Checking operator ports", "operatorId", operatorId)
+	s.logger.Info("checking operator ports", "operatorId", operatorId)
 	portCheckResponse, err := s.probeOperatorPorts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
-			s.logger.Warn("Operator not found", "operatorId", operatorId)
+			s.logger.Warn("operator not found", "operatorId", operatorId)
 			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
 		} else {
-			s.logger.Error("Operator port check failed", "error", err)
+			s.logger.Error("operator port check failed", "error", err)
 			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
 		}
 		errorResponse(c, err)

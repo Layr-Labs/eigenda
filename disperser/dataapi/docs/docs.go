@@ -777,19 +777,19 @@ const docTemplate = `{
         "dataapi.OperatorPortCheckResponse": {
             "type": "object",
             "properties": {
-                "disperser_online": {
+                "dispersal_online": {
                     "type": "boolean"
                 },
-                "disperser_socket": {
+                "dispersal_socket": {
                     "type": "string"
                 },
                 "operator_id": {
                     "type": "string"
                 },
-                "retriever_online": {
+                "retrieval_online": {
                     "type": "boolean"
                 },
-                "retriever_socket": {
+                "retrieval_socket": {
                     "type": "string"
                 }
             }
