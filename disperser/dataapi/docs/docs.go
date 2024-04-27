@@ -15,6 +15,60 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/ejector/operators": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ejector"
+                ],
+                "summary": "Eject operators who violate the SLAs during the given time interval",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lookback window for operator ejection [default: 86400]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End time for evaluating operator ejection [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Whether it's periodic or urgent ejection request [default: periodic]",
+                        "name": "mode",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -342,6 +396,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]",
                         "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Whether return only live nonsigners [default: true]",
+                        "name": "live_only",
                         "in": "query"
                     }
                 ],
@@ -769,14 +829,16 @@ const docTemplate = `{
                 1,
                 2,
                 3,
-                4
+                4,
+                5
             ],
             "x-enum-varnames": [
                 "Processing",
                 "Confirmed",
                 "Failed",
                 "Finalized",
-                "InsufficientSignatures"
+                "InsufficientSignatures",
+                "Dispersing"
             ]
         },
         "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
