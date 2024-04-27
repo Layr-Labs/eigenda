@@ -205,6 +205,7 @@ definitions:
     - 2
     - 3
     - 4
+    - 5
     type: integer
     x-enum-varnames:
     - Processing
@@ -212,6 +213,7 @@ definitions:
     - Failed
     - Finalized
     - InsufficientSignatures
+    - Dispersing
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:
@@ -225,6 +227,42 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
+  /ejector/operators:
+    get:
+      parameters:
+      - description: 'Lookback window for operator ejection [default: 86400]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'End time for evaluating operator ejection [default: now]'
+        in: query
+        name: end
+        type: integer
+      - description: 'Whether it''s periodic or urgent ejection request [default:
+          periodic]'
+        in: query
+        name: mode
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Eject operators who violate the SLAs during the given time interval
+      tags:
+      - Ejector
   /feed/blobs:
     get:
       parameters:

@@ -306,14 +306,14 @@ func (s *server) Shutdown() error {
 //	@Summary	Eject operators who violate the SLAs during the given time interval
 //	@Tags		Ejector
 //	@Produce	json
-//	@Param		interval query int false "Lookback window for operator ejection [default: 86400]"
-//	@Param		end  query int false "End time for evaluating operator ejection [default: now]"
-//	@Param		mode query string "Whether it's periodic or urgent ejection request [default: periodic]"
-//	@Success	200			{object}	BlobMetadataResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/ejector/ejection [get]
+//	@Param		interval	query	int		false	"Lookback window for operator ejection [default: 86400]"
+//	@Param		end			query	int		false	"End time for evaluating operator ejection [default: now]"
+//	@Param		mode		query	string	false	"Whether it's periodic or urgent ejection request [default: periodic]"
+//	@Success	200
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/ejector/operators [get]
 func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
@@ -551,17 +551,17 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 
 // FetchOperatorsNonsigningPercentageHandler godoc
 //
-//		@Summary	Fetch operators non signing percentage
-//		@Tags		Metrics
-//		@Produce	json
-//		@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
-//		@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
-//	 @Param      live_only   query       string false   "Whether return only live nonsigners [default: true]"
-//		@Success	200			{object}	OperatorsNonsigningPercentage
-//		@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//		@Failure	404			{object}	ErrorResponse	"error: Not found"
-//		@Failure	500			{object}	ErrorResponse	"error: Server error"
-//		@Router		/metrics/operator-nonsigning-percentage  [get]
+//	@Summary	Fetch operators non signing percentage
+//	@Tags		Metrics
+//	@Produce	json
+//	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
+//	@Param		live_only	query		string	false	"Whether return only live nonsigners [default: true]"
+//	@Success	200			{object}	OperatorsNonsigningPercentage
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/operator-nonsigning-percentage  [get]
 func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
