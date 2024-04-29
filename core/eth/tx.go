@@ -364,7 +364,7 @@ func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) er
 	return nil
 }
 
-func (t *Transactor) EjectOperators(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Receipt, error) {
+func (t *Transactor) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Transaction, error) {
 	byteIdsByQuorum := make([][][32]byte, len(operatorsByQuorum))
 	for i, ids := range operatorsByQuorum {
 		for _, id := range ids {
@@ -376,17 +376,7 @@ func (t *Transactor) EjectOperators(ctx context.Context, operatorsByQuorum [][]c
 		t.Logger.Error("Failed to generate transact opts", "err", err)
 		return nil, err
 	}
-	txn, err := t.Bindings.EjectionManager.EjectOperators(opts, byteIdsByQuorum)
-	if err != nil {
-		t.Logger.Error("Failed to create transaction", "err", err)
-		return nil, err
-	}
-	receipt, err := t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), txn, "EjectOperators", nil)
-	if err != nil {
-		t.Logger.Error("Failed to eject operators", "err", err)
-		return nil, err
-	}
-	return receipt, nil
+	return t.Bindings.EjectionManager.EjectOperators(opts, byteIdsByQuorum)
 }
 
 // GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
