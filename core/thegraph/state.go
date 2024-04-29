@@ -47,7 +47,7 @@ type (
 	}
 
 	// The indexed operator state consists of both mutable properties (socket) and  immutable properties
-	// (everyhing else: pubkeyG1, pubkeyG2, id). For the socket, we always want the latest value, irrespective
+	// (everything else: pubkeyG1, pubkeyG2, id). For the socket, we always want the latest value, irrespective
 	// of the reference block number. For the immutable properties, we can also use the value from the latest block
 	// since value cannot change. Thus, we always pull the state from the latest block indexed by the subgraph.
 	//
