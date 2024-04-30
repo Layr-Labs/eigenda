@@ -249,7 +249,7 @@ func (s *server) Start() error {
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
 		ejection := v1.Group("/ejection")
-		ejection.GET("/operators", s.EjectOperatorsHandler)
+		ejection.POST("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
