@@ -3,10 +3,8 @@ package dataapi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -107,27 +105,24 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 }
 
 // Check that the socketString is not private/unspecified
-func ValidOperatorIP(socketString string, logger logging.Logger) bool {
-	host := strings.Split(socketString, ":")[0]
-	ips, err := net.LookupIP(host)
-	fmt.Printf("  Check Socket %s\n", socketString)
+func ValidOperatorIP(address string, logger logging.Logger) bool {
+	host, _, err := net.SplitHostPort(address)
 	if err != nil {
-		fmt.Printf("  IP error - %s\n", err)
+		logger.Error("Failed to split host port", "address", address, "error", err)
+		return false
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
 		logger.Error("Error resolving operator host IP", "host", host, "error", err)
 		return false
 	}
 	ipAddr := ips[0]
 	if ipAddr == nil {
-		fmt.Printf("  Nil error - %s\n", err)
 		logger.Error("IP address is nil", "host", host, "ips", ips)
 		return false
 	}
-	fmt.Printf("  IPS %v\n", ips)
-	fmt.Printf("  IP %v\n", ipAddr)
-	fmt.Printf("  isPrivate %v\n", ipAddr.IsPrivate())
-	fmt.Printf("  isUnspecified %v\n", ipAddr.IsUnspecified())
 	isValid := !ipAddr.IsPrivate() && !ipAddr.IsUnspecified()
-	logger.Debug("Operator IP validation", "socketString", socketString, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
+	logger.Debug("Operator IP validation", "address", address, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
 
 	return isValid
 }

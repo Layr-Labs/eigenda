@@ -460,12 +460,13 @@ func TestPortCheckIpValidation(t *testing.T) {
 	assert.Equal(t, false, dataapi.ValidOperatorIP("0.0.0.0:32005", mockLogger))
 	assert.Equal(t, false, dataapi.ValidOperatorIP("10.0.0.1:32005", mockLogger))
 	assert.Equal(t, false, dataapi.ValidOperatorIP("::ffff:192.0.2.1:32005", mockLogger))
+	assert.Equal(t, false, dataapi.ValidOperatorIP("google.com", mockLogger))
 	assert.Equal(t, true, dataapi.ValidOperatorIP("localhost:32005", mockLogger))
 	assert.Equal(t, true, dataapi.ValidOperatorIP("127.0.0.1:32005", mockLogger))
 	assert.Equal(t, true, dataapi.ValidOperatorIP("23.93.76.1:32005", mockLogger))
 	assert.Equal(t, true, dataapi.ValidOperatorIP("google.com:32005", mockLogger))
-	assert.Equal(t, true, dataapi.ValidOperatorIP("google.com", mockLogger))
-	assert.Equal(t, true, dataapi.ValidOperatorIP("2606:4700:4400::ac40:98f1:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("[2606:4700:4400::ac40:98f1]:32005", mockLogger))
+	assert.Equal(t, false, dataapi.ValidOperatorIP("2606:4700:4400::ac40:98f1:32005", mockLogger))
 }
 
 func TestPortCheck(t *testing.T) {
