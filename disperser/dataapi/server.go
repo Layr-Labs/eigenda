@@ -312,7 +312,7 @@ func (s *server) Shutdown() error {
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/ejector/operators [get]
+//	@Router		/ejector/operators [post]
 func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds

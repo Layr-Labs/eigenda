@@ -228,7 +228,7 @@ info:
   version: "1"
 paths:
   /ejector/operators:
-    get:
+    post:
       parameters:
       - description: 'Lookback window for operator ejection [default: 86400]'
         in: query
