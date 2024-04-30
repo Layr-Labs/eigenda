@@ -32,8 +32,7 @@ import (
 )
 
 var (
-	maxNumberOfQuorums      = 192
-	maxNumWorkerPoolThreads = 8
+	maxNumberOfQuorums = 192
 )
 
 type Transactor struct {
