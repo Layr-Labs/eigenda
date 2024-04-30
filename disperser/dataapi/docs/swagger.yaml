@@ -138,6 +138,19 @@ definitions:
       total_unsigned_batches:
         type: integer
     type: object
+  dataapi.OperatorPortCheckResponse:
+    properties:
+      dispersal_online:
+        type: boolean
+      dispersal_socket:
+        type: string
+      operator_id:
+        type: string
+      retrieval_online:
+        type: boolean
+      retrieval_socket:
+        type: string
+    type: object
   dataapi.OperatorsNonsigningPercentage:
     properties:
       data:
@@ -228,7 +241,7 @@ info:
   version: "1"
 paths:
   /ejector/operators:
-    get:
+    post:
       parameters:
       - description: 'Lookback window for operator ejection [default: 86400]'
         in: query
@@ -559,6 +572,36 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch list of operators that have been deregistered for days. Days
         is a query parameter with a default value of 14 and max value of 30.
+      tags:
+      - OperatorsInfo
+  /operators-info/port-check:
+    get:
+      parameters:
+      - description: Operator ID
+        in: query
+        name: operator_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Operator node reachability port check
       tags:
       - OperatorsInfo
 schemes:

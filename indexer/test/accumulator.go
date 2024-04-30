@@ -42,7 +42,7 @@ func (a *Accumulator) UpdateObject(object indexer.AccumulatorObject, header *ind
 	return obj, nil
 }
 
-// Serialize object takes the accummulator object, and serializes it using the rules for the specified fork.
+// Serialize object takes the accumulator object, and serializes it using the rules for the specified fork.
 func (a *Accumulator) SerializeObject(object indexer.AccumulatorObject, fork indexer.UpgradeFork) ([]byte, error) {
 
 	switch fork {

@@ -38,6 +38,7 @@ const (
 	// Cache control for responses.
 	// The time unit is second for max age.
 	maxOperatorsNonsigningPercentageAge = 10
+	maxOperatorPortCheckAge             = 600
 	maxNonSignerAge                     = 10
 	maxDeregisteredOperatorAage         = 10
 	maxThroughputAge                    = 10
@@ -139,6 +140,17 @@ type (
 		Data []*ServiceAvailability `json:"data"`
 	}
 
+	OperatorPortCheckRequest struct {
+		OperatorId string `json:"operator_id"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -153,7 +165,7 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
-		ejector        *ejector
+		ejector        *Ejector
 		ejectionToken  string
 
 		metrics                   *Metrics
@@ -172,6 +184,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
+	ejector *Ejector,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -192,8 +205,6 @@ func NewServer(
 	if eigenDAHttpServiceChecker == nil {
 		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
-
-	ejector := newEjector(logger, transactor, metrics)
 
 	return &server{
 		logger:                    logger.With("component", "DataAPIServer"),
@@ -237,6 +248,7 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -249,7 +261,7 @@ func (s *server) Start() error {
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
 		ejection := v1.Group("/ejection")
-		ejection.GET("/operators", s.EjectOperatorsHandler)
+		ejection.POST("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
@@ -313,7 +325,7 @@ func (s *server) Shutdown() error {
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/ejector/operators [get]
+//	@Router		/ejector/operators [post]
 func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
@@ -350,7 +362,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
 	if err == nil {
-		err = s.ejector.eject(c.Request.Context(), nonSigningRate)
+		err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
 	}
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("EjectOperators")
@@ -655,6 +667,43 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 		},
 		Data: operatorMetadatas,
 	})
+}
+
+// OperatorPortCheck godoc
+//
+//	@Summary	Operator node reachability port check
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Success	200			{object}	OperatorPortCheckResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/port-check [get]
+func (s *server) OperatorPortCheck(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("checking operator ports", "operatorId", operatorId)
+	portCheckResponse, err := s.probeOperatorPorts(c.Request.Context(), operatorId)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			err = errNotFound
+			s.logger.Warn("operator not found", "operatorId", operatorId)
+			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
+		} else {
+			s.logger.Error("operator port check failed", "error", err)
+			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+		}
+		errorResponse(c, err)
+		return
+	}
+
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, portCheckResponse)
 }
 
 // FetchDisperserServiceAvailability godoc
