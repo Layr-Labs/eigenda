@@ -112,11 +112,13 @@ func ValidOperatorIP(socketString string, logger logging.Logger) bool {
 	ips, err := net.LookupIP(host)
 	fmt.Printf("  Check Socket %s\n", socketString)
 	if err != nil {
+		fmt.Printf("  IP error - %s\n", err)
 		logger.Error("Error resolving operator host IP", "host", host, "error", err)
 		return false
 	}
 	ipAddr := ips[0]
 	if ipAddr == nil {
+		fmt.Printf("  Nil error - %s\n", err)
 		logger.Error("IP address is nil", "host", host, "ips", ips)
 		return false
 	}
