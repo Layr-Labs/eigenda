@@ -169,6 +169,14 @@ func (g *Metrics) UpdateEjectionGasUsed(gasUsed uint64) {
 	g.EjectionGasUsed.Set(float64(gasUsed))
 }
 
+// IncrementNotFoundRequestNum increments the number of not found requests
+func (g *Metrics) IncrementNotFoundRequestNum(method string) {
+	g.NumRequests.With(prometheus.Labels{
+		"status": "not found",
+		"method": method,
+	}).Inc()
+}
+
 // Start starts the metrics server
 func (g *Metrics) Start(ctx context.Context) {
 	g.logger.Info("Starting metrics server at ", "port", g.httpPort)
