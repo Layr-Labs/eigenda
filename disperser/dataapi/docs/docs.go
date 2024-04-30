@@ -16,7 +16,7 @@ const docTemplate = `{
     "basePath": "{{.BasePath}}",
     "paths": {
         "/ejector/operators": {
-            "get": {
+            "post": {
                 "produces": [
                     "application/json"
                 ],
