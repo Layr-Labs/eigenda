@@ -499,6 +499,9 @@ func TestPortCheck(t *testing.T) {
 	assert.Equal(t, false, response.DispersalOnline)
 	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
 	assert.Equal(t, false, response.RetrievalOnline)
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
 }
 
 func TestCheckBatcherHealthExpectServing(t *testing.T) {

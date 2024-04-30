@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sort"
 	"strings"
@@ -109,6 +110,7 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 func ValidOperatorIP(socketString string, logger logging.Logger) bool {
 	host := strings.Split(socketString, ":")[0]
 	ips, err := net.LookupIP(host)
+	fmt.Printf("  Check Socket %s\n", socketString)
 	if err != nil {
 		logger.Error("Error resolving operator host IP", "host", host, "error", err)
 		return false
@@ -118,6 +120,10 @@ func ValidOperatorIP(socketString string, logger logging.Logger) bool {
 		logger.Error("IP address is nil", "host", host, "ips", ips)
 		return false
 	}
+	fmt.Printf("  IPS %v\n", ips)
+	fmt.Printf("  IP %v\n", ipAddr)
+	fmt.Printf("  isPrivate %v\n", ipAddr.IsPrivate())
+	fmt.Printf("  isUnspecified %v\n", ipAddr.IsUnspecified())
 	isValid := !ipAddr.IsPrivate() && !ipAddr.IsUnspecified()
 	logger.Debug("Operator IP validation", "socketString", socketString, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
 
