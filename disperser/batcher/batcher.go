@@ -40,13 +40,12 @@ type QuorumInfo struct {
 }
 
 type TimeoutConfig struct {
-	EncodingTimeout      time.Duration
-	AttestationTimeout   time.Duration
-	ChainReadTimeout     time.Duration
-	ChainWriteTimeout    time.Duration
-	ChainStateTimeout    time.Duration
-	FireblocksAPITimeout time.Duration
-	TxnBroadcastTimeout  time.Duration
+	EncodingTimeout     time.Duration
+	AttestationTimeout  time.Duration
+	ChainReadTimeout    time.Duration
+	ChainWriteTimeout   time.Duration
+	ChainStateTimeout   time.Duration
+	TxnBroadcastTimeout time.Duration
 }
 
 type Config struct {

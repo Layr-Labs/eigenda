@@ -38,8 +38,7 @@ type Config struct {
 	ChurnerHostname    string
 	BatcherHealthEndpt string
 
-	FireblockAPITimeout time.Duration
-	TxnTimeout          time.Duration
+	TxnTimeout time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -87,8 +86,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 
-		FireblockAPITimeout: ctx.GlobalDuration(flags.FireblockAPITimeoutFlag.Name),
-		TxnTimeout:          ctx.GlobalDuration(flags.TxnTimeoutFlag.Name),
+		TxnTimeout: ctx.GlobalDuration(flags.TxnTimeoutFlag.Name),
 	}
 	return config, nil
 }

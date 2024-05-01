@@ -185,7 +185,7 @@ func getWallet(config Config, ethClient common.EthClient, logger logging.Logger)
 			apiKey,
 			[]byte(secretKey),
 			config.FireblocksConfig.BaseURL,
-			config.FireblockAPITimeout,
+			config.FireblocksConfig.APITimeout,
 			logger.With("component", "FireblocksClient"),
 		)
 		if err != nil {

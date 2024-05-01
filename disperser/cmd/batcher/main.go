@@ -191,7 +191,7 @@ func RunBatcher(ctx *cli.Context) error {
 			apiKey,
 			[]byte(secretKey),
 			config.FireblocksConfig.BaseURL,
-			config.TimeoutConfig.FireblocksAPITimeout,
+			config.FireblocksConfig.APITimeout,
 			logger.With("component", "FireblocksClient"),
 		)
 		if err != nil {
