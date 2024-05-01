@@ -10,11 +10,23 @@ import (
 
 // PrefixEnvVar returns the environment variable name with the given prefix and suffix
 func PrefixEnvVar(prefix, suffix string) string {
+	if prefix == "" {
+		return suffix
+	}
+	if suffix == "" {
+		return prefix
+	}
 	return prefix + "_" + suffix
 }
 
 // PrefixFlag returns the flag name with the given prefix and suffix
 func PrefixFlag(prefix, suffix string) string {
+	if prefix == "" {
+		return suffix
+	}
+	if suffix == "" {
+		return prefix
+	}
 	return prefix + "." + suffix
 }
 
