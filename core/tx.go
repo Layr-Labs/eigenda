@@ -70,6 +70,11 @@ type Transactor interface {
 	// UpdateOperatorSocket updates the socket of the operator in all the quorums that it is registered with.
 	UpdateOperatorSocket(ctx context.Context, socket string) error
 
+	// BuildEjectOperatorsTxn returns a transaction that ejects operators from AVS registryCoordinator.
+	// The operatorsByQuorum provides a list of operators for each quorum. Within a quorum,
+	// the operators are ordered; in case of rate limiting, the first operators will be ejected.
+	BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]OperatorID) (*types.Transaction, error)
+
 	// GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
 	//  is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 	// are also returned.
@@ -96,6 +101,9 @@ type Transactor interface {
 
 	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)
+
+	// OperatorAddressToID returns the operator id from the operator address.
+	OperatorAddressToID(ctx context.Context, operatorAddress gethcommon.Address) (OperatorID, error)
 
 	// BatchOperatorIDToAddress returns the addresses of the operators from the operator id.
 	BatchOperatorIDToAddress(ctx context.Context, operatorIds []OperatorID) ([]gethcommon.Address, error)

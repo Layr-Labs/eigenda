@@ -23,9 +23,6 @@ const (
 	// Min number of seconds for the ExpirationPollIntervalSecFlag.
 	minExpirationPollIntervalSec = 3
 	AppName                      = "da-node"
-	SemVer                       = "0.6.1"
-	GitCommit                    = ""
-	GitDate                      = ""
 )
 
 var (
@@ -35,6 +32,9 @@ var (
 		0: "eth_quorum",
 		1: "permissioned_quorum",
 	}
+	SemVer    = "v0.0.0"
+	GitCommit = ""
+	GitDate   = ""
 )
 
 // Config contains all of the configuration information for a DA node.
@@ -48,6 +48,7 @@ type Config struct {
 	NodeApiPort                   string
 	EnableMetrics                 bool
 	MetricsPort                   string
+	OnchainMetricsInterval        int64
 	Timeout                       time.Duration
 	RegisterNodeAtStart           bool
 	ExpirationPollIntervalSec     uint64
@@ -167,6 +168,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		NodeApiPort:                   ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                 ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		MetricsPort:                   ctx.GlobalString(flags.MetricsPortFlag.Name),
+		OnchainMetricsInterval:        ctx.GlobalInt64(flags.OnchainMetricsIntervalFlag.Name),
 		Timeout:                       timeout,
 		RegisterNodeAtStart:           registerNodeAtStart,
 		ExpirationPollIntervalSec:     expirationPollIntervalSec,

@@ -325,6 +325,8 @@ type OperatorVars struct {
 	NODE_LOG_PATH string
 
 	NODE_LOG_FORMAT string
+
+	NODE_ONCHAIN_METRICS_INTERVAL string
 }
 
 func (vars OperatorVars) getEnvMap() map[string]string {

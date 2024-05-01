@@ -3,6 +3,7 @@ package apiserver_test
 import (
 	"context"
 	"crypto/rand"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -19,6 +20,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/urfave/cli"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
@@ -292,7 +294,7 @@ func TestGetBlobStatus(t *testing.T) {
 	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetQuorumIndexes(), quorumIndexes)
 }
 
-func TestGetBlobConfirmingStatus(t *testing.T) {
+func TestGetBlobDispersingStatus(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
@@ -304,11 +306,11 @@ func TestGetBlobConfirmingStatus(t *testing.T) {
 	assert.NotNil(t, requestID)
 	blobKey, err := disperser.ParseBlobKey(string(requestID))
 	assert.NoError(t, err)
-	err = queue.MarkBlobConfirming(context.Background(), blobKey)
+	err = queue.MarkBlobDispersing(context.Background(), blobKey)
 	assert.NoError(t, err)
 	meta, err := queue.GetBlobMetadata(context.Background(), blobKey)
 	assert.NoError(t, err)
-	assert.Equal(t, meta.BlobStatus, disperser.Confirming)
+	assert.Equal(t, meta.BlobStatus, disperser.Dispersing)
 
 	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 		RequestId: requestID,
@@ -362,7 +364,7 @@ func TestRetrieveBlob(t *testing.T) {
 		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
 
 		// Retrieve the blob and compare it with the original data
-		retrieveData, err := retrieveBlob(t, dispersalServer, requestID, 1)
+		retrieveData, err := retrieveBlob(dispersalServer, requestID, 1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, data, retrieveData)
@@ -390,7 +392,7 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
 	// Try to retrieve the blob before it is confirmed
-	_, err = retrieveBlob(t, dispersalServer, requestID, 2)
+	_, err = retrieveBlob(dispersalServer, requestID, 2)
 	assert.NotNil(t, err)
 	assert.Equal(t, "rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index", err.Error())
 
@@ -417,6 +419,83 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	})
 	assert.NotNil(t, err)
 	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = blob size cannot exceed 2 MiB")
+}
+
+func TestParseAllowlist(t *testing.T) {
+	fs := flag.NewFlagSet("disperser", flag.ContinueOnError)
+	allowlistFlag := apiserver.AllowlistFlag("disperser")
+	allowlistFlag.Apply(fs)
+	allowlistFileFlag := apiserver.AllowlistFileFlag("disperser")
+	allowlistFileFlag.Apply(fs)
+	err := fs.Parse([]string{"--auth.allowlist", "52.202.222.39/0/100/52428800"})
+	assert.NoError(t, err)
+	err = fs.Parse([]string{"--auth.allowlist", "52.202.222.39/1/100/52428800"})
+	assert.NoError(t, err)
+	err = fs.Parse([]string{"--auth.allowlist", "3.225.189.232/0/1/1024"})
+	assert.NoError(t, err)
+
+	f, err := os.CreateTemp("", "allowlist.*.json")
+	assert.NoError(t, err)
+	defer os.Remove(f.Name())
+	_, err = f.WriteString(`
+[
+  {
+    "name": "eigenlabs",
+    "account": "0.1.2.3",
+    "quorumID": 0,
+    "blobRate": 0.01,
+    "byteRate": 1024
+  },
+  {
+    "name": "eigenlabs",
+    "account": "0.1.2.3",
+    "quorumID": 1,
+    "blobRate": 1,
+    "byteRate": 1048576
+  },
+  {
+    "name": "foo",
+    "account": "5.5.5.5",
+    "quorumID": 1,
+    "blobRate": 0.1,
+    "byteRate": 4092
+  }
+]
+	`)
+	assert.NoError(t, err)
+	err = fs.Parse([]string{"--auth.allowlist-file", f.Name()})
+	assert.NoError(t, err)
+	c := cli.NewContext(nil, fs, nil)
+	rateConfig, err := apiserver.ReadCLIConfig(c)
+	assert.NoError(t, err)
+	assert.Contains(t, rateConfig.Allowlist, "52.202.222.39")
+	assert.Contains(t, rateConfig.Allowlist, "3.225.189.232")
+	assert.Contains(t, rateConfig.Allowlist["52.202.222.39"], uint8(0))
+	assert.Contains(t, rateConfig.Allowlist["52.202.222.39"], uint8(1))
+	assert.Contains(t, rateConfig.Allowlist["3.225.189.232"], uint8(0))
+	assert.NotContains(t, rateConfig.Allowlist["3.225.189.232"], uint8(1))
+	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][0].BlobRate, uint32(100*1e6))
+	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][0].Throughput, uint32(52428800))
+	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][1].BlobRate, uint32(100*1e6))
+	assert.Equal(t, rateConfig.Allowlist["52.202.222.39"][1].Throughput, uint32(52428800))
+	assert.Equal(t, rateConfig.Allowlist["3.225.189.232"][0].BlobRate, uint32(1e6))
+	assert.Equal(t, rateConfig.Allowlist["3.225.189.232"][0].Throughput, uint32(1024))
+
+	assert.Contains(t, rateConfig.Allowlist, "0.1.2.3")
+	assert.Contains(t, rateConfig.Allowlist, "5.5.5.5")
+	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(0))
+	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(1))
+	assert.Contains(t, rateConfig.Allowlist["5.5.5.5"], uint8(1))
+	assert.NotContains(t, rateConfig.Allowlist["5.5.5.5"], uint8(0))
+	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Name, "eigenlabs")
+	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
+	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Throughput, uint32(1024))
+	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].Name, "eigenlabs")
+	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].BlobRate, uint32(1e6))
+	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].Throughput, uint32(1048576))
+	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Name, "foo")
+	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Throughput, uint32(4092))
 }
 
 func setup(m *testing.M) {
@@ -560,7 +639,7 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()
 }
 
-func retrieveBlob(t *testing.T, server *apiserver.DispersalServer, requestID []byte, blobIndex uint32) ([]byte, error) {
+func retrieveBlob(server *apiserver.DispersalServer, requestID []byte, blobIndex uint32) ([]byte, error) {
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),

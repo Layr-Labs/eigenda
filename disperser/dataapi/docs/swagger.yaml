@@ -116,6 +116,19 @@ definitions:
       total_unsigned_batches:
         type: integer
     type: object
+  dataapi.OperatorPortCheckResponse:
+    properties:
+      dispersal_online:
+        type: boolean
+      dispersal_socket:
+        type: string
+      operator_id:
+        type: string
+      retrieval_online:
+        type: boolean
+      retrieval_socket:
+        type: string
+    type: object
   dataapi.OperatorsNonsigningPercentage:
     properties:
       data:
@@ -213,7 +226,7 @@ definitions:
     - Failed
     - Finalized
     - InsufficientSignatures
-    - Confirming
+    - Dispersing
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:
@@ -227,6 +240,42 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
+  /ejector/operators:
+    post:
+      parameters:
+      - description: 'Lookback window for operator ejection [default: 86400]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'End time for evaluating operator ejection [default: now]'
+        in: query
+        name: end
+        type: integer
+      - description: 'Whether it''s periodic or urgent ejection request [default:
+          periodic]'
+        in: query
+        name: mode
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Eject operators who violate the SLAs during the given time interval
+      tags:
+      - Ejector
   /feed/blobs:
     get:
       parameters:
@@ -439,6 +488,10 @@ paths:
         in: query
         name: end
         type: string
+      - description: 'Whether return only live nonsigners [default: true]'
+        in: query
+        name: live_only
+        type: string
       produces:
       - application/json
       responses:
@@ -519,6 +572,36 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch list of operators that have been deregistered for days. Days
         is a query parameter with a default value of 14 and max value of 30.
+      tags:
+      - OperatorsInfo
+  /operators-info/port-check:
+    get:
+      parameters:
+      - description: Operator ID
+        in: query
+        name: operator_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Operator node reachability port check
       tags:
       - OperatorsInfo
   /operators-info/registered-operators:

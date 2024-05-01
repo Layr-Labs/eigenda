@@ -2,12 +2,10 @@ package subgraph
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/shurcooL/graphql"
 )
 
@@ -26,7 +24,7 @@ type (
 		QueryBatchNonSigningInfo(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error)
 		QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
 		QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*Operator, error)
-		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error)
+		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*IndexedOperatorInfo, error)
 		QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 	}
@@ -196,11 +194,13 @@ func (a *api) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Co
 	return query.OperatorDeregistereds, nil
 }
 
-func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*IndexedOperatorInfo, error) {
+func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*IndexedOperatorInfo, error) {
+	fmt.Printf("==QueryOperatorInfoByOperatorIdAtBlockNumber ==== operatorId: %v\n", operatorId)
+
 	var (
 		query     queryOperatorById
 		variables = map[string]any{
-			"id": graphql.String(fmt.Sprintf("0x%s", hex.EncodeToString(operatorId[:]))),
+			"id": graphql.String(fmt.Sprintf("0x%s", operatorId)),
 		}
 	)
 	err := a.operatorStateGql.Query(context.Background(), &query, variables)

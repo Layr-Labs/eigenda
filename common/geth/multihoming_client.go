@@ -85,7 +85,7 @@ func (m *MultiHomingClient) SuggestGasTipCap(ctx context.Context) (*big.Int, err
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "SuggestGasTipCap") {
 			break
 		}
 	}
@@ -103,7 +103,7 @@ func (m *MultiHomingClient) HeaderByNumber(ctx context.Context, number *big.Int)
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "HeaderByNumber") {
 			break
 		}
 	}
@@ -121,7 +121,7 @@ func (m *MultiHomingClient) EstimateGas(ctx context.Context, msg ethereum.CallMs
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "EstimateGas") {
 			break
 		}
 
@@ -140,7 +140,7 @@ func (m *MultiHomingClient) SendTransaction(ctx context.Context, tx *types.Trans
 			return nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "SendTransaction") {
 			break
 		}
 
@@ -159,7 +159,7 @@ func (m *MultiHomingClient) TransactionReceipt(ctx context.Context, txHash gethc
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "TransactionReceipt") {
 			break
 		}
 
@@ -178,7 +178,7 @@ func (m *MultiHomingClient) BlockNumber(ctx context.Context) (uint64, error) {
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "BlockNumber") {
 			break
 		}
 
@@ -198,7 +198,7 @@ func (m *MultiHomingClient) BalanceAt(ctx context.Context, account gethcommon.Ad
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "BalanceAt") {
 			break
 		}
 
@@ -217,7 +217,7 @@ func (m *MultiHomingClient) BlockByHash(ctx context.Context, hash gethcommon.Has
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "BlockByHash") {
 			break
 		}
 
@@ -236,7 +236,7 @@ func (m *MultiHomingClient) BlockByNumber(ctx context.Context, number *big.Int) 
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "BlockByNumber") {
 			break
 		}
 
@@ -259,7 +259,7 @@ func (m *MultiHomingClient) CallContract(
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "CallContract") {
 			break
 		}
 
@@ -282,7 +282,7 @@ func (m *MultiHomingClient) CallContractAtHash(
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "CallContractAtHash") {
 			break
 		}
 
@@ -305,7 +305,7 @@ func (m *MultiHomingClient) CodeAt(
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "CodeAt") {
 			break
 		}
 
@@ -329,7 +329,7 @@ func (m *MultiHomingClient) FeeHistory(
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "FeeHistory") {
 			break
 		}
 
@@ -348,7 +348,7 @@ func (m *MultiHomingClient) FilterLogs(ctx context.Context, q ethereum.FilterQue
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "FilterLogs") {
 			break
 		}
 
@@ -367,7 +367,7 @@ func (m *MultiHomingClient) HeaderByHash(ctx context.Context, hash gethcommon.Ha
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "HeaderByHash") {
 			break
 		}
 
@@ -386,7 +386,7 @@ func (m *MultiHomingClient) NetworkID(ctx context.Context) (*big.Int, error) {
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "NetworkID") {
 			break
 		}
 
@@ -405,7 +405,7 @@ func (m *MultiHomingClient) NonceAt(ctx context.Context, account gethcommon.Addr
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "NonceAt") {
 			break
 		}
 
@@ -424,7 +424,7 @@ func (m *MultiHomingClient) PeerCount(ctx context.Context) (uint64, error) {
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PeerCount") {
 			break
 		}
 
@@ -443,7 +443,7 @@ func (m *MultiHomingClient) PendingBalanceAt(ctx context.Context, account gethco
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PendingBalanceAt") {
 			break
 		}
 
@@ -462,7 +462,7 @@ func (m *MultiHomingClient) PendingCallContract(ctx context.Context, msg ethereu
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PendingCallContract") {
 			break
 		}
 
@@ -481,7 +481,7 @@ func (m *MultiHomingClient) PendingCodeAt(ctx context.Context, account gethcommo
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PendingCodeAt") {
 			break
 		}
 
@@ -500,7 +500,7 @@ func (m *MultiHomingClient) PendingNonceAt(ctx context.Context, account gethcomm
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PendingNonceAt") {
 			break
 		}
 
@@ -518,7 +518,7 @@ func (m *MultiHomingClient) PendingStorageAt(ctx context.Context, account gethco
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PendingStorageAt") {
 			break
 		}
 
@@ -536,7 +536,7 @@ func (m *MultiHomingClient) PendingTransactionCount(ctx context.Context) (uint, 
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "PendingTransactionCount") {
 			break
 		}
 
@@ -555,7 +555,7 @@ func (m *MultiHomingClient) StorageAt(ctx context.Context, account gethcommon.Ad
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "StorageAt") {
 			break
 		}
 
@@ -575,7 +575,7 @@ func (m *MultiHomingClient) SubscribeFilterLogs(ctx context.Context, q ethereum.
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "SubscribeFilterLogs") {
 			break
 		}
 
@@ -595,7 +595,7 @@ func (m *MultiHomingClient) SubscribeNewHead(ctx context.Context, ch chan<- *typ
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "SubscribeNewHead") {
 			break
 		}
 
@@ -614,7 +614,7 @@ func (m *MultiHomingClient) SuggestGasPrice(ctx context.Context) (*big.Int, erro
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "SuggestGasPrice") {
 			break
 		}
 
@@ -633,7 +633,7 @@ func (m *MultiHomingClient) SyncProgress(ctx context.Context) (*ethereum.SyncPro
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "SyncProgress") {
 			break
 		}
 
@@ -652,7 +652,7 @@ func (m *MultiHomingClient) TransactionByHash(ctx context.Context, hash gethcomm
 			return tx, isPending, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "TransactionByHash") {
 			break
 		}
 
@@ -671,7 +671,7 @@ func (m *MultiHomingClient) TransactionCount(ctx context.Context, blockHash geth
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "TransactionCount") {
 			break
 		}
 
@@ -690,7 +690,7 @@ func (m *MultiHomingClient) TransactionInBlock(ctx context.Context, blockHash ge
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "TransactionInBlock") {
 			break
 		}
 
@@ -709,7 +709,7 @@ func (m *MultiHomingClient) TransactionSender(ctx context.Context, tx *types.Tra
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "TransactionSender") {
 			break
 		}
 
@@ -728,7 +728,7 @@ func (m *MultiHomingClient) ChainID(ctx context.Context) (*big.Int, error) {
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "ChainID") {
 			break
 		}
 
@@ -747,7 +747,7 @@ func (m *MultiHomingClient) GetLatestGasCaps(ctx context.Context) (*big.Int, *bi
 			return gasTipCap, gasFeeCap, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "GetLatestGasCaps") {
 			break
 		}
 
@@ -766,7 +766,7 @@ func (m *MultiHomingClient) EstimateGasPriceAndLimitAndSendTx(ctx context.Contex
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "EstimateGasPriceAndLimitAndSendTx") {
 			break
 		}
 
@@ -785,7 +785,7 @@ func (m *MultiHomingClient) UpdateGas(ctx context.Context, tx *types.Transaction
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "UpdateGas") {
 			break
 		}
 
@@ -803,7 +803,7 @@ func (m *MultiHomingClient) EnsureTransactionEvaled(ctx context.Context, tx *typ
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "EnsureTransactionEvaled") {
 			break
 		}
 
@@ -822,7 +822,7 @@ func (m *MultiHomingClient) EnsureAnyTransactionEvaled(ctx context.Context, txs 
 			return result, nil
 		}
 		errLast = err
-		if m.ProcessError(err, rpcIndex) {
+		if m.ProcessError(err, rpcIndex, "EnsureAnyTransactionEvaled") {
 			break
 		}
 

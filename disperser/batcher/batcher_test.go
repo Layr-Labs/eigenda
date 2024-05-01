@@ -415,7 +415,7 @@ func TestBlobRetry(t *testing.T) {
 	// ConfirmBatch transaction has been sent. Waiting for transaction to be confirmed onchain
 	meta, err := blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
-	assert.Equal(t, disperser.Confirming, meta.BlobStatus)
+	assert.Equal(t, disperser.Dispersing, meta.BlobStatus)
 	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
 	assert.ErrorContains(t, err, "no such key")
 	assert.Nil(t, encodedResult)
@@ -428,7 +428,7 @@ func TestBlobRetry(t *testing.T) {
 		t.Fatal("shouldn't have picked up any blobs to encode")
 	case <-timer.C:
 	}
-	batch, err := components.encodingStreamer.CreateBatch()
+	batch, err := components.encodingStreamer.CreateBatch(context.Background())
 	assert.ErrorContains(t, err, "no encoded results")
 	assert.Nil(t, batch)
 
@@ -443,13 +443,13 @@ func TestBlobRetry(t *testing.T) {
 	case <-timer.C:
 	}
 
-	batch, err = components.encodingStreamer.CreateBatch()
+	batch, err = components.encodingStreamer.CreateBatch(context.Background())
 	assert.ErrorContains(t, err, "no encoded results")
 	assert.Nil(t, batch)
 
 	meta, err = blobStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
-	assert.Equal(t, disperser.Confirming, meta.BlobStatus)
+	assert.Equal(t, disperser.Dispersing, meta.BlobStatus)
 
 	// Trigger a retry
 	confirmationErr := errors.New("error")

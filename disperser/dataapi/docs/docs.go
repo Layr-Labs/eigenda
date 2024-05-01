@@ -15,6 +15,60 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/ejector/operators": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Ejector"
+                ],
+                "summary": "Eject operators who violate the SLAs during the given time interval",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lookback window for operator ejection [default: 86400]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End time for evaluating operator ejection [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Whether it's periodic or urgent ejection request [default: periodic]",
+                        "name": "mode",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -343,6 +397,12 @@ const docTemplate = `{
                         "description": "End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]",
                         "name": "end",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Whether return only live nonsigners [default: true]",
+                        "name": "live_only",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -441,6 +501,52 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/dataapi.QueriedStateOperatorsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators-info/port-check": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Operator node reachability port check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "operator_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.OperatorPortCheckResponse"
                         }
                     },
                     "400": {
@@ -671,6 +777,26 @@ const docTemplate = `{
                 }
             }
         },
+        "dataapi.OperatorPortCheckResponse": {
+            "type": "object",
+            "properties": {
+                "dispersal_online": {
+                    "type": "boolean"
+                },
+                "dispersal_socket": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "retrieval_online": {
+                    "type": "boolean"
+                },
+                "retrieval_socket": {
+                    "type": "string"
+                }
+            }
+        },
         "dataapi.OperatorsNonsigningPercentage": {
             "type": "object",
             "properties": {
@@ -815,7 +941,7 @@ const docTemplate = `{
                 "Failed",
                 "Finalized",
                 "InsufficientSignatures",
-                "Confirming"
+                "Dispersing"
             ]
         },
         "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {

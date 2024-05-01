@@ -121,13 +121,6 @@ var (
 		Value:    15 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_STATE_TIMEOUT"),
 	}
-	FireblocksAPITimeoutFlag = cli.DurationFlag{
-		Name:     "fireblocks-write-timeout",
-		Usage:    "connection timeout to get API response from Fireblocks",
-		Required: false,
-		Value:    10 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FIREBLOCKS_API_TIMEOUT"),
-	}
 	TransactionBroadcastTimeoutFlag = cli.DurationFlag{
 		Name:     "transaction-broadcast-timeout",
 		Usage:    "timeout to broadcast transaction",
@@ -223,7 +216,6 @@ var optionalFlags = []cli.Flag{
 	ChainReadTimeoutFlag,
 	ChainWriteTimeoutFlag,
 	ChainStateTimeoutFlag,
-	FireblocksAPITimeoutFlag,
 	TransactionBroadcastTimeoutFlag,
 	NumConnectionsFlag,
 	FinalizerIntervalFlag,

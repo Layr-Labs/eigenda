@@ -33,7 +33,7 @@ func NewFailoverController(logger logging.Logger, rpcUrls []string) (*FailoverCo
 
 // ProcessError attributes the error and updates total number of fault for RPC
 // It returns if RPC should immediately give up
-func (f *FailoverController) ProcessError(err error, rpcIndex int) bool {
+func (f *FailoverController) ProcessError(err error, rpcIndex int, funcName string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err == nil {
@@ -47,7 +47,7 @@ func (f *FailoverController) ProcessError(err error, rpcIndex int) bool {
 		urlDomain = f.UrlDomains[rpcIndex]
 	}
 
-	nextEndpoint, action := f.handleError(err, urlDomain)
+	nextEndpoint, action := f.handleError(err, urlDomain, funcName)
 
 	if nextEndpoint == NewRPC {
 		f.numberRpcFault += 1

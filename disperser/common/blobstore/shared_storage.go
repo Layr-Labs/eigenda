@@ -156,8 +156,8 @@ func (s *SharedBlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadat
 	return &newMetadata, s.blobMetadataStore.UpdateBlobMetadata(ctx, existingMetadata.GetBlobKey(), &newMetadata)
 }
 
-func (s *SharedBlobStore) MarkBlobConfirming(ctx context.Context, metadataKey disperser.BlobKey) error {
-	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Confirming)
+func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey disperser.BlobKey) error {
+	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Dispersing)
 }
 
 func (s *SharedBlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {

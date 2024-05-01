@@ -15,7 +15,7 @@ import {IStakeRegistry, IDelegationManager} from "eigenlayer-middleware/interfac
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
 
-import {EigenDAServiceManager, IAVSDirectory} from "../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IAVSDirectory, IPaymentCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 
 import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
@@ -187,6 +187,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             IAVSDirectory(address(avsDirectory)),
+            IPaymentCoordinator(address(0)),
             registryCoordinator,
             stakeRegistry
         );

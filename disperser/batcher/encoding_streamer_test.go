@@ -429,7 +429,7 @@ func TestPartialBlob(t *testing.T) {
 
 	// get batch
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(10))
-	batch, err := encodingStreamer.CreateBatch()
+	batch, err := encodingStreamer.CreateBatch(context.Background())
 	assert.Nil(t, err)
 	assert.NotNil(t, batch)
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(0))
@@ -644,10 +644,25 @@ func TestGetBatch(t *testing.T) {
 
 	// get batch
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(10))
-	batch, err := encodingStreamer.CreateBatch()
+	batch, err := encodingStreamer.CreateBatch(context.Background())
 	assert.Nil(t, err)
 	assert.NotNil(t, batch)
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(0))
+	metadata1, err = c.blobStore.GetBlobMetadata(ctx, metadataKey1)
+	assert.Nil(t, err)
+	assert.Equal(t, disperser.Dispersing, metadata1.BlobStatus)
+	metadata2, err = c.blobStore.GetBlobMetadata(ctx, metadataKey2)
+	assert.Equal(t, disperser.Dispersing, metadata2.BlobStatus)
+	assert.Nil(t, err)
+	res, err := encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey1, core.QuorumID(0))
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "GetEncodedBlob: no such key")
+	res, err = encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey1, core.QuorumID(1))
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "GetEncodedBlob: no such key")
+	res, err = encodingStreamer.EncodedBlobstore.GetEncodingResult(metadataKey2, core.QuorumID(0))
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "GetEncodedBlob: no such key")
 
 	// Check BatchHeader
 	assert.NotNil(t, batch.BatchHeader)

@@ -70,8 +70,6 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 
 	promReg := prometheus.NewRegistry()
 	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger.With("component", "EigenMetrics"))
-
-	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort)
 	rpcCallsCollector := rpccalls.NewCollector(AppName, promReg)
 
 	// Generate BLS keys
@@ -110,6 +108,8 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
+	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
+
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
 	if err != nil {
@@ -117,8 +117,6 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
-
-	// Create new store
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
@@ -140,6 +138,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 		}
 		storeDurationBlocks = storeDuration
 	}
+	// Create new store
 	store, err := NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, blockStaleMeasure, storeDurationBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new store: %w", err)
@@ -150,10 +149,15 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
+	nodeLogger := logger.With("component", "Node")
+	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
+		"dispersalPort", config.DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
+		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
+		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks)
 
 	return &Node{
 		Config:                  config,
-		Logger:                  logger.With("component", "Node"),
+		Logger:                  nodeLogger,
 		KeyPair:                 keyPair,
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
@@ -183,6 +187,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 	// Build the socket based on the hostname/IP provided in the CLI
 	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
+	var operator *Operator
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
 			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
@@ -192,7 +197,7 @@ func (n *Node) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
 		}
-		operator := &Operator{
+		operator = &Operator{
 			Address:             crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
 			Socket:              socket,
 			Timeout:             10 * time.Second,
@@ -213,6 +218,16 @@ func (n *Node) Start(ctx context.Context) error {
 			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
 		} else {
 			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet", n.ChainID.String())
+		}
+	}
+
+	if operator != nil && operator.Address != "" {
+		operatorID, err := n.Transactor.OperatorAddressToID(ctx, gethcommon.HexToAddress(operator.Address))
+		if err != nil {
+			return fmt.Errorf("failed to get operator ID: %w", err)
+		}
+		if operatorID != operator.OperatorId {
+			return fmt.Errorf("operator ID mismatch: expected %s, got %s", operator.OperatorId.Hex(), operatorID.Hex())
 		}
 	}
 

@@ -35,6 +35,7 @@ type (
 		QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error)
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
+		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -52,12 +53,12 @@ type (
 		TxFee    uint64
 	}
 	Operator struct {
-		Id              []byte
-		OperatorId      []byte
-		Operator        []byte
+		Id              string
+		OperatorId      string
+		Operator        string
 		BlockTimestamp  uint64
 		BlockNumber     uint64
-		TransactionHash []byte
+		TransactionHash string
 	}
 	OperatorQuorum struct {
 		Operator       string
@@ -132,6 +133,22 @@ func (sc *subgraphClient) QueryOperatorsWithLimit(ctx context.Context, limit int
 		operators[i] = operator
 	}
 	return operators, nil
+}
+
+func (sc *subgraphClient) QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error) {
+	operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, 0)
+	if err != nil {
+		sc.logger.Error(fmt.Sprintf("failed to query operator info for operator %s", operatorId))
+		return nil, err
+	}
+
+	indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
+	if err != nil {
+		errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info for operator %s", operatorId)
+		sc.logger.Error(errorMessage)
+		return nil, err
+	}
+	return indexedOperatorInfo, nil
 }
 
 func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error) {
@@ -308,7 +325,7 @@ func getOperatorInfoForQueriedOperators(sc *subgraphClient, ctx context.Context,
 		// Copy the operator id to a 32 byte array.
 		copy(operatorId[:], operator.OperatorId)
 
-		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, uint32(operator.BlockNumber))
+		operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operator.OperatorId, uint32(operator.BlockNumber))
 		if err != nil {
 			operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
 			errorMessage := fmt.Sprintf("query operator info by operator id at block number failed: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)
@@ -399,12 +416,12 @@ func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	}
 
 	return &Operator{
-		Id:              []byte(operator.Id),
-		OperatorId:      []byte(operator.OperatorId),
-		Operator:        []byte(operator.Operator),
+		Id:              string(operator.Id),
+		OperatorId:      string(operator.OperatorId),
+		Operator:        string(operator.Operator),
 		BlockTimestamp:  timestamp,
 		BlockNumber:     blockNum,
-		TransactionHash: []byte(operator.TransactionHash),
+		TransactionHash: string(operator.TransactionHash),
 	}, nil
 }
 
