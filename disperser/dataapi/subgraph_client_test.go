@@ -349,7 +349,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfo = &subgraph.QueriedStateOperatorInfo{
+	subgraphDeregisteredOperatorInfo = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo1,
 		BlockNumber:         22,
 		Metadata: &subgraph.Operator{
@@ -362,7 +362,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfo2 = &subgraph.QueriedStateOperatorInfo{
+	subgraphDeregisteredOperatorInfo2 = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo2,
 		BlockNumber:         24,
 		Metadata: &subgraph.Operator{
@@ -375,7 +375,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfo3 = &subgraph.QueriedStateOperatorInfo{
+	subgraphDeregisteredOperatorInfo3 = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo2,
 		BlockNumber:         24,
 		Metadata: &subgraph.Operator{
@@ -388,7 +388,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfoNoSocketInfo = &subgraph.QueriedStateOperatorInfo{
+	subgraphDeregisteredOperatorInfoNoSocketInfo = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfoNoSocketInfo,
 		BlockNumber:         22,
 		Metadata: &subgraph.Operator{
@@ -401,7 +401,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfoInvalidTimeStamp = &subgraph.QueriedStateOperatorInfo{
+	subgraphDeregisteredOperatorInfoInvalidTimeStamp = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo1,
 		BlockNumber:         22,
 		Metadata: &subgraph.Operator{

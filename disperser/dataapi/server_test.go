@@ -530,7 +530,7 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoNoSocketInfo
 
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
@@ -576,7 +576,7 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoNoSocketInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -645,7 +645,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoInvalidTimeStamp
 
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregisteredInvalidTimeStamp, nil)
@@ -688,7 +688,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *tes
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfoInvalidTimeStamp
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -742,7 +742,7 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -810,7 +810,7 @@ func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
@@ -858,7 +858,7 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -918,7 +918,7 @@ func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -960,7 +960,7 @@ func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
@@ -1001,7 +1001,7 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -1062,7 +1062,7 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
@@ -1113,7 +1113,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -1181,7 +1181,7 @@ func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 
@@ -1251,7 +1251,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorStates := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorStates[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	indexedOperatorStates[core.OperatorID{1}] = subgraphDeregisteredOperatorInfo2
 	indexedOperatorStates[core.OperatorID{2}] = subgraphDeregisteredOperatorInfo3
@@ -1318,7 +1318,7 @@ func TestFetchRegisteredOperatorOnline(t *testing.T) {
 
 	r := setUpRouter()
 
-	indexedOperatorState := make(map[core.OperatorID]*subgraph.QueriedStateOperatorInfo)
+	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
 	indexedOperatorState[core.OperatorID{0}] = subgraphDeregisteredOperatorInfo
 	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
