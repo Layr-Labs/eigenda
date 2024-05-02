@@ -1,6 +1,8 @@
 package common
 
 import (
+	"time"
+
 	"github.com/urfave/cli"
 )
 
@@ -12,6 +14,7 @@ const (
 	FireblocksWalletAddressFlagName    = "fireblocks-wallet-address"
 	FireblocksSecretManagerRegion      = "fireblocks-secret-manager-region"
 	FireblocksDisable                  = "fireblocks-disable"
+	FireblocksAPITimeoutFlagName       = "fireblocks-api-timeout"
 )
 
 type FireblocksConfig struct {
@@ -22,6 +25,7 @@ type FireblocksConfig struct {
 	WalletAddress    string
 	Region           string
 	Disable          bool
+	APITimeout       time.Duration
 }
 
 func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -68,6 +72,13 @@ func FireblocksCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Required: false,
 			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_DISABLE"),
 		},
+		cli.DurationFlag{
+			Name:     PrefixFlag(flagPrefix, FireblocksAPITimeoutFlagName),
+			Usage:    "Timeout for Fireblocks API requests",
+			Required: false,
+			Value:    2 * time.Minute,
+			EnvVar:   PrefixEnvVar(envPrefix, "FIREBLOCKS_API_TIMEOUT"),
+		},
 	}
 }
 
@@ -80,5 +91,6 @@ func ReadFireblocksCLIConfig(ctx *cli.Context, flagPrefix string) FireblocksConf
 		WalletAddress:    ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksWalletAddressFlagName)),
 		Region:           ctx.GlobalString(PrefixFlag(flagPrefix, FireblocksSecretManagerRegion)),
 		Disable:          ctx.GlobalBool(PrefixFlag(flagPrefix, FireblocksDisable)),
+		APITimeout:       ctx.GlobalDuration(PrefixFlag(flagPrefix, FireblocksAPITimeoutFlagName)),
 	}
 }

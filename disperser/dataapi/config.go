@@ -8,4 +8,5 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+	EjectionToken      string
 }

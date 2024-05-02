@@ -119,6 +119,25 @@ var (
 		},
 	}
 
+	operatorInfo = &subgraph.IndexedOperatorInfo{
+		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
+		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
+		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
+		PubkeyG2_X: []graphql.String{
+			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
+			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
+		},
+		PubkeyG2_Y: []graphql.String{
+			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
+			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
+		},
+		SocketUpdates: []subgraph.SocketUpdates{
+			{
+				Socket: "23.93.76.1:32005;32006",
+			},
+		},
+	}
+
 	operatorAddedToQuorum = []*subgraph.OperatorQuorum{
 		{
 			Operator:       "operator-2",
@@ -440,20 +459,20 @@ func TestQueryOperators(t *testing.T) {
 	assert.Equal(t, 2, len(operators))
 
 	assert.NotNil(t, operators[0])
-	assert.Equal(t, []byte("0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211"), operators[0].Id)
-	assert.Equal(t, []byte("0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211"), operators[0].Operator)
-	assert.Equal(t, []byte("0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311"), operators[0].OperatorId)
+	assert.Equal(t, "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211", operators[0].Id)
+	assert.Equal(t, "0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211", operators[0].Operator)
+	assert.Equal(t, "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operators[0].OperatorId)
 	assert.Equal(t, uint64(1696975449), operators[0].BlockTimestamp)
 	assert.Equal(t, uint64(87), operators[0].BlockNumber)
-	assert.Equal(t, []byte("0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211"), operators[0].TransactionHash)
+	assert.Equal(t, "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211", operators[0].TransactionHash)
 
 	assert.NotNil(t, operators[1])
-	assert.Equal(t, []byte("0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212"), operators[1].Id)
-	assert.Equal(t, []byte("0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212"), operators[1].Operator)
-	assert.Equal(t, []byte("0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310"), operators[1].OperatorId)
+	assert.Equal(t, "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212", operators[1].Id)
+	assert.Equal(t, "0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212", operators[1].Operator)
+	assert.Equal(t, "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568310", operators[1].OperatorId)
 	assert.Equal(t, uint64(1696975459), operators[1].BlockTimestamp)
 	assert.Equal(t, uint64(88), operators[1].BlockNumber)
-	assert.Equal(t, []byte("0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212"), operators[1].TransactionHash)
+	assert.Equal(t, "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f212", operators[1].TransactionHash)
 }
 
 func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
@@ -480,8 +499,8 @@ func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG2, operator.IndexedOperatorInfo.PubkeyG2)
 	assert.Equal(t, "localhost:32006;32007", operator.IndexedOperatorInfo.Socket)
 	assert.Equal(t, uint64(22), uint64(operator.BlockNumber))
-	assert.Equal(t, []byte("0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311"), operator.Metadata.OperatorId)
-	assert.Equal(t, []byte("0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211"), operator.Metadata.TransactionHash)
+	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator.Metadata.OperatorId)
+	assert.Equal(t, "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211", operator.Metadata.TransactionHash)
 	assert.Equal(t, uint64(22), uint64(operator.Metadata.BlockNumber))
 }
 

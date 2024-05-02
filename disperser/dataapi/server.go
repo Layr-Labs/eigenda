@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -37,6 +38,7 @@ const (
 	// Cache control for responses.
 	// The time unit is second for max age.
 	maxOperatorsNonsigningPercentageAge = 10
+	maxOperatorPortCheckAge             = 600
 	maxNonSignerAge                     = 10
 	maxDeregisteredOperatorAage         = 10
 	maxThroughputAge                    = 10
@@ -138,6 +140,17 @@ type (
 		Data []*ServiceAvailability `json:"data"`
 	}
 
+	OperatorPortCheckRequest struct {
+		OperatorId string `json:"operator_id"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -152,6 +165,8 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
+		ejector        *Ejector
+		ejectionToken  string
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -169,6 +184,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
+	ejector *Ejector,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -204,6 +220,8 @@ func NewServer(
 		transactor:                transactor,
 		chainState:                chainState,
 		metrics:                   metrics,
+		ejector:                   ejector,
+		ejectionToken:             config.EjectionToken,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
@@ -233,6 +251,7 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -246,6 +265,8 @@ func (s *server) Start() error {
 				metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 			}
 		}
+		ejection := v1.Group("/ejection")
+		ejection.POST("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
@@ -275,7 +296,7 @@ func (s *server) Start() error {
 		Handler:           router,
 		ReadTimeout:       5 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      10 * time.Second,
+		WriteTimeout:      20 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 
@@ -295,6 +316,68 @@ func (s *server) Shutdown() error {
 	}
 
 	return nil
+}
+
+// EjectOperatorsHandler godoc
+//
+//	@Summary	Eject operators who violate the SLAs during the given time interval
+//	@Tags		Ejector
+//	@Produce	json
+//	@Param		interval	query	int		false	"Lookback window for operator ejection [default: 86400]"
+//	@Param		end			query	int		false	"End time for evaluating operator ejection [default: now]"
+//	@Param		mode		query	string	false	"Whether it's periodic or urgent ejection request [default: periodic]"
+//	@Success	200
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/ejector/operators [post]
+func (s *server) EjectOperatorsHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	token := c.GetHeader("ejection_token")
+	if token != s.ejectionToken {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	mode := "periodic"
+	if c.Query("mode") != "" {
+		mode = c.Query("mode")
+	}
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("EjectOperators")
+			s.metrics.IncrementEjectionRequest(mode, codes.InvalidArgument)
+			errorResponse(c, err)
+			return
+		}
+	}
+
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "86400"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 86400
+	}
+
+	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
+	if err == nil {
+		err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
+	}
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("EjectOperators")
+		s.metrics.IncrementEjectionRequest(mode, codes.Internal)
+		errorResponse(c, err)
+		return
+	}
+	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
+	s.metrics.IncrementEjectionRequest(mode, codes.OK)
+	c.Status(http.StatusOK)
 }
 
 // FetchBlobHandler godoc
@@ -490,6 +573,7 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Produce	json
 //	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
 //	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
+//	@Param		live_only	query		string	false	"Whether return only live nonsigners [default: true]"
 //	@Success	200			{object}	OperatorsNonsigningPercentage
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -517,9 +601,18 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 		interval = 3600
 	}
 
+	liveOnly := "true"
+	if c.Query("live_only") != "" {
+		liveOnly = c.Query("live_only")
+		if liveOnly != "true" && liveOnly != "false" {
+			errorResponse(c, errors.New("the live_only param must be \"true\" or \"false\""))
+			return
+		}
+	}
+
 	startTime := endTime.Add(-time.Duration(interval) * time.Second)
 
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix())
+	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix(), liveOnly == "true")
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 		errorResponse(c, err)
@@ -565,6 +658,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 
 	operatorMetadatas, err := s.getDeregisteredOperatorForDays(c.Request.Context(), int32(daysInt))
 	if err != nil {
+		s.logger.Error("Failed to fetch deregistered operators", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
 		errorResponse(c, err)
 		return
@@ -580,16 +674,55 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	})
 }
 
+// OperatorPortCheck godoc
+//
+//	@Summary	Operator node reachability port check
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Success	200			{object}	OperatorPortCheckResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/port-check [get]
+func (s *server) OperatorPortCheck(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("checking operator ports", "operatorId", operatorId)
+	portCheckResponse, err := s.probeOperatorPorts(c.Request.Context(), operatorId)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			err = errNotFound
+			s.logger.Warn("operator not found", "operatorId", operatorId)
+			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
+		} else {
+			s.logger.Error("operator port check failed", "error", err)
+			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+		}
+		errorResponse(c, err)
+		return
+	}
+
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, portCheckResponse)
+}
+
 // FetchDisperserServiceAvailability godoc
 //
-//	@Summary	Get status of EigenDA Disperser service.
-//	@Tags		ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/disperser-service-availability [get]
+//	@Summary		Get status of EigenDA Disperser service.
+//	@Description	This endpoint is available only if `AvailabilityCheck` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.
+//	@Tags			Disperser ServiceAvailability
+//	@Produce		json
+//	@Success		200	{object}	ServiceAvailabilityResponse	"Service is available"
+//	@Failure		400	{object}	ErrorResponse				"error: Bad request"
+//	@Failure		404	{object}	ErrorResponse				"error: Not found"
+//	@Failure		500	{object}	ErrorResponse				"error: Server error"
+//	@Failure		503	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Router			/metrics/disperser-service-availability [get]
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 	if s.eigenDAGRPCServiceChecker == nil {
@@ -641,14 +774,16 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 // FetchChurnerServiceAvailability godoc
 //
-//	@Summary	Get status of EigenDA churner service.
-//	@Tags		Churner ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/churner-service-availability [get]
+//	@Summary		Get status of EigenDA churner service.
+//	@Tags			Churner ServiceAvailability
+//	@Description	This endpoint is available only if `AvailabilityCheck` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.
+//	@Produce		json
+//	@Success		200	{object}	ServiceAvailabilityResponse	"Service is available"
+//	@Failure		400	{object}	ErrorResponse				"error: Bad request"
+//	@Failure		404	{object}	ErrorResponse				"error: Not found"
+//	@Failure		500	{object}	ErrorResponse				"error: Server error"
+//	@Failure		503	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Router			/metrics/churner-service-availability [get]
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 	if s.eigenDAGRPCServiceChecker == nil {
@@ -700,14 +835,16 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 // FetchBatcherAvailability godoc
 //
-//	@Summary	Get status of EigenDA batcher.
-//	@Tags		Batcher Availability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/batcher-service-availability [get]
+//	@Summary		Get status of EigenDA batcher.
+//	@Tags			Batcher Availability
+//	@Description	This endpoint is available only if `AvailabilityCheck` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.
+//	@Produce		json
+//	@Success		200	{object}	ServiceAvailabilityResponse	"Service is available"
+//	@Failure		400	{object}	ErrorResponse				"error: Bad request"
+//	@Failure		404	{object}	ErrorResponse				"error: Not found"
+//	@Failure		500	{object}	ErrorResponse				"error: Server error"
+//	@Failure		503	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Router			/metrics/batcher-service-availability [get]
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	if s.eigenDAHttpServiceChecker == nil {

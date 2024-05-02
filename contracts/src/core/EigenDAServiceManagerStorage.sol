@@ -26,7 +26,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * 
      * Note that this parameter needs to accommodate the delays which are introduced by the disperser, which are of two types: 
      *  - FinalizationBlockDelay: when initializing a batch, the disperser will use a ReferenceBlockNumber which is this many
-     *   blocks behind the current block number. This is to ensure that the the operator state associated with the reference block
+     *   blocks behind the current block number. This is to ensure that the operator state associated with the reference block
      *   will be stable.
      * - BatchInterval: the batch itself will only be confirmed after the batch interval has passed. 
      * 
