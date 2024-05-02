@@ -109,11 +109,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
-	EnableDASvcAvailabilityCheckFlag = cli.BoolFlag{
+	EnableEigenDASvcAvailabilityCheck = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-eigenda-svc-availability-check"),
 		Usage:    "start eigenda services availability check",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHECK_AVAILABILITY"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SVC_CHECK_AVAILABILITY"),
 	}
 	// EigenDA Disperser and Churner Hostnames to check Server Availability
 	// ex:
@@ -122,19 +122,19 @@ var (
 	DisperserHostnameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-disperser-hostname"),
 		Usage:    "HostName of EigenDA Disperser",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DISPERSER_HOSTNAME"),
 	}
 	ChurnerHostnameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-churner-hostname"),
 		Usage:    "HostName of EigenDA Churner",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CHURNER_HOSTNAME"),
 	}
 	BatcherHealthEndptFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-batcher-health-endpoint"),
 		Usage:    "Endpt of EigenDA Batcher Health Sidecar",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_BATCHER_HEALTH_ENDPOINT"),
 	}
 	/* Optional Flags*/
@@ -176,7 +176,7 @@ var requiredFlags = []cli.Flag{
 	AllowOriginsFlag,
 	EjectionTokenFlag,
 	EnableMetricsFlag,
-	EnableDASvcAvailabilityCheckFlag,
+	EnableEigenDASvcAvailabilityCheck,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,
