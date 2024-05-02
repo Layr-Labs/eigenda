@@ -56,8 +56,9 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	return DeregisteredOperatorMetadata, nil
 }
 
+// Function to get registered operators for a given number of days
 func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
-	// Track time taken to get deregistered operators
+	// Track time taken to get registered operators
 	startTime := time.Now()
 
 	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Registered)
@@ -87,8 +88,8 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 	return RegisteredOperatorMetadata, nil
 }
 
-func processOperatorOnlineCheck(deregisteredOperatorState *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
-	operators := deregisteredOperatorState.Operators
+func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
+	operators := queriedOperatorsInfo.Operators
 	wp := workerpool.New(poolSize)
 
 	for _, operatorInfo := range operators {

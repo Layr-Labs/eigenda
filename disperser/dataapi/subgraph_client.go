@@ -243,26 +243,26 @@ func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlo
 }
 
 func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error) {
-	// Query all deregistered operators in the last N days.
+	// Query all operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 	var operators map[core.OperatorID]*QueriedOperatorInfo
 	if state == Deregistered {
+		// Get OperatorsInfo for DeRegistered Operators
 		deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 		if err != nil {
 			return nil, err
 		}
 
 		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(deregisteredOperators))
-		// Get OpeatroInfo for DeRegistered Operators
 		getOperatorInfoForQueriedOperators(sc, ctx, operators, deregisteredOperators)
 	} else if state == Registered {
+		// Get OperatorsInfo for Registered Operators
 		registeredOperators, err := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 		if err != nil {
 			return nil, err
 		}
 
 		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
-		// Get OpeatroInfo for DeRegistered Operators
 		getOperatorInfoForQueriedOperators(sc, ctx, operators, registeredOperators)
 
 	} else {
