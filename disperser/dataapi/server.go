@@ -726,9 +726,7 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 	if s.eigenDAGRPCServiceChecker == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{
-			"error": "service availability check not enabled",
-		})
+		c.JSON(http.StatusNotImplemented, errors.New("service availability check not enabled"))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -789,9 +787,7 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 	if s.eigenDAGRPCServiceChecker == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{
-			"error": "service availability check not enabled",
-		})
+		c.JSON(http.StatusNotImplemented, errors.New("service availability check not enabled"))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -852,9 +848,7 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	if s.eigenDAHttpServiceChecker == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{
-			"error": "service availability check is not enabled",
-		})
+		c.JSON(http.StatusNotImplemented, errors.New("service availability check not enabled"))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
