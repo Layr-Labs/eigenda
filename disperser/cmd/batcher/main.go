@@ -14,7 +14,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/aws/secretmanager"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
@@ -23,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -170,45 +168,10 @@ func RunBatcher(ctx *cli.Context) error {
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
 	var wallet walletsdk.Wallet
 	if !config.FireblocksConfig.Disable {
-		validConfigflag := len(config.FireblocksConfig.APIKeyName) > 0 &&
-			len(config.FireblocksConfig.SecretKeyName) > 0 &&
-			len(config.FireblocksConfig.BaseURL) > 0 &&
-			len(config.FireblocksConfig.VaultAccountName) > 0 &&
-			len(config.FireblocksConfig.WalletAddress) > 0 &&
-			len(config.FireblocksConfig.Region) > 0
-		if !validConfigflag {
-			return errors.New("fireblocks config is either invalid or incomplete")
-		}
-		apiKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.APIKeyName, config.FireblocksConfig.Region)
-		if err != nil {
-			return fmt.Errorf("cannot read fireblocks api key %s from secret manager: %w", config.FireblocksConfig.APIKeyName, err)
-		}
-		secretKey, err := secretmanager.ReadStringFromSecretManager(context.Background(), config.FireblocksConfig.SecretKeyName, config.FireblocksConfig.Region)
-		if err != nil {
-			return fmt.Errorf("cannot read fireblocks secret key %s from secret manager: %w", config.FireblocksConfig.SecretKeyName, err)
-		}
-		fireblocksClient, err := fireblocks.NewClient(
-			apiKey,
-			[]byte(secretKey),
-			config.FireblocksConfig.BaseURL,
-			config.FireblocksConfig.APITimeout,
-			logger.With("component", "FireblocksClient"),
-		)
+		wallet, err = common.NewFireblocksWallet(&config.FireblocksConfig, client, logger)
 		if err != nil {
 			return err
 		}
-		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, client, config.FireblocksConfig.VaultAccountName, logger.With("component", "FireblocksWallet"))
-		if err != nil {
-			return err
-		}
-		sender, err := wallet.SenderAddress(context.Background())
-		if err != nil {
-			return err
-		}
-		if sender.Cmp(gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress)) != 0 {
-			return fmt.Errorf("configured wallet address %s does not match derived address %s", config.FireblocksConfig.WalletAddress, sender.Hex())
-		}
-		logger.Info("Initialized Fireblocks wallet", "vaultAccountName", config.FireblocksConfig.VaultAccountName, "address", sender.Hex())
 	} else if len(config.EthClientConfig.PrivateKeyString) > 0 {
 		privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
 		if err != nil {
