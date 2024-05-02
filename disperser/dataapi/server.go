@@ -197,7 +197,7 @@ func NewServer(
 		grpcConn = &GRPCDialerSkipTLS{}
 	}
 
-	if config.AvailabilityCheck {
+	if config.EigenDASvcAvailabilityCheck {
 
 		if eigenDAGRPCServiceChecker == nil {
 
@@ -259,7 +259,7 @@ func (s *server) Start() error {
 			metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
 			metrics.GET("/non-signers", s.FetchNonSigners)
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			if s.eigenDAHttpServiceChecker != nil {
+			if s.eigenDAHttpServiceChecker != nil && s.eigenDAGRPCServiceChecker != nil {
 				metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
 				metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 				metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
@@ -721,12 +721,14 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 //	@Failure		400	{object}	ErrorResponse				"error: Bad request"
 //	@Failure		404	{object}	ErrorResponse				"error: Not found"
 //	@Failure		500	{object}	ErrorResponse				"error: Server error"
-//	@Failure		503	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Failure		501	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
 //	@Router			/metrics/disperser-service-availability [get]
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 	if s.eigenDAGRPCServiceChecker == nil {
-		errorResponse(c, errors.New("service availability check is not enabled"))
+		c.JSON(http.StatusNotImplemented, gin.H{
+			"error": "service availability check not enabled",
+		})
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -782,12 +784,14 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 //	@Failure		400	{object}	ErrorResponse				"error: Bad request"
 //	@Failure		404	{object}	ErrorResponse				"error: Not found"
 //	@Failure		500	{object}	ErrorResponse				"error: Server error"
-//	@Failure		503	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Failure		501	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
 //	@Router			/metrics/churner-service-availability [get]
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 	if s.eigenDAGRPCServiceChecker == nil {
-		errorResponse(c, errors.New("service availability check is not enabled"))
+		c.JSON(http.StatusNotImplemented, gin.H{
+			"error": "service availability check not enabled",
+		})
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -843,12 +847,14 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 //	@Failure		400	{object}	ErrorResponse				"error: Bad request"
 //	@Failure		404	{object}	ErrorResponse				"error: Not found"
 //	@Failure		500	{object}	ErrorResponse				"error: Server error"
-//	@Failure		503	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Failure		501	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
 //	@Router			/metrics/batcher-service-availability [get]
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	if s.eigenDAHttpServiceChecker == nil {
-		errorResponse(c, errors.New("service availability check is not enabled"))
+		c.JSON(http.StatusNotImplemented, gin.H{
+			"error": "service availability check is not enabled",
+		})
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {

@@ -55,7 +55,7 @@ var (
 	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
 	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
 
-	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009", EjectionToken: "deadbeef"}
+	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009", EjectionToken: "deadbeef", EigenDASvcAvailabilityCheck: true}
 
 	mockTx            = &coremock.MockTransactor{}
 	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
@@ -570,6 +570,34 @@ func TestCheckBatcherHealthExpectNotServing(t *testing.T) {
 	assert.Equal(t, "NOT_SERVING", serviceData.ServiceStatus)
 }
 
+func TestFetchBatcherServiceAvailabilityDisableHandler(t *testing.T) {
+	r := setUpRouter()
+	daSvcDisableConfig := dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009", EjectionToken: "deadbeef", EigenDASvcAvailabilityCheck: false}
+
+	testDataApiServer = dataapi.NewServer(daSvcDisableConfig, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, nil, mockLogger, metrics, nil, nil, nil)
+
+	r.GET("/v1/metrics/batcher-service-availability", testDataApiServer.FetchBatcherAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/batcher-service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	fmt.Printf("Response: %v\n", response)
+
+	assert.Equal(t, http.StatusNotImplemented, res.StatusCode)
+}
+
 func TestFetchDisperserServiceAvailabilityHandler(t *testing.T) {
 	r := setUpRouter()
 
@@ -606,6 +634,42 @@ func TestFetchDisperserServiceAvailabilityHandler(t *testing.T) {
 	serviceData := response.Data[0]
 	assert.Equal(t, "Disperser", serviceData.ServiceName)
 	assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING.String(), serviceData.ServiceStatus)
+}
+
+func TestFetchDisperserServiceAvailabilityDisableHandler(t *testing.T) {
+	r := setUpRouter()
+
+	mockHealthCheckService := NewMockHealthCheckService()
+	mockHealthCheckService.AddResponse("Disperser", &grpc_health_v1.HealthCheckResponse{
+		Status: grpc_health_v1.HealthCheckResponse_SERVING,
+	})
+
+	daSvcDisableConfig := dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009", EjectionToken: "deadbeef", EigenDASvcAvailabilityCheck: false}
+
+	testDataApiServer = dataapi.NewServer(daSvcDisableConfig, blobstore, prometheusClient, dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger), mockTx, mockChainState, nil, mockLogger, metrics, nil, nil, nil)
+
+	r.GET("/v1/metrics/disperser-service-availability", testDataApiServer.FetchDisperserServiceAvailability)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/metrics/disperser-service-availability", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.ServiceAvailabilityResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	fmt.Printf("Response: %v\n", response)
+
+	assert.Equal(t, http.StatusNotImplemented, res.StatusCode)
+	assert.Equal(t, 0, response.Meta.Size)
+	assert.Equal(t, 0, len(response.Data))
 }
 
 func TestChurnerServiceAvailabilityHandler(t *testing.T) {

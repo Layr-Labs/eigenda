@@ -109,9 +109,9 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
-	EnableAvailabilityCheckFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-availability-check"),
-		Usage:    "start availability check",
+	EnableDASvcAvailabilityCheckFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-eigenda-svc-availability-check"),
+		Usage:    "start eigenda services availability check",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHECK_AVAILABILITY"),
 	}
@@ -176,7 +176,7 @@ var requiredFlags = []cli.Flag{
 	AllowOriginsFlag,
 	EjectionTokenFlag,
 	EnableMetricsFlag,
-	EnableAvailabilityCheckFlag,
+	EnableDASvcAvailabilityCheckFlag,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,

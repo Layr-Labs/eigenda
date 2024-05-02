@@ -252,7 +252,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
                     },
-                    "503": {
+                    "501": {
                         "description": "error: Service unavailable or checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
@@ -296,7 +296,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
                     },
-                    "503": {
+                    "501": {
                         "description": "error: Service unavailable or checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
@@ -340,7 +340,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
                     },
-                    "503": {
+                    "501": {
                         "description": "error: Service unavailable or checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
