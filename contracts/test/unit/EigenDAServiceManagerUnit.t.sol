@@ -8,7 +8,7 @@ import {EigenDAServiceManager, IPaymentCoordinator} from "../../src/core/EigenDA
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
-
+import {IEigenDAPaymentManager} from "../../src/interfaces/IEigenDAPaymentManager.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
@@ -35,7 +35,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             avsDirectory,
             IPaymentCoordinator(address(0)),
             registryCoordinator,
-            stakeRegistry
+            stakeRegistry,
+            IEigenDAPaymentManager(address(0))
         );
 
         address[] memory confirmers = new address[](1);
