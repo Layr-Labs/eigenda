@@ -721,7 +721,7 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 //	@Failure		400	{object}	ErrorResponse				"error: Bad request"
 //	@Failure		404	{object}	ErrorResponse				"error: Not found"
 //	@Failure		500	{object}	ErrorResponse				"error: Server error"
-//	@Failure		501	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Failure		501	{object}	ErrorResponse				"error: EigenDA Service checker not initialized"
 //	@Router			/metrics/disperser-service-availability [get]
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
@@ -784,7 +784,7 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 //	@Failure		400	{object}	ErrorResponse				"error: Bad request"
 //	@Failure		404	{object}	ErrorResponse				"error: Not found"
 //	@Failure		500	{object}	ErrorResponse				"error: Server error"
-//	@Failure		501	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Failure		501	{object}	ErrorResponse				"error: EigenDA Service checker not initialized"
 //	@Router			/metrics/churner-service-availability [get]
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
@@ -847,7 +847,7 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 //	@Failure		400	{object}	ErrorResponse				"error: Bad request"
 //	@Failure		404	{object}	ErrorResponse				"error: Not found"
 //	@Failure		500	{object}	ErrorResponse				"error: Server error"
-//	@Failure		501	{object}	ErrorResponse				"error: Service unavailable or checker not initialized"
+//	@Failure		501	{object}	ErrorResponse				"error: EigenDA Service checker not initialized"
 //	@Router			/metrics/batcher-service-availability [get]
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
 

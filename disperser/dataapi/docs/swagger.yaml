@@ -396,7 +396,7 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
         "501":
-          description: 'error: Service unavailable or checker not initialized'
+          description: 'error: EigenDA Service checker not initialized'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA batcher.
@@ -426,7 +426,7 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
         "501":
-          description: 'error: Service unavailable or checker not initialized'
+          description: 'error: EigenDA Service checker not initialized'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA churner service.
@@ -456,7 +456,7 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
         "501":
-          description: 'error: Service unavailable or checker not initialized'
+          description: 'error: EigenDA Service checker not initialized'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA Disperser service.

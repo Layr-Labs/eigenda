@@ -253,7 +253,7 @@ const docTemplate = `{
                         }
                     },
                     "501": {
-                        "description": "error: Service unavailable or checker not initialized",
+                        "description": "error: EigenDA Service checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
@@ -297,7 +297,7 @@ const docTemplate = `{
                         }
                     },
                     "501": {
-                        "description": "error: Service unavailable or checker not initialized",
+                        "description": "error: EigenDA Service checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
@@ -341,7 +341,7 @@ const docTemplate = `{
                         }
                     },
                     "501": {
-                        "description": "error: Service unavailable or checker not initialized",
+                        "description": "error: EigenDA Service checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
