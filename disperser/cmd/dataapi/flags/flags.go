@@ -139,13 +139,6 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_HTTP_PORT"),
 	}
-	FireblockAPITimeoutFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "fireblocks-api-timeout"),
-		Usage:    "the timeout for the fireblocks api",
-		Required: false,
-		Value:    3 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FIREBLOCKS_API_TIMEOUT"),
-	}
 	TxnTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "txn-timeout"),
 		Usage:    "the timeout for the transaction",
@@ -173,7 +166,6 @@ var requiredFlags = []cli.Flag{
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,
-	FireblockAPITimeoutFlag,
 	TxnTimeoutFlag,
 }
 
