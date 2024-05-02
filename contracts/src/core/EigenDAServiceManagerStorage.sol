@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAPaymentManager} from "../interfaces/IEigenDAPaymentManager.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
@@ -9,6 +10,10 @@ import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
  * @notice This storage contract is separate from the logic to simplify the upgrade process.
  */
 abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
+
+    /// @notice The payment manager contract for the EigenDA AVS
+    IEigenDAPaymentManager public immutable paymentManager;
+
     // CONSTANTS
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
 
@@ -56,6 +61,10 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
      */
     bytes public constant quorumNumbersRequired = hex"00";
+
+    constructor(IEigenDAPaymentManager _paymentManager) {
+        paymentManager = _paymentManager;
+    }
 
     /// @notice The current batchId
     uint32 public batchId;

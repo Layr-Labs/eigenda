@@ -4,13 +4,14 @@ pragma solidity ^0.8.9;
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
 
-import {ServiceManagerBase, IAVSDirectory, IPaymentCoordinator} from "eigenlayer-middleware/ServiceManagerBase.sol";
+import {ServiceManagerBase, IAVSDirectory, IPaymentCoordinator, IServiceManager} from "eigenlayer-middleware/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
 
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
+import {IEigenDAPaymentManager} from "../interfaces/IEigenDAPaymentManager.sol";
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
@@ -36,8 +37,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IAVSDirectory __avsDirectory,
         IPaymentCoordinator __paymentCoordinator,
         IRegistryCoordinator __registryCoordinator,
-        IStakeRegistry __stakeRegistry
+        IStakeRegistry __stakeRegistry,
+        IEigenDAPaymentManager __paymentManager
     )
+        EigenDAServiceManagerStorage(__paymentManager)
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __paymentCoordinator, __registryCoordinator, __stakeRegistry)
     {
@@ -122,6 +125,19 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
         // increment the batchId
         batchId = batchIdMemory + 1;
+    }
+
+    function payForRange(
+        IPaymentCoordinator.RangePayment[] calldata rangePayments
+    ) public override(ServiceManagerBase, IServiceManager) {
+        require(msg.sender == address(paymentManager), "EigenDAServiceManager.payForRange: only payment manager can pay for range");
+
+        for (uint256 i = 0; i < rangePayments.length; ++i) {
+            rangePayments[i].token.transferFrom(msg.sender, address(this), rangePayments[i].amount);
+            rangePayments[i].token.approve(address(_paymentCoordinator), rangePayments[i].amount);
+        }
+
+        _paymentCoordinator.payForRange(rangePayments);
     }
 
     /// @notice This function is used for changing the batch confirmer

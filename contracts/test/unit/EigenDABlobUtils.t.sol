@@ -11,7 +11,7 @@ import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDABlobUtilsHarness} from "../harnesses/EigenDABlobUtilsHarness.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
-
+import {IEigenDAPaymentManager} from "../../src/interfaces/IEigenDAPaymentManager.sol";
 
 import "forge-std/StdStorage.sol";
 
@@ -46,7 +46,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             avsDirectory,
             IPaymentCoordinator(address(0)),
             registryCoordinator,
-            stakeRegistry
+            stakeRegistry,
+            IEigenDAPaymentManager(address(0))
         );
 
         address[] memory confirmers = new address[](1);
