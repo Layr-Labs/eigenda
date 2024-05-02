@@ -25,6 +25,10 @@ var (
 	operatorOnlineStatusresultsChan chan *QueriedStateOperatorMetadata
 )
 
+// Function to get registered operators for given number of days
+// Queries subgraph for deregistered operators
+// Process operator online status
+// Returns list of Operators with their online status, socket address and block number they deregistered
 func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
 	// Track time taken to get deregistered operators
 	startTime := time.Now()
@@ -56,7 +60,10 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	return DeregisteredOperatorMetadata, nil
 }
 
-// Function to get registered operators for a given number of days
+// Function to get registered operators for given number of days
+// Queries subgraph for registered operators
+// Process operator online status
+// Returns list of Operators with their online status, socket address and block number they registered
 func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
 	// Track time taken to get registered operators
 	startTime := time.Now()
