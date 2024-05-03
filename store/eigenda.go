@@ -49,6 +49,5 @@ func (e EigenDAStore) PutWithoutComm(ctx context.Context, value []byte) (comm []
 		return nil, fmt.Errorf("failed to encode DA cert to RLP format: %w", err)
 	}
 
-	println(fmt.Sprintf("%x", bytes))
 	return bytes, nil
 }

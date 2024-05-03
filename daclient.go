@@ -97,7 +97,7 @@ func NewForkedDAClient(url string, verify bool) *ForkedDAClient {
 
 // GetInput returns the input data for the given encoded commitment bytes.
 func (c *ForkedDAClient) GetInput(ctx context.Context, comm EigenDACommitment) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/get/0x%x", c.url, comm.Encode()), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/get/0x%x", c.url, EigenDACommitment.Encode(comm)), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}

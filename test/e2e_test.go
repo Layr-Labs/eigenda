@@ -20,7 +20,7 @@ const (
 	transport   = "http"
 	serviceName = "plasma_test_server"
 	testSvrHost = "127.0.0.1"
-	testSvrPort = 6969
+	testSvrPort = 6970
 )
 
 type TestSuite struct {
@@ -46,6 +46,7 @@ func createEigenDATestSuite(t *testing.T) TestSuite {
 
 		StatusQueryTimeout:       time.Minute * 45,
 		StatusQueryRetryInterval: time.Second * 1,
+		UseTLS:                   true,
 	}
 
 	client := eigenda.NewEigenDAClient(log, testCfg)

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Useful to distinguish between plain calldata and alt-da blob refs
@@ -39,11 +40,20 @@ func NewEigenDAClient(log log.Logger, config Config) *EigenDAClient {
 	}
 }
 
+func (m *EigenDAClient) getConnection() (*grpc.ClientConn, error) {
+	if m.UseTLS {
+		config := &tls.Config{}
+		credential := credentials.NewTLS(config)
+		dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
+		return grpc.Dial(m.RPC, dialOptions...)
+	}
+
+	return grpc.Dial(m.RPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
 func (m *EigenDAClient) RetrieveBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error) {
-	config := &tls.Config{}
-	credential := credentials.NewTLS(config)
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
-	conn, err := grpc.Dial(m.RPC, dialOptions...)
+	m.Log.Info("Attempting to retrieve blob from EigenDA")
+	conn, err := m.getConnection()
 	if err != nil {
 		return nil, err
 	}
@@ -80,10 +90,7 @@ func (m *EigenDAClient) RetrieveBlob(ctx context.Context, BatchHeaderHash []byte
 
 func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
-	config := &tls.Config{}
-	credential := credentials.NewTLS(config)
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
-	conn, err := grpc.Dial(m.RPC, dialOptions...)
+	conn, err := m.getConnection()
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +146,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 				m.Log.Warn("Still waiting for confirmation from EigenDA", "requestID", base64RequestID)
 			case disperser.BlobStatus_FAILED:
 				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
+				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing")
 			case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
 				m.Log.Error("EigenDA blob dispersal failed in processing with insufficient signatures", "requestID", base64RequestID, "err", err)
 			case disperser.BlobStatus_CONFIRMED:
@@ -157,6 +165,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 					BlobIndex:            blobInfo.BlobVerificationProof.BlobIndex,
 					ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
 					QuorumIDs:            quorumIDs,
+					// insert commitment here
 				}, nil
 			default:
 				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
