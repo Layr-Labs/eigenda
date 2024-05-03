@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -91,6 +92,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
+	reg := prometheus.NewRegistry()
+
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
@@ -108,11 +111,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 				return err
 			}
 		}
-		ratelimiter = ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+		ratelimiter = ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 	}
 
-	// TODO: create a separate metrics for batcher
-	metrics := disperser.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
 	server := apiserver.NewDispersalServer(
 		config.ServerConfig,
 		blobStore,

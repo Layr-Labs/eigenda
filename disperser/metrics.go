@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -38,12 +37,10 @@ const (
 	AccountRateLimitedFailure string = "ratelimited-account" // The request rate limited at account level
 )
 
-func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(reg *prometheus.Registry, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_disperser"
-	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-	ratelimit.RegisterMetrics(reg)
 
 	metrics := &Metrics{
 		// TODO: revamp this metric -- it'll focus on quorum tracking, which is relevant

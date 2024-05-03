@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type BucketStore = common.KVStore[common.RateBucketParams]
@@ -22,11 +23,15 @@ type rateLimiter struct {
 	bucketLevels *prometheus.GaugeVec
 }
 
-func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, logger logging.Logger) common.RateLimiter {
+func NewRateLimiter(reg prometheus.Registerer, rateParams common.GlobalRateParams, bucketStore BucketStore, logger logging.Logger) common.RateLimiter {
 	return &rateLimiter{
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
 		logger:           logger.With("component", "RateLimiter"),
+		bucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
+			Name: "rate_limiter_bucket_levels",
+			Help: "Current level of each bucket for rate limiting",
+		}, []string{"requester_id", "bucket_index"}),
 	}
 }
 
