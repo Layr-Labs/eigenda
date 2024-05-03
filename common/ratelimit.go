@@ -16,16 +16,17 @@ import (
 type RequesterID = string
 
 type RequestParams struct {
-	RequesterID RequesterID
-	BlobSize    uint
-	Rate        RateParam
-	Info        interface{}
+	RequesterID     RequesterID
+	BlobSize        uint
+	Rate            RateParam
+	Info            interface{}
+	IsAuthenticated bool
 }
 
 type RateLimiter interface {
 	// AllowRequest checks whether the request should be allowed. If the request is allowed, the function returns true.
 	// If the request is not allowed, the function returns false and the RequestParams of the request that was not allowed.
-	// In order to for the request to be allowed, all of the requests represented by the RequestParams slice must be allowed.
+	// In order for the request to be allowed, all of the requests represented by the RequestParams slice must be allowed.
 	// Each RequestParams object represents a single request. Each request is subjected to the same GlobalRateParams, but the
 	// individual parameters of the request can differ.
 	//
@@ -37,7 +38,7 @@ type RateLimiter interface {
 
 type GlobalRateParams struct {
 	// BucketSizes are the time scales at which the rate limit is enforced.
-	// For each time scale, the rate limiter will make sure that the give rate (possibly subject to a relaxation given
+	// For each time scale, the rate limiter will make sure that the given rate (possibly subject to a relaxation given
 	// by one of the Multipliers) is observed when the request bandwidth is averaged at this time scale.
 	// In terms of implementation, the rate limiter uses a set of "time buckets". A time bucket, i, is filled to a maximum of
 	// `BucketSizes[i]` at a rate of 1, and emptied by an amount equal to `(size of request)/RateParam` each time a

@@ -355,11 +355,14 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 			rates.BlobRate = rateInfo.BlobRate
 		}
 
+		if len(rateInfo.Name) > 0 {
+			rates.Name = rateInfo.Name
+		}
+
 		break
 	}
 
 	return rates, key, nil
-
 }
 
 // Enum of rateTypes for the limiterInfo struct
@@ -446,6 +449,9 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 			return api.NewInternalError(err.Error())
 		}
+
+		// Note: There's an implicit assumption that an empty name means the account
+		// is not in the allow list.
 		requesterName = accountRates.Name
 
 		// Update the quorum rate
@@ -465,6 +471,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				RateType: SystemThroughputType,
 				QuorumID: param.QuorumID,
 			},
+			IsAuthenticated: len(requesterName) > 0,
 		})
 
 		key = fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemBlobRateType.Plug())
@@ -476,6 +483,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				RateType: SystemBlobRateType,
 				QuorumID: param.QuorumID,
 			},
+			IsAuthenticated: len(requesterName) > 0,
 		})
 
 		// Account Level
@@ -488,6 +496,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				RateType: AccountThroughputType,
 				QuorumID: param.QuorumID,
 			},
+			IsAuthenticated: len(requesterName) > 0,
 		})
 
 		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountBlobRateType.Plug())
@@ -499,6 +508,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				RateType: AccountBlobRateType,
 				QuorumID: param.QuorumID,
 			},
+			IsAuthenticated: len(requesterName) > 0,
 		})
 
 	}

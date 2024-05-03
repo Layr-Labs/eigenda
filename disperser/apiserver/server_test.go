@@ -662,20 +662,24 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		Allowlist: apiserver.Allowlist{
 			"1.2.3.4": map[uint8]apiserver.PerUserRateInfo{
 				0: {
+					Name:       "eigenlabs",
 					Throughput: 100 * 1024,
 					BlobRate:   5 * 1e6,
 				},
 				1: {
+					Name:       "eigenlabs",
 					Throughput: 1024 * 1024,
 					BlobRate:   5 * 1e6,
 				},
 			},
 			"0x1aa8226f6d354380dDE75eE6B634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
 				0: {
+					Name:       "eigenlabs",
 					Throughput: 100 * 1024,
 					BlobRate:   5 * 1e6,
 				},
 				1: {
+					Name:       "eigenlabs",
 					Throughput: 1024 * 1024,
 					BlobRate:   5 * 1e6,
 				},

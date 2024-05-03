@@ -113,7 +113,15 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	// TODO: create a separate metrics for batcher
 	metrics := disperser.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-	server := apiserver.NewDispersalServer(config.ServerConfig, blobStore, transactor, logger, metrics, ratelimiter, config.RateConfig)
+	server := apiserver.NewDispersalServer(
+		config.ServerConfig,
+		blobStore,
+		transactor,
+		logger,
+		metrics,
+		ratelimiter,
+		config.RateConfig,
+	)
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
