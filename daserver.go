@@ -100,6 +100,7 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 	route := path.Dir(r.URL.Path)
 	if route != "/get" {
+		d.log.Error("invalid route", "route", route)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -107,16 +108,19 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
 	comm, err := hexutil.Decode(key)
 	if err != nil {
+		d.log.Error("failed to decode commitment", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	input, err := d.store.Get(r.Context(), comm)
 	if err != nil && errors.Is(err, ErrNotFound) {
+		d.log.Error("key not found", "key", key)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	if err != nil {
+		d.log.Error("internal server error", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

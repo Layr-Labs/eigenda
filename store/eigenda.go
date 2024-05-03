@@ -21,9 +21,9 @@ func NewEigenDAStore(ctx context.Context, client *eigenda.EigenDAClient) (*Eigen
 // Get retrieves the given key if it's present in the key-value data store.
 func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	var cert eigenda.Cert
-	err := rlp.DecodeBytes(key, cert)
+	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode DA cert to RLP format: %w", err)
+		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
 	}
 	blob, err := e.client.RetrieveBlob(ctx, cert.BatchHeaderHash, cert.BlobIndex)
 	if err != nil {
@@ -49,7 +49,6 @@ func (e EigenDAStore) PutWithoutComm(ctx context.Context, value []byte) (comm []
 		return nil, fmt.Errorf("failed to encode DA cert to RLP format: %w", err)
 	}
 
-	println(fmt.Sprintf("%+v", bytes))
-	println(fmt.Sprintf("%+d", bytes))
+	println(fmt.Sprintf("%x", bytes))
 	return bytes, nil
 }

@@ -167,5 +167,5 @@ func (c *ForkedDAClient) Health() bool {
 		return false
 	}
 
-	return resp.StatusCode != http.StatusOK
+	return resp.StatusCode == http.StatusOK
 }
