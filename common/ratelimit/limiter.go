@@ -2,10 +2,12 @@ package ratelimit
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type BucketStore = common.KVStore[common.RateBucketParams]
@@ -15,6 +17,9 @@ type rateLimiter struct {
 	bucketStore      BucketStore
 
 	logger logging.Logger
+
+	// Prometheus metrics
+	bucketLevels *prometheus.GaugeVec
 }
 
 func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore, logger logging.Logger) common.RateLimiter {
@@ -22,6 +27,10 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore,
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
 		logger:           logger.With("component", "RateLimiter"),
+		bucketLevels: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "rate_limiter_bucket_levels",
+			Help: "Current level of each bucket for rate limiting",
+		}, []string{"requester_id", "bucket_index"}),
 	}
 }
 
@@ -109,7 +118,19 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 
-		d.logger.Debug("Bucket level", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
+		// Check if the user is authenticated before adding to metrics
+		requesterLabel := "unauthenticated" // Default or generic label
+		if params.IsAuthenticated {
+			requesterLabel = params.RequesterID
+		}
+
+		d.bucketLevels.With(prometheus.Labels{"requester_id": requesterLabel, "bucket_index": fmt.Sprintf("%d", i)}).Set(float64(bucketParams.BucketLevels[i]))
+		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
+	}
+
+	for i, level := range bucketParams.BucketLevels {
+		d.bucketLevels.With(prometheus.Labels{"requester_id": params.RequesterID, "bucket_index": fmt.Sprintf("%d", i)}).Set(float64(level))
+		d.logger.Debug("Bucket level updated", "requester_id", params.RequesterID, "bucket_index", i, "level", level)
 	}
 
 	return allowed, bucketParams
