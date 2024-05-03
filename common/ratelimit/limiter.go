@@ -128,11 +128,6 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
 	}
 
-	for i, level := range bucketParams.BucketLevels {
-		d.bucketLevels.With(prometheus.Labels{"requester_id": params.RequesterID, "bucket_index": fmt.Sprintf("%d", i)}).Set(float64(level))
-		d.logger.Debug("Bucket level updated", "requester_id", params.RequesterID, "bucket_index", i, "level", level)
-	}
-
 	return allowed, bucketParams
 
 }
