@@ -201,10 +201,8 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 
 func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-	conn, err := grpc.Dial(
-		addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
 	if err != nil {
 		return nil, err
 	}
