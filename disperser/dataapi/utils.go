@@ -3,6 +3,7 @@ package dataapi
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -37,37 +38,44 @@ func ConvertNanosecondToSecond(timestamp uint64) uint64 {
 }
 
 func ConvertOperatorInfoGqlToIndexedOperatorInfo(operator *subgraph.IndexedOperatorInfo) (*core.IndexedOperatorInfo, error) {
+	if operator == nil {
+		return nil, errors.New("operator is nil")
+	}
 
 	if len(operator.SocketUpdates) == 0 {
-		return nil, errors.New("no socket found for operator")
+		return nil, errors.New("no socket updates found for operator")
 	}
 
 	pubkeyG1 := new(bn254.G1Affine)
 	_, err := pubkeyG1.X.SetString(string(operator.PubkeyG1_X))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set PubkeyG1_X: %v", err)
 	}
 	_, err = pubkeyG1.Y.SetString(string(operator.PubkeyG1_Y))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set PubkeyG1_Y: %v", err)
+	}
+
+	if len(operator.PubkeyG2_X) < 2 || len(operator.PubkeyG2_Y) < 2 {
+		return nil, errors.New("incomplete PubkeyG2 coordinates")
 	}
 
 	pubkeyG2 := new(bn254.G2Affine)
 	_, err = pubkeyG2.X.A1.SetString(string(operator.PubkeyG2_X[0]))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set PubkeyG2_X[0]: %v", err)
 	}
 	_, err = pubkeyG2.X.A0.SetString(string(operator.PubkeyG2_X[1]))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set PubkeyG2_X[1]: %v", err)
 	}
 	_, err = pubkeyG2.Y.A1.SetString(string(operator.PubkeyG2_Y[0]))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set PubkeyG2_Y[0]: %v", err)
 	}
 	_, err = pubkeyG2.Y.A0.SetString(string(operator.PubkeyG2_Y[1]))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set PubkeyG2_Y[1]: %v", err)
 	}
 
 	return &core.IndexedOperatorInfo{

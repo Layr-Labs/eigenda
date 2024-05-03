@@ -32,7 +32,18 @@ var (
 		},
 	}
 
-	subgraphOperatorDeregistereds = []*subgraph.Operator{
+	subgraphOperatorRegistered = []*subgraph.Operator{
+		{
+			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
+			OperatorId:      "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
+			Operator:        "0x000563fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
+			BlockTimestamp:  "1696975449",
+			BlockNumber:     "87",
+			TransactionHash: "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
+		},
+	}
+
+	subgraphOperatorDeregistered = []*subgraph.Operator{
 		{
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
 			OperatorId:      "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
@@ -357,7 +368,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfo = &subgraph.DeregisteredOperatorInfo{
+	subgraphDeregisteredOperatorInfo = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo1,
 		BlockNumber:         22,
 		Metadata: &subgraph.Operator{
@@ -370,7 +381,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfo2 = &subgraph.DeregisteredOperatorInfo{
+	subgraphDeregisteredOperatorInfo2 = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo2,
 		BlockNumber:         24,
 		Metadata: &subgraph.Operator{
@@ -383,7 +394,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfo3 = &subgraph.DeregisteredOperatorInfo{
+	subgraphDeregisteredOperatorInfo3 = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo2,
 		BlockNumber:         24,
 		Metadata: &subgraph.Operator{
@@ -396,7 +407,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfoNoSocketInfo = &subgraph.DeregisteredOperatorInfo{
+	subgraphDeregisteredOperatorInfoNoSocketInfo = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfoNoSocketInfo,
 		BlockNumber:         22,
 		Metadata: &subgraph.Operator{
@@ -409,7 +420,7 @@ var (
 		},
 	}
 
-	subgraphDeregisteredOperatorInfoInvalidTimeStamp = &subgraph.DeregisteredOperatorInfo{
+	subgraphDeregisteredOperatorInfoInvalidTimeStamp = &subgraph.OperatorInfo{
 		IndexedOperatorInfo: subgraphIndexedOperatorInfo1,
 		BlockNumber:         22,
 		Metadata: &subgraph.Operator{
@@ -477,10 +488,10 @@ func TestQueryOperators(t *testing.T) {
 
 func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
-	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistereds, nil)
+	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
-	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedDeregisteredOperatorsForTimeWindow(context.Background(), 1)
+	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 1, dataapi.Deregistered)
 	assert.NoError(t, err)
 
 	operators := indexedDeregisteredOperatorState.Operators
@@ -502,6 +513,35 @@ func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator.Metadata.OperatorId)
 	assert.Equal(t, "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211", operator.Metadata.TransactionHash)
 	assert.Equal(t, uint64(22), uint64(operator.Metadata.BlockNumber))
+}
+
+func TestQueryIndexedRegisteredOperatorsForTimeWindow(t *testing.T) {
+	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
+	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistered, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
+	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	indexedRegisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 1, dataapi.Registered)
+	assert.NoError(t, err)
+
+	operators := indexedRegisteredOperatorState.Operators
+	assert.Equal(t, 1, len(operators))
+
+	var operatorId [32]byte
+	copy(operatorId[:], []byte("0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311"))
+	operator := operators[operatorId]
+
+	assert.NotNil(t, operator)
+
+	expectedIndexedOperatorInfo, err := dataapi.ConvertOperatorInfoGqlToIndexedOperatorInfo(subgraphIndexedOperatorInfo1)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG1, operator.IndexedOperatorInfo.PubkeyG1)
+	assert.Equal(t, expectedIndexedOperatorInfo.PubkeyG2, operator.IndexedOperatorInfo.PubkeyG2)
+	assert.Equal(t, "localhost:32006;32007", operator.IndexedOperatorInfo.Socket)
+	assert.Equal(t, uint64(87), uint64(operator.BlockNumber))
+	assert.Equal(t, "0xe1cdae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", operator.Metadata.OperatorId)
+	assert.Equal(t, "0x000163fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211", operator.Metadata.TransactionHash)
+	assert.Equal(t, uint64(87), uint64(operator.Metadata.BlockNumber))
 }
 
 func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {

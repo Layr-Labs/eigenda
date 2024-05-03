@@ -66,28 +66,6 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
-  dataapi.DeregisteredOperatorMetadata:
-    properties:
-      block_number:
-        type: integer
-      is_online:
-        type: boolean
-      operator_id:
-        type: string
-      operator_process_error:
-        type: string
-      socket:
-        type: string
-    type: object
-  dataapi.DeregisteredOperatorsResponse:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/dataapi.DeregisteredOperatorMetadata'
-        type: array
-      meta:
-        $ref: '#/definitions/dataapi.Meta'
-    type: object
   dataapi.ErrorResponse:
     properties:
       error:
@@ -156,6 +134,28 @@ definitions:
       data:
         items:
           $ref: '#/definitions/dataapi.OperatorNonsigningPercentageMetrics'
+        type: array
+      meta:
+        $ref: '#/definitions/dataapi.Meta'
+    type: object
+  dataapi.QueriedStateOperatorMetadata:
+    properties:
+      block_number:
+        type: integer
+      is_online:
+        type: boolean
+      operator_id:
+        type: string
+      operator_process_error:
+        type: string
+      socket:
+        type: string
+    type: object
+  dataapi.QueriedStateOperatorsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dataapi.QueriedStateOperatorMetadata'
         type: array
       meta:
         $ref: '#/definitions/dataapi.Meta'
@@ -557,7 +557,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.DeregisteredOperatorsResponse'
+            $ref: '#/definitions/dataapi.QueriedStateOperatorsResponse'
         "400":
           description: 'error: Bad request'
           schema:
@@ -602,6 +602,31 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Operator node reachability port check
+      tags:
+      - OperatorsInfo
+  /operators-info/registered-operators:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.QueriedStateOperatorsResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch list of operators that have been registered for days. Days is
+        a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
 schemes:
