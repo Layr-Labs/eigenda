@@ -27,10 +27,6 @@ func NewRateLimiter(rateParams common.GlobalRateParams, bucketStore BucketStore,
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
 		logger:           logger.With("component", "RateLimiter"),
-		bucketLevels: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "rate_limiter_bucket_levels",
-			Help: "Current level of each bucket for rate limiting",
-		}, []string{"requester_id", "bucket_index"}),
 	}
 }
 

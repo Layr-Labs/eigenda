@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -42,6 +43,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
+	ratelimit.RegisterMetrics(reg)
 
 	metrics := &Metrics{
 		// TODO: revamp this metric -- it'll focus on quorum tracking, which is relevant
