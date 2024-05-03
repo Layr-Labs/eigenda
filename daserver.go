@@ -51,6 +51,7 @@ func (d *DAServer) Start() error {
 
 	mux.HandleFunc("/get/", d.HandleGet)
 	mux.HandleFunc("/put/", d.HandlePut)
+	mux.HandleFunc("/health", d.Health)
 
 	d.httpServer.Handler = mux
 
@@ -61,6 +62,8 @@ func (d *DAServer) Start() error {
 	d.listener = listener
 
 	d.endpoint = listener.Addr().String()
+
+	d.log.Info("Starting DA server on", d.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
 		if d.tls != nil {
@@ -86,8 +89,14 @@ func (d *DAServer) Start() error {
 	}
 }
 
+func (d *DAServer) Health(w http.ResponseWriter, r *http.Request) {
+	d.log.Info("GET", "url", r.URL)
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
-	d.log.Debug("GET", "url", r.URL)
+	d.log.Info("GET", "url", r.URL)
 
 	route := path.Dir(r.URL.Path)
 	if route != "/get" {
@@ -118,7 +127,7 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
-	d.log.Debug("PUT", "url", r.URL)
+	d.log.Info("PUT", "url", r.URL)
 
 	route := path.Dir(r.URL.Path)
 	if route != "/put" {
@@ -133,13 +142,13 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var comm []byte
-	if r.URL.Path == "/put" { // without commitment
+	if r.URL.Path == "/put" || r.URL.Path == "/put/" { // without commitment
 		if comm, err = d.store.PutWithoutComm(r.Context(), input); err != nil {
 			d.log.Info("Failed to store commitment to the DA server", "err", err, "comm", comm)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-	} else { // with commitment
+	} else { // with commitment (might be worth deleting if we never expect a commitment to be passed in the URL for this server type)
 		key := path.Base(r.URL.Path)
 		comm, err = hexutil.Decode(key)
 		if err != nil {

@@ -55,7 +55,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:    RPCFlagName,
-			Usage:   "RPC endpoint of the EigenDA disperser",
+			Usage:   "RPC endpoint of the EigenDA disperser.",
 			EnvVars: prefixEnvVars("EIGENDA_RPC"),
 		},
 		&cli.DurationFlag{
@@ -66,7 +66,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		&cli.DurationFlag{
 			Name:    StatusQueryRetryIntervalFlagName,
-			Usage:   "Wait time between retries of EigenDA blob status queries (made while waiting for a blob to be confirmed by)",
+			Usage:   "Wait time between retries of EigenDA blob status queries (made while waiting for a blob to be confirmed by).",
 			Value:   5 * time.Second,
 			EnvVars: prefixEnvVars("EIGENDA_STATUS_QUERY_INTERVAL"),
 		},

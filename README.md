@@ -1,4 +1,4 @@
-# Plasma DA Server
+# EigenDA Plasma DA Server
 
 ## Introduction
 
@@ -29,3 +29,9 @@ export AWS_ENDPOINT_URL="https://storage.googleapis.com"
 export AWS_ACCESS_KEY_ID=YOUR_GOOGLE_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY=YOUR_GOOGLE_ACCESS_KEY_SECRET
 ```
+
+## EigenDA Configuration
+Additional cli args are provided for targeting an EigenDA network backend:
+- `--eigenda-rpc`: RPC host of disperser service. (e.g, on holesky this is `disperser-holesky.eigenda.xyz:443`)
+- `--eigenda-status-query-timeout`: (default: 1m) Duration for which a client will wait for a blob to finalize after being sent for dispersal.
+- `--eigenda-status-query-retry-interval`: (default: 5s) How often a client will attempt a retry when awaiting network blob finalization. 

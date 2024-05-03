@@ -1,8 +1,9 @@
-package main
+package store
 
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -64,4 +65,22 @@ func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
 		Body:   bytes.NewReader(value),
 	})
 	return err
+}
+
+func (s *S3Store) PutWithComm(ctx context.Context, key []byte, value []byte) error {
+	return s.Put(ctx, key, value)
+}
+
+func (s *S3Store) PutWithoutComm(ctx context.Context, value []byte) (key []byte, err error) {
+	// make key fingerprint of value
+	// this could result in collisions
+	hasher := sha256.New()
+	hasher.Write(value)
+	bs := hasher.Sum(nil)
+
+	if err := s.PutWithComm(ctx, bs, value); err != nil {
+		return nil, err
+	}
+
+	return bs, err
 }

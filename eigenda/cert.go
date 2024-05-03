@@ -1,8 +1,9 @@
 package eigenda
 
+// EigenDA finalized blob certificate
 type Cert struct {
-	BatchHeaderHash      []byte   `rlp:"batchHeaderHash"`
-	BlobIndex            uint32   `rlp:"blobIndex"`
-	ReferenceBlockNumber uint32   `rlp:"referenceBlockNumber"`
-	QuorumIDs            []uint32 `rlp:"quorumIDs"`
+	BatchHeaderHash      []byte
+	BlobIndex            uint32
+	ReferenceBlockNumber uint32
+	QuorumIDs            []uint32
 }

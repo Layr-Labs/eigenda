@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-// Useful to dinstiguish between plain calldata and alt-da blob refs
+// Useful to distinguish between plain calldata and alt-da blob refs
 // Support seamless migration of existing rollups using ETH DA
 const DerivationVersionEigenda = 0xed
 
@@ -69,7 +69,7 @@ func (m *EigenDAClient) RetrieveBlob(ctx context.Context, BatchHeaderHash []byte
 	data := make([]byte, length)
 	n, err := reader.Read(data)
 	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to copy unpadded data into final buffer")
+		return nil, fmt.Errorf("EigenDA client failed to copy un-padded data into final buffer")
 	}
 	if uint64(n) != length {
 		return nil, fmt.Errorf("EigenDA client failed, data length does not match length prefix")
@@ -113,7 +113,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 
 	base64RequestID := base64.StdEncoding.EncodeToString(disperseRes.RequestId)
 
-	m.Log.Info("Blob disepersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
+	m.Log.Info("Blob dispersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
 
 	timeoutTime := time.Now().Add(m.StatusQueryTimeout)
 	ticker := time.NewTicker(m.StatusQueryRetryInterval)
@@ -151,13 +151,13 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 				for i := range quorumIDs {
 					quorumIDs[i] = blobInfo.BlobHeader.BlobQuorumParams[i].QuorumNumber
 				}
-				cert := &Cert{
+
+				return &Cert{
 					BatchHeaderHash:      blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash,
 					BlobIndex:            blobInfo.BlobVerificationProof.BlobIndex,
 					ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
 					QuorumIDs:            quorumIDs,
-				}
-				return cert, nil
+				}, nil
 			default:
 				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
 			}

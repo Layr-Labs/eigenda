@@ -17,7 +17,10 @@ var ErrCommitmentMismatch = errors.New("commitment mismatch")
 type CommitmentType byte
 
 // KeccakCommitmentType is the default commitment type for the DA storage.
-const Keccak256CommitmentType CommitmentType = 0
+const (
+	Keccak256CommitmentType CommitmentType = 0
+	EigenDACommitmentType   CommitmentType = 1
+)
 
 // Keccak256Commitment is the default commitment type for op-plasma.
 type Keccak256Commitment []byte
@@ -57,5 +60,35 @@ func DecodeKeccak256(commitment []byte) (Keccak256Commitment, error) {
 	if len(c) != 32 {
 		return nil, ErrInvalidCommitment
 	}
+	return c, nil
+}
+
+// NOTE - This logic will need to be migrated into layr-labs/op-stack directly
+type EigenDACommitment []byte
+
+func (c EigenDACommitment) Encode() []byte {
+	return append([]byte{byte(EigenDACommitmentType)}, c...)
+}
+
+func (c EigenDACommitment) TxData() []byte {
+	return append([]byte{TxDataVersion1}, c.Encode()...)
+}
+
+// TODO - verify the commitment against the input blob by evaluating its polynomial representation at an arbitrary point
+// and asserting that the generated output proof can be successfully verified against the commitment.
+func (c EigenDACommitment) Verify(input []byte) error {
+	return nil
+}
+
+// commitments are of unknown length so length invariants need not be done
+func DecodeEigenDACommitment(commitment []byte) (EigenDACommitment, error) {
+	if len(commitment) == 0 {
+		return nil, ErrInvalidCommitment
+	}
+	if commitment[0] != byte(EigenDACommitmentType) {
+		return nil, ErrInvalidCommitment
+	}
+	c := commitment[1:]
+
 	return c, nil
 }
