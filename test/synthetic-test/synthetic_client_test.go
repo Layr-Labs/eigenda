@@ -70,12 +70,13 @@ type TestClients struct {
 
 // TestSuite Struct.
 type SyntheticTestSuite struct {
-	Clients         *TestClients
-	EthClient       common.EthClient
-	MockRollUp      *rollupbindings.ContractMockRollup
-	Logger          *log.Logger
-	RetrievalClient clients.RetrievalClient
-	TestRunID       string
+	Clients             *TestClients
+	EthClient           common.EthClient
+	MockRollUp          *rollupbindings.ContractMockRollup
+	Logger              *log.Logger
+	RetrievalClient     clients.RetrievalClient
+	TestRunID           string
+	BatcherPullInterval string
 }
 
 var (
@@ -86,7 +87,7 @@ var (
 	logger                     logging.Logger
 )
 
-func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
+func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig, batcherPullInterval string) *SyntheticTestSuite {
 	testRunID := uuid.New().String()
 	logger := log.New(os.Stdout, "EigenDA SyntheticClient:"+testRunID+" ", log.Ldate|log.Ltime)
 
@@ -128,9 +129,10 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
+	var mockRollup *rollupbindings.ContractMockRollup
 	if validateOnchainTransaction {
 		log.Printf("Create instance of MockRollUp to validate OnChain Transactions")
-		mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
+		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
 		if err != nil {
 			logger.Printf("Error: %v", err)
 			return nil
@@ -148,11 +150,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 
 	// Assign client connections to pointers in TestClients struct
 	return &SyntheticTestSuite{
-		Clients:         clients,
-		EthClient:       ethClient,
-		MockRollUp:      mockRollup,
-		RetrievalClient: retrievalClient,
-		Logger:          logger,
+		Clients:             clients,
+		EthClient:           ethClient,
+		MockRollUp:          mockRollup,
+		RetrievalClient:     retrievalClient,
+		Logger:              logger,
+		TestRunID:           testRunID,
+		BatcherPullInterval: batcherPullInterval,
 	}
 }
 
@@ -292,7 +296,7 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
 	// Update this to a minute over Batcher_Pull_Interval
-	confirmationDeadline := time.ParseDuration(batcherPullInterval)
+	confirmationDeadline, err := time.ParseDuration(t.batcherPullInterval)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -552,7 +556,7 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
 		BatchId:        verificationProof.GetBatchId(),
-		BlobIndex:      uint8(verificationProof.GetBlobIndex()),
+		BlobIndex:      verificationProof.GetBlobIndex(),
 		BatchMetadata:  batchMetadata,
 		InclusionProof: verificationProof.GetInclusionProof(),
 		QuorumIndices:  verificationProof.GetQuorumIndexes(),
