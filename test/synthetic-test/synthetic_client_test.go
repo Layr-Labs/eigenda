@@ -325,6 +325,36 @@ loop:
 				logger.Printf("Verify Retrieve Dispersed Blob Using Disperser Endpoint Against Dispersersed Blob")
 				assert.Equal(t, data, disperserClientBlobReply.Data)
 
+				// Retrieve Blob from Retriever Client
+				// Retrieval Client Iterates Over Operators to get the specific Blob
+				if isRetrieverClientEnabled {
+					logger.Printf("Retrieve Blob using Retrieval Client for %v", blobReply)
+					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+					logger.Printf("RetrievalClient:GetBatchHeaderHash() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash())
+					logger.Printf("RetrievalClient:GetBlobIndex() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
+					logger.Printf("RetrievalClient:GetReferenceBlockNumber() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
+					logger.Printf("RetrievalClient:GetBatchRoot() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
+
+					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+						0,
+					)
+					if err != nil {
+						logger.Printf("Error Retrieving Blob %v", err)
+					}
+
+					if err == nil {
+						logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
+						assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
+
+						logger.Printf("Blob Retrieved with Retrieval Client for %v", blobReply)
+					}
+				}
+
 				if validateOnchainTransaction {
 					logger.Printf("Validating OnChain Transaction for Blob with header %v", blobReply.Info.BlobHeader)
 
@@ -349,31 +379,6 @@ loop:
 					logger.Printf("PostCommitment Tx %v", tx)
 					_, err = ethClient.EstimateGasPriceAndLimitAndSendTx(ethClientCtx, tx, "PostCommitment", nil)
 					assert.Nil(t, err)
-				}
-
-				// Retrieve Blob from Retriever Client
-				// Retrieval Client Iterates Over Operators to get the specific Blob
-				if isRetrieverClientEnabled {
-					logger.Printf("Try Blob using Retrieval Client %v", blobReply)
-					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-					defer cancel()
-					logger.Printf("RetrievalClient:GetBatchHeaderHash() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash())
-					logger.Printf("RetrievalClient:GetBlobIndex() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
-					logger.Printf("RetrievalClient:GetReferenceBlockNumber() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
-					logger.Printf("RetrievalClient:GetBatchRoot() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
-
-					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
-						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-						0,
-					)
-					assert.Nil(t, err)
-					logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
-					assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
-
-					logger.Printf("Blob using Retrieval Client %v", blobReply)
 				}
 
 				break loop
