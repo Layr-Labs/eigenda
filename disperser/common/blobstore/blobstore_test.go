@@ -31,6 +31,9 @@ var (
 	blob = &core.Blob{
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: "test",
+			},
 		},
 
 		Data: []byte("test"),
@@ -85,10 +88,6 @@ func setup(m *testing.M) {
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 
-	fmt.Printf("Creating dynamodb table %s\n", metadataTableName)
-	fmt.Printf("Table Schema: %v\n", blobstore.GenerateTableSchema(metadataTableName, 10, 10).AttributeDefinitions)
-	fmt.Printf("Table Schema: %v\n", blobstore.GenerateTableSchema(metadataTableName, 10, 10).KeySchema)
-	fmt.Printf("Table Schema: %v\n", blobstore.GenerateTableSchema(metadataTableName, 10, 10).GlobalSecondaryIndexes)
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()

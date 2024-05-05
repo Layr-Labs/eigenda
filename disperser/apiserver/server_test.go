@@ -730,9 +730,13 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		BlobStatus:   disperser.Processing,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
 				SecurityParams: securityParams,
+				BlobAuthHeader: core.BlobAuthHeader{
+					AccountID: "test",
+				},
 			},
 			RequestedAt: requestedAt,
 			BlobSize:    blobSize,

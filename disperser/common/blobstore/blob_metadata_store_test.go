@@ -27,6 +27,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 		BlobStatus:   disperser.Processing,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
@@ -43,6 +44,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 		BlobStatus:   disperser.Finalized,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
@@ -123,6 +125,7 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 		BlobStatus:   disperser.Processing,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
@@ -139,6 +142,7 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 		BlobStatus:   disperser.Finalized,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
@@ -229,9 +233,13 @@ func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperse
 		BlobStatus:   disperser.Confirmed,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
 				SecurityParams: securityParams,
+				BlobAuthHeader: core.BlobAuthHeader{
+					AccountID: "test",
+				},
 			},
 			RequestedAt: requestedAt,
 			BlobSize:    blobSize,
@@ -309,6 +317,97 @@ func TestBlobMetadataStoreWithAccountId(t *testing.T) {
 	blobCountByAccountId, err := blobMetadataStore.GetBlobMetadataCountByAccountID(ctx, "test")
 	assert.NoError(t, err)
 	assert.Equal(t, int32(2), blobCountByAccountId)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
+		},
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey2.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey2.BlobHash},
+		},
+	})
+}
+
+func TestBlobMetadataStoreTwoDifferentAccountId(t *testing.T) {
+	ctx := context.Background()
+	blobKey1 := disperser.BlobKey{
+		BlobHash:     blobHash,
+		MetadataHash: "hash",
+	}
+	blob1 := &core.Blob{
+		RequestHeader: core.BlobRequestHeader{
+			SecurityParams: securityParams,
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: "test1",
+			},
+		},
+
+		Data: []byte("test1"),
+	}
+	metadata1 := &disperser.BlobMetadata{
+		MetadataHash: blobKey1.MetadataHash,
+		BlobHash:     blobHash,
+		BlobStatus:   disperser.Processing,
+		AccountID:    "test1",
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob1.RequestHeader,
+			BlobSize:          uint(len(blob1.Data)),
+			RequestedAt:       123,
+		},
+	}
+	blobKey2 := disperser.BlobKey{
+		BlobHash:     "blob2",
+		MetadataHash: "hash2",
+	}
+	blob2 := &core.Blob{
+		RequestHeader: core.BlobRequestHeader{
+			SecurityParams: securityParams,
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: "test2",
+			},
+		},
+
+		Data: []byte("test2"),
+	}
+	metadata2 := &disperser.BlobMetadata{
+		MetadataHash: blobKey2.MetadataHash,
+		BlobHash:     blobKey2.BlobHash,
+		BlobStatus:   disperser.Finalized,
+		AccountID:    "test2",
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob2.RequestHeader,
+			BlobSize:          uint(len(blob2.Data)),
+			RequestedAt:       123,
+		},
+		ConfirmationInfo: &disperser.ConfirmationInfo{},
+	}
+	err := blobMetadataStore.QueueNewBlobMetadata(ctx, metadata1)
+	assert.NoError(t, err)
+	err = blobMetadataStore.QueueNewBlobMetadata(ctx, metadata2)
+	assert.NoError(t, err)
+
+	processing, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Len(t, processing, 1)
+	assert.Equal(t, metadata1, processing[0])
+
+	processingCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), processingCount)
+
+	blobCountByAccountId1, err := blobMetadataStore.GetBlobMetadataCountByAccountID(ctx, "test1")
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), blobCountByAccountId1)
+
+	blobCountByAccountId2, err := blobMetadataStore.GetBlobMetadataCountByAccountID(ctx, "test2")
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), blobCountByAccountId2)
 
 	deleteItems(t, []commondynamodb.Key{
 		{
