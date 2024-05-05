@@ -62,6 +62,7 @@ type RetrieverClientConfig struct {
 	RetrieverG1Path                  string
 	RetrieverG2Path                  string
 	RetrieverCachePath               string
+	RetrieverG2PointPowerOf2Path     string
 }
 
 type TestClients struct {
@@ -124,14 +125,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		NumConfirmations: 0,
 	}
 	ethClient, err := geth.NewClient(ethConfig, gcommon.Address{}, 0, ethLogger)
-	log.Printf("Error: failed to create eth client: %v", err)
 	if err != nil {
 		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
 	var mockRollup *rollupbindings.ContractMockRollup
 	if validateOnchainTransaction {
-		log.Printf("Create instance of MockRollUp to validate OnChain Transactions")
+		log.Printf("Create instance of MockRollUp with Contract Address %s", mockRollUpContractAddress)
 		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
 		if err != nil {
 			logger.Printf("Error: %v", err)
@@ -191,7 +191,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Initialize Clients
-	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, *retrieverClientConfig)
+	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, *retrieverClientConfig, batcherPullInterval)
 	logger := testSuite.Logger
 
 	// Check if testSuite is nil
@@ -201,7 +201,7 @@ func TestMain(m *testing.M) {
 	}
 	logger.Println("RPC_URL for Chain...", rpcUrl)
 	logger.Println("Mock RollUp Contract Address...", mockRollUpContractAddress)
-	logger.Println("Retriever Client Deployed...", isRetrieverClientEnabled)
+	logger.Println("Retriever Client Enabled...", isRetrieverClientEnabled)
 
 	logger.Println("Running Test Client...")
 	// Run the tests and get the exit code
@@ -230,6 +230,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	if err != nil {
 		return err
 	}
+
 	v, err := verifier.NewVerifier(&kzg.KzgConfig{
 		G1Path:          retrievalClientConfig.RetrieverG1Path,
 		G2Path:          retrievalClientConfig.RetrieverG2Path,
@@ -249,6 +250,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	if err != nil {
 		return err
 	}
+
 	return indexedChainStateClient.Start(context.Background())
 }
 
@@ -296,7 +298,7 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
 	// Update this to a minute over Batcher_Pull_Interval
-	confirmationDeadline, err := time.ParseDuration(t.batcherPullInterval)
+	confirmationDeadline, err := time.ParseDuration(testSuite.BatcherPullInterval)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -389,8 +391,8 @@ loop:
 			}
 
 			// Check if the confirmation process has exceeded the maximum duration
-			if time.Now().After(confirmationDeadline) {
-				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout of 4 minutes")
+			if time.Now().After(time.Now().Add(confirmationDeadline)) {
+				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout")
 				logger.Println("Failing the test")
 				t.Fail()
 				return
