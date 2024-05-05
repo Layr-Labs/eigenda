@@ -254,3 +254,105 @@ func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperse
 		},
 	}
 }
+
+func TestBlobMetadataStoreWithAccountId(t *testing.T) {
+	ctx := context.Background()
+	blobKey1 := disperser.BlobKey{
+		BlobHash:     blobHash,
+		MetadataHash: "hash",
+	}
+	metadata1 := &disperser.BlobMetadata{
+		MetadataHash: blobKey1.MetadataHash,
+		BlobHash:     blobHash,
+		BlobStatus:   disperser.Processing,
+		AccountID:    "test",
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+	}
+	blobKey2 := disperser.BlobKey{
+		BlobHash:     "blob2",
+		MetadataHash: "hash2",
+	}
+	metadata2 := &disperser.BlobMetadata{
+		MetadataHash: blobKey2.MetadataHash,
+		BlobHash:     blobKey2.BlobHash,
+		BlobStatus:   disperser.Finalized,
+		AccountID:    "test",
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       124,
+		},
+		ConfirmationInfo: &disperser.ConfirmationInfo{},
+	}
+	err := blobMetadataStore.QueueNewBlobMetadata(ctx, metadata1)
+	assert.NoError(t, err)
+	err = blobMetadataStore.QueueNewBlobMetadata(ctx, metadata2)
+	assert.NoError(t, err)
+
+	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata1, fetchedMetadata)
+	fetchedMetadata, err = blobMetadataStore.GetBlobMetadata(ctx, blobKey2)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata2, fetchedMetadata)
+
+	processing, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Len(t, processing, 1)
+	assert.Equal(t, metadata1, processing[0])
+
+	processingCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), processingCount)
+
+	blobCountByAccountId, err := blobMetadataStore.GetBlobMetadataCountByAccountID(ctx, "test")
+	assert.NoError(t, err)
+	assert.Equal(t, int32(2), blobCountByAccountId)
+
+	err = blobMetadataStore.IncrementNumRetries(ctx, metadata1)
+	assert.NoError(t, err)
+	fetchedMetadata, err = blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
+	assert.NoError(t, err)
+	metadata1.NumRetries = 1
+	assert.Equal(t, metadata1, fetchedMetadata)
+
+	finalized, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, disperser.Finalized)
+	assert.NoError(t, err)
+	assert.Len(t, finalized, 1)
+	assert.Equal(t, metadata2, finalized[0])
+
+	finalizedCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Finalized)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), finalizedCount)
+
+	confirmedMetadata := getConfirmedMetadata(t, blobKey1)
+	err = blobMetadataStore.UpdateBlobMetadata(ctx, blobKey1, confirmedMetadata)
+	assert.NoError(t, err)
+
+	metadata, err := blobMetadataStore.GetBlobMetadataInBatch(ctx, confirmedMetadata.ConfirmationInfo.BatchHeaderHash, confirmedMetadata.ConfirmationInfo.BlobIndex)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata, confirmedMetadata)
+
+	confirmedCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Confirmed)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), confirmedCount)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
+		},
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey2.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey2.BlobHash},
+		},
+	})
+}

@@ -69,9 +69,10 @@ func ParseBlobKey(key string) (BlobKey, error) {
 }
 
 type BlobMetadata struct {
-	BlobHash     BlobHash     `json:"blob_hash"`
-	MetadataHash MetadataHash `json:"metadata_hash"`
-	BlobStatus   BlobStatus   `json:"blob_status"`
+	BlobHash     BlobHash       `json:"blob_hash"`
+	MetadataHash MetadataHash   `json:"metadata_hash"`
+	BlobStatus   BlobStatus     `json:"blob_status"`
+	AccountID    core.AccountID `json:"account_id"`
 	// Expiry is unix epoch time in seconds at which the blob will expire
 	Expiry uint64 `json:"expiry"`
 	// NumRetries is the number of times the blob has been retried
@@ -168,6 +169,8 @@ type BlobStore interface {
 	GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*BlobMetadata, error)
 	// GetBlobMetadata returns a blob metadata given a metadata key
 	GetBlobMetadata(ctx context.Context, blobKey BlobKey) (*BlobMetadata, error)
+	// GetBlobMetadataCountByAccountID returns a list of blob metadata for blobs with the given accountId
+	GetBlobMetadataCountByAccountID(ctx context.Context, accountID core.AccountID) (int32, error)
 	// HandleBlobFailure handles a blob failure by either incrementing the retry count or marking the blob as failed
 	// Returns a boolean indicating whether the blob should be retried and an error
 	HandleBlobFailure(ctx context.Context, metadata *BlobMetadata, maxRetry uint) (bool, error)

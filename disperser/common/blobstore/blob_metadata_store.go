@@ -7,6 +7,7 @@ import (
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	statusIndexName = "StatusIndex"
-	batchIndexName  = "BatchIndex"
+	statusIndexName    = "StatusIndex"
+	batchIndexName     = "BatchIndex"
+	accountIdIndexName = "AccountIdIndex"
 )
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -218,6 +220,21 @@ func (s *BlobMetadataStore) GetBlobMetadataInBatch(ctx context.Context, batchHea
 	return metadata, nil
 }
 
+// GetBlobMetadataByAccount Count returns the count of all the metadata with the given status
+// Because this function scans the entire index, it should only be used for status with a limited number of items.
+// It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
+func (s *BlobMetadataStore) GetBlobMetadataCountByAccountID(ctx context.Context, accountID core.AccountID) (int32, error) {
+	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, accountIdIndexName, "AccountID = :accountID", commondynamodb.ExpresseionValues{
+		":accountID": &types.AttributeValueMemberS{
+			Value: accountID,
+		}})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (s *BlobMetadataStore) IncrementNumRetries(ctx context.Context, existingMetadata *disperser.BlobMetadata) error {
 	_, err := s.dynamoDBClient.UpdateItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"BlobHash": &types.AttributeValueMemberS{
@@ -297,6 +314,10 @@ func GenerateTableSchema(metadataTableName string, readCapacityUnits int64, writ
 				AttributeName: aws.String("BlobIndex"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("AccountID"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -339,6 +360,26 @@ func GenerateTableSchema(metadataTableName string, readCapacityUnits int64, writ
 					},
 					{
 						AttributeName: aws.String("BlobIndex"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
+				IndexName: aws.String(accountIdIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("AccountID"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("RequestedAt"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
