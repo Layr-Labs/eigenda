@@ -286,7 +286,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, err
 	}
 
-	log.Debug("Processing batch", "num of blobs", len(blobs), "batchHeaderHash", batchHeaderHash)
+	log.Debug("Processing a batch", "batchHeaderHash", batchHeaderHash, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
 
 	if len(blobs) == 0 {
 		return nil, errors.New("ProcessBatch: number of blobs must be greater than zero")
