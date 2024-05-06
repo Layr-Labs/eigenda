@@ -71,6 +71,10 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 				return
 			}
 
+			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+			if err != nil {
+				return
+			}
 			requestedAt := time.Now()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
@@ -79,6 +83,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					Signature: nil,
 					Operator:  id,
 				}
+				c.logger.Warn("Failed to send chunks to operator", "batchHeaderHash", batchHeaderHash, "operator", op.Socket)
 				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
 				update <- core.SignerMessage{
@@ -86,6 +91,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					Operator:  id,
 					Err:       nil,
 				}
+				c.logger.Debug("Successfully sent chunks to operator", "batchHeaderHash", batchHeaderHash, "operator", op.Socket)
 				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
 			}
 
