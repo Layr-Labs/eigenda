@@ -35,6 +35,21 @@ func (s *server) getBlobs(ctx context.Context, limit int) ([]*BlobMetadataRespon
 	return s.convertBlobMetadatasToBlobMetadataResponse(ctx, blobMetadatas)
 }
 
+func (s *server) getBlobCountByAccountId(ctx context.Context, accountID string) (*BlobCountForAccountIdResponse, error) {
+	s.logger.Info("Calling get blob", "AccountId", accountID)
+
+	metadataCount, err := s.blobstore.GetBlobMetadataCountByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Debug("Got blob metadata count for AccountId", "AccountId", accountID, "metadataCount", metadataCount)
+	return &BlobCountForAccountIdResponse{
+		Count:     metadataCount,
+		AccountId: accountID,
+	}, nil
+}
+
 func (s *server) convertBlobMetadatasToBlobMetadataResponse(ctx context.Context, metadatas []*disperser.BlobMetadata) ([]*BlobMetadataResponse, error) {
 	var (
 		err               error

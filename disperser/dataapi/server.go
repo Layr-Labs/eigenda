@@ -151,6 +151,12 @@ type (
 		DispersalOnline bool   `json:"dispersal_online"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 	}
+
+	BlobCountForAccountIdResponse struct {
+		Count     int32  `json:"count"`
+		AccountId string `json:"account_id"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -244,6 +250,7 @@ func (s *server) Start() error {
 		{
 			feed.GET("/blobs", s.FetchBlobsHandler)
 			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
+			feed.GET("/blobs/:accountId", s.FetchBlobCountByAccountIdHandler)
 		}
 		operatorsInfo := v1.Group("/operators-info")
 		{
@@ -444,6 +451,40 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 		},
 		Data: metadatas,
 	})
+}
+
+// FetchBlobCountByAccountIdHandler godoc
+//
+//	@Summary	Fetch blob metadata count by AccountId
+//	@Tags		Feed
+//	@Produce	json
+//	@Param		accountId	path		string	true	"AccountId"
+//	@Success	200			{object}	BlobCountForAccountIdResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/feed/blobs/{accountId} [get]
+func (s *server) FetchBlobCountByAccountIdHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchBlobCountByAccountIdHandler", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	accountId := c.Param("accountId")
+	if accountId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "account id empty string is invalid"})
+	}
+
+	blobMetadataCountByAccountIdResp, err := s.getBlobCountByAccountId(c.Request.Context(), accountId)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobCountByAccountIdHandler")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobCountByAccountIdHandler")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAage))
+	c.JSON(http.StatusOK, blobMetadataCountByAccountIdResp)
 }
 
 // FetchMetricsHandler godoc

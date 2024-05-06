@@ -233,6 +233,65 @@ func TestFetchBlobsHandler(t *testing.T) {
 	assert.Equal(t, 2, len(response.Data))
 }
 
+func TestFetchBlobCountByAccountIdHandler(t *testing.T) {
+	r := setUpRouter()
+
+	blob := makeTestBlob(0, 80)
+	key := queueBlob(t, &blob, blobstore)
+	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, blobstore)
+	accountd := "test"
+	r.GET("/v1/feed/blobs/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/"+accountd, nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobCountForAccountIdResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, int32(1), response.Count)
+	assert.Equal(t, "test", response.AccountId)
+}
+
+func TestFetchBlobCountByAccountIdInvalidHandler(t *testing.T) {
+	r := setUpRouter()
+
+	blob := makeTestBlob(0, 80)
+	key := queueBlob(t, &blob, blobstore)
+	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, blobstore)
+	// BlobAccountId is "test"
+	// Search by AccountId test1
+	accountd := "test1"
+	r.GET("/v1/feed/blobs/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/"+accountd, nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobCountForAccountIdResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, int32(0), response.Count)
+}
+
 func TestFetchMetricsHandler(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
@@ -1529,9 +1588,11 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 		BlobStatus:   disperser.Confirmed,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
 				SecurityParams: blob.RequestHeader.SecurityParams,
+				BlobAuthHeader: blob.RequestHeader.BlobAuthHeader,
 			},
 			RequestedAt: expectedRequestedAt,
 			BlobSize:    uint(len(blob.Data)),
