@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -95,6 +97,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ALLOW_ORIGINS"),
 		Required: true,
 	}
+	EjectionTokenFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-token"),
+		Usage:    "The token used for authorizing the ejection requests",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EJECTION_TOKEN"),
+	}
 	EnableMetricsFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
 		Usage:    "start metrics server",
@@ -131,6 +139,13 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_HTTP_PORT"),
 	}
+	TxnTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "txn-timeout"),
+		Usage:    "the timeout for the transaction",
+		Required: false,
+		Value:    6 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRANSACTION_TIMEOUT"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -146,10 +161,12 @@ var requiredFlags = []cli.Flag{
 	PrometheusServerSecretFlag,
 	PrometheusMetricsClusterLabelFlag,
 	AllowOriginsFlag,
+	EjectionTokenFlag,
 	EnableMetricsFlag,
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,
+	TxnTimeoutFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -164,5 +181,6 @@ func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envVarPrefix)...)
+	Flags = append(Flags, common.FireblocksCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 }

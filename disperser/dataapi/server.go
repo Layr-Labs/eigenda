@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -37,6 +38,7 @@ const (
 	// Cache control for responses.
 	// The time unit is second for max age.
 	maxOperatorsNonsigningPercentageAge = 10
+	maxOperatorPortCheckAge             = 600
 	maxNonSignerAge                     = 10
 	maxDeregisteredOperatorAage         = 10
 	maxThroughputAge                    = 10
@@ -115,7 +117,7 @@ type (
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
-	DeregisteredOperatorMetadata struct {
+	QueriedStateOperatorMetadata struct {
 		OperatorId           string `json:"operator_id"`
 		BlockNumber          uint   `json:"block_number"`
 		Socket               string `json:"socket"`
@@ -123,9 +125,9 @@ type (
 		OperatorProcessError string `json:"operator_process_error"`
 	}
 
-	DeregisteredOperatorsResponse struct {
+	QueriedStateOperatorsResponse struct {
 		Meta Meta                            `json:"meta"`
-		Data []*DeregisteredOperatorMetadata `json:"data"`
+		Data []*QueriedStateOperatorMetadata `json:"data"`
 	}
 
 	ServiceAvailability struct {
@@ -138,6 +140,17 @@ type (
 		Data []*ServiceAvailability `json:"data"`
 	}
 
+	OperatorPortCheckRequest struct {
+		OperatorId string `json:"operator_id"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -152,6 +165,8 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
+		ejector        *Ejector
+		ejectionToken  string
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -169,6 +184,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
+	ejector *Ejector,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -201,6 +217,8 @@ func NewServer(
 		transactor:                transactor,
 		chainState:                chainState,
 		metrics:                   metrics,
+		ejector:                   ejector,
+		ejectionToken:             config.EjectionToken,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
@@ -230,6 +248,8 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
+			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -241,6 +261,8 @@ func (s *server) Start() error {
 			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
+		ejection := v1.Group("/ejection")
+		ejection.POST("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
@@ -290,6 +312,68 @@ func (s *server) Shutdown() error {
 	}
 
 	return nil
+}
+
+// EjectOperatorsHandler godoc
+//
+//	@Summary	Eject operators who violate the SLAs during the given time interval
+//	@Tags		Ejector
+//	@Produce	json
+//	@Param		interval	query	int		false	"Lookback window for operator ejection [default: 86400]"
+//	@Param		end			query	int		false	"End time for evaluating operator ejection [default: now]"
+//	@Param		mode		query	string	false	"Whether it's periodic or urgent ejection request [default: periodic]"
+//	@Success	200
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/ejector/operators [post]
+func (s *server) EjectOperatorsHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	token := c.GetHeader("ejection_token")
+	if token != s.ejectionToken {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	mode := "periodic"
+	if c.Query("mode") != "" {
+		mode = c.Query("mode")
+	}
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		var err error
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("EjectOperators")
+			s.metrics.IncrementEjectionRequest(mode, codes.InvalidArgument)
+			errorResponse(c, err)
+			return
+		}
+	}
+
+	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "86400"), 10, 64)
+	if err != nil || interval == 0 {
+		interval = 86400
+	}
+
+	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
+	if err == nil {
+		err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
+	}
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("EjectOperators")
+		s.metrics.IncrementEjectionRequest(mode, codes.Internal)
+		errorResponse(c, err)
+		return
+	}
+	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
+	s.metrics.IncrementEjectionRequest(mode, codes.OK)
+	c.Status(http.StatusOK)
 }
 
 // FetchBlobHandler godoc
@@ -480,17 +564,17 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 
 // FetchOperatorsNonsigningPercentageHandler godoc
 //
-//		@Summary	Fetch operators non signing percentage
-//		@Tags		Metrics
-//		@Produce	json
-//		@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
-//		@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
-//	 @Param      live_only   query       string false   "Whether return only live nonsigners [default: true]"
-//		@Success	200			{object}	OperatorsNonsigningPercentage
-//		@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//		@Failure	404			{object}	ErrorResponse	"error: Not found"
-//		@Failure	500			{object}	ErrorResponse	"error: Server error"
-//		@Router		/metrics/operator-nonsigning-percentage  [get]
+//	@Summary	Fetch operators non signing percentage
+//	@Tags		Metrics
+//	@Produce	json
+//	@Param		interval	query		int		false	"Interval to query for operators nonsigning percentage [default: 3600]"
+//	@Param		end			query		string	false	"End time (2006-01-02T15:04:05Z) to query for operators nonsigning percentage [default: now]"
+//	@Param		live_only	query		string	false	"Whether return only live nonsigners [default: true]"
+//	@Success	200			{object}	OperatorsNonsigningPercentage
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/operator-nonsigning-percentage  [get]
 func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
@@ -541,7 +625,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Summary	Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.
 //	@Tags		OperatorsInfo
 //	@Produce	json
-//	@Success	200	{object}	DeregisteredOperatorsResponse
+//	@Success	200	{object}	QueriedStateOperatorsResponse
 //	@Failure	400	{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
@@ -578,12 +662,98 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
-	c.JSON(http.StatusOK, DeregisteredOperatorsResponse{
+	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
 	})
+}
+
+// FetchRegisteredOperators godoc
+//
+//	@Summary	Fetch list of operators that have been registered for days. Days is a query parameter with a default value of 14 and max value of 30.
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200	{object}	QueriedStateOperatorsResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/registered-operators [get]
+func (s *server) FetchRegisteredOperators(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchRegisteredOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Get query parameters
+	// Default Value 14 days
+	days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+
+	// Convert days to integer
+	daysInt, err := strconv.Atoi(days)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+
+	if daysInt > 30 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
+		return
+	}
+
+	operatorMetadatas, err := s.getRegisteredOperatorForDays(c.Request.Context(), int32(daysInt))
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchRegisteredOperators")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
+		Meta: Meta{
+			Size: len(operatorMetadatas),
+		},
+		Data: operatorMetadatas,
+	})
+}
+
+// OperatorPortCheck godoc
+//
+//	@Summary	Operator node reachability port check
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Success	200			{object}	OperatorPortCheckResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/port-check [get]
+func (s *server) OperatorPortCheck(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("checking operator ports", "operatorId", operatorId)
+	portCheckResponse, err := s.probeOperatorPorts(c.Request.Context(), operatorId)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			err = errNotFound
+			s.logger.Warn("operator not found", "operatorId", operatorId)
+			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
+		} else {
+			s.logger.Error("operator port check failed", "error", err)
+			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+		}
+		errorResponse(c, err)
+		return
+	}
+
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, portCheckResponse)
 }
 
 // FetchDisperserServiceAvailability godoc

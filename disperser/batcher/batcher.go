@@ -40,13 +40,12 @@ type QuorumInfo struct {
 }
 
 type TimeoutConfig struct {
-	EncodingTimeout      time.Duration
-	AttestationTimeout   time.Duration
-	ChainReadTimeout     time.Duration
-	ChainWriteTimeout    time.Duration
-	ChainStateTimeout    time.Duration
-	FireblocksAPITimeout time.Duration
-	TxnBroadcastTimeout  time.Duration
+	EncodingTimeout     time.Duration
+	AttestationTimeout  time.Duration
+	ChainReadTimeout    time.Duration
+	ChainWriteTimeout   time.Duration
+	ChainStateTimeout   time.Duration
+	TxnBroadcastTimeout time.Duration
 }
 
 type Config struct {
@@ -389,17 +388,6 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 	return result.ErrorOrNil()
 }
 
-func (b *Batcher) transitionBlobToConfirming(ctx context.Context, metadata *disperser.BlobMetadata) error {
-	err := b.Queue.MarkBlobConfirming(ctx, metadata.GetBlobKey())
-	if err != nil {
-		b.logger.Error("error marking blob as confirming", "err", err)
-		return err
-	}
-	// remove encoded blob from storage so we don't disperse it again
-	b.EncodingStreamer.RemoveEncodedBlob(metadata)
-	return nil
-}
-
 type confirmationMetadata struct {
 	batchHeader *core.BatchHeader
 	blobs       []*disperser.BlobMetadata
@@ -421,7 +409,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	defer timer.ObserveDuration()
 
 	stageTimer := time.Now()
-	batch, err := b.EncodingStreamer.CreateBatch()
+	batch, err := b.EncodingStreamer.CreateBatch(ctx)
 	if err != nil {
 		return err
 	}
@@ -502,10 +490,6 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("HandleSingleBatch: error sending confirmBatch transaction: %w", err)
-	}
-
-	for _, metadata := range batch.BlobMetadata {
-		_ = b.transitionBlobToConfirming(ctx, metadata)
 	}
 
 	return nil

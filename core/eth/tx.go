@@ -20,6 +20,7 @@ import (
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
@@ -54,6 +55,7 @@ type ContractBindings struct {
 	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
 	StakeRegistry         *stakereg.ContractStakeRegistry
 	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
+	EjectionManager       *ejectionmg.ContractEjectionManager
 	AVSDirectory          *avsdir.ContractAVSDirectory
 }
 
@@ -360,6 +362,21 @@ func (t *Transactor) UpdateOperatorSocket(ctx context.Context, socket string) er
 		return err
 	}
 	return nil
+}
+
+func (t *Transactor) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Transaction, error) {
+	byteIdsByQuorum := make([][][32]byte, len(operatorsByQuorum))
+	for i, ids := range operatorsByQuorum {
+		for _, id := range ids {
+			byteIdsByQuorum[i] = append(byteIdsByQuorum[i], [32]byte(id))
+		}
+	}
+	opts, err := t.EthClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.Logger.Error("Failed to generate transact opts", "err", err)
+		return nil, err
+	}
+	return t.Bindings.EjectionManager.EjectOperators(opts, byteIdsByQuorum)
 }
 
 // GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
@@ -808,6 +825,17 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		return err
 	}
 
+	contractEjectionManagerAddr, err := contractIRegistryCoordinator.Ejector(&bind.CallOpts{})
+	if err != nil {
+		t.Logger.Error("Failed to fetch EjectionManager address", "err", err)
+		return err
+	}
+	contractEjectionManager, err := ejectionmg.NewContractEjectionManager(contractEjectionManagerAddr, t.EthClient)
+	if err != nil {
+		t.Logger.Error("Failed to fetch EjectionManager contract", "err", err)
+		return err
+	}
+
 	contractBLSOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.EthClient)
 	if err != nil {
 		t.Logger.Error("Failed to fetch BLSOperatorStateRetriever contract", "err", err)
@@ -860,6 +888,7 @@ func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigen
 		BLSApkRegistry:        contractBLSPubkeyReg,
 		IndexRegistry:         contractIIndexReg,
 		RegistryCoordinator:   contractIRegistryCoordinator,
+		EjectionManager:       contractEjectionManager,
 		StakeRegistry:         contractStakeRegistry,
 		EigenDAServiceManager: contractEigenDAServiceManager,
 		DelegationManager:     contractDelegationManager,

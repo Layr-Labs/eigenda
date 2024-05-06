@@ -129,7 +129,7 @@ func (a *OperatorPubKeysAccumulator) UpdateObject(object indexer.AccumulatorObje
 	return object, nil
 }
 
-// SerializeObject object takes the accummulator object, and serializes it using the rules for the specified fork.
+// SerializeObject object takes the accumulator object, and serializes it using the rules for the specified fork.
 func (a *OperatorPubKeysAccumulator) SerializeObject(object indexer.AccumulatorObject, fork indexer.UpgradeFork) ([]byte, error) {
 	switch fork {
 	case "genesis":
