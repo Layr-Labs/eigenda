@@ -167,6 +167,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 //
 // These entries will be stored atomically, i.e. either all or none entries will be stored.
 func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage, blobsProto []*node.Blob) (*[][]byte, error) {
+
 	log := s.logger
 	batchHeaderHash, err := header.GetBatchHeaderHash()
 	if err != nil {
@@ -218,6 +219,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 
 	// Generate key/value pairs for all blob headers and blob chunks .
 	size := int64(0)
+	var serializationDuration, encodingDuration time.Duration
 	for idx, blob := range blobs {
 		// blob header
 		blobHeaderKey, err := EncodeBlobHeaderKey(batchHeaderHash, idx)
@@ -241,6 +243,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				return nil, err
 			}
 
+			start := time.Now()
 			bundleRaw := make([][]byte, len(bundle))
 			for i, chunk := range bundle {
 				bundleRaw[i], err = chunk.Serialize()
@@ -249,10 +252,13 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					return nil, err
 				}
 			}
+			serializationDuration += time.Since(start)
+			start = time.Now()
 			chunkBytes, err := encodeChunks(bundleRaw)
 			if err != nil {
 				return nil, err
 			}
+			encodingDuration += time.Since(start)
 			size += int64(len(chunkBytes))
 
 			keys = append(keys, key)
@@ -261,12 +267,14 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		}
 	}
 
+	start := time.Now()
 	// Write all the key/value pairs to the local database atomically.
 	err = s.db.WriteBatch(keys, values)
 	if err != nil {
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
 	}
+	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start))
 
 	return &keys, nil
 }
