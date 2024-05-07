@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Use of single port makes tests incapable of running in parallel
 const (
 	transport   = "http"
 	serviceName = "plasma_test_server"
@@ -90,7 +91,7 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	// 1 - write pre-image data to test plasma server
+	// 1 - write arbitrary data to test plasma server
 
 	var testPreimage = []byte("inter-subjective and not objective!")
 
