@@ -296,17 +296,15 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 
 	// Measure num batches received and its size in bytes
 	batchSize := uint64(0)
-	quorumIds := make([]uint8, 0)
 	for _, blob := range blobs {
 		for quorumID, bundle := range blob.Bundles {
 			n.Metrics.AcceptBlobs(quorumID, bundle.Size())
-			quorumIds = append(quorumIds, quorumID)
 		}
 		batchSize += blob.Bundles.Size()
 	}
 	n.Metrics.AcceptBatches("received", batchSize)
 
-	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHash, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "quorum IDs involved", fmt.Sprintf("%d", quorumIds), "referenceBlockNumber", header.ReferenceBlockNumber)
+	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHash, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
 
 	// Store the batch.
 	// Run this in a goroutine so we can parallelize the batch storing and batch
