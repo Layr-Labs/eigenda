@@ -65,7 +65,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		&cli.DurationFlag{
 			Name:    StatusQueryTimeoutFlagName,
 			Usage:   "Timeout for aborting an EigenDA blob dispersal if the disperser does not report that the blob has been confirmed dispersed.",
-			Value:   1 * time.Minute,
+			Value:   25 * time.Minute,
 			EnvVars: prefixEnvVars("EIGENDA_STATUS_QUERY_TIMEOUT"),
 		},
 		&cli.DurationFlag{

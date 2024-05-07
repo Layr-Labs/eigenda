@@ -21,3 +21,6 @@
 go.work
 
 /bin
+
+## kzg cache
+kzg/SRSTables/

@@ -25,6 +25,12 @@ type PlasmaStore interface {
 	PutWithoutComm(ctx context.Context, value []byte) (key []byte, err error)
 }
 
+/*
+TODO - enable application server throughput constraints to prevent abuse
+
+	a) read/write timeouts
+	b) concurrency limits for request processing
+*/
 type DAServer struct {
 	log        log.Logger
 	endpoint   string
@@ -189,6 +195,9 @@ func (b *DAServer) Endpoint() string {
 func (b *DAServer) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = b.httpServer.Shutdown(ctx)
+	if err := b.httpServer.Shutdown(ctx); err != nil {
+		b.log.Error("Failed to shutdown DA server", "err", err)
+		return err
+	}
 	return nil
 }

@@ -20,7 +20,8 @@ const (
 	transport   = "http"
 	serviceName = "plasma_test_server"
 	testSvrHost = "127.0.0.1"
-	testSvrPort = 6970
+	testSvrPort = 6969
+	holeskyDA   = "disperser-holesky.eigenda.xyz:443"
 )
 
 type TestSuite struct {
@@ -29,7 +30,7 @@ type TestSuite struct {
 	server *plasma.DAServer
 }
 
-func createEigenDATestSuite(t *testing.T) TestSuite {
+func createTestSuite(t *testing.T) (TestSuite, func()) {
 	ctx := context.Background()
 
 	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
@@ -41,9 +42,7 @@ func createEigenDATestSuite(t *testing.T) TestSuite {
 	oplog.SetGlobalLogHandler(log.Handler())
 
 	testCfg := eigenda.Config{
-		// testnet baby
-		RPC: "disperser-holesky.eigenda.xyz:443",
-
+		RPC:                      holeskyDA,
 		StatusQueryTimeout:       time.Minute * 45,
 		StatusQueryRetryInterval: time.Second * 1,
 		UseTLS:                   true,
@@ -65,22 +64,24 @@ func createEigenDATestSuite(t *testing.T) TestSuite {
 		}
 	}()
 
+	kill := func() {
+		if err := server.Stop(); err != nil {
+			panic(err)
+		}
+	}
+
 	return TestSuite{
 		ctx:    ctx,
 		log:    log,
 		server: server,
-	}
+	}, kill
 }
 
-func TestPutGetLogicForEigenDAStore(t *testing.T) {
-	ts := createEigenDATestSuite(t)
-	defer func() {
-		if err := ts.server.Stop(); err != nil {
-			panic(err)
-		}
-	}()
+func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
+	ts, kill := createTestSuite(t)
+	defer kill()
 
-	daClient := plasma.NewForkedDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false)
+	daClient := plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false)
 	t.Log("Waiting for client to establish connection with plasma server...")
 	// wait for server to come online after starting
 	err := wait.For(ts.ctx, 500*time.Millisecond, func() (bool, error) {

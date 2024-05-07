@@ -67,25 +67,7 @@ func (m *EigenDAClient) RetrieveBlob(ctx context.Context, BatchHeaderHash []byte
 		return nil, err
 	}
 
-	// decode modulo bn254
-	decodedData := codec.RemoveEmptyByteFromPaddedBytes(reply.Data)
-
-	// Return exact data with buffer removed
-	reader := bytes.NewReader(decodedData)
-	length, err := binary.ReadUvarint(reader)
-	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to decode length uvarint prefix")
-	}
-	data := make([]byte, length)
-	n, err := reader.Read(data)
-	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to copy un-padded data into final buffer")
-	}
-	if uint64(n) != length {
-		return nil, fmt.Errorf("EigenDA client failed, data length does not match length prefix")
-	}
-
-	return data, nil
+	return DecodeFromBlob(reply.Data)
 }
 
 func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, error) {
@@ -96,11 +78,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 	}
 	daClient := disperser.NewDisperserClient(conn)
 
-	// encode data length
-	data = append(ConvertIntToVarUInt(len(data)), data...)
-
-	// encode modulo bn254
-	data = codec.ConvertByPaddingEmptyByte(data)
+	data = EncodeToBlob(data)
 
 	disperseReq := &disperser.DisperseBlobRequest{
 		Data: data,
@@ -165,7 +143,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 					BlobIndex:            blobInfo.BlobVerificationProof.BlobIndex,
 					ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
 					QuorumIDs:            quorumIDs,
-					// insert commitment here
+					BlobCommitment:       blobInfo.BlobHeader.Commitment,
 				}, nil
 			default:
 				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
@@ -179,4 +157,34 @@ func ConvertIntToVarUInt(v int) []byte {
 	n := binary.PutUvarint(buf, uint64(v))
 	return buf[:n]
 
+}
+
+func EncodeToBlob(data []byte) []byte {
+	// encode data length
+	data = append(ConvertIntToVarUInt(len(data)), data...)
+
+	// encode modulo bn254
+	return codec.ConvertByPaddingEmptyByte(data)
+}
+
+func DecodeFromBlob(b []byte) ([]byte, error) {
+	// decode modulo bn254
+	decodedData := codec.RemoveEmptyByteFromPaddedBytes(b)
+
+	// Return exact data with buffer removed
+	reader := bytes.NewReader(decodedData)
+	length, err := binary.ReadUvarint(reader)
+	if err != nil {
+		return nil, fmt.Errorf("EigenDA client failed to decode length uvarint prefix")
+	}
+	data := make([]byte, length)
+	n, err := reader.Read(data)
+	if err != nil {
+		return nil, fmt.Errorf("EigenDA client failed to copy un-padded data into final buffer")
+	}
+	if uint64(n) != length {
+		return nil, fmt.Errorf("EigenDA client failed, data length does not match length prefix")
+	}
+
+	return data, nil
 }

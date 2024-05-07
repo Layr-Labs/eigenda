@@ -3,23 +3,11 @@ package eigenda
 import (
 	"testing"
 
+	eigen_da_common "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/op-plasma-eigenda/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
-
-func equalSlices[P comparable](s1, s2 []P) bool {
-	if len(s1) != len(s2) {
-		return false
-	}
-
-	for i := 0; i < len(s1); i++ {
-		if s1[i] != s2[i] {
-			return false
-		}
-	}
-
-	return true
-}
 
 func TestCertEncodingDecoding(t *testing.T) {
 	c := Cert{
@@ -27,6 +15,10 @@ func TestCertEncodingDecoding(t *testing.T) {
 		BlobIndex:            420,
 		ReferenceBlockNumber: 80085,
 		QuorumIDs:            []uint32{666},
+		BlobCommitment: &eigen_da_common.G1Commitment{
+			X: []byte{0x1},
+			Y: []byte{0x3},
+		},
 	}
 
 	bytes, err := rlp.EncodeToBytes(c)
@@ -37,10 +29,12 @@ func TestCertEncodingDecoding(t *testing.T) {
 	assert.NoError(t, err, "decoding should pass")
 
 	equal := func() bool {
-		return equalSlices(c.BatchHeaderHash, c2.BatchHeaderHash) &&
+		return common.EqualSlices(c.BatchHeaderHash, c2.BatchHeaderHash) &&
 			c.BlobIndex == c2.BlobIndex &&
 			c.ReferenceBlockNumber == c2.ReferenceBlockNumber &&
-			equalSlices(c.QuorumIDs, c2.QuorumIDs)
+			common.EqualSlices(c.QuorumIDs, c2.QuorumIDs) &&
+			common.EqualSlices(c.BlobCommitment.X, c2.BlobCommitment.X) &&
+			common.EqualSlices(c.BlobCommitment.Y, c2.BlobCommitment.Y)
 	}
 
 	assert.True(t, equal(), "values shouldn't change")

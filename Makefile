@@ -21,7 +21,7 @@ clean:
 	rm bin/da-server
 
 test:
-	go test -v ./...
+	go test -v ./... -test.skip ".*E2E.*"
 
 e2e-test:
 	go test -timeout 50m -v ./test/e2e_test.go 

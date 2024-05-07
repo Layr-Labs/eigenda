@@ -16,10 +16,24 @@ var ErrCommitmentMismatch = errors.New("commitment mismatch")
 // CommitmentType is the commitment type prefix.
 type CommitmentType byte
 
-// KeccakCommitmentType is the default commitment type for the DA storage.
 const (
-	Keccak256CommitmentType CommitmentType = 0
-	EigenDACommitmentType   CommitmentType = 1
+	// default commitment type for the DA storage.
+	Keccak256CommitmentType CommitmentType = 0x00
+	DaService               CommitmentType = 0x01
+)
+
+// is redstone?
+type DaLayer byte
+
+const (
+	RedStone    DaLayer = 0x00
+	NotRedstone DaLayer = 0x01
+)
+
+type ExtDAType byte
+
+const (
+	EigenDA ExtDAType = 0x00
 )
 
 // Keccak256Commitment is the default commitment type for op-plasma.
@@ -67,7 +81,7 @@ func DecodeKeccak256(commitment []byte) (Keccak256Commitment, error) {
 type EigenDACommitment []byte
 
 func (c EigenDACommitment) Encode() []byte {
-	return append([]byte{byte(EigenDACommitmentType)}, c...)
+	return append([]byte{byte(DaService), byte(NotRedstone), byte(EigenDA)}, c...)
 }
 
 func (c EigenDACommitment) TxData() []byte {
@@ -77,18 +91,114 @@ func (c EigenDACommitment) TxData() []byte {
 // TODO - verify the commitment against the input blob by evaluating its polynomial representation at an arbitrary point
 // and asserting that the generated output proof can be successfully verified against the commitment.
 func (c EigenDACommitment) Verify(input []byte) error {
+	// Cast to certificate type
+	// var cert eigenda.Cert
+	// if err := rlp.DecodeBytes(c, &cert); err != nil {
+	// 	return err
+	// }
+
+	// input = eigenda.EncodeToBlob(input)
+	// commit, err := eigenda.ComputeCommitmentToData(input)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// kzgConfig := &kzg.KzgConfig{
+	// 	G1Path:          "./kzg/g1.point",
+	// 	G2Path:          "./kzg/g2.point",
+	// 	G2PowerOf2Path:  "./kzg/g2.point.powerOf2",
+	// 	CacheDir:        "./kzg/SRSTables",
+	// 	SRSOrder:        3000,
+	// 	SRSNumberToLoad: 3000,
+	// 	NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	// }
+
+	// // One pad encoding
+	// // Fr - Frame is a structured set of field elements
+	// validInput := codec.ConvertByPaddingEmptyByte(c)
+	// inputFr, err := rs.ToFrArray(validInput)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// frLen := uint64(len(inputFr))
+	// paddedInputFr := make([]fr.Element, encoding.NextPowerOf2(frLen))
+	// // pad input Fr to power of 2 for computing FFT
+	// for i := 0; i < len(paddedInputFr); i++ {
+	// 	if i < len(inputFr) {
+	// 		paddedInputFr[i].Set(&inputFr[i])
+	// 	} else {
+	// 		println("Padding zeros")
+	// 		paddedInputFr[i].SetZero()
+	// 	}
+	// }
+
+	// group, err := kzgProver.NewProver(kzgConfig, true)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// xElement, yElement := fp.Element{}, fp.Element{}
+
+	// xElement = *xElement.SetBytes(cert.BlobCommitment.X)
+	// yElement = *yElement.SetBytes(cert.BlobCommitment.Y)
+
+	// // RS encoding to get polynomial representation of data
+	// // numSys := uint64(4)
+	// // numPar := uint64(0)
+
+	// // params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(validInput)))
+	// // enc, err := group.GetKzgEncoder(params)
+	// // if err != nil {
+	// // 	return err
+	// // }
+
+	// // Lagrange basis SRS in normal order, not butterfly
+	// // lagrangeG1SRS, err := enc.Fs.FFTG1(group.Srs.G1[:len(paddedInputFr)], true)
+	// // if err != nil {
+	// // 	return err
+	// // }
+
+	// // commit in lagrange form
+	// commitLagrange, err := oc.CommitInLagrange(inputFr, group.Srs.G1[:len(inputFr)])
+	// if err != nil {
+	// 	return err
+	// }
+
+	// println(fmt.Sprintf("%+x", commitLagrange.X), len(commitLagrange.X))
+	// println(fmt.Sprintf("%+x", commitLagrange.Y), len(commitLagrange.Y))
+
+	// println(fmt.Sprintf("%+x", cert.BlobCommitment.X), len(cert.BlobCommitment.X))
+	// println(fmt.Sprintf("%+x", cert.BlobCommitment.Y), len(cert.BlobCommitment.Y))
+
+	// if commit.X.String() != xElement.String() {
+	// 	return fmt.Errorf("x element mismatch %s : %s, %s : %s", "generated_commit", commit.X.String(), "initial_commit", xElement.String())
+	// }
+	// if commit.Y.String() != yElement.String() {
+	// 	return fmt.Errorf("x element mismatch %s : %s, %s : %s", "generated_commit", commit.Y.String(), "initial_commit", yElement.String())
+	// }
+
 	return nil
 }
 
-// commitments are of unknown length so length invariants need not be done
 func DecodeEigenDACommitment(commitment []byte) (EigenDACommitment, error) {
-	if len(commitment) == 0 {
+	if len(commitment) <= 3 {
 		return nil, ErrInvalidCommitment
 	}
-	if commitment[0] != byte(EigenDACommitmentType) {
+	if commitment[0] != byte(DaService) {
 		return nil, ErrInvalidCommitment
 	}
-	c := commitment[1:]
 
+	if commitment[1] != byte(NotRedstone) {
+		return nil, ErrInvalidCommitment
+	}
+
+	if commitment[2] != byte(EigenDA) {
+		return nil, ErrInvalidCommitment
+	}
+
+	c := commitment[3:]
+
+	// TODO - Add a length check
 	return c, nil
 }
