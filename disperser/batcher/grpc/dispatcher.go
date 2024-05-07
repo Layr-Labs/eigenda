@@ -83,7 +83,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					Signature: nil,
 					Operator:  id,
 				}
-				c.logger.Warn("Failed to send chunks to operator", "batchHeaderHash", batchHeaderHash, "operator", op.Socket)
+				c.logger.Warn("Failed to send chunks to operator", "batchHeaderHash", batchHeaderHash, "operator", op.Socket, "err", err)
 				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
 				update <- core.SignerMessage{
