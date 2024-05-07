@@ -11,7 +11,7 @@ require (
 	github.com/aws/smithy-go v1.20.2
 	github.com/consensys/gnark-crypto v0.12.1
 	github.com/ethereum-optimism/optimism v1.7.4
-	github.com/ethereum/go-ethereum v1.14.0
+	github.com/ethereum/go-ethereum v1.13.14
 	github.com/prometheus/client_golang v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.1
@@ -187,4 +187,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ethereum/go-ethereum v1.14.0 => github.com/ethereum-optimism/op-geth v1.101311.0
+replace github.com/ethereum/go-ethereum v1.13.14 => github.com/ethereum-optimism/op-geth v1.101311.0
