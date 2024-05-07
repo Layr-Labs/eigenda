@@ -29,8 +29,6 @@ func StartDAServer(cliCtx *cli.Context) error {
 
 	var store plasma.PlasmaStore
 
-	// NOTE - we should probably delete optionality for other store types in the future
-	// given this implementation is purely unique to EigenDA
 	if cfg.FileStoreEnabled() {
 		log.Info("Using file storage", "path", cfg.FileStoreDirPath)
 		store = plasma_store.NewFileStore(cfg.FileStoreDirPath)
