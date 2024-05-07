@@ -25,6 +25,12 @@ type PlasmaStore interface {
 	PutWithoutComm(ctx context.Context, value []byte) (key []byte, err error)
 }
 
+/*
+TODO - enable application server throughput constraints to prevent abuse
+
+	a) read/write timeouts
+	b) concurrency limits for request processing
+*/
 type DAServer struct {
 	log        log.Logger
 	endpoint   string
@@ -51,6 +57,7 @@ func (d *DAServer) Start() error {
 
 	mux.HandleFunc("/get/", d.HandleGet)
 	mux.HandleFunc("/put/", d.HandlePut)
+	mux.HandleFunc("/health", d.Health)
 
 	d.httpServer.Handler = mux
 
@@ -61,6 +68,8 @@ func (d *DAServer) Start() error {
 	d.listener = listener
 
 	d.endpoint = listener.Addr().String()
+
+	d.log.Info("Starting DA server on", d.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
 		if d.tls != nil {
@@ -86,11 +95,18 @@ func (d *DAServer) Start() error {
 	}
 }
 
+func (d *DAServer) Health(w http.ResponseWriter, r *http.Request) {
+	d.log.Info("GET", "url", r.URL)
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
-	d.log.Debug("GET", "url", r.URL)
+	d.log.Info("GET", "url", r.URL)
 
 	route := path.Dir(r.URL.Path)
 	if route != "/get" {
+		d.log.Info("invalid route", "route", route)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -98,27 +114,38 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
 	comm, err := hexutil.Decode(key)
 	if err != nil {
+		d.log.Info("failed to decode commitment bytes from hex", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	input, err := d.store.Get(r.Context(), comm)
+	decodedComm, err := DecodeEigenDACommitment(comm)
+	if err != nil {
+		d.log.Info("failed to decode commitment", "err", err, "key", key)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	input, err := d.store.Get(r.Context(), decodedComm)
 	if err != nil && errors.Is(err, ErrNotFound) {
+		d.log.Info("key not found", "key", key)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	if err != nil {
+		d.log.Error("internal server error", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if _, err := w.Write(input); err != nil {
+		d.log.Error("failed to write response", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
 func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
-	d.log.Debug("PUT", "url", r.URL)
+	d.log.Info("PUT", "url", r.URL)
 
 	route := path.Dir(r.URL.Path)
 	if route != "/put" {
@@ -133,13 +160,13 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var comm []byte
-	if r.URL.Path == "/put" { // without commitment
+	if r.URL.Path == "/put" || r.URL.Path == "/put/" { // without commitment
 		if comm, err = d.store.PutWithoutComm(r.Context(), input); err != nil {
-			d.log.Info("Failed to store commitment to the DA server", "err", err, "comm", comm)
+			d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-	} else { // with commitment
+	} else { // with commitment (might be worth deleting if we never expect a commitment to be passed in the URL for this server type)
 		key := path.Base(r.URL.Path)
 		comm, err = hexutil.Decode(key)
 		if err != nil {
@@ -148,13 +175,14 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := d.store.PutWithComm(r.Context(), comm, input); err != nil {
-			d.log.Info("Failed to store commitment to the DA server", "err", err, "key", key)
+			d.log.Error("Failed to store commitment to the DA server", "err", err, "key", key)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}
 
-	if _, err := w.Write(comm); err != nil {
+	// write out encoded commitment
+	if _, err := w.Write(EigenDACommitment.Encode(comm)); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -167,6 +195,9 @@ func (b *DAServer) Endpoint() string {
 func (b *DAServer) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = b.httpServer.Shutdown(ctx)
+	if err := b.httpServer.Shutdown(ctx); err != nil {
+		b.log.Error("Failed to shutdown DA server", "err", err)
+		return err
+	}
 	return nil
 }

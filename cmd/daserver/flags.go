@@ -90,7 +90,10 @@ func (c CLIConfig) Check() error {
 		enabledStores += 1
 	}
 	if c.EigenDAEnabled() {
-		c.EigenDAConfig.Check()
+		err := c.EigenDAConfig.Check()
+		if err != nil {
+			return err
+		}
 		enabledStores += 1
 	}
 	if enabledStores == 0 {

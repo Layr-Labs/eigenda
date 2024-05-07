@@ -19,3 +19,8 @@
 
 # Go workspace file
 go.work
+
+/bin
+
+## kzg cache
+kzg/SRSTables/

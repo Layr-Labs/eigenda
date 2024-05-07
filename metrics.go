@@ -5,6 +5,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+/*
+	TODO: Add telemetry specific to EigenDA interactions and
+	request/response latency
+*/
+
 type Metricer interface {
 	RecordActiveChallenge(commBlock uint64, startBlock uint64, hash []byte)
 	RecordResolvedChallenge(hash []byte)

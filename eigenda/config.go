@@ -12,6 +12,7 @@ const (
 	RPCFlagName                      = "eigenda-rpc"
 	StatusQueryRetryIntervalFlagName = "eigenda-status-query-retry-interval"
 	StatusQueryTimeoutFlagName       = "eigenda-status-query-timeout"
+	UseTlsFlagName                   = "eigenda-use-tls"
 )
 
 type Config struct {
@@ -26,6 +27,9 @@ type Config struct {
 
 	// The amount of time to wait between status queries of a newly dispersed blob
 	StatusQueryRetryInterval time.Duration
+
+	// UseTLS specifies whether the client should use TLS as a transport layer when connecting to disperser.
+	UseTLS bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables.
@@ -55,20 +59,26 @@ func CLIFlags(envPrefix string) []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:    RPCFlagName,
-			Usage:   "RPC endpoint of the EigenDA disperser",
+			Usage:   "RPC endpoint of the EigenDA disperser.",
 			EnvVars: prefixEnvVars("EIGENDA_RPC"),
 		},
 		&cli.DurationFlag{
 			Name:    StatusQueryTimeoutFlagName,
 			Usage:   "Timeout for aborting an EigenDA blob dispersal if the disperser does not report that the blob has been confirmed dispersed.",
-			Value:   1 * time.Minute,
+			Value:   25 * time.Minute,
 			EnvVars: prefixEnvVars("EIGENDA_STATUS_QUERY_TIMEOUT"),
 		},
 		&cli.DurationFlag{
 			Name:    StatusQueryRetryIntervalFlagName,
-			Usage:   "Wait time between retries of EigenDA blob status queries (made while waiting for a blob to be confirmed by)",
+			Usage:   "Wait time between retries of EigenDA blob status queries (made while waiting for a blob to be confirmed by).",
 			Value:   5 * time.Second,
 			EnvVars: prefixEnvVars("EIGENDA_STATUS_QUERY_INTERVAL"),
+		},
+		&cli.BoolFlag{
+			Name:    UseTlsFlagName,
+			Usage:   "Use TLS when connecting to the EigenDA disperser.",
+			Value:   true,
+			EnvVars: prefixEnvVars("EIGENDA_GRPC_USE_TLS"),
 		},
 	}
 }

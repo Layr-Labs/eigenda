@@ -21,8 +21,8 @@ func main() {
 	app := cli.NewApp()
 	app.Flags = cliapp.ProtectFlags(Flags)
 	app.Version = opservice.FormatVersion(Version, "", "", "")
-	app.Name = "da-server"
-	app.Usage = "Plasma DA Storage Service"
+	app.Name = "eigenda-plasma-server"
+	app.Usage = "EigenDA Plasma DA Storage Service"
 	app.Description = "Service for storing plasma DA inputs"
 	app.Action = StartDAServer
 

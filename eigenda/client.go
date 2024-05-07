@@ -15,9 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Useful to dinstiguish between plain calldata and alt-da blob refs
+// Useful to distinguish between plain calldata and alt-da blob refs
 // Support seamless migration of existing rollups using ETH DA
 const DerivationVersionEigenda = 0xed
 
@@ -39,11 +40,20 @@ func NewEigenDAClient(log log.Logger, config Config) *EigenDAClient {
 	}
 }
 
+func (m *EigenDAClient) getConnection() (*grpc.ClientConn, error) {
+	if m.UseTLS {
+		config := &tls.Config{}
+		credential := credentials.NewTLS(config)
+		dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
+		return grpc.Dial(m.RPC, dialOptions...)
+	}
+
+	return grpc.Dial(m.RPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
 func (m *EigenDAClient) RetrieveBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error) {
-	config := &tls.Config{}
-	credential := credentials.NewTLS(config)
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
-	conn, err := grpc.Dial(m.RPC, dialOptions...)
+	m.Log.Info("Attempting to retrieve blob from EigenDA")
+	conn, err := m.getConnection()
 	if err != nil {
 		return nil, err
 	}
@@ -57,43 +67,18 @@ func (m *EigenDAClient) RetrieveBlob(ctx context.Context, BatchHeaderHash []byte
 		return nil, err
 	}
 
-	// decode modulo bn254
-	decodedData := codec.RemoveEmptyByteFromPaddedBytes(reply.Data)
-
-	// Return exact data with buffer removed
-	reader := bytes.NewReader(decodedData)
-	length, err := binary.ReadUvarint(reader)
-	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to decode length uvarint prefix")
-	}
-	data := make([]byte, length)
-	n, err := reader.Read(data)
-	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to copy unpadded data into final buffer")
-	}
-	if uint64(n) != length {
-		return nil, fmt.Errorf("EigenDA client failed, data length does not match length prefix")
-	}
-
-	return data, nil
+	return DecodeFromBlob(reply.Data)
 }
 
 func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
-	config := &tls.Config{}
-	credential := credentials.NewTLS(config)
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
-	conn, err := grpc.Dial(m.RPC, dialOptions...)
+	conn, err := m.getConnection()
 	if err != nil {
 		return nil, err
 	}
 	daClient := disperser.NewDisperserClient(conn)
 
-	// encode data length
-	data = append(ConvertIntToVarUInt(len(data)), data...)
-
-	// encode modulo bn254
-	data = codec.ConvertByPaddingEmptyByte(data)
+	data = EncodeToBlob(data)
 
 	disperseReq := &disperser.DisperseBlobRequest{
 		Data: data,
@@ -113,7 +98,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 
 	base64RequestID := base64.StdEncoding.EncodeToString(disperseRes.RequestId)
 
-	m.Log.Info("Blob disepersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
+	m.Log.Info("Blob dispersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
 
 	timeoutTime := time.Now().Add(m.StatusQueryTimeout)
 	ticker := time.NewTicker(m.StatusQueryRetryInterval)
@@ -139,6 +124,7 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 				m.Log.Warn("Still waiting for confirmation from EigenDA", "requestID", base64RequestID)
 			case disperser.BlobStatus_FAILED:
 				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
+				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing")
 			case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
 				m.Log.Error("EigenDA blob dispersal failed in processing with insufficient signatures", "requestID", base64RequestID, "err", err)
 			case disperser.BlobStatus_CONFIRMED:
@@ -151,13 +137,14 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 				for i := range quorumIDs {
 					quorumIDs[i] = blobInfo.BlobHeader.BlobQuorumParams[i].QuorumNumber
 				}
-				cert := &Cert{
+
+				return &Cert{
 					BatchHeaderHash:      blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash,
 					BlobIndex:            blobInfo.BlobVerificationProof.BlobIndex,
 					ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
 					QuorumIDs:            quorumIDs,
-				}
-				return cert, nil
+					BlobCommitment:       blobInfo.BlobHeader.Commitment,
+				}, nil
 			default:
 				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
 			}
@@ -170,4 +157,34 @@ func ConvertIntToVarUInt(v int) []byte {
 	n := binary.PutUvarint(buf, uint64(v))
 	return buf[:n]
 
+}
+
+func EncodeToBlob(data []byte) []byte {
+	// encode data length
+	data = append(ConvertIntToVarUInt(len(data)), data...)
+
+	// encode modulo bn254
+	return codec.ConvertByPaddingEmptyByte(data)
+}
+
+func DecodeFromBlob(b []byte) ([]byte, error) {
+	// decode modulo bn254
+	decodedData := codec.RemoveEmptyByteFromPaddedBytes(b)
+
+	// Return exact data with buffer removed
+	reader := bytes.NewReader(decodedData)
+	length, err := binary.ReadUvarint(reader)
+	if err != nil {
+		return nil, fmt.Errorf("EigenDA client failed to decode length uvarint prefix")
+	}
+	data := make([]byte, length)
+	n, err := reader.Read(data)
+	if err != nil {
+		return nil, fmt.Errorf("EigenDA client failed to copy un-padded data into final buffer")
+	}
+	if uint64(n) != length {
+		return nil, fmt.Errorf("EigenDA client failed, data length does not match length prefix")
+	}
+
+	return data, nil
 }
