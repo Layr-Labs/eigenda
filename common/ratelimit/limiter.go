@@ -2,7 +2,6 @@ package ratelimit
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -125,14 +124,39 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 
-		// Check if the user is authenticated before adding to metrics
-		if params.IsAuthenticated {
-			requesterLabel := params.RequesterID
-			d.bucketLevels.With(prometheus.Labels{"requester_id": requesterLabel, "bucket_index": fmt.Sprintf("%d", i)}).Set(float64(bucketParams.BucketLevels[i]))
-		}
-
 		if strings.HasPrefix(params.RequesterID, "system:") {
-			d.systemBucketLevels.With(prometheus.Labels{"bucket_index": fmt.Sprintf("%d", i)}).Set(float64(bucketParams.BucketLevels[i]))
+			requesterParts := strings.Split(params.RequesterID, ":")
+			if len(requesterParts) == 2 {
+				systemParts := strings.Split(requesterParts[1], "-")
+				if len(systemParts) == 2 {
+					quorum := systemParts[0]
+					limitType := systemParts[1]
+					d.systemBucketLevels.With(prometheus.Labels{
+						"quorum": quorum,
+						"type":   limitType,
+					}).Set(float64(bucketParams.BucketLevels[i]))
+				}
+			}
+		} else {
+			// Check if the user is authenticated before adding to metrics
+			if params.IsAuthenticated {
+				requesterParts := strings.Split(params.RequesterID, ":")
+				if len(requesterParts) == 3 {
+					accountType := requesterParts[0]
+					ipOrEthAddress := requesterParts[1]
+					quorumAndType := strings.Split(requesterParts[2], "-")
+					if len(quorumAndType) == 2 {
+						quorum := quorumAndType[0]
+						limitType := quorumAndType[1]
+						d.bucketLevels.With(prometheus.Labels{
+							"account_type":   accountType,
+							"ip_eth_address": ipOrEthAddress,
+							"quorum":         quorum,
+							"type":           limitType,
+						}).Set(float64(bucketParams.BucketLevels[i]))
+					}
+				}
+			}
 		}
 
 		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
