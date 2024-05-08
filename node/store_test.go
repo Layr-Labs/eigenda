@@ -76,9 +76,6 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	}
 	chunk1bytes, err := chunk1.Serialize()
 	assert.Nil(t, err)
-	for i := 0; i < 10000; i++ {
-		chunk1.Coeffs = append(chunk1.Coeffs, encoding.ONE)
-	}
 
 	blobMessage := []*core.BlobMessage{
 		{
