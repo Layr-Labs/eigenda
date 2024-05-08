@@ -250,7 +250,7 @@ func (s *server) Start() error {
 		{
 			feed.GET("/blobs", s.FetchBlobsHandler)
 			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
-			feed.GET("/blobs/:accountId", s.FetchBlobCountByAccountIdHandler)
+			feed.GET("/blobs/count/:accountId", s.FetchBlobCountByAccountIdHandler)
 		}
 		operatorsInfo := v1.Group("/operators-info")
 		{

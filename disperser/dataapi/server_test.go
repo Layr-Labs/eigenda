@@ -256,10 +256,10 @@ func TestFetchBlobCountByAccountIdHandler(t *testing.T) {
 	// mark Blob confirmed with accountId test1
 	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, "test1", blobstore)
 	accountId := "test1"
-	r.GET("/v1/feed/blobs/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
+	r.GET("/v1/feed/blobs/count/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/"+accountId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/count/"+accountId, nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
@@ -288,10 +288,10 @@ func TestFetchBlobCountByAccountIdInvalidHandler(t *testing.T) {
 	// BlobAccountId is "test"
 	// Search by AccountId test1
 	accountId := "test3"
-	r.GET("/v1/feed/blobs/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
+	r.GET("/v1/feed/blobs/count/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/"+accountId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/count/"+accountId, nil)
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
