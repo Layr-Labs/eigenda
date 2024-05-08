@@ -281,10 +281,13 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	start := time.Now()
 	log := n.Logger
 
-	log.Debug("Processing batch", "num of blobs", len(blobs))
+	batchHeaderHash, err := header.GetBatchHeaderHash()
+	if err != nil {
+		return nil, err
+	}
 
 	if len(blobs) == 0 {
-		return nil, errors.New("ProcessBatch: number of blobs must be greater than zero")
+		return nil, errors.New("number of blobs must be greater than zero")
 	}
 
 	if len(blobs) != len(rawBlobs) {
@@ -301,10 +304,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	}
 	n.Metrics.AcceptBatches("received", batchSize)
 
-	batchHeaderHash, err := header.GetBatchHeaderHash()
-	if err != nil {
-		return nil, err
-	}
+	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHash, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
 
 	// Store the batch.
 	// Run this in a goroutine so we can parallelize the batch storing and batch

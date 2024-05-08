@@ -22,10 +22,11 @@ var (
 	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
 )
 
-type SignerMessage struct {
-	Signature *Signature
-	Operator  OperatorID
-	Err       error
+type SigningMessage struct {
+	Signature       *Signature
+	Operator        OperatorID
+	BatchHeaderHash [32]byte
+	Err             error
 }
 
 // SignatureAggregation contains the results of aggregating signatures from a set of operators
@@ -53,7 +54,7 @@ type SignatureAggregator interface {
 
 	// AggregateSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the aggregated signature.
 	// If the aggregated signature is invalid, an error is returned.
-	AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SignerMessage) (*SignatureAggregation, error)
+	AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SigningMessage) (*SignatureAggregation, error)
 }
 
 type StdSignatureAggregator struct {
@@ -78,7 +79,7 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*S
 
 var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
-func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SignerMessage) (*SignatureAggregation, error) {
+func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SigningMessage) (*SignatureAggregation, error) {
 	// TODO: Add logging
 
 	if len(quorumIDs) == 0 {
@@ -127,7 +128,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 			socket = op.Socket
 		}
 		if r.Err != nil {
-			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "err", r.Err)
+			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", r.BatchHeaderHash, "err", r.Err)
 			continue
 		}
 
@@ -170,7 +171,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 				aggPubKeys[ind].Add(op.PubkeyG2)
 			}
 		}
-		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums))
+		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", r.BatchHeaderHash)
 	}
 
 	// Aggregate Non signer Pubkey Id
