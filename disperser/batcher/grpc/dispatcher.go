@@ -88,9 +88,10 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
 				update <- core.SigningMessage{
-					Signature: sig,
-					Operator:  id,
-					Err:       nil,
+					Signature:       sig,
+					Operator:        id,
+					BatchHeaderHash: batchHeaderHash,
+					Err:             nil,
 				}
 				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
 			}
