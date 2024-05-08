@@ -218,7 +218,6 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 
 	// Generate key/value pairs for all blob headers and blob chunks .
 	size := int64(0)
-	var serializationDuration, encodingDuration time.Duration
 	for idx, blob := range blobs {
 		// blob header
 		blobHeaderKey, err := EncodeBlobHeaderKey(batchHeaderHash, idx)
@@ -235,10 +234,9 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		values = append(values, blobHeaderBytes)
 
 		// Get raw chunks
-		start := time.Now()
 		rawBlob := blobsProto[idx]
 		if len(rawBlob.GetBundles()) != len(blob.Bundles) {
-			return nil, errors.New("internal error: the number of bundles in pased blob must be the same as in raw blob")
+			return nil, errors.New("internal error: the number of bundles in parsed blob must be the same as in raw blob")
 		}
 		rawChunks := make(map[core.QuorumID][][]byte)
 		for i, chunks := range rawBlob.GetBundles() {
@@ -248,8 +246,6 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				rawChunks[quorumID][j] = chunk
 			}
 		}
-		serializationDuration += time.Since(start)
-		start = time.Now()
 
 		// blob chunks
 		for quorumID, bundle := range blob.Bundles {
@@ -272,17 +268,14 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 			keys = append(keys, key)
 			values = append(values, chunkBytes)
 		}
-		encodingDuration += time.Since(start)
 	}
 
 	// Write all the key/value pairs to the local database atomically.
-	start := time.Now()
 	err = s.db.WriteBatch(keys, values)
 	if err != nil {
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
 	}
-	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start), "total bytes", size)
 
 	return &keys, nil
 }
