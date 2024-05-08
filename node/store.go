@@ -167,6 +167,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 //
 // These entries will be stored atomically, i.e. either all or none entries will be stored.
 func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage, blobsProto []*node.Blob) (*[][]byte, error) {
+	storeBatchStart := time.Now()
 
 	log := s.logger
 	batchHeaderHash, err := header.GetBatchHeaderHash()
@@ -236,6 +237,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		values = append(values, blobHeaderBytes)
 
 		// Get raw chunks
+		start := time.Now()
 		rawBlob := blobsProto[idx]
 		if len(rawBlob.GetBundles()) != len(blob.Bundles) {
 			return nil, errors.New("internal error: the number of bundles in parsed blob must be the same as in raw blob")
@@ -248,7 +250,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				rawChunks[quorumID][j] = chunk
 			}
 		}
-
+		serializationDuration += time.Since(start)
+		start = time.Now()
 		// blob chunks
 		for quorumID, bundle := range blob.Bundles {
 			key, err := EncodeBlobKey(batchHeaderHash, idx, quorumID)
@@ -256,24 +259,24 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				log.Error("Cannot generate the key for storing blob:", "err", err)
 				return nil, err
 			}
+			if len(rawChunks[quorumID]) != len(bundle) {
+				return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
+			}
 
-			start := time.Now()
 			bundleRaw := make([][]byte, len(bundle))
 			for i := 0; i < len(bundle); i++ {
 				bundleRaw[i] = rawChunks[quorumID][i]
 			}
-			serializationDuration += time.Since(start)
-			start = time.Now()
 			chunkBytes, err := encodeChunks(bundleRaw)
 			if err != nil {
 				return nil, err
 			}
-			encodingDuration += time.Since(start)
 			size += int64(len(chunkBytes))
 
 			keys = append(keys, key)
 			values = append(values, chunkBytes)
 		}
+		encodingDuration += time.Since(start)
 	}
 
 	start := time.Now()
@@ -283,7 +286,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
 	}
-	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start), "total bytes", size)
+	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start), "total store batch duration", time.Since(storeBatchStart), "total bytes", size)
 
 	return &keys, nil
 }
