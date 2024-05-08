@@ -74,6 +74,8 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		Proof:  commitment,
 		Coeffs: []encoding.Symbol{encoding.ONE},
 	}
+	chunk1bytes, err := chunk1.Serialize()
+	assert.Nil(t, err)
 
 	blobMessage := []*core.BlobMessage{
 		{
@@ -163,12 +165,21 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 		Length:        uint32(50),
 		QuorumHeaders: []*pb.BlobQuorumInfo{quorumHeaderProto},
 	}
+	bundles := []*pb.Bundle{
+		{
+			Chunks: [][]byte{
+				chunk1bytes,
+			},
+		},
+	}
 	blobs := []*pb.Blob{
 		{
-			Header: blobHeaderProto0,
+			Header:  blobHeaderProto0,
+			Bundles: bundles,
 		},
 		{
-			Header: blobHeaderProto1,
+			Header:  blobHeaderProto1,
+			Bundles: bundles,
 		},
 	}
 	return &batchHeader, blobMessage, blobs

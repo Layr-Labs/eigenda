@@ -233,6 +233,20 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		keys = append(keys, blobHeaderKey)
 		values = append(values, blobHeaderBytes)
 
+		// Get raw chunks
+		rawBlob := blobsProto[idx]
+		if len(rawBlob.GetBundles()) != len(blob.Bundles) {
+			return nil, errors.New("internal error: the number of bundles in parsed blob must be the same as in raw blob")
+		}
+		rawChunks := make(map[core.QuorumID][][]byte)
+		for i, chunks := range rawBlob.GetBundles() {
+			quorumID := uint8(rawBlob.GetHeader().GetQuorumHeaders()[i].GetQuorumId())
+			rawChunks[quorumID] = make([][]byte, len(chunks.GetChunks()))
+			for j, chunk := range chunks.GetChunks() {
+				rawChunks[quorumID][j] = chunk
+			}
+		}
+
 		// blob chunks
 		for quorumID, bundle := range blob.Bundles {
 			key, err := EncodeBlobKey(batchHeaderHash, idx, quorumID)
@@ -242,12 +256,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 			}
 
 			bundleRaw := make([][]byte, len(bundle))
-			for i, chunk := range bundle {
-				bundleRaw[i], err = chunk.Serialize()
-				if err != nil {
-					log.Error("Cannot serialize chunk:", "err", err)
-					return nil, err
-				}
+			for i := 0; i < len(bundle); i++ {
+				bundleRaw[i] = rawChunks[quorumID][i]
 			}
 			chunkBytes, err := encodeChunks(bundleRaw)
 			if err != nil {
@@ -257,7 +267,6 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 
 			keys = append(keys, key)
 			values = append(values, chunkBytes)
-
 		}
 	}
 
