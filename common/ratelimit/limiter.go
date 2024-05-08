@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,11 +33,11 @@ func NewRateLimiter(reg prometheus.Registerer, rateParams common.GlobalRateParam
 		bucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
 			Name: "rate_limiter_bucket_levels",
 			Help: "Current level of each bucket for rate limiting",
-		}, []string{"requester_id", "bucket_index"}),
+		}, []string{"account_type", "account_key", "quorum", "type", "bucket_index"}),
 		systemBucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
 			Name: "rate_limiter_system_bucket_levels",
 			Help: "Current level of each bucket for system rate limiting",
-		}, []string{"bucket_index"}),
+		}, []string{"quorum", "type", "bucket_index"}),
 	}
 }
 
@@ -132,8 +133,9 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 					quorum := systemParts[0]
 					limitType := systemParts[1]
 					d.systemBucketLevels.With(prometheus.Labels{
-						"quorum": quorum,
-						"type":   limitType,
+						"quorum":       quorum,
+						"type":         limitType,
+						"bucket_index": strconv.Itoa(i),
 					}).Set(float64(bucketParams.BucketLevels[i]))
 				}
 			}
@@ -149,10 +151,11 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 						quorum := quorumAndType[0]
 						limitType := quorumAndType[1]
 						d.bucketLevels.With(prometheus.Labels{
-							"account_type":   accountType,
-							"ip_eth_address": ipOrEthAddress,
-							"quorum":         quorum,
-							"type":           limitType,
+							"account_type": accountType,
+							"account_key":  ipOrEthAddress,
+							"quorum":       quorum,
+							"type":         limitType,
+							"bucket_index": strconv.Itoa(i),
 						}).Set(float64(bucketParams.BucketLevels[i]))
 					}
 				}
