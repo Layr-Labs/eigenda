@@ -37,8 +37,8 @@ func NewDispatcher(cfg *Config, logger logging.Logger, metrics *batcher.Dispatch
 
 var _ disperser.Dispatcher = (*dispatcher)(nil)
 
-func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader) chan core.SignerMessage {
-	update := make(chan core.SignerMessage, len(state.IndexedOperators))
+func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader) chan core.SigningMessage {
+	update := make(chan core.SigningMessage, len(state.IndexedOperators))
 
 	// Disperse
 	c.sendAllChunks(ctx, state, blobs, batchHeader, update)
@@ -46,11 +46,15 @@ func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 	return update
 }
 
-func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, update chan core.SignerMessage) {
+func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, update chan core.SigningMessage) {
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
 			blobMessages := make([]*core.BlobMessage, 0)
 			hasAnyBundles := false
+			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+			if err != nil {
+				return
+			}
 			for _, blob := range blobs {
 				if _, ok := blob.BundlesByOperator[id]; ok {
 					hasAnyBundles = true
@@ -63,35 +67,31 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 			}
 			if !hasAnyBundles {
 				// Operator is not part of any quorum, no need to send chunks
-				update <- core.SignerMessage{
-					Err:       errors.New("operator is not part of any quorum"),
-					Signature: nil,
-					Operator:  id,
+				update <- core.SigningMessage{
+					Err:             errors.New("operator is not part of any quorum"),
+					Signature:       nil,
+					Operator:        id,
+					BatchHeaderHash: batchHeaderHash,
 				}
 				return
 			}
 
-			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
-			if err != nil {
-				return
-			}
 			requestedAt := time.Now()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
-				update <- core.SignerMessage{
-					Err:       err,
-					Signature: nil,
-					Operator:  id,
+				update <- core.SigningMessage{
+					Err:             err,
+					Signature:       nil,
+					Operator:        id,
+					BatchHeaderHash: batchHeaderHash,
 				}
-				c.logger.Warn("Failed to send chunks to operator", "batchHeaderHash", batchHeaderHash, "operator", op.Socket, "err", err)
 				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
-				update <- core.SignerMessage{
+				update <- core.SigningMessage{
 					Signature: sig,
 					Operator:  id,
 					Err:       nil,
 				}
-				c.logger.Debug("Successfully sent chunks to operator", "batchHeaderHash", batchHeaderHash, "operator", op.Socket)
 				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
 			}
 

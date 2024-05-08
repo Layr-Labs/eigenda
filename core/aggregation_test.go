@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update chan core.SignerMessage, advCount uint) {
+func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update chan core.SigningMessage, advCount uint) {
 
 	count := 0
 
@@ -54,13 +54,13 @@ func simulateOperators(state mock.PrivateOperatorState, message [32]byte, update
 		op := state.PrivateOperators[id]
 		sig := op.KeyPair.SignMessage(message)
 		if count < len(state.IndexedOperators)-int(advCount) {
-			update <- core.SignerMessage{
+			update <- core.SigningMessage{
 				Signature: sig,
 				Operator:  id,
 				Err:       nil,
 			}
 		} else {
-			update <- core.SignerMessage{
+			update <- core.SigningMessage{
 				Signature: nil,
 				Operator:  id,
 				Err:       errors.New("adversary"),
@@ -154,7 +154,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, []core.QuorumID{0, 1})
 
-			update := make(chan core.SignerMessage)
+			update := make(chan core.SigningMessage)
 			message := [32]byte{1, 2, 3, 4, 5, 6}
 
 			go simulateOperators(*state, message, update, tt.adversaryCount)
@@ -183,7 +183,7 @@ func TestSortNonsigners(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	update := make(chan core.SignerMessage)
+	update := make(chan core.SigningMessage)
 	message := [32]byte{1, 2, 3, 4, 5, 6}
 
 	go simulateOperators(*state, message, update, 4)

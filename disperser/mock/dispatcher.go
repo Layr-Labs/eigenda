@@ -20,12 +20,12 @@ func NewDispatcher(state *mock.PrivateOperatorState) disperser.Dispatcher {
 	}
 }
 
-func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader) chan core.SignerMessage {
-	update := make(chan core.SignerMessage)
+func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader) chan core.SigningMessage {
+	update := make(chan core.SigningMessage)
 	message, err := header.GetBatchHeaderHash()
 	if err != nil {
 		for id := range d.state.PrivateOperators {
-			update <- core.SignerMessage{
+			update <- core.SigningMessage{
 				Signature: nil,
 				Operator:  id,
 				Err:       err,
@@ -37,7 +37,7 @@ func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 		for id, op := range d.state.PrivateOperators {
 			sig := op.KeyPair.SignMessage(message)
 
-			update <- core.SignerMessage{
+			update <- core.SigningMessage{
 				Signature: sig,
 				Operator:  id,
 				Err:       nil,
