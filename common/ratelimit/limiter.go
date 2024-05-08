@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -20,7 +21,8 @@ type rateLimiter struct {
 	logger logging.Logger
 
 	// Prometheus metrics
-	bucketLevels *prometheus.GaugeVec
+	bucketLevels       *prometheus.GaugeVec
+	systemBucketLevels *prometheus.GaugeVec
 }
 
 func NewRateLimiter(reg prometheus.Registerer, rateParams common.GlobalRateParams, bucketStore BucketStore, logger logging.Logger) common.RateLimiter {
@@ -32,6 +34,10 @@ func NewRateLimiter(reg prometheus.Registerer, rateParams common.GlobalRateParam
 			Name: "rate_limiter_bucket_levels",
 			Help: "Current level of each bucket for rate limiting",
 		}, []string{"requester_id", "bucket_index"}),
+		systemBucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
+			Name: "rate_limiter_system_bucket_levels",
+			Help: "Current level of each bucket for system rate limiting",
+		}, []string{"bucket_index"}),
 	}
 }
 
@@ -120,12 +126,15 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 
 		// Check if the user is authenticated before adding to metrics
-		requesterLabel := "unauthenticated" // Default or generic label
 		if params.IsAuthenticated {
-			requesterLabel = params.RequesterID
+			requesterLabel := params.RequesterID
+			d.bucketLevels.With(prometheus.Labels{"requester_id": requesterLabel, "bucket_index": fmt.Sprintf("%d", i)}).Set(float64(bucketParams.BucketLevels[i]))
 		}
 
-		d.bucketLevels.With(prometheus.Labels{"requester_id": requesterLabel, "bucket_index": fmt.Sprintf("%d", i)}).Set(float64(bucketParams.BucketLevels[i]))
+		if strings.HasPrefix(params.RequesterID, "system:") {
+			d.systemBucketLevels.With(prometheus.Labels{"bucket_index": fmt.Sprintf("%d", i)}).Set(float64(bucketParams.BucketLevels[i]))
+		}
+
 		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
 	}
 
