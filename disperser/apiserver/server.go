@@ -472,6 +472,11 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				QuorumID: param.QuorumID,
 			},
 			IsAuthenticated: len(requesterName) > 0,
+			MetricsKey:      "rate_limiter_system_bucket_levels",
+			MetricsParams: map[string]string{
+				"quorum": fmt.Sprint(param.QuorumID),
+				"type":   SystemThroughputType.Plug(),
+			},
 		})
 
 		key = fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemBlobRateType.Plug())
@@ -484,6 +489,11 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				QuorumID: param.QuorumID,
 			},
 			IsAuthenticated: len(requesterName) > 0,
+			MetricsKey:      "rate_limiter_system_bucket_levels",
+			MetricsParams: map[string]string{
+				"quorum": fmt.Sprint(param.QuorumID),
+				"type":   SystemBlobRateType.Plug(),
+			},
 		})
 
 		// Account Level
@@ -497,6 +507,12 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				QuorumID: param.QuorumID,
 			},
 			IsAuthenticated: len(requesterName) > 0,
+			MetricsKey:      "rate_limiter_account_bucket_levels",
+			MetricsParams: map[string]string{
+				"account_key": accountKey,
+				"quorum":      fmt.Sprint(param.QuorumID),
+				"type":        AccountThroughputType.Plug(),
+			},
 		})
 
 		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountBlobRateType.Plug())
@@ -509,6 +525,12 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 				QuorumID: param.QuorumID,
 			},
 			IsAuthenticated: len(requesterName) > 0,
+			MetricsKey:      "rate_limiter_account_bucket_levels",
+			MetricsParams: map[string]string{
+				"account_key": accountKey,
+				"quorum":      fmt.Sprint(param.QuorumID),
+				"type":        AccountThroughputType.Plug(),
+			},
 		})
 
 	}

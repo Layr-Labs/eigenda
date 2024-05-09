@@ -3,7 +3,6 @@ package ratelimit
 import (
 	"context"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -21,8 +20,8 @@ type rateLimiter struct {
 	logger logging.Logger
 
 	// Prometheus metrics
-	bucketLevels       *prometheus.GaugeVec
-	systemBucketLevels *prometheus.GaugeVec
+	accountBucketLevels *prometheus.GaugeVec
+	systemBucketLevels  *prometheus.GaugeVec
 }
 
 func NewRateLimiter(reg prometheus.Registerer, rateParams common.GlobalRateParams, bucketStore BucketStore, logger logging.Logger) common.RateLimiter {
@@ -30,10 +29,10 @@ func NewRateLimiter(reg prometheus.Registerer, rateParams common.GlobalRateParam
 		globalRateParams: rateParams,
 		bucketStore:      bucketStore,
 		logger:           logger.With("component", "RateLimiter"),
-		bucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
-			Name: "rate_limiter_bucket_levels",
-			Help: "Current level of each bucket for rate limiting",
-		}, []string{"account_type", "account_key", "quorum", "type", "bucket_index"}),
+		accountBucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
+			Name: "rate_limiter_account_bucket_levels",
+			Help: "Current level of each account bucket for rate limiting",
+		}, []string{"account_key", "quorum", "type", "bucket_index"}),
 		systemBucketLevels: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
 			Name: "rate_limiter_system_bucket_levels",
 			Help: "Current level of each bucket for system rate limiting",
@@ -125,44 +124,54 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 
-		if strings.HasPrefix(params.RequesterID, "system:") {
-			requesterParts := strings.Split(params.RequesterID, ":")
-			if len(requesterParts) == 2 {
-				systemParts := strings.Split(requesterParts[1], "-")
-				if len(systemParts) == 2 {
-					quorum := systemParts[0]
-					limitType := systemParts[1]
-					d.systemBucketLevels.With(prometheus.Labels{
-						"quorum":       quorum,
-						"type":         limitType,
-						"bucket_index": strconv.Itoa(i),
-					}).Set(float64(bucketParams.BucketLevels[i]))
+		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
+		// Update the metrics
+		if params.MetricsKey != "" {
+			if params.MetricsKey == "rate_limiter_account_bucket_levels" {
+				// Validate the metrics param map
+				if _, ok := params.MetricsParams["account_type"]; !ok {
+					d.logger.Warn("Missing account_type in metrics params")
+					continue
 				}
+				if _, ok := params.MetricsParams["account_key"]; !ok {
+					d.logger.Warn("Missing account_key in metrics params")
+					continue
+				}
+				if _, ok := params.MetricsParams["quorum"]; !ok {
+					d.logger.Warn("Missing quorum in metrics params")
+					continue
+				}
+				if _, ok := params.MetricsParams["type"]; !ok {
+					d.logger.Warn("Missing type in metrics params")
+					continue
+				}
+				d.accountBucketLevels.With(prometheus.Labels{
+					"account_key":  params.MetricsParams["account_key"],
+					"quorum":       params.MetricsParams["quorum"],
+					"type":         params.MetricsParams["type"],
+					"bucket_index": strconv.Itoa(i),
+				}).Set(float64(bucketParams.BucketLevels[i]))
+			} else if params.MetricsKey == "rate_limiter_system_bucket_levels" {
+				// Validate the metrics param map
+				if _, ok := params.MetricsParams["quorum"]; !ok {
+					d.logger.Warn("Missing quorum in metrics params")
+					continue
+				}
+				if _, ok := params.MetricsParams["type"]; !ok {
+					d.logger.Warn("Missing type in metrics params")
+					continue
+				}
+				d.systemBucketLevels.With(prometheus.Labels{
+					"quorum":       params.MetricsParams["quorum"],
+					"type":         params.MetricsParams["type"],
+					"bucket_index": strconv.Itoa(i),
+				}).Set(float64(bucketParams.BucketLevels[i]))
+			} else {
+				d.logger.Warn("Unknown metrics key", "key", params.MetricsKey)
 			}
 		} else {
-			// Check if the user is authenticated before adding to metrics
-			if params.IsAuthenticated {
-				requesterParts := strings.Split(params.RequesterID, ":")
-				if len(requesterParts) == 3 {
-					accountType := requesterParts[0]
-					ipOrEthAddress := requesterParts[1]
-					quorumAndType := strings.Split(requesterParts[2], "-")
-					if len(quorumAndType) == 2 {
-						quorum := quorumAndType[0]
-						limitType := quorumAndType[1]
-						d.bucketLevels.With(prometheus.Labels{
-							"account_type": accountType,
-							"account_key":  ipOrEthAddress,
-							"quorum":       quorum,
-							"type":         limitType,
-							"bucket_index": strconv.Itoa(i),
-						}).Set(float64(bucketParams.BucketLevels[i]))
-					}
-				}
-			}
+			d.logger.Warn("Missing metrics key")
 		}
-
-		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
 	}
 
 	return allowed, bucketParams

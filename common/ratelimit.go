@@ -21,6 +21,10 @@ type RequestParams struct {
 	Rate            RateParam
 	Info            interface{}
 	IsAuthenticated bool
+
+	// If the metrics key is set, the rate limiter will increment the metric that corresponds to the key
+	MetricsKey    string
+	MetricsParams map[string]string
 }
 
 type RateLimiter interface {
