@@ -25,6 +25,8 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_GRPC_STREAM_TIMEOUT string
 
+	DISPERSER_SERVER_ENABLE_DUAL_QUORUMS string
+
 	DISPERSER_SERVER_CHAIN_RPC string
 
 	DISPERSER_SERVER_PRIVATE_KEY string
@@ -69,11 +71,11 @@ type DisperserVars struct {
 
 	DISPERSER_SERVER_ALLOWLIST string
 
+	DISPERSER_SERVER_ALLOWLIST_FILE string
+
 	DISPERSER_SERVER_RETRIEVAL_BLOB_RATE string
 
 	DISPERSER_SERVER_RETRIEVAL_BYTE_RATE string
-
-	DISPERSER_SERVER_ENABLE_DUAL_QUORUMS string
 }
 
 func (vars DisperserVars) getEnvMap() map[string]string {
@@ -100,8 +102,6 @@ type BatcherVars struct {
 
 	BATCHER_ENABLE_METRICS string
 
-	BATCHER_GRAPH_URL string
-
 	BATCHER_BATCH_SIZE_LIMIT string
 
 	BATCHER_USE_GRAPH string
@@ -119,6 +119,10 @@ type BatcherVars struct {
 	BATCHER_CHAIN_READ_TIMEOUT string
 
 	BATCHER_CHAIN_WRITE_TIMEOUT string
+
+	BATCHER_CHAIN_STATE_TIMEOUT string
+
+	BATCHER_TRANSACTION_BROADCAST_TIMEOUT string
 
 	BATCHER_NUM_CONNECTIONS string
 
@@ -160,19 +164,17 @@ type BatcherVars struct {
 
 	BATCHER_AWS_ENDPOINT_URL string
 
-	BATCHER_FIREBLOCKS_API_KEY_NAME string
+	BATCHER_GRAPH_URL string
 
-	BATCHER_FIREBLOCKS_API_SECRET_NAME string
+	BATCHER_GRAPH_BACKOFF string
 
-	BATCHER_FIREBLOCKS_API_URL string
+	BATCHER_GRAPH_MAX_RETRIES string
 
-	BATCHER_FIREBLOCKS_VAULT_ACCOUNT_NAME string
+	BATCHER_KMS_KEY_ID string
 
-	BATCHER_FIREBLOCKS_WALLET_ADDRESS string
+	BATCHER_KMS_KEY_REGION string
 
-	BATCHER_FIREBLOCKS_SECRET_MANAGER_REGION string
-
-	BATCHER_FIREBLOCKS_DISABLE string
+	BATCHER_KMS_KEY_DISABLE string
 }
 
 func (vars BatcherVars) getEnvMap() map[string]string {
@@ -242,6 +244,8 @@ type OperatorVars struct {
 
 	NODE_METRICS_PORT string
 
+	NODE_ONCHAIN_METRICS_INTERVAL string
+
 	NODE_ENABLE_NODE_API string
 
 	NODE_API_PORT string
@@ -254,11 +258,7 @@ type OperatorVars struct {
 
 	NODE_BLS_KEY_FILE string
 
-	NODE_ECDSA_KEY_FILE string
-
 	NODE_BLS_KEY_PASSWORD string
-
-	NODE_ECDSA_KEY_PASSWORD string
 
 	NODE_BLS_OPERATOR_STATE_RETRIVER string
 
@@ -291,6 +291,10 @@ type OperatorVars struct {
 	NODE_CLIENT_IP_HEADER string
 
 	NODE_CHURNER_USE_SECURE_GRPC string
+
+	NODE_ECDSA_KEY_FILE string
+
+	NODE_ECDSA_KEY_PASSWORD string
 
 	NODE_G1_PATH string
 
@@ -325,8 +329,6 @@ type OperatorVars struct {
 	NODE_LOG_PATH string
 
 	NODE_LOG_FORMAT string
-
-	NODE_ONCHAIN_METRICS_INTERVAL string
 }
 
 func (vars OperatorVars) getEnvMap() map[string]string {
@@ -354,8 +356,6 @@ type RetrieverVars struct {
 	RETRIEVER_DATA_DIR string
 
 	RETRIEVER_METRICS_HTTP_PORT string
-
-	RETRIEVER_GRAPH_URL string
 
 	RETRIEVER_USE_GRAPH string
 
@@ -394,6 +394,12 @@ type RetrieverVars struct {
 	RETRIEVER_LOG_FORMAT string
 
 	RETRIEVER_INDEXER_PULL_INTERVAL string
+
+	RETRIEVER_GRAPH_URL string
+
+	RETRIEVER_GRAPH_BACKOFF string
+
+	RETRIEVER_GRAPH_MAX_RETRIES string
 }
 
 func (vars RetrieverVars) getEnvMap() map[string]string {
@@ -409,8 +415,6 @@ type ChurnerVars struct {
 	CHURNER_HOSTNAME string
 
 	CHURNER_GRPC_PORT string
-
-	CHURNER_GRAPH_URL string
 
 	CHURNER_BLS_OPERATOR_STATE_RETRIVER string
 
@@ -437,6 +441,12 @@ type ChurnerVars struct {
 	CHURNER_LOG_FORMAT string
 
 	CHURNER_INDEXER_PULL_INTERVAL string
+
+	CHURNER_GRAPH_URL string
+
+	CHURNER_GRAPH_BACKOFF string
+
+	CHURNER_GRAPH_MAX_RETRIES string
 }
 
 func (vars ChurnerVars) getEnvMap() map[string]string {
