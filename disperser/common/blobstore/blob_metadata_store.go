@@ -220,9 +220,8 @@ func (s *BlobMetadataStore) GetBlobMetadataInBatch(ctx context.Context, batchHea
 	return metadata, nil
 }
 
-// GetBlobMetadataByAccount Count returns the count of all the metadata with the given status
-// Because this function scans the entire index, it should only be used for status with a limited number of items.
-// It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
+// GetBlobMetadataByAccount returns the count of all the metadata with the given status
+// Because this function scans the entire index, it should only be used to get limited number of items.
 func (s *BlobMetadataStore) GetBlobMetadataCountByAccountID(ctx context.Context, accountID core.AccountID) (int32, error) {
 	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, accountIdIndexName, "AccountID = :accountID", commondynamodb.ExpresseionValues{
 		":accountID": &types.AttributeValueMemberS{
