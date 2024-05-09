@@ -77,6 +77,7 @@ func NewDispersalServer(
 			logger.Info("[Allowlist]", "account", account, "name", rateInfo.Name, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
 		}
 	}
+	logger.Info("allowlist config", "file", rateConfig.AllowlistFile, "refreshInterval", rateConfig.AllowlistRefreshInterval.String())
 
 	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
 
@@ -752,7 +753,23 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}, nil
 }
 
+func (s *DispersalServer) GetRateConfig() *RateConfig {
+	return &s.rateConfig
+}
+
 func (s *DispersalServer) Start(ctx context.Context) error {
+	go func() {
+		t := time.NewTicker(s.rateConfig.AllowlistRefreshInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.LoadAllowlist()
+			}
+		}
+	}()
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
@@ -776,6 +793,15 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *DispersalServer) LoadAllowlist() {
+	al, err := ReadAllowlistFromFile(s.rateConfig.AllowlistFile)
+	if err != nil {
+		s.logger.Error("failed to load allowlist", "err", err)
+		return
+	}
+	s.rateConfig.Allowlist = al
 }
 
 // updateQuorumConfig updates the quorum config and returns the updated quorum config. If the update fails,
