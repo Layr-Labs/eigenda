@@ -83,7 +83,7 @@ func TestDisperseBlobAuth(t *testing.T) {
 
 	// Use an unauthenticated signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
-	signer := auth.NewSigner(privateKeyHex)
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	errorChan := make(chan error, 10)
 
@@ -105,7 +105,7 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 
 	// Use an unauthenticated signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
-	signer := auth.NewSigner(privateKeyHex)
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	errorChan := make(chan error, 10)
 

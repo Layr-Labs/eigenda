@@ -17,7 +17,7 @@ func TestAuthentication(t *testing.T) {
 
 	// Make the signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	signer := auth.NewSigner(privateKeyHex)
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	testHeader := core.BlobAuthHeader{
 		BlobCommitments:    encoding.BlobCommitments{},
@@ -44,7 +44,7 @@ func TestAuthenticationFail(t *testing.T) {
 
 	// Make the signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	signer := auth.NewSigner(privateKeyHex)
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	testHeader := core.BlobAuthHeader{
 		BlobCommitments:    encoding.BlobCommitments{},
@@ -54,7 +54,7 @@ func TestAuthenticationFail(t *testing.T) {
 	}
 
 	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer = auth.NewSigner(privateKeyHex)
+	signer = auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	// Sign the header
 	signature, err := signer.SignBlobRequest(testHeader)

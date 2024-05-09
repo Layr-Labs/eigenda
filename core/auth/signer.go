@@ -12,11 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-type signer struct {
+type LocalBlobRequestSigner struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 
-func NewSigner(privateKeyHex string) core.BlobRequestSigner {
+var _ core.BlobRequestSigner = &LocalBlobRequestSigner{}
+
+func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
 
 	privateKeyBytes := common.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
@@ -24,12 +26,12 @@ func NewSigner(privateKeyHex string) core.BlobRequestSigner {
 		log.Fatalf("Failed to parse private key: %v", err)
 	}
 
-	return &signer{
+	return &LocalBlobRequestSigner{
 		PrivateKey: privateKey,
 	}
 }
 
-func (s *signer) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
 
 	// Message you want to sign
 	buf := make([]byte, 4)
@@ -45,7 +47,7 @@ func (s *signer) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
 	return sig, nil
 }
 
-func (s *signer) GetAccountID() string {
+func (s *LocalBlobRequestSigner) GetAccountID() string {
 
 	publicKeyBytes := crypto.FromECDSAPub(&s.PrivateKey.PublicKey)
 	return hexutil.Encode(publicKeyBytes)

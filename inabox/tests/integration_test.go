@@ -34,7 +34,7 @@ var _ = Describe("Inabox Integration", func() {
 		Expect(err).To(BeNil())
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewSigner(privateKeyHex)
+		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
