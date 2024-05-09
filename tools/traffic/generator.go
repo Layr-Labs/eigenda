@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -22,7 +23,7 @@ type TrafficGenerator struct {
 	Config          *Config
 }
 
-func NewTrafficGenerator(config *Config) (*TrafficGenerator, error) {
+func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*TrafficGenerator, error) {
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
@@ -31,7 +32,7 @@ func NewTrafficGenerator(config *Config) (*TrafficGenerator, error) {
 
 	return &TrafficGenerator{
 		Logger:          logger,
-		DisperserClient: clients.NewDisperserClient(&config.Config, nil),
+		DisperserClient: clients.NewDisperserClient(&config.Config, signer),
 		Config:          config,
 	}, nil
 }
@@ -97,11 +98,23 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
 	defer cancel()
-	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, g.Config.CustomQuorums)
-	if err != nil {
-		return err
+
+	if g.Config.SignerPrivateKey != "" {
+		blobStatus, key, err := g.DisperserClient.DisperseBlobAuthenticated(ctxTimeout, data, g.Config.CustomQuorums)
+		if err != nil {
+			return err
+		}
+
+		g.Logger.Info("successfully dispersed new blob,", "key", hex.EncodeToString(key), "status", blobStatus.String())
+		return nil
+	} else {
+		blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, g.Config.CustomQuorums)
+		if err != nil {
+			return err
+		}
+
+		g.Logger.Info("successfully dispersed new blob,", "key", hex.EncodeToString(key), "status", blobStatus.String())
+		return nil
 	}
 
-	g.Logger.Info("successfully dispersed new blob,", "key", hex.EncodeToString(key), "status", blobStatus.String())
-	return nil
 }
