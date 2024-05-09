@@ -62,6 +62,7 @@ type RetrieverClientConfig struct {
 	RetrieverG1Path                  string
 	RetrieverG2Path                  string
 	RetrieverCachePath               string
+	RetrieverG2PointPowerOf2Path     string
 }
 
 type TestClients struct {
@@ -70,12 +71,13 @@ type TestClients struct {
 
 // TestSuite Struct.
 type SyntheticTestSuite struct {
-	Clients         *TestClients
-	EthClient       common.EthClient
-	MockRollUp      *rollupbindings.ContractMockRollup
-	Logger          *log.Logger
-	RetrievalClient clients.RetrievalClient
-	TestRunID       string
+	Clients             *TestClients
+	EthClient           common.EthClient
+	MockRollUp          *rollupbindings.ContractMockRollup
+	Logger              *log.Logger
+	RetrievalClient     clients.RetrievalClient
+	TestRunID           string
+	BatcherPullInterval string
 }
 
 var (
@@ -86,7 +88,7 @@ var (
 	logger                     logging.Logger
 )
 
-func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig) *SyntheticTestSuite {
+func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, retrieverClientConfig RetrieverClientConfig, batcherPullInterval string) *SyntheticTestSuite {
 	testRunID := uuid.New().String()
 	logger := log.New(os.Stdout, "EigenDA SyntheticClient:"+testRunID+" ", log.Ldate|log.Ltime)
 
@@ -123,14 +125,14 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 		NumConfirmations: 0,
 	}
 	ethClient, err := geth.NewClient(ethConfig, gcommon.Address{}, 0, ethLogger)
-	log.Printf("Error: failed to create eth client: %v", err)
 	if err != nil {
 		log.Printf("Error: failed to create eth client: %v", err)
 	}
 
+	var mockRollup *rollupbindings.ContractMockRollup
 	if validateOnchainTransaction {
-		log.Printf("Create instance of MockRollUp to validate OnChain Transactions")
-		mockRollup, err := rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
+		log.Printf("Create instance of MockRollUp with Contract Address %s", mockRollUpContractAddress)
+		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(mockRollUpContractAddress), ethClient)
 		if err != nil {
 			logger.Printf("Error: %v", err)
 			return nil
@@ -148,11 +150,13 @@ func setUpClients(pk string, rpcUrl string, mockRollUpContractAddress string, re
 
 	// Assign client connections to pointers in TestClients struct
 	return &SyntheticTestSuite{
-		Clients:         clients,
-		EthClient:       ethClient,
-		MockRollUp:      mockRollup,
-		RetrievalClient: retrievalClient,
-		Logger:          logger,
+		Clients:             clients,
+		EthClient:           ethClient,
+		MockRollUp:          mockRollup,
+		RetrievalClient:     retrievalClient,
+		Logger:              logger,
+		TestRunID:           testRunID,
+		BatcherPullInterval: batcherPullInterval,
 	}
 }
 
@@ -187,7 +191,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Initialize Clients
-	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, *retrieverClientConfig)
+	testSuite = setUpClients(privateKey, rpcUrl, mockRollUpContractAddress, *retrieverClientConfig, batcherPullInterval)
 	logger := testSuite.Logger
 
 	// Check if testSuite is nil
@@ -197,7 +201,7 @@ func TestMain(m *testing.M) {
 	}
 	logger.Println("RPC_URL for Chain...", rpcUrl)
 	logger.Println("Mock RollUp Contract Address...", mockRollUpContractAddress)
-	logger.Println("Retriever Client Deployed...", isRetrieverClientEnabled)
+	logger.Println("Retriever Client Enabled...", isRetrieverClientEnabled)
 
 	logger.Println("Running Test Client...")
 	// Run the tests and get the exit code
@@ -226,6 +230,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	if err != nil {
 		return err
 	}
+
 	v, err := verifier.NewVerifier(&kzg.KzgConfig{
 		G1Path:          retrievalClientConfig.RetrieverG1Path,
 		G2Path:          retrievalClientConfig.RetrieverG2Path,
@@ -245,6 +250,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	if err != nil {
 		return err
 	}
+
 	return indexedChainStateClient.Start(context.Background())
 }
 
@@ -292,7 +298,7 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 
 	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
 	// Update this to a minute over Batcher_Pull_Interval
-	confirmationDeadline := time.ParseDuration(batcherPullInterval)
+	confirmationDeadline, err := time.ParseDuration(testSuite.BatcherPullInterval)
 
 	// Start the loop with a timeout mechanism
 	confirmationTicker := time.NewTicker(5 * time.Second)
@@ -325,6 +331,36 @@ loop:
 				logger.Printf("Verify Retrieve Dispersed Blob Using Disperser Endpoint Against Dispersersed Blob")
 				assert.Equal(t, data, disperserClientBlobReply.Data)
 
+				// Retrieve Blob from Retriever Client
+				// Retrieval Client Iterates Over Operators to get the specific Blob
+				if isRetrieverClientEnabled {
+					logger.Printf("Retrieve Blob using Retrieval Client for %v", blobReply)
+					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+					logger.Printf("RetrievalClient:GetBatchHeaderHash() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash())
+					logger.Printf("RetrievalClient:GetBlobIndex() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
+					logger.Printf("RetrievalClient:GetReferenceBlockNumber() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
+					logger.Printf("RetrievalClient:GetBatchRoot() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
+
+					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+						0,
+					)
+					if err != nil {
+						logger.Printf("Error Retrieving Blob %v", err)
+					}
+
+					if err == nil {
+						logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
+						assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
+
+						logger.Printf("Blob Retrieved with Retrieval Client for %v", blobReply)
+					}
+				}
+
 				if validateOnchainTransaction {
 					logger.Printf("Validating OnChain Transaction for Blob with header %v", blobReply.Info.BlobHeader)
 
@@ -351,37 +387,12 @@ loop:
 					assert.Nil(t, err)
 				}
 
-				// Retrieve Blob from Retriever Client
-				// Retrieval Client Iterates Over Operators to get the specific Blob
-				if isRetrieverClientEnabled {
-					logger.Printf("Try Blob using Retrieval Client %v", blobReply)
-					retrieverClientCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-					defer cancel()
-					logger.Printf("RetrievalClient:GetBatchHeaderHash() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash())
-					logger.Printf("RetrievalClient:GetBlobIndex() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
-					logger.Printf("RetrievalClient:GetReferenceBlockNumber() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber())
-					logger.Printf("RetrievalClient:GetBatchRoot() %v", blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot())
-
-					retrieved, err := retrievalClient.RetrieveBlob(retrieverClientCtx,
-						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
-						blobReply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
-						uint(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
-						[32]byte(blobReply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-						0,
-					)
-					assert.Nil(t, err)
-					logger.Printf("Validate BlobReply %v is equal to inputData %v", bytes.TrimRight(retrieved, "\x00"), data)
-					assert.Equal(t, data, bytes.TrimRight(retrieved, "\x00"))
-
-					logger.Printf("Blob using Retrieval Client %v", blobReply)
-				}
-
 				break loop
 			}
 
 			// Check if the confirmation process has exceeded the maximum duration
-			if time.Now().After(confirmationDeadline) {
-				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout of 4 minutes")
+			if time.Now().After(time.Now().Add(confirmationDeadline)) {
+				logger.Println("Dispersing Blob Confirmation is taking longer than the specified timeout")
 				logger.Println("Failing the test")
 				t.Fail()
 				return
@@ -547,7 +558,7 @@ func blobVerificationProofFromProto(verificationProof *disperser_rpc.BlobVerific
 
 	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
 		BatchId:        verificationProof.GetBatchId(),
-		BlobIndex:      uint8(verificationProof.GetBlobIndex()),
+		BlobIndex:      verificationProof.GetBlobIndex(),
 		BatchMetadata:  batchMetadata,
 		InclusionProof: verificationProof.GetInclusionProof(),
 		QuorumIndices:  verificationProof.GetQuorumIndexes(),
