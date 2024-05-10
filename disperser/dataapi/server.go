@@ -33,7 +33,8 @@ const (
 	maxWorkerPoolLimit   = 10
 	maxQueryBatchesLimit = 2
 
-	cacheControlParam = "Cache-Control"
+	ejectionTokenParam = "X-Ejection-Token"
+	cacheControlParam  = "Cache-Control"
 
 	// Cache control for responses.
 	// The time unit is second for max age.
@@ -333,7 +334,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	token := c.GetHeader("X-Ejection-Token")
+	token := c.GetHeader(ejectionTokenParam)
 	if token != s.ejectionToken {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
