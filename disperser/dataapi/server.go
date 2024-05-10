@@ -280,7 +280,7 @@ func (s *server) Start() error {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = s.allowOrigins
 	config.AllowCredentials = true
-	config.AllowMethods = []string{"GET", "HEAD", "OPTIONS"}
+	config.AllowMethods = []string{"GET", "POST", "HEAD", "OPTIONS"}
 
 	if s.serverMode != gin.ReleaseMode {
 		config.AllowOrigins = []string{"*"}
@@ -333,7 +333,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	token := c.GetHeader("ejection_token")
+	token := c.GetHeader("X-Ejection-Token")
 	if token != s.ejectionToken {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
