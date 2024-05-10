@@ -334,8 +334,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	token := "foobar"
-	// token := c.GetHeader(ejectionTokenParam)
+	token := c.GetHeader("ejection_token")
 	if token != s.ejectionToken {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
