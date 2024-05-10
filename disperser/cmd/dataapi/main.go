@@ -82,7 +82,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
 	if err != nil {
 		return err
 	}
