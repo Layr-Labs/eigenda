@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/gammazero/workerpool"
 	"github.com/pingcap/errors"
 
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
@@ -33,8 +32,7 @@ import (
 )
 
 var (
-	maxNumberOfQuorums      = 192
-	maxNumWorkerPoolThreads = 8
+	maxNumberOfQuorums = 192
 )
 
 type Transactor struct {
@@ -574,32 +572,16 @@ func (t *Transactor) OperatorAddressToID(ctx context.Context, address gethcommon
 }
 
 func (t *Transactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
-	type AddressOrError struct {
-		address gethcommon.Address
-		index   int
-		err     error
+	byteIds := make([][32]byte, len(operatorIds))
+	for i, id := range operatorIds {
+		byteIds[i] = [32]byte(id)
 	}
-	resultChan := make(chan AddressOrError, len(operatorIds))
-	pool := workerpool.New(maxNumWorkerPoolThreads)
-	for i, operatorId := range operatorIds {
-		idx := i
-		op := operatorId
-		pool.Submit(func() {
-			addr, err := t.Bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
-				Context: ctx,
-			}, op)
-			resultChan <- AddressOrError{address: addr, index: idx, err: err}
-		})
-	}
-	pool.StopWait()
-	close(resultChan)
-
-	addresses := make([]gethcommon.Address, len(operatorIds))
-	for result := range resultChan {
-		if result.err != nil {
-			return nil, result.err
-		}
-		addresses[result.index] = result.address
+	addresses, err := t.Bindings.OpStateRetriever.GetBatchOperatorFromId(&bind.CallOpts{
+		Context: ctx,
+	}, t.Bindings.RegCoordinatorAddr, byteIds)
+	if err != nil {
+		t.Logger.Error("Failed to get operator address in batch", "err", err)
+		return nil, err
 	}
 	return addresses, nil
 }
