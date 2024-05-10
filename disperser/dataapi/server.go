@@ -281,7 +281,7 @@ func (s *server) Start() error {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = s.allowOrigins
 	config.AllowCredentials = true
-	config.AllowMethods = []string{"GET", "POST", "HEAD", "OPTIONS"}
+	config.AllowMethods = []string{"GET", "HEAD", "OPTIONS"}
 
 	if s.serverMode != gin.ReleaseMode {
 		config.AllowOrigins = []string{"*"}
