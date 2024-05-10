@@ -370,7 +370,7 @@ func TestEjectOperatorHandler(t *testing.T) {
 
 	w2 := httptest.NewRecorder()
 	req2 := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	req2.Header.Set("ejection_token", "deadbeef")
+	req2.Header.Set("X-Ejection-Token", "deadbeef")
 	ctxWithDeadline2, cancel2 := context.WithTimeout(req2.Context(), 500*time.Microsecond)
 	defer cancel2()
 	req2 = req2.WithContext(ctxWithDeadline2)
