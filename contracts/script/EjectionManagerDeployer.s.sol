@@ -14,14 +14,13 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
-contract Deployer_EjectionManager is Script, Test{
+contract Deployer_EjectionManager is Script, Test {
     
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/holesky/output/holesky_testnet_deployment_data.json"));
-    string public deployConfigPath = string(bytes("./script/deploy/holesky/config/ejector.config.json"));
+    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/mainnet/output/mainnet_deployment_data.json"));
+    string public deployConfigPath = string(bytes("./script/deploy/mainnet/config/ejector.config.json"));
 
     address ejectorOwner;
     address ejector;
-    address fallbackEjector;
     address deployer;
 
     EjectionManager public ejectionManager;
@@ -54,7 +53,6 @@ contract Deployer_EjectionManager is Script, Test{
 
         ejectorOwner = stdJson.readAddress(config_data, ".permissions.owner");
         ejector = stdJson.readAddress(config_data, ".permissions.ejector");
-        fallbackEjector = stdJson.readAddress(config_data, ".permissions.fallbackEjector");
         deployer = stdJson.readAddress(config_data, ".permissions.deployer");
 
         emptyContract = EmptyContract(stdJson.readAddress(config_data, ".permissions.emptyContract"));
@@ -71,9 +69,8 @@ contract Deployer_EjectionManager is Script, Test{
         );
 
         IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams = _parseQuorumEjectionParams(config_data);
-        address[] memory ejectors = new address[](2);   
+        address[] memory ejectors = new address[](1);   
         ejectors[0] = ejector;
-        ejectors[1] = fallbackEjector;
 
         TransparentUpgradeableProxy(payable(address(ejectionManager))).upgradeToAndCall(
             address(ejectionManagerImplementation),
@@ -116,7 +113,6 @@ contract Deployer_EjectionManager is Script, Test{
 
         require(_ejectionManager.owner() == ejectorOwner, "ejectionManager.owner() != ejectorOwner");
         require(_ejectionManager.isEjector(ejector) == true, "ejector != ejector");
-        require(_ejectionManager.isEjector(fallbackEjector) == true, "fallbackEjector != ejector");
 
         IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams = _parseQuorumEjectionParams(config_data);
         for (uint8 i = 0; i < quorumEjectionParams.length; ++i) {
