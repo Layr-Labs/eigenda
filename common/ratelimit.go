@@ -15,16 +15,16 @@ import (
 // ID is the authenticated Account ID. For retrieval requests, the requester ID will be the requester's IP address.
 type RequesterID = string
 
-type RequestParams struct {
-	RequesterID     RequesterID
-	BlobSize        uint
-	Rate            RateParam
-	Info            interface{}
-	IsAuthenticated bool
+// RequesterName is the friendly name of the party making the request. In the case
+// of a rollup making a dispersal request, the RequesterName is the name of the rollup.
+type RequesterName = string
 
-	// If the metrics key is set, the rate limiter will increment the metric that corresponds to the key
-	MetricsKey    string
-	MetricsParams map[string]string
+type RequestParams struct {
+	RequesterID   RequesterID
+	RequesterName RequesterName
+	BlobSize      uint
+	Rate          RateParam
+	Info          interface{}
 }
 
 type RateLimiter interface {

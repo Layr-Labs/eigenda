@@ -464,72 +464,50 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		// System Level
 		key := fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemThroughputType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
-			RequesterID: key,
-			BlobSize:    encodedSize,
-			Rate:        globalRates.TotalUnauthThroughput,
+			RequesterID:   key,
+			RequesterName: systemAccountKey,
+			BlobSize:      encodedSize,
+			Rate:          globalRates.TotalUnauthThroughput,
 			Info: limiterInfo{
 				RateType: SystemThroughputType,
 				QuorumID: param.QuorumID,
-			},
-			IsAuthenticated: len(requesterName) > 0,
-			MetricsKey:      "rate_limiter_system_bucket_levels",
-			MetricsParams: map[string]string{
-				"quorum": fmt.Sprint(param.QuorumID),
-				"type":   SystemThroughputType.Plug(),
 			},
 		})
 
 		key = fmt.Sprintf("%s:%d-%s", systemAccountKey, param.QuorumID, SystemBlobRateType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
-			RequesterID: key,
-			BlobSize:    blobRateMultiplier,
-			Rate:        globalRates.TotalUnauthBlobRate,
+			RequesterID:   key,
+			RequesterName: systemAccountKey,
+			BlobSize:      blobRateMultiplier,
+			Rate:          globalRates.TotalUnauthBlobRate,
 			Info: limiterInfo{
 				RateType: SystemBlobRateType,
 				QuorumID: param.QuorumID,
-			},
-			IsAuthenticated: len(requesterName) > 0,
-			MetricsKey:      "rate_limiter_system_bucket_levels",
-			MetricsParams: map[string]string{
-				"quorum": fmt.Sprint(param.QuorumID),
-				"type":   SystemBlobRateType.Plug(),
 			},
 		})
 
 		// Account Level
 		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountThroughputType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
-			RequesterID: key,
-			BlobSize:    encodedSize,
-			Rate:        accountRates.Throughput,
+			RequesterID:   key,
+			RequesterName: requesterName,
+			BlobSize:      encodedSize,
+			Rate:          accountRates.Throughput,
 			Info: limiterInfo{
 				RateType: AccountThroughputType,
 				QuorumID: param.QuorumID,
-			},
-			IsAuthenticated: len(requesterName) > 0,
-			MetricsKey:      "rate_limiter_account_bucket_levels",
-			MetricsParams: map[string]string{
-				"account_key": accountKey,
-				"quorum":      fmt.Sprint(param.QuorumID),
-				"type":        AccountThroughputType.Plug(),
 			},
 		})
 
 		key = fmt.Sprintf("%s:%d-%s", accountKey, param.QuorumID, AccountBlobRateType.Plug())
 		requestParams = append(requestParams, common.RequestParams{
-			RequesterID: key,
-			BlobSize:    blobRateMultiplier,
-			Rate:        accountRates.BlobRate,
+			RequesterID:   key,
+			RequesterName: requesterName,
+			BlobSize:      blobRateMultiplier,
+			Rate:          accountRates.BlobRate,
 			Info: limiterInfo{
 				RateType: AccountBlobRateType,
 				QuorumID: param.QuorumID,
-			},
-			IsAuthenticated: len(requesterName) > 0,
-			MetricsKey:      "rate_limiter_account_bucket_levels",
-			MetricsParams: map[string]string{
-				"account_key": accountKey,
-				"quorum":      fmt.Sprint(param.QuorumID),
-				"type":        AccountThroughputType.Plug(),
 			},
 		})
 
