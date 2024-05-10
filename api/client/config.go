@@ -21,8 +21,8 @@ type Config struct {
 	// Signer private key in hex encoded format. This key should not be associated with an Ethereum address holding any funds.
 	SignerPrivateKeyHex string
 
-	// Whether to connect over TLS.
-	UseTLS bool
+	// Whether to disable TLS for an insecure connection when connecting to a local EigenDA disperser instance.
+	DisableTLS bool
 }
 
 var DefaultQuorums = map[uint]bool{0: true, 1: true}

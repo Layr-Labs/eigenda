@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type BlobEncodingVersion byte
@@ -46,7 +47,7 @@ func NewEigenDAClient(log log.Logger, config Config) (*EigenDAClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := NewDisperserClient(config.RPC)
+	client, err := NewDisperserClient(config.RPC, config.DisableTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instatiated EigenDA GRPC client: %w", err)
 	}
@@ -58,13 +59,19 @@ func NewEigenDAClient(log log.Logger, config Config) (*EigenDAClient, error) {
 	}, nil
 }
 
-func NewDisperserClient(rpc string) (disperser.DisperserClient, error) {
-	config := &tls.Config{}
-	credential := credentials.NewTLS(config)
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
-	conn, err := grpc.Dial(rpc, dialOptions...)
+func NewDisperserClient(rpc string, disableTLS bool) (disperser.DisperserClient, error) {
+	var credentialOptions grpc.DialOption
+	if !disableTLS {
+		config := &tls.Config{}
+		credential := credentials.NewTLS(config)
+		credentialOptions = grpc.WithTransportCredentials(credential)
+	} else {
+		credentialOptions = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
+
+	conn, err := grpc.Dial(rpc, credentialOptions)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error dialing EigenDA GRPC connection: %w", err)
 	}
 	client := disperser.NewDisperserClient(conn)
 	return client, nil
@@ -109,6 +116,23 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 }
 
 func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) {
+	resultChan, errorChan := m.PutBlobAsync(ctx, data)
+	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
+	case result := <-resultChan:
+		return result, nil
+	case err := <-errorChan:
+		return nil, err
+	}
+}
+
+func (m EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *Cert, errChan chan error) {
+	resultChan = make(chan *Cert, 1)
+	errChan = make(chan error, 1)
+	go m.putBlob(ctx, data, resultChan, errChan)
+	return
+}
+
+func (m EigenDAClient) putBlob(ctx context.Context, data []byte, resultChan chan *Cert, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode current blob encoding version byte
@@ -123,7 +147,8 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 	// do auth handshake
 	disperseBlobAuthClient, err := m.client.DisperseBlobAuthenticated(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
+		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
+		return
 	}
 
 	customQuorumNumbers := make([]uint32, len(m.Config.CustomQuorumIDs))
@@ -140,28 +165,32 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed sending initial disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("failed sending initial disperse blob authenticated request: %w", err)
+		return
 	}
 
 	reply, err := disperseBlobAuthClient.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("failed receiving challenge parameter for disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("failed receiving challenge parameter for disperse blob authenticated request: %w", err)
+		return
 	}
 
 	authHeaderReply, ok := reply.Payload.(*disperser.AuthenticatedReply_BlobAuthHeader)
 	if !ok {
-		return nil, fmt.Errorf("expected blob auth header message in response to initial disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("expected blob auth header message in response to initial disperse blob authenticated request: %w", err)
+		return
 	}
 
 	authHeader := core.BlobAuthHeader{
 		BlobCommitments: encoding.BlobCommitments{},
-		AccountID:       "",
+		AccountID:       m.signer.GetAccountID(),
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}
 
 	authData, err := m.signer.SignBlobRequest(authHeader)
 	if err != nil {
-		return nil, fmt.Errorf("error signing challenge parameter while performing disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("error signing challenge parameter while performing disperse blob authenticated request: %w", err)
+		return
 	}
 
 	// Process challenge and send back challenge_reply
@@ -171,17 +200,20 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 		},
 	}})
 	if err != nil {
-		return nil, fmt.Errorf("error writing signed challenge paramter in disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("error writing signed challenge paramter in disperse blob authenticated request: %w", err)
+		return
 	}
 
 	reply, err = disperseBlobAuthClient.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("error receiving signed challenge paramter in disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("error receiving signed challenge paramter in disperse blob authenticated request: %w", err)
+		return
 	}
 
 	disperseResWrapper, ok := reply.Payload.(*disperser.AuthenticatedReply_DisperseReply)
 	if !ok {
-		return nil, fmt.Errorf("expected disperser reply message in response to signed challenge parameter submission in disperse blob authenticated request: %w", err)
+		errChan <- fmt.Errorf("expected disperser reply message in response to signed challenge parameter submission in disperse blob authenticated request: %w", err)
+		return
 	}
 
 	disperseRes := disperseResWrapper.DisperseReply
@@ -190,29 +222,32 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 	if disperseRes.Result == disperser.BlobStatus_UNKNOWN ||
 		disperseRes.Result == disperser.BlobStatus_FAILED {
 		m.Log.Error("Unable to disperse blob to EigenDA, aborting", "err", err)
-		return nil, fmt.Errorf("reply status is %d", disperseRes.Result)
+		errChan <- fmt.Errorf("reply status is %d", disperseRes.Result)
+		return
 	}
 
 	base64RequestID := base64.StdEncoding.EncodeToString(disperseRes.RequestId)
 
 	m.Log.Info("Blob disepersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
 
-	timeoutTime := time.Now().Add(m.StatusQueryTimeout)
 	ticker := time.NewTicker(m.StatusQueryRetryInterval)
 	defer ticker.Stop()
+
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, m.StatusQueryTimeout)
+	defer cancel()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			errChan <- fmt.Errorf("timed out waiting for EigenDA blob to confirm blob with request id=%s: %w", base64RequestID, ctx.Err())
+			return
 		case <-ticker.C:
-			if time.Now().After(timeoutTime) {
-				return nil, fmt.Errorf("timed out waiting for EigenDA blob to confirm blob with request id: %s", base64RequestID)
-			}
 			statusRes, err := m.client.GetBlobStatus(ctx, &disperser.BlobStatusRequest{
 				RequestId: disperseRes.RequestId,
 			})
 			if err != nil {
-				m.Log.Warn("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
+				m.Log.Error("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
 				continue
 			}
 
@@ -221,8 +256,12 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 				m.Log.Info("Waiting for confirmation from EigenDA", "requestID", base64RequestID)
 			case disperser.BlobStatus_FAILED:
 				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
+				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
+				return
 			case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
 				m.Log.Error("EigenDA blob dispersal failed in processing with insufficient signatures", "requestID", base64RequestID, "err", err)
+				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with insufficient signatures, requestID=%s: %w", base64RequestID, err)
+				return
 			case disperser.BlobStatus_CONFIRMED:
 				m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
 			case disperser.BlobStatus_FINALIZED:
@@ -240,9 +279,11 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 					QuorumIDs:            quorumIDs,
 					BlobCommitment:       blobInfo.BlobHeader.Commitment,
 				}
-				return cert, nil
+				resultChan <- cert
+				return
 			default:
-				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
+				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
+				return
 			}
 		}
 	}
