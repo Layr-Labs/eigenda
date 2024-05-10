@@ -18,7 +18,7 @@ func init() {
 	flag.BoolVar(&runTestnetIntegrationTests, "testnet-integration", false, "Run testnet-based integration tests")
 }
 
-func TestClient(t *testing.T) {
+func TestClientUsingTestnet(t *testing.T) {
 	if !runTestnetIntegrationTests {
 		t.Skip("Skipping testnet integration test")
 	}

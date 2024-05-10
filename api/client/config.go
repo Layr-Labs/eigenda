@@ -9,11 +9,14 @@ type Config struct {
 	// RPC is the HTTP provider URL for the Data Availability node.
 	RPC string
 
-	// The total amount of time that the batcher will spend waiting for EigenDA to confirm a blob
+	// The total amount of time that the client will spend waiting for EigenDA to confirm a blob
 	StatusQueryTimeout time.Duration
 
 	// The amount of time to wait between status queries of a newly dispersed blob
 	StatusQueryRetryInterval time.Duration
+
+	// The total amount of time that the client will waiting for a response from the EigenDA disperser
+	ResponseTimeout time.Duration
 
 	// The quorum IDs to write blobs to using this client. Should not include quorums 0 or 1.
 	CustomQuorumIDs []uint

@@ -65,3 +65,16 @@ func (c *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*d
 	}
 	return reply, err
 }
+
+func (c *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
+	args := c.Called(batchHeaderHash, blobIndex)
+	var blob []byte
+	if args.Get(0) != nil {
+		blob = (args.Get(0)).([]byte)
+	}
+	var err error
+	if args.Get(1) != nil {
+		err = (args.Get(1)).(error)
+	}
+	return blob, err
+}
