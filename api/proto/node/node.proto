@@ -19,7 +19,7 @@ service Dispersal {
 service Retrieval {
 	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
 	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
-	// Similar to RetrieveChunks, this just returns the header of the blob.
+	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
 }
 

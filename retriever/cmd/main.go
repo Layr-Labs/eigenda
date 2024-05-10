@@ -135,7 +135,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
-	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, v, ics, chainClient)
+	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
 	if err = retrieverServiceServer.Start(context.Background()); err != nil {
 		log.Fatalln("failed to start retriever service server", err)
 	}

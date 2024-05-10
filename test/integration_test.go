@@ -335,7 +335,7 @@ func mustMakeRetriever(cst core.IndexedChainState, logger logging.Logger) (*comm
 	gethClient := &commonmock.MockEthClient{}
 	retrievalClient := &clientsmock.MockRetrievalClient{}
 	chainClient := retrievermock.NewMockChainClient()
-	server := retriever.NewServer(config, logger, retrievalClient, v, cst, chainClient)
+	server := retriever.NewServer(config, logger, retrievalClient, cst, chainClient)
 
 	return gethClient, TestRetriever{
 		Server: server,

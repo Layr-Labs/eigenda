@@ -71,14 +71,14 @@ func newTestServer(t *testing.T) *retriever.Server {
 		log.Fatalf("failed to create new mocked chain data: %s", err)
 	}
 
-	_, v, err := makeTestComponents()
+	_, _, err = makeTestComponents()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	retrievalClient = &clientsmock.MockRetrievalClient{}
 	chainClient = mock.NewMockChainClient()
-	return retriever.NewServer(config, logger, retrievalClient, v, indexedChainState, chainClient)
+	return retriever.NewServer(config, logger, retrievalClient, indexedChainState, chainClient)
 }
 
 func TestRetrieveBlob(t *testing.T) {
