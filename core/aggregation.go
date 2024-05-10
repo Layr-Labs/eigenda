@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -127,8 +128,9 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		if op, ok := state.IndexedOperators[r.Operator]; ok {
 			socket = op.Socket
 		}
+		batchHeaderHashHex := hex.EncodeToString(r.BatchHeaderHash[:])
 		if r.Err != nil {
-			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", r.BatchHeaderHash, "err", r.Err)
+			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", batchHeaderHashHex, "err", r.Err)
 			continue
 		}
 
@@ -171,7 +173,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 				aggPubKeys[ind].Add(op.PubkeyG2)
 			}
 		}
-		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", r.BatchHeaderHash)
+		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", batchHeaderHashHex)
 	}
 
 	// Aggregate Non signer Pubkey Id
