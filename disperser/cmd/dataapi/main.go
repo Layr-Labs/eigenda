@@ -82,7 +82,12 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
+	sender := gethcommon.Address{}
+	if !config.FireblocksConfig.Disable {
+		sender = gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress)
+	}
+
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, sender, logger)
 	if err != nil {
 		return err
 	}
