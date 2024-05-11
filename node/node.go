@@ -459,8 +459,9 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 	}
 }
 
+// OperatorReachabilityResponse is the response object for the reachability check
 type OperatorReachabilityResponse struct {
-	OperatorId      string `json:"operator_id"`
+	OperatorID      string `json:"operator_id"`
 	DispersalSocket string `json:"dispersal_socket"`
 	RetrievalSocket string `json:"retrieval_socket"`
 	DispersalOnline bool   `json:"dispersal_online"`
@@ -511,13 +512,17 @@ func (n *Node) checkNodeReachability() {
 		}
 
 		var responseObject OperatorReachabilityResponse
-		json.Unmarshal(data, &responseObject)
+		err = json.Unmarshal(data, &responseObject)
+		if err != nil {
+			n.Logger.Error("Reachability check failed to unmarshal json response", err)
+			continue
+		}
+
 		if responseObject.DispersalOnline {
 			n.Logger.Info("Reachability check - dispersal socket is ONLINE", "socket", responseObject.DispersalSocket)
 		} else {
 			n.Logger.Error("Reachability check - dispersal socket is UNREACHABLE", "socket", responseObject.DispersalSocket)
 		}
-
 		if responseObject.RetrievalOnline {
 			n.Logger.Info("Reachability check - retrieval socket is ONLINE", "socket", responseObject.RetrievalSocket)
 		} else {
