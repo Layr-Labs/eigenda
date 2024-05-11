@@ -3,10 +3,14 @@ package node
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
+	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -185,6 +189,7 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 
 	go n.expireLoop()
+	go n.checkNodeReachability()
 
 	// Build the socket based on the hostname/IP provided in the CLI
 	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
@@ -450,6 +455,73 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 				continue
 			}
 			n.updateSocketAddress(ctx, newSocketAddr)
+		}
+	}
+}
+
+type OperatorReachabilityResponse struct {
+	OperatorId      string `json:"operator_id"`
+	DispersalSocket string `json:"dispersal_socket"`
+	RetrievalSocket string `json:"retrieval_socket"`
+	DispersalOnline bool   `json:"dispersal_online"`
+	RetrievalOnline bool   `json:"retrieval_online"`
+}
+
+func (n *Node) checkNodeReachability() {
+	if n.Config.ReachabilityPollIntervalSec == 0 {
+		n.Logger.Warn("Node reachability checks disabled!!! ReachabilityPollIntervalSec set to 0")
+		return
+	}
+	if n.Config.DataApiUrl == "" {
+		n.Logger.Error("Node reachability checks disabled!!! DataAPI URL is not configured")
+		return
+	}
+
+	checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", n.Config.DataApiUrl, n.Config.ID.Hex()))
+	if err != nil {
+		n.Logger.Error("Node reachability checks disabled!!! Failed to parse reachability check url", err)
+		return
+	}
+
+	n.Logger.Info("Start nodeReachabilityCheck goroutine in background to check the reachability of the operator node")
+	ticker := time.NewTicker(time.Duration(n.Config.ReachabilityPollIntervalSec) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+
+		n.Logger.Info("Calling reachability check", "url", checkUrl.String())
+
+		resp, err := http.Get(checkUrl.String())
+		if err != nil {
+			n.Logger.Error("Reachability check failed", err)
+			continue
+		} else if resp.StatusCode == 404 {
+			n.Logger.Error("Reachability check failed - operator id not found", "status", resp.StatusCode, "operator_id", n.Config.ID.Hex())
+			continue
+		} else if resp.StatusCode != 200 {
+			n.Logger.Error("Reachability check failed", "status", resp.StatusCode)
+			continue
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			n.Logger.Error("Failed to read reachability check response", err, "data", resp.Body)
+			continue
+		}
+
+		var responseObject OperatorReachabilityResponse
+		json.Unmarshal(data, &responseObject)
+		if responseObject.DispersalOnline {
+			n.Logger.Info("Reachability check - dispersal socket is ONLINE", "socket", responseObject.DispersalSocket)
+		} else {
+			n.Logger.Error("Reachability check - dispersal socket is UNREACHABLE", "socket", responseObject.DispersalSocket)
+		}
+
+		if responseObject.RetrievalOnline {
+			n.Logger.Info("Reachability check - retrieval socket is ONLINE", "socket", responseObject.RetrievalSocket)
+		} else {
+			n.Logger.Error("Reachability check - retrieval socket is UNREACHABLE", "socket", responseObject.RetrievalSocket)
 		}
 	}
 }

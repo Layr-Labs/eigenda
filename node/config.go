@@ -21,8 +21,9 @@ import (
 
 const (
 	// Min number of seconds for the ExpirationPollIntervalSecFlag.
-	minExpirationPollIntervalSec = 3
-	AppName                      = "da-node"
+	minExpirationPollIntervalSec   = 3
+	minReachabilityPollIntervalSec = 10
+	AppName                        = "da-node"
 )
 
 var (
@@ -65,9 +66,11 @@ type Config struct {
 	PubIPProvider                 string
 	PubIPCheckInterval            time.Duration
 	ChurnerUrl                    string
+	DataApiUrl                    string
 	NumBatchValidators            int
 	ClientIPHeader                string
 	UseSecureGrpc                 bool
+	ReachabilityPollIntervalSec   uint64
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
@@ -96,8 +99,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	expirationPollIntervalSec := ctx.GlobalUint64(flags.ExpirationPollIntervalSecFlag.Name)
-	if expirationPollIntervalSec <= minExpirationPollIntervalSec {
-		return nil, errors.New("the expiration-poll-interval flag must be greater than 3 seconds")
+	if expirationPollIntervalSec < minExpirationPollIntervalSec {
+		return nil, fmt.Errorf("the expiration-poll-interval flag must be >= %d seconds", minExpirationPollIntervalSec)
+	}
+
+	reachabilityPollIntervalSec := ctx.GlobalUint64(flags.ReachabilityPollIntervalSecFlag.Name)
+	if reachabilityPollIntervalSec != 0 && reachabilityPollIntervalSec < minReachabilityPollIntervalSec {
+		return nil, fmt.Errorf("the reachability-poll-interval flag must be >= %d seconds or 0 to disable", minReachabilityPollIntervalSec)
 	}
 
 	testMode := ctx.GlobalBool(flags.EnableTestModeFlag.Name)
@@ -172,6 +180,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		Timeout:                       timeout,
 		RegisterNodeAtStart:           registerNodeAtStart,
 		ExpirationPollIntervalSec:     expirationPollIntervalSec,
+		ReachabilityPollIntervalSec:   reachabilityPollIntervalSec,
 		EnableTestMode:                testMode,
 		OverrideBlockStaleMeasure:     ctx.GlobalInt64(flags.OverrideBlockStaleMeasureFlag.Name),
 		OverrideStoreDurationBlocks:   ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
@@ -186,6 +195,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		PubIPProvider:                 ctx.GlobalString(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:            pubIPCheckInterval,
 		ChurnerUrl:                    ctx.GlobalString(flags.ChurnerUrlFlag.Name),
+		DataApiUrl:                    ctx.GlobalString(flags.DataApiUrlFlag.Name),
 		NumBatchValidators:            ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
 		ClientIPHeader:                ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                 ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
