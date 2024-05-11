@@ -39,6 +39,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
+	kmsConfig := common.ReadKMSKeyConfig(ctx, flags.FlagPrefix)
+	if !kmsConfig.Disable {
+		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -80,7 +84,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
-		KMSKeyConfig:                  common.ReadKMSKeyConfig(ctx, flags.FlagPrefix),
+		KMSKeyConfig:                  kmsConfig,
 	}
 	return config, nil
 }
