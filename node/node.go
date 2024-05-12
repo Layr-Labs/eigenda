@@ -473,16 +473,6 @@ func (n *Node) checkNodeReachability() {
 		n.Logger.Warn("Node reachability checks disabled!!! ReachabilityPollIntervalSec set to 0")
 		return
 	}
-	if n.Config.DataApiUrl == "" {
-		n.Logger.Error("Node reachability checks disabled!!! DataAPI URL is not configured")
-		return
-	}
-
-	checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", n.Config.DataApiUrl, n.Config.ID.Hex()))
-	if err != nil {
-		n.Logger.Error("Node reachability checks disabled!!! Failed to parse reachability check url", err)
-		return
-	}
 
 	n.Logger.Info("Start nodeReachabilityCheck goroutine in background to check the reachability of the operator node")
 	ticker := time.NewTicker(time.Duration(n.Config.ReachabilityPollIntervalSec) * time.Second)
@@ -491,17 +481,28 @@ func (n *Node) checkNodeReachability() {
 	for {
 		<-ticker.C
 
+		if n.Config.DataApiUrl == "" {
+			n.Logger.Error("Unable to perform reachability check - NODE_DATAAPI_URL is not defined in .env")
+			continue
+		}
+
+		checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", n.Config.DataApiUrl, n.Config.ID.Hex()))
+		if err != nil {
+			n.Logger.Error("Reachability check failed - invalid check url", err, "checkUrl", checkUrl.String())
+			return
+		}
+
 		n.Logger.Info("Calling reachability check", "url", checkUrl.String())
 
 		resp, err := http.Get(checkUrl.String())
 		if err != nil {
-			n.Logger.Error("Reachability check failed", err)
+			n.Logger.Error("Reachability check request failed", err)
 			continue
 		} else if resp.StatusCode == 404 {
 			n.Logger.Error("Reachability check failed - operator id not found", "status", resp.StatusCode, "operator_id", n.Config.ID.Hex())
 			continue
 		} else if resp.StatusCode != 200 {
-			n.Logger.Error("Reachability check failed", "status", resp.StatusCode)
+			n.Logger.Error("Reachability check request failed", "status", resp.StatusCode)
 			continue
 		}
 
