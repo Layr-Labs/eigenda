@@ -1,10 +1,10 @@
 GITCOMMIT := $(shell git rev-parse --short HEAD)
 GITDATE := $(shell git log -1 --format=%cd --date=unix)
 
-# GitVersion provides the semantic versioning for the project. If docker is not installed, semver fallsback to 0.0.0
+# GitVersion provides the semantic versioning for the project. 
 SEMVER := $(shell docker run --rm --volume "${PWD}/../:/repo" gittools/gitversion:5.12.0 /repo -output json -showvariable SemVer)
 ifeq ($(SEMVER), )
-SEMVER = "0.0.0"
+SEMVER = "0.0.0" # Fallback if docker is not installed or gitversion fails
 endif
 
 build: clean
