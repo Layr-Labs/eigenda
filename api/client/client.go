@@ -28,9 +28,9 @@ type IEigenDAClient interface {
 }
 
 type EigenDAClient struct {
-	Config
+	Config Config
 	Log    log.Logger
-	client clients.DisperserClient
+	Client clients.DisperserClient
 }
 
 var _ IEigenDAClient = EigenDAClient{}
@@ -52,12 +52,12 @@ func NewEigenDAClient(log log.Logger, config Config) (*EigenDAClient, error) {
 	return &EigenDAClient{
 		Log:    log,
 		Config: config,
-		client: llClient,
+		Client: llClient,
 	}, nil
 }
 
 func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error) {
-	data, err := m.client.RetrieveBlob(ctx, BatchHeaderHash, BlobIndex)
+	data, err := m.Client.RetrieveBlob(ctx, BatchHeaderHash, BlobIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -109,14 +109,20 @@ func (m EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultCha
 	return
 }
 
-func (m EigenDAClient) putBlob(ctx context.Context, data []byte, resultChan chan *Cert, errChan chan error) {
+func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *Cert, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode current blob encoding version byte
-	data = append([]byte{byte(NoIFFT)}, data...)
+	data := make([]byte, 0, 1+8+len(rawData))
+
+	// append version byte
+	data = append(data, byte(NoIFFT))
 
 	// encode data length
-	data = append(ConvertIntToVarUInt(len(data)), data...)
+	data = append(data, ConvertIntToVarUInt(len(rawData))...)
+
+	// append raw data
+	data = append(data, rawData...)
 
 	// encode modulo bn254
 	data = codec.ConvertByPaddingEmptyByte(data)
@@ -126,8 +132,8 @@ func (m EigenDAClient) putBlob(ctx context.Context, data []byte, resultChan chan
 		customQuorumNumbers[i] = uint8(e)
 	}
 
-	// do auth handshake
-	blobStatus, requestID, err := m.client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
+	// disperse blob
+	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
 		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
 		return
@@ -141,13 +147,13 @@ func (m EigenDAClient) putBlob(ctx context.Context, data []byte, resultChan chan
 	}
 
 	base64RequestID := base64.StdEncoding.EncodeToString(requestID)
-	m.Log.Info("Blob disepersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
+	m.Log.Info("Blob dispersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
 
-	ticker := time.NewTicker(m.StatusQueryRetryInterval)
+	ticker := time.NewTicker(m.Config.StatusQueryRetryInterval)
 	defer ticker.Stop()
 
 	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, m.StatusQueryTimeout)
+	ctx, cancel = context.WithTimeout(ctx, m.Config.StatusQueryTimeout)
 	defer cancel()
 
 	for {
@@ -156,15 +162,15 @@ func (m EigenDAClient) putBlob(ctx context.Context, data []byte, resultChan chan
 			errChan <- fmt.Errorf("timed out waiting for EigenDA blob to confirm blob with request id=%s: %w", base64RequestID, ctx.Err())
 			return
 		case <-ticker.C:
-			statusRes, err := m.client.GetBlobStatus(ctx, requestID)
+			statusRes, err := m.Client.GetBlobStatus(ctx, requestID)
 			if err != nil {
 				m.Log.Error("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
 				continue
 			}
 
 			switch statusRes.Status {
-			case grpcdisperser.BlobStatus_PROCESSING:
-				m.Log.Info("Waiting for confirmation from EigenDA", "requestID", base64RequestID)
+			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
+				m.Log.Info("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
 			case grpcdisperser.BlobStatus_FAILED:
 				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
 				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
