@@ -1231,7 +1231,7 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
-	// Skipping this test as repported being flaky but could not reproduce it locally
+	// Skipping this test as reported being flaky but could not reproduce it locally
 	t.Skip("Skipping testing in CI environment")
 
 	defer goleak.VerifyNone(t)
