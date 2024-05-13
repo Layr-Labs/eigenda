@@ -236,6 +236,6 @@ func init() {
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, indexer.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
-	Flags = append(Flags, common.FireblocksCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, thegraph.CLIFlags(envVarPrefix)...)
+	Flags = append(Flags, common.KMSWalletCLIFlags(envVarPrefix, FlagPrefix)...)
 }

@@ -23,7 +23,7 @@ type Config struct {
 	LoggerConfig     common.LoggerConfig
 	MetricsConfig    batcher.MetricsConfig
 	IndexerConfig    indexer.Config
-	FireblocksConfig common.FireblocksConfig
+	KMSKeyConfig     common.KMSKeyConfig
 	ChainStateConfig thegraph.Config
 	UseGraph         bool
 
@@ -39,8 +39,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
-	fireblocksConfig := common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix)
-	if !fireblocksConfig.Disable {
+	kmsConfig := common.ReadKMSKeyConfig(ctx, flags.FlagPrefix)
+	if !kmsConfig.Disable {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
 	}
 	config := Config{
@@ -84,7 +84,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
-		FireblocksConfig:              fireblocksConfig,
+		KMSKeyConfig:                  kmsConfig,
 	}
 	return config, nil
 }

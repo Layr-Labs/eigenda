@@ -222,7 +222,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_NUM_CONFIRMATIONS:             "0",
 		BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE: "100",
 		BATCHER_FINALIZATION_BLOCK_DELAY:      "5",
-		BATCHER_FIREBLOCKS_DISABLE:            "true",
+		BATCHER_KMS_KEY_DISABLE:               "true",
 	}
 
 	env.applyDefaults(&v, "BATCHER", "batcher", ind)
