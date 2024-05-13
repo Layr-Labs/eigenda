@@ -1,4 +1,4 @@
-package batcher
+package common
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
@@ -67,7 +66,7 @@ type ReceiptOrErr struct {
 type txnManager struct {
 	mu sync.Mutex
 
-	ethClient        common.EthClient
+	ethClient        EthClient
 	wallet           walletsdk.Wallet
 	numConfirmations int
 	requestChan      chan *TxnRequest
@@ -82,7 +81,7 @@ type txnManager struct {
 
 var _ TxnManager = (*txnManager)(nil)
 
-func NewTxnManager(ethClient common.EthClient, wallet walletsdk.Wallet, numConfirmations, queueSize int, txnBroadcastTimeout time.Duration, txnRefreshInterval time.Duration, logger logging.Logger, metrics *TxnManagerMetrics) TxnManager {
+func NewTxnManager(ethClient EthClient, wallet walletsdk.Wallet, numConfirmations, queueSize int, txnBroadcastTimeout time.Duration, txnRefreshInterval time.Duration, logger logging.Logger, metrics *TxnManagerMetrics) TxnManager {
 	return &txnManager{
 		ethClient:           ethClient,
 		wallet:              wallet,

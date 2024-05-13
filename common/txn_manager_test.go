@@ -1,4 +1,4 @@
-package batcher_test
+package common_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	dacommon "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	sdkmock "github.com/Layr-Labs/eigensdk-go/chainio/clients/mocks"
@@ -24,7 +25,7 @@ func TestProcessTransaction(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 100*time.Millisecond, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 100*time.Millisecond, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -40,7 +41,7 @@ func TestProcessTransaction(t *testing.T) {
 		}, nil).Times(2),
 	)
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -56,7 +57,7 @@ func TestProcessTransaction(t *testing.T) {
 	w.EXPECT().GetTransactionReceipt(gomock.Any(), gomock.Any()).Return(nil, randomErr).AnyTimes()
 	w.EXPECT().SendTransaction(gomock.Any(), gomock.Any()).Return("", randomErr).AnyTimes()
 
-	err = txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err = txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -74,7 +75,7 @@ func TestReplaceGasFee(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 100*time.Millisecond, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 100*time.Millisecond, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -93,7 +94,7 @@ func TestReplaceGasFee(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -110,7 +111,7 @@ func TestTransactionReplacementFailure(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -126,7 +127,7 @@ func TestTransactionReplacementFailure(t *testing.T) {
 	w.EXPECT().SendTransaction(gomock.Any(), gomock.Any()).Return(badTxID, nil)
 	w.EXPECT().GetTransactionReceipt(gomock.Any(), badTxID).Return(nil, errors.New("blah")).AnyTimes()
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -143,7 +144,7 @@ func TestSendTransactionReceiptRetry(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -161,7 +162,7 @@ func TestSendTransactionReceiptRetry(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -181,7 +182,7 @@ func TestSendTransactionRetrySuccess(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -203,7 +204,7 @@ func TestSendTransactionRetrySuccess(t *testing.T) {
 		BlockNumber: new(big.Int).SetUint64(1),
 	}, nil)
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -223,7 +224,7 @@ func TestSendTransactionRetryFailure(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -241,7 +242,7 @@ func TestSendTransactionRetryFailure(t *testing.T) {
 	// assume that the transaction is not mined within the timeout
 	w.EXPECT().GetTransactionReceipt(gomock.Any(), txID).Return(nil, walletsdk.ErrReceiptNotYetAvailable).AnyTimes()
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -261,7 +262,7 @@ func TestTransactionNotBroadcasted(t *testing.T) {
 	w := sdkmock.NewMockWallet(ctrl)
 	logger := logging.NewNoopLogger()
 	metrics := batcher.NewMetrics("9100", logger)
-	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 48*time.Second, logger, metrics.TxnManagerMetrics)
+	txnManager := dacommon.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 48*time.Second, logger, metrics.TxnManagerMetrics)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
@@ -275,7 +276,7 @@ func TestTransactionNotBroadcasted(t *testing.T) {
 	// assume that the transaction does not get broadcasted to the network
 	w.EXPECT().GetTransactionReceipt(gomock.Any(), txID).Return(nil, walletsdk.ErrNotYetBroadcasted).AnyTimes()
 
-	err := txnManager.ProcessTransaction(ctx, &batcher.TxnRequest{
+	err := txnManager.ProcessTransaction(ctx, &dacommon.TxnRequest{
 		Tx:    txn,
 		Tag:   "test transaction",
 		Value: nil,
@@ -283,6 +284,6 @@ func TestTransactionNotBroadcasted(t *testing.T) {
 	<-ctx.Done()
 	assert.NoError(t, err)
 	res := <-txnManager.ReceiptChan()
-	assert.ErrorAs(t, res.Err, &batcher.ErrTransactionNotBroadcasted)
+	assert.ErrorAs(t, res.Err, &dacommon.ErrTransactionNotBroadcasted)
 	assert.Nil(t, res.Receipt)
 }

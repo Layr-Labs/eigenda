@@ -18,7 +18,6 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
@@ -38,7 +37,7 @@ var (
 
 type batcherComponents struct {
 	transactor       *coremock.MockTransactor
-	txnManager       *batchermock.MockTxnManager
+	txnManager       *cmock.MockTxnManager
 	blobStore        disperser.BlobStore
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
@@ -121,7 +120,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	encoderClient := disperser.NewLocalEncoderClient(p)
 	finalizer := batchermock.NewFinalizer()
 	ethClient := &cmock.MockEthClient{}
-	txnManager := mock.NewTxnManager()
+	txnManager := cmock.NewTxnManager()
 
 	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics, handleBatchLivenessChan)
 	assert.NoError(t, err)
@@ -228,7 +227,7 @@ func TestBatcherIterations(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 	assert.Greater(t, len(components.txnManager.Requests), 0)
-	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+	err = batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt:  receipt,
 		Err:      nil,
 		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
@@ -304,7 +303,7 @@ func TestBlobFailures(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 	assert.Greater(t, len(components.txnManager.Requests), 0)
-	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+	err = batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt:  nil,
 		Err:      confirmationErr,
 		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
@@ -333,7 +332,7 @@ func TestBlobFailures(t *testing.T) {
 	components.encodingStreamer.ReferenceBlockNumber = 10
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
-	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+	err = batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt: &types.Receipt{
 			TxHash: gethcommon.HexToHash("0x1234"),
 		},
@@ -358,7 +357,7 @@ func TestBlobFailures(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 
-	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+	err = batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt: &types.Receipt{
 			TxHash: gethcommon.HexToHash("0x1234"),
 		},
@@ -453,7 +452,7 @@ func TestBlobRetry(t *testing.T) {
 
 	// Trigger a retry
 	confirmationErr := errors.New("error")
-	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+	err = batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt:  nil,
 		Err:      confirmationErr,
 		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
@@ -539,7 +538,7 @@ func TestRetryTxnReceipt(t *testing.T) {
 
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
-	err = batcher.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+	err = batcher.ProcessConfirmedBatch(ctx, &common.ReceiptOrErr{
 		Receipt:  invalidReceipt,
 		Err:      nil,
 		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
