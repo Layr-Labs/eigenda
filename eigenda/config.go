@@ -39,6 +39,7 @@ func ReadConfig(ctx *cli.Context) Config {
 		RPC:                      ctx.String(RPCFlagName),
 		StatusQueryRetryInterval: ctx.Duration(StatusQueryRetryIntervalFlagName),
 		StatusQueryTimeout:       ctx.Duration(StatusQueryTimeoutFlagName),
+		UseTLS:                   ctx.Bool(UseTlsFlagName),
 	}
 }
 
