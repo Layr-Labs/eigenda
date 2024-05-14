@@ -350,6 +350,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// revert all the keys for that batch.
 		result := <-storeChan
 		if result.keys != nil {
+			log.Debug("Batch validation failed, rolling back the key/value entries stored in database", "number of entires", len(*result.keys), "batchHeaderHash", batchHeaderHash)
 			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
 				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHashHex, "err", deleteKeysErr)
 			}
@@ -363,23 +364,23 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	// Before we sign the batch, we should first complete the batch storing successfully.
 	result := <-storeChan
 	if result.err != nil {
+		log.Error("Store batch failed", "batchHeaderHash", batchHeaderHash, "err", result.err)
 		return nil, err
 	}
 	if result.keys != nil {
 		n.Metrics.AcceptBatches("stored", batchSize)
 		n.Metrics.ObserveLatency("StoreChunks", "stored", result.latency)
-		n.Logger.Debug("Store batch took", "duration:", time.Duration(result.latency*float64(time.Millisecond)))
+		n.Logger.Debug("Store batch succeeded", "batchHeaderHash", batchHeaderHash, "duration:", time.Duration(result.latency*float64(time.Millisecond)))
+	} else {
+		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeaderHash", batchHeaderHash)
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
 	sig := n.KeyPair.SignMessage(batchHeaderHash)
-	log.Debug("Signed batch header hash", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()))
 	n.Metrics.AcceptBatches("signed", batchSize)
 	n.Metrics.ObserveLatency("StoreChunks", "signed", float64(time.Since(stageTimer).Milliseconds()))
-	log.Debug("Sign batch took", "duration", time.Since(stageTimer))
-
-	log.Info("StoreChunks succeeded")
+	log.Debug("Sign batch succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
 	return sig, nil
