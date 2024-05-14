@@ -118,7 +118,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *indexedstate.IndexedChainState {
 	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
-	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
+	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetriever, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	var (
