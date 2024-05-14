@@ -183,9 +183,9 @@ var (
 	}
 	ReachabilityPollIntervalSecFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "reachability-poll-interval"),
-		Usage:    "How often (in second) to check if node is reachabile from DA backend",
+		Usage:    "How often (in second) to check if node is reachabile from Disperser",
 		Required: false,
-		Value:    "300",
+		Value:    "60",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "REACHABILITY_POLL_INTERVAL"),
 	}
 	// Optional DataAPI URL. If not set, reachability checks are disabled
