@@ -51,6 +51,11 @@ func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
 	return uint(header.Number.Uint64()), nil
 }
 
+func (cs *ChainState) EthClientOnline() (bool, error) {
+	ctx := context.Background()
+	return cs.Client.IsSynced(ctx)
+}
+
 func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
 	totals := make(map[core.QuorumID]*core.OperatorInfo)

@@ -25,6 +25,26 @@ func (m mockGraphQLQuerier) Query(ctx context.Context, q any, variables map[stri
 	return m.QueryFn(ctx, q, variables)
 }
 
+type mockChainState struct {
+	GetCurrentBlockNumberFn func() (uint, error)
+}
+
+func (m mockChainState) GetCurrentBlockNumber() (uint, error) {
+	return m.GetCurrentBlockNumberFn()
+}
+
+func (m *mockChainState) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
+	return nil, nil
+}
+
+func (m *mockChainState) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
+	return nil, nil
+}
+
+func (m *mockChainState) EthClientOnline() (bool, error) {
+	return true, nil
+}
+
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	logger := logging.NewNoopLogger()
 

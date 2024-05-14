@@ -250,6 +250,15 @@ func (c *EthClient) EnsureAnyTransactionEvaled(ctx context.Context, txs []*types
 	return receipt, nil
 }
 
+// IsSynced returns true if the client is synced with the network.
+func (c *EthClient) IsSynced(ctx context.Context) (bool, error) {
+	syncProgress, err := c.SyncProgress(ctx)
+	if err != nil {
+		return false, fmt.Errorf("IsSynced: failed to get sync progress: %w", err)
+	}
+	return syncProgress == nil, nil
+}
+
 // waitMined takes multiple transactions and waits for any of them to be mined on the blockchain and returns the receipt.
 // If the context times out but the receipt is available, it returns both receipt and error, noting that the transaction is confirmed but has not accumulated the required number of confirmations.
 // Taken from https://github.com/ethereum/go-ethereum/blob/master/accounts/abi/bind/util.go#L32,

@@ -289,3 +289,9 @@ func (mock *MockEthClient) EnsureAnyTransactionEvaled(ctx context.Context, txs [
 
 	return result, args.Error(1)
 }
+
+func (mock *MockEthClient) IsSynced(ctx context.Context) (bool, error) {
+	args := mock.Called()
+	result := args.Get(0)
+	return result.(bool), args.Error(1)
+}
