@@ -372,7 +372,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		n.Metrics.ObserveLatency("StoreChunks", "stored", result.latency)
 		n.Logger.Debug("Store batch succeeded", "batchHeaderHash", batchHeaderHash, "duration:", time.Duration(result.latency*float64(time.Millisecond)))
 	} else {
-		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeadherHash", batchHeaderHash)
+		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeaderHash", batchHeaderHash)
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
