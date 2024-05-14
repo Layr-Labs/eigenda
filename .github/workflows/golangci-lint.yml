@@ -12,16 +12,16 @@ jobs:
     name: Linter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.21' # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Checkout EigenDA
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
         with:
           version: v1.54
           args: --timeout 3m --verbose
