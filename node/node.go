@@ -321,7 +321,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// Defined only if the batch not already exists and gets stored to database successfully.
 		keys *[][]byte
 
-		// Latency (in ms) to store the batch.
+		// Latency to store the batch.
 		// Defined only if the batch not already exists and gets stored to database successfully.
 		latency time.Duration
 	}
