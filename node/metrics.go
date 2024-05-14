@@ -181,6 +181,11 @@ func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
 }
 
+func (g *Metrics) RecordStoreChunksStage(stage string, dataSize uint64, latency time.Duration) {
+	g.AcceptBatches(stage, dataSize)
+	g.ObserveLatency("StoreChunks", stage, float64(latency.Milliseconds()))
+}
+
 func (g *Metrics) collectOnchainMetrics() {
 	ticker := time.NewTicker(time.Duration(g.onchainMetricsInterval) * time.Second)
 	defer ticker.Stop()
