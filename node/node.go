@@ -474,6 +474,17 @@ func (n *Node) checkNodeReachability() {
 		return
 	}
 
+	if n.Config.DataApiUrl == "" {
+		n.Logger.Error("Unable to perform reachability check - NODE_DATAAPI_URL is not defined in .env")
+		return
+	}
+
+	checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", n.Config.DataApiUrl, n.Config.ID.Hex()))
+	if err != nil {
+		n.Logger.Error("Reachability check failed - invalid check url", err, "checkUrl", checkUrl.String())
+		return
+	}
+
 	n.Logger.Info("Start nodeReachabilityCheck goroutine in background to check the reachability of the operator node")
 	ticker := time.NewTicker(time.Duration(n.Config.ReachabilityPollIntervalSec) * time.Second)
 	defer ticker.Stop()
@@ -481,18 +492,7 @@ func (n *Node) checkNodeReachability() {
 	for {
 		<-ticker.C
 
-		if n.Config.DataApiUrl == "" {
-			n.Logger.Error("Unable to perform reachability check - NODE_DATAAPI_URL is not defined in .env")
-			continue
-		}
-
-		checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", n.Config.DataApiUrl, n.Config.ID.Hex()))
-		if err != nil {
-			n.Logger.Error("Reachability check failed - invalid check url", err, "checkUrl", checkUrl.String())
-			return
-		}
-
-		n.Logger.Info("Calling reachability check", "url", checkUrl.String())
+		n.Logger.Debug("Calling reachability check", "url", checkUrl.String())
 
 		resp, err := http.Get(checkUrl.String())
 		if err != nil {
@@ -521,13 +521,17 @@ func (n *Node) checkNodeReachability() {
 
 		if responseObject.DispersalOnline {
 			n.Logger.Info("Reachability check - dispersal socket is ONLINE", "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(1.0)
 		} else {
 			n.Logger.Error("Reachability check - dispersal socket is UNREACHABLE", "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(0.0)
 		}
 		if responseObject.RetrievalOnline {
 			n.Logger.Info("Reachability check - retrieval socket is ONLINE", "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(1.0)
 		} else {
 			n.Logger.Error("Reachability check - retrieval socket is UNREACHABLE", "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(0.0)
 		}
 	}
 }
