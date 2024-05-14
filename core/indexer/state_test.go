@@ -83,7 +83,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIEVER, op.NODE_EIGENDA_SERVICE_MANAGER)
 	Expect(err).To(BeNil())
 	return tx
 
