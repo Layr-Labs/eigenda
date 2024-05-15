@@ -50,7 +50,6 @@ srs:
 	if ! test -f /operator-setup/resources/g1.point; then \
 		cd operator-setup && ./srs_setup.sh; \
 	fi
-	@golangci-lint run
 
 .PHONY: \
 	op-batcher \
