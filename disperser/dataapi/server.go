@@ -39,7 +39,7 @@ const (
 	// Cache control for responses.
 	// The time unit is second for max age.
 	maxOperatorsNonsigningPercentageAge = 10
-	maxOperatorPortCheckAge             = 600
+	maxOperatorPortCheckAge             = 60
 	maxNonSignerAge                     = 10
 	maxDeregisteredOperatorAage         = 10
 	maxThroughputAge                    = 10
@@ -92,6 +92,10 @@ type (
 	Throughput struct {
 		Throughput float64 `json:"throughput"`
 		Timestamp  uint64  `json:"timestamp"`
+	}
+
+	EjectionResponse struct {
+		TransactionHash string `json:"transaction_hash"`
 	}
 
 	Meta struct {
@@ -320,13 +324,13 @@ func (s *server) Shutdown() error {
 //	@Summary	Eject operators who violate the SLAs during the given time interval
 //	@Tags		Ejector
 //	@Produce	json
-//	@Param		interval	query	int		false	"Lookback window for operator ejection [default: 86400]"
-//	@Param		end			query	int		false	"End time for evaluating operator ejection [default: now]"
-//	@Param		mode		query	string	false	"Whether it's periodic or urgent ejection request [default: periodic]"
-//	@Success	200
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Param		interval	query		int		false	"Lookback window for operator ejection [default: 86400]"
+//	@Param		end			query		int		false	"End time for evaluating operator ejection [default: now]"
+//	@Param		mode		query		string	false	"Whether it's periodic or urgent ejection request [default: periodic]"
+//	@Success	200			{object}	EjectionResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/ejector/operators [post]
 func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -363,8 +367,9 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}
 
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
+	var ejectionResponse *EjectionResponse
 	if err == nil {
-		err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
+		ejectionResponse, err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
 	}
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("EjectOperators")
@@ -374,7 +379,7 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}
 	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
 	s.metrics.IncrementEjectionRequest(mode, codes.OK)
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, ejectionResponse)
 }
 
 // FetchBlobHandler godoc

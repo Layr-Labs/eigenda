@@ -46,7 +46,10 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.EjectionResponse"
+                        }
                     },
                     "400": {
                         "description": "error: Bad request",
@@ -696,6 +699,14 @@ const docTemplate = `{
                 },
                 "meta": {
                     "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.EjectionResponse": {
+            "type": "object",
+            "properties": {
+                "transaction_hash": {
+                    "type": "string"
                 }
             }
         },

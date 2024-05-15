@@ -76,7 +76,7 @@ func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logg
 	}
 }
 
-func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage) error {
+func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage) (*EjectionResponse, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -103,13 +103,13 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 
 	operatorsByQuorum, err := e.convertOperators(nonsigners)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	txn, err := e.transactor.BuildEjectOperatorsTxn(ctx, operatorsByQuorum)
 	if err != nil {
 		e.logger.Error("Failed to build ejection transaction", "err", err)
-		return err
+		return nil, err
 	}
 
 	var txID walletsdk.TxID
@@ -117,12 +117,12 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	for retryFromFailure < maxSendTransactionRetry {
 		gasTipCap, gasFeeCap, err := e.ethClient.GetLatestGasCaps(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get latest gas caps: %w", err)
+			return nil, fmt.Errorf("failed to get latest gas caps: %w", err)
 		}
 
 		txn, err = e.ethClient.UpdateGas(ctx, txn, big.NewInt(0), gasTipCap, gasFeeCap)
 		if err != nil {
-			return fmt.Errorf("failed to update gas price: %w", err)
+			return nil, fmt.Errorf("failed to update gas price: %w", err)
 		}
 		txID, err = e.wallet.SendTransaction(ctx, txn)
 		var urlErr *url.Error
@@ -135,7 +135,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 			retryFromFailure++
 			continue
 		} else if err != nil {
-			return fmt.Errorf("failed to send txn %s: %w", txn.Hash().Hex(), err)
+			return nil, fmt.Errorf("failed to send txn %s: %w", txn.Hash().Hex(), err)
 		} else {
 			e.logger.Debug("successfully sent txn", "txID", txID, "txHash", txn.Hash().Hex())
 			break
@@ -159,16 +159,16 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 			e.logger.Warn("Transaction has not been broadcasted to network but attempted to retrieve receipt", "err", err)
 		} else if errors.Is(err, walletsdk.ErrTransactionFailed) {
 			e.logger.Error("Transaction failed", "txID", txID, "txHash", txn.Hash().Hex(), "err", err)
-			return err
+			return nil, err
 		} else {
 			e.logger.Error("Transaction receipt retrieval failed", "err", err)
-			return err
+			return nil, err
 		}
 
 		// Wait for the next round.
 		select {
 		case <-ctxWithTimeout.Done():
-			return ctxWithTimeout.Err()
+			return nil, ctxWithTimeout.Err()
 		case <-queryTicker.C:
 		}
 	}
@@ -178,8 +178,11 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	e.metrics.UpdateEjectionGasUsed(receipt.GasUsed)
 
 	// TODO: get the txn response and update the metrics.
+	ejectionResponse := &EjectionResponse{
+		TransactionHash: receipt.TxHash.Hex(),
+	}
 
-	return nil
+	return ejectionResponse, nil
 }
 
 func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMetrics) ([][]core.OperatorID, error) {
