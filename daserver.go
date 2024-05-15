@@ -25,12 +25,6 @@ type PlasmaStore interface {
 	PutWithoutComm(ctx context.Context, value []byte) (key []byte, err error)
 }
 
-/*
-TODO - enable application server throughput constraints to prevent abuse
-
-	a) read/write timeouts
-	b) concurrency limits for request processing
-*/
 type DAServer struct {
 	log        log.Logger
 	endpoint   string
@@ -47,7 +41,10 @@ func NewDAServer(host string, port int, store PlasmaStore, log log.Logger) *DASe
 		endpoint: endpoint,
 		store:    store,
 		httpServer: &http.Server{
-			Addr: endpoint,
+			Addr:              endpoint,
+			ReadHeaderTimeout: 10 * time.Second,
+			// aligned with existing blob finalization times
+			WriteTimeout: 40 * time.Minute,
 		},
 	}
 }
