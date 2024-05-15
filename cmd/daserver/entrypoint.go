@@ -42,7 +42,6 @@ func StartDAServer(cliCtx *cli.Context) error {
 		store = s3
 	} else if cfg.EigenDAEnabled() {
 		daCfg := cfg.EigenDAConfig
-		log.Info("Using EigenDA storage", "RPC", daCfg.RPC)
 
 		v, err := verify.NewVerifier(daCfg.KzgConfig())
 		if err != nil {
