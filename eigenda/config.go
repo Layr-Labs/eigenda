@@ -24,7 +24,7 @@ const (
 
 type Config struct {
 	// TODO(eigenlayer): Update quorum ID command-line parameters to support passing
-	// and arbitrary number of quorum IDs.
+	// an arbitrary number of quorum IDs.
 
 	// RPC is the HTTP provider URL for the Data Availability node.
 	RPC string
