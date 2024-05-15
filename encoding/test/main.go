@@ -86,9 +86,9 @@ func TestKzgRs() {
 	printFr(inputFr)
 
 	//inputSize := uint64(len(inputFr))
-	commit, legnthCommit, legnthProof, frames, fIndices, err := enc.Encode(inputFr)
-	_ = legnthProof
-	_ = legnthCommit
+	commit, lengthCommit, lengthProof, frames, fIndices, err := enc.Encode(inputFr)
+	_ = lengthProof
+	_ = lengthCommit
 	if err != nil {
 		log.Fatal(err)
 	}

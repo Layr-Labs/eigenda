@@ -26,13 +26,13 @@ func TestLengthProof(t *testing.T) {
 		inputFr, err := rs.ToFrArray(inputBytes)
 		require.Nil(t, err)
 
-		_, legnthCommitment, legnthProof, _, _, err := enc.Encode(inputFr)
+		_, lengthCommitment, lengthProof, _, _, err := enc.Encode(inputFr)
 		require.Nil(t, err)
 
 		length := len(inputFr)
-		assert.NoError(t, v.VerifyCommit(legnthCommitment, legnthProof, uint64(length)), "low degree verification failed\n")
+		assert.NoError(t, v.VerifyCommit(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
 
 		length = len(inputFr) - 10
-		assert.Error(t, v.VerifyCommit(legnthCommitment, legnthProof, uint64(length)), "low degree verification failed\n")
+		assert.Error(t, v.VerifyCommit(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
 	}
 }
