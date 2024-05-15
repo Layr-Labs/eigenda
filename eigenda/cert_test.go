@@ -2,7 +2,6 @@ package eigenda
 
 import (
 	"testing"
-	"unsafe"
 
 	eigen_da_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/op-plasma-eigenda/common"
@@ -41,15 +40,8 @@ func TestCertEncodingDecoding(t *testing.T) {
 	assert.True(t, equal(), "values shouldn't change")
 }
 
-func ItoBSlice(i int) []byte {
-	data := *(*[unsafe.Sizeof(i)]byte)(unsafe.Pointer(&i))
-	return data[:]
-}
-
 func TestCommitmentToFieldElement(t *testing.T) {
 	xBytes, yBytes := []byte{0x69}, []byte{0x42}
-	println(xBytes)
-	println(yBytes)
 
 	c := Cert{
 		BatchHeaderHash:      []byte{0x42, 0x69},

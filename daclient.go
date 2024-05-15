@@ -47,13 +47,7 @@ func (c *DAClient) GetInput(ctx context.Context, comm EigenDACommitment) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Implement verification
-	if c.verify {
-		if err := comm.Verify(input); err != nil {
-			return nil, err
-		}
 
-	}
 	return input, nil
 }
 

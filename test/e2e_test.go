@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	plasma "github.com/Layr-Labs/op-plasma-eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/store"
+	"github.com/Layr-Labs/op-plasma-eigenda/verify"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum/go-ethereum/log"
@@ -49,9 +52,23 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		UseTLS:                   true,
 	}
 
-	client := eigenda.NewEigenDAClient(log, testCfg)
+	kzgCfg := &kzg.KzgConfig{
+		G1Path:          "../kzg/g1.point",
+		G2Path:          "../kzg/g2.point",
+		G2PowerOf2Path:  "../kzg/g2.point.powerOf2",
+		CacheDir:        "../kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
 
-	daStore, err := store.NewEigenDAStore(ctx, client)
+	client := eigenda.NewEigenDAClient(log, testCfg)
+	verifier, err := verify.NewVerifier(kzgCfg)
+	if err != nil {
+		panic(err)
+	}
+
+	daStore, err := store.NewEigenDAStore(ctx, client, verifier)
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +114,6 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 
 	t.Log("Setting input data on plasma server...")
 	commit, err := daClient.SetInput(ts.ctx, testPreimage)
-
 	assert.NoError(t, err)
 
 	// 2 - fetch pre-image data from test plasma server

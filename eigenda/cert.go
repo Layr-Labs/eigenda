@@ -15,12 +15,13 @@ type Cert struct {
 	BlobCommitment *common.G1Commitment
 }
 
+// BlobCommitmentFields transforms commitment byte arrays to bn254 field elements
 func (c *Cert) BlobCommitmentFields() (*fp.Element, *fp.Element) {
 	xBytes, yBytes := c.BlobCommitment.X, c.BlobCommitment.Y
 	xElement, yElement := &fp.Element{}, &fp.Element{}
 
-	xElement.SetBytes(xBytes)
-	yElement.SetBytes(yBytes)
+	xElement.Unmarshal(xBytes)
+	yElement.Unmarshal(yBytes)
 
 	return xElement, yElement
 }

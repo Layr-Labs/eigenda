@@ -1,13 +1,13 @@
-package plasma
+package verify
 
 import (
 	"encoding/hex"
-	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,14 +28,19 @@ func TestVerification(t *testing.T) {
 		},
 	}
 
-	println(fmt.Sprintf("x: %+x", x))
-	println(fmt.Sprintf("y: %+x", y))
+	kzgConfig := &kzg.KzgConfig{
+		G1Path:          "../test/resources/g1.point",
+		G2Path:          "../test/resources/g2.point",
+		G2PowerOf2Path:  "../test/resources/g2.point.powerOf2",
+		CacheDir:        "../test/resources/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
 
-	b, err := rlp.EncodeToBytes(c)
+	v, err := NewVerifier(kzgConfig)
 	assert.NoError(t, err)
 
-	var commit EigenDACommitment = b
-
-	err = commit.Verify(data)
+	err = v.Verify(c, eigenda.EncodeToBlob(data))
 	assert.NoError(t, err)
 }

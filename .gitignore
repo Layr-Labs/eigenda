@@ -23,4 +23,4 @@ go.work
 /bin
 
 ## kzg cache
-kzg/SRSTables/
+test/resources/SRSTables/
