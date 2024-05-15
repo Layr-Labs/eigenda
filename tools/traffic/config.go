@@ -1,6 +1,7 @@
 package traffic
 
 import (
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/clients"
@@ -18,12 +19,21 @@ type Config struct {
 	LoggingConfig          common.LoggerConfig
 	RandomizeBlobs         bool
 	InstanceLaunchInterval time.Duration
+	CustomQuorums          []uint8
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
 	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
 		return nil, err
+	}
+	customQuorums := ctx.GlobalIntSlice(flags.CustomQuorumNumbersFlag.Name)
+	customQuorumsUint8 := make([]uint8, len(customQuorums))
+	for i, q := range customQuorums {
+		if q < 0 || q > 255 {
+			return nil, errors.New("invalid custom quorum number")
+		}
+		customQuorumsUint8[i] = uint8(q)
 	}
 	return &Config{
 		Config: *clients.NewConfig(
@@ -38,5 +48,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LoggingConfig:          *loggerConfig,
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
+		CustomQuorums:          customQuorumsUint8,
 	}, nil
 }

@@ -97,7 +97,7 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
 	defer cancel()
-	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, []uint8{})
+	blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, g.Config.CustomQuorums)
 	if err != nil {
 		return err
 	}
