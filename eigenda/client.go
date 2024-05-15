@@ -138,13 +138,14 @@ func (m *EigenDAClient) DisperseBlob(ctx context.Context, data []byte) (*Cert, e
 					quorumIDs[i] = blobInfo.BlobHeader.BlobQuorumParams[i].QuorumNumber
 				}
 
-				return &Cert{
+				c := &Cert{
 					BatchHeaderHash:      blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash,
 					BlobIndex:            blobInfo.BlobVerificationProof.BlobIndex,
 					ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
 					QuorumIDs:            quorumIDs,
 					BlobCommitment:       blobInfo.BlobHeader.Commitment,
-				}, nil
+				}
+				return c, nil
 			default:
 				return nil, fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
 			}

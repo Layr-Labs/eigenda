@@ -39,3 +39,23 @@ func TestCertEncodingDecoding(t *testing.T) {
 
 	assert.True(t, equal(), "values shouldn't change")
 }
+
+func TestCommitmentToFieldElement(t *testing.T) {
+	xBytes, yBytes := []byte{0x69}, []byte{0x42}
+
+	c := Cert{
+		BatchHeaderHash:      []byte{0x42, 0x69},
+		BlobIndex:            420,
+		ReferenceBlockNumber: 80085,
+		QuorumIDs:            []uint32{666},
+		BlobCommitment: &eigen_da_common.G1Commitment{
+			X: xBytes,
+			Y: yBytes,
+		},
+	}
+
+	x, y := c.BlobCommitmentFields()
+
+	assert.Equal(t, uint64(0x69), x.Uint64())
+	assert.Equal(t, uint64(0x42), y.Uint64())
+}

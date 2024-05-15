@@ -86,12 +86,6 @@ func (c EigenDACommitment) TxData() []byte {
 	return append([]byte{TxDataVersion1}, c.Encode()...)
 }
 
-// TODO - verify the commitment against the input blob by evaluating its polynomial representation at an arbitrary point
-// and asserting that the generated output proof can be successfully verified against the commitment.
-func (c EigenDACommitment) Verify(input []byte) error {
-	return nil
-}
-
 func DecodeEigenDACommitment(commitment []byte) (EigenDACommitment, error) {
 	if len(commitment) <= 3 {
 		return nil, ErrInvalidCommitment

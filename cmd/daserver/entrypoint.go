@@ -8,6 +8,7 @@ import (
 	plasma "github.com/Layr-Labs/op-plasma-eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	plasma_store "github.com/Layr-Labs/op-plasma-eigenda/store"
+	"github.com/Layr-Labs/op-plasma-eigenda/verify"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
@@ -25,7 +26,7 @@ func StartDAServer(cliCtx *cli.Context) error {
 	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_plasma_server")
 	oplog.SetGlobalLogHandler(log.Handler())
 
-	log.Info("Initializing EigenDA Plasma DA server...")
+	log.Info("Initializing EigenDA Plasma DA server with config ...")
 
 	var store plasma.PlasmaStore
 
@@ -40,13 +41,20 @@ func StartDAServer(cliCtx *cli.Context) error {
 		}
 		store = s3
 	} else if cfg.EigenDAEnabled() {
-		log.Info("Using EigenDA storage", "RPC", cfg.EigenDAConfig.RPC)
+		daCfg := cfg.EigenDAConfig
+
+		v, err := verify.NewVerifier(daCfg.KzgConfig())
+		if err != nil {
+			return err
+		}
+
 		eigenda, err := plasma_store.NewEigenDAStore(
 			cliCtx.Context,
 			eigenda.NewEigenDAClient(
 				log,
-				cfg.EigenDAConfig,
+				daCfg,
 			),
+			v,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create EigenDA store: %w", err)

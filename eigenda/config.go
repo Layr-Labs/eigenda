@@ -2,8 +2,10 @@ package eigenda
 
 import (
 	"errors"
+	"runtime"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/urfave/cli/v2"
 )
@@ -13,11 +15,16 @@ const (
 	StatusQueryRetryIntervalFlagName = "eigenda-status-query-retry-interval"
 	StatusQueryTimeoutFlagName       = "eigenda-status-query-timeout"
 	UseTlsFlagName                   = "eigenda-use-tls"
+	// Kzg flags
+	G1PathFlagName    = "eigenda-g1-path"
+	G2PathFlagName    = "eigenda-g2-path"
+	G2TauFlagName     = "eigenda-g2-tau-path"
+	CachePathFlagName = "eigenda-cache-path"
 )
 
 type Config struct {
 	// TODO(eigenlayer): Update quorum ID command-line parameters to support passing
-	// and arbitrary number of quorum IDs.
+	// an arbitrary number of quorum IDs.
 
 	// RPC is the HTTP provider URL for the Data Availability node.
 	RPC string
@@ -30,16 +37,42 @@ type Config struct {
 
 	// UseTLS specifies whether the client should use TLS as a transport layer when connecting to disperser.
 	UseTLS bool
+
+	// KZG vars
+	CacheDir string
+
+	G1Path string
+	G2Path string
+
+	G2PowerOfTauPath string
+}
+
+func (c *Config) KzgConfig() *kzg.KzgConfig {
+	return &kzg.KzgConfig{
+		G1Path:          c.G1Path,
+		G2Path:          c.G2Path,
+		G2PowerOf2Path:  c.G2PowerOfTauPath,
+		CacheDir:        c.CacheDir,
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
 }
 
 // NewConfig parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
-	return Config{
+	cfg := Config{
 		/* Required Flags */
 		RPC:                      ctx.String(RPCFlagName),
 		StatusQueryRetryInterval: ctx.Duration(StatusQueryRetryIntervalFlagName),
 		StatusQueryTimeout:       ctx.Duration(StatusQueryTimeoutFlagName),
+		UseTLS:                   ctx.Bool(UseTlsFlagName),
+		G1Path:                   ctx.String(G1PathFlagName),
+		G2Path:                   ctx.String(G2PathFlagName),
+		G2PowerOfTauPath:         ctx.String(G2TauFlagName),
+		CacheDir:                 ctx.String(CachePathFlagName),
 	}
+	return cfg
 }
 
 func (m Config) Check() error {
@@ -79,6 +112,26 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "Use TLS when connecting to the EigenDA disperser.",
 			Value:   true,
 			EnvVars: prefixEnvVars("EIGENDA_GRPC_USE_TLS"),
+		},
+		&cli.StringFlag{
+			Name:    G1PathFlagName,
+			Usage:   "Directory path to g1.point file",
+			EnvVars: prefixEnvVars("EIGENDA_KZG_G1_PATH"),
+		},
+		&cli.StringFlag{
+			Name:    G2PathFlagName,
+			Usage:   "Directory path to g2.point file",
+			EnvVars: prefixEnvVars("EIGENDA_KZG_G2_PATH"),
+		},
+		&cli.StringFlag{
+			Name:    G2TauFlagName,
+			Usage:   "Directory path to g2.point.powerOf2 file",
+			EnvVars: prefixEnvVars("EIGENDA_G2_TAU_PATH"),
+		},
+		&cli.StringFlag{
+			Name:    CachePathFlagName,
+			Usage:   "Directory path to SRS tables",
+			EnvVars: prefixEnvVars("EIGENDA_CACHE_PATH"),
 		},
 	}
 }

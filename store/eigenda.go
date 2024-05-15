@@ -5,16 +5,19 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
+	"github.com/Layr-Labs/op-plasma-eigenda/verify"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type EigenDAStore struct {
-	client *eigenda.EigenDAClient
+	client   *eigenda.EigenDAClient
+	verifier *verify.Verifier
 }
 
-func NewEigenDAStore(ctx context.Context, client *eigenda.EigenDAClient) (*EigenDAStore, error) {
+func NewEigenDAStore(ctx context.Context, client *eigenda.EigenDAClient, v *verify.Verifier) (*EigenDAStore, error) {
 	return &EigenDAStore{
-		client: client,
+		client:   client,
+		verifier: v,
 	}, nil
 }
 
@@ -29,6 +32,12 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to retrieve blob: %w", err)
 	}
+
+	err = e.verifier.Verify(cert, eigenda.EncodeToBlob(blob))
+	if err != nil {
+		return nil, err
+	}
+
 	return blob, nil
 }
 

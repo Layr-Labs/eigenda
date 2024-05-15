@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This simple DA server implementation supports ephemeral storage via EigenDA. 
+This simple DA server implementation supports ephemeral storage via EigenDA.
 
 ## EigenDA Configuration
 Additional cli args are provided for targeting an EigenDA network backend:
@@ -10,10 +10,14 @@ Additional cli args are provided for targeting an EigenDA network backend:
 - `--eigenda-status-query-timeout`: (default: 25m) Duration for which a client will wait for a blob to finalize after being sent for dispersal.
 - `--eigenda-status-query-retry-interval`: (default: 5s) How often a client will attempt a retry when awaiting network blob finalization. 
 - `--eigenda-use-tls`: (default: true) Whether or not to use TLS for grpc communication with disperser.
+- `eigenda-g1-path`: Directory path to g1.point file
+- `eigenda-g2-path`: Directory path to g2.point file 
+- `eigenda-g2-power-of-tau`: Directory path to g2.point.powerOf2 file
+- `eigenda-cache-path`: Directory path to dump cached SRS tables
 
 ## Running Locally
 1. Compile binary: `make da-server`
-2. Run binary; e.g: `./bin/da-server --addr 127.0.0.1 --port 6969 --eigenda-rpc disperser-holesky.eigenda.xyz:443 --eigenda-status-query-timeout 45m`
+2. Run binary; e.g: `./bin/da-server --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path test/resources/g1.point --eigenda-g2-path test/resources/g2.point --eigenda-g2-tau-path test/resources/g2.point.powerOf2 --eigenda-use-tls true`
 
 ## Breaking changes from existing OP-Stack
 
@@ -49,6 +53,10 @@ type Cert struct {
 Some unit tests have been introduced to assert correctness of encoding/decoding logic and mocked server interactions. These can be ran via `make test`.
 
 Otherwise E2E tests (`test/e2e_test.go`) exists which asserts that a commitment can be generated when inserting some arbitrary data to the server and can be read using the commitment for a key lookup via the client. These can be ran via `make e2e-test`. Please **note** that this test uses the EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for quicker iteration testing. 
+
+
+## Downloading SRS
+KZG commitment verification requires constructing the SRS string from the proper trusted setup values (g1, g2, g2.power_of_tau). These values can be downloaded locally using the [srs_setup](https://github.com/Layr-Labs/eigenda-operator-setup/blob/master/srs_setup.sh) script in the operator setup repo.
 
 
 ## Resources

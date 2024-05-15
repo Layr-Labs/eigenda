@@ -32,7 +32,6 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			EnvVars:  plasmaEnv(envPrefix, "DA_SERVER"),
 			Category: category,
 		},
-		// This is currently unsupported
 		&cli.BoolFlag{
 			Name:     VerifyOnReadFlagName,
 			Usage:    "Verify input data matches the commitments from the DA storage service",
