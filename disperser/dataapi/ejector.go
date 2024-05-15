@@ -168,7 +168,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 		// Wait for the next round.
 		select {
 		case <-ctxWithTimeout.Done():
-			return ctxWithTimeout.Err()
+			return nil, ctxWithTimeout.Err()
 		case <-queryTicker.C:
 		}
 	}
