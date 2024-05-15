@@ -106,7 +106,9 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-
+	if c.signer == nil {
+		return nil, nil, errors.New("signer is nil in an authenticated request")
+	}
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
