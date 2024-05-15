@@ -148,7 +148,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	defer cancelCtx()
 	var receipt *types.Receipt
 	for {
-		receipt, err = e.wallet.GetTransactionReceipt(ctx, txID)
+		receipt, err = e.wallet.GetTransactionReceipt(ctxWithTimeout, txID)
 		if err == nil {
 			break
 		}
@@ -167,8 +167,8 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 
 		// Wait for the next round.
 		select {
-		case <-ctx.Done():
-			return nil, ctxWithTimeout.Err()
+		case <-ctxWithTimeout.Done():
+			return ctxWithTimeout.Err()
 		case <-queryTicker.C:
 		}
 	}
