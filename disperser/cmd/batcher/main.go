@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/aws/kms"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -102,11 +103,73 @@ func RunBatcher(ctx *cli.Context) error {
 	}, logger, metrics.DispatcherMetrics)
 	asgn := &core.StdAssignmentCoordinator{}
 
-	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.HexToAddress(config.FireblocksConfig.WalletAddress), logger)
-	if err != nil {
-		logger.Error("Cannot create chain.Client", "err", err)
-		return err
+	var wallet walletsdk.Wallet
+	var client *geth.MultiHomingClient
+	if !config.KMSKeyConfig.Disable {
+		if config.KMSKeyConfig.KeyID == "" || config.KMSKeyConfig.Region == "" {
+			return errors.New("KMS key ID and region must be specified unless KMS wallet is disabled")
+		}
+		kmsClient, err := kms.NewKMSClient(context.Background(), config.KMSKeyConfig.Region)
+		if err != nil {
+			return fmt.Errorf("failed to create KMS client: %w", err)
+		}
+		pubKey, err := kms.GetECDSAPublicKey(context.Background(), kmsClient, config.KMSKeyConfig.KeyID)
+		if err != nil {
+			return fmt.Errorf("failed to get public key from KMS: %w", err)
+		}
+		addr := crypto.PubkeyToAddress(*pubKey)
+		client, err = geth.NewMultiHomingClient(config.EthClientConfig, addr, logger)
+		if err != nil {
+			logger.Error("Cannot create chain.Client", "err", err)
+			return err
+		}
+		chainID, err := client.ChainID(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get chain ID: %w", err)
+		}
+		signer := signerv2.NewKMSSigner(context.Background(), kmsClient, pubKey, config.KMSKeyConfig.KeyID, chainID)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewPrivateKeyWallet(client, signer, addr, logger)
+		if err != nil {
+			return err
+		}
+		logger.Info("Initialized KMS wallet", "address", addr.Hex())
+	} else if len(config.EthClientConfig.PrivateKeyString) > 0 {
+		privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+		client, err = geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
+		if err != nil {
+			logger.Error("Cannot create chain.Client", "err", err)
+			return err
+		}
+		chainID, err := client.ChainID(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get chain ID: %w", err)
+		}
+		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: privateKey}, chainID)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger.With("component", "PrivateKeyWallet"))
+		if err != nil {
+			return err
+		}
+		logger.Info("Initialized PrivateKey wallet", "address", address.Hex())
+	} else {
+		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
 	}
+
+	if wallet == nil {
+		return errors.New("wallet is not configured")
+	}
+	if client == nil {
+		return errors.New("eth client is not configured")
+	}
+
 	// used by non graph indexer
 	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
 	if err != nil {
@@ -166,34 +229,6 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
-	var wallet walletsdk.Wallet
-	if !config.FireblocksConfig.Disable {
-		wallet, err = common.NewFireblocksWallet(&config.FireblocksConfig, client, logger)
-		if err != nil {
-			return err
-		}
-	} else if len(config.EthClientConfig.PrivateKeyString) > 0 {
-		privateKey, err := crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
-		if err != nil {
-			return fmt.Errorf("failed to parse private key: %w", err)
-		}
-		chainID, err := client.ChainID(context.Background())
-		if err != nil {
-			return fmt.Errorf("failed to get chain ID: %w", err)
-		}
-		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: privateKey}, chainID)
-		if err != nil {
-			return err
-		}
-		wallet, err = walletsdk.NewPrivateKeyWallet(client, signerV2, address, logger.With("component", "PrivateKeyWallet"))
-		if err != nil {
-			return err
-		}
-		logger.Info("Initialized PrivateKey wallet", "address", address.Hex())
-	} else {
-		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
-	}
-
 	txnManager := batcher.NewTxnManager(client, wallet, config.EthClientConfig.NumConfirmations, 20, config.TimeoutConfig.TxnBroadcastTimeout, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
 	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
 	if err != nil {

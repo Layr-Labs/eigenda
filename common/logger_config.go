@@ -26,7 +26,7 @@ const (
 type LoggerConfig struct {
 	Format       LogFormat
 	OutputWriter io.Writer
-	HandlerOpts  slog.HandlerOptions
+	HandlerOpts  logging.SLoggerOptions
 }
 
 func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -56,7 +56,7 @@ func DefaultLoggerConfig() LoggerConfig {
 	return LoggerConfig{
 		Format:       JSONLogFormat,
 		OutputWriter: os.Stdout,
-		HandlerOpts: slog.HandlerOptions{
+		HandlerOpts: logging.SLoggerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
 		},
@@ -95,10 +95,10 @@ func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, er
 
 func NewLogger(cfg LoggerConfig) (logging.Logger, error) {
 	if cfg.Format == JSONLogFormat {
-		return logging.NewSlogJsonLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
+		return logging.NewJsonSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	if cfg.Format == TextLogFormat {
-		return logging.NewSlogTextLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
+		return logging.NewTextSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	return nil, fmt.Errorf("unknown log format: %s", cfg.Format)
 }

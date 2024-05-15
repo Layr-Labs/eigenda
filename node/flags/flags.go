@@ -181,6 +181,21 @@ var (
 		Value:    "180",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EXPIRATION_POLL_INTERVAL"),
 	}
+	ReachabilityPollIntervalSecFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reachability-poll-interval"),
+		Usage:    "How often (in second) to check if node is reachabile from Disperser",
+		Required: false,
+		Value:    "60",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "REACHABILITY_POLL_INTERVAL"),
+	}
+	// Optional DataAPI URL. If not set, reachability checks are disabled
+	DataApiUrlFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dataapi-url"),
+		Usage:    "URL of the DataAPI",
+		Required: false,
+		Value:    "",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DATAAPI_URL"),
+	}
 	// NumBatchValidators is the maximum number of parallel workers used to
 	// validate a batch (defaults to 128).
 	NumBatchValidatorsFlag = cli.IntFlag{
@@ -263,6 +278,7 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	RegisterAtNodeStartFlag,
 	ExpirationPollIntervalSecFlag,
+	ReachabilityPollIntervalSecFlag,
 	EnableTestModeFlag,
 	OverrideBlockStaleMeasureFlag,
 	OverrideStoreDurationBlocksFlag,
@@ -274,6 +290,7 @@ var optionalFlags = []cli.Flag{
 	ChurnerUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
+	DataApiUrlFlag,
 }
 
 func init() {

@@ -43,6 +43,8 @@ type Metrics struct {
 	AccuSocketUpdates prometheus.Counter
 	// avs node spec eigen_ metrics: https://eigen.nethermind.io/docs/spec/metrics/metrics-prom-spec
 	EigenMetrics eigenmetrics.Metrics
+	// Reachability gauge to monitoring the reachability of the node's retrieval/dispersal sockets
+	ReachabilityGauge *prometheus.GaugeVec
 
 	registry *prometheus.Registry
 	// socketAddr is the address at which the metrics server will be listening.
@@ -129,6 +131,14 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Help:      "the total number of node's socket address updates",
 			},
 		),
+		ReachabilityGauge: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Name:      "reachability_status",
+				Help:      "the reachability status of the nodes retrievel/dispersal sockets",
+			},
+			[]string{"service"},
+		),
 		EigenMetrics:           eigenMetrics,
 		logger:                 logger.With("component", "NodeMetrics"),
 		registry:               reg,
@@ -179,6 +189,11 @@ func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize uint64) {
 func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 	g.AccuBatches.WithLabelValues("number", status).Inc()
 	g.AccuBatches.WithLabelValues("size", status).Add(float64(batchSize))
+}
+
+func (g *Metrics) RecordStoreChunksStage(stage string, dataSize uint64, latency time.Duration) {
+	g.AcceptBatches(stage, dataSize)
+	g.ObserveLatency("StoreChunks", stage, float64(latency.Milliseconds()))
 }
 
 func (g *Metrics) collectOnchainMetrics() {
