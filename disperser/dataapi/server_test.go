@@ -348,7 +348,8 @@ func TestEjectOperatorHandler(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
 	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
 	ejectorComponents.ethClient.On("GetLatestGasCaps").Return(big.NewInt(0), big.NewInt(0), nil)
-	ejectorComponents.ethClient.On("UpdateGas").Return(types.NewTransaction(0, gethcommon.HexToAddress("0x1"), big.NewInt(0), 0, big.NewInt(0), []byte{}), nil)
+	txn := types.NewTransaction(0, gethcommon.HexToAddress("0x1"), big.NewInt(0), 0, big.NewInt(0), []byte{})
+	ejectorComponents.ethClient.On("UpdateGas").Return(txn, nil)
 	txID := "1234"
 	gomock.InOrder(
 		ejectorComponents.wallet.EXPECT().SendTransaction(gomock.Any(), gomock.Any()).Return(txID, nil),
@@ -359,8 +360,9 @@ func TestEjectOperatorHandler(t *testing.T) {
 
 	r.GET("/v1/ejector/operator", testDataApiServer.EjectOperatorsHandler)
 
-	w := httptest.NewRecorder()
 	reqStr := fmt.Sprintf("/v1/ejector/operator?interval=%v&end=%s", interval, stopTime.Format("2006-01-02T15:04:05Z"))
+
+	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
 	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
@@ -374,8 +376,20 @@ func TestEjectOperatorHandler(t *testing.T) {
 	ctxWithDeadline2, cancel2 := context.WithTimeout(req2.Context(), 500*time.Microsecond)
 	defer cancel2()
 	req2 = req2.WithContext(ctxWithDeadline2)
-	r.ServeHTTP(w, req2)
+	r.ServeHTTP(w2, req2)
 	assert.Equal(t, w2.Code, http.StatusOK)
+
+	res := w2.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.EjectionResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, txn.Hash().Hex(), response.TransactionHash)
 }
 
 func TestFetchUnsignedBatchesHandler(t *testing.T) {

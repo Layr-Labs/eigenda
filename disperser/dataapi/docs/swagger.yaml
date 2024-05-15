@@ -66,6 +66,11 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
+  dataapi.EjectionResponse:
+    properties:
+      transaction_hash:
+        type: string
+    type: object
   dataapi.ErrorResponse:
     properties:
       error:
@@ -261,6 +266,8 @@ paths:
       responses:
         "200":
           description: OK
+          schema:
+            $ref: '#/definitions/dataapi.EjectionResponse'
         "400":
           description: 'error: Bad request'
           schema:
