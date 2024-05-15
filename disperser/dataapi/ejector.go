@@ -179,7 +179,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 
 	// TODO: get the txn response and update the metrics.
 	ejectionResponse := &EjectionResponse{
-		TransactionHash: txn.Hash().Hex(),
+		TransactionHash: receipt.TxHash.Hex(),
 	}
 
 	return ejectionResponse, nil

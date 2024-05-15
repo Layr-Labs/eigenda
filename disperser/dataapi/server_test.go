@@ -348,14 +348,15 @@ func TestEjectOperatorHandler(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
 	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
 	ejectorComponents.ethClient.On("GetLatestGasCaps").Return(big.NewInt(0), big.NewInt(0), nil)
-	txn := types.NewTransaction(0, gethcommon.HexToAddress("0x1"), big.NewInt(0), 0, big.NewInt(0), []byte{})
-	ejectorComponents.ethClient.On("UpdateGas").Return(txn, nil)
+	ejectorComponents.ethClient.On("UpdateGas").Return(types.NewTransaction(0, gethcommon.HexToAddress("0x1"), big.NewInt(0), 0, big.NewInt(0), []byte{}), nil)
 	txID := "1234"
+	receipt := &types.Receipt{
+		BlockNumber: new(big.Int).SetUint64(1),
+		TxHash:      gethcommon.HexToHash("0xdf9c2506b0dbb107d5a35e262e2e94fe9ce91440dfbba2e7a919bd2e83aee29e"),
+	}
 	gomock.InOrder(
 		ejectorComponents.wallet.EXPECT().SendTransaction(gomock.Any(), gomock.Any()).Return(txID, nil),
-		ejectorComponents.wallet.EXPECT().GetTransactionReceipt(gomock.Any(), gomock.Any()).Return(&types.Receipt{
-			BlockNumber: new(big.Int).SetUint64(1),
-		}, nil),
+		ejectorComponents.wallet.EXPECT().GetTransactionReceipt(gomock.Any(), gomock.Any()).Return(receipt, nil),
 	)
 
 	r.GET("/v1/ejector/operator", testDataApiServer.EjectOperatorsHandler)
@@ -389,7 +390,7 @@ func TestEjectOperatorHandler(t *testing.T) {
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.Equal(t, txn.Hash().Hex(), response.TransactionHash)
+	assert.Equal(t, receipt.TxHash.Hex(), response.TransactionHash)
 }
 
 func TestFetchUnsignedBatchesHandler(t *testing.T) {
