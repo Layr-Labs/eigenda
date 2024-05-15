@@ -1,0 +1,44 @@
+# Go test workflow
+name: test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Build App
+      run: make da-server
+
+  go-test:
+    outputs:
+      COVERAGE: ${{ steps.unit.outputs.coverage }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+
+    - name: Run Unit Tests
+      id: unit
+      run: | 
+        make test 
+
