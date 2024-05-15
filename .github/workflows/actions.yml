@@ -1,5 +1,5 @@
 # Go test workflow
-name: test
+name: actions
 
 on:
   push:
@@ -42,3 +42,27 @@ jobs:
       run: | 
         make test 
 
+  gosec:
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v3
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
+  lint:
+    # Linting job
+    # https://github.com/golangci/golangci-lint-action
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
+          version: v1.52.1
