@@ -55,8 +55,8 @@ Some unit tests have been introduced to assert correctness of encoding/decoding 
 Otherwise E2E tests (`test/e2e_test.go`) exists which asserts that a commitment can be generated when inserting some arbitrary data to the server and can be read using the commitment for a key lookup via the client. These can be ran via `make e2e-test`. Please **note** that this test uses the EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for quicker iteration testing. 
 
 
-## Generating SRS
-KZG commitment verification requires constructing the SRS string from the proper trusted setup values (g1, g2, g2.power_of_tau). These values can be generated locally using the [srs_setup](https://github.com/Layr-Labs/eigenda-operator-setup/blob/master/srs_setup.sh) script in the operator setup repo.
+## Downloading SRS
+KZG commitment verification requires constructing the SRS string from the proper trusted setup values (g1, g2, g2.power_of_tau). These values can be downloaded locally using the [srs_setup](https://github.com/Layr-Labs/eigenda-operator-setup/blob/master/srs_setup.sh) script in the operator setup repo.
 
 
 ## Resources
