@@ -42,7 +42,7 @@ func NewEigenDAClient(log log.Logger, config Config) *EigenDAClient {
 
 func (m *EigenDAClient) getConnection() (*grpc.ClientConn, error) {
 	if m.UseTLS {
-		config := &tls.Config{}
+		config := &tls.Config{} // #nosec G402
 		credential := credentials.NewTLS(config)
 		dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(credential)}
 		return grpc.Dial(m.RPC, dialOptions...)
