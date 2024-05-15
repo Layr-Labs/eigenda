@@ -23,12 +23,12 @@ clean:
 test:
 	go test -v ./... -test.skip ".*E2E.*"
 
-e2e-test:
+e2e-test: submodules srs
 	go test -timeout 50m -v ./test/e2e_test.go 
 
 .PHONY: lint
 lint:
-	@if ! command -v golangci-lint &> /dev/null; \
+	@if ! test -f  &> /dev/null; \
 	then \
     	echo "golangci-lint command could not be found...."; \
 		echo "\nTo install, please run $(GET_LINT_CMD)"; \
@@ -41,6 +41,16 @@ lint:
 gosec:
 	@echo "$(GREEN) Running security scan with gosec...$(COLOR_END)"
 	gosec ./...
+
+submodules:
+	git submodule update --init --recursive
+
+
+srs:
+	if ! test -f /operator-setup/resources/g1.point; then \
+		cd operator-setup && ./srs_setup.sh; \
+	fi
+	@golangci-lint run
 
 .PHONY: \
 	op-batcher \

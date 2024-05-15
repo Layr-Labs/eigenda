@@ -26,40 +26,25 @@ func StartDAServer(cliCtx *cli.Context) error {
 	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_plasma_server")
 	oplog.SetGlobalLogHandler(log.Handler())
 
-	log.Info("Initializing EigenDA Plasma DA server with config ...")
+	log.Info("Initializing EigenDA Plasma DA server...")
 
-	var store plasma.PlasmaStore
+	daCfg := cfg.EigenDAConfig
 
-	if cfg.FileStoreEnabled() {
-		log.Info("Using file storage", "path", cfg.FileStoreDirPath)
-		store = plasma_store.NewFileStore(cfg.FileStoreDirPath)
-	} else if cfg.S3Enabled() {
-		log.Info("Using S3 storage", "bucket", cfg.S3Bucket)
-		s3, err := plasma_store.NewS3Store(cliCtx.Context, cfg.S3Bucket)
-		if err != nil {
-			return fmt.Errorf("failed to create S3 store: %w", err)
-		}
-		store = s3
-	} else if cfg.EigenDAEnabled() {
-		daCfg := cfg.EigenDAConfig
+	v, err := verify.NewVerifier(daCfg.KzgConfig())
+	if err != nil {
+		return err
+	}
 
-		v, err := verify.NewVerifier(daCfg.KzgConfig())
-		if err != nil {
-			return err
-		}
-
-		eigenda, err := plasma_store.NewEigenDAStore(
-			cliCtx.Context,
-			eigenda.NewEigenDAClient(
-				log,
-				daCfg,
-			),
-			v,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create EigenDA store: %w", err)
-		}
-		store = eigenda
+	store, err := plasma_store.NewEigenDAStore(
+		cliCtx.Context,
+		eigenda.NewEigenDAClient(
+			log,
+			daCfg,
+		),
+		v,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create EigenDA store: %w", err)
 	}
 
 	server := plasma.NewDAServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), store, log)
