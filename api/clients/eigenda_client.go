@@ -43,7 +43,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
 
-	codec, err := EncodingVersionToCodec(config.PutBlobEncodingVersion)
+	codec, err := BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing EigenDA client: %w", err)
 	}
@@ -67,14 +67,14 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 	}
 
 	version := BlobEncodingVersion(data[0])
-	codec, err := EncodingVersionToCodec(version)
+	codec, err := BlobEncodingVersionToCodec(version)
 	if err != nil {
-		fmt.Errorf("error getting blob: %w", err)
+		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
 
 	rawData, err := codec.DecodeBlob(data)
 	if err != nil {
-		fmt.Errorf("error getting blob: %w", err)
+		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
 
 	return rawData, nil
@@ -101,6 +101,10 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode blob
+	if m.PutCodec == nil {
+		errChan <- fmt.Errorf("PutCodec cannot be nil")
+		return
+	}
 	data := m.PutCodec.EncodeBlob(rawData)
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))

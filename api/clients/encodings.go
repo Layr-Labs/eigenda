@@ -20,20 +20,20 @@ type BlobCodec interface {
 	EncodeBlob(rawData []byte) []byte
 }
 
-func EncodingVersionToCodec(version BlobEncodingVersion) (BlobCodec, error) {
+func BlobEncodingVersionToCodec(version BlobEncodingVersion) (BlobCodec, error) {
 	switch version {
 	case DefaultBlobEncoding:
-		return NoIFFTCodec{}, nil
+		return DefaultBlobEncodingCodec{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported blob encoding version: %x", version)
 	}
 }
 
-type NoIFFTCodec struct{}
+type DefaultBlobEncodingCodec struct{}
 
-var _ BlobCodec = NoIFFTCodec{}
+var _ BlobCodec = DefaultBlobEncodingCodec{}
 
-func (v NoIFFTCodec) EncodeBlob(rawData []byte) []byte {
+func (v DefaultBlobEncodingCodec) EncodeBlob(rawData []byte) []byte {
 	// encode current blob encoding version byte
 	encodedData := make([]byte, 0, 1+8+len(rawData))
 
@@ -52,7 +52,7 @@ func (v NoIFFTCodec) EncodeBlob(rawData []byte) []byte {
 	return encodedData
 }
 
-func (v NoIFFTCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
+func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 	// decode modulo bn254
 	decodedData := codec.RemoveEmptyByteFromPaddedBytes(encodedData)
 
@@ -74,7 +74,7 @@ func (v NoIFFTCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 	rawData := make([]byte, length)
 	n, err := reader.Read(rawData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to copy unpadded data into final buffer")
+		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
 	}
 	if uint64(n) != length {
 		return nil, fmt.Errorf("data length does not match length prefix")

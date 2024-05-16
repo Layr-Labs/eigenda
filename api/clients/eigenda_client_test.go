@@ -65,8 +65,10 @@ func TestPutRetrieveBlobSuccess(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	cert, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -100,8 +102,10 @@ func TestPutBlobFailDispersal(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -130,8 +134,10 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -160,8 +166,10 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -190,8 +198,10 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -222,8 +232,10 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -279,8 +291,10 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
@@ -345,8 +359,10 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
+			PutBlobEncodingVersion:   clients.DefaultBlobEncoding,
 		},
-		Client: disperserClient,
+		Client:   disperserClient,
+		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 

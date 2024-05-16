@@ -1,0 +1,47 @@
+package clients
+
+import (
+	"bytes"
+	"crypto/rand"
+	"math/big"
+	"testing"
+)
+
+// Helper function to generate a random byte slice of a given length
+func randomByteSlice(length int64) []byte {
+	b := make([]byte, length)
+	rand.Read(b)
+	return b
+}
+
+// TestDefaultBlobEncodingCodec tests the encoding and decoding of random byte streams
+func TestDefaultBlobEncodingCodec(t *testing.T) {
+	// Create an instance of the DefaultBlobEncodingCodec
+	codec := DefaultBlobEncodingCodec{}
+
+	// Number of test iterations
+	const iterations = 100
+
+	for i := 0; i < iterations; i++ {
+		// Generate a random length for the byte slice
+		length, err := rand.Int(rand.Reader, big.NewInt(1024)) // Random length between 0 and 1023
+		if err != nil {
+			panic(err)
+		}
+		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
+
+		// Encode the original data
+		encodedData := codec.EncodeBlob(originalData)
+
+		// Decode the encoded data
+		decodedData, err := codec.DecodeBlob(encodedData)
+		if err != nil {
+			t.Fatalf("Iteration %d: failed to decode blob: %v", i, err)
+		}
+
+		// Compare the original data with the decoded data
+		if !bytes.Equal(originalData, decodedData) {
+			t.Fatalf("Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v", i, originalData, decodedData)
+		}
+	}
+}
