@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	plasma "github.com/Layr-Labs/op-plasma-eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
+	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
 	"github.com/Layr-Labs/op-plasma-eigenda/store"
 	"github.com/Layr-Labs/op-plasma-eigenda/verify"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
@@ -73,7 +74,7 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		panic(err)
 	}
 
-	server := plasma.NewDAServer(testSvrHost, testSvrPort, daStore, log)
+	server := plasma.NewDAServer(testSvrHost, testSvrPort, daStore, log, metrics.NoopMetrics)
 
 	go func() {
 		t.Log("Starting test plasma server on separate routine...")

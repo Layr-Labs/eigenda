@@ -30,13 +30,13 @@ type DAServer struct {
 	log        log.Logger
 	endpoint   string
 	store      PlasmaStore
-	m          *metrics.Metrics
+	m          metrics.Metricer
 	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
 
-func NewDAServer(host string, port int, store PlasmaStore, log log.Logger, m *metrics.Metrics) *DAServer {
+func NewDAServer(host string, port int, store PlasmaStore, log log.Logger, m metrics.Metricer) *DAServer {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &DAServer{
 		m:        m,
