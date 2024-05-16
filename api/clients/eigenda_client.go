@@ -1,10 +1,8 @@
 package clients
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -13,13 +11,8 @@ import (
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/ethereum/go-ethereum/log"
 )
-
-type BlobEncodingVersion byte
-
-var NoIFFT BlobEncodingVersion = 0x00
 
 type IEigenDAClient interface {
 	GetBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error)
@@ -27,9 +20,10 @@ type IEigenDAClient interface {
 }
 
 type EigenDAClient struct {
-	Config EigenDAClientConfig
-	Log    log.Logger
-	Client DisperserClient
+	Config   EigenDAClientConfig
+	Log      log.Logger
+	Client   DisperserClient
+	PutCodec BlobCodec
 }
 
 var _ IEigenDAClient = EigenDAClient{}
@@ -48,10 +42,17 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	signer := auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
+
+	codec, err := EncodingVersionToCodec(config.PutBlobEncodingVersion)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing EigenDA client: %w", err)
+	}
+
 	return &EigenDAClient{
-		Log:    log,
-		Config: config,
-		Client: llClient,
+		Log:      log,
+		Config:   config,
+		Client:   llClient,
+		PutCodec: codec,
 	}, nil
 }
 
@@ -61,34 +62,22 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 		return nil, err
 	}
 
-	// decode modulo bn254
-	decodedData := codec.RemoveEmptyByteFromPaddedBytes(data)
+	if len(data) == 0 {
+		return nil, fmt.Errorf("blob has length zero")
+	}
 
-	// Return exact data with buffer removed
-	reader := bytes.NewReader(decodedData)
-
-	// read version byte, we will not use it for now since there is only one version
-	_, err = reader.ReadByte()
+	version := BlobEncodingVersion(data[0])
+	codec, err := EncodingVersionToCodec(version)
 	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to read version byte")
+		fmt.Errorf("error getting blob: %w", err)
 	}
 
-	// read length uvarint
-	length, err := binary.ReadUvarint(reader)
+	rawData, err := codec.DecodeBlob(data)
 	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to decode length uvarint prefix")
+		fmt.Errorf("error getting blob: %w", err)
 	}
 
-	result := make([]byte, length)
-	n, err := reader.Read(result)
-	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to copy unpadded data into final buffer")
-	}
-	if uint64(n) != length {
-		return nil, fmt.Errorf("EigenDA client failed, data length does not match length prefix")
-	}
-
-	return result, nil
+	return rawData, nil
 }
 
 func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) {
@@ -111,20 +100,8 @@ func (m EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultCha
 func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *Cert, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
-	// encode current blob encoding version byte
-	data := make([]byte, 0, 1+8+len(rawData))
-
-	// append version byte
-	data = append(data, byte(NoIFFT))
-
-	// encode data length
-	data = append(data, ConvertIntToVarUInt(len(rawData))...)
-
-	// append raw data
-	data = append(data, rawData...)
-
-	// encode modulo bn254
-	data = codec.ConvertByPaddingEmptyByte(data)
+	// encode blob
+	data := m.PutCodec.EncodeBlob(rawData)
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {

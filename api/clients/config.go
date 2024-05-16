@@ -26,6 +26,9 @@ type EigenDAClientConfig struct {
 
 	// Whether to disable TLS for an insecure connection when connecting to a local EigenDA disperser instance.
 	DisableTLS bool
+
+	// The blob encoding version to use when writing blobs from the high level interface.
+	PutBlobEncodingVersion BlobEncodingVersion
 }
 
 var DefaultQuorums = map[uint]bool{0: true, 1: true}
