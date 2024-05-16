@@ -72,6 +72,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "USE_SECURE_GRPC"),
 	}
+	CustomQuorumNumbersFlag = cli.IntSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "custom-quorum-numbers"),
+		Usage:    "Custom quorum numbers to use for the traffic generator",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "CUSTOM_QUORUM_NUMBERS"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -87,6 +93,7 @@ var optionalFlags = []cli.Flag{
 	RandomizeBlobsFlag,
 	InstanceLaunchIntervalFlag,
 	UseSecureGrpcFlag,
+	CustomQuorumNumbersFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
