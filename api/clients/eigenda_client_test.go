@@ -1,4 +1,4 @@
-package client_test
+package clients_test
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/client"
+	"github.com/Layr-Labs/eigenda/api/clients"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
@@ -55,9 +55,9 @@ func TestPutRetrieveBlobSuccess(t *testing.T) {
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
 			StatusQueryRetryInterval: 50 * time.Millisecond,
@@ -72,7 +72,7 @@ func TestPutRetrieveBlobSuccess(t *testing.T) {
 	cert, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
 	require.NoError(t, err)
 	require.NotNil(t, cert)
-	assert.Equal(t, &client.Cert{
+	assert.Equal(t, &clients.Cert{
 		BatchHeaderHash:      []byte("mock-batch-header-hash"),
 		BlobIndex:            100,
 		ReferenceBlockNumber: 200,
@@ -90,9 +90,9 @@ func TestPutBlobFailDispersal(t *testing.T) {
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, fmt.Errorf("error dispersing")))
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
 			StatusQueryRetryInterval: 50 * time.Millisecond,
@@ -120,9 +120,9 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
 			StatusQueryRetryInterval: 50 * time.Millisecond,
@@ -150,9 +150,9 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FAILED}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
 			StatusQueryRetryInterval: 50 * time.Millisecond,
@@ -180,9 +180,9 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_UNKNOWN}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
 			StatusQueryRetryInterval: 50 * time.Millisecond,
@@ -212,9 +212,9 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       200 * time.Millisecond,
 			StatusQueryRetryInterval: 51 * time.Millisecond,
@@ -269,9 +269,9 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
 			StatusQueryRetryInterval: 50 * time.Millisecond,
@@ -287,7 +287,7 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 	// despite initial timeout it should succeed
 	require.NoError(t, err)
 	require.NotNil(t, cert)
-	assert.Equal(t, &client.Cert{
+	assert.Equal(t, &clients.Cert{
 		BatchHeaderHash:      []byte("mock-batch-header-hash"),
 		BlobIndex:            100,
 		ReferenceBlockNumber: 200,
@@ -335,9 +335,9 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
-	eigendaClient := client.EigenDAClient{
+	eigendaClient := clients.EigenDAClient{
 		Log: logger,
-		Config: client.Config{
+		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       100 * time.Millisecond, // low total timeout
 			StatusQueryRetryInterval: 50 * time.Millisecond,

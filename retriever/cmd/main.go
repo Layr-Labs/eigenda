@@ -7,8 +7,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
-	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"

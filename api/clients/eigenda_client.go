@@ -1,4 +1,4 @@
-package client
+package clients
 
 import (
 	"bytes"
@@ -11,7 +11,6 @@ import (
 	"time"
 
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -28,14 +27,14 @@ type IEigenDAClient interface {
 }
 
 type EigenDAClient struct {
-	Config Config
+	Config EigenDAClientConfig
 	Log    log.Logger
-	Client clients.DisperserClient
+	Client DisperserClient
 }
 
 var _ IEigenDAClient = EigenDAClient{}
 
-func NewEigenDAClient(log log.Logger, config Config) (*EigenDAClient, error) {
+func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
 	err := config.Check()
 	if err != nil {
 		return nil, err
@@ -47,8 +46,8 @@ func NewEigenDAClient(log log.Logger, config Config) (*EigenDAClient, error) {
 	}
 
 	signer := auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
-	llConfig := clients.NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
-	llClient := clients.NewDisperserClient(llConfig, signer)
+	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
+	llClient := NewDisperserClient(llConfig, signer)
 	return &EigenDAClient{
 		Log:    log,
 		Config: config,

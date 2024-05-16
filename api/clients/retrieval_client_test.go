@@ -1,4 +1,4 @@
-package retriever_test
+package clients_test
 
 import (
 	"bytes"
@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/clients"
-	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
+	"github.com/Layr-Labs/eigenda/api/clients"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"

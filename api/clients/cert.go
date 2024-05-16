@@ -1,4 +1,4 @@
-package client
+package clients
 
 import "github.com/Layr-Labs/eigenda/api/grpc/common"
 

@@ -21,9 +21,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/shurcooL/graphql"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	retriever_rpc "github.com/Layr-Labs/eigenda/api/grpc/retriever"
-	"github.com/Layr-Labs/eigenda/clients"
 	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"

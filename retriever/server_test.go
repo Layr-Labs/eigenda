@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"testing"
 
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
-	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"

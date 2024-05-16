@@ -1,4 +1,4 @@
-package client_test
+package clients_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/client"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +23,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		t.Skip("Skipping testnet integration test")
 	}
 	logger := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
-	client, err := client.NewEigenDAClient(logger, client.Config{
+	client, err := clients.NewEigenDAClient(logger, clients.EigenDAClientConfig{
 		RPC:                      "disperser-holesky.eigenda.xyz:443",
 		StatusQueryTimeout:       25 * time.Minute,
 		StatusQueryRetryInterval: 5 * time.Second,

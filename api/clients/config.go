@@ -1,11 +1,11 @@
-package client
+package clients
 
 import (
 	"fmt"
 	"time"
 )
 
-type Config struct {
+type EigenDAClientConfig struct {
 	// RPC is the HTTP provider URL for the Data Availability node.
 	RPC string
 
@@ -30,7 +30,7 @@ type Config struct {
 
 var DefaultQuorums = map[uint]bool{0: true, 1: true}
 
-func (c *Config) Check() error {
+func (c *EigenDAClientConfig) Check() error {
 	for _, e := range c.CustomQuorumIDs {
 		if DefaultQuorums[e] {
 			return fmt.Errorf("EigenDA client config failed validation because CustomQuorumIDs includes a default quorum ID %d. Because it is included by default this quorum ID can be removed from the client configuration", e)
