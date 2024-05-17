@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
+	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 )
 
 const (
@@ -61,6 +62,7 @@ var optionalFlags = []cli.Flag{
 func init() {
 	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, eigenda.CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
 	Flags = append(requiredFlags, optionalFlags...)
 }
 
@@ -71,6 +73,7 @@ type CLIConfig struct {
 	FileStoreDirPath string
 	S3Bucket         string
 	EigenDAConfig    eigenda.Config
+	MetricsCfg       opmetrics.CLIConfig
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
@@ -78,6 +81,7 @@ func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 		FileStoreDirPath: ctx.String(FileStorePathFlagName),
 		S3Bucket:         ctx.String(S3BucketFlagName),
 		EigenDAConfig:    eigenda.ReadConfig(ctx),
+		MetricsCfg:       opmetrics.ReadCLIConfig(ctx),
 	}
 }
 
