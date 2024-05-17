@@ -7,6 +7,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// ErrCommitmentLength is returned when the commitment length is invalid.
+var ErrCommitmentLength = errors.New("invalid commitment length")
+
 // ErrInvalidCommitment is returned when the commitment cannot be parsed into a known commitment type.
 var ErrInvalidCommitment = errors.New("invalid commitment")
 
@@ -18,8 +21,8 @@ type CommitmentType byte
 
 const (
 	// default commitment type for the DA storage.
-	Keccak256CommitmentType CommitmentType = 0x00
-	DaService               CommitmentType = 0x01
+	Keccak256CommitmentType CommitmentType = 0
+	DaService               CommitmentType = 1
 )
 
 type ExtDAType byte
@@ -79,7 +82,7 @@ func DecodeKeccak256(commitment []byte) (Keccak256Commitment, error) {
 type EigenDACommitment []byte
 
 func (c EigenDACommitment) Encode() []byte {
-	return append([]byte{byte(DaService), byte(EigenDA), byte(EigenV0)}, c...)
+	return append([]byte{byte(EigenDA), byte(EigenV0)}, c...)
 }
 
 func (c EigenDACommitment) TxData() []byte {
@@ -88,18 +91,21 @@ func (c EigenDACommitment) TxData() []byte {
 
 func DecodeEigenDACommitment(commitment []byte) (EigenDACommitment, error) {
 	if len(commitment) <= 3 {
-		return nil, ErrInvalidCommitment
+		return nil, ErrCommitmentLength
 	}
 	if commitment[0] != byte(DaService) {
+		println("commitment[0] != byte(DaService)")
 		return nil, ErrInvalidCommitment
 	}
 
 	if commitment[1] != byte(EigenDA) {
+		println("commitment[1] != byte(EigenDA)")
 		return nil, ErrInvalidCommitment
 	}
 
 	// additional versions will need to be hardcoded here
 	if commitment[2] != byte(EigenV0) {
+		println("commitment[2] != byte(EigenDA)")
 		return nil, ErrInvalidCommitment
 	}
 
