@@ -68,10 +68,11 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 			if !hasAnyBundles {
 				// Operator is not part of any quorum, no need to send chunks
 				update <- core.SigningMessage{
-					Err:             errors.New("operator is not part of any quorum"),
-					Signature:       nil,
-					Operator:        id,
-					BatchHeaderHash: batchHeaderHash,
+					Err:                  errors.New("operator is not part of any quorum"),
+					Signature:            nil,
+					Operator:             id,
+					BatchHeaderHash:      batchHeaderHash,
+					AttestationLatencyMs: -1,
 				}
 				return
 			}
@@ -80,18 +81,20 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			if err != nil {
 				update <- core.SigningMessage{
-					Err:             err,
-					Signature:       nil,
-					Operator:        id,
-					BatchHeaderHash: batchHeaderHash,
+					Err:                  err,
+					Signature:            nil,
+					Operator:             id,
+					BatchHeaderHash:      batchHeaderHash,
+					AttestationLatencyMs: float64(time.Since(requestedAt).Milliseconds()),
 				}
 				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
 			} else {
 				update <- core.SigningMessage{
-					Signature:       sig,
-					Operator:        id,
-					BatchHeaderHash: batchHeaderHash,
-					Err:             nil,
+					Signature:            sig,
+					Operator:             id,
+					BatchHeaderHash:      batchHeaderHash,
+					Err:                  nil,
+					AttestationLatencyMs: float64(time.Since(requestedAt).Milliseconds()),
 				}
 				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
 			}

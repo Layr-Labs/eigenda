@@ -24,10 +24,11 @@ var (
 )
 
 type SigningMessage struct {
-	Signature       *Signature
-	Operator        OperatorID
-	BatchHeaderHash [32]byte
-	Err             error
+	Signature            *Signature
+	Operator             OperatorID
+	BatchHeaderHash      [32]byte
+	AttestationLatencyMs float64
+	Err                  error
 }
 
 // SignatureAggregation contains the results of aggregating signatures from a set of operators
@@ -130,7 +131,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		}
 		batchHeaderHashHex := hex.EncodeToString(r.BatchHeaderHash[:])
 		if r.Err != nil {
-			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", batchHeaderHashHex, "err", r.Err)
+			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs, "err", r.Err)
 			continue
 		}
 
@@ -173,7 +174,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 				aggPubKeys[ind].Add(op.PubkeyG2)
 			}
 		}
-		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", batchHeaderHashHex)
+		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs)
 	}
 
 	// Aggregate Non signer Pubkey Id
