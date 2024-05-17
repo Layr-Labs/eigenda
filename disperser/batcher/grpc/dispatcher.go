@@ -79,24 +79,25 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 
 			requestedAt := time.Now()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
+			latencyMs := float64(time.Since(requestedAt).Milliseconds())
 			if err != nil {
 				update <- core.SigningMessage{
 					Err:                  err,
 					Signature:            nil,
 					Operator:             id,
 					BatchHeaderHash:      batchHeaderHash,
-					AttestationLatencyMs: float64(time.Since(requestedAt).Milliseconds()),
+					AttestationLatencyMs: latencyMs,
 				}
-				c.metrics.ObserveLatency(false, float64(time.Since(requestedAt).Milliseconds()))
+				c.metrics.ObserveLatency(false, latencyMs)
 			} else {
 				update <- core.SigningMessage{
 					Signature:            sig,
 					Operator:             id,
 					BatchHeaderHash:      batchHeaderHash,
-					AttestationLatencyMs: float64(time.Since(requestedAt).Milliseconds()),
+					AttestationLatencyMs: latencyMs,
 					Err:                  nil,
 				}
-				c.metrics.ObserveLatency(true, float64(time.Since(requestedAt).Milliseconds()))
+				c.metrics.ObserveLatency(true, latencyMs)
 			}
 
 		}(core.IndexedOperatorInfo{
