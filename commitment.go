@@ -22,7 +22,7 @@ type CommitmentType byte
 const (
 	// default commitment type for the DA storage.
 	Keccak256CommitmentType CommitmentType = 0
-	DaService               CommitmentType = 1
+	GenericCommitment       CommitmentType = 1
 )
 
 type ExtDAType byte
@@ -78,7 +78,6 @@ func DecodeKeccak256(commitment []byte) (Keccak256Commitment, error) {
 	return c, nil
 }
 
-// NOTE - This logic will need to be migrated into layr-labs/op-stack directly
 type EigenDACommitment []byte
 
 func (c EigenDACommitment) Encode() []byte {
@@ -93,19 +92,16 @@ func DecodeEigenDACommitment(commitment []byte) (EigenDACommitment, error) {
 	if len(commitment) <= 3 {
 		return nil, ErrCommitmentLength
 	}
-	if commitment[0] != byte(DaService) {
-		println("commitment[0] != byte(DaService)")
+	if commitment[0] != byte(GenericCommitment) {
 		return nil, ErrInvalidCommitment
 	}
 
 	if commitment[1] != byte(EigenDA) {
-		println("commitment[1] != byte(EigenDA)")
 		return nil, ErrInvalidCommitment
 	}
 
 	// additional versions will need to be hardcoded here
 	if commitment[2] != byte(EigenV0) {
-		println("commitment[2] != byte(EigenDA)")
 		return nil, ErrInvalidCommitment
 	}
 
