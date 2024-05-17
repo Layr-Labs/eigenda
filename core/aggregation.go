@@ -24,9 +24,10 @@ var (
 )
 
 type SigningMessage struct {
-	Signature            *Signature
-	Operator             OperatorID
-	BatchHeaderHash      [32]byte
+	Signature       *Signature
+	Operator        OperatorID
+	BatchHeaderHash [32]byte
+	// Undefined if this value <= 0.
 	AttestationLatencyMs float64
 	Err                  error
 }
