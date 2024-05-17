@@ -206,10 +206,10 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 	// Record metrics.
 	if err != nil {
 		s.node.Metrics.RecordRPCRequest("StoreChunks", "failure", time.Since(start))
-		s.node.Logger.Error("StoreChunks failed", "duration", time.Since(start), "err", err)
+		s.node.Logger.Error("StoreChunks RPC failed", "duration", time.Since(start), "err", err)
 	} else {
 		s.node.Metrics.RecordRPCRequest("StoreChunks", "success", time.Since(start))
-		s.node.Logger.Info("StoreChunks succeeded", "duration", time.Since(start))
+		s.node.Logger.Info("StoreChunks RPC succeeded", "duration", time.Since(start))
 	}
 
 	return reply, err
