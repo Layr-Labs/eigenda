@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"net"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -193,10 +193,7 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 
 // StoreChunks is called by dispersers to store data.
 func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(sec float64) {
-		s.node.Metrics.ObserveLatency("StoreChunks", "total", sec*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	start := time.Now()
 
 	// Validate the request.
 	if err := s.validateStoreChunkRequest(in); err != nil {
@@ -208,21 +205,18 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 
 	// Record metrics.
 	if err != nil {
-		s.node.Metrics.RecordRPCRequest("StoreChunks", "failure")
-		s.node.Logger.Error("StoreChunks failed", "err", err)
+		s.node.Metrics.RecordRPCRequest("StoreChunks", "failure", time.Since(start))
+		s.node.Logger.Error("StoreChunks failed", "duration", time.Since(start), "err", err)
 	} else {
-		s.node.Metrics.RecordRPCRequest("StoreChunks", "success")
-		s.node.Logger.Info("StoreChunks succeeded")
+		s.node.Metrics.RecordRPCRequest("StoreChunks", "success", time.Since(start))
+		s.node.Logger.Info("StoreChunks succeeded", "duration", time.Since(start))
 	}
 
 	return reply, err
 }
 
 func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksRequest) (*pb.RetrieveChunksReply, error) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(sec float64) {
-		s.node.Metrics.ObserveLatency("RetrieveChunks", "total", sec*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	start := time.Now()
 
 	if in.GetQuorumId() > core.MaxQuorumID {
 		return nil, fmt.Errorf("invalid request: quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, in.GetQuorumId())
@@ -268,10 +262,10 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 
 	chunks, ok := s.node.Store.GetChunks(ctx, batchHeaderHash, int(in.GetBlobIndex()), uint8(in.GetQuorumId()))
 	if !ok {
-		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure")
+		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure", time.Since(start))
 		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", batchHeaderHash, in.GetBlobIndex(), in.GetQuorumId())
 	}
-	s.node.Metrics.RecordRPCRequest("RetrieveChunks", "success")
+	s.node.Metrics.RecordRPCRequest("RetrieveChunks", "success", time.Since(start))
 	return &pb.RetrieveChunksReply{Chunks: chunks}, nil
 }
 

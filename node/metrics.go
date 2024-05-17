@@ -161,8 +161,9 @@ func (g *Metrics) Start() {
 	}
 }
 
-func (g *Metrics) RecordRPCRequest(method string, status string) {
+func (g *Metrics) RecordRPCRequest(method string, status string, duration time.Duration) {
 	g.AccNumRequests.WithLabelValues(method, status).Inc()
+	g.ObserveLatency(method, "total", float64(duration.Milliseconds()))
 }
 
 func (g *Metrics) RecordSocketAddressChange() {
