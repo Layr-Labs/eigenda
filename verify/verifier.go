@@ -18,7 +18,7 @@ type Verifier struct {
 
 func NewVerifier(cfg *kzg.KzgConfig) (*Verifier, error) {
 
-	prover, err := prover.NewProver(cfg, true)
+	prover, err := prover.NewProver(cfg, false)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func NewVerifier(cfg *kzg.KzgConfig) (*Verifier, error) {
 // TODO: Optimize implementation by opening a point on the commitment instead
 func (v *Verifier) Verify(cert eigenda.Cert, blob []byte) error {
 	encoder, err := v.prover.GetKzgEncoder(
-		encoding.ParamsFromSysPar(6, 69, uint64(len(blob))),
+		encoding.ParamsFromSysPar(3, 4, uint64(len(blob))),
 	)
 	if err != nil {
 		return err

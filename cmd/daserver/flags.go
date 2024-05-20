@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
+	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 )
 
@@ -41,6 +42,15 @@ var requiredFlags = []cli.Flag{
 	PortFlag,
 }
 
+var optionalFlags = []cli.Flag{}
+
+func init() {
+	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, eigenda.CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
+	Flags = append(requiredFlags, optionalFlags...)
+}
+
 // Flags contains the list of configuration options available to the binary.
 var Flags []cli.Flag
 
@@ -54,6 +64,7 @@ type CLIConfig struct {
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 	return CLIConfig{
 		EigenDAConfig: eigenda.ReadConfig(ctx),
+		MetricsCfg:    opmetrics.ReadCLIConfig(ctx),
 	}
 }
 
@@ -64,10 +75,6 @@ func (c CLIConfig) Check() error {
 		return err
 	}
 	return nil
-}
-
-func (c CLIConfig) EigenDAEnabled() bool {
-	return c.EigenDAConfig.RPC != ""
 }
 
 func CheckRequired(ctx *cli.Context) error {

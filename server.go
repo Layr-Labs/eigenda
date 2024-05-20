@@ -25,9 +25,7 @@ type PlasmaStore interface {
 	// Get retrieves the given key if it's present in the key-value data store.
 	Get(ctx context.Context, key []byte) ([]byte, error)
 	// Put inserts the given value into the key-value data store.
-	PutWithComm(ctx context.Context, key []byte, value []byte) error
-	// Put inserts the given value into the key-value data store.
-	PutWithoutComm(ctx context.Context, value []byte) (key []byte, err error)
+	Put(ctx context.Context, value []byte) (key []byte, err error)
 }
 
 type DAServer struct {
@@ -170,25 +168,10 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var comm []byte
-	if r.URL.Path == "/put" || r.URL.Path == "/put/" { // without commitment
-		if comm, err = d.store.PutWithoutComm(r.Context(), input); err != nil {
-			d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	} else { // with commitment (might be worth deleting if we never expect a commitment to be passed in the URL for this server type)
-		key := path.Base(r.URL.Path)
-		comm, err = hexutil.Decode(key)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		if err := d.store.PutWithComm(r.Context(), comm, input); err != nil {
-			d.log.Error("Failed to store commitment to the DA server", "err", err, "key", key)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	if comm, err = d.store.Put(r.Context(), input); err != nil {
+		d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	// write out encoded commitment

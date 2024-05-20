@@ -41,14 +41,8 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	return blob, nil
 }
 
-// PutWithCommitment attempts to insert the given key and value into the key-value data store
-// Since EigenDA only has a commitment after blob dispersal this method is unsupported
-func (e EigenDAStore) PutWithComm(ctx context.Context, key []byte, value []byte) error {
-	return fmt.Errorf("EigenDA plasma store does not support PutWithComm()")
-}
-
-// PutWithoutComm inserts the given value into the key-value data store and returns the corresponding commitment
-func (e EigenDAStore) PutWithoutComm(ctx context.Context, value []byte) (comm []byte, err error) {
+// Put inserts the given value into the key-value data store and returns the corresponding commitment.
+func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err error) {
 	cert, err := e.client.DisperseBlob(ctx, value)
 	if err != nil {
 		return nil, err
