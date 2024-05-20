@@ -181,14 +181,14 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
-func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, legnthProof *bn254.G2Affine, length uint64) error {
+func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
 
 	g1Challenge, err := kzg.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
 	if err != nil {
 		return err
 	}
 
-	err = VerifyLengthProof(lengthCommit, legnthProof, &g1Challenge)
+	err = VerifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
 	if err != nil {
 		return fmt.Errorf("%v . %v ", "low degree proof fails", err)
 	} else {
