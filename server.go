@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
@@ -33,14 +34,16 @@ type DAServer struct {
 	log        log.Logger
 	endpoint   string
 	store      PlasmaStore
+	m          metrics.Metricer
 	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
 
-func NewDAServer(host string, port int, store PlasmaStore, log log.Logger) *DAServer {
+func NewDAServer(host string, port int, store PlasmaStore, log log.Logger, m metrics.Metricer) *DAServer {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &DAServer{
+		m:        m,
 		log:      log,
 		endpoint: endpoint,
 		store:    store,
@@ -98,12 +101,16 @@ func (d *DAServer) Start() error {
 
 func (d *DAServer) Health(w http.ResponseWriter, r *http.Request) {
 	d.log.Info("GET", "url", r.URL)
+	recordDur := d.m.RecordRPCServerRequest("health")
+	defer recordDur()
 
 	w.WriteHeader(http.StatusOK)
 }
 
 func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 	d.log.Info("GET", "url", r.URL)
+	recordDur := d.m.RecordRPCServerRequest("put")
+	defer recordDur()
 
 	route := path.Dir(r.URL.Path)
 	if route != "/get" {
@@ -147,6 +154,8 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	d.log.Info("PUT", "url", r.URL)
+	recordDur := d.m.RecordRPCServerRequest("put")
+	defer recordDur()
 
 	route := path.Dir(r.URL.Path)
 	if route != "/put" {

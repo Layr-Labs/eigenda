@@ -39,11 +39,14 @@ func (v *Verifier) Verify(cert eigenda.Cert, blob []byte) error {
 	if err != nil {
 		return err
 	}
+
+	// blob to field elements
 	inputFr, err := rs.ToFrArray(blob)
 	if err != nil {
 		return err
 	}
 
+	// encode using FFT to evaluations
 	polyEvals, _, err := encoder.ExtendPolyEval(inputFr)
 	if err != nil {
 		return err

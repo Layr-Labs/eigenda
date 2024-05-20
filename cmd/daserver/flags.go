@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
+	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 )
 
 const (
@@ -47,6 +48,7 @@ type CLIConfig struct {
 	FileStoreDirPath string
 	S3Bucket         string
 	EigenDAConfig    eigenda.Config
+	MetricsCfg       opmetrics.CLIConfig
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
