@@ -802,6 +802,11 @@ func (s *DispersalServer) LoadAllowlist() {
 		return
 	}
 	s.rateConfig.Allowlist = al
+	for account, rateInfoByQuorum := range al {
+		for quorumID, rateInfo := range rateInfoByQuorum {
+			s.logger.Info("[Allowlist]", "account", account, "name", rateInfo.Name, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
+		}
+	}
 }
 
 // updateQuorumConfig updates the quorum config and returns the updated quorum config. If the update fails,
