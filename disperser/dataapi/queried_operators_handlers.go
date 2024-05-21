@@ -169,8 +169,8 @@ func ValidOperatorIP(address string, logger logging.Logger) bool {
 func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
 	operatorInfo, err := s.subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), operatorId)
 	if err != nil {
-		s.logger.Warn("failed to fetch operator info", "operator_id", operatorId, "error", err)
-		return &OperatorPortCheckResponse{}, errors.New("operator info not found.")
+		s.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
+		return &OperatorPortCheckResponse{}, errors.New("operator info not found")
 	}
 
 	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
