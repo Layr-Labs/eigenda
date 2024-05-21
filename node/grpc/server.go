@@ -137,7 +137,7 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 		return nil, err
 	}
 
-	blobs, err := GetBlobMessages(in)
+	blobs, err := GetBlobMessages(in, s.node.Config.NumBatchDeserializationWorkers)
 	if err != nil {
 		return nil, err
 	}

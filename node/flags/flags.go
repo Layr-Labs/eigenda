@@ -205,6 +205,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "NUM_BATCH_VALIDATORS"),
 		Value:    128,
 	}
+	NumBatchDeserializationWorkersFlag = cli.IntFlag{
+		Name:     "num-batch-deserialization-workers",
+		Usage:    "maximum number of parallel workers used to deserialize a batch (defaults to 128)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "NUM_BATCH_DESERIALIZATION_WORKERS"),
+		Value:    128,
+	}
 
 	// Test only, DO NOT USE the following flags in production
 

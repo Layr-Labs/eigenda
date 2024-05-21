@@ -19,10 +19,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	maxDeserializationWorkers = 32
-)
-
 // GetBatchHeader constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
 // Note the StoreChunksRequest is validated as soon as it enters the node gRPC
 // interface, see grpc.Server.validateStoreChunkRequest.
@@ -39,9 +35,9 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 // GetBlobMessages constructs a core.BlobMessage array from a proto of pb.StoreChunksRequest.
 // Note the StoreChunksRequest is validated as soon as it enters the node gRPC
 // interface, see grpc.Server.validateStoreChunkRequest.
-func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
+func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMessage, error) {
 	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
-	pool := workerpool.New(maxDeserializationWorkers)
+	pool := workerpool.New(numWorkers)
 	resultChan := make(chan error, len(blobs))
 	for i, blob := range in.GetBlobs() {
 		i := i
