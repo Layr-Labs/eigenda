@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
@@ -32,6 +33,13 @@ func main() {
 			Name:        "doc",
 			Subcommands: doc.NewSubcommands(metrics.NewMetrics("default")),
 		},
+	}
+
+	// load env file (if applicable)
+	if p := os.Getenv("ENV_PATH"); p != "" {
+		if err := godotenv.Load(p); err != nil {
+			panic(err)
+		}
 	}
 
 	ctx := opio.WithInterruptBlocker(context.Background())

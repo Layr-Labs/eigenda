@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// EigenDAStore does storage interactions and verifications for blobs with DA.
 type EigenDAStore struct {
 	client   *eigenda.EigenDAClient
 	verifier *verify.Verifier
@@ -21,7 +22,8 @@ func NewEigenDAStore(ctx context.Context, client *eigenda.EigenDAClient, v *veri
 	}, nil
 }
 
-// Get retrieves the given key if it's present in the key-value data store.
+// Get fetches a blob from DA using certificate fields and verifies blob
+// against commitment to ensure data is valid and non-tampered.
 func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	var cert eigenda.Cert
 	err := rlp.DecodeBytes(key, &cert)
@@ -41,14 +43,8 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	return blob, nil
 }
 
-// PutWithCommitment attempts to insert the given key and value into the key-value data store
-// Since EigenDA only has a commitment after blob dispersal this method is unsupported
-func (e EigenDAStore) PutWithComm(ctx context.Context, key []byte, value []byte) error {
-	return fmt.Errorf("EigenDA plasma store does not support PutWithComm()")
-}
-
-// PutWithoutComm inserts the given value into the key-value data store and returns the corresponding commitment
-func (e EigenDAStore) PutWithoutComm(ctx context.Context, value []byte) (comm []byte, err error) {
+// Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
+func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err error) {
 	cert, err := e.client.DisperseBlob(ctx, value)
 	if err != nil {
 		return nil, err

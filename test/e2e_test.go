@@ -14,7 +14,8 @@ import (
 	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
 	"github.com/Layr-Labs/op-plasma-eigenda/store"
 	"github.com/Layr-Labs/op-plasma-eigenda/verify"
-	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
+	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
+
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
@@ -54,10 +55,10 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 	}
 
 	kzgCfg := &kzg.KzgConfig{
-		G1Path:          "../kzg/g1.point",
-		G2Path:          "../kzg/g2.point",
-		G2PowerOf2Path:  "../kzg/g2.point.powerOf2",
-		CacheDir:        "../kzg/SRSTables",
+		G1Path:          "../operator-setup/resources/g1.point",
+		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
+		CacheDir:        "../operator-setup/resources/SRSTables",
+		G2Path:          "../test/resources/g2.point",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
@@ -100,14 +101,10 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 	ts, kill := createTestSuite(t)
 	defer kill()
 
-	daClient := plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false)
+	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false, false)
 	t.Log("Waiting for client to establish connection with plasma server...")
 	// wait for server to come online after starting
-	err := wait.For(ts.ctx, 500*time.Millisecond, func() (bool, error) {
-		return daClient.Health(), nil
-	})
-
-	assert.NoError(t, err)
+	time.Sleep(5 * time.Second)
 
 	// 1 - write arbitrary data to test plasma server
 

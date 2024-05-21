@@ -11,19 +11,22 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 )
 
+var (
+	ErrNotFound = errors.New("not found")
+)
+
 type PlasmaStore interface {
 	// Get retrieves the given key if it's present in the key-value data store.
 	Get(ctx context.Context, key []byte) ([]byte, error)
 	// Put inserts the given value into the key-value data store.
-	PutWithComm(ctx context.Context, key []byte, value []byte) error
-	// Put inserts the given value into the key-value data store.
-	PutWithoutComm(ctx context.Context, value []byte) (key []byte, err error)
+	Put(ctx context.Context, value []byte) (key []byte, err error)
 }
 
 type DAServer struct {
@@ -123,7 +126,7 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decodedComm, err := DecodeEigenDACommitment(comm)
+	decodedComm, err := eigenda.DecodeCommitment(comm)
 	if err != nil {
 		d.log.Info("failed to decode commitment", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
@@ -132,7 +135,7 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 	input, err := d.store.Get(r.Context(), decodedComm)
 	if err != nil && errors.Is(err, ErrNotFound) {
-		d.log.Info("key not found", "key", key)
+		d.log.Info("no entry found in DA store", "key", key)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -166,29 +169,14 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var comm []byte
-	if r.URL.Path == "/put" || r.URL.Path == "/put/" { // without commitment
-		if comm, err = d.store.PutWithoutComm(r.Context(), input); err != nil {
-			d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	} else { // with commitment (might be worth deleting if we never expect a commitment to be passed in the URL for this server type)
-		key := path.Base(r.URL.Path)
-		comm, err = hexutil.Decode(key)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		if err := d.store.PutWithComm(r.Context(), comm, input); err != nil {
-			d.log.Error("Failed to store commitment to the DA server", "err", err, "key", key)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	if comm, err = d.store.Put(r.Context(), input); err != nil {
+		d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	// write out encoded commitment
-	if _, err := w.Write(EigenDACommitment.Encode(comm)); err != nil {
+	if _, err := w.Write(eigenda.Commitment.Encode(comm)); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
