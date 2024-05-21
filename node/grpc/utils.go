@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/gammazero/workerpool"
 	"github.com/wealdtech/go-merkletree"
 	"github.com/wealdtech/go-merkletree/keccak256"
 	"google.golang.org/protobuf/proto"
@@ -34,34 +35,52 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 // GetBlobMessages constructs a core.BlobMessage array from a proto of pb.StoreChunksRequest.
 // Note the StoreChunksRequest is validated as soon as it enters the node gRPC
 // interface, see grpc.Server.validateStoreChunkRequest.
-func GetBlobMessages(in *pb.StoreChunksRequest) ([]*core.BlobMessage, error) {
+func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMessage, error) {
 	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
+	pool := workerpool.New(numWorkers)
+	resultChan := make(chan error, len(blobs))
 	for i, blob := range in.GetBlobs() {
-		blobHeader, err := GetBlobHeaderFromProto(blob.GetHeader())
+		i := i
+		blob := blob
+		pool.Submit(func() {
+			blobHeader, err := GetBlobHeaderFromProto(blob.GetHeader())
 
+			if err != nil {
+				resultChan <- err
+				return
+			}
+			if len(blob.GetBundles()) != len(blob.GetHeader().GetQuorumHeaders()) {
+				resultChan <- fmt.Errorf("number of quorum headers (%d) does not match number of bundles in blob message (%d)", len(blob.GetHeader().GetQuorumHeaders()), len(blob.GetBundles()))
+				return
+			}
+
+			bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
+			for j, chunks := range blob.GetBundles() {
+				quorumID := blob.GetHeader().GetQuorumHeaders()[j].GetQuorumId()
+				bundles[uint8(quorumID)] = make([]*encoding.Frame, len(chunks.GetChunks()))
+				for k, data := range chunks.GetChunks() {
+					chunk, err := new(encoding.Frame).Deserialize(data)
+					if err != nil {
+						resultChan <- err
+						return
+					}
+					bundles[uint8(quorumID)][k] = chunk
+				}
+			}
+
+			blobs[i] = &core.BlobMessage{
+				BlobHeader: blobHeader,
+				Bundles:    bundles,
+			}
+
+			resultChan <- nil
+		})
+	}
+	pool.StopWait()
+	close(resultChan)
+	for err := range resultChan {
 		if err != nil {
 			return nil, err
-		}
-		if len(blob.GetBundles()) != len(blob.GetHeader().GetQuorumHeaders()) {
-			return nil, fmt.Errorf("number of quorum headers (%d) does not match number of bundles in blob message (%d)", len(blob.GetHeader().GetQuorumHeaders()), len(blob.GetBundles()))
-		}
-
-		bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
-		for j, chunks := range blob.GetBundles() {
-			quorumID := blob.GetHeader().GetQuorumHeaders()[j].GetQuorumId()
-			bundles[uint8(quorumID)] = make([]*encoding.Frame, len(chunks.GetChunks()))
-			for k, data := range chunks.GetChunks() {
-				chunk, err := new(encoding.Frame).Deserialize(data)
-				if err != nil {
-					return nil, err
-				}
-				bundles[uint8(quorumID)][k] = chunk
-			}
-		}
-
-		blobs[i] = &core.BlobMessage{
-			BlobHeader: blobHeader,
-			Bundles:    bundles,
 		}
 	}
 	return blobs, nil
