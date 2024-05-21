@@ -56,7 +56,6 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 
 	kzgCfg := &kzg.KzgConfig{
 		G1Path:          "../operator-setup/resources/g1.point",
-		G2Path:          "resources/g2.point",
 		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
 		CacheDir:        "../operator-setup/resources/SRSTables",
 		SRSOrder:        3000,
@@ -101,7 +100,7 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 	ts, kill := createTestSuite(t)
 	defer kill()
 
-	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false)
+	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false, false)
 	t.Log("Waiting for client to establish connection with plasma server...")
 	// wait for server to come online after starting
 	time.Sleep(5 * time.Second)

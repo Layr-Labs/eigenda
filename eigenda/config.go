@@ -17,7 +17,6 @@ const (
 	UseTlsFlagName                   = "eigenda-use-tls"
 	// Kzg flags
 	G1PathFlagName    = "eigenda-g1-path"
-	G2PathFlagName    = "eigenda-g2-path"
 	G2TauFlagName     = "eigenda-g2-tau-path"
 	CachePathFlagName = "eigenda-cache-path"
 )
@@ -50,7 +49,6 @@ type Config struct {
 func (c *Config) KzgConfig() *kzg.KzgConfig {
 	return &kzg.KzgConfig{
 		G1Path:          c.G1Path,
-		G2Path:          c.G2Path,
 		G2PowerOf2Path:  c.G2PowerOfTauPath,
 		CacheDir:        c.CacheDir,
 		SRSOrder:        3000,
@@ -68,7 +66,6 @@ func ReadConfig(ctx *cli.Context) Config {
 		StatusQueryTimeout:       ctx.Duration(StatusQueryTimeoutFlagName),
 		UseTLS:                   ctx.Bool(UseTlsFlagName),
 		G1Path:                   ctx.String(G1PathFlagName),
-		G2Path:                   ctx.String(G2PathFlagName),
 		G2PowerOfTauPath:         ctx.String(G2TauFlagName),
 		CacheDir:                 ctx.String(CachePathFlagName),
 	}
@@ -117,11 +114,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    G1PathFlagName,
 			Usage:   "Directory path to g1.point file",
 			EnvVars: prefixEnvVars("EIGENDA_KZG_G1_PATH"),
-		},
-		&cli.StringFlag{
-			Name:    G2PathFlagName,
-			Usage:   "Directory path to g2.point file",
-			EnvVars: prefixEnvVars("EIGENDA_KZG_G2_PATH"),
 		},
 		&cli.StringFlag{
 			Name:    G2TauFlagName,
