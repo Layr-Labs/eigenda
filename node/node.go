@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -477,7 +478,7 @@ func (n *Node) checkNodeReachability() {
 		return
 	}
 
-	checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", n.Config.DataApiUrl, n.Config.ID.Hex()))
+	checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", strings.TrimSuffix(n.Config.DataApiUrl, "/"), n.Config.ID.Hex()))
 	if err != nil {
 		n.Logger.Error("Reachability check failed - invalid check url", err, "checkUrl", checkUrl.String())
 		return
@@ -497,7 +498,12 @@ func (n *Node) checkNodeReachability() {
 			n.Logger.Error("Reachability check request failed", err)
 			continue
 		} else if resp.StatusCode == 404 {
-			n.Logger.Error("Reachability check failed - operator id not found", "status", resp.StatusCode, "operator_id", n.Config.ID.Hex())
+			body, _ := io.ReadAll(resp.Body)
+			if string(body) == "404 page not found" {
+				n.Logger.Error("Invalid reachability check url", "checkUrl", checkUrl.String())
+			} else {
+				n.Logger.Warn("Reachability check operator id not found", "status", resp.StatusCode, "operator_id", n.Config.ID.Hex())
+			}
 			continue
 		} else if resp.StatusCode != 200 {
 			n.Logger.Error("Reachability check request failed", "status", resp.StatusCode)
@@ -506,7 +512,7 @@ func (n *Node) checkNodeReachability() {
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
-			n.Logger.Error("Failed to read reachability check response", err, "data", resp.Body)
+			n.Logger.Error("Failed to read reachability check response", err)
 			continue
 		}
 
