@@ -17,8 +17,13 @@ Additional cli args are provided for targeting an EigenDA network backend:
 1. Compile binary: `make da-server`
 2. Run binary; e.g: `./bin/da-server --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path test/resources/g1.point --eigenda-g2-tau-path test/resources/g2.point.powerOf2 --eigenda-use-tls true`
 
+**Env File**
+An env file can be provided to the binary for runtime process ingestion; e.g:
+1. Create env: `cp .env.example .env`
+2. Pass into binary: `ENV_PATH=.env ./bin/da-server`
+
 ### Commitment Schemas
-An `EigenDACommitment` layer type has been added that supports verification against its respective pre-images. Otherwise this logic is pseudo-identical to the existing `Keccak256` commitment type. The commitment is encoded via the following byte array:
+An `EigenDACommitment` layer type has been added that supports verification against its respective pre-images. The commitment is encoded via the following byte array:
 ```
             0        1        2        3        4                 N
             |--------|--------|--------|--------|-----------------|
@@ -38,10 +43,14 @@ type Cert struct {
 }
 ```
 
-**NOTE:** Commitments are cryptographically verified against the data fetched from EigenDA for all `/get` calls.
+**NOTE:** Commitments are cryptographically verified against the data fetched from EigenDA for all `/get` calls. The server will respond with status `500` in the event where EigenDA were to lie and provide falsified data thats irrespective of the client provided commitment. This feature isn't flag guarded and is part of standard operation.
 
 ## Testing
-Some unit tests have been introduced to assert correctness of encoding/decoding logic and mocked server interactions. These can be ran via `make test`.
+Some unit tests have been introduced to assert the correctness of:
+* DA Certificate encoding/decoding logic
+* commitment verification logic
+
+Unit tests can be ran via `make test`.
 
 Otherwise E2E tests (`test/e2e_test.go`) exists which asserts that a commitment can be generated when inserting some arbitrary data to the server and can be read using the commitment for a key lookup via the client. These can be ran via `make e2e-test`. Please **note** that this test uses the EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for quicker iteration testing. 
 
@@ -52,6 +61,11 @@ KZG commitment verification requires constructing the SRS string from the proper
 1. `make submodules`
 2. `make srs`
 
+## Hardware Requirements
+The following specs are recommended for running on a single production server:
+* 12 GB SSD (assuming SRS values are stored on instance)
+* 16 GB RAM
+* 1-2 cores CPU
 
 ## Resources
 - [op-stack](https://github.com/ethereum-optimism/optimism)
@@ -59,8 +73,3 @@ KZG commitment verification requires constructing the SRS string from the proper
 - [eigen da](https://github.com/Layr-Labs/eigenda)
 
 
-## Hardware Requirements
-The following specs are recommended for running on a single production server:
-* 12 GB SSD (assuming SRS values are stored on instance)
-* 16 GB RAM
-* 1-2 cores CPU

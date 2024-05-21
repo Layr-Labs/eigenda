@@ -29,10 +29,9 @@ func TestVerification(t *testing.T) {
 	}
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../test/resources/g1.point",
-		G2Path:          "../test/resources/g2.point",
-		G2PowerOf2Path:  "../test/resources/g2.point.powerOf2",
-		CacheDir:        "../test/resources/SRSTables",
+		G1Path:          "../operator-setup/resources/g1.point",
+		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
+		CacheDir:        "../operator-setup/resources/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
@@ -41,6 +40,12 @@ func TestVerification(t *testing.T) {
 	v, err := NewVerifier(kzgConfig)
 	assert.NoError(t, err)
 
+	// Happy path verification
 	err = v.Verify(c, eigenda.EncodeToBlob(data))
 	assert.NoError(t, err)
+
+	// failure with wrong data
+	fakeData := eigenda.EncodeToBlob([]byte("I am an imposter!!"))
+	err = v.Verify(c, fakeData)
+	assert.Error(t, err)
 }

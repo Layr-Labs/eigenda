@@ -16,7 +16,7 @@ const (
 	PortFlagName       = "port"
 )
 
-const EnvVarPrefix = "OP_PLASMA_DA_SERVER"
+const EnvVarPrefix = "EIGEN_PLASMA_SERVER"
 
 func prefixEnvVars(name string) []string {
 	return opservice.PrefixEnvVar(EnvVarPrefix, name)

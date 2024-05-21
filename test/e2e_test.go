@@ -58,6 +58,7 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		G1Path:          "../operator-setup/resources/g1.point",
 		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
 		CacheDir:        "../operator-setup/resources/SRSTables",
+		G2Path:          "../test/resources/g2.point",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

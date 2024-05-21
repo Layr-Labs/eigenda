@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -125,7 +126,7 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decodedComm, err := DecodeEigenDACommitment(comm)
+	decodedComm, err := eigenda.DecodeCommitment(comm)
 	if err != nil {
 		d.log.Info("failed to decode commitment", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
@@ -134,7 +135,7 @@ func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 	input, err := d.store.Get(r.Context(), decodedComm)
 	if err != nil && errors.Is(err, ErrNotFound) {
-		d.log.Info("key not found", "key", key)
+		d.log.Info("no entry found in DA store", "key", key)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -175,7 +176,7 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write out encoded commitment
-	if _, err := w.Write(EigenDACommitment.Encode(comm)); err != nil {
+	if _, err := w.Write(eigenda.Commitment.Encode(comm)); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
