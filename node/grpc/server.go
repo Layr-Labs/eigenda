@@ -131,6 +131,8 @@ func (s *Server) serveRetrieval() error {
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
+	start := time.Now()
+
 	// Get batch header hash
 	batchHeader, err := GetBatchHeader(in)
 	if err != nil {
@@ -141,6 +143,9 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 	if err != nil {
 		return nil, err
 	}
+
+	s.node.Metrics.ObserveLatency("StoreChunks", "deserialization", float64(time.Since(start).Milliseconds()))
+	s.node.Logger.Info("StoreChunksRequest deserialized", "duration", time.Since(start))
 
 	sig, err := s.node.ProcessBatch(ctx, batchHeader, blobs, in.GetBlobs())
 	if err != nil {
