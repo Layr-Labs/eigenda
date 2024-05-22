@@ -164,7 +164,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Help:       "attestation latency summary in milliseconds",
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
-			[]string{"status"},
+			[]string{"operator_id", "status"},
 		),
 	}
 
@@ -252,12 +252,12 @@ func (g *Metrics) UpdateAttestation(operatorCount map[core.QuorumID]int, signerC
 	}
 }
 
-func (t *DispatcherMetrics) ObserveLatency(success bool, latencyMS float64) {
+func (t *DispatcherMetrics) ObserveLatency(operatorId string, success bool, latencyMS float64) {
 	label := "success"
 	if !success {
 		label = "failure"
 	}
-	t.Latency.WithLabelValues(label).Observe(latencyMS)
+	t.Latency.WithLabelValues(operatorId, label).Observe(latencyMS)
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.

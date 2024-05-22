@@ -88,7 +88,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					BatchHeaderHash:      batchHeaderHash,
 					AttestationLatencyMs: latencyMs,
 				}
-				c.metrics.ObserveLatency(false, latencyMs)
+				c.metrics.ObserveLatency(id.Hex(), false, latencyMs)
 			} else {
 				update <- core.SigningMessage{
 					Signature:            sig,
@@ -97,7 +97,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					AttestationLatencyMs: latencyMs,
 					Err:                  nil,
 				}
-				c.metrics.ObserveLatency(true, latencyMs)
+				c.metrics.ObserveLatency(id.Hex(), true, latencyMs)
 			}
 
 		}(core.IndexedOperatorInfo{
