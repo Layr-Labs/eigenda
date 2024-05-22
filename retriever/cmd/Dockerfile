@@ -9,7 +9,6 @@ COPY core /app/core
 COPY api /app/api
 COPY contracts /app/contracts
 COPY disperser /app/disperser
-COPY clients /app/clients
 COPY node /app/node
 COPY operators/churner /app/operators/churner
 COPY indexer /app/indexer
