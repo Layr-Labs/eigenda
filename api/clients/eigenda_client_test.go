@@ -71,16 +71,10 @@ func TestPutRetrieveBlobSuccess(t *testing.T) {
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
-	cert, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
 	require.NoError(t, err)
-	require.NotNil(t, cert)
-	assert.Equal(t, &clients.Cert{
-		BatchHeaderHash:      []byte("mock-batch-header-hash"),
-		BlobIndex:            100,
-		ReferenceBlockNumber: 200,
-		QuorumIDs:            []uint32{0, 1},
-		BlobCommitment:       &common.G1Commitment{X: []byte{0x00, 0x00, 0x00, 0x00}, Y: []byte{0x01, 0x00, 0x00, 0x00}},
-	}, cert)
+	require.NotNil(t, blobInfo)
+	assert.Equal(t, finalizedBlobInfo, blobInfo)
 
 	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
 	require.NoError(t, err)
@@ -107,9 +101,9 @@ func TestPutBlobFailDispersal(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
-	require.Nil(t, cert)
+	require.Nil(t, blobInfo)
 }
 
 func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
@@ -139,9 +133,9 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
-	require.Nil(t, cert)
+	require.Nil(t, blobInfo)
 }
 
 func TestPutBlobFailureGeneral(t *testing.T) {
@@ -171,9 +165,9 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
-	require.Nil(t, cert)
+	require.Nil(t, blobInfo)
 }
 
 func TestPutBlobFailureUnknown(t *testing.T) {
@@ -203,9 +197,9 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
-	require.Nil(t, cert)
+	require.Nil(t, blobInfo)
 }
 
 func TestPutBlobFinalizationTimeout(t *testing.T) {
@@ -237,9 +231,9 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
-	require.Nil(t, cert)
+	require.Nil(t, blobInfo)
 }
 
 func TestPutBlobIndividualRequestTimeout(t *testing.T) {
@@ -296,18 +290,12 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
 	// despite initial timeout it should succeed
 	require.NoError(t, err)
-	require.NotNil(t, cert)
-	assert.Equal(t, &clients.Cert{
-		BatchHeaderHash:      []byte("mock-batch-header-hash"),
-		BlobIndex:            100,
-		ReferenceBlockNumber: 200,
-		QuorumIDs:            []uint32{0, 1},
-		BlobCommitment:       &common.G1Commitment{X: []byte{0x00, 0x00, 0x00, 0x00}, Y: []byte{0x01, 0x00, 0x00, 0x00}},
-	}, cert)
+	require.NotNil(t, blobInfo)
+	assert.Equal(t, finalizedBlobInfo, blobInfo)
 }
 
 func TestPutBlobTotalTimeout(t *testing.T) {
@@ -364,9 +352,9 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 		Client:   disperserClient,
 		PutCodec: clients.DefaultBlobEncodingCodec{},
 	}
-	cert, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
+	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
 	// should timeout even though it would have finalized eventually
 	require.Error(t, err)
-	require.Nil(t, cert)
+	require.Nil(t, blobInfo)
 }

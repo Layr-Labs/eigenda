@@ -32,9 +32,11 @@ func TestClientUsingTestnet(t *testing.T) {
 	})
 	data := "hello world!"
 	assert.NoError(t, err)
-	cert, err := client.PutBlob(context.Background(), []byte(data))
+	blobInfo, err := client.PutBlob(context.Background(), []byte(data))
 	assert.NoError(t, err)
-	blob, err := client.GetBlob(context.Background(), cert.BatchHeaderHash, cert.BlobIndex)
+	batchHeaderHash := blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash
+	blobIndex := blobInfo.BlobVerificationProof.BlobIndex
+	blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, data, string(blob))
 }

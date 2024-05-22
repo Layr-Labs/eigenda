@@ -16,7 +16,7 @@ import (
 
 type IEigenDAClient interface {
 	GetBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error)
-	PutBlob(ctx context.Context, txData []byte) (*Cert, error)
+	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
 }
 
 type EigenDAClient struct {
@@ -80,7 +80,7 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 	return rawData, nil
 }
 
-func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) {
+func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
 	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
 	case result := <-resultChan:
@@ -90,14 +90,14 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*Cert, error) 
 	}
 }
 
-func (m EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *Cert, errChan chan error) {
-	resultChan = make(chan *Cert, 1)
+func (m EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
+	resultChan = make(chan *grpcdisperser.BlobInfo, 1)
 	errChan = make(chan error, 1)
 	go m.putBlob(ctx, data, resultChan, errChan)
 	return
 }
 
-func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *Cert, errChan chan error) {
+func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode blob
@@ -164,19 +164,7 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 			case grpcdisperser.BlobStatus_FINALIZED:
 				batchHeaderHashHex := fmt.Sprintf("0x%s", hex.EncodeToString(statusRes.Info.BlobVerificationProof.BatchMetadata.BatchHeaderHash))
 				m.Log.Info("Successfully dispersed blob to EigenDA", "requestID", base64RequestID, "batchHeaderHash", batchHeaderHashHex)
-				blobInfo := statusRes.Info
-				quorumIDs := make([]uint32, len(blobInfo.BlobHeader.BlobQuorumParams))
-				for i := range quorumIDs {
-					quorumIDs[i] = blobInfo.BlobHeader.BlobQuorumParams[i].QuorumNumber
-				}
-				cert := &Cert{
-					BatchHeaderHash:      blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash,
-					BlobIndex:            blobInfo.BlobVerificationProof.BlobIndex,
-					ReferenceBlockNumber: blobInfo.BlobVerificationProof.BatchMetadata.BatchHeader.ReferenceBlockNumber,
-					QuorumIDs:            quorumIDs,
-					BlobCommitment:       blobInfo.BlobHeader.Commitment,
-				}
-				resultChan <- cert
+				resultChan <- statusRes.Info
 				return
 			default:
 				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
