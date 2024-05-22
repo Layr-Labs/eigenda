@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -36,6 +37,15 @@ func (c *EigenDAClientConfig) Check() error {
 	}
 	if c.StatusQueryTimeout == 0 {
 		c.StatusQueryTimeout = 25 * time.Minute
+	}
+	if c.ResponseTimeout == 0 {
+		c.ResponseTimeout = 30 * time.Second
+	}
+	if len(c.SignerPrivateKeyHex) != 64 {
+		return fmt.Errorf("EigenDAClientConfig.SignerPrivateKeyHex should be 64 hex characters long, should not have 0x prefix")
+	}
+	if len(c.RPC) == 0 {
+		return fmt.Errorf("EigenDAClientConfig.RPC not set")
 	}
 	return nil
 }
