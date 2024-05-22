@@ -6,6 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
+	"github.com/Layr-Labs/op-plasma-eigenda/store"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -55,10 +56,9 @@ func init() {
 var Flags []cli.Flag
 
 type CLIConfig struct {
-	FileStoreDirPath string
-	S3Bucket         string
-	EigenDAConfig    eigenda.Config
-	MetricsCfg       opmetrics.CLIConfig
+	MemStoreCfg   store.MemStoreConfig
+	EigenDAConfig eigenda.Config
+	MetricsCfg    opmetrics.CLIConfig
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
