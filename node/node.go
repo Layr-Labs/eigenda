@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -478,9 +477,9 @@ func (n *Node) checkNodeReachability() {
 		return
 	}
 
-	checkUrl, err := url.Parse(fmt.Sprintf("%s/api/v1/operators-info/port-check?operator_id=%s", strings.TrimSuffix(n.Config.DataApiUrl, "/"), n.Config.ID.Hex()))
+	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, n.Config.ID.Hex())
 	if err != nil {
-		n.Logger.Error("Reachability check failed - invalid check url", err, "checkUrl", checkUrl.String())
+		n.Logger.Error("Failed to get reachability check URL", err)
 		return
 	}
 
@@ -491,16 +490,16 @@ func (n *Node) checkNodeReachability() {
 	for {
 		<-ticker.C
 
-		n.Logger.Debug("Calling reachability check", "url", checkUrl.String())
+		n.Logger.Debug("Calling reachability check", "url", checkURL)
 
-		resp, err := http.Get(checkUrl.String())
+		resp, err := http.Get(checkURL)
 		if err != nil {
 			n.Logger.Error("Reachability check request failed", err)
 			continue
 		} else if resp.StatusCode == 404 {
 			body, _ := io.ReadAll(resp.Body)
 			if string(body) == "404 page not found" {
-				n.Logger.Error("Invalid reachability check url", "checkUrl", checkUrl.String())
+				n.Logger.Error("Invalid reachability check url", "checkUrl", checkURL)
 			} else {
 				n.Logger.Warn("Reachability check operator id not found", "status", resp.StatusCode, "operator_id", n.Config.ID.Hex())
 			}
@@ -538,4 +537,21 @@ func (n *Node) checkNodeReachability() {
 			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(0.0)
 		}
 	}
+}
+
+func GetReachabilityURL(dataApiUrl, operatorID string) (string, error) {
+	checkURLString, err := url.JoinPath(dataApiUrl, "/api/v1/operators-info/port-check")
+	if err != nil {
+		return "", err
+	}
+	checkURL, err := url.Parse(checkURLString)
+	if err != nil {
+		return "", err
+	}
+
+	q := checkURL.Query()
+	q.Set("operator_id", operatorID)
+	checkURL.RawQuery = q.Encode()
+
+	return checkURL.String(), nil
 }

@@ -139,3 +139,12 @@ func TestNodeStartOperatorIDDoesNotMatch(t *testing.T) {
 	err := c.node.Start(context.Background())
 	assert.ErrorContains(t, err, "operator ID mismatch")
 }
+
+func TestGetReachabilityURL(t *testing.T) {
+	url, err := node.GetReachabilityURL("https://dataapi.eigenda.xyz/", "123123123")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v1/operators-info/port-check?operator_id=123123123", url)
+	url, err = node.GetReachabilityURL("https://dataapi.eigenda.xyz", "123123123")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v1/operators-info/port-check?operator_id=123123123", url)
+}
