@@ -1,9 +1,32 @@
-ARG OP_STACK_GO_BUILDER=us-docker.pkg.dev/oplabs-tools-artifacts/images/op-stack-go:latest
-FROM $OP_STACK_GO_BUILDER as builder
-# See "make golang-docker" and /ops/docker/op-stack-go
+# multi container builds ftw
 
-FROM alpine:3.18
+FROM golang:1.21.10-alpine3.19 as builder
 
-COPY --from=builder /usr/local/bin/da-server /usr/local/bin/da-server
+RUN apk add --no-cache make gcc musl-dev linux-headers jq bash git
 
-CMD ["da-server"]
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy go.mod and go.sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
+RUN go mod download
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the application binary
+RUN make da-server
+
+# Use alpine to run app
+FROM alpine:3.16
+
+WORKDIR /app
+COPY --from=builder /app/bin/da-server .
+
+# API & metrics servers
+EXPOSE 4242 7300
+
+# Run app
+CMD ["./da-server"]

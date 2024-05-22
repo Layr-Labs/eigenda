@@ -15,10 +15,10 @@ func TestVerification(t *testing.T) {
 
 	var data = []byte("inter-subjective and not objective!")
 
-	x, err := hex.DecodeString("0b187c5351919a9bf83271637be3bcb7b8bbb0abe0b80bb9d632ad8f6e8401e5")
+	x, err := hex.DecodeString("0184B47F64FBA17D6F49CDFED20434B1015A2A369AB203256EC4CD00C324E83B")
 	assert.NoError(t, err)
 
-	y, err := hex.DecodeString("0d41ee143f13cc2526d36189a22538f630ea31398e0af32b5877728c8fe5452e")
+	y, err := hex.DecodeString("122CD859CC5CDD048B482C50721821CB413C151BA7AF10285C1D2483F2A88085")
 	assert.NoError(t, err)
 
 	c := eigenda.Cert{
@@ -29,9 +29,9 @@ func TestVerification(t *testing.T) {
 	}
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../operator-setup/resources/g1.point",
-		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
-		CacheDir:        "../operator-setup/resources/SRSTables",
+		G1Path:          "../test/resources/g1.point",
+		G2PowerOf2Path:  "../test/resources/g2.point.powerOf2",
+		CacheDir:        "../test/resources/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
