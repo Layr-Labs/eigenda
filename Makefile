@@ -1,3 +1,4 @@
+APP_NAME = eigenda-sidecar
 LINTER_VERSION = v1.52.1
 LINTER_URL = https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
 GET_LINT_CMD = "curl -sSfL $(LINTER_URL) | sh -s -- -b $(go env GOPATH)/bin $(LINTER_VERSION)"
@@ -11,8 +12,13 @@ LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
 LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
+.PHONY: da-server
 da-server:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/da-server ./cmd/daserver
+
+.PHONY: docker-build
+docker-build:
+	@docker build -t $(APP_NAME) .
 
 run-server:
 	./bin/da-server
@@ -44,7 +50,6 @@ gosec:
 
 submodules:
 	git submodule update --init --recursive
-
 
 srs:
 	if ! test -f /operator-setup/resources/g1.point; then \

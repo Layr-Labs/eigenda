@@ -1,7 +1,12 @@
-# EigenDA Plasma DA Server
+# EigenDA Sidecar Proxy
 
 ## Introduction
-This simple DA server implementation supports ephemeral storage via EigenDA.
+This simple DA server implementation is a side-car communication relay between different rollup frameworks and EigenDA. This allows us to keep existing protocol functions (i.e, batch submission, state derivation) lightweight in respect to modification since the server handles key security and data operations like:
+* blob submission/retrieval to EigenDA
+* data <--> blob encoding/decoding
+* tamper resistance assurance (i.e, cryptographic verification of retrieved blobs)
+
+This allows for deduplication of redundant logical flows into a single representation which can be used cross functionally across rollups.
 
 ## EigenDA Configuration
 Additional cli args are provided for targeting an EigenDA network backend:
@@ -22,7 +27,10 @@ An env file can be provided to the binary for runtime process ingestion; e.g:
 1. Create env: `cp .env.example .env`
 2. Pass into binary: `ENV_PATH=.env ./bin/da-server`
 
-### Commitment Schemas
+## Running via Docker
+Container can be built via running `make build-docker`. 
+
+## Commitment Schemas
 An `EigenDACommitment` layer type has been added that supports verification against its respective pre-images. The commitment is encoded via the following byte array:
 ```
             0        1        2        3        4                 N
@@ -52,7 +60,7 @@ Some unit tests have been introduced to assert the correctness of:
 
 Unit tests can be ran via `make test`.
 
-Otherwise E2E tests (`test/e2e_test.go`) exists which asserts that a commitment can be generated when inserting some arbitrary data to the server and can be read using the commitment for a key lookup via the client. These can be ran via `make e2e-test`. Please **note** that this test uses the EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for quicker iteration testing. 
+Otherwise E2E tests (`test/e2e_test.go`) exists which asserts that a commitment can be generated when inserting some arbitrary data to the server and can be read using the commitment for a key lookup via the client. These can be ran via `make e2e-test`. Please **note** that this test uses the EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing. 
 
 
 ## Downloading Mainnet SRS
