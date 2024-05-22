@@ -10,7 +10,10 @@ import (
 // Helper function to generate a random byte slice of a given length
 func randomByteSlice(length int64) []byte {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
 	return b
 }
 
