@@ -53,7 +53,7 @@ func StartDAServer(cliCtx *cli.Context) error {
 
 	m := metrics.NewMetrics("default")
 
-	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_plasma_server")
+	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_proxy")
 	oplog.SetGlobalLogHandler(log.Handler())
 
 	log.Info("Initializing EigenDA Plasma DA server...")
