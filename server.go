@@ -72,7 +72,7 @@ func (d *DAServer) Start() error {
 
 	d.endpoint = listener.Addr().String()
 
-	d.log.Info("Starting DA server on", d.endpoint)
+	d.log.Info("Starting DA server", "endpoint", d.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
 		if d.tls != nil {
@@ -108,7 +108,7 @@ func (d *DAServer) Health(w http.ResponseWriter, r *http.Request) {
 
 func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 	d.log.Info("GET", "url", r.URL)
-	recordDur := d.m.RecordRPCServerRequest("put")
+	recordDur := d.m.RecordRPCServerRequest("get")
 	defer recordDur()
 
 	route := path.Dir(r.URL.Path)

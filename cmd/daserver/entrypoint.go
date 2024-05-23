@@ -18,9 +18,11 @@ import (
 
 func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (plasma.PlasmaStore, error) {
 	if cfg.MemStoreCfg.Enabled {
+		log.Info("Using memstore backend")
 		return store.NewMemStore(ctx, &cfg.MemStoreCfg)
 	}
 
+	log.Info("Using eigenda backend")
 	daCfg := cfg.EigenDAConfig
 
 	v, err := verify.NewVerifier(daCfg.KzgConfig())
@@ -47,6 +49,8 @@ func StartDAServer(cliCtx *cli.Context) error {
 		return err
 	}
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
+	defer ctxCancel()
+
 	m := metrics.NewMetrics("default")
 
 	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_plasma_server")
@@ -67,9 +71,6 @@ func StartDAServer(cliCtx *cli.Context) error {
 	}
 
 	defer func() {
-		// shutdown dependency routines
-		ctxCancel()
-
 		if err := server.Stop(); err != nil {
 			log.Error("failed to stop DA server", "err", err)
 		}

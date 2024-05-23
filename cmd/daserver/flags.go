@@ -17,7 +17,7 @@ const (
 	PortFlagName       = "port"
 )
 
-const EnvVarPrefix = "EIGEN_PLASMA_SERVER"
+const EnvVarPrefix = "EIGENDA_PROXY"
 
 func prefixEnvVars(name string) []string {
 	return opservice.PrefixEnvVar(EnvVarPrefix, name)
@@ -49,6 +49,7 @@ func init() {
 	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, eigenda.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, store.CLIFlags(EnvVarPrefix)...)
 	Flags = append(requiredFlags, optionalFlags...)
 }
 
@@ -65,6 +66,7 @@ func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 	return CLIConfig{
 		EigenDAConfig: eigenda.ReadConfig(ctx),
 		MetricsCfg:    opmetrics.ReadCLIConfig(ctx),
+		MemStoreCfg:   store.ReadConfig(ctx),
 	}
 }
 

@@ -8,15 +8,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 const (
-	MemStoreName       = "memstore"
-	MemStoreFlagName   = "enable"
-	ExpirationFlagName = "expiration"
+	MemStoreFlagName   = "memstore.enabled"
+	ExpirationFlagName = "memstore.expiration"
 
-	DefaultPruneInterval = 1 * time.Second
+	DefaultPruneInterval = 500 * time.Millisecond
 )
 
 type MemStoreConfig struct {
@@ -35,6 +34,7 @@ type MemStore struct {
 	store     map[string][]byte
 }
 
+// NewMemStore ... constructor
 func NewMemStore(ctx context.Context, cfg *MemStoreConfig) (*MemStore, error) {
 	store := &MemStore{
 		cfg:       cfg,
@@ -64,41 +64,45 @@ func (e *MemStore) EventLoop(ctx context.Context) {
 }
 
 func (e *MemStore) pruneExpired() {
-	e.RLock()
-	defer e.RUnlock()
+	e.Lock()
+	defer e.Unlock()
 
 	for commit, dur := range e.keyStarts {
 		if time.Since(dur) >= e.cfg.BlobExpiration {
-			// prune expired blobs
-			e.Lock()
 			delete(e.keyStarts, commit)
 			delete(e.store, commit)
-			e.Unlock()
 		}
 	}
 
 }
 
-func (e *MemStore) Get(ctx context.Context, key []byte) ([]byte, error) {
+// Get fetches a value from the store.
+func (e *MemStore) Get(ctx context.Context, commit []byte) ([]byte, error) {
 	e.RLock()
 	defer e.RUnlock()
 
-	if _, exists := e.store[common.Bytes2Hex(key)]; !exists {
+	key := "0x" + common.Bytes2Hex(commit)
+	if _, exists := e.store[key]; !exists {
 		return nil, fmt.Errorf("commitment key not found")
 	}
 
-	return e.store[string(key)], nil
+	return e.store[key], nil
 }
 
+// Put inserts a value into the store.
 func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	e.Lock()
 	defer e.Unlock()
 
 	commit := crypto.Keccak256Hash(value)
 
-	if _, exists := e.store[commit.String()]; !exists {
-		return nil, fmt.Errorf("commitment key not found")
+	if _, exists := e.store[commit.Hex()]; exists {
+		return nil, fmt.Errorf("commitment key already exists")
 	}
+
+	e.store[commit.Hex()] = value
+	// add expiration
+	e.keyStarts[commit.Hex()] = time.Now()
 
 	return commit.Bytes(), nil
 }
@@ -106,7 +110,7 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 func ReadConfig(ctx *cli.Context) MemStoreConfig {
 	cfg := MemStoreConfig{
 		/* Required Flags */
-		Enabled:        ctx.Bool(MemStoreName),
+		Enabled:        ctx.Bool(MemStoreFlagName),
 		BlobExpiration: ctx.Duration(ExpirationFlagName),
 	}
 	return cfg
@@ -116,15 +120,15 @@ func CLIFlags(envPrefix string) []cli.Flag {
 
 	return []cli.Flag{
 		&cli.BoolFlag{
-			Name:   MemStoreFlagName,
-			Usage:  "Whether to use mem-store for DA logic.",
-			EnvVar: "MEMSTORE_ENABLED",
+			Name:    MemStoreFlagName,
+			Usage:   "Whether to use mem-store for DA logic.",
+			EnvVars: []string{"MEMSTORE_ENABLED"},
 		},
 		&cli.DurationFlag{
-			Name:   ExpirationFlagName,
-			Usage:  "Duration that a blob/commitment pair are allowed to live.",
-			Value:  25 * time.Minute,
-			EnvVar: "MEMSTORE_EXPIRATION",
+			Name:    ExpirationFlagName,
+			Usage:   "Duration that a blob/commitment pair are allowed to live.",
+			Value:   25 * time.Minute,
+			EnvVars: []string{"MEMSTORE_EXPIRATION"},
 		},
 	}
 }
