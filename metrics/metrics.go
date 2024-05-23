@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	Namespace = "plasma_eigenda"
+	Namespace = "eigenda_proxy"
 )
 
 // Config ... Metrics server configuration
@@ -62,7 +62,7 @@ func NewMetrics(procName string) *Metrics {
 		Up: factory.NewGauge(prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "up",
-			Help:      "1 if the plasma server has finished starting up",
+			Help:      "1 if the proxy server has finished starting up",
 		}),
 		Info: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: ns,
@@ -79,7 +79,7 @@ func NewMetrics(procName string) *Metrics {
 }
 
 // RecordInfo sets a pseudo-metric that contains versioning and
-// config info for the plasma DA node.
+// config info for the proxy DA node.
 func (m *Metrics) RecordInfo(version string) {
 	m.Info.WithLabelValues(version).Set(1)
 }

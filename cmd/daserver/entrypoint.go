@@ -11,12 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
-	plasma "github.com/Layr-Labs/op-plasma-eigenda"
+	proxy "github.com/Layr-Labs/op-plasma-eigenda"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
 
-func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (plasma.PlasmaStore, error) {
+func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store, error) {
 	if cfg.MemStoreCfg.Enabled {
 		log.Info("Using memstore backend")
 		return store.NewMemStore(ctx, &cfg.MemStoreCfg)
@@ -62,7 +62,7 @@ func StartDAServer(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
-	server := plasma.NewDAServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), da, log, m)
+	server := proxy.NewServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), da, log, m)
 
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server")
