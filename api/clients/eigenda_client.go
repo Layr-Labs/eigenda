@@ -29,7 +29,7 @@ type EigenDAClient struct {
 var _ IEigenDAClient = EigenDAClient{}
 
 func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
-	err := config.Check()
+	err := config.CheckAndSetDefaults()
 	if err != nil {
 		return nil, err
 	}

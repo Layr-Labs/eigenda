@@ -31,7 +31,7 @@ type EigenDAClientConfig struct {
 	PutBlobEncodingVersion BlobEncodingVersion
 }
 
-func (c *EigenDAClientConfig) Check() error {
+func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 	if c.StatusQueryRetryInterval == 0 {
 		c.StatusQueryRetryInterval = 5 * time.Second
 	}
