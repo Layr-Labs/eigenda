@@ -1,4 +1,4 @@
-APP_NAME = eigenda-sidecar
+APP_NAME = eigenda-proxy
 LINTER_VERSION = v1.52.1
 LINTER_URL = https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
 GET_LINT_CMD = "curl -sSfL $(LINTER_URL) | sh -s -- -b $(go env GOPATH)/bin $(LINTER_VERSION)"
@@ -12,19 +12,19 @@ LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
 LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
-.PHONY: da-server
-da-server:
-	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/da-server ./cmd/daserver
+.PHONY: eigenda-proxy
+eigenda-proxy:
+	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/daserver
 
 .PHONY: docker-build
 docker-build:
 	@docker build -t $(APP_NAME) .
 
 run-server:
-	./bin/da-server
+	./bin/eigenda-proxy
 
 clean:
-	rm bin/da-server
+	rm bin/eigenda-proxy
 
 test:
 	go test -v ./... -test.skip ".*E2E.*"

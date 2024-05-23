@@ -19,7 +19,7 @@ jobs:
         go-version: 1.21
 
     - name: Build App
-      run: make da-server
+      run: make eigenda-proxy
 
   go-test:
     outputs:
