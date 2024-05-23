@@ -99,7 +99,10 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	// add some entropy to commit to emulate randomness seen in EigenDA
 	// when generating operator BLS signature certificates
 	entropy := make([]byte, 10)
-	rand.Read(entropy)
+	_, err := rand.Read(entropy)
+	if err != nil {
+		return nil, err
+	}
 
 	rawCommit := append(fingerprint.Bytes(), entropy...)
 	commit := common.Bytes2Hex(rawCommit)
