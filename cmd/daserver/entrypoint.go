@@ -40,7 +40,7 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store,
 	)
 }
 
-func StartDAServer(cliCtx *cli.Context) error {
+func StartProxySvr(cliCtx *cli.Context) error {
 	if err := CheckRequired(cliCtx); err != nil {
 		return err
 	}
