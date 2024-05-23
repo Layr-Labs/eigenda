@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
@@ -81,7 +82,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte) ([]byte, error) {
 	e.RLock()
 	defer e.RUnlock()
 
-	key := "0x" + common.Bytes2Hex(commit)
+	key := common.Bytes2Hex(commit)
 	if _, exists := e.store[key]; !exists {
 		return nil, fmt.Errorf("commitment key not found")
 	}
@@ -94,17 +95,24 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	e.Lock()
 	defer e.Unlock()
 
-	commit := crypto.Keccak256Hash(value)
+	fingerprint := crypto.Keccak256Hash(value)
+	// add some entropy to commit to emulate randomness seen in EigenDA
+	// when generating operator BLS signature certificates
+	entropy := make([]byte, 10)
+	rand.Read(entropy)
 
-	if _, exists := e.store[commit.Hex()]; exists {
+	rawCommit := append(fingerprint.Bytes(), entropy...)
+	commit := common.Bytes2Hex(rawCommit)
+
+	if _, exists := e.store[commit]; exists {
 		return nil, fmt.Errorf("commitment key already exists")
 	}
 
-	e.store[commit.Hex()] = value
+	e.store[commit] = value
 	// add expiration
-	e.keyStarts[commit.Hex()] = time.Now()
+	e.keyStarts[commit] = time.Now()
 
-	return commit.Bytes(), nil
+	return rawCommit, nil
 }
 
 func ReadConfig(ctx *cli.Context) MemStoreConfig {

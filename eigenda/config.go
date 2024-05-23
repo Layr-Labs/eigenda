@@ -90,40 +90,40 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		&cli.StringFlag{
 			Name:    RPCFlagName,
 			Usage:   "RPC endpoint of the EigenDA disperser.",
-			EnvVars: prefixEnvVars("EIGENDA_RPC"),
+			EnvVars: prefixEnvVars("TARGET_RPC"),
 		},
 		&cli.DurationFlag{
 			Name:    StatusQueryTimeoutFlagName,
 			Usage:   "Timeout for aborting an EigenDA blob dispersal if the disperser does not report that the blob has been confirmed dispersed.",
 			Value:   25 * time.Minute,
-			EnvVars: prefixEnvVars("EIGENDA_STATUS_QUERY_TIMEOUT"),
+			EnvVars: prefixEnvVars("TARGET_STATUS_QUERY_TIMEOUT"),
 		},
 		&cli.DurationFlag{
 			Name:    StatusQueryRetryIntervalFlagName,
 			Usage:   "Wait time between retries of EigenDA blob status queries (made while waiting for a blob to be confirmed by).",
 			Value:   5 * time.Second,
-			EnvVars: prefixEnvVars("EIGENDA_STATUS_QUERY_INTERVAL"),
+			EnvVars: prefixEnvVars("TARGET_STATUS_QUERY_INTERVAL"),
 		},
 		&cli.BoolFlag{
 			Name:    UseTlsFlagName,
 			Usage:   "Use TLS when connecting to the EigenDA disperser.",
 			Value:   true,
-			EnvVars: prefixEnvVars("EIGENDA_GRPC_USE_TLS"),
+			EnvVars: prefixEnvVars("TARGET_GRPC_USE_TLS"),
 		},
 		&cli.StringFlag{
 			Name:    G1PathFlagName,
 			Usage:   "Directory path to g1.point file",
-			EnvVars: prefixEnvVars("EIGENDA_KZG_G1_PATH"),
+			EnvVars: prefixEnvVars("TARGET_KZG_G1_PATH"),
 		},
 		&cli.StringFlag{
 			Name:    G2TauFlagName,
 			Usage:   "Directory path to g2.point.powerOf2 file",
-			EnvVars: prefixEnvVars("EIGENDA_G2_TAU_PATH"),
+			EnvVars: prefixEnvVars("TARGET_G2_TAU_PATH"),
 		},
 		&cli.StringFlag{
 			Name:    CachePathFlagName,
 			Usage:   "Directory path to SRS tables",
-			EnvVars: prefixEnvVars("EIGENDA_CACHE_PATH"),
+			EnvVars: prefixEnvVars("TARGET_CACHE_PATH"),
 		},
 	}
 }
