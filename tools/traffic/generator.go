@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/clients"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"

@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 
-	"github.com/Layr-Labs/eigenda/clients"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/mock"
 )

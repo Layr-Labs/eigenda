@@ -37,6 +37,7 @@ type DisperserClient interface {
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
+	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 }
 
 type disperserClient struct {
@@ -221,4 +222,24 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (
 	}
 
 	return reply, nil
+}
+
+func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
+	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
+	if err != nil {
+		return nil, err
+	}
+	disperserClient := disperser_rpc.NewDisperserClient(conn)
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+	reply, err := disperserClient.RetrieveBlob(ctxTimeout, &disperser_rpc.RetrieveBlobRequest{
+		BatchHeaderHash: batchHeaderHash,
+		BlobIndex:       blobIndex,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return reply.Data, nil
 }

@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	"github.com/Layr-Labs/eigenda/clients"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -34,7 +34,7 @@ var _ = Describe("Inabox Integration", func() {
 		Expect(err).To(BeNil())
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewSigner(privateKeyHex)
+		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",

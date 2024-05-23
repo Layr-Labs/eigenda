@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/clients"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"

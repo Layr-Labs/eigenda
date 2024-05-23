@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
-	"github.com/Layr-Labs/eigenda/clients"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"

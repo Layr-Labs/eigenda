@@ -105,7 +105,7 @@ func TestAuthRatelimit(t *testing.T) {
 
 	// Use an unauthenticated signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
-	signer := auth.NewSigner(privateKeyHex)
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	errorChan := make(chan error, 10)
 
@@ -130,7 +130,7 @@ func TestAuthRatelimit(t *testing.T) {
 
 	// Use an authenticated signer
 	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer = auth.NewSigner(privateKeyHex)
+	signer = auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 	// This should succeed because the account throughput limit is 100 KiB/s for quorum 0
 	simulateClient(t, signer, "4.4.4.4", data50KiB, []uint32{0}, 0, errorChan, false)

@@ -22,7 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
-	clientsmock "github.com/Layr-Labs/eigenda/clients/mock"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
