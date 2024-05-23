@@ -17,16 +17,16 @@ RUN go mod download
 COPY . .
 
 # Build the application binary
-RUN make da-server
+RUN make eigenda-proxy
 
 # Use alpine to run app
 FROM alpine:3.16
 
 WORKDIR /app
-COPY --from=builder /app/bin/da-server .
+COPY --from=builder /app/bin/eigenda-proxy .
 
 # API & metrics servers
 EXPOSE 4242 7300
 
 # Run app
-CMD ["./da-server"]
+CMD ["./eigenda-proxy"]

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	plasma "github.com/Layr-Labs/op-plasma-eigenda"
+	proxy "github.com/Layr-Labs/op-plasma-eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
 	"github.com/Layr-Labs/op-plasma-eigenda/store"
@@ -24,9 +25,9 @@ import (
 // Use of single port makes tests incapable of running in parallel
 const (
 	transport   = "http"
-	serviceName = "plasma_test_server"
-	testSvrHost = "127.0.0.1"
-	testSvrPort = 6969
+	serviceName = "eigenda_proxy"
+	host        = "127.0.0.1"
+	port        = 6969
 	holeskyDA   = "disperser-holesky.eigenda.xyz:443"
 )
 
@@ -54,6 +55,7 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		UseTLS:                   true,
 	}
 
+	// these values can be generated locally by running `make srs`
 	kzgCfg := &kzg.KzgConfig{
 		G1Path:          "../operator-setup/resources/g1.point",
 		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
@@ -75,10 +77,10 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		panic(err)
 	}
 
-	server := plasma.NewDAServer(testSvrHost, testSvrPort, daStore, log, metrics.NoopMetrics)
+	server := proxy.NewServer(host, port, daStore, log, metrics.NoopMetrics)
 
 	go func() {
-		t.Log("Starting test plasma server on separate routine...")
+		t.Log("Starting proxy server on separate routine...")
 		if err := server.Start(); err != nil {
 			panic(err)
 		}
@@ -101,21 +103,21 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 	ts, kill := createTestSuite(t)
 	defer kill()
 
-	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, testSvrHost, testSvrPort), false, false)
+	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, host, port), false, false)
 	t.Log("Waiting for client to establish connection with plasma server...")
 	// wait for server to come online after starting
 	time.Sleep(5 * time.Second)
 
-	// 1 - write arbitrary data to test plasma server
+	// 1 - write arbitrary data to EigenDA
 
 	var testPreimage = []byte("inter-subjective and not objective!")
 
-	t.Log("Setting input data on plasma server...")
+	t.Log("Setting input data on proxy server...")
 	commit, err := daClient.SetInput(ts.ctx, testPreimage)
 	assert.NoError(t, err)
 
-	// 2 - fetch pre-image data from test plasma server
-	t.Log("Getting input data from plasma server...")
+	// 2 - fetch data from EigenDA for generated commitment key
+	t.Log("Getting input data from proxy server...")
 	preimage, err := daClient.GetInput(ts.ctx, commit)
 	assert.NoError(t, err)
 	assert.Equal(t, testPreimage, preimage)

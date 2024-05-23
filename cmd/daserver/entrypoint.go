@@ -4,18 +4,43 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
+	"github.com/Layr-Labs/op-plasma-eigenda/store"
+	"github.com/Layr-Labs/op-plasma-eigenda/verify"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
-	plasma "github.com/Layr-Labs/op-plasma-eigenda"
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
-	plasma_store "github.com/Layr-Labs/op-plasma-eigenda/store"
-	"github.com/Layr-Labs/op-plasma-eigenda/verify"
+	proxy "github.com/Layr-Labs/op-plasma-eigenda"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
 
-func StartDAServer(cliCtx *cli.Context) error {
+func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store, error) {
+	if cfg.MemStoreCfg.Enabled {
+		log.Info("Using memstore backend")
+		return store.NewMemStore(ctx, &cfg.MemStoreCfg)
+	}
+
+	log.Info("Using eigenda backend")
+	daCfg := cfg.EigenDAConfig
+
+	v, err := verify.NewVerifier(daCfg.KzgConfig())
+	if err != nil {
+		return nil, err
+	}
+
+	return store.NewEigenDAStore(
+		ctx,
+		eigenda.NewEigenDAClient(
+			log,
+			daCfg,
+		),
+		v,
+	)
+}
+
+func StartProxySvr(cliCtx *cli.Context) error {
 	if err := CheckRequired(cliCtx); err != nil {
 		return err
 	}
@@ -23,32 +48,21 @@ func StartDAServer(cliCtx *cli.Context) error {
 	if err := cfg.Check(); err != nil {
 		return err
 	}
+	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
+	defer ctxCancel()
+
 	m := metrics.NewMetrics("default")
 
-	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_plasma_server")
+	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_proxy")
 	oplog.SetGlobalLogHandler(log.Handler())
 
 	log.Info("Initializing EigenDA Plasma DA server...")
 
-	daCfg := cfg.EigenDAConfig
-
-	v, err := verify.NewVerifier(daCfg.KzgConfig())
+	da, err := LoadStore(cfg, ctx, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create store: %w", err)
 	}
-
-	store, err := plasma_store.NewEigenDAStore(
-		cliCtx.Context,
-		eigenda.NewEigenDAClient(
-			log,
-			daCfg,
-		),
-		v,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create EigenDA store: %w", err)
-	}
-	server := plasma.NewDAServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), store, log, m)
+	server := proxy.NewServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), da, log, m)
 
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server")
@@ -60,6 +74,8 @@ func StartDAServer(cliCtx *cli.Context) error {
 		if err := server.Stop(); err != nil {
 			log.Error("failed to stop DA server", "err", err)
 		}
+
+		log.Info("successfully shutdown API server")
 	}()
 
 	if cfg.MetricsCfg.Enabled {

@@ -14,18 +14,23 @@ Additional cli args are provided for targeting an EigenDA network backend:
 - `--eigenda-status-query-timeout`: (default: 25m) Duration for which a client will wait for a blob to finalize after being sent for dispersal.
 - `--eigenda-status-query-retry-interval`: (default: 5s) How often a client will attempt a retry when awaiting network blob finalization. 
 - `--eigenda-use-tls`: (default: true) Whether or not to use TLS for grpc communication with disperser.
-- `eigenda-g1-path`: Directory path to g1.point file
-- `eigenda-g2-power-of-tau`: Directory path to g2.point.powerOf2 file
-- `eigenda-cache-path`: Directory path to dump cached SRS tables
+- `--eigenda-g1-path`: Directory path to g1.point file
+- `--eigenda-g2-power-of-tau`: Directory path to g2.point.powerOf2 file
+- `--eigenda-cache-path`: Directory path to dump cached SRS tables
+
+### In-Memory Storage
+An ephemeral memory store backend can be used for faster feedback testing when performing rollup integrations. The following cli args can be used to target the feature:
+* `--memstore.enabled`: Boolean feature flag
+* `--memstore.expiration`: Duration for which a blob will exist
 
 ## Running Locally
-1. Compile binary: `make da-server`
-2. Run binary; e.g: `./bin/da-server --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path test/resources/g1.point --eigenda-g2-tau-path test/resources/g2.point.powerOf2 --eigenda-use-tls true`
+1. Compile binary: `make eigenda-proxy`
+2. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path test/resources/g1.point --eigenda-g2-tau-path test/resources/g2.point.powerOf2 --eigenda-use-tls true`
 
 **Env File**
 An env file can be provided to the binary for runtime process ingestion; e.g:
 1. Create env: `cp .env.example .env`
-2. Pass into binary: `ENV_PATH=.env ./bin/da-server`
+2. Pass into binary: `ENV_PATH=.env ./bin/eigenda-proxy`
 
 ## Running via Docker
 Container can be built via running `make build-docker`. 
@@ -79,5 +84,3 @@ The following specs are recommended for running on a single production server:
 - [op-stack](https://github.com/ethereum-optimism/optimism)
 - [plasma spec](https://specs.optimism.io/experimental/plasma.html)
 - [eigen da](https://github.com/Layr-Labs/eigenda)
-
-

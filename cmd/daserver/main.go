@@ -24,10 +24,10 @@ func main() {
 	app := cli.NewApp()
 	app.Flags = cliapp.ProtectFlags(Flags)
 	app.Version = opservice.FormatVersion(Version, "", "", "")
-	app.Name = "eigenda-plasma-server"
-	app.Usage = "EigenDA Plasma DA Storage Service"
-	app.Description = "Service for storing plasma DA inputs"
-	app.Action = StartDAServer
+	app.Name = "eigenda-proxy"
+	app.Usage = "EigenDA Proxy Sidecar Service"
+	app.Description = "Service for more trustless and secure interactions with EigenDA"
+	app.Action = StartProxySvr
 	app.Commands = []*cli.Command{
 		{
 			Name:        "doc",

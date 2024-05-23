@@ -6,6 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
+	"github.com/Layr-Labs/op-plasma-eigenda/store"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -16,7 +17,7 @@ const (
 	PortFlagName       = "port"
 )
 
-const EnvVarPrefix = "EIGEN_PLASMA_SERVER"
+const EnvVarPrefix = "EIGENDA_PROXY"
 
 func prefixEnvVars(name string) []string {
 	return opservice.PrefixEnvVar(EnvVarPrefix, name)
@@ -48,6 +49,7 @@ func init() {
 	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, eigenda.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, store.CLIFlags(EnvVarPrefix)...)
 	Flags = append(requiredFlags, optionalFlags...)
 }
 
@@ -55,16 +57,16 @@ func init() {
 var Flags []cli.Flag
 
 type CLIConfig struct {
-	FileStoreDirPath string
-	S3Bucket         string
-	EigenDAConfig    eigenda.Config
-	MetricsCfg       opmetrics.CLIConfig
+	MemStoreCfg   store.MemStoreConfig
+	EigenDAConfig eigenda.Config
+	MetricsCfg    opmetrics.CLIConfig
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 	return CLIConfig{
 		EigenDAConfig: eigenda.ReadConfig(ctx),
 		MetricsCfg:    opmetrics.ReadCLIConfig(ctx),
+		MemStoreCfg:   store.ReadConfig(ctx),
 	}
 }
 

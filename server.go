@@ -1,4 +1,4 @@
-package plasma
+package proxy
 
 import (
 	"context"
@@ -22,7 +22,7 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-type PlasmaStore interface {
+type Store interface {
 	// Get retrieves the given key if it's present in the key-value data store.
 	Get(ctx context.Context, key []byte) ([]byte, error)
 	// Put inserts the given value into the key-value data store.
@@ -32,14 +32,14 @@ type PlasmaStore interface {
 type DAServer struct {
 	log        log.Logger
 	endpoint   string
-	store      PlasmaStore
+	store      Store
 	m          metrics.Metricer
 	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
 
-func NewDAServer(host string, port int, store PlasmaStore, log log.Logger, m metrics.Metricer) *DAServer {
+func NewServer(host string, port int, store Store, log log.Logger, m metrics.Metricer) *DAServer {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &DAServer{
 		m:        m,
@@ -72,7 +72,7 @@ func (d *DAServer) Start() error {
 
 	d.endpoint = listener.Addr().String()
 
-	d.log.Info("Starting DA server on", d.endpoint)
+	d.log.Info("Starting DA server", "endpoint", d.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
 		if d.tls != nil {
@@ -108,7 +108,7 @@ func (d *DAServer) Health(w http.ResponseWriter, r *http.Request) {
 
 func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 	d.log.Info("GET", "url", r.URL)
-	recordDur := d.m.RecordRPCServerRequest("put")
+	recordDur := d.m.RecordRPCServerRequest("get")
 	defer recordDur()
 
 	route := path.Dir(r.URL.Path)
