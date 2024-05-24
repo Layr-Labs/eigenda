@@ -53,6 +53,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -402,7 +403,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	dis.batcher.EncodingStreamer.Pool.StopWait()
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
-	dis.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	dis.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(txn, nil)
 	dis.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = dis.batcher.HandleSingleBatch(ctx)

@@ -2,25 +2,33 @@ package mock
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/stretchr/testify/mock"
 )
 
 type Dispatcher struct {
-	state *mock.PrivateOperatorState
+	mock.Mock
+	state *coremock.PrivateOperatorState
 }
 
 var _ disperser.Dispatcher = (*Dispatcher)(nil)
 
-func NewDispatcher(state *mock.PrivateOperatorState) disperser.Dispatcher {
+func NewDispatcher(state *coremock.PrivateOperatorState) *Dispatcher {
 	return &Dispatcher{
 		state: state,
 	}
 }
 
 func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader) chan core.SigningMessage {
+	args := d.Called()
+	var nonSigners map[core.OperatorID]struct{}
+	if args.Get(0) != nil {
+		nonSigners = args.Get(0).(map[core.OperatorID]struct{})
+	}
 	update := make(chan core.SigningMessage)
 	message, err := header.GetBatchHeaderHash()
 	if err != nil {
@@ -34,13 +42,22 @@ func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 	}
 
 	go func() {
-		for id, op := range d.state.PrivateOperators {
-			sig := op.KeyPair.SignMessage(message)
+		for id := range state.IndexedOperators {
+			info := d.state.PrivateOperators[id]
+			if _, ok := nonSigners[id]; ok {
+				update <- core.SigningMessage{
+					Signature: nil,
+					Operator:  id,
+					Err:       errors.New("not a signer"),
+				}
+			} else {
+				sig := info.KeyPair.SignMessage(message)
 
-			update <- core.SigningMessage{
-				Signature: sig,
-				Operator:  id,
-				Err:       nil,
+				update <- core.SigningMessage{
+					Signature: sig,
+					Operator:  id,
+					Err:       nil,
+				}
 			}
 		}
 	}()
