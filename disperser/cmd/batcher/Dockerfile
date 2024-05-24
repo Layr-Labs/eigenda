@@ -21,6 +21,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.18
 
+RUN apk update \
+    && apk add --update sudo \
+    && apk add --update curl \
+    && apk add --update tcptraceroute \
+    && apk add --update tcpdump
+
 COPY --from=builder /app/disperser/bin/server /usr/local/bin
 
 ENTRYPOINT ["server"]

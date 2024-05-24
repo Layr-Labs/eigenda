@@ -1,3 +1,12 @@
+GITCOMMIT := $(shell git rev-parse --short HEAD)
+GITDATE := $(shell git log -1 --format=%cd --date=unix)
+
+# GitVersion provides the semantic versioning for the project.
+SEMVER := $(shell docker run --rm --volume "${PWD}/../:/repo" gittools/gitversion:5.12.0 /repo -output json -showvariable SemVer)
+ifeq ($(SEMVER), )
+SEMVER = "0.0.0" # Fallback if docker is not installed or gitversion fails
+endif
+
 clean:
 	rm -rf ./bin
 
@@ -5,6 +14,9 @@ build: build_server build_batcher build_encoder build_dataapi
 
 build_batcher:
 	go build -o ./bin/batcher ./cmd/batcher
+
+docker-batcher:
+	cd ../ && docker build --build-arg SEMVER=${SEMVER} --build-arg GITCOMMIT=${GITCOMMIT} --build-arg GITDATE=${GITDATE} . -t batcher:${SEMVER} -t batcher:latest -f disperser/cmd/batcher/Dockerfile
 
 build_server:
 	go build -o ./bin/server ./cmd/apiserver
