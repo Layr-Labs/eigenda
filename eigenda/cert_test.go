@@ -3,8 +3,8 @@ package eigenda
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	eigen_da_common "github.com/Layr-Labs/eigenda/api/grpc/common"
-	"github.com/Layr-Labs/op-plasma-eigenda/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )

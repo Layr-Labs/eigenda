@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
-	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/eigenda"
+	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"

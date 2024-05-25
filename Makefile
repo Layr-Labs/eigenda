@@ -14,7 +14,7 @@ LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
 .PHONY: eigenda-proxy
 eigenda-proxy:
-	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/daserver
+	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
 
 .PHONY: docker-build
 docker-build:
