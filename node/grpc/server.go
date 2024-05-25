@@ -200,6 +200,8 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	start := time.Now()
 
+	s.node.Logger.Info("StoreChunks RPC request recieved", "request message size", proto.Size(in))
+
 	// Validate the request.
 	if err := s.validateStoreChunkRequest(in); err != nil {
 		return nil, err

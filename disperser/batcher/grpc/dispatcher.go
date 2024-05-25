@@ -14,6 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
 )
 
 type Config struct {
@@ -130,7 +131,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	}
 
 	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
-	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize)
+	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize, "request message size", proto.Size(request))
 	reply, err := gc.StoreChunks(ctx, request, opt)
 
 	if err != nil {
