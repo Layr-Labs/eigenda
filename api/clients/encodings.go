@@ -67,7 +67,6 @@ func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error)
 	// Return exact data with buffer removed
 	reader := bytes.NewReader(decodedData)
 
-	// read version byte, we will not use it for now since there is only one version
 	versionByte, err := reader.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read version byte")
@@ -162,7 +161,6 @@ func (v IFFTBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 	// Return exact data with buffer removed
 	reader := bytes.NewReader(decodedData)
 
-	// read version byte, we will not use it for now since there is only one version
 	versionByte, err := reader.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read version byte")
