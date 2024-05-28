@@ -153,7 +153,15 @@ func (v IFFTBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to convert encoded data to fr array")
 	}
 
-	decodedDataBytes := rs.ToByteArray(decodedDataFr, nextPowerOfTwo*encoding.BYTES_PER_SYMBOL)
+	decodedDataFrLen := len(decodedDataFr)
+
+	fs := fft.NewFFTSettings(uint8(decodedDataFrLen))
+	decodedDataFftFr, err := fs.FFT(decodedDataFr, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform IFFT: %w", err)
+	}
+
+	decodedDataBytes := rs.ToByteArray(decodedDataFftFr, uint64(decodedDataFrLen)*encoding.BYTES_PER_SYMBOL)
 
 	// decode modulo bn254
 	decodedData := codec.RemoveEmptyByteFromPaddedBytes(decodedDataBytes)
