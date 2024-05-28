@@ -16,65 +16,6 @@ type IFFTBlobEncodingCodec struct{}
 
 var _ BlobCodec = IFFTBlobEncodingCodec{}
 
-// func (v IFFTBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
-// 	// check that the length of the data is a power of two
-// 	nextPowerOfTwo := encoding.NextPowerOf2(uint64(len(encodedData)))
-
-// 	if len(encodedData) != int(nextPowerOfTwo) {
-// 		return nil, fmt.Errorf("encoded data length is not a power of two, data length: %d", len(encodedData))
-// 	}
-
-// 	// perform FFT on data
-// 	decodedDataFr, err := rs.ToFrArray(encodedData)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to convert encoded data to fr array")
-// 	}
-
-// 	decodedDataFrLen := len(decodedDataFr)
-
-// 	maxScale := uint8(math.Log2(float64(decodedDataFrLen)))
-
-// 	fs := fft.NewFFTSettings(maxScale)
-// 	decodedDataFftFr, err := fs.FFT(decodedDataFr, false)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to perform FFT: %w", err)
-// 	}
-
-// 	decodedDataBytes := rs.ToByteArray(decodedDataFftFr, uint64(decodedDataFrLen)*encoding.BYTES_PER_SYMBOL)
-
-// 	// decode modulo bn254
-// 	decodedData := codec.RemoveEmptyByteFromPaddedBytes(decodedDataBytes)
-
-// 	// Return exact data with buffer removed
-// 	reader := bytes.NewReader(decodedData)
-
-// 	versionByte, err := reader.ReadByte()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to read version byte")
-// 	}
-
-// 	if IFFTBlobEncoding != BlobEncodingVersion(versionByte) {
-// 		return nil, fmt.Errorf("unsupported blob encoding version: %x", versionByte)
-// 	}
-
-// 	// read length uvarint
-// 	length, err := binary.ReadUvarint(reader)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to decode length uvarint prefix")
-// 	}
-
-// 	rawData := make([]byte, length)
-// 	n, err := reader.Read(rawData)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
-// 	}
-// 	if uint64(n) != length {
-// 		return nil, fmt.Errorf("data length does not match length prefix")
-// 	}
-
-// 	return rawData, nil
-// }
-
 func (v IFFTBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	// create the 32 bytes long codec blob header
 	codecBlobHeader := EncodeCodecBlobHeader(byte(IFFTBlobEncoding), uint64(len(rawData)))

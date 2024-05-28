@@ -34,9 +34,6 @@ func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error)
 		return nil, fmt.Errorf("unsupported blob encoding version: %x", versionByte)
 	}
 
-	fmt.Println("versionByte", versionByte)
-	fmt.Println("length", length)
-
 	// get non blob header data
 	rawDataPadded := encodedData[32:]
 
