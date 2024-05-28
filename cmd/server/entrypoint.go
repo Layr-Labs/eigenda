@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
@@ -30,12 +30,13 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store,
 		return nil, err
 	}
 
+	client, err := clients.NewEigenDAClient(log, daCfg.ClientConfig)
+	if err != nil {
+		return nil, err
+	}
 	return store.NewEigenDAStore(
 		ctx,
-		eigenda.NewEigenDAClient(
-			log,
-			daCfg,
-		),
+		client,
 		v,
 	)
 }

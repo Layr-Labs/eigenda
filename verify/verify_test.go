@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/eigenda"
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/stretchr/testify/assert"
@@ -41,11 +42,17 @@ func TestVerification(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Happy path verification
-	err = v.Verify(c, eigenda.EncodeToBlob(data))
+
+	// TODO: Update this test to use the IFFT codec
+	codec := codecs.DefaultBlobEncodingCodec{}
+	blob, err := codec.EncodeBlob(data)
+	assert.NoError(t, err)
+	err = v.Verify(c, blob)
 	assert.NoError(t, err)
 
 	// failure with wrong data
-	fakeData := eigenda.EncodeToBlob([]byte("I am an imposter!!"))
+	fakeData, err := codec.EncodeBlob([]byte("I am an imposter!!"))
+	assert.NoError(t, err)
 	err = v.Verify(c, fakeData)
 	assert.Error(t, err)
 }
