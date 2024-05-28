@@ -2,7 +2,6 @@ package codecs
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -13,45 +12,38 @@ type DefaultBlobEncodingCodec struct{}
 var _ BlobCodec = DefaultBlobEncodingCodec{}
 
 func (v DefaultBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
-	// encode current blob encoding version byte
-	encodedData := make([]byte, 0, 1+8+len(rawData))
+	// encode blob encoding version byte
+	codecBlobHeader := EncodeCodecBlobHeader(byte(DefaultBlobEncoding), uint64(len(rawData)))
 
-	// append version byte
-	encodedData = append(encodedData, byte(DefaultBlobEncoding))
-
-	// encode data length
-	encodedData = append(encodedData, ConvertIntToVarUInt(len(rawData))...)
+	// encode raw data modulo bn254
+	rawDataPadded := codec.ConvertByPaddingEmptyByte(rawData)
 
 	// append raw data
-	encodedData = append(encodedData, rawData...)
-
-	// encode modulo bn254
-	encodedData = codec.ConvertByPaddingEmptyByte(encodedData)
+	encodedData := append(codecBlobHeader, rawDataPadded...)
 
 	return encodedData, nil
 }
 
 func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
-	// decode modulo bn254
-	decodedData := codec.RemoveEmptyByteFromPaddedBytes(encodedData)
-
-	// Return exact data with buffer removed
-	reader := bytes.NewReader(decodedData)
-
-	versionByte, err := reader.ReadByte()
+	versionByte, length, err := DecodeCodecBlobHeader(encodedData[:32])
 	if err != nil {
-		return nil, fmt.Errorf("failed to read version byte")
+		return nil, err
 	}
+
 	if DefaultBlobEncoding != BlobEncodingVersion(versionByte) {
 		return nil, fmt.Errorf("unsupported blob encoding version: %x", versionByte)
 	}
 
-	// read length uvarint
-	length, err := binary.ReadUvarint(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode length uvarint prefix")
-	}
+	fmt.Println("versionByte", versionByte)
+	fmt.Println("length", length)
 
+	// get non blob header data
+	rawDataPadded := encodedData[32:]
+
+	// decode raw data modulo bn254
+	decodedRawData := codec.RemoveEmptyByteFromPaddedBytes(rawDataPadded)
+
+	reader := bytes.NewReader(decodedRawData)
 	rawData := make([]byte, length)
 	n, err := reader.Read(rawData)
 	if err != nil {

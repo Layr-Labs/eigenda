@@ -67,8 +67,12 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 		return nil, fmt.Errorf("blob has length zero")
 	}
 
-	version := codecs.BlobEncodingVersion(data[0])
-	codec, err := codecs.BlobEncodingVersionToCodec(version)
+	version, _, err := codecs.DecodeCodecBlobHeader(data[:32])
+	if err != nil {
+		return nil, fmt.Errorf("error getting blob: %w", err)
+	}
+
+	codec, err := codecs.BlobEncodingVersionToCodec(codecs.BlobEncodingVersion(version))
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
