@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,6 +23,7 @@ func TestGetSet(t *testing.T) {
 			Enabled:        true,
 			BlobExpiration: time.Hour * 1000,
 		},
+		log.New(),
 	)
 
 	assert.NoError(t, err)
@@ -46,6 +48,7 @@ func TestExpiration(t *testing.T) {
 			Enabled:        true,
 			BlobExpiration: time.Millisecond * 10,
 		},
+		log.New(),
 	)
 
 	assert.NoError(t, err)
@@ -54,7 +57,7 @@ func TestExpiration(t *testing.T) {
 	key, err := ms.Put(ctx, preimage)
 	assert.NoError(t, err)
 
-	// sleep 1ms and verify that older entries are removed
+	// sleep 1 second and verify that older blob entries are removed
 	time.Sleep(time.Second * 1)
 
 	_, err = ms.Get(ctx, key)

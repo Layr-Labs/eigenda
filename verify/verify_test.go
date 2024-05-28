@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 	"github.com/stretchr/testify/assert"
 )
 

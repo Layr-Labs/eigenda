@@ -5,10 +5,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 
+	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
 )
 
 type Verifier struct {

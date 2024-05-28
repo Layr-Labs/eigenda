@@ -5,8 +5,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
-	"github.com/Layr-Labs/op-plasma-eigenda/store"
+	"github.com/Layr-Labs/eigenda-proxy/eigenda"
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"

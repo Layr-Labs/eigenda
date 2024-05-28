@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
-	"github.com/Layr-Labs/op-plasma-eigenda/verify"
+	"github.com/Layr-Labs/eigenda-proxy/eigenda"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

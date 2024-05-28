@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/op-plasma-eigenda/eigenda"
-	"github.com/Layr-Labs/op-plasma-eigenda/metrics"
-	"github.com/Layr-Labs/op-plasma-eigenda/store"
-	"github.com/Layr-Labs/op-plasma-eigenda/verify"
+	"github.com/Layr-Labs/eigenda-proxy/eigenda"
+	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
-	proxy "github.com/Layr-Labs/op-plasma-eigenda"
+	proxy "github.com/Layr-Labs/eigenda-proxy"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
@@ -19,7 +19,7 @@ import (
 func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store, error) {
 	if cfg.MemStoreCfg.Enabled {
 		log.Info("Using memstore backend")
-		return store.NewMemStore(ctx, &cfg.MemStoreCfg)
+		return store.NewMemStore(ctx, &cfg.MemStoreCfg, log)
 	}
 
 	log.Info("Using eigenda backend")
@@ -56,7 +56,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_proxy")
 	oplog.SetGlobalLogHandler(log.Handler())
 
-	log.Info("Initializing EigenDA Plasma DA server...")
+	log.Info("Initializing EigenDA proxy server...")
 
 	da, err := LoadStore(cfg, ctx, log)
 	if err != nil {

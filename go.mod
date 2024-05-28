@@ -1,4 +1,4 @@
-module github.com/Layr-Labs/op-plasma-eigenda
+module github.com/Layr-Labs/eigenda-proxy
 
 go 1.21
 

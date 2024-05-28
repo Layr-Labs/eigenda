@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/urfave/cli/v2"
@@ -31,19 +33,22 @@ type MemStore struct {
 	sync.RWMutex
 
 	cfg       *MemStoreConfig
+	l         log.Logger
 	keyStarts map[string]time.Time
 	store     map[string][]byte
 }
 
 // NewMemStore ... constructor
-func NewMemStore(ctx context.Context, cfg *MemStoreConfig) (*MemStore, error) {
+func NewMemStore(ctx context.Context, cfg *MemStoreConfig, l log.Logger) (*MemStore, error) {
 	store := &MemStore{
 		cfg:       cfg,
+		l:         l,
 		keyStarts: make(map[string]time.Time),
 		store:     make(map[string][]byte),
 	}
 
 	if cfg.BlobExpiration != 0 {
+		l.Info("memstore expiration enabled", "time", cfg.BlobExpiration)
 		go store.EventLoop(ctx)
 	}
 
@@ -51,17 +56,18 @@ func NewMemStore(ctx context.Context, cfg *MemStoreConfig) (*MemStore, error) {
 }
 
 func (e *MemStore) EventLoop(ctx context.Context) {
-
 	timer := time.NewTicker(DefaultPruneInterval)
 
-	select {
-	case <-ctx.Done():
-		return
+	for {
+		select {
+		case <-ctx.Done():
+			return
 
-	case <-timer.C:
-		e.pruneExpired()
+		case <-timer.C:
+			e.l.Debug("pruning expired blobs")
+			e.pruneExpired()
+		}
 	}
-
 }
 
 func (e *MemStore) pruneExpired() {
@@ -72,6 +78,8 @@ func (e *MemStore) pruneExpired() {
 		if time.Since(dur) >= e.cfg.BlobExpiration {
 			delete(e.keyStarts, commit)
 			delete(e.store, commit)
+
+			e.l.Info("blob pruned", "commit", commit)
 		}
 	}
 
