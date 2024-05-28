@@ -3,6 +3,7 @@ package clients
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"testing"
 )
@@ -47,4 +48,24 @@ func TestDefaultBlobEncodingCodec(t *testing.T) {
 			t.Fatalf("Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v", i, originalData, decodedData)
 		}
 	}
+}
+
+func TestDefaultBlobEncodingCodec_EncodeBlobIFFT(t *testing.T) {
+	codec := DefaultBlobEncodingCodec{}
+
+	// Test data
+	originalData := randomByteSlice(33)
+
+	fmt.Println("Original Data:")
+	fmt.Println(originalData)
+
+	// Encode the data using EncodeBlobIFFT
+	encodedData, err := codec.EncodeBlobIFFT(originalData)
+	if err != nil {
+		t.Fatalf("Failed to encode data: %v", err)
+	}
+
+	fmt.Println("Encoded Data:")
+	fmt.Println(encodedData)
+
 }
