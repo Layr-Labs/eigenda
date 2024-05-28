@@ -55,23 +55,32 @@ func TestDefaultBlobEncodingCodec(t *testing.T) {
 func TestIFFTBlobEncodingCodec(t *testing.T) {
 	codec := IFFTBlobEncodingCodec{}
 
-	// Test data
-	originalData := []byte("test data for IFFT encoding")
+	// Number of test iterations
+	const iterations = 100
 
-	// Encode the data using IFFTBlobEncodingCodec
-	encodedData, err := codec.EncodeBlob(originalData)
-	if err != nil {
-		t.Fatalf("Failed to encode data: %v", err)
-	}
+	for i := 0; i < iterations; i++ {
+		// Generate a random length for the byte slice
+		length, err := rand.Int(rand.Reader, big.NewInt(1024)) // Random length between 0 and 1023
+		if err != nil {
+			panic(err)
+		}
+		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
 
-	// Decode the encoded data to verify it matches the original
-	decodedData, err := codec.DecodeBlob(encodedData)
-	if err != nil {
-		t.Fatalf("Failed to decode data: %v", err)
-	}
+		// Encode the data using IFFTBlobEncodingCodec
+		encodedData, err := codec.EncodeBlob(originalData)
+		if err != nil {
+			t.Fatalf("Failed to encode data: %v", err)
+		}
 
-	// Check if the original and decoded data match
-	if !bytes.Equal(originalData, decodedData) {
-		t.Errorf("Original data and decoded data do not match. Original: %v, Decoded: %v", originalData, decodedData)
+		// Decode the encoded data to verify it matches the original
+		decodedData, err := codec.DecodeBlob(encodedData)
+		if err != nil {
+			t.Fatalf("Failed to decode data: %v", err)
+		}
+
+		// Check if the original and decoded data match
+		if !bytes.Equal(originalData, decodedData) {
+			t.Errorf("Original data and decoded data do not match. Original: %v, Decoded: %v", originalData, decodedData)
+		}
 	}
 }

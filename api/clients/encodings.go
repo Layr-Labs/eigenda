@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -127,8 +128,10 @@ func (v IFFTBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 		}
 	}
 
+	maxScale := uint8(math.Log2(float64(encodedDataFrLenPow2)))
+
 	// perform IFFT
-	fs := fft.NewFFTSettings(uint8(encodedDataFrLen))
+	fs := fft.NewFFTSettings(maxScale)
 	encodedDataIfftFr, err := fs.FFT(paddedEncodedDataFr, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform IFFT: %w", err)
@@ -155,10 +158,12 @@ func (v IFFTBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 
 	decodedDataFrLen := len(decodedDataFr)
 
-	fs := fft.NewFFTSettings(uint8(decodedDataFrLen))
+	maxScale := uint8(math.Log2(float64(decodedDataFrLen)))
+
+	fs := fft.NewFFTSettings(maxScale)
 	decodedDataFftFr, err := fs.FFT(decodedDataFr, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform IFFT: %w", err)
+		return nil, fmt.Errorf("failed to perform FFT: %w", err)
 	}
 
 	decodedDataBytes := rs.ToByteArray(decodedDataFftFr, uint64(decodedDataFrLen)*encoding.BYTES_PER_SYMBOL)
