@@ -3,7 +3,6 @@ package clients
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"testing"
 )
@@ -35,7 +34,10 @@ func TestDefaultBlobEncodingCodec(t *testing.T) {
 		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
 
 		// Encode the original data
-		encodedData := codec.EncodeBlob(originalData)
+		encodedData, err := codec.EncodeBlob(originalData)
+		if err != nil {
+			t.Fatalf("Iteration %d: failed to encode blob: %v", i, err)
+		}
 
 		// Decode the encoded data
 		decodedData, err := codec.DecodeBlob(encodedData)
@@ -50,22 +52,26 @@ func TestDefaultBlobEncodingCodec(t *testing.T) {
 	}
 }
 
-func TestDefaultBlobEncodingCodec_EncodeBlobIFFT(t *testing.T) {
-	codec := DefaultBlobEncodingCodec{}
+func TestIFFTBlobEncodingCodec(t *testing.T) {
+	codec := IFFTBlobEncodingCodec{}
 
 	// Test data
-	originalData := randomByteSlice(33)
+	originalData := []byte("test data for IFFT encoding")
 
-	fmt.Println("Original Data:")
-	fmt.Println(originalData)
-
-	// Encode the data using EncodeBlobIFFT
-	encodedData, err := codec.EncodeBlobIFFT(originalData)
+	// Encode the data using IFFTBlobEncodingCodec
+	encodedData, err := codec.EncodeBlob(originalData)
 	if err != nil {
 		t.Fatalf("Failed to encode data: %v", err)
 	}
 
-	fmt.Println("Encoded Data:")
-	fmt.Println(encodedData)
+	// Decode the encoded data to verify it matches the original
+	decodedData, err := codec.DecodeBlob(encodedData)
+	if err != nil {
+		t.Fatalf("Failed to decode data: %v", err)
+	}
 
+	// Check if the original and decoded data match
+	if !bytes.Equal(originalData, decodedData) {
+		t.Errorf("Original data and decoded data do not match. Original: %v, Decoded: %v", originalData, decodedData)
+	}
 }

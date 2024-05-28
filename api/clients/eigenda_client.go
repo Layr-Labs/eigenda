@@ -105,7 +105,11 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		errChan <- fmt.Errorf("PutCodec cannot be nil")
 		return
 	}
-	data := m.PutCodec.EncodeBlob(rawData)
+	data, err := m.PutCodec.EncodeBlob(rawData)
+	if err != nil {
+		errChan <- fmt.Errorf("error encoding blob: %w", err)
+		return
+	}
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {

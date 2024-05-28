@@ -99,7 +99,7 @@ func (v IFFTBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	encodedData := make([]byte, 0, 1+8+len(rawData))
 
 	// append version byte
-	encodedData = append(encodedData, byte(DefaultBlobEncoding))
+	encodedData = append(encodedData, byte(IFFTBlobEncoding))
 
 	// encode data length
 	encodedData = append(encodedData, ConvertIntToVarUInt(len(rawData))...)
