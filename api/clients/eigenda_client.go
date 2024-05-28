@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -23,7 +24,7 @@ type EigenDAClient struct {
 	Config   EigenDAClientConfig
 	Log      log.Logger
 	Client   DisperserClient
-	PutCodec BlobCodec
+	PutCodec codecs.BlobCodec
 }
 
 var _ IEigenDAClient = EigenDAClient{}
@@ -43,7 +44,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
 
-	codec, err := BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
+	codec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing EigenDA client: %w", err)
 	}
@@ -66,8 +67,8 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 		return nil, fmt.Errorf("blob has length zero")
 	}
 
-	version := BlobEncodingVersion(data[0])
-	codec, err := BlobEncodingVersionToCodec(version)
+	version := codecs.BlobEncodingVersion(data[0])
+	codec, err := codecs.BlobEncodingVersionToCodec(version)
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}

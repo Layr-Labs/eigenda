@@ -1,4 +1,4 @@
-package clients
+package codecs
 
 import (
 	"bytes"
@@ -13,86 +13,9 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type BlobEncodingVersion byte
-
-const (
-	// This minimal blob encoding includes a version byte, a length varuint, and 31 byte field element mapping. It does not include IFFT padding + IFFT.
-	DefaultBlobEncoding BlobEncodingVersion = 0x0
-	IFFTBlobEncoding    BlobEncodingVersion = 0x01
-)
-
-type BlobCodec interface {
-	DecodeBlob(encodedData []byte) ([]byte, error)
-	EncodeBlob(rawData []byte) ([]byte, error)
-}
-
-func BlobEncodingVersionToCodec(version BlobEncodingVersion) (BlobCodec, error) {
-	switch version {
-	case DefaultBlobEncoding:
-		return DefaultBlobEncodingCodec{}, nil
-	case IFFTBlobEncoding:
-		return IFFTBlobEncodingCodec{}, nil
-	default:
-		return nil, fmt.Errorf("unsupported blob encoding version: %x", version)
-	}
-}
-
-type DefaultBlobEncodingCodec struct{}
 type IFFTBlobEncodingCodec struct{}
 
-var _ BlobCodec = DefaultBlobEncodingCodec{}
-
-func (v DefaultBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
-	// encode current blob encoding version byte
-	encodedData := make([]byte, 0, 1+8+len(rawData))
-
-	// append version byte
-	encodedData = append(encodedData, byte(DefaultBlobEncoding))
-
-	// encode data length
-	encodedData = append(encodedData, ConvertIntToVarUInt(len(rawData))...)
-
-	// append raw data
-	encodedData = append(encodedData, rawData...)
-
-	// encode modulo bn254
-	encodedData = codec.ConvertByPaddingEmptyByte(encodedData)
-
-	return encodedData, nil
-}
-
-func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
-	// decode modulo bn254
-	decodedData := codec.RemoveEmptyByteFromPaddedBytes(encodedData)
-
-	// Return exact data with buffer removed
-	reader := bytes.NewReader(decodedData)
-
-	versionByte, err := reader.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read version byte")
-	}
-	if DefaultBlobEncoding != BlobEncodingVersion(versionByte) {
-		return nil, fmt.Errorf("unsupported blob encoding version: %x", versionByte)
-	}
-
-	// read length uvarint
-	length, err := binary.ReadUvarint(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode length uvarint prefix")
-	}
-
-	rawData := make([]byte, length)
-	n, err := reader.Read(rawData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
-	}
-	if uint64(n) != length {
-		return nil, fmt.Errorf("data length does not match length prefix")
-	}
-
-	return rawData, nil
-}
+var _ BlobCodec = IFFTBlobEncodingCodec{}
 
 func (v IFFTBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	// encode current blob encoding version byte

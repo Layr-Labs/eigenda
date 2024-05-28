@@ -1,4 +1,4 @@
-package clients
+package codecs
 
 import "encoding/binary"
 

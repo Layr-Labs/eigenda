@@ -3,6 +3,8 @@ package clients
 import (
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 )
 
 type EigenDAClientConfig struct {
@@ -28,7 +30,7 @@ type EigenDAClientConfig struct {
 	DisableTLS bool
 
 	// The blob encoding version to use when writing blobs from the high level interface.
-	PutBlobEncodingVersion BlobEncodingVersion
+	PutBlobEncodingVersion codecs.BlobEncodingVersion
 }
 
 func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
