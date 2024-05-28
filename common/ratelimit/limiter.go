@@ -119,7 +119,7 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
 		allowed = allowed && bucketParams.BucketLevels[i] > 0
 
-		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
+		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "name", params.RequesterName, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
 
 		// Update metrics only if the requester name is provided. We're making
 		// an assumption that the requester name is only provided for authenticated
