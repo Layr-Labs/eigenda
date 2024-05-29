@@ -5,19 +5,19 @@ import (
 	"fmt"
 )
 
-func EncodeCodecBlobHeader(version byte, length uint64) []byte {
+func EncodeCodecBlobHeader(version byte, length uint32) []byte {
 	codecBlobHeader := make([]byte, 32)
 	// the first byte is always 0 so we are always smaller than the field modulo
 
 	// encode version byte
 	codecBlobHeader[1] = version
 
-	// encode length as uint64
-	binary.BigEndian.PutUint64(codecBlobHeader[2:10], length) // uint64 should be more than enough to store the length
+	// encode length as uint32
+	binary.BigEndian.PutUint32(codecBlobHeader[2:6], length) // uint32 should be more than enough to store the length (approx 4gb)
 	return codecBlobHeader
 }
 
-func DecodeCodecBlobHeader(codecBlobHeader []byte) (byte, uint64, error) {
+func DecodeCodecBlobHeader(codecBlobHeader []byte) (byte, uint32, error) {
 	// make sure the codecBlobHeader is 32 bytes long
 	if len(codecBlobHeader) != 32 {
 		err := fmt.Errorf("codecBlobHeader must be exactly 32 bytes long, but got %d bytes", len(codecBlobHeader))
@@ -30,7 +30,7 @@ func DecodeCodecBlobHeader(codecBlobHeader []byte) (byte, uint64, error) {
 	}
 
 	version := codecBlobHeader[1]
-	length := binary.BigEndian.Uint64(codecBlobHeader[2:10])
+	length := binary.BigEndian.Uint32(codecBlobHeader[2:6])
 
 	return version, length, nil
 }

@@ -18,7 +18,7 @@ var _ BlobCodec = IFFTBlobEncodingCodec{}
 
 func (v IFFTBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	// create the 32 bytes long codec blob header
-	codecBlobHeader := EncodeCodecBlobHeader(byte(IFFTBlobEncoding), uint64(len(rawData)))
+	codecBlobHeader := EncodeCodecBlobHeader(byte(IFFTBlobEncoding), uint32(len(rawData)))
 
 	// encode modulo bn254
 	encodedRawData := codec.ConvertByPaddingEmptyByte(rawData)
@@ -100,7 +100,7 @@ func (v IFFTBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
 	}
-	if uint64(n) != length {
+	if uint32(n) != length {
 		return nil, fmt.Errorf("data length does not match length prefix")
 	}
 

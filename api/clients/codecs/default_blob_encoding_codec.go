@@ -13,7 +13,7 @@ var _ BlobCodec = DefaultBlobEncodingCodec{}
 
 func (v DefaultBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	// encode blob encoding version byte
-	codecBlobHeader := EncodeCodecBlobHeader(byte(DefaultBlobEncoding), uint64(len(rawData)))
+	codecBlobHeader := EncodeCodecBlobHeader(byte(DefaultBlobEncoding), uint32(len(rawData)))
 
 	// encode raw data modulo bn254
 	rawDataPadded := codec.ConvertByPaddingEmptyByte(rawData)
@@ -46,7 +46,7 @@ func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
 	}
-	if uint64(n) != length {
+	if uint32(n) != length {
 		return nil, fmt.Errorf("data length does not match length prefix")
 	}
 
