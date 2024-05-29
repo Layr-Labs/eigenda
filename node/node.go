@@ -67,16 +67,15 @@ type Node struct {
 }
 
 // NewNode creates a new Node with the provided config.
-func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger) (*Node, error) {
+func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provider, logger logging.Logger) (*Node, error) {
 	// Setup metrics
 	// sdkClients, err := buildSdkClients(config, logger)
 	// if err != nil {
 	// 	return nil, err
 	// }
 
-	promReg := prometheus.NewRegistry()
-	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, promReg, logger.With("component", "EigenMetrics"))
-	rpcCallsCollector := rpccalls.NewCollector(AppName, promReg)
+	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, reg, logger.With("component", "EigenMetrics"))
+	rpcCallsCollector := rpccalls.NewCollector(AppName, reg)
 
 	// Generate BLS keys
 	keyPair, err := core.MakeKeyPairFromString(config.PrivateBls)
@@ -114,7 +113,7 @@ func NewNode(config *Config, pubIPProvider pubip.Provider, logger logging.Logger
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
-	metrics := NewMetrics(eigenMetrics, promReg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
+	metrics := NewMetrics(eigenMetrics, reg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)

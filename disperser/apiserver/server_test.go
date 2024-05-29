@@ -20,6 +20,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -641,7 +642,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create bucket store")
 	}
-	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{
 		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
@@ -662,20 +663,24 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		Allowlist: apiserver.Allowlist{
 			"1.2.3.4": map[uint8]apiserver.PerUserRateInfo{
 				0: {
+					Name:       "eigenlabs",
 					Throughput: 100 * 1024,
 					BlobRate:   5 * 1e6,
 				},
 				1: {
+					Name:       "eigenlabs",
 					Throughput: 1024 * 1024,
 					BlobRate:   5 * 1e6,
 				},
 			},
 			"0x1aa8226f6d354380dDE75eE6B634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
 				0: {
+					Name:       "eigenlabs",
 					Throughput: 100 * 1024,
 					BlobRate:   5 * 1e6,
 				},
 				1: {
+					Name:       "eigenlabs",
 					Throughput: 1024 * 1024,
 					BlobRate:   5 * 1e6,
 				},
@@ -693,7 +698,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics("9001", logger), ratelimiter, rateConfig)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {
