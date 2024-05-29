@@ -6,7 +6,7 @@ import (
 )
 
 func EncodeCodecBlobHeader(version byte, length uint32) []byte {
-	codecBlobHeader := make([]byte, 5)
+	codecBlobHeader := make([]byte, 31)
 
 	// encode version byte
 	codecBlobHeader[0] = version
@@ -18,8 +18,8 @@ func EncodeCodecBlobHeader(version byte, length uint32) []byte {
 
 func DecodeCodecBlobHeader(codecBlobHeader []byte) (byte, uint32, error) {
 	// make sure the codecBlobHeader is 5 bytes long
-	if len(codecBlobHeader) != 5 {
-		err := fmt.Errorf("codecBlobHeader must be exactly 5 bytes long, but got %d bytes", len(codecBlobHeader))
+	if len(codecBlobHeader) != 31 {
+		err := fmt.Errorf("codecBlobHeader must be exactly 31 bytes long, but got %d bytes", len(codecBlobHeader))
 		return 0, 0, err
 	}
 

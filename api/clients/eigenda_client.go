@@ -94,8 +94,12 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 
 	data := rs.ToByteArray(dataFr, dataFrIFFTLenPow2*encoding.BYTES_PER_SYMBOL)
 
+	// log data
+	fmt.Println("DATA RETRIEVE")
+	fmt.Println(data)
+
 	// get version and length from codec blob header
-	version, _, err := codecs.DecodeCodecBlobHeader(data[:5])
+	version, _, err := codecs.DecodeCodecBlobHeader(data[:31])
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
@@ -144,6 +148,10 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		return
 	}
 
+	// log data
+	fmt.Println("DATA")
+	fmt.Println(data)
+
 	// we now IFFT data regardless of the encoding type
 	// convert data to fr.Element
 	dataFr, err := rs.ToFrArray(data)
@@ -181,6 +189,9 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 	for i, e := range m.Config.CustomQuorumIDs {
 		customQuorumNumbers[i] = uint8(e)
 	}
+
+	fmt.Println("DATAIFFT")
+	fmt.Println(dataIFFT)
 
 	// disperse blob
 	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, dataIFFT, customQuorumNumbers)
