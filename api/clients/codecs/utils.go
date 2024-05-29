@@ -7,7 +7,6 @@ import (
 
 func EncodeCodecBlobHeader(version byte, length uint32) []byte {
 	codecBlobHeader := make([]byte, 5)
-	// the first byte is always 0 so we are always smaller than the field modulo
 
 	// encode version byte
 	codecBlobHeader[0] = version

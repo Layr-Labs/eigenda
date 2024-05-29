@@ -19,9 +19,9 @@ func init() {
 }
 
 func TestClientUsingTestnet(t *testing.T) {
-	// if !runTestnetIntegrationTests {
-	// 	t.Skip("Skipping testnet integration test")
-	// }
+	if !runTestnetIntegrationTests {
+		t.Skip("Skipping testnet integration test")
+	}
 	logger := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
 	client, err := clients.NewEigenDAClient(logger, clients.EigenDAClientConfig{
 		RPC:                      "disperser-holesky.eigenda.xyz:443",
