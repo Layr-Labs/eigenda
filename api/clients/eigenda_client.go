@@ -58,19 +58,21 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 }
 
 func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error) {
-	dataIFFT, err := m.Client.RetrieveBlob(ctx, BatchHeaderHash, BlobIndex)
+	data, err := m.Client.RetrieveBlob(ctx, BatchHeaderHash, BlobIndex)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(dataIFFT) == 0 {
+	if len(data) == 0 {
 		return nil, fmt.Errorf("blob has length zero")
 	}
 
-	// we assume the data is already IFFT'd so we FFT it before decoding
-	data, err := FFT(dataIFFT)
-	if err != nil {
-		return nil, fmt.Errorf("error FFTing data: %w", err)
+	if !m.Config.DisablePointVerificationMode {
+		// we assume the data is already IFFT'd so we FFT it before decoding
+		data, err = FFT(data)
+		if err != nil {
+			return nil, fmt.Errorf("error FFTing data: %w", err)
+		}
 	}
 
 	// get version and length from codec blob header
@@ -84,12 +86,12 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
 
-	rawData, err := codec.DecodeBlob(data)
+	decodedData, err := codec.DecodeBlob(data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
 
-	return rawData, nil
+	return decodedData, nil
 }
 
 func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
@@ -123,12 +125,13 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		return
 	}
 
-	// we now IFFT data regardless of the encoding type
-	// convert data to fr.Element
-	dataIFFT, err := IFFT(data)
-	if err != nil {
-		errChan <- fmt.Errorf("error IFFTing data: %w", err)
-		return
+	if !m.Config.DisablePointVerificationMode {
+		// convert data to fr.Element
+		data, err = IFFT(data)
+		if err != nil {
+			errChan <- fmt.Errorf("error IFFTing data: %w", err)
+			return
+		}
 	}
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
@@ -136,7 +139,7 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		customQuorumNumbers[i] = uint8(e)
 	}
 	// disperse blob
-	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, dataIFFT, customQuorumNumbers)
+	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
 		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
 		return
