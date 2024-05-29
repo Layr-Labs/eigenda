@@ -12,14 +12,15 @@ import (
 )
 
 const (
-	RPCFlagName                      = "eigenda-rpc"
-	StatusQueryRetryIntervalFlagName = "eigenda-status-query-retry-interval"
-	StatusQueryTimeoutFlagName       = "eigenda-status-query-timeout"
-	DisableTlsFlagName               = "eigenda-disable-tls"
-	ResponseTimeoutFlagName          = "eigenda-response-timeout"
-	CustomQuorumIDsFlagName          = "eigenda-custom-quorum-ids"
-	SignerPrivateKeyHexFlagName      = "eigenda-signer-private-key-hex"
-	PutBlobEncodingVersionFlagName   = "eigenda-put-blob-encoding-version"
+	RPCFlagName                          = "eigenda-rpc"
+	StatusQueryRetryIntervalFlagName     = "eigenda-status-query-retry-interval"
+	StatusQueryTimeoutFlagName           = "eigenda-status-query-timeout"
+	DisableTlsFlagName                   = "eigenda-disable-tls"
+	ResponseTimeoutFlagName              = "eigenda-response-timeout"
+	CustomQuorumIDsFlagName              = "eigenda-custom-quorum-ids"
+	SignerPrivateKeyHexFlagName          = "eigenda-signer-private-key-hex"
+	PutBlobEncodingVersionFlagName       = "eigenda-put-blob-encoding-version"
+	DisablePointVerificationModeFlagName = "eigenda-disable-point-verification-mode"
 	// Kzg flags
 	G1PathFlagName    = "eigenda-g1-path"
 	G2TauFlagName     = "eigenda-g2-tau-path"
@@ -57,14 +58,15 @@ func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
 		ClientConfig: clients.EigenDAClientConfig{
 			/* Required Flags */
-			RPC:                      ctx.String(RPCFlagName),
-			StatusQueryRetryInterval: ctx.Duration(StatusQueryRetryIntervalFlagName),
-			StatusQueryTimeout:       ctx.Duration(StatusQueryTimeoutFlagName),
-			DisableTLS:               ctx.Bool(DisableTlsFlagName),
-			ResponseTimeout:          ctx.Duration(ResponseTimeoutFlagName),
-			CustomQuorumIDs:          ctx.UintSlice(CustomQuorumIDsFlagName),
-			SignerPrivateKeyHex:      ctx.String(SignerPrivateKeyHexFlagName),
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),
+			RPC:                          ctx.String(RPCFlagName),
+			StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
+			StatusQueryTimeout:           ctx.Duration(StatusQueryTimeoutFlagName),
+			DisableTLS:                   ctx.Bool(DisableTlsFlagName),
+			ResponseTimeout:              ctx.Duration(ResponseTimeoutFlagName),
+			CustomQuorumIDs:              ctx.UintSlice(CustomQuorumIDsFlagName),
+			SignerPrivateKeyHex:          ctx.String(SignerPrivateKeyHexFlagName),
+			PutBlobEncodingVersion:       codecs.BlobEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),
+			DisablePointVerificationMode: ctx.Bool(DisablePointVerificationModeFlagName),
 		},
 		G1Path:           ctx.String(G1PathFlagName),
 		G2PowerOfTauPath: ctx.String(G2TauFlagName),
@@ -134,6 +136,13 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "The blob encoding version to use when writing blobs from the high level interface.",
 			EnvVars:  prefixEnvVars("PUT_BLOB_ENCODING_VERSION"),
 			Value:    1,
+			Required: false,
+		},
+		&cli.BoolFlag{
+			Name:     DisablePointVerificationModeFlagName,
+			Usage:    "Point verification mode does an IFFT on data before it is written, and does an FFT on data after it is read. This makes it possible to open points on the KZG commitment to prove that the field elements correspond to the commitment. With this mode disabled, you will need to supply the entire blob to perform a verification that any part of the data matches the KZG commitment.",
+			EnvVars:  prefixEnvVars("DISABLE_POINT_VERIFICATION_MODE"),
+			Value:    false,
 			Required: false,
 		},
 		&cli.StringFlag{
