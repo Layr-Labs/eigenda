@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -23,7 +24,7 @@ type EigenDAClient struct {
 	Config   EigenDAClientConfig
 	Log      log.Logger
 	Client   DisperserClient
-	PutCodec BlobCodec
+	PutCodec codecs.BlobCodec
 }
 
 var _ IEigenDAClient = EigenDAClient{}
@@ -43,7 +44,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
 
-	codec, err := BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
+	codec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing EigenDA client: %w", err)
 	}
@@ -66,18 +67,31 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 		return nil, fmt.Errorf("blob has length zero")
 	}
 
-	version := BlobEncodingVersion(data[0])
-	codec, err := BlobEncodingVersionToCodec(version)
+	if !m.Config.DisablePointVerificationMode {
+		// we assume the data is already IFFT'd so we FFT it before decoding
+		data, err = FFT(data)
+		if err != nil {
+			return nil, fmt.Errorf("error FFTing data: %w", err)
+		}
+	}
+
+	// get version and length from codec blob header
+	version, _, err := codecs.DecodeCodecBlobHeader(data[:32])
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
 
-	rawData, err := codec.DecodeBlob(data)
+	codec, err := codecs.BlobEncodingVersionToCodec(codecs.BlobEncodingVersion(version))
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
 
-	return rawData, nil
+	decodedData, err := codec.DecodeBlob(data)
+	if err != nil {
+		return nil, fmt.Errorf("error getting blob: %w", err)
+	}
+
+	return decodedData, nil
 }
 
 func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
@@ -105,13 +119,25 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		errChan <- fmt.Errorf("PutCodec cannot be nil")
 		return
 	}
-	data := m.PutCodec.EncodeBlob(rawData)
+	data, err := m.PutCodec.EncodeBlob(rawData)
+	if err != nil {
+		errChan <- fmt.Errorf("error encoding blob: %w", err)
+		return
+	}
+
+	if !m.Config.DisablePointVerificationMode {
+		// convert data to fr.Element
+		data, err = IFFT(data)
+		if err != nil {
+			errChan <- fmt.Errorf("error IFFTing data: %w", err)
+			return
+		}
+	}
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {
 		customQuorumNumbers[i] = uint8(e)
 	}
-
 	// disperse blob
 	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {

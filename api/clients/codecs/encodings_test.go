@@ -1,10 +1,12 @@
-package clients
+package codecs_test
 
 import (
 	"bytes"
 	"crypto/rand"
 	"math/big"
 	"testing"
+
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 )
 
 // Helper function to generate a random byte slice of a given length
@@ -20,7 +22,7 @@ func randomByteSlice(length int64) []byte {
 // TestDefaultBlobEncodingCodec tests the encoding and decoding of random byte streams
 func TestDefaultBlobEncodingCodec(t *testing.T) {
 	// Create an instance of the DefaultBlobEncodingCodec
-	codec := DefaultBlobEncodingCodec{}
+	codec := codecs.DefaultBlobEncodingCodec{}
 
 	// Number of test iterations
 	const iterations = 100
@@ -34,7 +36,10 @@ func TestDefaultBlobEncodingCodec(t *testing.T) {
 		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
 
 		// Encode the original data
-		encodedData := codec.EncodeBlob(originalData)
+		encodedData, err := codec.EncodeBlob(originalData)
+		if err != nil {
+			t.Fatalf("Iteration %d: failed to encode blob: %v", i, err)
+		}
 
 		// Decode the encoded data
 		decodedData, err := codec.DecodeBlob(encodedData)
