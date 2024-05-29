@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"net"
 	"time"
 
@@ -13,10 +12,6 @@ import (
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -73,30 +68,10 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 	}
 
 	// we assume the data is already IFFT'd so we FFT it before decoding
-	dataFrIFFT, err := rs.ToFrArray(dataIFFT)
+	data, err := FFT(dataIFFT)
 	if err != nil {
-		return nil, fmt.Errorf("error converting data to fr.Element: %w", err)
+		return nil, fmt.Errorf("error FFTing data: %w", err)
 	}
-	dataFrIFFTLen := uint64(len(dataFrIFFT))
-	dataFrIFFTLenPow2 := encoding.NextPowerOf2(dataFrIFFTLen)
-
-	if dataFrIFFTLenPow2 != dataFrIFFTLen {
-		return nil, fmt.Errorf("data length %d is not a power of 2", dataFrIFFTLen)
-	}
-
-	maxScale := uint8(math.Log2(float64(dataFrIFFTLenPow2)))
-
-	fs := fft.NewFFTSettings(maxScale)
-	dataFr, err := fs.FFT(dataFrIFFT, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform FFT: %w", err)
-	}
-
-	data := rs.ToByteArray(dataFr, dataFrIFFTLenPow2*encoding.BYTES_PER_SYMBOL)
-
-	// log data
-	fmt.Println("DATA RETRIEVE")
-	fmt.Println(data)
 
 	// get version and length from codec blob header
 	version, _, err := codecs.DecodeCodecBlobHeader(data[:31])
@@ -148,51 +123,18 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		return
 	}
 
-	// log data
-	fmt.Println("DATA")
-	fmt.Println(data)
-
 	// we now IFFT data regardless of the encoding type
 	// convert data to fr.Element
-	dataFr, err := rs.ToFrArray(data)
+	dataIFFT, err := IFFT(data)
 	if err != nil {
-		errChan <- fmt.Errorf("error converting data to fr.Element: %w", err)
+		errChan <- fmt.Errorf("error IFFTing data: %w", err)
 		return
 	}
-
-	dataFrLen := len(dataFr)
-	dataFrLenPow2 := encoding.NextPowerOf2(uint64(dataFrLen))
-
-	// expand data to the next power of 2
-	paddedDataFr := make([]fr.Element, dataFrLenPow2)
-	for i := 0; i < len(paddedDataFr); i++ {
-		if i < len(dataFr) {
-			paddedDataFr[i].Set(&dataFr[i])
-		} else {
-			paddedDataFr[i].SetZero()
-		}
-	}
-
-	maxScale := uint8(math.Log2(float64(dataFrLenPow2)))
-
-	// perform IFFT
-	fs := fft.NewFFTSettings(maxScale)
-	dataIFFTFr, err := fs.FFT(paddedDataFr, true)
-	if err != nil {
-		errChan <- fmt.Errorf("failed to perform IFFT: %w", err)
-		return
-	}
-
-	dataIFFT := rs.ToByteArray(dataIFFTFr, dataFrLenPow2*encoding.BYTES_PER_SYMBOL)
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {
 		customQuorumNumbers[i] = uint8(e)
 	}
-
-	fmt.Println("DATAIFFT")
-	fmt.Println(dataIFFT)
-
 	// disperse blob
 	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, dataIFFT, customQuorumNumbers)
 	if err != nil {
