@@ -76,23 +76,21 @@ func (v IFFTBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("encoded data length is not a power of two, data length: %d", len(encodedData))
 	}
 
-	// decode modulo bn254
-	rawDataIFFT := codec.RemoveEmptyByteFromPaddedBytes(paddedIFFTRawData)
-
-	rawDataIFFTFr, err := rs.ToFrArray(rawDataIFFT)
+	paddedIFFTRawDataFr, err := rs.ToFrArray(paddedIFFTRawData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert raw data IFFT to fr array")
 	}
 
-	maxScale := uint8(math.Log2(float64(len(rawDataIFFTFr))))
+	maxScale := uint8(math.Log2(float64(len(paddedIFFTRawDataFr))))
 
 	fs := fft.NewFFTSettings(maxScale)
-	rawDataFr, err := fs.FFT(rawDataIFFTFr, false)
+	rawDataFr, err := fs.FFT(paddedIFFTRawDataFr, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform FFT: %w", err)
 	}
 
 	rawDataPadded := rs.ToByteArray(rawDataFr, uint64(len(rawDataFr))*encoding.BYTES_PER_SYMBOL)
+	rawDataPadded = codec.RemoveEmptyByteFromPaddedBytes(rawDataPadded)
 
 	reader := bytes.NewReader(rawDataPadded)
 	rawData := make([]byte, length)
