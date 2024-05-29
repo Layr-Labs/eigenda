@@ -147,3 +147,5 @@ require (
 replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101315.1-rc.4
 
 replace github.com/cockroachdb/pebble => github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
+
+replace github.com/crate-crypto/go-kzg-4844 => github.com/crate-crypto/go-kzg-4844 v0.7.0
