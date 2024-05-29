@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -359,7 +360,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHashHex, "err", deleteKeysErr)
 			}
 		}
-		return nil, fmt.Errorf("failed to validate batch: %w", err)
+		return nil, err
 	}
 	n.Metrics.RecordStoreChunksStage("validated", batchSize, time.Since(stageTimer))
 	log.Debug("Validate batch took", "duration:", time.Since(stageTimer))
@@ -394,7 +395,20 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 
 	pool := workerpool.New(n.Config.NumBatchValidators)
-	return n.Validator.ValidateBatch(header, blobs, operatorState, pool)
+	err = n.Validator.ValidateBatch(header, blobs, operatorState, pool)
+	if err != nil {
+		h, hashErr := operatorState.Hash()
+		if hashErr != nil {
+			n.Logger.Error("failed to get operator state hash", "err", hashErr)
+		}
+
+		hStr := make([]string, 0, len(h))
+		for q, hash := range h {
+			hStr = append(hStr, fmt.Sprintf("%d: %x", q, hash))
+		}
+		return fmt.Errorf("failed to validate batch with operator state %x: %w", strings.Join(hStr, ","), err)
+	}
+	return nil
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
