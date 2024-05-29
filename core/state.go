@@ -2,8 +2,11 @@ package core
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 )
 
@@ -58,6 +61,46 @@ type OperatorState struct {
 	Totals map[QuorumID]*OperatorInfo
 	// BlockNumber is the block number at which this state was retrieved
 	BlockNumber uint
+}
+
+func (s *OperatorState) Hash() (map[QuorumID][16]byte, error) {
+	res := make(map[QuorumID][16]byte)
+	type operatorInfoWithID struct {
+		OperatorID string
+		Stake      string
+		Index      uint
+	}
+	for quorumID, opInfos := range s.Operators {
+		marshalable := struct {
+			Operators   []operatorInfoWithID
+			Totals      OperatorInfo
+			BlockNumber uint
+		}{
+			Operators:   make([]operatorInfoWithID, 0, len(opInfos)),
+			Totals:      OperatorInfo{},
+			BlockNumber: s.BlockNumber,
+		}
+
+		for opID, opInfo := range opInfos {
+			marshalable.Operators = append(marshalable.Operators, operatorInfoWithID{
+				OperatorID: opID.Hex(),
+				Stake:      opInfo.Stake.String(),
+				Index:      uint(opInfo.Index),
+			})
+		}
+		slices.SortStableFunc(marshalable.Operators, func(a, b operatorInfoWithID) int {
+			return strings.Compare(a.OperatorID, b.OperatorID)
+		})
+
+		marshalable.Totals = *s.Totals[quorumID]
+		data, err := json.Marshal(marshalable)
+		if err != nil {
+			return nil, err
+		}
+		res[quorumID] = md5.Sum(data)
+	}
+
+	return res, nil
 }
 
 // IndexedOperatorInfo contains information about an operator which is contained in events from the EigenDA smart contracts. Note that

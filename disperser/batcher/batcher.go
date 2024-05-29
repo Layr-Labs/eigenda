@@ -420,6 +420,15 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	stageTimer = time.Now()
 	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer))
+	h, err := batch.State.OperatorState.Hash()
+	if err != nil {
+		log.Error("HandleSingleBatch: error getting operator state hash", "err", err)
+	}
+	hStr := make([]string, 0, len(h))
+	for q, hash := range h {
+		hStr = append(hStr, fmt.Sprintf("%d: %x", q, hash))
+	}
+	log.Info("Dispatched encoded batch", "operatorStateHash", hStr)
 
 	// Get the batch header hash
 	log.Debug("Getting batch header hash...")
