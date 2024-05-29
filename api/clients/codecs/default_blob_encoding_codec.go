@@ -15,17 +15,20 @@ func (v DefaultBlobEncodingCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	// encode blob encoding version byte
 	codecBlobHeader := EncodeCodecBlobHeader(byte(DefaultBlobEncoding), uint32(len(rawData)))
 
-	// encode raw data modulo bn254
-	rawDataPadded := codec.ConvertByPaddingEmptyByte(rawData)
-
 	// append raw data
-	encodedData := append(codecBlobHeader, rawDataPadded...)
+	encodedData := append(codecBlobHeader, rawData...)
+
+	// encode all data modulo bn254
+	encodedData = codec.ConvertByPaddingEmptyByte(encodedData)
 
 	return encodedData, nil
 }
 
 func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error) {
-	versionByte, length, err := DecodeCodecBlobHeader(encodedData[:32])
+	// decode raw data modulo bn254
+	decodedData := codec.RemoveEmptyByteFromPaddedBytes(encodedData)
+
+	versionByte, length, err := DecodeCodecBlobHeader(decodedData[:5])
 	if err != nil {
 		return nil, err
 	}
@@ -35,12 +38,7 @@ func (v DefaultBlobEncodingCodec) DecodeBlob(encodedData []byte) ([]byte, error)
 	}
 
 	// get non blob header data
-	rawDataPadded := encodedData[32:]
-
-	// decode raw data modulo bn254
-	decodedRawData := codec.RemoveEmptyByteFromPaddedBytes(rawDataPadded)
-
-	reader := bytes.NewReader(decodedRawData)
+	reader := bytes.NewReader(decodedData[5:])
 	rawData := make([]byte, length)
 	n, err := reader.Read(rawData)
 	if err != nil {
