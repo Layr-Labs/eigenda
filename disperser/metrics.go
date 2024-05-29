@@ -37,9 +37,8 @@ const (
 	AccountRateLimitedFailure string = "ratelimited-account" // The request rate limited at account level
 )
 
-func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(reg *prometheus.Registry, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_disperser"
-	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 

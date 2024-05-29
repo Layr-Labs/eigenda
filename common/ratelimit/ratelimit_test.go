@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,7 @@ func makeTestRatelimiter() (common.RateLimiter, error) {
 		return nil, err
 	}
 
-	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logging.NewNoopLogger())
+	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logging.NewNoopLogger())
 
 	return ratelimiter, nil
 

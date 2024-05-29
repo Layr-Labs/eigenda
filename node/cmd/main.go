@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/urfave/cli"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/ratelimit"
-	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/Layr-Labs/eigenda/node/grpc"
@@ -56,18 +57,8 @@ func NodeMain(ctx *cli.Context) error {
 
 	pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
 
-	// Create the node.
-	node, err := node.NewNode(config, pubIPProvider, logger)
-	if err != nil {
-		return err
-	}
-
-	err = node.Start(context.Background())
-	if err != nil {
-		node.Logger.Error("could not start node", "error", err)
-		return err
-	}
-
+	// Rate limiter
+	reg := prometheus.NewRegistry()
 	globalParams := common.GlobalRateParams{
 		BucketSizes: []time.Duration{bucketDuration},
 		Multipliers: []float32{bucketMultiplier},
@@ -79,7 +70,19 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	ratelimiter := ratelimit.NewRateLimiter(globalParams, bucketStore, logger)
+	ratelimiter := ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
+
+	// Create the node.
+	node, err := node.NewNode(reg, config, pubIPProvider, logger)
+	if err != nil {
+		return err
+	}
+
+	err = node.Start(context.Background())
+	if err != nil {
+		node.Logger.Error("could not start node", "error", err)
+		return err
+	}
 
 	// Creates the GRPC server.
 	server := grpc.NewServer(config, node, logger, ratelimiter)
