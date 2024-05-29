@@ -7,7 +7,7 @@ import (
 type BlobEncodingVersion byte
 
 const (
-	// This minimal blob encoding includes a version byte, a length varuint, and 31 byte field element mapping. It does not include IFFT padding + IFFT.
+	// This minimal blob encoding includes a version byte, a length uint32, and 31 byte field element mapping. It does not include IFFT padding + IFFT.
 	DefaultBlobEncoding BlobEncodingVersion = 0x0
 	IFFTBlobEncoding    BlobEncodingVersion = 0x01
 )
