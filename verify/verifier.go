@@ -60,15 +60,9 @@ func (v *Verifier) Verify(cert eigenda.Cert, blob []byte) error {
 	x, y := cert.BlobCommitmentFields()
 
 	errMsg := ""
-	if !commit.X.Equal(x) {
-		errMsg += fmt.Sprintf(" x element mismatch %s : %s %s : %s,", "generated_commit", commit.X.String(), "initial_commit", x.String())
-	}
-
-	if !commit.Y.Equal(y) {
-		errMsg += fmt.Sprintf(" y element mismatch %s : %s %s : %s,", "generated_commit", commit.Y.String(), "initial_commit", y.String())
-	}
-
-	if errMsg != "" {
+	if !commit.X.Equal(x) || !commit.Y.Equal(y) {
+		errMsg += fmt.Sprintf("field elements do not match, x generated commit: %x, x initial commit: %x, ", commit.X.Marshal(), (*x).Marshal())
+		errMsg += fmt.Sprintf("y generated commit: %x, y initial commit: %x", commit.Y.Marshal(), (*y).Marshal())
 		return fmt.Errorf(errMsg)
 	}
 

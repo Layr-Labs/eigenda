@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
@@ -22,6 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
+
+var runTestnetIntegrationTests bool
+
+func init() {
+	flag.BoolVar(&runTestnetIntegrationTests, "testnet-integration", false, "Run testnet-based integration tests")
+}
 
 // Use of single port makes tests incapable of running in parallel
 const (
@@ -107,6 +114,10 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 }
 
 func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
+	if !runTestnetIntegrationTests {
+		t.Skip("Skipping testnet integration test")
+	}
+
 	ts, kill := createTestSuite(t)
 	defer kill()
 

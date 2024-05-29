@@ -16,10 +16,10 @@ func TestVerification(t *testing.T) {
 
 	var data = []byte("inter-subjective and not objective!")
 
-	x, err := hex.DecodeString("0184B47F64FBA17D6F49CDFED20434B1015A2A369AB203256EC4CD00C324E83B")
+	x, err := hex.DecodeString("07c23d7720de3f10064c8f48774d8f59207964c482419063246a67e1c454a886")
 	assert.NoError(t, err)
 
-	y, err := hex.DecodeString("122CD859CC5CDD048B482C50721821CB413C151BA7AF10285C1D2483F2A88085")
+	y, err := hex.DecodeString("0f747070e6fdb4e1346fec54dbc3d2d61a2c9ad2cb6b1744fa7f47072ad13370")
 	assert.NoError(t, err)
 
 	c := eigenda.Cert{
