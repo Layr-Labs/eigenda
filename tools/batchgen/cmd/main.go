@@ -4,9 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
-
-	//"errors"
-	//"time"
+	"strconv"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -25,32 +23,60 @@ var (
 )
 
 func main() {
-	req, _, _, _, _ := makeStoreChunksRequest(100, 10)
-
-	host := os.Args[1]
-	log.Println("Connecting to operator", "operator", host)
-	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	factor, err := strconv.Atoi(os.Args[1])
 	if err != nil {
-		log.Println("Batchgen cannot connect to operator dispersal socket", "dispersal_socket", host, "err", err)
+		log.Println("failed to convert factor to int:", err)
 		return
 	}
-	defer conn.Close()
+	req, _, _, _, _ := makeStoreChunksRequest(100, 10, factor)
 
-	client := pb.NewDispersalClient(conn)
-	//opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
+	hosts := os.Args[2:]                                   // assuming multiple hosts are passed as command line arguments
+	results := make(chan *pb.StoreChunksReply, len(hosts)) // channel to collect results
+	errors := make(chan error, len(hosts))                 // channel to collect errors
 
-	log.Println("sending chunks to operator", "operator", host, "request message size", proto.Size(req))
-	reply, err := client.StoreChunks(context.Background(), req)
+	for _, host := range hosts {
+		go func(host string) {
+			conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				errors <- err
+				return
+			}
+			defer conn.Close()
 
-	if err != nil {
-		log.Println("Reply err", err)
-		return
+			client := pb.NewDispersalClient(conn)
+			opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
+
+			log.Println("sending chunks to operator", host, "request message size", proto.Size(req))
+			reply, err := client.StoreChunks(context.Background(), req, opt)
+			if err != nil {
+				errors <- err
+			} else {
+				results <- reply
+			}
+		}(host)
 	}
-	log.Println("Reply", reply)
-	log.Println("Signature", reply.GetSignature())
+
+	// Wait for all goroutines to finish and collect results
+	for i := 0; i < len(hosts); i++ {
+		select {
+		case result := <-results:
+			log.Println("reply", result)
+		case err := <-errors:
+			log.Println("error", err)
+		}
+	}
 }
 
-func makeStoreChunksRequest(quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
+func makeStoreChunksRequest(quorumThreshold, adversaryThreshold uint8, factor int) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
+	// Create a new slice with the required length
+	newSize := len(encodedChunk) * factor
+	newEncodedChunk := make([]byte, newSize)
+
+	// Fill the new slice with repeated data from the original slice
+	for i := 0; i < factor; i++ {
+		copy(newEncodedChunk[i*len(encodedChunk):], encodedChunk)
+	}
+
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
 	if err != nil {
@@ -139,11 +165,11 @@ func makeStoreChunksRequest(quorumThreshold, adversaryThreshold uint8) (*pb.Stor
 				Header: blobHeaderProto0,
 				Bundles: []*pb.Bundle{
 					{
-						Chunks: [][]byte{encodedChunk},
+						Chunks: [][]byte{newEncodedChunk},
 					},
 					{
-						// Empty bundle for the second quorum
-						Chunks: [][]byte{},
+						// second quorum
+						Chunks: [][]byte{newEncodedChunk},
 					},
 				},
 			},
@@ -151,7 +177,7 @@ func makeStoreChunksRequest(quorumThreshold, adversaryThreshold uint8) (*pb.Stor
 				Header: blobHeaderProto1,
 				Bundles: []*pb.Bundle{
 					{
-						Chunks: [][]byte{encodedChunk},
+						Chunks: [][]byte{newEncodedChunk},
 					},
 				},
 			},
