@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
@@ -14,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
 
@@ -21,6 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
+
+var runTestnetIntegrationTests bool
+
+func init() {
+	flag.BoolVar(&runTestnetIntegrationTests, "testnet-integration", false, "Run testnet-based integration tests")
+}
 
 // Use of single port makes tests incapable of running in parallel
 const (
@@ -49,10 +57,12 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 	oplog.SetGlobalLogHandler(log.Handler())
 
 	testCfg := eigenda.Config{
-		RPC:                      holeskyDA,
-		StatusQueryTimeout:       time.Minute * 45,
-		StatusQueryRetryInterval: time.Second * 1,
-		UseTLS:                   true,
+		ClientConfig: clients.EigenDAClientConfig{
+			RPC:                      holeskyDA,
+			StatusQueryTimeout:       time.Minute * 45,
+			StatusQueryRetryInterval: time.Second * 1,
+			DisableTLS:               false,
+		},
 	}
 
 	// these values can be generated locally by running `make srs`
@@ -66,7 +76,11 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	client := eigenda.NewEigenDAClient(log, testCfg)
+	client, err := clients.NewEigenDAClient(log, testCfg.ClientConfig)
+	if err != nil {
+		panic(err)
+	}
+
 	verifier, err := verify.NewVerifier(kzgCfg)
 	if err != nil {
 		panic(err)
@@ -100,6 +114,10 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 }
 
 func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
+	if !runTestnetIntegrationTests {
+		t.Skip("Skipping testnet integration test")
+	}
+
 	ts, kill := createTestSuite(t)
 	defer kill()
 

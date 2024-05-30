@@ -27,10 +27,10 @@ clean:
 	rm bin/eigenda-proxy
 
 test:
-	go test -v ./... -test.skip ".*E2E.*"
+	go test -v ./...
 
 e2e-test: submodules srs
-	go test -timeout 50m -v ./test/e2e_test.go 
+	go test -timeout 50m -v -testnet-integration ./test/e2e_test.go 
 
 .PHONY: lint
 lint:
