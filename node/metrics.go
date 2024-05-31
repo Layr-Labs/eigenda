@@ -231,8 +231,12 @@ func (g *Metrics) collectOnchainMetrics() {
 		}
 		for q, operators := range state.Operators {
 			operatorStakeShares := make([]*OperatorStakeShare, 0)
+			totalStake := new(big.Float).SetInt(state.Totals[q].Stake)
 			for opId, opInfo := range operators {
-				share, _ := new(big.Int).Div(new(big.Int).Mul(opInfo.Stake, big.NewInt(10000)), state.Totals[q].Stake).Float64()
+				opStake := new(big.Float).SetInt(opInfo.Stake)
+				share, _ := new(big.Float).Quo(
+					new(big.Float).Mul(opStake, big.NewFloat(100000)),
+					totalStake).Float64()
 				operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{operatorId: opId, stakeShare: share})
 			}
 			// Descending order by stake share in the quorum.
