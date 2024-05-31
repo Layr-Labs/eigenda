@@ -7,11 +7,10 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import {BLSMockAVSDeployer} from "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {MockRollup} from "../../src/rollup/MockRollup.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IPaymentCoordinator} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
 import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
-import {IEigenDAPaymentManager} from "../../src/interfaces/IEigenDAPaymentManager.sol";
 
 import "forge-std/StdStorage.sol";
 
@@ -55,10 +54,9 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IPaymentCoordinator(address(0)),
+            IRewardsCoordinator(address(0)),
             registryCoordinator,
-            stakeRegistry,
-            IEigenDAPaymentManager(address(0)) 
+            stakeRegistry
         );
 
         address[] memory confirmers = new address[](1);

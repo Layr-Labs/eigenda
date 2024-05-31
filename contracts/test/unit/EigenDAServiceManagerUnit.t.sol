@@ -4,11 +4,10 @@ pragma solidity =0.8.12;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {EigenDAServiceManager, IPaymentCoordinator} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
-import {IEigenDAPaymentManager} from "../../src/interfaces/IEigenDAPaymentManager.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
@@ -33,10 +32,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IPaymentCoordinator(address(0)),
+            IRewardsCoordinator(address(0)),
             registryCoordinator,
-            stakeRegistry,
-            IEigenDAPaymentManager(address(0))
+            stakeRegistry
         );
 
         address[] memory confirmers = new address[](1);
