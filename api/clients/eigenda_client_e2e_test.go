@@ -36,7 +36,7 @@ func TestClientUsingTestnet(t *testing.T) {
 	assert.NoError(t, err)
 	batchHeaderHash := blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash
 	blobIndex := blobInfo.BlobVerificationProof.BlobIndex
-	blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex)
+	blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex, true)
 	assert.NoError(t, err)
 	assert.Equal(t, data, string(blob))
 }

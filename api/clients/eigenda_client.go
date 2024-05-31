@@ -16,15 +16,15 @@ import (
 )
 
 type IEigenDAClient interface {
-	GetBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error)
+	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32, decode bool) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
 }
 
 type EigenDAClient struct {
-	Config   EigenDAClientConfig
-	Log      log.Logger
-	Client   DisperserClient
-	PutCodec codecs.BlobCodec
+	Config EigenDAClientConfig
+	Log    log.Logger
+	Client DisperserClient
+	Codec  codecs.BlobCodec
 }
 
 var _ IEigenDAClient = EigenDAClient{}
@@ -44,21 +44,34 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
 
-	codec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
+	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing EigenDA client: %w", err)
 	}
 
+	var codec codecs.BlobCodec
+	if config.DisablePointVerificationMode {
+		codec = codecs.NewNoIFFTCodec(lowLevelCodec)
+	} else {
+		codec = codecs.NewIFFTCodec(lowLevelCodec)
+	}
+
 	return &EigenDAClient{
-		Log:      log,
-		Config:   config,
-		Client:   llClient,
-		PutCodec: codec,
+		Log:    log,
+		Config: config,
+		Client: llClient,
+		Codec:  codec,
 	}, nil
 }
 
-func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, BlobIndex uint32) ([]byte, error) {
-	data, err := m.Client.RetrieveBlob(ctx, BatchHeaderHash, BlobIndex)
+// GetBlob retrieves a blob from the EigenDA service using the provided context,
+// batch header hash, and blob index.  If decode is set to true, the function
+// decodes the retrieved blob data. If set to false it returns the encoded blob
+// data, which is necessary for generating KZG proofs for data's correctness.
+// The function handles potential errors during blob retrieval, data length
+// checks, and decoding processes.
+func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32, decode bool) ([]byte, error) {
+	data, err := m.Client.RetrieveBlob(ctx, batchHeaderHash, blobIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -67,26 +80,11 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 		return nil, fmt.Errorf("blob has length zero")
 	}
 
-	if !m.Config.DisablePointVerificationMode {
-		// we assume the data is already IFFT'd so we FFT it before decoding
-		data, err = FFT(data)
-		if err != nil {
-			return nil, fmt.Errorf("error FFTing data: %w", err)
-		}
+	if !decode {
+		return data, nil
 	}
 
-	// get version and length from codec blob header
-	version, _, err := codecs.DecodeCodecBlobHeader(data[:32])
-	if err != nil {
-		return nil, fmt.Errorf("error getting blob: %w", err)
-	}
-
-	codec, err := codecs.BlobEncodingVersionToCodec(codecs.BlobEncodingVersion(version))
-	if err != nil {
-		return nil, fmt.Errorf("error getting blob: %w", err)
-	}
-
-	decodedData, err := codec.DecodeBlob(data)
+	decodedData, err := m.Codec.DecodeBlob(data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting blob: %w", err)
 	}
@@ -94,6 +92,9 @@ func (m EigenDAClient) GetBlob(ctx context.Context, BatchHeaderHash []byte, Blob
 	return decodedData, nil
 }
 
+// PutBlob encodes and writes a blob to EigenDA, waiting for it to be finalized
+// before returning. This function is resiliant to transient failures and
+// timeouts.
 func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
 	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
@@ -115,23 +116,15 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode blob
-	if m.PutCodec == nil {
-		errChan <- fmt.Errorf("PutCodec cannot be nil")
-		return
-	}
-	data, err := m.PutCodec.EncodeBlob(rawData)
-	if err != nil {
-		errChan <- fmt.Errorf("error encoding blob: %w", err)
+	if m.Codec == nil {
+		errChan <- fmt.Errorf("Codec cannot be nil")
 		return
 	}
 
-	if !m.Config.DisablePointVerificationMode {
-		// convert data to fr.Element
-		data, err = IFFT(data)
-		if err != nil {
-			errChan <- fmt.Errorf("error IFFTing data: %w", err)
-			return
-		}
+	data, err := m.Codec.EncodeBlob(rawData)
+	if err != nil {
+		errChan <- fmt.Errorf("error encoding blob: %w", err)
+		return
 	}
 
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
