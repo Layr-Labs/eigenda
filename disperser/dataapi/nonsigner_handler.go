@@ -99,8 +99,10 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 				const multipler = 10000
 				stakePercentage := float64(0)
 				if stake, ok := state.Operators[q][opID]; ok {
-					p, _ := new(big.Int).Div(new(big.Int).Mul(stake.Stake, big.NewInt(multipler)), state.Totals[q].Stake).Float64()
-					stakePercentage = p / multipler
+					totalStake := new(big.Float).SetInt(state.Totals[q].Stake)
+					stakePercentage, _ = new(big.Float).Quo(
+						new(big.Float).SetInt(stake.Stake),
+						totalStake).Float64()
 				} else if liveOnly {
 					// Operator "opID" isn't live at "endBlock", skip it.
 					continue
