@@ -185,8 +185,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         }
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
-            IAVSDirectory(address(avsDirectory)),
-            IRewardsCoordinator(address(0)),
+            avsDirectory,
+            rewardsCoordinator,
             registryCoordinator,
             stakeRegistry
         );
@@ -203,7 +203,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 eigenDAPauserReg,
                 0,
                 addressConfig.eigenDACommunityMultisig,
-                confirmers
+                confirmers,
+                addressConfig.eigenDACommunityMultisig
             )
         );
 

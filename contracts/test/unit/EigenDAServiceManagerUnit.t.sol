@@ -17,6 +17,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     address confirmer = address(uint160(uint256(keccak256(abi.encodePacked("confirmer")))));
     address notConfirmer = address(uint160(uint256(keccak256(abi.encodePacked("notConfirmer")))));
     address newFeeSetter = address(uint160(uint256(keccak256(abi.encodePacked("newFeeSetter")))));
+    address rewardsInitiator = address(uint160(uint256(keccak256(abi.encodePacked("rewardsInitiator")))));
 
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
@@ -32,7 +33,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IRewardsCoordinator(address(0)),
+            rewardsCoordinator,
             registryCoordinator,
             stakeRegistry
         );
@@ -51,7 +52,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                         pauserRegistry,
                         0,
                         registryCoordinatorOwner,
-                        confirmers
+                        confirmers,
+                        rewardsInitiator
                     )
                 )
             )

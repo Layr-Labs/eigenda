@@ -48,13 +48,15 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IPauserRegistry _pauserRegistry,
         uint256 _initialPausedStatus,
         address _initialOwner,
-        address[] memory _batchConfirmers
+        address[] memory _batchConfirmers,
+        address _rewardsInitiator
     )
         public
         initializer
     {
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
+        _setRewardsInitiator(_rewardsInitiator);
         for (uint i = 0; i < _batchConfirmers.length; ++i) {
             _setBatchConfirmer(_batchConfirmers[i]);
         }
