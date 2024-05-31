@@ -96,7 +96,6 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 					return nil, err
 				}
 
-				const multipler = 10000
 				stakePercentage := float64(0)
 				if stake, ok := state.Operators[q][opID]; ok {
 					totalStake := new(big.Float).SetInt(state.Totals[q].Stake)
