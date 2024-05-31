@@ -9,7 +9,6 @@ import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
  * @notice This storage contract is separate from the logic to simplify the upgrade process.
  */
 abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
-
     // CONSTANTS
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
 
