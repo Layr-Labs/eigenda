@@ -596,7 +596,9 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 	return batchID, nil
 }
 
-// numBlobsAttestedByQuorum returns the number of blobs that have been successfully attested by the given quorums
+// numBlobsAttestedByQuorum returns two values:
+// 1. the number of blobs that have been successfully attested by all quorums
+// 2. map[QuorumID]int mapping a quorum to the number of blobs that have been successfully attested by the quorum
 func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) (int, map[core.QuorumID]int) {
 	numPassed := 0
 	quorumCounts := make(map[core.QuorumID]int)

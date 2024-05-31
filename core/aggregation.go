@@ -34,13 +34,12 @@ type SigningMessage struct {
 }
 
 // QuorumAttestation contains the results of aggregating signatures from a set of operators by quorums
+// It also returns map of all signers across all quorums
 type QuorumAttestation struct {
 	// QuorumAggPubKeys contains the aggregated public keys for all of the operators each quorum,
 	// including those that did not sign
 	QuorumAggPubKey map[QuorumID]*G1Point
-	// SignersAggPubKey is the aggregated public key for all of the operators that signed the message for each quorum,
-	// further aggregated across the quorums; operators signing for multiple quorums will be included in
-	// the aggregation multiple times
+	// SignersAggPubKey is the aggregated public key for all of the operators that signed the message by each quorum
 	SignersAggPubKey map[QuorumID]*G2Point
 	// AggSignature is the aggregated signature for all of the operators that signed the message for each quorum, mirroring the
 	// SignersAggPubKey.
