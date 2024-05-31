@@ -69,4 +69,4 @@ jobs:
 
     - name: Push docker image release
       run: make docker-release-push
-      if: ${{ success() }}
+      if: github.event_name == 'workflow_dispatch'

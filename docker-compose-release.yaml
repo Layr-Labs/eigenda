@@ -4,9 +4,9 @@ services:
     build:
       context: .
       dockerfile: node/cmd/Dockerfile
-    image: ghcr.io/layr-labs/eigenda/node:${RELEASE_TAG}
+    image: ghcr.io/layr-labs/eigenda/opr-node:${RELEASE_TAG}
   nodeplugin:
     build:
       context: .
       dockerfile: node/plugin/cmd/Dockerfile
-    image: ghcr.io/layr-labs/eigenda/nodeplugin:${RELEASE_TAG}
+    image: ghcr.io/layr-labs/eigenda/opr-nodeplugin:${RELEASE_TAG}
