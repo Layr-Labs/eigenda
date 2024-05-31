@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IPaymentCoordinator} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDABlobUtilsHarness} from "../harnesses/EigenDABlobUtilsHarness.sol";
@@ -44,7 +44,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IPaymentCoordinator(address(0)),
+            IRewardsCoordinator(address(0)),
             registryCoordinator,
             stakeRegistry
         );
