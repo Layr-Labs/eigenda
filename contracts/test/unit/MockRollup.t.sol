@@ -54,7 +54,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IRewardsCoordinator(address(0)),
+            rewardsCoordinator,
             registryCoordinator,
             stakeRegistry
         );
@@ -73,7 +73,8 @@ contract MockRollupTest is BLSMockAVSDeployer {
                         pauserRegistry,
                         0,
                         registryCoordinatorOwner,
-                        confirmers
+                        confirmers,
+                        registryCoordinatorOwner
                     )
                 )
             )
