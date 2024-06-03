@@ -464,7 +464,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		log.Info("Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
 
-	numPassed, numPassedByQuorum := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batch.BlobHeaders)
+	numPassed, passedQuorums := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailNoSignatures)
@@ -472,11 +472,9 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	nonEmptyQuorums := []core.QuorumID{}
-	for quorumID, count := range numPassedByQuorum {
-		log.Info("Blobs attested by quorum", "quorumID", quorumID, "count", count)
-		if count > 0 {
-			nonEmptyQuorums = append(nonEmptyQuorums, quorumID)
-		}
+	for quorumID := range passedQuorums {
+		log.Info("Quorums successfully attested", "quorumID", quorumID)
+		nonEmptyQuorums = append(nonEmptyQuorums, quorumID)
 	}
 
 	// Aggregate the signatures across only the non-empty quorums. Excluding empty quorums reduces the gas cost.
@@ -598,17 +596,17 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 
 // numBlobsAttestedByQuorum returns two values:
 // 1. the number of blobs that have been successfully attested by all quorums
-// 2. map[QuorumID]int mapping a quorum to the number of blobs that have been successfully attested by the quorum
-func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) (int, map[core.QuorumID]int) {
+// 2. map[QuorumID]struct{} contains quorums that have been successfully attested by the quorum (has at least one blob attested in the quorum)
+func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) (int, map[core.QuorumID]struct{}) {
 	numPassed := 0
-	quorumCounts := make(map[core.QuorumID]int)
+	quorums := make(map[core.QuorumID]struct{})
 	for _, blob := range headers {
 		thisPassed := true
 		for _, quorum := range blob.QuorumInfos {
 			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 				thisPassed = false
 			} else {
-				quorumCounts[quorum.QuorumID]++
+				quorums[quorum.QuorumID] = struct{}{}
 			}
 		}
 		if thisPassed {
@@ -616,7 +614,7 @@ func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult
 		}
 	}
 
-	return numPassed, quorumCounts
+	return numPassed, quorums
 }
 
 func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {
