@@ -2,8 +2,6 @@ name: docker-publish-release
 
 on:
   push:
-    branches:
-      - pschork/semver
     tags:
       - v*
   pull_request:
