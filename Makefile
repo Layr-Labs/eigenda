@@ -1,5 +1,22 @@
 .PHONY: compile-el compile-dl clean protoc lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer
 
+ifeq ($(wildcard .git/*),)
+$(warning semver disabled - building from release zip)
+GITCOMMIT := ""
+GITDATE := ""
+SEMVER := $(shell basename $(CURDIR))
+else
+GITCOMMIT := $(shell git rev-parse --short HEAD)
+GITDATE := $(shell git log -1 --format=%cd --date=unix)
+SEMVER := $(shell docker run --rm --volume "$(PWD):/repo" gittools/gitversion:5.12.0 /repo -output json -showvariable SemVer)
+ifeq ($(SEMVER), )
+$(warning semver disabled - docker not installed)
+SEMVER := "0.0.0"
+endif
+endif
+
+RELEASE_TAG := $(or $(RELEASE_TAG),latest)
+
 PROTOS := ./api/proto
 PROTOS_DISPERSER := ./disperser/api/proto
 PROTO_GEN := ./api/grpc
@@ -75,3 +92,12 @@ integration-tests-graph-indexer:
 integration-tests-dataapi:
 	make dataapi-build
 	go test -v ./disperser/dataapi
+
+docker-release-build:
+	RELEASE_TAG=${SEMVER} docker compose -f docker-compose-release.yaml build --build-arg SEMVER=${SEMVER} --build-arg GITCOMMIT=${GITCOMMIT} --build-arg GITDATE=${GITDATE} 
+
+docker-release-push:
+	RELEASE_TAG=${SEMVER} docker compose -f docker-compose-release.yaml push
+
+semver:
+	echo "${SEMVER}"

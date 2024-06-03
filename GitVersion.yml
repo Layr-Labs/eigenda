@@ -19,7 +19,7 @@ branches:
     increment: None
     prevent-increment-of-merged-branch-version: true
     track-merge-target: false
-    regex: ^releases?[/-]
+    regex: ^v*|^releases?[/-]
     source-branches:
     - main
     - release
