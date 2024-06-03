@@ -9,10 +9,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Branch or SHA"
+      force:
+        description: "Force untagged release (expert mode)"
         required: false
-        type: string
+        default: false
+        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -29,7 +30,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.inputs.ref }}
         fetch-depth: 0
 
     - name: Install GitVersion
@@ -43,7 +43,7 @@ jobs:
         useConfigFile: true
 
     - run: |
-        echo "SemVer ${{ env.semVer }} FullSemVer ${{ env.fullSemVer }}"
+        echo "SemVer ${{ env.fullSemVer }} Forced ${{ github.event.inputs.force }}"
       name: Display SemVer
 
     - name: Setup Buildx
@@ -74,7 +74,7 @@ jobs:
       run: make docker-release-build
       if: ${{ success() }}
 
-    # Publish if manually triggered or when semver tag is pushed
+    # Publish if release is tagged or force == true
     - name: Push docker image release
       run: make docker-release-push
-      if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+      if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.force == 'true'
