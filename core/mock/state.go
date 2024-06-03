@@ -190,6 +190,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		BlockNumber: blockNumber,
 	}
 
+	filteredIndexedOperators := make(map[core.OperatorID]*core.IndexedOperatorInfo, 0)
 	for quorumID, operatorsByID := range storedOperators {
 		for opID := range operatorsByID {
 			if aggPubKeys[quorumID] == nil {
@@ -198,12 +199,13 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			} else {
 				aggPubKeys[quorumID].Add(privateOperators[opID].KeyPair.GetPubKeyG1())
 			}
+			filteredIndexedOperators[opID] = indexedOperators[opID]
 		}
 	}
 
 	indexedState := &core.IndexedOperatorState{
 		OperatorState:    operatorState,
-		IndexedOperators: indexedOperators,
+		IndexedOperators: filteredIndexedOperators,
 		AggKeys:          make(map[core.QuorumID]*core.G1Point),
 	}
 	for quorumID, apk := range aggPubKeys {

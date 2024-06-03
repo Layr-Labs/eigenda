@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -441,21 +440,12 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// Aggregate the signatures
 	log.Debug("Aggregating signatures...")
 
-	// construct quorumParams
-	quorumIDs := make([]core.QuorumID, 0, len(batch.State.AggKeys))
-	for quorumID := range batch.State.Operators {
-		quorumIDs = append(quorumIDs, quorumID)
-	}
-	slices.Sort(quorumIDs)
-
 	stageTimer = time.Now()
-	aggSig, err := b.Aggregator.AggregateSignatures(ctx, batch.State, quorumIDs, headerHash, update)
+	quorumAttestation, err := b.Aggregator.ReceiveSignatures(ctx, batch.State, headerHash, update)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
-		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
+		return fmt.Errorf("HandleSingleBatch: error receiving and validating signatures: %w", err)
 	}
-	log.Debug("AggregateSignatures took", "duration", time.Since(stageTimer))
-	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
 	operatorCount := make(map[core.QuorumID]int)
 	signerCount := make(map[core.QuorumID]int)
 	for quorumID, opState := range batch.State.Operators {
@@ -464,22 +454,38 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 			signerCount[quorumID] = 0
 		}
 		for opID := range opState {
-			if _, ok := aggSig.SignerMap[opID]; ok {
+			if _, ok := quorumAttestation.SignerMap[opID]; ok {
 				signerCount[quorumID]++
 			}
 		}
 	}
-	b.Metrics.UpdateAttestation(operatorCount, signerCount, aggSig.QuorumResults)
-	for _, quorumResult := range aggSig.QuorumResults {
+	b.Metrics.UpdateAttestation(operatorCount, signerCount, quorumAttestation.QuorumResults)
+	for _, quorumResult := range quorumAttestation.QuorumResults {
 		log.Info("Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
 
-	numPassed := numBlobsAttested(aggSig.QuorumResults, batch.BlobHeaders)
+	numPassed, passedQuorums := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailNoSignatures)
 		return errors.New("HandleSingleBatch: no blobs received sufficient signatures")
 	}
+
+	nonEmptyQuorums := []core.QuorumID{}
+	for quorumID := range passedQuorums {
+		log.Info("Quorums successfully attested", "quorumID", quorumID)
+		nonEmptyQuorums = append(nonEmptyQuorums, quorumID)
+	}
+
+	// Aggregate the signatures across only the non-empty quorums. Excluding empty quorums reduces the gas cost.
+	aggSig, err := b.Aggregator.AggregateSignatures(ctx, b.ChainState, batch.BatchHeader.ReferenceBlockNumber, quorumAttestation, nonEmptyQuorums)
+	if err != nil {
+		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
+		return fmt.Errorf("HandleSingleBatch: error aggregating signatures: %w", err)
+	}
+
+	log.Debug("AggregateSignatures took", "duration", time.Since(stageTimer))
+	b.Metrics.ObserveLatency("AggregateSignatures", float64(time.Since(stageTimer).Milliseconds()))
 
 	// Confirm the batch
 	log.Debug("Confirming batch...")
@@ -588,15 +594,19 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 	return batchID, nil
 }
 
-// numBlobsAttested returns the number of blobs that have been successfully attested by the given quorums
-func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) int {
+// numBlobsAttestedByQuorum returns two values:
+// 1. the number of blobs that have been successfully attested by all quorums
+// 2. map[QuorumID]struct{} contains quorums that have been successfully attested by the quorum (has at least one blob attested in the quorum)
+func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) (int, map[core.QuorumID]struct{}) {
 	numPassed := 0
+	quorums := make(map[core.QuorumID]struct{})
 	for _, blob := range headers {
 		thisPassed := true
 		for _, quorum := range blob.QuorumInfos {
 			if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 				thisPassed = false
-				break
+			} else {
+				quorums[quorum.QuorumID] = struct{}{}
 			}
 		}
 		if thisPassed {
@@ -604,7 +614,7 @@ func numBlobsAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header
 		}
 	}
 
-	return numPassed
+	return numPassed, quorums
 }
 
 func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {

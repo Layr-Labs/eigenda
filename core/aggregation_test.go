@@ -164,7 +164,32 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				quorumIDs[ind] = quorum.QuorumID
 			}
 
-			sigAgg, err := agg.AggregateSignatures(context.Background(), state.IndexedOperatorState, quorumIDs, message, update)
+			numOpr := 0
+			for _, quorum := range tt.quorums {
+				if len(dat.Stakes[quorum.QuorumID]) > numOpr {
+					numOpr = len(dat.Stakes[quorum.QuorumID])
+				}
+			}
+
+			aq, err := agg.ReceiveSignatures(context.Background(), state.IndexedOperatorState, message, update)
+			assert.NoError(t, err)
+			assert.Len(t, aq.SignerMap, numOpr-int(tt.adversaryCount))
+			assert.Len(t, aq.AggSignature, 2)
+			assert.Len(t, aq.QuorumAggPubKey, 2)
+			assert.Len(t, aq.SignersAggPubKey, 2)
+			assert.Len(t, aq.QuorumResults, 2)
+			for i, q := range tt.quorums {
+				assert.NotNil(t, aq.AggSignature[q.QuorumID])
+				assert.NotNil(t, aq.QuorumAggPubKey[q.QuorumID])
+				assert.NotNil(t, aq.SignersAggPubKey[q.QuorumID])
+				if tt.meetsQuorum[i] {
+					assert.GreaterOrEqual(t, aq.QuorumResults[q.QuorumID].PercentSigned, q.PercentSigned)
+				} else {
+					assert.Less(t, aq.QuorumResults[q.QuorumID].PercentSigned, q.PercentSigned)
+				}
+			}
+
+			sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorumIDs)
 			assert.NoError(t, err)
 
 			for i, quorum := range tt.quorums {
@@ -180,7 +205,6 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 }
 
 func TestSortNonsigners(t *testing.T) {
-
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
 	update := make(chan core.SigningMessage)
@@ -190,7 +214,9 @@ func TestSortNonsigners(t *testing.T) {
 
 	quorums := []core.QuorumID{0}
 
-	sigAgg, err := agg.AggregateSignatures(context.Background(), state.IndexedOperatorState, quorums, message, update)
+	aq, err := agg.ReceiveSignatures(context.Background(), state.IndexedOperatorState, message, update)
+	assert.NoError(t, err)
+	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
 	assert.NoError(t, err)
 
 	for i := range sigAgg.NonSigners {
@@ -203,4 +229,102 @@ func TestSortNonsigners(t *testing.T) {
 		currHashInt := new(big.Int).SetBytes(currHash[:])
 		assert.Equal(t, currHashInt.Cmp(prevHashInt), 1)
 	}
+}
+
+func TestFilterQuorums(t *testing.T) {
+	allQuorums := []core.QuorumID{0, 1}
+	state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, allQuorums)
+
+	update := make(chan core.SigningMessage)
+	message := [32]byte{1, 2, 3, 4, 5, 6}
+	advCount := 4
+	go simulateOperators(*state, message, update, uint(advCount))
+
+	numOpr := 0
+	for _, quorum := range allQuorums {
+		if len(dat.Stakes[quorum]) > numOpr {
+			numOpr = len(dat.Stakes[quorum])
+		}
+	}
+
+	aq, err := agg.ReceiveSignatures(context.Background(), state.IndexedOperatorState, message, update)
+	assert.NoError(t, err)
+	assert.Len(t, aq.SignerMap, numOpr-advCount)
+	assert.Equal(t, aq.SignerMap, map[core.OperatorID]bool{
+		mock.MakeOperatorId(0): true,
+		mock.MakeOperatorId(1): true,
+	})
+	assert.Contains(t, aq.AggSignature, core.QuorumID(0))
+	assert.Contains(t, aq.AggSignature, core.QuorumID(1))
+	assert.Equal(t, aq.QuorumAggPubKey, map[core.QuorumID]*core.G1Point{
+		core.QuorumID(0): state.IndexedOperatorState.AggKeys[0],
+		core.QuorumID(1): state.IndexedOperatorState.AggKeys[1],
+	})
+	aggSignerPubKey0 := state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(0)].PubkeyG2.Clone()
+	aggSignerPubKey0.Add(state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(1)].PubkeyG2)
+	aggSignerPubKey1 := state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(0)].PubkeyG2.Clone()
+	aggSignerPubKey1.Add(state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(1)].PubkeyG2)
+	assert.Contains(t, aq.SignersAggPubKey, core.QuorumID(0))
+	assert.Equal(t, aq.SignersAggPubKey[core.QuorumID(0)], aggSignerPubKey0)
+	assert.Contains(t, aq.SignersAggPubKey, core.QuorumID(1))
+	assert.Equal(t, aq.SignersAggPubKey[core.QuorumID(1)], aggSignerPubKey1)
+	assert.Equal(t, aq.QuorumResults[core.QuorumID(0)].PercentSigned, uint8(14))
+	assert.Equal(t, aq.QuorumResults[core.QuorumID(1)].PercentSigned, uint8(50))
+
+	// Only consider quorum 0
+	quorums := []core.QuorumID{0}
+	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+	assert.NoError(t, err)
+	assert.Len(t, sigAgg.NonSigners, 4)
+	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{
+		state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(2)].PubkeyG1,
+		state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(3)].PubkeyG1,
+		state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(4)].PubkeyG1,
+		state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(5)].PubkeyG1,
+	})
+	assert.Len(t, sigAgg.QuorumAggPubKeys, 1)
+	assert.Contains(t, sigAgg.QuorumAggPubKeys, core.QuorumID(0))
+	assert.Equal(t, sigAgg.QuorumAggPubKeys[0], state.IndexedOperatorState.AggKeys[0])
+
+	assert.Equal(t, sigAgg.AggPubKey, aggSignerPubKey0)
+	expectedAggSignerKey := sigAgg.QuorumAggPubKeys[0].Clone()
+	for _, nsk := range sigAgg.NonSigners {
+		expectedAggSignerKey.Sub(nsk)
+	}
+	ok, err := expectedAggSignerKey.VerifyEquivalence(sigAgg.AggPubKey)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	ok = sigAgg.AggSignature.Verify(sigAgg.AggPubKey, message)
+	assert.True(t, ok)
+	assert.Len(t, sigAgg.QuorumResults, 1)
+	assert.Contains(t, sigAgg.QuorumResults, core.QuorumID(0))
+	assert.Equal(t, sigAgg.QuorumResults[0].QuorumID, core.QuorumID(0))
+	assert.Equal(t, sigAgg.QuorumResults[0].PercentSigned, core.QuorumID(14))
+
+	// Only consider quorum 1
+	quorums = []core.QuorumID{1}
+	sigAgg, err = agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
+	assert.NoError(t, err)
+	assert.Len(t, sigAgg.NonSigners, 1)
+	assert.ElementsMatch(t, sigAgg.NonSigners, []*core.G1Point{
+		state.IndexedOperatorState.IndexedOperators[mock.MakeOperatorId(2)].PubkeyG1,
+	})
+	assert.Len(t, sigAgg.QuorumAggPubKeys, 1)
+	assert.Contains(t, sigAgg.QuorumAggPubKeys, core.QuorumID(1))
+	assert.Equal(t, sigAgg.QuorumAggPubKeys[1], state.IndexedOperatorState.AggKeys[1])
+
+	assert.Equal(t, sigAgg.AggPubKey, aggSignerPubKey1)
+	expectedAggSignerKey = sigAgg.QuorumAggPubKeys[1].Clone()
+	for _, nsk := range sigAgg.NonSigners {
+		expectedAggSignerKey.Sub(nsk)
+	}
+	ok, err = expectedAggSignerKey.VerifyEquivalence(sigAgg.AggPubKey)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	ok = sigAgg.AggSignature.Verify(sigAgg.AggPubKey, message)
+	assert.True(t, ok)
+	assert.Len(t, sigAgg.QuorumResults, 1)
+	assert.Contains(t, sigAgg.QuorumResults, core.QuorumID(1))
+	assert.Equal(t, sigAgg.QuorumResults[1].QuorumID, core.QuorumID(1))
+	assert.Equal(t, sigAgg.QuorumResults[1].PercentSigned, core.QuorumID(50))
 }

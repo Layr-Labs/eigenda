@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,13 +33,30 @@ type SigningMessage struct {
 	Err                  error
 }
 
-// SignatureAggregation contains the results of aggregating signatures from a set of operators
+// QuorumAttestation contains the results of aggregating signatures from a set of operators by quorums
+// It also returns map of all signers across all quorums
+type QuorumAttestation struct {
+	// QuorumAggPubKeys contains the aggregated public keys for all of the operators each quorum,
+	// including those that did not sign
+	QuorumAggPubKey map[QuorumID]*G1Point
+	// SignersAggPubKey is the aggregated public key for all of the operators that signed the message by each quorum
+	SignersAggPubKey map[QuorumID]*G2Point
+	// AggSignature is the aggregated signature for all of the operators that signed the message for each quorum, mirroring the
+	// SignersAggPubKey.
+	AggSignature map[QuorumID]*Signature
+	// QuorumResults contains the quorum ID and the amount signed for each quorum
+	QuorumResults map[QuorumID]*QuorumResult
+	// SignerMap contains the operator IDs that signed the message
+	SignerMap map[OperatorID]bool
+}
+
+// SignatureAggregation contains the results of aggregating signatures from a set of operators across multiple quorums
 type SignatureAggregation struct {
 	// NonSigners contains the public keys of the operators that did not sign the message
 	NonSigners []*G1Point
 	// QuorumAggPubKeys contains the aggregated public keys for all of the operators each quorum,
 	// Including those that did not sign
-	QuorumAggPubKeys []*G1Point
+	QuorumAggPubKeys map[QuorumID]*G1Point
 	// AggPubKey is the aggregated public key for all of the operators that signed the message,
 	// further aggregated across the quorums; operators signing for multiple quorums will be included in
 	// the aggregation multiple times
@@ -48,16 +66,15 @@ type SignatureAggregation struct {
 	AggSignature *Signature
 	// QuorumResults contains the quorum ID and the amount signed for each quorum
 	QuorumResults map[QuorumID]*QuorumResult
-	// SignerMap contains the operator IDs that signed the message
-	SignerMap map[OperatorID]bool
 }
 
 // SignatureAggregator is an interface for aggregating the signatures returned by DA nodes so that they can be verified by the DA contract
 type SignatureAggregator interface {
-
-	// AggregateSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the aggregated signature.
+	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the attestation result by quorum.
+	ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error)
+	// AggregateSignatures takes attestation result by quorum and aggregates the signatures across them.
 	// If the aggregated signature is invalid, an error is returned.
-	AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SigningMessage) (*SignatureAggregation, error)
+	AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error)
 }
 
 type StdSignatureAggregator struct {
@@ -82,8 +99,12 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*S
 
 var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
-func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state *IndexedOperatorState, quorumIDs []QuorumID, message [32]byte, messageChan chan SigningMessage) (*SignatureAggregation, error) {
-	// TODO: Add logging
+func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error) {
+	quorumIDs := make([]QuorumID, 0, len(state.AggKeys))
+	for quorumID := range state.Operators {
+		quorumIDs = append(quorumIDs, quorumID)
+	}
+	slices.Sort(quorumIDs)
 
 	if len(quorumIDs) == 0 {
 		return nil, errors.New("the number of quorums must be greater than zero")
@@ -97,13 +118,12 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		}
 	}
 
-	stakeSigned := make([]*big.Int, len(quorumIDs))
-	for ind := range quorumIDs {
-		stakeSigned[ind] = big.NewInt(0)
+	stakeSigned := make(map[QuorumID]*big.Int, len(quorumIDs))
+	for _, quorumID := range quorumIDs {
+		stakeSigned[quorumID] = big.NewInt(0)
 	}
-	aggSigs := make([]*Signature, len(quorumIDs))
-	aggPubKeys := make([]*G2Point, len(quorumIDs))
-
+	aggSigs := make(map[QuorumID]*Signature, len(quorumIDs))
+	aggPubKeys := make(map[QuorumID]*G2Point, len(quorumIDs))
 	signerMap := make(map[OperatorID]bool)
 
 	// Aggregate Signatures
@@ -151,7 +171,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		}
 
 		operatorQuorums := make([]uint8, 0, len(quorumIDs))
-		for ind, quorumID := range quorumIDs {
+		for _, quorumID := range quorumIDs {
 			// Get stake amounts for operator
 			ops := state.Operators[quorumID]
 			opInfo, ok := ops[r.Operator]
@@ -164,15 +184,15 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 			signerMap[r.Operator] = true
 
 			// Add to stake signed
-			stakeSigned[ind].Add(stakeSigned[ind], opInfo.Stake)
+			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
 
 			// Add to agg signature
-			if aggSigs[ind] == nil {
-				aggSigs[ind] = &Signature{sig.Clone()}
-				aggPubKeys[ind] = op.PubkeyG2.Clone()
+			if aggSigs[quorumID] == nil {
+				aggSigs[quorumID] = &Signature{sig.Clone()}
+				aggPubKeys[quorumID] = op.PubkeyG2.Clone()
 			} else {
-				aggSigs[ind].Add(sig.G1Point)
-				aggPubKeys[ind].Add(op.PubkeyG2)
+				aggSigs[quorumID].Add(sig.G1Point)
+				aggPubKeys[quorumID].Add(op.PubkeyG2)
 			}
 		}
 		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs)
@@ -190,14 +210,14 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		}
 	}
 
-	quorumAggPubKeys := make([]*G1Point, len(quorumIDs))
+	quorumAggPubKeys := make(map[QuorumID]*G1Point, len(quorumIDs))
 
 	// Validate the amount signed and aggregate signatures for each quorum
 	quorumResults := make(map[QuorumID]*QuorumResult)
 
-	for ind, quorumID := range quorumIDs {
+	for _, quorumID := range quorumIDs {
 		// Check that quorum has sufficient stake
-		percent := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[ind])
+		percent := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[quorumID])
 		quorumResults[quorumID] = &QuorumResult{
 			QuorumID:      quorumID,
 			PercentSigned: percent,
@@ -205,7 +225,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 
 		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
-		quorumAggPubKeys[ind] = quorumAggKey
+		quorumAggPubKeys[quorumID] = quorumAggKey
 
 		signersAggKey := quorumAggKey.Clone()
 		for opInd, nsk := range nonSignerKeys {
@@ -215,11 +235,11 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 			}
 		}
 
-		if aggPubKeys[ind] == nil {
+		if aggPubKeys[quorumID] == nil {
 			return nil, ErrAggSigNotValid
 		}
 
-		ok, err := signersAggKey.VerifyEquivalence(aggPubKeys[ind])
+		ok, err := signersAggKey.VerifyEquivalence(aggPubKeys[quorumID])
 		if err != nil {
 			return nil, err
 		}
@@ -228,20 +248,54 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		}
 
 		// Verify the aggregated signature for the quorum
-		ok = aggSigs[ind].Verify(aggPubKeys[ind], message)
+		ok = aggSigs[quorumID].Verify(aggPubKeys[quorumID], message)
 		if !ok {
 			return nil, ErrAggSigNotValid
 		}
 	}
 
+	return &QuorumAttestation{
+		QuorumAggPubKey:  quorumAggPubKeys,
+		SignersAggPubKey: aggPubKeys,
+		AggSignature:     aggSigs,
+		QuorumResults:    quorumResults,
+		SignerMap:        signerMap,
+	}, nil
+}
+
+func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error) {
 	// Aggregate the aggregated signatures. We reuse the first aggregated signature as the accumulator
-	for i := 1; i < len(aggSigs); i++ {
-		aggSigs[0].Add(aggSigs[i].G1Point)
+	var aggSig *Signature
+	for _, quorumID := range quorumIDs {
+		sig := quorumAttestation.AggSignature[quorumID]
+		if aggSig == nil {
+			aggSig = &Signature{sig.G1Point.Clone()}
+		} else {
+			aggSig.Add(sig.G1Point)
+		}
 	}
 
 	// Aggregate the aggregated public keys. We reuse the first aggregated public key as the accumulator
-	for i := 1; i < len(aggPubKeys); i++ {
-		aggPubKeys[0].Add(aggPubKeys[i])
+	var aggPubKey *G2Point
+	for _, quorumID := range quorumIDs {
+		apk := quorumAttestation.SignersAggPubKey[quorumID]
+		if aggPubKey == nil {
+			aggPubKey = apk.Clone()
+		} else {
+			aggPubKey.Add(apk)
+		}
+	}
+
+	nonSignerKeys := make([]*G1Point, 0)
+	indexedOperatorState, err := ics.GetIndexedOperatorState(ctx, referenceBlockNumber, quorumIDs)
+	if err != nil {
+		return nil, err
+	}
+	for id, op := range indexedOperatorState.IndexedOperators {
+		_, found := quorumAttestation.SignerMap[id]
+		if !found {
+			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+		}
 	}
 
 	// sort non signer keys according to how it's checked onchain
@@ -253,13 +307,22 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, state 
 		return bytes.Compare(hash1[:], hash2[:]) == -1
 	})
 
+	quorumAggKeys := make(map[QuorumID]*G1Point, len(quorumIDs))
+	for _, quorumID := range quorumIDs {
+		quorumAggKeys[quorumID] = quorumAttestation.QuorumAggPubKey[quorumID]
+	}
+
+	quorumResults := make(map[QuorumID]*QuorumResult, len(quorumIDs))
+	for _, quorumID := range quorumIDs {
+		quorumResults[quorumID] = quorumAttestation.QuorumResults[quorumID]
+	}
+
 	return &SignatureAggregation{
 		NonSigners:       nonSignerKeys,
-		QuorumAggPubKeys: quorumAggPubKeys,
-		AggPubKey:        aggPubKeys[0],
-		AggSignature:     aggSigs[0],
+		QuorumAggPubKeys: quorumAggKeys,
+		AggPubKey:        aggPubKey,
+		AggSignature:     aggSig,
 		QuorumResults:    quorumResults,
-		SignerMap:        signerMap,
 	}, nil
 
 }

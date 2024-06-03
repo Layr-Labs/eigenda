@@ -18,8 +18,8 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
-	"github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
+	batmock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -29,6 +29,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -43,6 +44,8 @@ type batcherComponents struct {
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
 	ethClient        *cmock.MockEthClient
+	dispatcher       *dmock.Dispatcher
+	chainData        *coremock.ChainDataMock
 }
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
@@ -72,15 +75,17 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 
 func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.Time) {
 	// Common Components
+	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	// assert.NoError(t, err)
 	logger := logging.NewNoopLogger()
 
 	finalizationBlockDelay := uint(75)
 
 	// Core Components
 	cst, err := coremock.MakeChainDataMock(map[uint8]int{
-		0: 10,
-		1: 10,
-		2: 10,
+		0: 4,
+		1: 4,
+		2: 6,
 	})
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10)+finalizationBlockDelay, nil)
@@ -121,7 +126,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	encoderClient := disperser.NewLocalEncoderClient(p)
 	finalizer := batchermock.NewFinalizer()
 	ethClient := &cmock.MockEthClient{}
-	txnManager := mock.NewTxnManager()
+	txnManager := batmock.NewTxnManager()
 
 	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics, handleBatchLivenessChan)
 	assert.NoError(t, err)
@@ -151,6 +156,8 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 			encoderClient:    encoderClient,
 			encodingStreamer: b.EncodingStreamer,
 			ethClient:        ethClient,
+			dispatcher:       dispatcher,
+			chainData:        cst,
 		}, b, func() []time.Time {
 			close(doneListening) // Stop the goroutine listening to heartbeats
 
@@ -180,6 +187,7 @@ func TestBatcherIterations(t *testing.T) {
 		ConfirmationThreshold: 100,
 	}})
 	components, batcher, getHeartbeats := makeBatcher(t)
+	components.dispatcher.On("DisperseBatch").Return(map[core.OperatorID]struct{}{})
 
 	defer func() {
 		heartbeats := getHeartbeats()
@@ -222,7 +230,28 @@ func TestBatcherIterations(t *testing.T) {
 	assert.Equal(t, uint64(24576), size) // Robert checks it
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
-	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		quorumResults := args[2].(map[core.QuorumID]*core.QuorumResult)
+		assert.Len(t, quorumResults, 2)
+		assert.Contains(t, quorumResults, core.QuorumID(0))
+		assert.Contains(t, quorumResults, core.QuorumID(1))
+
+		aggSig := args[3].(*core.SignatureAggregation)
+		assert.Empty(t, aggSig.NonSigners)
+		assert.Len(t, aggSig.QuorumAggPubKeys, 2)
+		assert.Contains(t, aggSig.QuorumAggPubKeys, core.QuorumID(0))
+		assert.Contains(t, aggSig.QuorumAggPubKeys, core.QuorumID(1))
+		assert.Equal(t, aggSig.QuorumResults, map[core.QuorumID]*core.QuorumResult{
+			core.QuorumID(0): {
+				QuorumID:      core.QuorumID(0),
+				PercentSigned: uint8(100),
+			},
+			core.QuorumID(1): {
+				QuorumID:      core.QuorumID(1),
+				PercentSigned: uint8(100),
+			},
+		})
+	}).Return(txn, nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = batcher.HandleSingleBatch(ctx)
@@ -278,6 +307,7 @@ func TestBlobFailures(t *testing.T) {
 	}})
 
 	components, batcher, getHeartbeats := makeBatcher(t)
+	components.dispatcher.On("DisperseBatch").Return(map[core.OperatorID]struct{}{})
 
 	defer func() {
 		heartbeats := getHeartbeats()
@@ -297,7 +327,7 @@ func TestBlobFailures(t *testing.T) {
 	assert.NoError(t, err)
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
-	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(txn, nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	// Test with receipt response with error
@@ -384,6 +414,7 @@ func TestBlobRetry(t *testing.T) {
 	}})
 
 	components, batcher, getHeartbeats := makeBatcher(t)
+	components.dispatcher.On("DisperseBatch").Return(map[core.OperatorID]struct{}{})
 
 	defer func() {
 		heartbeats := getHeartbeats()
@@ -406,7 +437,7 @@ func TestBlobRetry(t *testing.T) {
 	assert.NotNil(t, encodedResult)
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
-	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(txn, nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = batcher.HandleSingleBatch(ctx)
@@ -490,6 +521,7 @@ func TestRetryTxnReceipt(t *testing.T) {
 		ConfirmationThreshold: 100,
 	}})
 	components, batcher, getHeartbeats := makeBatcher(t)
+	components.dispatcher.On("DisperseBatch").Return(map[core.OperatorID]struct{}{})
 
 	defer func() {
 		heartbeats := getHeartbeats()
@@ -534,7 +566,7 @@ func TestRetryTxnReceipt(t *testing.T) {
 	assert.NoError(t, err)
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
-	components.transactor.On("BuildConfirmBatchTxn").Return(txn, nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(txn, nil)
 	components.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = batcher.HandleSingleBatch(ctx)
@@ -553,4 +585,169 @@ func TestRetryTxnReceipt(t *testing.T) {
 	assert.Equal(t, disperser.Confirmed, meta.BlobStatus)
 	assert.Equal(t, meta.ConfirmationInfo.BatchID, uint32(3))
 	components.ethClient.AssertNumberOfCalls(t, "TransactionReceipt", 3)
+}
+
+// TestBlobAttestationFailures tests a case where the attestation fails for all blobs in one quorum,
+// in which case the quorum should be omitted from the confirmation transaction.
+func TestBlobAttestationFailures(t *testing.T) {
+	blob0 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
+	blob1 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              1,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
+	components, batcher, _ := makeBatcher(t)
+
+	blobStore := components.blobStore
+	ctx := context.Background()
+	_, _ = queueBlob(t, ctx, &blob0, blobStore)
+	_, _ = queueBlob(t, ctx, &blob1, blobStore)
+
+	// Start the batcher
+	out := make(chan bat.EncodingResultOrStatus)
+	err := components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+
+	components.dispatcher.On("DisperseBatch").Return(map[core.OperatorID]struct{}{
+		// operator 5 is only in quorum 2
+		coremock.MakeOperatorId(5): {},
+	})
+
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		quorumResults := args[2].(map[core.QuorumID]*core.QuorumResult)
+		assert.Len(t, quorumResults, 2)
+		assert.Contains(t, quorumResults, core.QuorumID(0))
+		assert.Contains(t, quorumResults, core.QuorumID(1))
+		// should not contain quorum 2
+		assert.NotContains(t, quorumResults, core.QuorumID(2))
+
+		aggSig := args[3].(*core.SignatureAggregation)
+		assert.Empty(t, aggSig.NonSigners)
+		assert.NotContains(t, aggSig.QuorumAggPubKeys, core.QuorumID(2))
+		assert.NotContains(t, aggSig.QuorumResults, core.QuorumID(2))
+	}).Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
+	// Test with receipt response with error
+	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
+}
+
+// TestBlobAttestationFailures2 tests a case where the attestation fails for some blobs in one quorum,
+// in which case the quorum should not be omitted from the confirmation transaction.
+func TestBlobAttestationFailures2(t *testing.T) {
+	blob0 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 50,
+		},
+	})
+
+	blob1 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
+	components, batcher, _ := makeBatcher(t)
+
+	blobStore := components.blobStore
+	ctx := context.Background()
+	_, _ = queueBlob(t, ctx, &blob0, blobStore)
+	_, _ = queueBlob(t, ctx, &blob1, blobStore)
+
+	// Start the batcher
+	out := make(chan bat.EncodingResultOrStatus)
+	err := components.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	err = components.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+
+	components.dispatcher.On("DisperseBatch").Return(map[core.OperatorID]struct{}{
+		// this operator is only in quorum 2
+		coremock.MakeOperatorId(5): {},
+	})
+
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		quorumResults := args[2].(map[core.QuorumID]*core.QuorumResult)
+		assert.Len(t, quorumResults, 2)
+		assert.Contains(t, quorumResults, core.QuorumID(0))
+		assert.Contains(t, quorumResults, core.QuorumID(2))
+
+		aggSig := args[3].(*core.SignatureAggregation)
+		assert.Len(t, aggSig.NonSigners, 1)
+		assert.Contains(t, aggSig.QuorumAggPubKeys, core.QuorumID(0))
+		assert.Contains(t, aggSig.QuorumAggPubKeys, core.QuorumID(2))
+		assert.Equal(t, aggSig.QuorumResults, map[core.QuorumID]*core.QuorumResult{
+			core.QuorumID(0): {
+				QuorumID:      core.QuorumID(0),
+				PercentSigned: uint8(100),
+			},
+			core.QuorumID(2): {
+				QuorumID:      core.QuorumID(2),
+				PercentSigned: uint8(71),
+			},
+		})
+	}).Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+
+	// Test with receipt response with error
+	err = batcher.HandleSingleBatch(ctx)
+	assert.NoError(t, err)
 }
