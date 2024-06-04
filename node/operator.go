@@ -44,7 +44,7 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 		return nil
 	}
 
-	logger.Info("Quorums to register for", "quorums", quorumsToRegister)
+	logger.Info("Quorums to register for", "quorums", fmt.Sprint(quorumsToRegister))
 
 	// register for quorums
 	shouldCallChurner := false

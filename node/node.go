@@ -197,7 +197,7 @@ func (n *Node) Start(ctx context.Context) error {
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
 			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
-			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", n.Config.QuorumIDList)
+			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
 		socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
@@ -355,7 +355,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// revert all the keys for that batch.
 		result := <-storeChan
 		if result.keys != nil {
-			log.Debug("Batch validation failed, rolling back the key/value entries stored in database", "number of entires", len(*result.keys), "batchHeaderHash", batchHeaderHash)
+			log.Debug("Batch validation failed, rolling back the key/value entries stored in database", "number of entires", len(*result.keys), "batchHeaderHash", batchHeaderHashHex)
 			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
 				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHashHex, "err", deleteKeysErr)
 			}
@@ -368,14 +368,14 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	// Before we sign the batch, we should first complete the batch storing successfully.
 	result := <-storeChan
 	if result.err != nil {
-		log.Error("Store batch failed", "batchHeaderHash", batchHeaderHash, "err", result.err)
+		log.Error("Store batch failed", "batchHeaderHash", batchHeaderHashHex, "err", result.err)
 		return nil, err
 	}
 	if result.keys != nil {
 		n.Metrics.RecordStoreChunksStage("stored", batchSize, result.latency)
-		n.Logger.Debug("Store batch succeeded", "batchHeaderHash", batchHeaderHash, "duration:", result.latency)
+		n.Logger.Debug("Store batch succeeded", "batchHeaderHash", batchHeaderHashHex, "duration:", result.latency)
 	} else {
-		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeaderHash", batchHeaderHash)
+		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeaderHash", batchHeaderHashHex)
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
