@@ -619,6 +619,9 @@ func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult
 
 func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {
 	for _, quorum := range header.QuorumInfos {
+		if _, ok := signedQuorums[quorum.QuorumID]; !ok {
+			return false
+		}
 		if signedQuorums[quorum.QuorumID].PercentSigned < quorum.ConfirmationThreshold {
 			return false
 		}
