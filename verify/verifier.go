@@ -47,12 +47,7 @@ func (v *Verifier) Verify(cert eigenda.Cert, blob []byte) error {
 		return fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
 
-	poly, _, _, err := encoder.Encoder.Encode(inputFr)
-	if err != nil {
-		return err
-	}
-
-	commit, err := encoder.Commit(poly.Coeffs)
+	commit, err := encoder.Commit(inputFr)
 	if err != nil {
 		return err
 	}
