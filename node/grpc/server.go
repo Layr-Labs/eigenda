@@ -164,9 +164,6 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 	if in.GetBatchHeader().GetBatchRoot() == nil {
 		return api.NewInvalidArgError("missing batch_root in request")
 	}
-	if in.GetBatchHeader().GetReferenceBlockNumber() == 0 {
-		return api.NewInvalidArgError("missing reference_block_number in request")
-	}
 
 	if len(in.GetBlobs()) == 0 {
 		return api.NewInvalidArgError("missing blobs in request")

@@ -5,8 +5,6 @@ build: clean
 clean:
 	rm -rf ./bin
 
-proto: 
-	protoc --go_out=. store_chunks.proto
-
 run: build
-	./bin/batchgen 10000 localhost:32005 localhost:32005
+	./bin/batchgen 1000 10 localhost:32005
+
