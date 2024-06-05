@@ -153,20 +153,20 @@ func (r *retrievalClient) RetrieveBlob(
 	for i := 0; i < len(operators); i++ {
 		reply := <-chunksChan
 		if reply.Err != nil {
-			r.logger.Error("failed to get chunks from operator", "operator", reply.OperatorID, "err", reply.Err)
+			r.logger.Error("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
 			continue
 		}
 		assignment, ok := assignments[reply.OperatorID]
 		if !ok {
-			return nil, fmt.Errorf("no assignment to operator %v", reply.OperatorID)
+			return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
 		}
 
 		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
 		if err != nil {
-			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID, "err", err)
+			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
 			continue
 		} else {
-			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID)
+			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID.Hex())
 		}
 
 		chunks = append(chunks, reply.Chunks...)

@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"math/big"
 
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
@@ -19,7 +20,7 @@ func NewMockChainClient() *MockChainClient {
 	return &MockChainClient{}
 }
 
-func (c *MockChainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte) (*binding.IEigenDAServiceManagerBatchHeader, error) {
+func (c *MockChainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.IEigenDAServiceManagerBatchHeader, error) {
 	args := c.Called()
 	return args.Get(0).(*binding.IEigenDAServiceManagerBatchHeader), args.Error(1)
 }

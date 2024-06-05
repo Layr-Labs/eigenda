@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
@@ -14,7 +15,7 @@ import (
 )
 
 type ChainClient interface {
-	FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte) (*binding.IEigenDAServiceManagerBatchHeader, error)
+	FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.IEigenDAServiceManagerBatchHeader, error)
 }
 
 type chainClient struct {
@@ -31,9 +32,12 @@ func NewChainClient(ethClient common.EthClient, logger logging.Logger) ChainClie
 
 // FetchBatchHeader fetches batch header from chain given a service manager contract address and batch header hash.
 // It filters logs by the batch header hashes which are logged as events by the service manager contract.
-// From those logs, it identifies corresponding confirmBatch transaction and decodes batch header from the calldata
-func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte) (*binding.IEigenDAServiceManagerBatchHeader, error) {
+// From those logs, it identifies corresponding confirmBatch transaction and decodes batch header from the calldata.
+// It takes fromBlock and toBlock as arguments to filter logs within a specific block range. This can help with optimizing queries to the chain. nil values for fromBlock and toBlock will default to genesis block and latest block respectively.
+func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.IEigenDAServiceManagerBatchHeader, error) {
 	logs, err := c.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
+		FromBlock: fromBlock,
+		ToBlock:   toBlock,
 		Addresses: []gcommon.Address{serviceManagerAddress},
 		Topics: [][]gcommon.Hash{
 			{common.BatchConfirmedEventSigHash},

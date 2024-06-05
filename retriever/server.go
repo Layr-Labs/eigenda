@@ -3,6 +3,7 @@ package retriever
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
@@ -56,7 +57,7 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], req.GetBatchHeaderHash())
 
-	batchHeader, err := s.chainClient.FetchBatchHeader(ctx, gcommon.HexToAddress(s.config.EigenDAServiceManagerAddr), req.GetBatchHeaderHash())
+	batchHeader, err := s.chainClient.FetchBatchHeader(ctx, gcommon.HexToAddress(s.config.EigenDAServiceManagerAddr), req.GetBatchHeaderHash(), big.NewInt(int64(req.ReferenceBlockNumber)), nil)
 	if err != nil {
 		return nil, err
 	}
