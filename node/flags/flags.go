@@ -291,6 +291,7 @@ var optionalFlags = []cli.Flag{
 	OverrideStoreDurationBlocksFlag,
 	TestPrivateBlsFlag,
 	NumBatchValidatorsFlag,
+	NumBatchDeserializationWorkersFlag,
 	InternalDispersalPortFlag,
 	InternalRetrievalPortFlag,
 	ClientIPHeaderFlag,
