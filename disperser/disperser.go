@@ -148,7 +148,7 @@ type BlobStore interface {
 	// Returns the updated metadata and error
 	MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *BlobMetadata, confirmationInfo *ConfirmationInfo) (*BlobMetadata, error)
 	// MarkBlobFinalized marks a blob as finalized
-	MarkBlobFinalized(ctx context.Context, blobKey BlobKey) error
+	MarkBlobFinalized(ctx context.Context, existingMetadata *BlobMetadata, confirmationBlockNumber uint64) (*BlobMetadata, error)
 	// MarkBlobProcessing marks a blob as processing
 	MarkBlobProcessing(ctx context.Context, blobKey BlobKey) error
 	// MarkBlobFailed marks a blob as failed

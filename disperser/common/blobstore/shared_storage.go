@@ -161,14 +161,28 @@ func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey di
 }
 
 func (s *SharedBlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {
+	if existingMetadata == nil {
+		return nil, errors.New("metadata is nil")
+	}
 	newMetadata := *existingMetadata
 	newMetadata.BlobStatus = disperser.InsufficientSignatures
-	newMetadata.ConfirmationInfo = confirmationInfo
+	if confirmationInfo != nil {
+		newMetadata.ConfirmationInfo = confirmationInfo
+	}
 	return &newMetadata, s.blobMetadataStore.UpdateBlobMetadata(ctx, existingMetadata.GetBlobKey(), &newMetadata)
 }
 
-func (s *SharedBlobStore) MarkBlobFinalized(ctx context.Context, metadataKey disperser.BlobKey) error {
-	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Finalized)
+func (s *SharedBlobStore) MarkBlobFinalized(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint64) (*disperser.BlobMetadata, error) {
+	if existingMetadata == nil {
+		return nil, errors.New("metadata is nil")
+	}
+	newMetadata := *existingMetadata
+	newMetadata.BlobStatus = disperser.Finalized
+	if confirmationBlockNumber > 0 {
+		newMetadata.ConfirmationInfo.ConfirmationBlockNumber = uint32(confirmationBlockNumber)
+	}
+
+	return &newMetadata, s.blobMetadataStore.UpdateBlobMetadata(ctx, existingMetadata.GetBlobKey(), &newMetadata)
 }
 
 func (s *SharedBlobStore) MarkBlobProcessing(ctx context.Context, metadataKey disperser.BlobKey) error {

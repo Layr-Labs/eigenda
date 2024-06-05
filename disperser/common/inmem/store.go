@@ -123,15 +123,19 @@ func (q *BlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existing
 	return &newMetadata, nil
 }
 
-func (q *BlobStore) MarkBlobFinalized(ctx context.Context, blobKey disperser.BlobKey) error {
+func (q *BlobStore) MarkBlobFinalized(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint64) (*disperser.BlobMetadata, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	blobKey := existingMetadata.GetBlobKey()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return disperser.ErrBlobNotFound
+		return nil, disperser.ErrBlobNotFound
 	}
 
-	q.Metadata[blobKey].BlobStatus = disperser.Finalized
-	return nil
+	newMetadata := *existingMetadata
+	newMetadata.BlobStatus = disperser.Finalized
+	newMetadata.ConfirmationInfo.ConfirmationBlockNumber = uint32(confirmationBlockNumber)
+	q.Metadata[blobKey] = &newMetadata
+	return &newMetadata, nil
 }
 
 func (q *BlobStore) MarkBlobProcessing(ctx context.Context, blobKey disperser.BlobKey) error {

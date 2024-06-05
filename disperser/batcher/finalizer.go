@@ -198,8 +198,7 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 			continue
 		}
 
-		confirmationMetadata.ConfirmationInfo.ConfirmationBlockNumber = uint32(confirmationBlockNumber)
-		err = f.blobStore.MarkBlobFinalized(ctx, blobKey)
+		_, err = f.blobStore.MarkBlobFinalized(ctx, confirmationMetadata, confirmationBlockNumber)
 		if err != nil {
 			f.logger.Error("error marking blob as finalized", "blobKey", blobKey.String(), "err", err)
 			f.metrics.IncrementNumBlobs("failed")
