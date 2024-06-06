@@ -26,6 +26,7 @@ Additional CLI args are provided for targeting an EigenDA network backend:
 * `--eigenda-g1-path`: Directory path to g1.point file
 * `--eigenda-g2-power-of-tau`: Directory path to g2.point.powerOf2 file
 * `--eigenda-cache-path`: Directory path to dump cached SRS tables
+* `--eigenda-max-blob-length`: The maximum blob length that this EigenDA sidecar proxy should expect to be written or read from EigenDA. This configuration setting is used to determine how many SRS points should be loaded into memory for generating/verifying KZG commitments returned by the EigenDA disperser. Valid byte units are either base-2 or base-10 byte amounts (not bits), e.g. `30 MiB`, `4Kb`, `30MB`. The maximum blob size is a little more than `1GB`.
 
 ### In-Memory Storage
 

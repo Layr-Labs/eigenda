@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 // ErrCommitmentLength is returned when the commitment length is invalid.
@@ -33,6 +34,11 @@ type Commitment []byte
 
 func (c Commitment) Encode() []byte {
 	return append([]byte{byte(op_plasma.GenericCommitmentType), byte(EigenDA), byte(EigenV0)}, c...)
+}
+
+func StringToCommit(key string) (Commitment, error) {
+	comm, _ := hexutil.Decode(key)
+	return DecodeCommitment(comm)
 }
 
 // DecodeCommitment verifies and decodes an EigenDACommit from raw encoded bytes.

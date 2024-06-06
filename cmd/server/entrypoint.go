@@ -16,18 +16,23 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
 
-func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store, error) {
-	if cfg.MemStoreCfg.Enabled {
-		log.Info("Using memstore backend")
-		return store.NewMemStore(ctx, &cfg.MemStoreCfg, log)
-	}
-
+func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store, error) {
 	log.Info("Using eigenda backend")
 	daCfg := cfg.EigenDAConfig
 
-	v, err := verify.NewVerifier(daCfg.KzgConfig())
+	verifier, err := verify.NewVerifier(daCfg.KzgConfig())
 	if err != nil {
 		return nil, err
+	}
+
+	maxBlobLength, err := daCfg.GetMaxBlobLength()
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.MemStoreCfg.Enabled {
+		log.Info("Using memstore backend")
+		return store.NewMemStore(ctx, &cfg.MemStoreCfg, verifier, log, maxBlobLength)
 	}
 
 	client, err := clients.NewEigenDAClient(log, daCfg.ClientConfig)
@@ -37,7 +42,8 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (proxy.Store,
 	return store.NewEigenDAStore(
 		ctx,
 		client,
-		v,
+		verifier,
+		maxBlobLength,
 	)
 }
 

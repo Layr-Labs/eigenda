@@ -42,7 +42,7 @@ const (
 type TestSuite struct {
 	ctx    context.Context
 	log    log.Logger
-	server *proxy.DAServer
+	server *proxy.Server
 }
 
 func createTestSuite(t *testing.T) (TestSuite, func()) {
@@ -93,7 +93,7 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 		panic(err)
 	}
 
-	daStore, err := store.NewEigenDAStore(ctx, client, verifier)
+	daStore, err := store.NewEigenDAStore(ctx, client, verifier, 1024*1024*2)
 	if err != nil {
 		panic(err)
 	}

@@ -11,10 +11,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -22,26 +23,30 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-type Store interface {
-	// Get retrieves the given key if it's present in the key-value data store.
-	Get(ctx context.Context, key []byte) ([]byte, error)
-	// Put inserts the given value into the key-value data store.
-	Put(ctx context.Context, value []byte) (key []byte, err error)
-}
+const (
+	invalidDomain = "invalid domain type"
+)
 
-type DAServer struct {
+const (
+	GetRoute = "/get"
+	PutRoute = "/put"
+
+	DomainFilterKey = "domain"
+)
+
+type Server struct {
 	log        log.Logger
 	endpoint   string
-	store      Store
+	store      store.Store
 	m          metrics.Metricer
 	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
 
-func NewServer(host string, port int, store Store, log log.Logger, m metrics.Metricer) *DAServer {
+func NewServer(host string, port int, store store.Store, log log.Logger, m metrics.Metricer) *Server {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
-	return &DAServer{
+	return &Server{
 		m:        m,
 		log:      log,
 		endpoint: endpoint,
@@ -55,32 +60,63 @@ func NewServer(host string, port int, store Store, log log.Logger, m metrics.Met
 	}
 }
 
-func (d *DAServer) Start() error {
+// WithVerify is a middleware that verifies the route path.
+func WithVerify(handleFn func(http.ResponseWriter, *http.Request), path string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		route := r.URL.Path
+
+		if route != path {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		handleFn(w, r)
+	}
+}
+
+// WithMetrics is a middleware that records metrics for the route path.
+func WithMetrics(handleFn func(http.ResponseWriter, *http.Request), m metrics.Metricer) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		recordDur := m.RecordRPCServerRequest(r.URL.Path)
+		defer recordDur()
+
+		handleFn(w, r)
+	}
+}
+
+func WithLogging(handleFn func(http.ResponseWriter, *http.Request), log log.Logger) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Info("request", "method", r.Method, "url", r.URL)
+		handleFn(w, r)
+	}
+}
+
+func (svr *Server) Start() error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/get/", d.HandleGet)
-	mux.HandleFunc("/put/", d.HandlePut)
-	mux.HandleFunc("/health", d.Health)
+	mux.HandleFunc(GetRoute, WithMetrics(WithVerify(svr.HandleGet, GetRoute), svr.m))
+	mux.HandleFunc(PutRoute, WithMetrics(WithVerify(svr.HandlePut, PutRoute), svr.m))
+	mux.HandleFunc("/health", WithVerify(svr.Health, "/health"))
 
-	d.httpServer.Handler = mux
+	svr.httpServer.Handler = mux
 
-	listener, err := net.Listen("tcp", d.endpoint)
+	listener, err := net.Listen("tcp", svr.endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
-	d.listener = listener
+	svr.listener = listener
 
-	d.endpoint = listener.Addr().String()
+	svr.endpoint = listener.Addr().String()
 
-	d.log.Info("Starting DA server", "endpoint", d.endpoint)
+	svr.log.Info("Starting DA server", "endpoint", svr.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
-		if d.tls != nil {
-			if err := d.httpServer.ServeTLS(d.listener, "", ""); err != nil {
+		if svr.tls != nil {
+			if err := svr.httpServer.ServeTLS(svr.listener, "", ""); err != nil {
 				errCh <- err
 			}
 		} else {
-			if err := d.httpServer.Serve(d.listener); err != nil {
+			if err := svr.httpServer.Serve(svr.listener); err != nil {
 				errCh <- err
 			}
 		}
@@ -98,69 +134,58 @@ func (d *DAServer) Start() error {
 	}
 }
 
-func (d *DAServer) Health(w http.ResponseWriter, r *http.Request) {
-	d.log.Info("GET", "url", r.URL)
-	recordDur := d.m.RecordRPCServerRequest("health")
-	defer recordDur()
+func (svr *Server) Endpoint() string {
+	return svr.listener.Addr().String()
+}
+
+func (svr *Server) Stop() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := svr.httpServer.Shutdown(ctx); err != nil {
+		svr.log.Error("Failed to shutdown proxy server", "err", err)
+		return err
+	}
+	return nil
+}
+func (svr *Server) Health(w http.ResponseWriter, r *http.Request) {
+	svr.log.Info("GET", "url", r.URL)
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (d *DAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
-	d.log.Info("GET", "url", r.URL)
-	recordDur := d.m.RecordRPCServerRequest("get")
-	defer recordDur()
+func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
+	svr.log.Info("GET", "url", r.URL)
 
-	route := path.Dir(r.URL.Path)
-	if route != "/get" {
-		d.log.Info("invalid route", "route", route)
-		w.WriteHeader(http.StatusBadRequest)
+	domain, err := ReadDomainFilter(r)
+	if err != nil {
+		svr.WriteBadRequest(w, invalidDomain)
 		return
 	}
 
 	key := path.Base(r.URL.Path)
-	comm, err := hexutil.Decode(key)
+	comm, err := eigenda.StringToCommit(key)
 	if err != nil {
-		d.log.Info("failed to decode commitment bytes from hex", "err", err, "key", key)
+		svr.log.Info("failed to decode commitment", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	decodedComm, err := eigenda.DecodeCommitment(comm)
-	if err != nil {
-		d.log.Info("failed to decode commitment", "err", err, "key", key)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	input, err := d.store.Get(r.Context(), decodedComm)
+	input, err := svr.store.Get(r.Context(), comm, domain)
 	if err != nil && errors.Is(err, ErrNotFound) {
-		d.log.Info("no entry found in DA store", "key", key)
-		w.WriteHeader(http.StatusNotFound)
+		svr.WriteNotFound(w, err.Error())
 		return
 	}
+
 	if err != nil {
-		d.log.Error("internal server error", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		svr.WriteInternalError(w, err)
 		return
 	}
-	if _, err := w.Write(input); err != nil {
-		d.log.Error("failed to write response", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+
+	svr.WriteResponse(w, input)
 }
 
-func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
-	d.log.Info("PUT", "url", r.URL)
-	recordDur := d.m.RecordRPCServerRequest("put")
-	defer recordDur()
-
-	route := path.Dir(r.URL.Path)
-	if route != "/put" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
+	svr.log.Info("PUT", "url", r.URL)
 
 	input, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -169,29 +194,46 @@ func (d *DAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var comm []byte
-	if comm, err = d.store.Put(r.Context(), input); err != nil {
-		d.log.Error("Failed to store commitment to the DA server", "err", err, "comm", comm)
-		w.WriteHeader(http.StatusInternalServerError)
+	if comm, err = svr.store.Put(r.Context(), input); err != nil {
+		svr.WriteInternalError(w, err)
 		return
 	}
 
 	// write out encoded commitment
-	if _, err := w.Write(eigenda.Commitment.Encode(comm)); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	svr.WriteResponse(w, comm)
+}
+
+func (svr *Server) WriteResponse(w http.ResponseWriter, data []byte) {
+	if _, err := w.Write(data); err != nil {
+		svr.WriteInternalError(w, err)
 	}
 }
 
-func (b *DAServer) Endpoint() string {
-	return b.listener.Addr().String()
+func (svr *Server) WriteInternalError(w http.ResponseWriter, err error) {
+	svr.log.Error("internal server error", "err", err)
+	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func (b *DAServer) Stop() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := b.httpServer.Shutdown(ctx); err != nil {
-		b.log.Error("Failed to shutdown DA server", "err", err)
-		return err
+func (svr *Server) WriteNotFound(w http.ResponseWriter, msg string) {
+	svr.log.Info("not found", "msg", msg)
+	w.WriteHeader(http.StatusNotFound)
+}
+
+func (svr *Server) WriteBadRequest(w http.ResponseWriter, msg string) {
+	svr.log.Info("bad request", "msg", msg)
+	w.WriteHeader(http.StatusBadRequest)
+}
+
+func ReadDomainFilter(r *http.Request) (common.DomainType, error) {
+	query := r.URL.Query()
+	key := query.Get(DomainFilterKey)
+	if key == "" { // default
+		return common.BinaryDomain, nil
 	}
-	return nil
+	dt := common.StrToDomainType(key)
+	if dt == common.UnknownDomain {
+		return common.UnknownDomain, common.ErrInvalidDomainType
+	}
+
+	return dt, nil
 }

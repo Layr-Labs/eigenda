@@ -6,8 +6,8 @@ github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/DataDog/zstd v1.5.2 h1:vUG4lAyuPCXO0TLbXvPv7EB7cNK1QV/luu55UHLrrn8=
 github.com/DataDog/zstd v1.5.2/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/Layr-Labs/eigenda v0.7.2-0.20240529223545-5aecf5c2b679 h1:pa127fpHOA9OkByOFEdvOUJN7fLBudNWT2/2hw47sSs=
-github.com/Layr-Labs/eigenda v0.7.2-0.20240529223545-5aecf5c2b679/go.mod h1:gG5KSp5gGY0lywj6aZwaK9ZEF8eEVX4ilo679pFpvAA=
+github.com/Layr-Labs/eigenda v0.7.2-0.20240606151432-5c99021df5f2 h1:BRnv/HVhE95H0svhhPwuUWnh7yGKHjM8fg0gmC04zso=
+github.com/Layr-Labs/eigenda v0.7.2-0.20240606151432-5c99021df5f2/go.mod h1:gG5KSp5gGY0lywj6aZwaK9ZEF8eEVX4ilo679pFpvAA=
 github.com/Layr-Labs/eigensdk-go v0.1.7-0.20240507215523-7e4891d5099a h1:L/UsJFw9M31FD/WgXTPFB0oxbq9Cu4Urea1xWPMQS7Y=
 github.com/Layr-Labs/eigensdk-go v0.1.7-0.20240507215523-7e4891d5099a/go.mod h1:OF9lmS/57MKxS0xpSpX0qHZl0SKkDRpvJIvsGvMN1y8=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
