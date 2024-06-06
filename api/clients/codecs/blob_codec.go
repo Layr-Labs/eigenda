@@ -20,8 +20,26 @@ type BlobCodec interface {
 func BlobEncodingVersionToCodec(version BlobEncodingVersion) (BlobCodec, error) {
 	switch version {
 	case DefaultBlobEncoding:
-		return DefaultBlobEncodingCodec{}, nil
+		return DefaultBlobCodec{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported blob encoding version: %x", version)
 	}
+}
+
+func GenericDecodeBlob(data []byte) ([]byte, error) {
+	if len(data) <= 32 {
+		return nil, fmt.Errorf("data is not of length greater than 32 bytes: %d", len(data))
+	}
+	version := BlobEncodingVersion(data[1])
+	codec, err := BlobEncodingVersionToCodec(version)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err = codec.DecodeBlob(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
