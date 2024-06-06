@@ -35,6 +35,10 @@ func (v DefaultBlobCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 }
 
 func (v DefaultBlobCodec) DecodeBlob(data []byte) ([]byte, error) {
+	if len(data) < 32 {
+		return nil, fmt.Errorf("blob does not contain 32 header bytes, meaning it is malformed")
+	}
+
 	length := binary.BigEndian.Uint32(data[2:6])
 
 	// decode raw data modulo bn254

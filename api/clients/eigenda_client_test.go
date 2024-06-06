@@ -78,7 +78,7 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 	require.NotNil(t, blobInfo)
 	assert.Equal(t, finalizedBlobInfo, blobInfo)
 
-	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100, true)
+	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
 	require.NoError(t, err)
 	require.Equal(t, expectedBlob, resultBlob)
 }
@@ -143,10 +143,12 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 	require.NotNil(t, blobInfo)
 	assert.Equal(t, finalizedBlobInfo, blobInfo)
 
-	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100, false)
+	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
+	require.NoError(t, err)
+	encodedBlob, err := eigendaClient.GetCodec().EncodeBlob(resultBlob)
 	require.NoError(t, err)
 
-	resultBlob, err = codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()).DecodeBlob(resultBlob)
+	resultBlob, err = codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()).DecodeBlob(encodedBlob)
 	require.NoError(t, err)
 	require.Equal(t, expectedBlob, resultBlob)
 }
@@ -211,7 +213,7 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 	require.NotNil(t, blobInfo)
 	assert.Equal(t, finalizedBlobInfo, blobInfo)
 
-	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100, true)
+	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
 	require.NoError(t, err)
 	require.Equal(t, expectedBlob, resultBlob)
 }

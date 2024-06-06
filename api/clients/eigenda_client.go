@@ -16,8 +16,9 @@ import (
 )
 
 type IEigenDAClient interface {
-	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32, decode bool) ([]byte, error)
+	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
+	GetCodec() codecs.BlobCodec
 }
 
 type EigenDAClient struct {
@@ -64,13 +65,17 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}, nil
 }
 
+func (m EigenDAClient) GetCodec() codecs.BlobCodec {
+	return m.Codec
+}
+
 // GetBlob retrieves a blob from the EigenDA service using the provided context,
 // batch header hash, and blob index.  If decode is set to true, the function
 // decodes the retrieved blob data. If set to false it returns the encoded blob
 // data, which is necessary for generating KZG proofs for data's correctness.
 // The function handles potential errors during blob retrieval, data length
 // checks, and decoding processes.
-func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32, decode bool) ([]byte, error) {
+func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
 	data, err := m.Client.RetrieveBlob(ctx, batchHeaderHash, blobIndex)
 	if err != nil {
 		return nil, err
@@ -78,10 +83,6 @@ func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blob
 
 	if len(data) == 0 {
 		return nil, fmt.Errorf("blob has length zero")
-	}
-
-	if !decode {
-		return data, nil
 	}
 
 	decodedData, err := m.Codec.DecodeBlob(data)
