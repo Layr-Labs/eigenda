@@ -146,6 +146,13 @@ var (
 		Value:    6 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRANSACTION_TIMEOUT"),
 	}
+	NonsigningRateThresholdFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "nonsigning-rate-threshold"),
+		Usage:    "only operators with nonsigning rate >= this threshold will be ejected, this value must be in range [10, 100], any value not in this range means disabling this flag",
+		Required: false,
+		Value:    -1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NONSIGNING_RATE_THRESHOLD"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -172,6 +179,7 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
+	NonsigningRateThresholdFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

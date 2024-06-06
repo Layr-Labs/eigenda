@@ -462,7 +462,7 @@ func getEjector(t *testing.T) *ejectorComponents {
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
 	ethClient := &commonmock.MockEthClient{}
-	ejector := dataapi.NewEjector(w, ethClient, mockLogger, mockTx, metrics, 100*time.Millisecond)
+	ejector := dataapi.NewEjector(w, ethClient, mockLogger, mockTx, metrics, 100*time.Millisecond, -1)
 	return &ejectorComponents{
 		wallet:    w,
 		ethClient: ethClient,

@@ -30,6 +30,7 @@ type Config struct {
 	ServerMode                   string
 	AllowOrigins                 []string
 	EjectionToken                string
+	NonsigningRateThreshold      int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -76,8 +77,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			Secret:    ctx.GlobalString(flags.PrometheusServerSecretFlag.Name),
 			Cluster:   ctx.GlobalString(flags.PrometheusMetricsClusterLabelFlag.Name),
 		},
-		AllowOrigins:  ctx.GlobalStringSlice(flags.AllowOriginsFlag.Name),
-		EjectionToken: ejectionToken,
+		AllowOrigins:            ctx.GlobalStringSlice(flags.AllowOriginsFlag.Name),
+		EjectionToken:           ejectionToken,
+		NonsigningRateThreshold: ctx.GlobalInt(flags.NonsigningRateThresholdFlag.Name),
+
 		MetricsConfig: dataapi.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetricsFlag.Name),
