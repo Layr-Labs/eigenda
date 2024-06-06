@@ -41,7 +41,7 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte, domain common.DomainT
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to retrieve decoded blob: %w", err)
 	}
-	// reencode blob because that's what the caller wants
+	// reencode blob for verification
 	encodedBlob, err := e.client.GetCodec().EncodeBlob(decodedBlob)
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to reencode blob: %w", err)
@@ -68,6 +68,15 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.maxBlobSizeBytes)
 	}
 	cert, err := e.client.PutBlob(ctx, value)
+	if err != nil {
+		return nil, err
+	}
+
+	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
+	if err != nil {
+		return nil, fmt.Errorf("EigenDA client failed to reencode blob: %w", err)
+	}
+	err = e.verifier.Verify(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
 		return nil, err
 	}
