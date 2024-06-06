@@ -62,17 +62,7 @@ An `EigenDACommitment` layer type has been added that supports verification agai
 
 ```
 
-The `raw commitment` for EigenDA is encoding the following certificate and kzg fields:
-
-```go
-type Cert struct {
- BatchHeaderHash      []byte
- BlobIndex            uint32
- ReferenceBlockNumber uint32
- QuorumIDs            []uint32
- BlobCommitment *common.G1Commitment
-}
-```
+The `raw commitment` for EigenDA is encoding certificate and kzg fields.
 
 **NOTE:** Commitments are cryptographically verified against the data fetched from EigenDA for all `/get` calls. The server will respond with status `500` in the event where EigenDA were to lie and provide falsified data thats irrespective of the client provided commitment. This feature isn't flag guarded and is part of standard operation.
 
