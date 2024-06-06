@@ -32,7 +32,7 @@ const (
 type Commitment []byte
 
 func (c Commitment) Encode() []byte {
-	return append([]byte{byte(EigenDA), byte(EigenV0)}, c...)
+	return append([]byte{byte(op_plasma.GenericCommitmentType), byte(EigenDA), byte(EigenV0)}, c...)
 }
 
 // DecodeCommitment verifies and decodes an EigenDACommit from raw encoded bytes.
