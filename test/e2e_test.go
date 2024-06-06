@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	plasma "github.com/Layr-Labs/eigenda-proxy"
 	proxy "github.com/Layr-Labs/eigenda-proxy"
 	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
@@ -32,6 +31,7 @@ func init() {
 
 // Use of single port makes tests incapable of running in parallel
 const (
+	privateKey  = "SIGNER_PRIVATE_KEY"
 	transport   = "http"
 	serviceName = "eigenda_proxy"
 	host        = "127.0.0.1"
@@ -42,11 +42,17 @@ const (
 type TestSuite struct {
 	ctx    context.Context
 	log    log.Logger
-	server *plasma.DAServer
+	server *proxy.DAServer
 }
 
 func createTestSuite(t *testing.T) (TestSuite, func()) {
 	ctx := context.Background()
+
+	// load signer key from environment
+	pk := os.Getenv(privateKey)
+	if pk == "" {
+		t.Fatal("SIGNER_PRIVATE_KEY environment variable not set")
+	}
 
 	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
 		Level:  log.LevelDebug,
@@ -62,6 +68,7 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 			StatusQueryTimeout:       time.Minute * 45,
 			StatusQueryRetryInterval: time.Second * 1,
 			DisableTLS:               false,
+			SignerPrivateKeyHex:      pk,
 		},
 	}
 
