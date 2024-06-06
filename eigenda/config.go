@@ -182,6 +182,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    MaxBlobLengthFlagName,
 			Usage:   "Maximum size in string representation (e.g. \"10mb\", \"4 KiB\") of blobs to be dispersed and verified using this proxy. This impacts the number of SRS points loaded into memory.",
 			EnvVars: prefixEnvVars("TARGET_KZG_G1_PATH"),
+			Value:   "2MiB",
 		},
 		&cli.StringFlag{
 			Name:    G1PathFlagName,
