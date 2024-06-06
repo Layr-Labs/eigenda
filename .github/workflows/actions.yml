@@ -53,3 +53,22 @@ jobs:
         uses: securego/gosec@master
         with:
           args: ./...
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+    - name: Run E2E Tests
+      env: 
+        SIGNER_PRIVATE_KEY:  ${{ secrets.SIGNER_PRIVATE_KEY }}
+      run: | 
+        SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY make e2e-test
