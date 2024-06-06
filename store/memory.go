@@ -8,8 +8,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/ethereum/go-ethereum/common"
+	eigendacommon "github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/urfave/cli/v2"
 )
@@ -36,15 +41,24 @@ type MemStore struct {
 	l         log.Logger
 	keyStarts map[string]time.Time
 	store     map[string][]byte
+	verifier  *verify.Verifier
+	codec     codecs.BlobCodec
+
+	maxBlobSizeBytes uint64
 }
 
+var _ Store = (*MemStore)(nil)
+
 // NewMemStore ... constructor
-func NewMemStore(ctx context.Context, cfg *MemStoreConfig, l log.Logger) (*MemStore, error) {
+func NewMemStore(ctx context.Context, cfg *MemStoreConfig, verifier *verify.Verifier, l log.Logger, maxBlobSizeBytes uint64) (*MemStore, error) {
 	store := &MemStore{
-		cfg:       cfg,
-		l:         l,
-		keyStarts: make(map[string]time.Time),
-		store:     make(map[string][]byte),
+		cfg:              cfg,
+		l:                l,
+		keyStarts:        make(map[string]time.Time),
+		store:            make(map[string][]byte),
+		verifier:         verifier,
+		codec:            codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
+		maxBlobSizeBytes: maxBlobSizeBytes,
 	}
 
 	if cfg.BlobExpiration != 0 {
@@ -86,44 +100,110 @@ func (e *MemStore) pruneExpired() {
 }
 
 // Get fetches a value from the store.
-func (e *MemStore) Get(ctx context.Context, commit []byte) ([]byte, error) {
+func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.DomainType) ([]byte, error) {
 	e.RLock()
 	defer e.RUnlock()
 
-	key := common.Bytes2Hex(commit)
-	if _, exists := e.store[key]; !exists {
+	var cert *disperser.BlobInfo
+	err := rlp.DecodeBytes(commit, &cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
+	}
+
+	var encodedBlob []byte
+	var exists bool
+	if encodedBlob, exists = e.store[string(commit)]; !exists {
 		return nil, fmt.Errorf("commitment key not found")
 	}
 
-	return e.store[key], nil
-}
-
-// Put inserts a value into the store.
-func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
-	e.Lock()
-	defer e.Unlock()
-
-	fingerprint := crypto.Keccak256Hash(value)
-	// add some entropy to commit to emulate randomness seen in EigenDA
-	// when generating operator BLS signature certificates
-	entropy := make([]byte, 10)
-	_, err := rand.Read(entropy)
+	// Don't need to do this really since it's a mock store
+	err = e.verifier.Verify(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
 		return nil, err
 	}
 
-	rawCommit := append(fingerprint.Bytes(), entropy...)
-	commit := common.Bytes2Hex(rawCommit)
+	switch domain {
+	case eigendacommon.BinaryDomain:
+		return e.codec.DecodeBlob(encodedBlob)
+	case eigendacommon.PolyDomain:
+		return encodedBlob, nil
+	default:
+		return nil, fmt.Errorf("unexpected domain type: %d", domain)
+	}
+}
 
-	if _, exists := e.store[commit]; exists {
+// Put inserts a value into the store.
+func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
+	if uint64(len(value)) > e.maxBlobSizeBytes {
+		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.maxBlobSizeBytes)
+	}
+
+	e.Lock()
+	defer e.Unlock()
+
+	encodedVal, err := e.codec.EncodeBlob(value)
+	if err != nil {
+		return nil, err
+	}
+
+	commitment, err := e.verifier.Commit(encodedVal)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate batch header hash
+	entropy := make([]byte, 10)
+	_, err = rand.Read(entropy)
+	if err != nil {
+		return nil, err
+	}
+	mockBatchHeaderHash := crypto.Keccak256Hash(entropy)
+
+	// only filling out commitment fields for now
+	cert := &disperser.BlobInfo{
+		BlobHeader: &disperser.BlobHeader{
+			Commitment: &grpccommon.G1Commitment{
+				X: commitment.X.Marshal(),
+				Y: commitment.Y.Marshal(),
+			},
+			// DataLength: ,
+			// BlobQuorumParams: ,
+		},
+		BlobVerificationProof: &disperser.BlobVerificationProof{
+			BatchMetadata: &disperser.BatchMetadata{
+				BatchHeader: &disperser.BatchHeader{
+					// BatchRoot: ,
+					// QuorumNumbers: ,
+					// QuorumSignedPercentages: ,
+					// ReferenceBlockNumber: ,
+				},
+				// SignatoryRecordHash: ,
+				// Fee: ,
+				// ConfirmationBlockNumber: ,
+				BatchHeaderHash: mockBatchHeaderHash[:],
+			},
+			// BatchId: ,
+			// BlobIndex: ,
+			// InclusionProof: ,
+			// QuorumIndexes: ,
+		},
+	}
+
+	certBytes, err := rlp.EncodeToBytes(cert)
+	if err != nil {
+		return nil, err
+	}
+	certStr := string(certBytes)
+
+	if _, exists := e.store[certStr]; exists {
 		return nil, fmt.Errorf("commitment key already exists")
 	}
 
-	e.store[commit] = value
+	e.store[certStr] = encodedVal
 	// add expiration
-	e.keyStarts[commit] = time.Now()
+	e.keyStarts[certStr] = time.Now()
 
-	return rawCommit, nil
+	return certBytes, nil
 }
 
 func ReadConfig(ctx *cli.Context) MemStoreConfig {

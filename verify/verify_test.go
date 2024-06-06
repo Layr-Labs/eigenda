@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -16,17 +15,15 @@ func TestVerification(t *testing.T) {
 
 	var data = []byte("inter-subjective and not objective!")
 
-	x, err := hex.DecodeString("07c23d7720de3f10064c8f48774d8f59207964c482419063246a67e1c454a886")
+	x, err := hex.DecodeString("2fc55f968a2d29d22aebf55b382528d1d9401577c166483e162355b19d8bc446")
 	assert.NoError(t, err)
 
-	y, err := hex.DecodeString("0f747070e6fdb4e1346fec54dbc3d2d61a2c9ad2cb6b1744fa7f47072ad13370")
+	y, err := hex.DecodeString("149e2241c21c391e069b9f317710c7f57f31ee88245a5e61f0d294b11acf9aff")
 	assert.NoError(t, err)
 
-	c := eigenda.Cert{
-		BlobCommitment: &common.G1Commitment{
-			X: x,
-			Y: y,
-		},
+	c := &common.G1Commitment{
+		X: x,
+		Y: y,
 	}
 
 	kzgConfig := &kzg.KzgConfig{
@@ -42,9 +39,7 @@ func TestVerification(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Happy path verification
-
-	// TODO: Update this test to use the IFFT codec
-	codec := codecs.DefaultBlobEncodingCodec{}
+	codec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
 	blob, err := codec.EncodeBlob(data)
 	assert.NoError(t, err)
 	err = v.Verify(c, blob)

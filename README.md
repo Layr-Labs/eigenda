@@ -26,6 +26,7 @@ Additional CLI args are provided for targeting an EigenDA network backend:
 * `--eigenda-g1-path`: Directory path to g1.point file
 * `--eigenda-g2-power-of-tau`: Directory path to g2.point.powerOf2 file
 * `--eigenda-cache-path`: Directory path to dump cached SRS tables
+* `--eigenda-max-blob-length`: The maximum blob length that this EigenDA sidecar proxy should expect to be written or read from EigenDA. This configuration setting is used to determine how many SRS points should be loaded into memory for generating/verifying KZG commitments returned by the EigenDA disperser. Valid byte units are either base-2 or base-10 byte amounts (not bits), e.g. `30 MiB`, `4Kb`, `30MB`. The maximum blob size is a little more than `1GB`.
 
 ### In-Memory Storage
 
@@ -61,17 +62,7 @@ An `EigenDACommitment` layer type has been added that supports verification agai
 
 ```
 
-The `raw commitment` for EigenDA is encoding the following certificate and kzg fields:
-
-```go
-type Cert struct {
- BatchHeaderHash      []byte
- BlobIndex            uint32
- ReferenceBlockNumber uint32
- QuorumIDs            []uint32
- BlobCommitment *common.G1Commitment
-}
-```
+The `raw commitment` for EigenDA is encoding certificate and kzg fields.
 
 **NOTE:** Commitments are cryptographically verified against the data fetched from EigenDA for all `/get` calls. The server will respond with status `500` in the event where EigenDA were to lie and provide falsified data thats irrespective of the client provided commitment. This feature isn't flag guarded and is part of standard operation.
 
