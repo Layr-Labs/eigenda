@@ -58,7 +58,7 @@ type Config struct {
 
 func (c *Config) GetMaxBlobLength() (uint64, error) {
 	if c.maxBlobLengthBytes == 0 {
-		numBytes, err := common.ConvertToBytes(c.MaxBlobLength)
+		numBytes, err := common.ParseBytesAmount(c.MaxBlobLength)
 		if err != nil {
 			return 0, err
 		}

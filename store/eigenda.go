@@ -54,7 +54,7 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte, domain common.DomainT
 
 	switch domain {
 	case common.BinaryDomain:
-		return e.client.Codec.DecodeBlob(encodedBlob)
+		return decodedBlob, nil
 	case common.PolyDomain:
 		return encodedBlob, nil
 	default:

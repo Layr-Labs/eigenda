@@ -185,8 +185,6 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
-	svr.log.Info("PUT", "url", r.URL)
-
 	input, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -200,7 +198,7 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write out encoded commitment
-	svr.WriteResponse(w, comm)
+	svr.WriteResponse(w, eigenda.Commitment.Encode(comm))
 }
 
 func (svr *Server) WriteResponse(w http.ResponseWriter, data []byte) {

@@ -42,7 +42,7 @@ func TestParseByteAmount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Input: %s", tc.input), func(t *testing.T) {
-			got, err := common.ConvertToBytes(tc.input)
+			got, err := common.ParseBytesAmount(tc.input)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("wantErr: %v, got error: %v", tc.wantErr, err)
 			}

@@ -37,7 +37,10 @@ func (c Commitment) Encode() []byte {
 }
 
 func StringToCommit(key string) (Commitment, error) {
-	comm, _ := hexutil.Decode(key)
+	comm, err := hexutil.Decode(key)
+	if err != nil {
+		return nil, err
+	}
 	return DecodeCommitment(comm)
 }
 

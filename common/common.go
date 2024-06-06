@@ -47,7 +47,7 @@ func EqualSlices[P comparable](s1, s2 []P) bool {
 	return true
 }
 
-func ConvertToBytes(s string) (uint64, error) {
+func ParseBytesAmount(s string) (uint64, error) {
 	s = strings.TrimSpace(s)
 
 	// Extract numeric part and unit
