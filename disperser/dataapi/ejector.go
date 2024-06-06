@@ -86,7 +86,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	for _, metric := range nonsigningRate.Data {
 		// If nonsigningRateThreshold is set and valid, we will only eject operators with
 		// nonsigning rate >= nonsigningRateThreshold.
-		if e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100 && metric.Percentage >= float64(e.nonsigningRateThreshold) {
+		if e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100 && metric.Percentage < float64(e.nonsigningRateThreshold) {
 			continue
 		}
 		// Collect only the nonsigners who violate the SLA.

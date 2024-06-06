@@ -148,7 +148,7 @@ var (
 	}
 	NonsigningRateThresholdFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "nonsigning-rate-threshold"),
-		Usage:    "only operators with nonsigning rate >= this threshold will be ejected, this value must be in range [10, 100], any value not in this range means disabling this flag",
+		Usage:    "only operators with nonsigning rate >= this threshold are eligible for ejection, this value must be in range [10, 100], any value not in this range means disabling this flag",
 		Required: false,
 		Value:    -1,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NONSIGNING_RATE_THRESHOLD"),
