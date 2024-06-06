@@ -71,7 +71,6 @@ func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 }
 
 func (c CLIConfig) Check() error {
-
 	err := c.EigenDAConfig.Check()
 	if err != nil {
 		return err
