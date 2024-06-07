@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -38,32 +37,26 @@ func main() {
 	app.Flags = flags.Flags
 	app.Action = batchGeneratorMain
 	if err := app.Run(os.Args); err != nil {
-		log.Fatalf("runtime failure: %v", err)
+		log.Fatal(err)
 	}
 }
 
-func batchGeneratorMain() {
-	threads, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		log.Fatalf("failed to convert threads to int:", err)
-	}
+func batchGeneratorMain(ctx *cli.Context) {
+	threads := int(ctx.GlobalUint(flags.NumThreadsFlag.Name))
+	factor := int(ctx.GlobalUint(flags.ScalingFactorFlag.Name))
+	hosts := ctx.GlobalStringSlice(flags.HostsFlag.Name)
 
-	factor, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		log.Fatalf("failed to convert batch scaling factor to int:", err)
-	}
-
-	hosts := os.Args[3:]
 	results := make(chan *pb.StoreChunksReply, len(hosts))
 	errors := make(chan error, len(hosts))
 
 	req, _, _, _, _ := makeStoreChunksRequest(100, 10, factor)
 	reqSizeMB := float64(proto.Size(req)) / 1024.0 / 1024.0
 	totalSizeMB := reqSizeMB * float64(threads) * float64(len(hosts))
-	log.Println("request size", reqSizeMB, "total data sent", totalSizeMB, "MB")
 
 	for _, host := range hosts {
+		log.Printf("host: %v", host)
 		for i := 0; i < threads; i++ {
+			log.Printf("i: %v", i)
 			go func(host string, i int) {
 				conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
@@ -93,6 +86,9 @@ func batchGeneratorMain() {
 			log.Println("ERR", err)
 		}
 	}
+
+	log.Println("request size", reqSizeMB, "total data sent", totalSizeMB, "MB")
+	os.Exit(0)
 }
 
 func makeStoreChunksRequest(quorumThreshold, adversaryThreshold uint8, factor int) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {

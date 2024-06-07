@@ -6,5 +6,5 @@ clean:
 	rm -rf ./bin
 
 run: build
-	./bin/batchgen 1000 10 localhost:32005
+	./bin/batchgen --host localhost:32005
 

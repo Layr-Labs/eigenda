@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	FlagPrefix = "batchgen"
+	FlagPrefix = ""
 	envPrefix  = "BATCHGEN"
 )
 
@@ -14,27 +14,34 @@ var (
 	/* Required Flags */
 
 	NumThreadsFlag = cli.UintFlag{
-		Name:     "host-threads",
+		Name:     common.PrefixFlag(FlagPrefix, "threads"),
 		Usage:    "Number of host threads in parallel",
 		Required: false,
 		Value:    1,
-		EnvVar:   "HOST_THREADS",
+		EnvVar:   common.PrefixEnvVar(envPrefix, "HOST_THREADS"),
 	}
 	ScalingFactorFlag = cli.UintFlag{
-		Name:     "scaling-factor",
+		Name:     common.PrefixFlag(FlagPrefix, "scaling-factor"),
 		Usage:    "Scaling factor applied to default batch size",
 		Required: false,
-		Value:    10,
-		EnvVar:   "SCALING_FACTOR",
+		Value:    100,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "SCALING_FACTOR"),
+	}
+	HostsFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "host"),
+		Usage:    "host:port",
+		Required: true,
 	}
 )
 
 var requiredFlags = []cli.Flag{
+	HostsFlag,
+}
+
+var optionalFlags = []cli.Flag{
 	NumThreadsFlag,
 	ScalingFactorFlag,
 }
-
-var optionalFlags = []cli.Flag{}
 
 // Flags contains the list of configuration options available to the binary.
 var Flags []cli.Flag
