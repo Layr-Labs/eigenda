@@ -148,13 +148,15 @@ type BlobStore interface {
 	// Returns the updated metadata and error
 	MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *BlobMetadata, confirmationInfo *ConfirmationInfo) (*BlobMetadata, error)
 	// MarkBlobFinalized marks a blob as finalized
-	MarkBlobFinalized(ctx context.Context, existingMetadata *BlobMetadata, confirmationBlockNumber uint64) (*BlobMetadata, error)
+	MarkBlobFinalized(ctx context.Context, blobKey BlobKey) error
 	// MarkBlobProcessing marks a blob as processing
 	MarkBlobProcessing(ctx context.Context, blobKey BlobKey) error
 	// MarkBlobFailed marks a blob as failed
 	MarkBlobFailed(ctx context.Context, blobKey BlobKey) error
 	// IncrementBlobRetryCount increments the retry count of a blob
 	IncrementBlobRetryCount(ctx context.Context, existingMetadata *BlobMetadata) error
+	// UpdateConfirmationBlockNumber updates the confirmation block number of a blob
+	UpdateConfirmationBlockNumber(ctx context.Context, existingMetadata *BlobMetadata, confirmationBlockNumber uint32) error
 	// GetBlobsByMetadata retrieves a list of blobs given a list of metadata
 	GetBlobsByMetadata(ctx context.Context, metadata []*BlobMetadata) (map[BlobKey]*core.Blob, error)
 	// GetBlobMetadataByStatus returns a list of blob metadata for blobs with the given status

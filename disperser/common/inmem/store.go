@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"sort"
 	"strconv"
 	"sync"
@@ -123,19 +124,15 @@ func (q *BlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existing
 	return &newMetadata, nil
 }
 
-func (q *BlobStore) MarkBlobFinalized(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint64) (*disperser.BlobMetadata, error) {
+func (q *BlobStore) MarkBlobFinalized(ctx context.Context, blobKey disperser.BlobKey) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	blobKey := existingMetadata.GetBlobKey()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return nil, disperser.ErrBlobNotFound
+		return disperser.ErrBlobNotFound
 	}
 
-	newMetadata := *existingMetadata
-	newMetadata.BlobStatus = disperser.Finalized
-	newMetadata.ConfirmationInfo.ConfirmationBlockNumber = uint32(confirmationBlockNumber)
-	q.Metadata[blobKey] = &newMetadata
-	return &newMetadata, nil
+	q.Metadata[blobKey].BlobStatus = disperser.Finalized
+	return nil
 }
 
 func (q *BlobStore) MarkBlobProcessing(ctx context.Context, blobKey disperser.BlobKey) error {
@@ -168,6 +165,21 @@ func (q *BlobStore) IncrementBlobRetryCount(ctx context.Context, existingMetadat
 	}
 
 	q.Metadata[existingMetadata.GetBlobKey()].NumRetries++
+	return nil
+}
+
+func (q *BlobStore) UpdateConfirmationBlockNumber(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint32) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if _, ok := q.Metadata[existingMetadata.GetBlobKey()]; !ok {
+		return disperser.ErrBlobNotFound
+	}
+
+	if q.Metadata[existingMetadata.GetBlobKey()].ConfirmationInfo == nil {
+		return fmt.Errorf("cannot update confirmation block number for blob without confirmation info: %s", existingMetadata.GetBlobKey().String())
+	}
+
+	q.Metadata[existingMetadata.GetBlobKey()].ConfirmationInfo.ConfirmationBlockNumber = confirmationBlockNumber
 	return nil
 }
 
