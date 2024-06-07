@@ -54,25 +54,27 @@ func computePerfScore(metric *OperatorNonsigningPercentageMetrics) float64 {
 }
 
 type Ejector struct {
-	wallet     walletsdk.Wallet
-	ethClient  common.EthClient
-	logger     logging.Logger
-	transactor core.Transactor
-	metrics    *Metrics
-	txnTimeout time.Duration
+	wallet                  walletsdk.Wallet
+	ethClient               common.EthClient
+	logger                  logging.Logger
+	transactor              core.Transactor
+	metrics                 *Metrics
+	txnTimeout              time.Duration
+	nonsigningRateThreshold int
 
 	// For serializing the ejection requests.
 	mu sync.Mutex
 }
 
-func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logging.Logger, tx core.Transactor, metrics *Metrics, txnTimeout time.Duration) *Ejector {
+func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logging.Logger, tx core.Transactor, metrics *Metrics, txnTimeout time.Duration, nonsigningRateThreshold int) *Ejector {
 	return &Ejector{
-		wallet:     wallet,
-		ethClient:  ethClient,
-		logger:     logger.With("component", "Ejector"),
-		transactor: tx,
-		metrics:    metrics,
-		txnTimeout: txnTimeout,
+		wallet:                  wallet,
+		ethClient:               ethClient,
+		logger:                  logger.With("component", "Ejector"),
+		transactor:              tx,
+		metrics:                 metrics,
+		txnTimeout:              txnTimeout,
+		nonsigningRateThreshold: nonsigningRateThreshold,
 	}
 }
 
@@ -82,6 +84,11 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 
 	nonsigners := make([]*OperatorNonsigningPercentageMetrics, 0)
 	for _, metric := range nonsigningRate.Data {
+		// If nonsigningRateThreshold is set and valid, we will only eject operators with
+		// nonsigning rate >= nonsigningRateThreshold.
+		if e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100 && metric.Percentage < float64(e.nonsigningRateThreshold) {
+			continue
+		}
 		// Collect only the nonsigners who violate the SLA.
 		if metric.Percentage/100.0 > 1-stakeShareToSLA(metric.StakePercentage/100.0) {
 			nonsigners = append(nonsigners, metric)

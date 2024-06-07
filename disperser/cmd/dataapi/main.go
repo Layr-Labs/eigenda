@@ -124,7 +124,7 @@ func RunDataApi(ctx *cli.Context) error {
 			subgraphClient,
 			tx,
 			chainState,
-			dataapi.NewEjector(wallet, client, logger, tx, metrics, config.TxnTimeout),
+			dataapi.NewEjector(wallet, client, logger, tx, metrics, config.TxnTimeout, config.NonsigningRateThreshold),
 			logger,
 			metrics,
 			nil,
