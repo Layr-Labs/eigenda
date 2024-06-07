@@ -104,7 +104,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.
 	e.RLock()
 	defer e.RUnlock()
 
-	var cert *disperser.BlobInfo
+	var cert disperser.BlobInfo
 	err := rlp.DecodeBytes(commit, &cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)

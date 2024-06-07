@@ -59,7 +59,6 @@ An `EigenDACommitment` layer type has been added that supports verification agai
             |--------|--------|--------|--------|-----------------|
              commit   da layer  ext da   version  raw commitment
              type       type    type      byte
-
 ```
 
 The `raw commitment` for EigenDA is encoding certificate and kzg fields.
