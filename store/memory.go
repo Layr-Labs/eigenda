@@ -23,7 +23,7 @@ const (
 	MemStoreFlagName   = "memstore.enabled"
 	ExpirationFlagName = "memstore.expiration"
 
-	DefaultPruneInterval = 1 * time.Minute
+	DefaultPruneInterval = 500 * time.Millisecond
 )
 
 type MemStoreConfig struct {

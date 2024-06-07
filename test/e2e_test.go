@@ -139,6 +139,10 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 }
 
 func TestE2EPutGetLogicForMemoryStore(t *testing.T) {
+	if runTestnetIntegrationTests {
+		t.Skip("Skipping non-testnet integration test")
+	}
+
 	ts, kill := createTestSuite(t, true)
 	defer kill()
 
