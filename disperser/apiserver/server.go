@@ -457,6 +457,11 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		// Update the quorum rate
 		blob.RequestHeader.SecurityParams[i].QuorumRate = accountRates.Throughput
 
+		// Update AccountID to accountKey.
+		// This will use the origin as the account key if the user does not provide
+		// an authenticated address.
+		blob.RequestHeader.BlobAuthHeader.AccountID = accountKey
+
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
 		encodedSize := encoding.GetBlobSize(encodedLength)
