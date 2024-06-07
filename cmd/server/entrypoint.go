@@ -5,53 +5,18 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
-	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
-	proxy "github.com/Layr-Labs/eigenda-proxy"
+	"github.com/Layr-Labs/eigenda-proxy/server"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
 
-func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store, error) {
-	log.Info("Using eigenda backend")
-	daCfg := cfg.EigenDAConfig
-
-	verifier, err := verify.NewVerifier(daCfg.KzgConfig())
-	if err != nil {
-		return nil, err
-	}
-
-	maxBlobLength, err := daCfg.GetMaxBlobLength()
-	if err != nil {
-		return nil, err
-	}
-
-	if cfg.MemStoreCfg.Enabled {
-		log.Info("Using memstore backend")
-		return store.NewMemStore(ctx, &cfg.MemStoreCfg, verifier, log, maxBlobLength)
-	}
-
-	client, err := clients.NewEigenDAClient(log, daCfg.ClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return store.NewEigenDAStore(
-		ctx,
-		client,
-		verifier,
-		maxBlobLength,
-	)
-}
-
 func StartProxySvr(cliCtx *cli.Context) error {
-	if err := CheckRequired(cliCtx); err != nil {
+	if err := server.CheckRequired(cliCtx); err != nil {
 		return err
 	}
-	cfg := ReadCLIConfig(cliCtx)
+	cfg := server.ReadCLIConfig(cliCtx)
 	if err := cfg.Check(); err != nil {
 		return err
 	}
@@ -65,11 +30,11 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	log.Info("Initializing EigenDA proxy server...")
 
-	da, err := LoadStore(cfg, ctx, log)
+	da, err := server.LoadStore(cfg, ctx, log)
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
-	server := proxy.NewServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), da, log, m)
+	server := server.NewServer(cliCtx.String(server.ListenAddrFlagName), cliCtx.Int(server.PortFlagName), da, log, m)
 
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server")

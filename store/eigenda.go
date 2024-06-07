@@ -31,8 +31,8 @@ func NewEigenDAStore(ctx context.Context, client *clients.EigenDAClient, v *veri
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
 func (e EigenDAStore) Get(ctx context.Context, key []byte, domain common.DomainType) ([]byte, error) {
-	var cert *disperser.BlobInfo
-	err := rlp.DecodeBytes(key, cert)
+	var cert disperser.BlobInfo
+	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
 	}

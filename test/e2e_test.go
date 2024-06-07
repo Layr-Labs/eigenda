@@ -5,22 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
-	proxy "github.com/Layr-Labs/eigenda-proxy"
 	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
+	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var runTestnetIntegrationTests bool
@@ -42,15 +40,15 @@ const (
 type TestSuite struct {
 	ctx    context.Context
 	log    log.Logger
-	server *proxy.Server
+	server *server.Server
 }
 
-func createTestSuite(t *testing.T) (TestSuite, func()) {
+func createTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 	ctx := context.Background()
 
 	// load signer key from environment
 	pk := os.Getenv(privateKey)
-	if pk == "" {
+	if pk == "" && !useMemory {
 		t.Fatal("SIGNER_PRIVATE_KEY environment variable not set")
 	}
 
@@ -62,7 +60,7 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 
 	oplog.SetGlobalLogHandler(log.Handler())
 
-	testCfg := eigenda.Config{
+	eigendaCfg := eigenda.Config{
 		ClientConfig: clients.EigenDAClientConfig{
 			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
@@ -70,42 +68,34 @@ func createTestSuite(t *testing.T) (TestSuite, func()) {
 			DisableTLS:               false,
 			SignerPrivateKeyHex:      pk,
 		},
+		CacheDir:               "../operator-setup/resources/SRSTables",
+		G1Path:                 "../operator-setup/resources/g1_abbr.point",
+		G2Path:                 "../test/resources/g2.point", // do we need this?
+		MaxBlobLength:          "90kib",
+		G2PowerOfTauPath:       "../operator-setup/resources/g2_abbr.point.powerOf2",
+		PutBlobEncodingVersion: 0x00,
 	}
 
-	// these values can be generated locally by running `make srs`
-	kzgCfg := &kzg.KzgConfig{
-		G1Path:          "../operator-setup/resources/g1.point",
-		G2PowerOf2Path:  "../operator-setup/resources/g2.point.powerOf2",
-		CacheDir:        "../operator-setup/resources/SRSTables",
-		G2Path:          "../test/resources/g2.point",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	memstoreCfg := store.MemStoreConfig{
+		Enabled:        useMemory,
+		BlobExpiration: 14 * 24 * time.Hour,
 	}
 
-	client, err := clients.NewEigenDAClient(log, testCfg.ClientConfig)
-	if err != nil {
-		panic(err)
-	}
+	store, err := server.LoadStore(
+		server.CLIConfig{
+			EigenDAConfig: eigendaCfg,
+			MemStoreCfg:   memstoreCfg,
+			MetricsCfg:    opmetrics.CLIConfig{},
+		},
+		ctx,
+		log,
+	)
+	require.NoError(t, err)
+	server := server.NewServer(host, port, store, log, metrics.NoopMetrics)
 
-	verifier, err := verify.NewVerifier(kzgCfg)
-	if err != nil {
-		panic(err)
-	}
-
-	daStore, err := store.NewEigenDAStore(ctx, client, verifier, 1024*1024*2)
-	if err != nil {
-		panic(err)
-	}
-
-	server := proxy.NewServer(host, port, daStore, log, metrics.NoopMetrics)
-
-	go func() {
-		t.Log("Starting proxy server on separate routine...")
-		if err := server.Start(); err != nil {
-			panic(err)
-		}
-	}()
+	t.Log("Starting proxy server...")
+	err = server.Start()
+	require.NoError(t, err)
 
 	kill := func() {
 		if err := server.Stop(); err != nil {
@@ -125,7 +115,7 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 		t.Skip("Skipping testnet integration test")
 	}
 
-	ts, kill := createTestSuite(t)
+	ts, kill := createTestSuite(t, false)
 	defer kill()
 
 	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, host, port), false, false)
@@ -139,12 +129,39 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 
 	t.Log("Setting input data on proxy server...")
 	commit, err := daClient.SetInput(ts.ctx, testPreimage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// 2 - fetch data from EigenDA for generated commitment key
 	t.Log("Getting input data from proxy server...")
 	preimage, err := daClient.GetInput(ts.ctx, commit)
-	assert.NoError(t, err)
-	assert.Equal(t, testPreimage, preimage)
+	require.NoError(t, err)
+	require.Equal(t, testPreimage, preimage)
+}
 
+func TestE2EPutGetLogicForMemoryStore(t *testing.T) {
+	if runTestnetIntegrationTests {
+		t.Skip("Skipping non-testnet integration test")
+	}
+
+	ts, kill := createTestSuite(t, true)
+	defer kill()
+
+	daClient := op_plasma.NewDAClient(fmt.Sprintf("%s://%s:%d", transport, host, port), false, false)
+	t.Log("Waiting for client to establish connection with plasma server...")
+	// wait for server to come online after starting
+	time.Sleep(5 * time.Second)
+
+	// 1 - write arbitrary data to EigenDA
+
+	var testPreimage = []byte("inter-subjective and not objective!")
+
+	t.Log("Setting input data on proxy server...")
+	commit, err := daClient.SetInput(ts.ctx, testPreimage)
+	require.NoError(t, err)
+
+	// 2 - fetch data from EigenDA for generated commitment key
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetInput(ts.ctx, commit)
+	require.NoError(t, err)
+	require.Equal(t, testPreimage, preimage)
 }

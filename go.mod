@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/Layr-Labs/eigenda v0.7.2-0.20240606180508-e90cb7432ca5
 	github.com/consensys/gnark-crypto v0.12.1
-	github.com/ethereum-optimism/optimism v1.7.5-0.20240520224312-38cd9944494a
+	github.com/ethereum-optimism/optimism v1.7.6
 	github.com/ethereum/go-ethereum v1.14.0
 	github.com/joho/godotenv v1.5.1
 	github.com/prometheus/client_golang v1.19.0
@@ -49,7 +49,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
-	github.com/ethereum-optimism/superchain-registry/superchain v0.0.0-20240516202831-8117b611dc3c // indirect
+	github.com/ethereum-optimism/superchain-registry/superchain v0.0.0-20240522134500-19555bdbdc95 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/fjl/memsize v0.0.2 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect

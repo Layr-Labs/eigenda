@@ -29,7 +29,7 @@ clean:
 test:
 	go test -v ./...
 
-e2e-test: submodules srs
+e2e-test: submodules
 	go test -timeout 50m -v ./test/e2e_test.go -testnet-integration
 
 .PHONY: lint
