@@ -1,4 +1,4 @@
-package proxy
+package server
 
 import (
 	"context"
@@ -28,8 +28,8 @@ const (
 )
 
 const (
-	GetRoute = "/get"
-	PutRoute = "/put"
+	GetRoute = "/get/"
+	PutRoute = "/put/"
 
 	DomainFilterKey = "domain"
 )
@@ -60,43 +60,32 @@ func NewServer(host string, port int, store store.Store, log log.Logger, m metri
 	}
 }
 
-// WithVerify is a middleware that verifies the route path.
-func WithVerify(handleFn func(http.ResponseWriter, *http.Request), path string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		route := r.URL.Path
-
-		if route != path {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		handleFn(w, r)
-	}
-}
-
 // WithMetrics is a middleware that records metrics for the route path.
-func WithMetrics(handleFn func(http.ResponseWriter, *http.Request), m metrics.Metricer) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error, m metrics.Metricer) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		recordDur := m.RecordRPCServerRequest(r.URL.Path)
 		defer recordDur()
 
-		handleFn(w, r)
+		return handleFn(w, r)
 	}
 }
 
-func WithLogging(handleFn func(http.ResponseWriter, *http.Request), log log.Logger) func(http.ResponseWriter, *http.Request) {
+func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error, log log.Logger) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Info("request", "method", r.Method, "url", r.URL)
-		handleFn(w, r)
+		err := handleFn(w, r)
+		if err != nil {
+			log.Error(err.Error())
+		}
 	}
 }
 
 func (svr *Server) Start() error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(GetRoute, WithMetrics(WithVerify(svr.HandleGet, GetRoute), svr.m))
-	mux.HandleFunc(PutRoute, WithMetrics(WithVerify(svr.HandlePut, PutRoute), svr.m))
-	mux.HandleFunc("/health", WithVerify(svr.Health, "/health"))
+	mux.HandleFunc(GetRoute, WithLogging(WithMetrics(svr.HandleGet, svr.m), svr.log))
+	mux.HandleFunc(PutRoute, WithLogging(WithMetrics(svr.HandlePut, svr.m), svr.log))
+	mux.HandleFunc("/health", WithLogging(svr.Health, svr.log))
 
 	svr.httpServer.Handler = mux
 
@@ -147,19 +136,16 @@ func (svr *Server) Stop() error {
 	}
 	return nil
 }
-func (svr *Server) Health(w http.ResponseWriter, r *http.Request) {
-	svr.log.Info("GET", "url", r.URL)
-
+func (svr *Server) Health(w http.ResponseWriter, r *http.Request) error {
 	w.WriteHeader(http.StatusOK)
+	return nil
 }
 
-func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
-	svr.log.Info("GET", "url", r.URL)
-
+func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) error {
 	domain, err := ReadDomainFilter(r)
 	if err != nil {
 		svr.WriteBadRequest(w, invalidDomain)
-		return
+		return err
 	}
 
 	key := path.Base(r.URL.Path)
@@ -167,38 +153,40 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		svr.log.Info("failed to decode commitment", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		return err
 	}
 
 	input, err := svr.store.Get(r.Context(), comm, domain)
 	if err != nil && errors.Is(err, ErrNotFound) {
 		svr.WriteNotFound(w, err.Error())
-		return
+		return err
 	}
 
 	if err != nil {
 		svr.WriteInternalError(w, err)
-		return
+		return err
 	}
 
 	svr.WriteResponse(w, input)
+	return nil
 }
 
-func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
+func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 	input, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		return err
 	}
 
 	var comm []byte
 	if comm, err = svr.store.Put(r.Context(), input); err != nil {
 		svr.WriteInternalError(w, err)
-		return
+		return err
 	}
 
 	// write out encoded commitment
 	svr.WriteResponse(w, eigenda.Commitment.Encode(comm))
+	return nil
 }
 
 func (svr *Server) WriteResponse(w http.ResponseWriter, data []byte) {
