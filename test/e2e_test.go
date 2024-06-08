@@ -143,8 +143,8 @@ func TestHoleskyWithPlasmaClient(t *testing.T) {
 }
 
 func TestHoleskyWithProxyClient(t *testing.T) {
-	if runTestnetIntegrationTests {
-		t.Skip("Skipping non-testnet integration test")
+	if !runTestnetIntegrationTests {
+		t.Skip("Skipping testnet integration test")
 	}
 
 	ts, kill := createTestSuite(t, false)
