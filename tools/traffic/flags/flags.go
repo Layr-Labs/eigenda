@@ -74,8 +74,8 @@ var (
 	}
 	SignerPrivateKeyFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "signer-private-key-hex"),
-		Usage:    "Path to the private key file",
-		Required: true,
+		Usage:    "Private key to use for signing requests",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "SIGNER_PRIVATE_KEY_HEX"),
 	}
 	CustomQuorumNumbersFlag = cli.IntSliceFlag{

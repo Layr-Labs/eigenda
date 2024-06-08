@@ -40,7 +40,7 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 	var signer core.BlobRequestSigner
 	if config.SignerPrivateKey != "" {
 		log.Println("Using signer private key")
-		signer = auth.NewSigner(config.SignerPrivateKey)
+		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKey)
 	}
 
 	generator, err := traffic.NewTrafficGenerator(config, signer)
