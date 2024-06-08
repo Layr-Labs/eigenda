@@ -72,6 +72,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "USE_SECURE_GRPC"),
 	}
+	SignerPrivateKeyFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signer-private-key-hex"),
+		Usage:    "Private key to use for signing requests",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "SIGNER_PRIVATE_KEY_HEX"),
+	}
 	CustomQuorumNumbersFlag = cli.IntSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "custom-quorum-numbers"),
 		Usage:    "Custom quorum numbers to use for the traffic generator",
@@ -93,6 +99,7 @@ var optionalFlags = []cli.Flag{
 	RandomizeBlobsFlag,
 	InstanceLaunchIntervalFlag,
 	UseSecureGrpcFlag,
+	SignerPrivateKeyFlag,
 	CustomQuorumNumbersFlag,
 }
 
