@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	eigendacommon "github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -104,7 +105,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.
 	e.RLock()
 	defer e.RUnlock()
 
-	var cert disperser.BlobInfo
+	var cert common.Certificate
 	err := rlp.DecodeBytes(commit, &cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
@@ -160,7 +161,7 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	mockBatchHeaderHash := crypto.Keccak256Hash(entropy)
 
 	// only filling out commitment fields for now
-	cert := &disperser.BlobInfo{
+	cert := &common.Certificate{
 		BlobHeader: &disperser.BlobHeader{
 			Commitment: &grpccommon.G1Commitment{
 				X: commitment.X.Marshal(),

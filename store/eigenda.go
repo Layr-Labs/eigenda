@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -31,7 +30,7 @@ func NewEigenDAStore(ctx context.Context, client *clients.EigenDAClient, v *veri
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
 func (e EigenDAStore) Get(ctx context.Context, key []byte, domain common.DomainType) ([]byte, error) {
-	var cert disperser.BlobInfo
+	var cert common.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
