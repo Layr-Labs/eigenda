@@ -12,7 +12,7 @@ var (
 	ErrInvalidDomainType = fmt.Errorf("invalid domain type")
 )
 
-type BlobInfo = disperser.BlobInfo
+type Certificate = disperser.BlobInfo
 
 // DomainType is a enumeration type for the different data domains for which a
 // blob can exist between
