@@ -66,11 +66,18 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.21
+        go-version: 1.21        
 
     - name: Install project dependencies
       run: | 
         go mod download
+
+    - name: Install foundry
+      uses: foundry-rs/foundry-toolchain@v1
+  
+    - name: Generate devnet allocations
+      run: make op-devnet-allocs 
+  
     - name: Run E2E Tests
       env: 
         SIGNER_PRIVATE_KEY:  ${{ secrets.SIGNER_PRIVATE_KEY }}

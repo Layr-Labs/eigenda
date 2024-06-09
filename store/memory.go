@@ -44,6 +44,7 @@ type MemStore struct {
 	store     map[string][]byte
 	verifier  *verify.Verifier
 	codec     codecs.BlobCodec
+	reads     int
 
 	maxBlobSizeBytes uint64
 }
@@ -102,6 +103,7 @@ func (e *MemStore) pruneExpired() {
 
 // Get fetches a value from the store.
 func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.DomainType) ([]byte, error) {
+	e.reads += 1
 	e.RLock()
 	defer e.RUnlock()
 
@@ -205,6 +207,15 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	e.keyStarts[certStr] = time.Now()
 
 	return certBytes, nil
+}
+
+func (e *MemStore) Stats() *common.Stats {
+	e.RLock()
+	defer e.RUnlock()
+	return &common.Stats{
+		Entries: len(e.store),
+		Reads:   e.reads,
+	}
 }
 
 func ReadConfig(ctx *cli.Context) MemStoreConfig {

@@ -11,4 +11,6 @@ type Store interface {
 	Get(ctx context.Context, key []byte, domain common.DomainType) ([]byte, error)
 	// Put inserts the given value into the key-value data store.
 	Put(ctx context.Context, value []byte) (key []byte, err error)
+	// Entries returns the number of values in the store; only used for memstore
+	Stats() *common.Stats
 }

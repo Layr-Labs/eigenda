@@ -111,25 +111,7 @@ func ParseBytesAmount(s string) (uint64, error) {
 	}
 }
 
-func SubsetExists[P comparable](arr, sub []P) bool {
-	if len(sub) == 0 {
-		return true
-	}
-
-	i := 0
-	j := 0
-
-	for i < len(arr) {
-		if arr[i] == sub[j] {
-			j++
-			if j == len(sub) {
-				return true
-			}
-		} else {
-			i -= j
-			j = 0
-		}
-		i++
-	}
-	return false
+type Stats struct {
+	Entries int
+	Reads   int
 }

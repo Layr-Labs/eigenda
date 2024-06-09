@@ -60,6 +60,7 @@ func (v *Verifier) Verify(expectedCommit *common.G1Commitment, blob []byte) erro
 		return err
 	}
 
+	// convert to field elements
 	expectedX := &fp.Element{}
 	expectedX.Unmarshal(expectedCommit.X)
 	expectedY := &fp.Element{}

@@ -12,6 +12,8 @@ LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
 LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
+ALLOCS := e2e/resources/optimism/devnetL1.json
+
 .PHONY: eigenda-proxy
 eigenda-proxy:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
@@ -28,9 +30,10 @@ clean:
 
 test:
 	go test -v ./...
+	go test -timeout 50m -v ./e2e/ -optimism -deploy-config ${ALLOCS}
 
-e2e-test: submodules
-	go test -timeout 50m -v ./test/e2e_test.go -testnet-integration
+e2e-test:
+	go test -timeout 50m -v ./e2e/server_test.go -testnet-integration
 
 .PHONY: lint
 lint:
@@ -45,7 +48,7 @@ lint:
 	@golangci-lint run
 
 gosec:
-	@echo "$(GREEN) Running security scan with gosec...$(COLOR_END)"
+	@echo "Running security scan with gosec..."
 	gosec ./...
 
 submodules:
@@ -56,7 +59,10 @@ srs:
 		cd operator-setup && ./srs_setup.sh; \
 	fi
 
+op-devnet-allocs: submodules
+	@echo "Generating devnet allocs..."
+	@./scripts/op-devnet-allocs.sh
+
 .PHONY: \
-	op-batcher \
 	clean \
 	test
