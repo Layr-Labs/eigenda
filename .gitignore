@@ -25,6 +25,4 @@ go.work
 
 ## kzg cache
 e2e/resources/kzg/SRSTables/
-
-## Optimism artifacts
-.devnet
+ 
