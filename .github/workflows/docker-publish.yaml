@@ -1,4 +1,4 @@
-name: docker-publish
+name: docker-publish-internal
 on:
   push:
     branches:
@@ -47,10 +47,10 @@ jobs:
 
       # Build And Push Image
       - name: Build Docker image
-        run: docker compose -f docker-compose-build.yaml build
+        run: docker compose -f docker-compose-internal.yaml build
       - name: Push Docker image
         if: github.ref == 'refs/heads/master'
-        run: docker compose -f docker-compose-build.yaml push
+        run: docker compose -f docker-compose-internal.yaml push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}
