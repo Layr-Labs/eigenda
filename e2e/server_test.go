@@ -13,17 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// var (
-// 	runTestnetIntegrationTests bool
-// )
-
-// func init() {
-// 	flag.BoolVar(&runTestnetIntegrationTests, "testnet-integration", false, "Run testnet-based integration tests")
-
-// }
-
 func TestHoleskyWithPlasmaClient(t *testing.T) {
-	if !runTestnetIntegrationTests {
+	if !runTestnetIntegrationTests || runOptimismIntegrationTests {
 		t.Skip("Skipping testnet integration test")
 	}
 
@@ -51,7 +42,7 @@ func TestHoleskyWithPlasmaClient(t *testing.T) {
 }
 
 func TestHoleskyWithProxyClient(t *testing.T) {
-	if !runTestnetIntegrationTests {
+	if !runTestnetIntegrationTests || runOptimismIntegrationTests {
 		t.Skip("Skipping testnet integration test")
 	}
 
@@ -103,7 +94,7 @@ func TestHoleskyWithProxyClient(t *testing.T) {
 }
 
 func TestMemStoreWithPlasmaClient(t *testing.T) {
-	if runTestnetIntegrationTests {
+	if runTestnetIntegrationTests || runOptimismIntegrationTests {
 		t.Skip("Skipping non-testnet integration test")
 	}
 
@@ -131,7 +122,7 @@ func TestMemStoreWithPlasmaClient(t *testing.T) {
 }
 
 func TestMemStoreWithProxyClient(t *testing.T) {
-	if runTestnetIntegrationTests {
+	if runTestnetIntegrationTests || runOptimismIntegrationTests {
 		t.Skip("Skipping non-testnet integration test")
 	}
 

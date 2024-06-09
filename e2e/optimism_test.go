@@ -13,17 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// var (
-// 	runOptimismIntegrationTests bool
-
-// // deployConfig                string
-// )
-
-// func init() {
-// 	flag.BoolVar(&runOptimismIntegrationTests, "optimism", false, "Run OP Stack integration tests")
-// 	// flag.StringVar(&deployConfig, "deploy-config", "", "Path to deploy config")
-// }
-
 var defaultAlloc = &e2eutils.AllocParams{PrefundTestUsers: true}
 
 // L2PlasmaDA is a test harness for manipulating plasma DA state.
@@ -120,8 +109,7 @@ func (a *L2PlasmaDA) ActL1Finalized(t actions.Testing) {
 
 // TestOptimism ... Creates a new SysTestSuite
 func TestOptimism(gt *testing.T) {
-	println("Optimism ", optimism)
-	if !optimism {
+	if !runOptimismIntegrationTests {
 		gt.Skip("Skipping OP Stack integration test")
 	}
 
@@ -129,6 +117,7 @@ func TestOptimism(gt *testing.T) {
 	defer close()
 
 	t := actions.NewDefaultTesting(gt)
+
 	op_stack := NewL2PlasmaDA(t, proxyTS.Address())
 
 	// build L1 block #1

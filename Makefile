@@ -12,8 +12,6 @@ LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
 LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
-ALLOCS := e2e/resources/optimism/devnetL1.json
-
 .PHONY: eigenda-proxy
 eigenda-proxy:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
@@ -30,10 +28,10 @@ clean:
 
 test:
 	go test -v ./...
-	go test -timeout 50m -v ./e2e/ -optimism -deploy-config ${ALLOCS}
+	OPTIMISM=true go test -timeout 50m -v ./e2e/... -deploy-config ../.devnet/devnetL1.json
 
 e2e-test:
-	go test -timeout 50m -v ./e2e/server_test.go -testnet-integration
+	TESTNET=true go test -timeout 50m -v ./e2e/server_test.go -testnet-integration
 
 .PHONY: lint
 lint:
