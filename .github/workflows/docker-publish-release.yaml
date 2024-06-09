@@ -2,6 +2,8 @@ name: docker-publish-release
 
 on:
   push:
+    branches:
+      - pschork/multi-platform-releases
     tags:
       - v*
   pull_request:
