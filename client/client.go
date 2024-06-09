@@ -121,10 +121,10 @@ func (c *client) SetData(ctx context.Context, b []byte) (*common.Certificate, er
 		return nil, fmt.Errorf("read certificate is of invalid length: %d", len(b))
 	}
 
-	var blob *common.Certificate
-	if err = rlp.DecodeBytes(b[decodingOffset:], &blob); err != nil {
+	var cert *common.Certificate
+	if err = rlp.DecodeBytes(b[decodingOffset:], &cert); err != nil {
 		return nil, err
 	}
 
-	return blob, err
+	return cert, err
 }
