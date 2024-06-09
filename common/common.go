@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 )
 
 var (
 	ErrInvalidDomainType = fmt.Errorf("invalid domain type")
 )
+
+type Certificate = disperser.BlobInfo
 
 // DomainType is a enumeration type for the different data domains for which a
 // blob can exist between
@@ -19,6 +23,19 @@ const (
 	PolyDomain
 	UnknownDomain
 )
+
+func (dt DomainType) String() string {
+	switch dt {
+	case BinaryDomain:
+		return "binary"
+
+	case PolyDomain:
+		return "polynomial"
+
+	default:
+		return "unknown"
+	}
+}
 
 func StrToDomainType(s string) DomainType {
 	switch s {

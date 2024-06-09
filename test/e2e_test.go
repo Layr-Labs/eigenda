@@ -8,11 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/client"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
 	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 
@@ -33,7 +37,7 @@ const (
 	transport   = "http"
 	serviceName = "eigenda_proxy"
 	host        = "127.0.0.1"
-	port        = 6969
+	port        = 4200
 	holeskyDA   = "disperser-holesky.eigenda.xyz:443"
 )
 
@@ -110,7 +114,7 @@ func createTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 	}, kill
 }
 
-func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
+func TestHoleskyWithPlasmaClient(t *testing.T) {
 	if !runTestnetIntegrationTests {
 		t.Skip("Skipping testnet integration test")
 	}
@@ -138,7 +142,59 @@ func TestE2EPutGetLogicForEigenDAStore(t *testing.T) {
 	require.Equal(t, testPreimage, preimage)
 }
 
-func TestE2EPutGetLogicForMemoryStore(t *testing.T) {
+func TestHoleskyWithProxyClient(t *testing.T) {
+	if !runTestnetIntegrationTests {
+		t.Skip("Skipping testnet integration test")
+	}
+
+	ts, kill := createTestSuite(t, false)
+	defer kill()
+
+	cfg := &client.Config{
+		URL: fmt.Sprintf("%s://%s:%d", transport, host, port),
+	}
+	daClient := client.New(cfg)
+	t.Log("Waiting for client to establish connection with plasma server...")
+	// wait for server to come online after starting
+	wait.For(ts.ctx, time.Second*1, func() (bool, error) {
+		err := daClient.Health()
+		if err != nil {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	// 1 - write arbitrary data to EigenDA
+
+	var testPreimage = []byte("inter-subjective and not objective!")
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.ctx, testPreimage)
+	require.NoError(t, err)
+
+	// 2 - fetch data from EigenDA for generated commitment key
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetData(ts.ctx, blobInfo, common.BinaryDomain)
+	require.NoError(t, err)
+	require.Equal(t, testPreimage, preimage)
+
+	// 3 - fetch iFFT representation of preimage
+	iFFTPreimage, err := daClient.GetData(ts.ctx, blobInfo, common.PolyDomain)
+	require.NoError(t, err)
+	require.NotEqual(t, preimage, iFFTPreimage)
+
+	// 4 - Assert domain transformations
+
+	ifftCodec := codecs.NewIFFTCodec(codecs.DefaultBlobCodec{})
+
+	decodedBlob, err := ifftCodec.DecodeBlob(iFFTPreimage)
+	require.NoError(t, err)
+
+	require.Equal(t, decodedBlob, preimage)
+}
+
+func TestMemStoreWithPlasmaClient(t *testing.T) {
 	if runTestnetIntegrationTests {
 		t.Skip("Skipping non-testnet integration test")
 	}
@@ -164,4 +220,56 @@ func TestE2EPutGetLogicForMemoryStore(t *testing.T) {
 	preimage, err := daClient.GetInput(ts.ctx, commit)
 	require.NoError(t, err)
 	require.Equal(t, testPreimage, preimage)
+}
+
+func TestMemStoreWithProxyClient(t *testing.T) {
+	if runTestnetIntegrationTests {
+		t.Skip("Skipping non-testnet integration test")
+	}
+
+	ts, kill := createTestSuite(t, true)
+	defer kill()
+
+	cfg := &client.Config{
+		URL: fmt.Sprintf("%s://%s:%d", transport, host, port),
+	}
+	daClient := client.New(cfg)
+	t.Log("Waiting for client to establish connection with plasma server...")
+	// wait for server to come online after starting
+	wait.For(ts.ctx, time.Second*1, func() (bool, error) {
+		err := daClient.Health()
+		if err != nil {
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	// 1 - write arbitrary data to EigenDA
+
+	var testPreimage = []byte("inter-subjective and not objective!")
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.ctx, testPreimage)
+	require.NoError(t, err)
+
+	// 2 - fetch data from EigenDA for generated commitment key
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetData(ts.ctx, blobInfo, common.BinaryDomain)
+	require.NoError(t, err)
+	require.Equal(t, testPreimage, preimage)
+
+	// 3 - fetch iFFT representation of preimage
+	iFFTPreimage, err := daClient.GetData(ts.ctx, blobInfo, common.PolyDomain)
+	require.NoError(t, err)
+	require.NotEqual(t, preimage, iFFTPreimage)
+
+	// 4 - Assert domain transformations
+
+	ifftCodec := codecs.NewIFFTCodec(codecs.DefaultBlobCodec{})
+
+	decodedBlob, err := ifftCodec.DecodeBlob(iFFTPreimage)
+	require.NoError(t, err)
+
+	require.Equal(t, decodedBlob, preimage)
 }

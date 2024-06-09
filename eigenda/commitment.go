@@ -36,6 +36,10 @@ func (c Commitment) Encode() []byte {
 	return append([]byte{byte(EigenDA), byte(EigenV0)}, c...)
 }
 
+func GenericPrefix(b []byte) []byte {
+	return append([]byte{byte(op_plasma.GenericCommitmentType)}, b...)
+}
+
 func StringToCommit(key string) (Commitment, error) {
 	comm, err := hexutil.Decode(key)
 	if err != nil {
