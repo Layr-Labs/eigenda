@@ -30,10 +30,10 @@ test:
 	go test -v ./... -parallel 4
 
 optimism-test:
-	OPTIMISM=true go test -timeout 50m -v ./e2e/... -deploy-config ../.devnet/devnetL1.json
+	OPTIMISM=true go test -timeout 1m -v ./e2e -deploy-config ../.devnet/devnetL1.json
 
 holesky-test:
-	TESTNET=true go test -timeout 50m -v ./e2e  -parallel
+	TESTNET=true go test -timeout 50m -v ./e2e  -parallel 4
 
 .PHONY: lint
 lint:
