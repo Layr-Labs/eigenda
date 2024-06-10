@@ -3,6 +3,8 @@ package e2e_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/e2e"
+
 	"github.com/ethereum-optimism/optimism/op-e2e/actions"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 	plasma "github.com/ethereum-optimism/optimism/op-plasma"
@@ -69,10 +71,6 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 	plasmaCfg, err := sd.RollupCfg.GetOPPlasmaConfig()
 	require.NoError(t, err)
 
-	// // set lower finalization times
-	// plasmaCfg.ChallengeWindow = 1
-	// plasmaCfg.ResolveWindow = 1
-
 	daMgr := plasma.NewPlasmaDAWithStorage(log, plasmaCfg, storage, &plasma.NoopMetrics{})
 
 	enabled := sd.RollupCfg.PlasmaEnabled()
@@ -107,13 +105,12 @@ func (a *L2PlasmaDA) ActL1Finalized(t actions.Testing) {
 	a.sequencer.ActL1FinalizedSignal(t)
 }
 
-// TestOptimism ... Creates a new SysTestSuite
 func TestOptimism(gt *testing.T) {
 	if !runOptimismIntegrationTests {
 		gt.Skip("Skipping OP Stack integration test")
 	}
 
-	proxyTS, close := CreateTestSuite(gt, true)
+	proxyTS, close := e2e.CreateTestSuite(gt, true)
 	defer close()
 
 	t := actions.NewDefaultTesting(gt)
@@ -160,7 +157,7 @@ func TestOptimism(gt *testing.T) {
 	op_stack.sequencer.ActL2PipelineFull(t)
 	op_stack.ActL1Finalized(t)
 
-	// assert that EigenDA proxy was written and read from
+	// assert that EigenDA proxy's was written and read from
 	stat := proxyTS.Server.Store().Stats()
 
 	require.Equal(t, stat.Entries, 1)

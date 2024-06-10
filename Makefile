@@ -26,11 +26,13 @@ run-server:
 clean:
 	rm bin/eigenda-proxy
 
-test:
+test: optimism-test
 	go test -v ./...
+
+optimism-test:
 	OPTIMISM=true go test -timeout 50m -v ./e2e/... -deploy-config ../.devnet/devnetL1.json
 
-e2e-test:
+holesky-test:
 	TESTNET=true go test -timeout 50m -v ./e2e/server_test.go -testnet-integration
 
 .PHONY: lint

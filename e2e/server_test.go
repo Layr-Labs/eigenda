@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/client"
+
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/e2e"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
 	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
@@ -18,7 +20,7 @@ func TestHoleskyWithPlasmaClient(t *testing.T) {
 		t.Skip("Skipping testnet integration test")
 	}
 
-	ts, kill := CreateTestSuite(t, false)
+	ts, kill := e2e.CreateTestSuite(t, false)
 	defer kill()
 
 	daClient := op_plasma.NewDAClient(ts.Address(), false, false)
@@ -46,7 +48,7 @@ func TestHoleskyWithProxyClient(t *testing.T) {
 		t.Skip("Skipping testnet integration test")
 	}
 
-	ts, kill := CreateTestSuite(t, false)
+	ts, kill := e2e.CreateTestSuite(t, false)
 	defer kill()
 
 	cfg := &client.Config{
@@ -98,7 +100,7 @@ func TestMemStoreWithPlasmaClient(t *testing.T) {
 		t.Skip("Skipping non-testnet integration test")
 	}
 
-	ts, kill := CreateTestSuite(t, true)
+	ts, kill := e2e.CreateTestSuite(t, true)
 	defer kill()
 
 	daClient := op_plasma.NewDAClient(ts.Address(), false, false)
@@ -126,7 +128,7 @@ func TestMemStoreWithProxyClient(t *testing.T) {
 		t.Skip("Skipping non-testnet integration test")
 	}
 
-	ts, kill := CreateTestSuite(t, true)
+	ts, kill := e2e.CreateTestSuite(t, true)
 	defer kill()
 
 	cfg := &client.Config{

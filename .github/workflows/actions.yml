@@ -72,14 +72,8 @@ jobs:
       run: | 
         go mod download
 
-    - name: Install foundry
-      uses: foundry-rs/foundry-toolchain@v1
-  
-    - name: Generate devnet allocations
-      run: make op-devnet-allocs 
-  
-    - name: Run E2E Tests
+    - name: Run holesky tests
       env: 
         SIGNER_PRIVATE_KEY:  ${{ secrets.SIGNER_PRIVATE_KEY }}
       run: | 
-        SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY make e2e-test
+        SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY make holesky-test
