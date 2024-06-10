@@ -33,8 +33,8 @@ optimism-test:
 	OPTIMISM=true go test -timeout 50m -v ./e2e/... -deploy-config ../.devnet/devnetL1.json
 
 holesky-test:
-	TESTNET=true go test -timeout 50m -v ./e2e/server_test.go -testnet-integration
-
+	TESTNET=true go test -timeout 50m -v ./e2e
+	
 .PHONY: lint
 lint:
 	@if ! test -f  &> /dev/null; \
