@@ -55,6 +55,8 @@ func TestGetSet(t *testing.T) {
 }
 
 func TestExpiration(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

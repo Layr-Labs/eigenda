@@ -44,6 +44,10 @@ jobs:
       run: | 
         make test 
 
+    - name: Run Optimism Test
+      run: | 
+        make optimism-test
+
   gosec:
     runs-on: ubuntu-latest
     env:

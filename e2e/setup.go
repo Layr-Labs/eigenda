@@ -26,7 +26,6 @@ const (
 	transport  = "http"
 	SvcName    = "eigenda_proxy"
 	host       = "127.0.0.1"
-	port       = 4200
 	HoleskyDA  = "disperser-holesky.eigenda.xyz:443"
 )
 
@@ -84,7 +83,7 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		log,
 	)
 	require.NoError(t, err)
-	server := server.NewServer(host, port, store, log, metrics.NoopMetrics)
+	server := server.NewServer(host, 0, store, log, metrics.NoopMetrics)
 
 	t.Log("Starting proxy server...")
 	err = server.Start()
@@ -104,5 +103,8 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 }
 
 func (ts *TestSuite) Address() string {
+	// read port from listener
+	port := ts.Server.Port()
+
 	return fmt.Sprintf("%s://%s:%d", transport, host, port)
 }

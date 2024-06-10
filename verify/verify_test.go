@@ -12,6 +12,7 @@ import (
 )
 
 func TestVerification(t *testing.T) {
+	t.Parallel()
 
 	var data = []byte("inter-subjective and not objective!")
 

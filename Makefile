@@ -26,15 +26,15 @@ run-server:
 clean:
 	rm bin/eigenda-proxy
 
-test: optimism-test
-	go test -v ./...
+test:
+	go test -v ./... -parallel 4
 
 optimism-test:
 	OPTIMISM=true go test -timeout 50m -v ./e2e/... -deploy-config ../.devnet/devnetL1.json
 
 holesky-test:
-	TESTNET=true go test -timeout 50m -v ./e2e
-	
+	TESTNET=true go test -timeout 50m -v ./e2e  -parallel
+
 .PHONY: lint
 lint:
 	@if ! test -f  &> /dev/null; \
@@ -59,7 +59,7 @@ srs:
 		cd operator-setup && ./srs_setup.sh; \
 	fi
 
-op-devnet-allocs: submodules
+op-devnet-allocs:
 	@echo "Generating devnet allocs..."
 	@./scripts/op-devnet-allocs.sh
 
