@@ -56,7 +56,7 @@ jobs:
         with:
           args: ./...
 
-  e2e-test:
+  holesky-test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
