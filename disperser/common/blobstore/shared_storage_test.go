@@ -86,9 +86,11 @@ func TestSharedBlobStore(t *testing.T) {
 		BlobStatus:   disperser.Processing,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
 				SecurityParams: securityParams,
+				BlobAuthHeader: blob.RequestHeader.BlobAuthHeader,
 			},
 			RequestedAt: requestedAt,
 			BlobSize:    blobSize,
@@ -138,9 +140,11 @@ func TestSharedBlobStore(t *testing.T) {
 		BlobStatus:   disperser.Processing,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    "test",
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
 				SecurityParams: securityParams,
+				BlobAuthHeader: blob.RequestHeader.BlobAuthHeader,
 			},
 			RequestedAt: requestedAt,
 			BlobSize:    blobSize2,

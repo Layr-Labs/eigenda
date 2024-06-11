@@ -55,6 +55,7 @@ func (q *BlobStore) StoreBlob(ctx context.Context, blob *core.Blob, requestedAt 
 		BlobHash:     blobHash,
 		MetadataHash: blobKey.MetadataHash,
 		BlobStatus:   disperser.Processing,
+		AccountID:    blob.RequestHeader.AccountID,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
@@ -268,6 +269,18 @@ func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobK
 		return meta, nil
 	}
 	return nil, disperser.ErrBlobNotFound
+}
+
+func (q *BlobStore) GetBlobMetadataCountByAccountID(ctx context.Context, accountID core.AccountID) (int32, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	count := int32(0)
+	for _, meta := range q.Metadata {
+		if meta.AccountID == accountID {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (q *BlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {

@@ -101,6 +101,7 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 	metadata := disperser.BlobMetadata{
 		BlobHash:     blobHash,
 		MetadataHash: metadataHash,
+		AccountID:    blob.RequestHeader.AccountID,
 		NumRetries:   0,
 		BlobStatus:   disperser.Processing,
 		Expiry:       expiry,
@@ -235,6 +236,10 @@ func (s *SharedBlobStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHe
 // GetMetadata returns a blob metadata given a metadata key
 func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
+}
+
+func (s *SharedBlobStore) GetBlobMetadataCountByAccountID(ctx context.Context, accountID core.AccountID) (int32, error) {
+	return s.blobMetadataStore.GetBlobMetadataCountByAccountID(ctx, accountID)
 }
 
 func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {

@@ -31,7 +31,11 @@ var (
 	blob = &core.Blob{
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: securityParams,
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: "test",
+			},
 		},
+
 		Data: []byte("test"),
 	}
 	s3Client   = cmock.NewS3Client()

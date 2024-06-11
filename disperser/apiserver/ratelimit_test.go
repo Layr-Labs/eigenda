@@ -244,7 +244,7 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 
 	authHeader := core.BlobAuthHeader{
 		BlobCommitments: encoding.BlobCommitments{},
-		AccountID:       "",
+		AccountID:       "test",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}
 

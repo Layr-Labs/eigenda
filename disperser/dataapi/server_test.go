@@ -155,9 +155,9 @@ func (c *MockHttpClient) CheckHealth(url string) (string, error) {
 func TestFetchBlobHandler(t *testing.T) {
 	r := setUpRouter()
 
-	blob := makeTestBlob(0, 80)
+	blob := makeTestBlob(0, 80, "test")
 	key := queueBlob(t, &blob, blobstore)
-	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, blobstore)
+	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, "test", blobstore)
 	blobKey := key.String()
 	r.GET("/v1/feed/blobs/:blob_key", testDataApiServer.FetchBlobHandler)
 
@@ -196,7 +196,7 @@ func TestFetchBlobsHandler(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	r := setUpRouter()
-	blob := makeTestBlob(0, 10)
+	blob := makeTestBlob(0, 10, "test")
 
 	for _, batch := range subgraphBatches {
 		var (
@@ -206,7 +206,7 @@ func TestFetchBlobsHandler(t *testing.T) {
 		batchHeaderHashBytes := []byte(batch.BatchHeaderHash)
 		batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes(batchHeaderHashBytes)
 		assert.NoError(t, err)
-		markBlobConfirmed(t, &blob, key, batchHeaderHash, blobstore)
+		markBlobConfirmed(t, &blob, key, batchHeaderHash, "test", blobstore)
 	}
 
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
@@ -233,12 +233,88 @@ func TestFetchBlobsHandler(t *testing.T) {
 	assert.Equal(t, 2, len(response.Data))
 }
 
+func TestFetchBlobCountByAccountIdHandler(t *testing.T) {
+	r := setUpRouter()
+	testBlob := core.Blob{
+		RequestHeader: core.BlobRequestHeader{
+			SecurityParams: []*core.SecurityParam{
+				{
+					QuorumID:           0,
+					AdversaryThreshold: 80,
+				},
+			},
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: "test1",
+			},
+		},
+		Data: gettysburgAddressBytes,
+	}
+
+	// Create Blob With test1 accountId
+	blob := makeTestBlob(0, 80, "test1")
+	key := queueBlob(t, &testBlob, blobstore)
+	// mark Blob confirmed with accountId test1
+	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, "test1", blobstore)
+	accountId := "test1"
+	r.GET("/v1/feed/blobs/count/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/count/"+accountId, nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobCountForAccountIdResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, int32(1), response.Count)
+	assert.Equal(t, "test1", response.AccountId)
+}
+
+func TestFetchBlobCountByAccountIdInvalidHandler(t *testing.T) {
+	r := setUpRouter()
+	// Create Blob With test accountId
+	blob := makeTestBlob(0, 80, "test2")
+	key := queueBlob(t, &blob, blobstore)
+	// mark Blob confirmed with accountId test
+	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, "test2", blobstore)
+	// BlobAccountId is "test"
+	// Search by AccountId test1
+	accountId := "test3"
+	r.GET("/v1/feed/blobs/count/:accountId", testDataApiServer.FetchBlobCountByAccountIdHandler)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/blobs/count/"+accountId, nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobCountForAccountIdResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, int32(0), response.Count)
+}
+
 func TestFetchMetricsHandler(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	r := setUpRouter()
 
-	blob := makeTestBlob(0, 10)
+	blob := makeTestBlob(0, 10, "test")
 	for _, batch := range subgraphBatches {
 		var (
 			key = queueBlob(t, &blob, blobstore)
@@ -248,7 +324,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 		batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes(batchHeaderHashBytes)
 		assert.NoError(t, err)
 
-		markBlobConfirmed(t, &blob, key, batchHeaderHash, blobstore)
+		markBlobConfirmed(t, &blob, key, batchHeaderHash, "test", blobstore)
 	}
 
 	s := new(model.SampleStream)
@@ -1510,7 +1586,7 @@ func queueBlob(t *testing.T, blob *core.Blob, queue disperser.BlobStore) dispers
 	return key
 }
 
-func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, batchHeaderHash [32]byte, queue disperser.BlobStore) {
+func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, batchHeaderHash [32]byte, accountId string, queue disperser.BlobStore) {
 	// simulate blob confirmation
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
@@ -1544,9 +1620,11 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 		BlobStatus:   disperser.Confirmed,
 		Expiry:       0,
 		NumRetries:   0,
+		AccountID:    accountId,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
 				SecurityParams: blob.RequestHeader.SecurityParams,
+				BlobAuthHeader: blob.RequestHeader.BlobAuthHeader,
 			},
 			RequestedAt: expectedRequestedAt,
 			BlobSize:    uint(len(blob.Data)),
@@ -1559,7 +1637,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 	assert.Equal(t, disperser.Confirmed, updated.BlobStatus)
 }
 
-func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8) core.Blob {
+func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8, accountId string) core.Blob {
 	blob := core.Blob{
 		RequestHeader: core.BlobRequestHeader{
 			SecurityParams: []*core.SecurityParam{
@@ -1567,6 +1645,9 @@ func makeTestBlob(quorumID core.QuorumID, adversityThreshold uint8) core.Blob {
 					QuorumID:           quorumID,
 					AdversaryThreshold: adversityThreshold,
 				},
+			},
+			BlobAuthHeader: core.BlobAuthHeader{
+				AccountID: accountId,
 			},
 		},
 		Data: gettysburgAddressBytes,
