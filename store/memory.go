@@ -104,8 +104,8 @@ func (e *MemStore) pruneExpired() {
 // Get fetches a value from the store.
 func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.DomainType) ([]byte, error) {
 	e.reads += 1
-	e.RLock()
-	defer e.RUnlock()
+	e.Lock()
+	defer e.Unlock()
 
 	var cert common.Certificate
 	err := rlp.DecodeBytes(commit, &cert)

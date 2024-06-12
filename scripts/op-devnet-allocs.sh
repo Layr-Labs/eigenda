@@ -28,4 +28,4 @@ if [ $? -eq 0 ] ; then
     exit ${STATUS}
 else
     echo "Failed to clean up ${REPO_NAME} repo"
-    exit ${STATUS
+    exit ${STATUS}

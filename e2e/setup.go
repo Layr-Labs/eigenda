@@ -20,13 +20,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Use of single port makes tests incapable of running in parallel
 const (
-	PrivateKey = "SIGNER_PRIVATE_KEY"
+	privateKey = "SIGNER_PRIVATE_KEY"
 	transport  = "http"
-	SvcName    = "eigenda_proxy"
+	svcName    = "eigenda_proxy"
 	host       = "127.0.0.1"
-	HoleskyDA  = "disperser-holesky.eigenda.xyz:443"
+	holeskyDA  = "disperser-holesky.eigenda.xyz:443"
 )
 
 type TestSuite struct {
@@ -39,7 +38,7 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 	ctx := context.Background()
 
 	// load signer key from environment
-	pk := os.Getenv(PrivateKey)
+	pk := os.Getenv(privateKey)
 	if pk == "" && !useMemory {
 		t.Fatal("SIGNER_PRIVATE_KEY environment variable not set")
 	}
@@ -48,13 +47,11 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		Level:  log.LevelDebug,
 		Format: oplog.FormatLogFmt,
 		Color:  true,
-	}).New("role", SvcName)
-
-	// oplog.SetGlobalLogHandler(log.Handler())
+	}).New("role", svcName)
 
 	eigendaCfg := eigenda.Config{
 		ClientConfig: clients.EigenDAClientConfig{
-			RPC:                      HoleskyDA,
+			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
 			StatusQueryRetryInterval: time.Second * 1,
 			DisableTLS:               false,
