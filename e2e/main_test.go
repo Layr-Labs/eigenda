@@ -6,17 +6,16 @@ import (
 )
 
 var (
-	runOptimismIntegrationTests bool
-	runTestnetIntegrationTests  bool
+	runTestnetIntegrationTests bool
 )
 
 func ParseEnv() {
-	runOptimismIntegrationTests = os.Getenv("OPTIMISM") == "true" || os.Getenv("OPTIMISM") == "1"
 	runTestnetIntegrationTests = os.Getenv("TESTNET") == "true" || os.Getenv("TESTNET") == "1"
 }
 
 func TestMain(m *testing.M) {
 	ParseEnv()
+	println("runTestnetIntegrationTests:", runTestnetIntegrationTests)
 	code := m.Run()
 	os.Exit(code)
 }

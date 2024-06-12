@@ -16,23 +16,11 @@ import (
 )
 
 func useMemory() bool {
-	if runOptimismIntegrationTests {
-		return true
-	}
-
-	if runTestnetIntegrationTests {
-		return false
-	}
-
-	return true
+	return !runTestnetIntegrationTests
 }
 
 func TestPlasmaClient(t *testing.T) {
 	t.Parallel()
-
-	if runOptimismIntegrationTests {
-		t.Skip("Skipping testnet integration test")
-	}
 
 	ts, kill := e2e.CreateTestSuite(t, useMemory())
 	defer kill()
@@ -59,10 +47,6 @@ func TestPlasmaClient(t *testing.T) {
 
 func TestProxyClient(t *testing.T) {
 	t.Parallel()
-
-	if runOptimismIntegrationTests {
-		t.Skip("Skipping testnet integration test")
-	}
 
 	ts, kill := e2e.CreateTestSuite(t, useMemory())
 	defer kill()

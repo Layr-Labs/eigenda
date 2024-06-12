@@ -44,9 +44,9 @@ jobs:
       run: | 
         make test 
 
-    - name: Run Optimism Test
+    - name: Run E2E Tests
       run: | 
-        make optimism-test
+        make e2e-test
 
   gosec:
     runs-on: ubuntu-latest
