@@ -8,6 +8,8 @@ import (
 )
 
 func TestParseByteAmount(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		input    string
 		expected uint64

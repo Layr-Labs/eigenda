@@ -38,7 +38,7 @@ An ephemeral memory store backend can be used for faster feedback testing when p
 ## Running Locally
 
 1. Compile binary: `make eigenda-proxy`
-2. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path test/resources/g1.point --eigenda-g2-tau-path test/resources/g2.point.powerOf2 --eigenda-use-tls true`
+2. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path e2e/resources/kzg/g1.point --eigenda-g2-tau-path e2e/resources/kzg/g2.point.powerOf2 --eigenda-use-tls true`
 
 **Env File**
 An env file can be provided to the binary for runtime process ingestion; e.g:
@@ -67,14 +67,17 @@ The `raw commitment` for EigenDA is encoding certificate and kzg fields.
 
 ## Testing
 
-Some unit tests have been introduced to assert the correctness of:
+### Unit
+Unit tests can be ran via invoking `make test`.
 
-* DA Certificate encoding/decoding logic
-* commitment verification logic
+### Holesky
+A holesky integration test can be ran using `make holesky-test` to assert proper dispersal/retrieval against a public network. Please **note** that EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
 
-Unit tests can be ran via `make test`.
 
-Otherwise E2E tests (`test/e2e_test.go`) exists which asserts that a commitment can be generated when inserting some arbitrary data to the server and can be read using the commitment for a key lookup via the client. These can be ran via `make e2e-test`. Please **note** that this test uses the EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
+### Optimism
+An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation. These tests can be ran via `make optimism-test`.
+
+**NOTE:** 
 
 ## Downloading Mainnet SRS
 

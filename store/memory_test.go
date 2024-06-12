@@ -22,9 +22,9 @@ func TestGetSet(t *testing.T) {
 	defer cancel()
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../test/resources/g1.point",
-		G2PowerOf2Path:  "../test/resources/g2.point.powerOf2",
-		CacheDir:        "../test/resources/SRSTables",
+		G1Path:          "../e2e/resources/kzg/g1.point",
+		G2PowerOf2Path:  "../e2e/resources/kzg/g2.point.powerOf2",
+		CacheDir:        "../e2e/resources/kzg/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
@@ -55,13 +55,15 @@ func TestGetSet(t *testing.T) {
 }
 
 func TestExpiration(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../test/resources/g1.point",
-		G2PowerOf2Path:  "../test/resources/g2.point.powerOf2",
-		CacheDir:        "../test/resources/SRSTables",
+		G1Path:          "../e2e/resources/kzg/g1.point",
+		G2PowerOf2Path:  "../e2e/resources/kzg/g2.point.powerOf2",
+		CacheDir:        "../e2e/resources/kzg/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

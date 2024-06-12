@@ -110,3 +110,8 @@ func ParseBytesAmount(s string) (uint64, error) {
 		return 0, fmt.Errorf("unsupported unit: %s", unit)
 	}
 }
+
+type Stats struct {
+	Entries int
+	Reads   int
+}

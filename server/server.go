@@ -223,3 +223,14 @@ func ReadDomainFilter(r *http.Request) (common.DomainType, error) {
 
 	return dt, nil
 }
+
+func (svr *Server) Store() store.Store {
+	return svr.store
+}
+
+func (svr *Server) Port() int {
+	// read from listener
+	_, portStr, _ := net.SplitHostPort(svr.listener.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	return port
+}

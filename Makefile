@@ -27,10 +27,13 @@ clean:
 	rm bin/eigenda-proxy
 
 test:
-	go test -v ./...
+	go test -v ./... -parallel 4
 
-e2e-test: submodules
-	go test -timeout 50m -v ./test/e2e_test.go -testnet-integration
+optimism-test:
+	OPTIMISM=true go test -timeout 1m -v ./e2e -deploy-config ../.devnet/devnetL1.json
+
+holesky-test:
+	TESTNET=true go test -timeout 50m -v ./e2e  -parallel 4
 
 .PHONY: lint
 lint:
@@ -45,7 +48,7 @@ lint:
 	@golangci-lint run
 
 gosec:
-	@echo "$(GREEN) Running security scan with gosec...$(COLOR_END)"
+	@echo "Running security scan with gosec..."
 	gosec ./...
 
 submodules:
@@ -56,7 +59,10 @@ srs:
 		cd operator-setup && ./srs_setup.sh; \
 	fi
 
+op-devnet-allocs:
+	@echo "Generating devnet allocs..."
+	@./scripts/op-devnet-allocs.sh
+
 .PHONY: \
-	op-batcher \
 	clean \
 	test
