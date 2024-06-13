@@ -27,10 +27,10 @@ clean:
 	rm bin/eigenda-proxy
 
 test:
-	go test -v $(go list ./... | grep -v e2e) -parallel 4
+	go test -v ./... -parallel 4 
 
 e2e-test:
-	go test -timeout 1m -v ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
+	INTEGRATION=true go test -timeout 1m -v ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
 
 holesky-test:
 	TESTNET=true go test -timeout 50m -v ./e2e  -parallel 4 -deploy-config ../.devnet/devnetL1.json

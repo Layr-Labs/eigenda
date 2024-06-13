@@ -35,6 +35,7 @@ type TestSuite struct {
 }
 
 func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
+
 	ctx := context.Background()
 
 	// load signer key from environment

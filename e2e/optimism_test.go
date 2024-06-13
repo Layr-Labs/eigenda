@@ -106,6 +106,9 @@ func (a *L2PlasmaDA) ActL1Finalized(t actions.Testing) {
 }
 
 func TestOptimism(gt *testing.T) {
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
 
 	proxyTS, close := e2e.CreateTestSuite(gt, true)
 	defer close()

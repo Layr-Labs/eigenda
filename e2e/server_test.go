@@ -20,6 +20,10 @@ func useMemory() bool {
 }
 
 func TestPlasmaClient(t *testing.T) {
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
+
 	t.Parallel()
 
 	ts, kill := e2e.CreateTestSuite(t, useMemory())
@@ -46,6 +50,10 @@ func TestPlasmaClient(t *testing.T) {
 }
 
 func TestProxyClient(t *testing.T) {
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
+
 	t.Parallel()
 
 	ts, kill := e2e.CreateTestSuite(t, useMemory())
