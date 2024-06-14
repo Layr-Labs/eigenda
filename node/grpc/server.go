@@ -208,6 +208,8 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 			bundleSize += proto.Size(bundle)
 		}
 	}
+	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf
+	// message (over about 2GiB).
 	s.node.Logger.Info("StoreChunks RPC request recieved", "num of blobs", len(in.Blobs), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
 
 	// Validate the request.
