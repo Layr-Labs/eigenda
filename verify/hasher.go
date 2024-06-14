@@ -3,7 +3,6 @@ package verify
 import (
 	"encoding/binary"
 
-	common "github.com/Layr-Labs/eigenda-proxy/common"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	geth_common "github.com/ethereum/go-ethereum/common"
@@ -98,7 +97,7 @@ func HashBatchHashedMetadata(batchHeaderHash [32]byte, signatoryRecordHash [32]b
 }
 
 // HashBlobHeader function to hash BlobHeader
-func HashBlobHeader(blobHeader common.BlobHeader) (geth_common.Hash, error) {
+func HashBlobHeader(blobHeader BlobHeader) (geth_common.Hash, error) {
 
 	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
@@ -133,7 +132,7 @@ func HashBlobHeader(blobHeader common.BlobHeader) (geth_common.Hash, error) {
 }
 
 // Function to hash and encode header
-func HashEncodeBlobHeader(header common.BlobHeader) (geth_common.Hash, error) {
+func HashEncodeBlobHeader(header BlobHeader) (geth_common.Hash, error) {
 	// Hash the BlobHeader
 	blobHash, err := HashBlobHeader(header)
 	if err != nil {

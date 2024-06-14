@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/urfave/cli/v2"
 
-	"github.com/Layr-Labs/eigenda-proxy/server"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )

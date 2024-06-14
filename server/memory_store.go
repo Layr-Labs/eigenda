@@ -1,4 +1,4 @@
-package store
+package server
 
 import (
 	"context"
@@ -10,27 +10,16 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	eigendacommon "github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/urfave/cli/v2"
 )
 
 const (
-	MemStoreFlagName   = "memstore.enabled"
-	ExpirationFlagName = "memstore.expiration"
-
 	DefaultPruneInterval = 500 * time.Millisecond
 )
-
-type MemStoreConfig struct {
-	Enabled        bool
-	BlobExpiration time.Duration
-}
 
 // MemStore is a simple in-memory store for blobs which uses an expiration
 // time to evict blobs to best emulate the ephemeral nature of blobs dispersed to
@@ -38,33 +27,33 @@ type MemStoreConfig struct {
 type MemStore struct {
 	sync.RWMutex
 
-	cfg       *MemStoreConfig
 	l         log.Logger
 	keyStarts map[string]time.Time
 	store     map[string][]byte
 	verifier  *verify.Verifier
 	codec     codecs.BlobCodec
-	reads     int
 
 	maxBlobSizeBytes uint64
+	blobExpiration   time.Duration
+	reads            int
 }
 
 var _ Store = (*MemStore)(nil)
 
 // NewMemStore ... constructor
-func NewMemStore(ctx context.Context, cfg *MemStoreConfig, verifier *verify.Verifier, l log.Logger, maxBlobSizeBytes uint64) (*MemStore, error) {
+func NewMemStore(ctx context.Context, verifier *verify.Verifier, l log.Logger, maxBlobSizeBytes uint64, blobExpiration time.Duration) (*MemStore, error) {
 	store := &MemStore{
-		cfg:              cfg,
 		l:                l,
 		keyStarts:        make(map[string]time.Time),
 		store:            make(map[string][]byte),
 		verifier:         verifier,
 		codec:            codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 		maxBlobSizeBytes: maxBlobSizeBytes,
+		blobExpiration:   blobExpiration,
 	}
 
-	if cfg.BlobExpiration != 0 {
-		l.Info("memstore expiration enabled", "time", cfg.BlobExpiration)
+	if store.blobExpiration != 0 {
+		l.Info("memstore expiration enabled", "time", store.blobExpiration)
 		go store.EventLoop(ctx)
 	}
 
@@ -91,7 +80,7 @@ func (e *MemStore) pruneExpired() {
 	defer e.Unlock()
 
 	for commit, dur := range e.keyStarts {
-		if time.Since(dur) >= e.cfg.BlobExpiration {
+		if time.Since(dur) >= e.blobExpiration {
 			delete(e.keyStarts, commit)
 			delete(e.store, commit)
 
@@ -102,12 +91,12 @@ func (e *MemStore) pruneExpired() {
 }
 
 // Get fetches a value from the store.
-func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.DomainType) ([]byte, error) {
+func (e *MemStore) Get(ctx context.Context, commit []byte, domain DomainType) ([]byte, error) {
 	e.reads += 1
-	e.Lock()
-	defer e.Unlock()
+	e.RLock()
+	defer e.RUnlock()
 
-	var cert common.Certificate
+	var cert verify.Certificate
 	err := rlp.DecodeBytes(commit, &cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
@@ -126,9 +115,9 @@ func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.
 	}
 
 	switch domain {
-	case eigendacommon.BinaryDomain:
+	case BinaryDomain:
 		return e.codec.DecodeBlob(encodedBlob)
-	case eigendacommon.PolyDomain:
+	case PolyDomain:
 		return encodedBlob, nil
 	default:
 		return nil, fmt.Errorf("unexpected domain type: %d", domain)
@@ -163,9 +152,9 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	mockBatchHeaderHash := crypto.Keccak256Hash(entropy)
 
 	// only filling out commitment fields for now
-	cert := &common.Certificate{
+	cert := &verify.Certificate{
 		BlobHeader: &disperser.BlobHeader{
-			Commitment: &grpccommon.G1Commitment{
+			Commitment: &common.G1Commitment{
 				X: commitment.X.Marshal(),
 				Y: commitment.Y.Marshal(),
 			},
@@ -209,37 +198,11 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	return certBytes, nil
 }
 
-func (e *MemStore) Stats() *common.Stats {
+func (e *MemStore) Stats() *Stats {
 	e.RLock()
 	defer e.RUnlock()
-	return &common.Stats{
+	return &Stats{
 		Entries: len(e.store),
 		Reads:   e.reads,
-	}
-}
-
-func ReadConfig(ctx *cli.Context) MemStoreConfig {
-	cfg := MemStoreConfig{
-		/* Required Flags */
-		Enabled:        ctx.Bool(MemStoreFlagName),
-		BlobExpiration: ctx.Duration(ExpirationFlagName),
-	}
-	return cfg
-}
-
-func CLIFlags(envPrefix string) []cli.Flag {
-
-	return []cli.Flag{
-		&cli.BoolFlag{
-			Name:    MemStoreFlagName,
-			Usage:   "Whether to use mem-store for DA logic.",
-			EnvVars: []string{"MEMSTORE_ENABLED"},
-		},
-		&cli.DurationFlag{
-			Name:    ExpirationFlagName,
-			Usage:   "Duration that a blob/commitment pair are allowed to live.",
-			Value:   25 * time.Minute,
-			EnvVars: []string{"MEMSTORE_EXPIRATION"},
-		},
 	}
 }

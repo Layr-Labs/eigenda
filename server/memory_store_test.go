@@ -1,4 +1,4 @@
-package store
+package server
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
@@ -40,13 +39,10 @@ func TestGetSet(t *testing.T) {
 
 	ms, err := NewMemStore(
 		ctx,
-		&MemStoreConfig{
-			Enabled:        true,
-			BlobExpiration: time.Hour * 1000,
-		},
 		verifier,
 		log.New(),
 		1024*1024*2,
+		time.Hour*1000,
 	)
 
 	assert.NoError(t, err)
@@ -55,7 +51,7 @@ func TestGetSet(t *testing.T) {
 	key, err := ms.Put(ctx, expected)
 	assert.NoError(t, err)
 
-	actual, err := ms.Get(ctx, key, common.BinaryDomain)
+	actual, err := ms.Get(ctx, key, BinaryDomain)
 	assert.NoError(t, err)
 	assert.Equal(t, actual, expected)
 }
@@ -85,13 +81,10 @@ func TestExpiration(t *testing.T) {
 
 	ms, err := NewMemStore(
 		ctx,
-		&MemStoreConfig{
-			Enabled:        true,
-			BlobExpiration: time.Millisecond * 10,
-		},
 		verifier,
 		log.New(),
 		1024*1024*2,
+		time.Millisecond*10,
 	)
 
 	assert.NoError(t, err)
@@ -103,7 +96,7 @@ func TestExpiration(t *testing.T) {
 	// sleep 1 second and verify that older blob entries are removed
 	time.Sleep(time.Second * 1)
 
-	_, err = ms.Get(ctx, key, common.BinaryDomain)
+	_, err = ms.Get(ctx, key, BinaryDomain)
 	assert.Error(t, err)
 
 }

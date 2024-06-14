@@ -5,8 +5,6 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/Layr-Labs/eigenda-proxy/eigenda"
-	"github.com/Layr-Labs/eigenda-proxy/store"
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -47,9 +45,8 @@ var optionalFlags = []cli.Flag{}
 
 func init() {
 	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
-	optionalFlags = append(optionalFlags, eigenda.CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
-	optionalFlags = append(optionalFlags, store.CLIFlags(EnvVarPrefix)...)
 	Flags = append(requiredFlags, optionalFlags...)
 }
 
@@ -57,16 +54,14 @@ func init() {
 var Flags []cli.Flag
 
 type CLIConfig struct {
-	MemStoreCfg   store.MemStoreConfig
-	EigenDAConfig eigenda.Config
+	EigenDAConfig Config
 	MetricsCfg    opmetrics.CLIConfig
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
 	return CLIConfig{
-		EigenDAConfig: eigenda.ReadConfig(ctx),
+		EigenDAConfig: ReadConfig(ctx),
 		MetricsCfg:    opmetrics.ReadCLIConfig(ctx),
-		MemStoreCfg:   store.ReadConfig(ctx),
 	}
 }
 

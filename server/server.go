@@ -11,10 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -24,27 +21,41 @@ var (
 )
 
 const (
-	invalidDomain = "invalid domain type"
-)
+	invalidDomain         = "invalid domain type"
+	invalidCommitmentMode = "invalid commitment mode"
 
-const (
 	GetRoute = "/get/"
 	PutRoute = "/put/"
 
-	DomainFilterKey = "domain"
+	DomainFilterKey   = "domain"
+	CommitmentModeKey = "commitment_mode"
 )
+
+type Store interface {
+	// Get retrieves the given key if it's present in the key-value data store.
+	Get(ctx context.Context, key []byte, domain DomainType) ([]byte, error)
+	// Put inserts the given value into the key-value data store.
+	Put(ctx context.Context, value []byte) (key []byte, err error)
+	// Stats returns the current usage metrics of the key-value data store.
+	Stats() *Stats
+}
+
+type Stats struct {
+	Entries int
+	Reads   int
+}
 
 type Server struct {
 	log        log.Logger
 	endpoint   string
-	store      store.Store
+	store      Store
 	m          metrics.Metricer
 	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
 
-func NewServer(host string, port int, store store.Store, log log.Logger, m metrics.Metricer) *Server {
+func NewServer(host string, port int, store Store, log log.Logger, m metrics.Metricer) *Server {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &Server{
 		m:        m,
@@ -147,9 +158,14 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) error {
 		svr.WriteBadRequest(w, invalidDomain)
 		return err
 	}
+	commitmentType, err := ReadCommitmentMode(r)
+	if err != nil {
+		svr.WriteBadRequest(w, invalidCommitmentMode)
+		return err
+	}
 
 	key := path.Base(r.URL.Path)
-	comm, err := eigenda.StringToCommit(key)
+	comm, err := StringToCommitment(key, commitmentType)
 	if err != nil {
 		svr.log.Info("failed to decode commitment", "err", err, "key", key)
 		w.WriteHeader(http.StatusBadRequest)
@@ -172,6 +188,12 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
+	commitmentType, err := ReadCommitmentMode(r)
+	if err != nil {
+		svr.WriteBadRequest(w, invalidCommitmentMode)
+		return err
+	}
+
 	input, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -184,8 +206,15 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	comm, err = EncodeCommitment(comm, commitmentType)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	fmt.Printf("write cert: %x\n", comm)
 	// write out encoded commitment
-	svr.WriteResponse(w, eigenda.Commitment.Encode(comm))
+	svr.WriteResponse(w, comm)
 	return nil
 }
 
@@ -210,27 +239,13 @@ func (svr *Server) WriteBadRequest(w http.ResponseWriter, msg string) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func ReadDomainFilter(r *http.Request) (common.DomainType, error) {
-	query := r.URL.Query()
-	key := query.Get(DomainFilterKey)
-	if key == "" { // default
-		return common.BinaryDomain, nil
-	}
-	dt := common.StrToDomainType(key)
-	if dt == common.UnknownDomain {
-		return common.UnknownDomain, common.ErrInvalidDomainType
-	}
-
-	return dt, nil
-}
-
-func (svr *Server) Store() store.Store {
-	return svr.store
-}
-
 func (svr *Server) Port() int {
 	// read from listener
 	_, portStr, _ := net.SplitHostPort(svr.listener.Addr().String())
 	port, _ := strconv.Atoi(portStr)
 	return port
+}
+
+func (svr *Server) Store() Store {
+	return svr.store
 }

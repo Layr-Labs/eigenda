@@ -3,16 +3,14 @@ package verify
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/log"
 
-	proxy_common "github.com/Layr-Labs/eigenda-proxy/common"
-
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -54,7 +52,7 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 	}, nil
 }
 
-func (v *Verifier) VerifyCert(cert *proxy_common.Certificate) error {
+func (v *Verifier) VerifyCert(cert *Certificate) error {
 	if !v.verifyCert {
 		return nil
 	}
@@ -119,7 +117,6 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 		return err
 	}
 
-	// convert to field elements
 	expectedX := &fp.Element{}
 	expectedX.Unmarshal(expectedCommit.X)
 	expectedY := &fp.Element{}
@@ -136,7 +133,7 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 }
 
 // VerifySecurityParams ensures that returned security parameters are valid
-func (v *Verifier) VerifySecurityParams(blobHeader proxy_common.BlobHeader, batchHeader binding.IEigenDAServiceManagerBatchHeader) error {
+func (v *Verifier) VerifySecurityParams(blobHeader BlobHeader, batchHeader binding.IEigenDAServiceManagerBatchHeader) error {
 
 	confirmedQuorums := make(map[uint8]bool)
 

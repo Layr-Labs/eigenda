@@ -7,14 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/eigenda"
-	"github.com/ethereum/go-ethereum/rlp"
-)
-
-const (
-	// NOTE: this will need to be updated as plasma's implementation changes
-	decodingOffset = 3
+	"github.com/Layr-Labs/eigenda-proxy/server"
 )
 
 // TODO: Add support for custom http client option
@@ -25,8 +18,8 @@ type Config struct {
 // ProxyClient is an interface for communicating with the EigenDA proxy server
 type ProxyClient interface {
 	Health() error
-	GetData(ctx context.Context, cert *common.Certificate, domain common.DomainType) ([]byte, error)
-	SetData(ctx context.Context, b []byte) (*common.Certificate, error)
+	GetData(ctx context.Context, cert []byte, domain server.DomainType) ([]byte, error)
+	SetData(ctx context.Context, b []byte) ([]byte, error)
 }
 
 // client is the implementation of ProxyClient
@@ -34,6 +27,8 @@ type client struct {
 	cfg        *Config
 	httpClient *http.Client
 }
+
+var _ ProxyClient = (*client)(nil)
 
 func New(cfg *Config) ProxyClient {
 	return &client{
@@ -64,16 +59,8 @@ func (c *client) Health() error {
 }
 
 // GetData fetches blob data associated with a DA certificate
-func (c *client) GetData(ctx context.Context, cert *common.Certificate, domain common.DomainType) ([]byte, error) {
-	b, err := rlp.EncodeToBytes(cert)
-	if err != nil {
-		return nil, err
-	}
-
-	// encode prefix bytes
-	b = eigenda.Commitment(b).Encode()
-
-	url := fmt.Sprintf("%s/get/0x%x?domain=%s", c.cfg.URL, b, domain.String())
+func (c *client) GetData(ctx context.Context, comm []byte, domain server.DomainType) ([]byte, error) {
+	url := fmt.Sprintf("%s/get/0x%x?domain=%s&commitment_mode=simple", c.cfg.URL, comm, domain.String())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -96,8 +83,8 @@ func (c *client) GetData(ctx context.Context, cert *common.Certificate, domain c
 }
 
 // SetData writes raw byte data to DA and returns the respective certificate
-func (c *client) SetData(ctx context.Context, b []byte) (*common.Certificate, error) {
-	url := fmt.Sprintf("%s/put/", c.cfg.URL)
+func (c *client) SetData(ctx context.Context, b []byte) ([]byte, error) {
+	url := fmt.Sprintf("%s/put/?commitment_mode=simple", c.cfg.URL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
@@ -117,14 +104,9 @@ func (c *client) SetData(ctx context.Context, b []byte) (*common.Certificate, er
 		return nil, err
 	}
 
-	if len(b) < decodingOffset {
-		return nil, fmt.Errorf("read certificate is of invalid length: %d", len(b))
+	if len(b) == 0 {
+		return nil, fmt.Errorf("read certificate is empty")
 	}
 
-	var cert *common.Certificate
-	if err = rlp.DecodeBytes(b[decodingOffset:], &cert); err != nil {
-		return nil, err
-	}
-
-	return cert, err
+	return b, err
 }

@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
@@ -88,7 +87,7 @@ func TestHashBlobHeader(t *testing.T) {
 		},
 	}
 
-	cert := &common.Certificate{
+	cert := &Certificate{
 		BlobHeader: header,
 	}
 
@@ -124,7 +123,7 @@ func TestHashEncodeBlobHeader(t *testing.T) {
 		},
 	}
 
-	cert := &common.Certificate{
+	cert := &Certificate{
 		BlobHeader: header,
 	}
 

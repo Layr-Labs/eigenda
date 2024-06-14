@@ -3,12 +3,12 @@ package verify
 import (
 	"fmt"
 
-	proxy_common "github.com/Layr-Labs/eigenda-proxy/common"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	"golang.org/x/exp/slices"
 )
 
 // CertVerifier verifies the DA certificate against on-chain EigenDA contracts
@@ -52,7 +52,7 @@ func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchH
 		return err
 	}
 
-	equal := proxy_common.EqualSlices(expectedHash[:], actualHash[:])
+	equal := slices.Equal(expectedHash[:], actualHash[:])
 	if !equal {
 		return fmt.Errorf("batch hash mismatch, expected: %x, got: %x", expectedHash, actualHash)
 	}
@@ -61,7 +61,7 @@ func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchH
 }
 
 // VerifyMerkleProof
-func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, blobIndex uint32, blobHeader proxy_common.BlobHeader) error {
+func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, blobIndex uint32, blobHeader BlobHeader) error {
 	leafHash, err := HashEncodeBlobHeader(blobHeader)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, bl
 		return err
 	}
 
-	equal := proxy_common.EqualSlices(root, generatedRoot.Bytes())
+	equal := slices.Equal(root, generatedRoot.Bytes())
 	if !equal {
 		return fmt.Errorf("root hash mismatch, expected: %x, got: %x", root, generatedRoot)
 	}

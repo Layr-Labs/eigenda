@@ -3,13 +3,13 @@ package server
 import (
 	"context"
 
-	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store, error) {
+func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (Store, error) {
+	log.Info("Using eigenda backend")
 	daCfg := cfg.EigenDAConfig
 	vCfg := daCfg.VerificationCfg()
 
@@ -29,9 +29,9 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store,
 		return nil, err
 	}
 
-	if cfg.MemStoreCfg.Enabled {
+	if cfg.EigenDAConfig.MemstoreEnabled {
 		log.Info("Using memstore backend")
-		return store.NewMemStore(ctx, &cfg.MemStoreCfg, verifier, log, maxBlobLength)
+		return NewMemStore(ctx, verifier, log, maxBlobLength, cfg.EigenDAConfig.MemstoreBlobExpiration)
 	}
 
 	log.Info("Using EigenDA backend")
@@ -39,7 +39,7 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store,
 	if err != nil {
 		return nil, err
 	}
-	return store.NewEigenDAStore(
+	return NewEigenDAStore(
 		ctx,
 		client,
 		verifier,

@@ -7,10 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/eigenda"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
-	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -57,7 +55,7 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		Color:  true,
 	}).New("role", svcName)
 
-	eigendaCfg := eigenda.Config{
+	eigendaCfg := server.Config{
 		ClientConfig: clients.EigenDAClientConfig{
 			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
@@ -69,21 +67,16 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
 		CacheDir:               "../resources/SRSTables",
 		G1Path:                 "../resources/g1.point",
-		G2Path:                 "",
 		MaxBlobLength:          "90kib",
 		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
 		PutBlobEncodingVersion: 0x00,
-	}
-
-	memstoreCfg := store.MemStoreConfig{
-		Enabled:        useMemory,
-		BlobExpiration: 14 * 24 * time.Hour,
+		MemstoreEnabled:        useMemory,
+		MemstoreBlobExpiration: 14 * 24 * time.Hour,
 	}
 
 	store, err := server.LoadStore(
 		server.CLIConfig{
 			EigenDAConfig: eigendaCfg,
-			MemStoreCfg:   memstoreCfg,
 			MetricsCfg:    opmetrics.CLIConfig{},
 		},
 		ctx,
