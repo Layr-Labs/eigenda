@@ -1,4 +1,4 @@
-name: docker-publish
+name: docker-publish-internal
 on:
   push:
     branches:
@@ -19,7 +19,9 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v1
@@ -47,10 +49,10 @@ jobs:
 
       # Build And Push Image
       - name: Build Docker image
-        run: docker compose -f docker-compose-build.yaml build
+        run: docker compose -f docker-compose-internal.yaml build
       - name: Push Docker image
         if: github.ref == 'refs/heads/master'
-        run: docker compose -f docker-compose-build.yaml push
+        run: docker compose -f docker-compose-internal.yaml push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}

@@ -67,12 +67,9 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
       if: ${{ success() }}
 
-    # Build And Push Image
-    - name: Build docker image release
-      run: make docker-release-build
-      if: ${{ success() }}
-
-    # Publish if release is tagged or force == true
-    - name: Push docker image release
-      run: make docker-release-push
+    - name: Set release PUSH_FLAG
+      run: echo "PUSH_FLAG=--push" >> $GITHUB_ENV
       if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.force == 'true'
+
+    - name: Build (and potentially push) docker image release
+      run: PUSH_FLAG=$PUSH_FLAG make docker-release-build
