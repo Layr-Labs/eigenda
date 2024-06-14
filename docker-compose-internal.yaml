@@ -24,6 +24,9 @@ services:
     build:
       context: .
       dockerfile: node/cmd/Dockerfile
+      platforms:
+        - "linux/amd64"
+        - "linux/arm64"
     image: ghcr.io/layr-labs/eigenda/node:${BUILD_TAG:-latest}
   churner:
     build:

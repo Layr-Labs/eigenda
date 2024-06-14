@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - pschork/multi-platform-releases
   pull_request:
   workflow_dispatch:
 
@@ -45,12 +46,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build And Push Image
-      - name: Build Docker image
-        run: docker compose -f docker-compose-internal.yaml build
-      - name: Push Docker image
+      - name: Set internal release PUSH_FLAG
+        run: echo "PUSH_FLAG=--push" >> $GITHUB_ENV
         if: github.ref == 'refs/heads/master'
-        run: docker compose -f docker-compose-internal.yaml push
+
+      - name: Build (and potentially push) internal docker image release
+        run: PUSH_FLAG=$PUSH_FLAG make docker-internal-build
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}

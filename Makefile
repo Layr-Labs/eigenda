@@ -93,6 +93,9 @@ integration-tests-dataapi:
 	make dataapi-build
 	go test -v ./disperser/dataapi
 
+docker-internal-build:
+	RELEASE_TAG=latest docker compose -f docker-compose-internal.yaml build --build-arg SEMVER=${SEMVER} --build-arg GITCOMMIT=${GITCOMMIT} --build-arg GITDATE=${GITDATE} ${PUSH_FLAG}
+
 docker-release-build:
 	RELEASE_TAG=${SEMVER} docker compose -f docker-compose-release.yaml build --build-arg SEMVER=${SEMVER} --build-arg GITCOMMIT=${GITCOMMIT} --build-arg GITDATE=${GITDATE} ${PUSH_FLAG}
 
