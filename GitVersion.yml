@@ -7,8 +7,7 @@ branches:
     prevent-increment-of-merged-branch-version: true
     track-merge-target: false
     regex: ^master$|^main$
-    source-branches:
-    - release
+    source-branches: []
     tracks-release-branches: true
     is-release-branch: false
     is-mainline: true
@@ -19,10 +18,8 @@ branches:
     increment: None
     prevent-increment-of-merged-branch-version: true
     track-merge-target: false
-    regex: ^v\d+\.\d+\.\d+$|^releases?[/-]
-    source-branches:
-    - main
-    - release
+    regex: ^tags/v\d+\.\d+\.\d+(-[a-z]+\.\d+)?|^releases?[/-]
+    source-branches: []
     tracks-release-branches: false
     is-release-branch: true
     is-mainline: false
