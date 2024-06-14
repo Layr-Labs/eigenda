@@ -208,7 +208,7 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 			bundleSize += proto.Size(bundle)
 		}
 	}
-	s.node.Logger.Info("StoreChunks RPC request recieved", "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
+	s.node.Logger.Info("StoreChunks RPC request recieved", "num of blobs", len(in.Blobs), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
 
 	// Validate the request.
 	if err := s.validateStoreChunkRequest(in); err != nil {
