@@ -360,7 +360,11 @@ func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
 //
 // encodeChunks(chunks) = (len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)
 func encodeChunks(chunks [][]byte) ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
+	totalSize := 0
+	for _, chunk := range chunks {
+		totalSize += len(chunk) + 8 // Add size of uint64 for length
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, totalSize))
 	for _, chunk := range chunks {
 		if err := binary.Write(buf, binary.LittleEndian, uint64(len(chunk))); err != nil {
 			return nil, err
