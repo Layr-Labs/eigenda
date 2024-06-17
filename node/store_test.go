@@ -3,6 +3,7 @@ package node_test
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"testing"
 	"time"
 
@@ -263,4 +264,25 @@ func TestStoringBlob(t *testing.T) {
 	assert.False(t, s.HasKey(ctx, blobHeaderKey2))
 	assert.False(t, s.HasKey(ctx, blobKey1))
 	assert.False(t, s.HasKey(ctx, blobKey2))
+}
+
+func BenchmarkEncodeChunks(b *testing.B) {
+	numSamples := 32
+	numChunks := 10
+	chunkSize := 2 * 1024
+	sampleChunks := make([][][]byte, numSamples)
+	for n := 0; n < numSamples; n++ {
+		chunks := make([][]byte, numChunks)
+		for i := 0; i < numChunks; i++ {
+			chunk := make([]byte, chunkSize)
+			_, _ = cryptorand.Read(chunk)
+			chunks[i] = chunk
+		}
+		sampleChunks[n] = chunks
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = node.EncodeChunks(sampleChunks[i%numSamples])
+	}
 }

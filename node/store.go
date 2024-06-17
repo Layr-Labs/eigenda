@@ -267,7 +267,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 			for i := 0; i < len(bundle); i++ {
 				bundleRaw[i] = rawChunks[quorumID][i]
 			}
-			chunkBytes, err := encodeChunks(bundleRaw)
+			chunkBytes, err := EncodeChunks(bundleRaw)
 			if err != nil {
 				return nil, err
 			}
@@ -358,8 +358,8 @@ func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
 
 // Flattens an array of byte arrays (chunks) into a single byte array
 //
-// encodeChunks(chunks) = (len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)
-func encodeChunks(chunks [][]byte) ([]byte, error) {
+// EncodeChunks(chunks) = (len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)
+func EncodeChunks(chunks [][]byte) ([]byte, error) {
 	totalSize := 0
 	for _, chunk := range chunks {
 		totalSize += len(chunk) + 8 // Add size of uint64 for length
