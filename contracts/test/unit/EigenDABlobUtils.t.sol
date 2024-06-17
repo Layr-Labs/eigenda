@@ -5,13 +5,12 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDAServiceManager, IPaymentCoordinator} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDABlobUtilsHarness} from "../harnesses/EigenDABlobUtilsHarness.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
-
 
 import "forge-std/StdStorage.sol";
 
@@ -26,6 +25,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
 
     address confirmer = address(uint160(uint256(keccak256(abi.encodePacked("confirmer")))));
     address notConfirmer = address(uint160(uint256(keccak256(abi.encodePacked("notConfirmer")))));
+    address rewardsInitiator = address(uint160(uint256(keccak256(abi.encodePacked("rewardsInitiator")))));
 
     EigenDABlobUtilsHarness eigenDABlobUtilsHarness;
 
@@ -44,7 +44,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IPaymentCoordinator(address(0)),
+            rewardsCoordinator,
             registryCoordinator,
             stakeRegistry
         );
@@ -63,7 +63,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                         pauserRegistry,
                         0,
                         registryCoordinatorOwner,
-                        confirmers
+                        confirmers,
+                        rewardsInitiator
                     )
                 )
             )

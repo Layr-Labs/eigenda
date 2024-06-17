@@ -4,11 +4,10 @@ pragma solidity =0.8.12;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {EigenDAServiceManager, IPaymentCoordinator} from "../../src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
-
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
@@ -18,6 +17,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     address confirmer = address(uint160(uint256(keccak256(abi.encodePacked("confirmer")))));
     address notConfirmer = address(uint160(uint256(keccak256(abi.encodePacked("notConfirmer")))));
     address newFeeSetter = address(uint160(uint256(keccak256(abi.encodePacked("newFeeSetter")))));
+    address rewardsInitiator = address(uint160(uint256(keccak256(abi.encodePacked("rewardsInitiator")))));
 
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
@@ -33,7 +33,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            IPaymentCoordinator(address(0)),
+            rewardsCoordinator,
             registryCoordinator,
             stakeRegistry
         );
@@ -52,7 +52,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                         pauserRegistry,
                         0,
                         registryCoordinatorOwner,
-                        confirmers
+                        confirmers,
+                        rewardsInitiator
                     )
                 )
             )

@@ -4,7 +4,7 @@ pragma solidity ^0.8.9;
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
 import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
 
-import {ServiceManagerBase, IAVSDirectory, IPaymentCoordinator} from "eigenlayer-middleware/ServiceManagerBase.sol";
+import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager} from "eigenlayer-middleware/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
@@ -34,12 +34,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     constructor(
         IAVSDirectory __avsDirectory,
-        IPaymentCoordinator __paymentCoordinator,
+        IRewardsCoordinator __rewardsCoordinator,
         IRegistryCoordinator __registryCoordinator,
         IStakeRegistry __stakeRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
-        ServiceManagerBase(__avsDirectory, __paymentCoordinator, __registryCoordinator, __stakeRegistry)
+        ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
     {
         _disableInitializers();
     }
@@ -48,13 +48,15 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IPauserRegistry _pauserRegistry,
         uint256 _initialPausedStatus,
         address _initialOwner,
-        address[] memory _batchConfirmers
+        address[] memory _batchConfirmers,
+        address _rewardsInitiator
     )
         public
         initializer
     {
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
+        _setRewardsInitiator(_rewardsInitiator);
         for (uint i = 0; i < _batchConfirmers.length; ++i) {
             _setBatchConfirmer(_batchConfirmers[i]);
         }

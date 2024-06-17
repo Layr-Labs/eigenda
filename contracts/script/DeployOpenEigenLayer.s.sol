@@ -13,6 +13,7 @@ import "eigenlayer-core/contracts/core/StrategyManager.sol";
 import "eigenlayer-core/contracts/core/Slasher.sol";
 import "eigenlayer-core/contracts/core/DelegationManager.sol";
 import "eigenlayer-core/contracts/core/AVSDirectory.sol";
+import "eigenlayer-core/contracts/core/RewardsCoordinator.sol";
 
 import "eigenlayer-core/contracts/strategies/StrategyBaseTVLLimits.sol";
 
@@ -35,6 +36,14 @@ import "forge-std/Test.sol";
 // forge script script/M1_Deploy.s.sol:Deployer_M1 --rpc-url $RPC_URL  --private-key $PRIVATE_KEY --broadcast -vvvv
 contract DeployOpenEigenLayer is Script, Test {
     Vm cheats = Vm(VM_ADDRESS);
+
+    uint32 CALCULATION_INTERVAL_SECONDS = 7 days;
+    uint32 MAX_REWARDS_DURATION = 70 days;
+    uint32 MAX_RETROACTIVE_LENGTH = 84 days;
+    uint32 MAX_FUTURE_LENGTH = 28 days;
+    uint32 GENESIS_REWARDS_TIMESTAMP = 1712188800;
+    uint32 activationDelay = 7 days;
+    uint16 globalCommissionBips = 1000;
 
     // struct used to encode token info in config file
     struct StrategyConfig {
@@ -59,6 +68,8 @@ contract DeployOpenEigenLayer is Script, Test {
     DelayedWithdrawalRouter public delayedWithdrawalRouterImplementation;
     AVSDirectory public avsDirectory;
     AVSDirectory public avsDirectoryImplementation;
+    RewardsCoordinator public rewardsCoordinator;
+    RewardsCoordinator public rewardsCoordinatorImplementation;
     UpgradeableBeacon public eigenPodBeacon;
     EigenPod public eigenPodImplementation;
     StrategyBase public baseStrategyImplementation;
@@ -115,6 +126,9 @@ contract DeployOpenEigenLayer is Script, Test {
         delayedWithdrawalRouter = DelayedWithdrawalRouter(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
+        rewardsCoordinator = RewardsCoordinator(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
+        );
 
         // ETH POS deposit is 0 address
         eigenPodImplementation = new EigenPod(
@@ -131,6 +145,15 @@ contract DeployOpenEigenLayer is Script, Test {
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
         delegationImplementation = new DelegationManager(strategyManager, slasher, eigenPodManager);
         avsDirectoryImplementation = new AVSDirectory(delegation);
+        rewardsCoordinatorImplementation = new RewardsCoordinator(
+            delegation,
+            strategyManager,
+            CALCULATION_INTERVAL_SECONDS,
+            MAX_REWARDS_DURATION,
+            MAX_RETROACTIVE_LENGTH,
+            MAX_FUTURE_LENGTH,
+            GENESIS_REWARDS_TIMESTAMP
+        );
         strategyManagerImplementation = new StrategyManager(delegation, eigenPodManager, slasher);
         slasherImplementation = new Slasher(strategyManager, delegation);
         eigenPodManagerImplementation = new EigenPodManager(
@@ -165,6 +188,19 @@ contract DeployOpenEigenLayer is Script, Test {
                 eigenLayerPauserReg,
                 0,
                 0
+            )
+        );
+        eigenLayerProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(rewardsCoordinator))),
+            address(rewardsCoordinatorImplementation),
+            abi.encodeWithSelector(
+                RewardsCoordinator.initialize.selector,
+                executorMultisig, 
+                eigenLayerPauserReg,
+                0, 
+                executorMultisig,
+                activationDelay,
+                globalCommissionBips
             )
         );
         eigenLayerProxyAdmin.upgradeAndCall(
