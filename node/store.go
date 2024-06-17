@@ -364,14 +364,15 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 	for _, chunk := range chunks {
 		totalSize += len(chunk) + 8 // Add size of uint64 for length
 	}
-	buf := make([]byte, totalSize)
+	result := make([]byte, totalSize)
+	buf := result
 	for _, chunk := range chunks {
 		binary.LittleEndian.PutUint64(buf, uint64(len(chunk)))
 		buf = buf[4:]
 		copy(buf, chunk)
 		buf = buf[len(chunk):]
 	}
-	return buf, nil
+	return result, nil
 }
 
 // Converts a flattened array of chunks into an array of its constituent chunks,
