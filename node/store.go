@@ -368,7 +368,7 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 	buf := result
 	for _, chunk := range chunks {
 		binary.LittleEndian.PutUint64(buf, uint64(len(chunk)))
-		buf = buf[4:]
+		buf = buf[8:]
 		copy(buf, chunk)
 		buf = buf[len(chunk):]
 	}
