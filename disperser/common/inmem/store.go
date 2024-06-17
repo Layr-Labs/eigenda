@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"sort"
 	"strconv"
 	"sync"
@@ -164,6 +165,21 @@ func (q *BlobStore) IncrementBlobRetryCount(ctx context.Context, existingMetadat
 	}
 
 	q.Metadata[existingMetadata.GetBlobKey()].NumRetries++
+	return nil
+}
+
+func (q *BlobStore) UpdateConfirmationBlockNumber(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint32) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if _, ok := q.Metadata[existingMetadata.GetBlobKey()]; !ok {
+		return disperser.ErrBlobNotFound
+	}
+
+	if q.Metadata[existingMetadata.GetBlobKey()].ConfirmationInfo == nil {
+		return fmt.Errorf("cannot update confirmation block number for blob without confirmation info: %s", existingMetadata.GetBlobKey().String())
+	}
+
+	q.Metadata[existingMetadata.GetBlobKey()].ConfirmationInfo.ConfirmationBlockNumber = confirmationBlockNumber
 	return nil
 }
 

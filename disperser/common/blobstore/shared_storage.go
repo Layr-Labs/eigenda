@@ -161,14 +161,19 @@ func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey di
 }
 
 func (s *SharedBlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationInfo *disperser.ConfirmationInfo) (*disperser.BlobMetadata, error) {
+	if existingMetadata == nil {
+		return nil, errors.New("metadata is nil")
+	}
 	newMetadata := *existingMetadata
 	newMetadata.BlobStatus = disperser.InsufficientSignatures
-	newMetadata.ConfirmationInfo = confirmationInfo
+	if confirmationInfo != nil {
+		newMetadata.ConfirmationInfo = confirmationInfo
+	}
 	return &newMetadata, s.blobMetadataStore.UpdateBlobMetadata(ctx, existingMetadata.GetBlobKey(), &newMetadata)
 }
 
-func (s *SharedBlobStore) MarkBlobFinalized(ctx context.Context, metadataKey disperser.BlobKey) error {
-	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Finalized)
+func (s *SharedBlobStore) MarkBlobFinalized(ctx context.Context, blobKey disperser.BlobKey) error {
+	return s.blobMetadataStore.SetBlobStatus(ctx, blobKey, disperser.Finalized)
 }
 
 func (s *SharedBlobStore) MarkBlobProcessing(ctx context.Context, metadataKey disperser.BlobKey) error {
@@ -183,6 +188,10 @@ func (s *SharedBlobStore) MarkBlobFailed(ctx context.Context, metadataKey disper
 
 func (s *SharedBlobStore) IncrementBlobRetryCount(ctx context.Context, existingMetadata *disperser.BlobMetadata) error {
 	return s.blobMetadataStore.IncrementNumRetries(ctx, existingMetadata)
+}
+
+func (s *SharedBlobStore) UpdateConfirmationBlockNumber(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint32) error {
+	return s.blobMetadataStore.UpdateConfirmationBlockNumber(ctx, existingMetadata, confirmationBlockNumber)
 }
 
 func (s *SharedBlobStore) GetBlobsByMetadata(ctx context.Context, metadata []*disperser.BlobMetadata) (map[disperser.BlobKey]*core.Blob, error) {

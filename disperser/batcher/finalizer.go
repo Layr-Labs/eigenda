@@ -193,12 +193,21 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 			continue
 		}
 
+		if confirmationBlockNumber != uint64(confirmationMetadata.ConfirmationInfo.ConfirmationBlockNumber) {
+			// Confirmation block number has changed due to reorg. Update the confirmation block number in the metadata
+			err := f.blobStore.UpdateConfirmationBlockNumber(ctx, m, uint32(confirmationBlockNumber))
+			if err != nil {
+				f.logger.Error("error updating confirmation block number", "blobKey", blobKey.String(), "err", err)
+				f.metrics.IncrementNumBlobs("failed")
+				continue
+			}
+		}
+
 		// Leave as confirmed if the reorged confirmation block is after the latest finalized block (not yet finalized)
 		if uint64(confirmationBlockNumber) > lastFinalBlock {
 			continue
 		}
 
-		confirmationMetadata.ConfirmationInfo.ConfirmationBlockNumber = uint32(confirmationBlockNumber)
 		err = f.blobStore.MarkBlobFinalized(ctx, blobKey)
 		if err != nil {
 			f.logger.Error("error marking blob as finalized", "blobKey", blobKey.String(), "err", err)

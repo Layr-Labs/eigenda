@@ -155,6 +155,8 @@ type BlobStore interface {
 	MarkBlobFailed(ctx context.Context, blobKey BlobKey) error
 	// IncrementBlobRetryCount increments the retry count of a blob
 	IncrementBlobRetryCount(ctx context.Context, existingMetadata *BlobMetadata) error
+	// UpdateConfirmationBlockNumber updates the confirmation block number of a blob
+	UpdateConfirmationBlockNumber(ctx context.Context, existingMetadata *BlobMetadata, confirmationBlockNumber uint32) error
 	// GetBlobsByMetadata retrieves a list of blobs given a list of metadata
 	GetBlobsByMetadata(ctx context.Context, metadata []*BlobMetadata) (map[BlobKey]*core.Blob, error)
 	// GetBlobMetadataByStatus returns a list of blob metadata for blobs with the given status

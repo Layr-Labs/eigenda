@@ -102,8 +102,17 @@ func TestSharedBlobStore(t *testing.T) {
 	assert.Nil(t, err)
 	assertMetadata(t, blobKey, blobSize, requestedAt, disperser.Confirmed, metadata1)
 
+	err = sharedStorage.UpdateConfirmationBlockNumber(ctx, metadata1, 151)
+	assert.Nil(t, err)
+	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
+	assert.Nil(t, err)
+	assert.Equal(t, uint32(151), metadata1.ConfirmationInfo.ConfirmationBlockNumber)
+
 	err = sharedStorage.MarkBlobFinalized(ctx, blobKey)
 	assert.Nil(t, err)
+	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
+	assert.Nil(t, err)
+	assert.Equal(t, disperser.Finalized, metadata1.BlobStatus)
 
 	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
 	assert.Nil(t, err)

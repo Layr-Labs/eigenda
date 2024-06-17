@@ -235,6 +235,30 @@ func (s *BlobMetadataStore) IncrementNumRetries(ctx context.Context, existingMet
 	return err
 }
 
+func (s *BlobMetadataStore) UpdateConfirmationBlockNumber(ctx context.Context, existingMetadata *disperser.BlobMetadata, confirmationBlockNumber uint32) error {
+	updated := *existingMetadata
+	if updated.ConfirmationInfo == nil {
+		return fmt.Errorf("failed to update confirmation block number because confirmation info is missing for blob key %s", existingMetadata.GetBlobKey().String())
+	}
+
+	updated.ConfirmationInfo.ConfirmationBlockNumber = confirmationBlockNumber
+	item, err := MarshalBlobMetadata(&updated)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.dynamoDBClient.UpdateItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"BlobHash": &types.AttributeValueMemberS{
+			Value: existingMetadata.BlobHash,
+		},
+		"MetadataHash": &types.AttributeValueMemberS{
+			Value: existingMetadata.MetadataHash,
+		},
+	}, item)
+
+	return err
+}
+
 func (s *BlobMetadataStore) UpdateBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey, updated *disperser.BlobMetadata) error {
 	item, err := MarshalBlobMetadata(updated)
 	if err != nil {

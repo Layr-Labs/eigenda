@@ -96,9 +96,14 @@ func TestBlobStore(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, disperser.Confirmed, updated.BlobStatus)
 
+	err = bs.UpdateConfirmationBlockNumber(ctx, updated, 151)
+	assert.Nil(t, err)
+
 	meta2, err = bs.GetBlobMetadata(ctx, blobKey2)
 	assert.Nil(t, err)
 	assert.Equal(t, meta2.BlobStatus, disperser.Confirmed)
+	assert.Equal(t, uint32(151), meta2.ConfirmationInfo.ConfirmationBlockNumber)
+
 	meta1, err = bs.GetBlobMetadata(ctx, blobKey1)
 	assert.Nil(t, err)
 	assert.Equal(t, meta1.BlobStatus, disperser.Processing)
