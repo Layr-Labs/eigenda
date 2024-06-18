@@ -7,25 +7,76 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/ethereum/go-ethereum/log"
+
+	proxy_common "github.com/Layr-Labs/eigenda-proxy/common"
+
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
-type Verifier struct {
-	prover *prover.Prover
+type Config struct {
+	Verify         bool
+	RPCURL         string
+	SvcManagerAddr string
+	KzgConfig      *kzg.KzgConfig
 }
 
-func NewVerifier(cfg *kzg.KzgConfig) (*Verifier, error) {
-	prover, err := prover.NewProver(cfg, false) // don't load G2 points
+type Verifier struct {
+	verifyCert bool
+	prover     *prover.Prover
+	cv         *CertVerifier
+}
+
+func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
+	var cv *CertVerifier
+	var err error
+
+	if cfg.Verify {
+		cv, err = NewCertVerifier(cfg, l)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	prover, err := prover.NewProver(cfg.KzgConfig, false) // don't load G2 points
 	if err != nil {
 		return nil, err
 	}
 
 	return &Verifier{
-		prover: prover,
+		verifyCert: cfg.Verify,
+		prover:     prover,
+		cv:         cv,
 	}, nil
+}
+
+func (v *Verifier) VerifyCert(cert *proxy_common.Certificate) error {
+	if !v.verifyCert {
+		return nil
+	}
+
+	// 1 - verify batch
+
+	header := binding.IEigenDAServiceManagerBatchHeader{
+		BlobHeadersRoot:       [32]byte(cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		QuorumNumbers:         cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumNumbers(),
+		ReferenceBlockNumber:  cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber(),
+		SignedStakeForQuorums: cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages(),
+	}
+
+	err := v.cv.VerifyBatch(&header, cert.BlobVerificationProof.BatchId, [32]byte(cert.BlobVerificationProof.BatchMetadata.SignatoryRecordHash), cert.BlobVerificationProof.BatchMetadata.GetConfirmationBlockNumber())
+	if err != nil {
+		return err
+	}
+
+	// 2 - TODO: verify merkle proof
+
+	// 3 - TODO: verify security params
+	return nil
 }
 
 func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
@@ -54,7 +105,7 @@ func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
 // Verify regenerates a commitment from the blob and asserts equivalence
 // to the commitment in the certificate
 // TODO: Optimize implementation by opening a point on the commitment instead
-func (v *Verifier) Verify(expectedCommit *common.G1Commitment, blob []byte) error {
+func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []byte) error {
 	actualCommit, err := v.Commit(blob)
 	if err != nil {
 		return err

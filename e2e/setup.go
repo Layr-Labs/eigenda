@@ -22,6 +22,7 @@ import (
 
 const (
 	privateKey = "SIGNER_PRIVATE_KEY"
+	ethRPC     = "ETHEREUM_RPC"
 	transport  = "http"
 	svcName    = "eigenda_proxy"
 	host       = "127.0.0.1"
@@ -43,6 +44,12 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		t.Fatal("SIGNER_PRIVATE_KEY environment variable not set")
 	}
 
+	// load node url from environment
+	ethRPC := os.Getenv(ethRPC)
+	if ethRPC != "" && !useMemory {
+		t.Fatal("ETHEREUM_RPC environment variable is not set")
+	}
+
 	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
 		Level:  log.LevelDebug,
 		Format: oplog.FormatLogFmt,
@@ -57,6 +64,8 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 			DisableTLS:               false,
 			SignerPrivateKeyHex:      pk,
 		},
+		EthRPC:                 ethRPC,
+		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
 		CacheDir:               "../operator-setup/resources/SRSTables",
 		G1Path:                 "../operator-setup/resources/g1_abbr.point",
 		G2Path:                 "../test/resources/kzg/g2.point", // do we need this?

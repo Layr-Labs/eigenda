@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -16,6 +17,8 @@ import (
 
 const (
 	RPCFlagName                          = "eigenda-rpc"
+	EthRPCFlagName                       = "eigenda-eth-rpc"
+	SvcManagerAddrFlagName               = "eigenda-svc-manager-addr"
 	StatusQueryRetryIntervalFlagName     = "eigenda-status-query-retry-interval"
 	StatusQueryTimeoutFlagName           = "eigenda-status-query-timeout"
 	DisableTlsFlagName                   = "eigenda-disable-tls"
@@ -43,6 +46,10 @@ type Config struct {
 
 	// The blob encoding version to use when writing blobs from the high level interface.
 	PutBlobEncodingVersion codecs.BlobEncodingVersion
+
+	// ETH vars
+	EthRPC         string
+	SvcManagerAddr string
 
 	// KZG vars
 	CacheDir string
@@ -73,14 +80,15 @@ func (c *Config) GetMaxBlobLength() (uint64, error) {
 	return c.maxBlobLengthBytes, nil
 }
 
-func (c *Config) KzgConfig() *kzg.KzgConfig {
+func (c *Config) VerificationCfg() *verify.Config {
 	numBytes, err := c.GetMaxBlobLength()
 	if err != nil {
 		panic(fmt.Errorf("Check() was not called on config object, err is not nil: %w", err))
 	}
 
 	numPointsNeeded := uint64(math.Ceil(float64(numBytes) / BytesPerSymbol))
-	return &kzg.KzgConfig{
+
+	kzgCfg := &kzg.KzgConfig{
 		G1Path:          c.G1Path,
 		G2PowerOf2Path:  c.G2PowerOfTauPath,
 		CacheDir:        c.CacheDir,
@@ -88,6 +96,21 @@ func (c *Config) KzgConfig() *kzg.KzgConfig {
 		SRSNumberToLoad: numPointsNeeded,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
+
+	if c.EthRPC == "" || c.SvcManagerAddr == "" {
+		return &verify.Config{
+			Verify:    false,
+			KzgConfig: kzgCfg,
+		}
+	}
+
+	return &verify.Config{
+		Verify:         true,
+		RPCURL:         c.EthRPC,
+		SvcManagerAddr: c.SvcManagerAddr,
+		KzgConfig:      kzgCfg,
+	}
+
 }
 
 // NewConfig parses the Config from the provided flags or environment variables.
@@ -109,6 +132,8 @@ func ReadConfig(ctx *cli.Context) Config {
 		G2PowerOfTauPath: ctx.String(G2TauFlagName),
 		CacheDir:         ctx.String(CachePathFlagName),
 		MaxBlobLength:    ctx.String(MaxBlobLengthFlagName),
+		SvcManagerAddr:   ctx.String(SvcManagerAddrFlagName),
+		EthRPC:           ctx.String(EthRPCFlagName),
 	}
 	return cfg
 }
@@ -198,6 +223,16 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    CachePathFlagName,
 			Usage:   "Directory path to SRS tables",
 			EnvVars: prefixEnvVars("TARGET_CACHE_PATH"),
+		},
+		&cli.StringFlag{
+			Name:    EthRPCFlagName,
+			Usage:   "JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs.",
+			EnvVars: prefixEnvVars("ETH_RPC"),
+		},
+		&cli.StringFlag{
+			Name:    SvcManagerAddrFlagName,
+			Usage:   "Deployed EigenDA service manager address.",
+			EnvVars: prefixEnvVars("SERVICE_MANAGER_ADDR"),
 		},
 	}
 }

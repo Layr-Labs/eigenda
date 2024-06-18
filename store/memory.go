@@ -120,7 +120,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte, domain eigendacommon.
 	}
 
 	// Don't need to do this really since it's a mock store
-	err = e.verifier.Verify(cert.BlobHeader.Commitment, encodedBlob)
+	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
 		return nil, err
 	}

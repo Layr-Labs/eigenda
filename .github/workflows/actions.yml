@@ -79,5 +79,6 @@ jobs:
     - name: Run holesky tests
       env: 
         SIGNER_PRIVATE_KEY:  ${{ secrets.SIGNER_PRIVATE_KEY }}
+        ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
       run: | 
         SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY make holesky-test
