@@ -286,3 +286,25 @@ func BenchmarkEncodeChunks(b *testing.B) {
 		_, _ = node.EncodeChunks(sampleChunks[i%numSamples])
 	}
 }
+
+func BenchmarkDecocodeChunks(b *testing.B) {
+	numSamples := 32
+	numChunks := 10
+	chunkSize := 2 * 1024
+	sampleChunks := make([][]byte, numSamples)
+	for n := 0; n < numSamples; n++ {
+		chunks := make([][]byte, numChunks)
+		for i := 0; i < numChunks; i++ {
+			chunk := make([]byte, chunkSize)
+			_, _ = cryptorand.Read(chunk)
+			chunks[i] = chunk
+		}
+		encoded, _ := node.EncodeChunks(chunks)
+		sampleChunks[n] = encoded
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = node.DecodeChunks(sampleChunks[i%numSamples])
+	}
+}

@@ -334,7 +334,7 @@ func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobInd
 	}
 	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
-	chunks, err := decodeChunks(data)
+	chunks, err := DecodeChunks(data)
 	if err != nil {
 		return nil, false
 	}
@@ -377,8 +377,8 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 // Converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly
 //
-// decodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
-func decodeChunks(data []byte) ([][]byte, error) {
+// DecodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
+func DecodeChunks(data []byte) ([][]byte, error) {
 	chunks := make([][]byte, 0)
 	buf := data
 	for len(buf) > 0 {
