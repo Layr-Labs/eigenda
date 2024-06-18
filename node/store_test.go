@@ -186,6 +186,25 @@ func CreateBatch(t *testing.T) (*core.BatchHeader, []*core.BlobMessage, []*pb.Bl
 	return &batchHeader, blobMessage, blobs
 }
 
+func TestEncodeDecodeChunks(t *testing.T) {
+	numSamples := 32
+	numChunks := 10
+	chunkSize := 2 * 1024
+	for n := 0; n < numSamples; n++ {
+		chunks := make([][]byte, numChunks)
+		for i := 0; i < numChunks; i++ {
+			chunk := make([]byte, chunkSize)
+			_, _ = cryptorand.Read(chunk)
+			chunks[i] = chunk
+		}
+		encoded, _ := node.EncodeChunks(chunks)
+		decoded, _ := node.DecodeChunks(encoded)
+		for i := 0; i < numChunks; i++ {
+			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
+		}
+	}
+}
+
 func TestStoringBlob(t *testing.T) {
 	staleMeasure := uint32(1)
 	storeDuration := uint32(1)
