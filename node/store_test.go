@@ -197,8 +197,10 @@ func TestEncodeDecodeChunks(t *testing.T) {
 			_, _ = cryptorand.Read(chunk)
 			chunks[i] = chunk
 		}
-		encoded, _ := node.EncodeChunks(chunks)
-		decoded, _ := node.DecodeChunks(encoded)
+		encoded, err := node.EncodeChunks(chunks)
+		assert.Nil(t, err)
+		decoded, err := node.DecodeChunks(encoded)
+		assert.Nil(t, err)
 		for i := 0; i < numChunks; i++ {
 			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
 		}
