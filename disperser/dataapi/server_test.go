@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/operators/ejector"
 	sdkmock "github.com/Layr-Labs/eigensdk-go/chainio/clients/mocks"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -386,7 +387,7 @@ func TestEjectOperatorHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.EjectionResponse
+	var response ejector.EjectionResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -455,14 +456,14 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 type ejectorComponents struct {
 	wallet    *sdkmock.MockWallet
 	ethClient *commonmock.MockEthClient
-	ejector   *dataapi.Ejector
+	ejector   *ejector.Ejector
 }
 
 func getEjector(t *testing.T) *ejectorComponents {
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
 	ethClient := &commonmock.MockEthClient{}
-	ejector := dataapi.NewEjector(w, ethClient, mockLogger, mockTx, metrics, 100*time.Millisecond, -1)
+	ejector := ejector.NewEjector(w, ethClient, mockLogger, mockTx, metrics.EjectorMetrics, 100*time.Millisecond, -1)
 	return &ejectorComponents{
 		wallet:    w,
 		ethClient: ethClient,
