@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"io"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -335,7 +334,7 @@ func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobInd
 	}
 	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
-	chunks, err := decodeChunks(data)
+	chunks, err := DecodeChunks(data)
 	if err != nil {
 		return nil, false
 	}
@@ -378,34 +377,24 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 // Converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly
 //
-// decodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
-func decodeChunks(data []byte) ([][]byte, error) {
-	buf := bytes.NewReader(data)
+// DecodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
+func DecodeChunks(data []byte) ([][]byte, error) {
 	chunks := make([][]byte, 0)
+	buf := data
+	for len(buf) > 0 {
+		if len(buf) < 8 {
+			return nil, errors.New("invalid data to decode")
+		}
+		chunkSize := binary.LittleEndian.Uint64(buf)
+		buf = buf[8:]
 
-	for {
-		var length uint64
-		err := binary.Read(buf, binary.LittleEndian, &length)
-		if errors.Is(err, io.EOF) {
-			break
+		if len(buf) < int(chunkSize) {
+			return nil, errors.New("invalid data to decode")
 		}
-		if err != nil {
-			return nil, err
-		}
-
-		chunk := make([]byte, length)
-		_, err = buf.Read(chunk)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
+		chunk := buf[:chunkSize]
+		buf = buf[chunkSize:]
 
 		chunks = append(chunks, chunk)
-		if buf.Len() < 8 {
-			break
-		}
 	}
 
 	return chunks, nil
