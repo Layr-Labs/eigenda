@@ -81,4 +81,4 @@ jobs:
         SIGNER_PRIVATE_KEY:  ${{ secrets.SIGNER_PRIVATE_KEY }}
         ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
       run: | 
-        SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY make holesky-test
+        SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY ETHEREUM_RPC=$ETHEREUM_RPC make holesky-test
