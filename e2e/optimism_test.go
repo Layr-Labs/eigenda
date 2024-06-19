@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 
 	"github.com/ethereum-optimism/optimism/op-e2e/actions"
+	"github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 	plasma "github.com/ethereum-optimism/optimism/op-plasma"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
@@ -50,6 +51,7 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 
 	log := testlog.Logger(t, log.LvlDebug)
 
+	config.DeployConfig.DACommitmentType = plasma.GenericCommitmentString
 	dp := e2eutils.MakeDeployParams(t, p)
 	dp.DeployConfig.DAChallengeProxy = common.Address{0x42}
 	sd := e2eutils.Setup(t, dp, defaultAlloc)
@@ -71,6 +73,8 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 	plasmaCfg, err := sd.RollupCfg.GetOPPlasmaConfig()
 	require.NoError(t, err)
 
+	plasmaCfg.CommitmentType = plasma.GenericCommitmentType
+
 	daMgr := plasma.NewPlasmaDAWithStorage(log, plasmaCfg, storage, &plasma.NoopMetrics{})
 
 	enabled := sd.RollupCfg.PlasmaEnabled()
@@ -87,7 +91,6 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 		storage:   storage,
 		daMgr:     daMgr,
 		plasmaCfg: plasmaCfg,
-		// contract:  contract,
 		batcher:   batcher,
 		sequencer: sequencer,
 		engine:    engine,
@@ -160,6 +163,6 @@ func TestOptimism(gt *testing.T) {
 	// assert that EigenDA proxy's was written and read from
 	stat := proxyTS.Server.Store().Stats()
 
-	require.Equal(t, stat.Entries, 1)
-	require.Equal(t, stat.Reads, 1)
+	require.Equal(t, 1, stat.Entries)
+	require.Equal(t, 1, stat.Reads)
 }

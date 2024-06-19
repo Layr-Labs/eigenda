@@ -33,7 +33,7 @@ const (
 type Commitment []byte
 
 func (c Commitment) Encode() []byte {
-	return append([]byte{byte(EigenDA), byte(EigenV0)}, c...)
+	return append([]byte{byte(op_plasma.GenericCommitmentType), byte(EigenDA), byte(EigenV0)}, c...)
 }
 
 func GenericPrefix(b []byte) []byte {
