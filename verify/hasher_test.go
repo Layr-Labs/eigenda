@@ -1,8 +1,12 @@
 package verify
 
 import (
+	"math/big"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
+	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
@@ -56,4 +60,76 @@ func TestHashBatchMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, actual.String(), expected)
 
+}
+
+func TestHashBlobHeader(t *testing.T) {
+	expected := "0xba4675a31c9bf6b2f7abfdcedd34b74645cb7332b35db39bff00ae8516a67393"
+
+	// [[1,1],2,[[2,4,5,6]]]
+	header := &disperser.BlobHeader{
+		Commitment: &eigenda_common.G1Commitment{
+			X: big.NewInt(1).Bytes(),
+			Y: big.NewInt(1).Bytes(),
+		},
+		DataLength: 2,
+		BlobQuorumParams: []*disperser.BlobQuorumParam{
+			{
+				QuorumNumber:                    2,
+				AdversaryThresholdPercentage:    4,
+				ConfirmationThresholdPercentage: 5,
+				ChunkLength:                     6,
+			},
+			{
+				QuorumNumber:                    2,
+				AdversaryThresholdPercentage:    4,
+				ConfirmationThresholdPercentage: 5,
+				ChunkLength:                     6,
+			},
+		},
+	}
+
+	cert := &common.Certificate{
+		BlobHeader: header,
+	}
+
+	actual, err := HashBlobHeader(cert.ReadBlobHeader())
+
+	require.NoError(t, err)
+	require.Equal(t, expected, actual.String())
+}
+
+func TestHashEncodeBlobHeader(t *testing.T) {
+	expected := "0xf15f43fa44bae9b74cd2f88f8f838e09ff7ab5d50f2170f07b98479eb7da98ba"
+
+	// [[1,1],2,[[2,4,5,6]]]
+	header := &disperser.BlobHeader{
+		Commitment: &eigenda_common.G1Commitment{
+			X: big.NewInt(1).Bytes(),
+			Y: big.NewInt(1).Bytes(),
+		},
+		DataLength: 2,
+		BlobQuorumParams: []*disperser.BlobQuorumParam{
+			{
+				QuorumNumber:                    2,
+				AdversaryThresholdPercentage:    4,
+				ConfirmationThresholdPercentage: 5,
+				ChunkLength:                     6,
+			},
+			{
+				QuorumNumber:                    2,
+				AdversaryThresholdPercentage:    4,
+				ConfirmationThresholdPercentage: 5,
+				ChunkLength:                     6,
+			},
+		},
+	}
+
+	cert := &common.Certificate{
+		BlobHeader: header,
+	}
+
+	actual, err := HashEncodeBlobHeader(cert.ReadBlobHeader())
+
+	require.NoError(t, err)
+	require.Equal(t, expected, actual.String())
 }

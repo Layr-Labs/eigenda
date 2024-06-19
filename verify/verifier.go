@@ -60,22 +60,30 @@ func (v *Verifier) VerifyCert(cert *proxy_common.Certificate) error {
 	}
 
 	// 1 - verify batch
-
 	header := binding.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:       [32]byte(cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-		QuorumNumbers:         cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumNumbers(),
-		ReferenceBlockNumber:  cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber(),
-		SignedStakeForQuorums: cert.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages(),
+		BlobHeadersRoot:       [32]byte(cert.Proof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+		QuorumNumbers:         cert.Proof().GetBatchMetadata().GetBatchHeader().GetQuorumNumbers(),
+		ReferenceBlockNumber:  cert.Proof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber(),
+		SignedStakeForQuorums: cert.Proof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages(),
 	}
 
-	err := v.cv.VerifyBatch(&header, cert.BlobVerificationProof.BatchId, [32]byte(cert.BlobVerificationProof.BatchMetadata.SignatoryRecordHash), cert.BlobVerificationProof.BatchMetadata.GetConfirmationBlockNumber())
+	err := v.cv.VerifyBatch(&header, cert.Proof().GetBatchId(), [32]byte(cert.Proof().BatchMetadata.GetSignatoryRecordHash()), cert.Proof().BatchMetadata.GetConfirmationBlockNumber())
 	if err != nil {
 		return err
 	}
 
-	// 2 - TODO: verify merkle proof
+	// 2 - verify merkle proof
+	err = v.cv.VerifyMerkleProof(cert.Proof().GetInclusionProof(), cert.BatchHeaderRoot(), cert.Proof().GetBlobIndex(), cert.ReadBlobHeader())
+	if err != nil {
+		return err
+	}
 
-	// 3 - TODO: verify security params
+	// 3 - verify security parameters
+	err = v.VerifySecurityParams(cert.ReadBlobHeader(), header)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -125,4 +133,63 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 	}
 
 	return nil
+}
+
+// VerifySecurityParams
+func (v *Verifier) VerifySecurityParams(blobHeader proxy_common.BlobHeader, batchHeader binding.IEigenDAServiceManagerBatchHeader) error {
+
+	confirmedQuorums := make(map[uint8]bool)
+
+	// require that the security param in each blob is met
+	for i := 0; i < len(blobHeader.QuorumBlobParams); i++ {
+		if batchHeader.QuorumNumbers[i] != blobHeader.QuorumBlobParams[i].QuorumNumber {
+			return fmt.Errorf("quorum number mismatch, expected: %d, got: %d", batchHeader.QuorumNumbers[i], blobHeader.QuorumBlobParams[i].QuorumNumber)
+		}
+
+		if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage > blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
+			return fmt.Errorf("adversary threshold percentage must be greater than or equal to confirmation threshold percentage")
+		}
+
+		quorumAdversaryThreshold, err := v.getQuorumAdversaryThreshold(blobHeader.QuorumBlobParams[i].QuorumNumber)
+		if err != nil {
+			log.Warn("failed to get quorum adversary threshold", "err", err)
+		}
+
+		if quorumAdversaryThreshold > 0 && blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage < quorumAdversaryThreshold {
+			return fmt.Errorf("adversary threshold percentage must be greater than or equal to quorum adversary threshold percentage")
+		}
+
+		if batchHeader.SignedStakeForQuorums[i] < blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
+			return fmt.Errorf("signed stake for quorum must be greater than or equal to confirmation threshold percentage")
+		}
+
+		confirmedQuorums[blobHeader.QuorumBlobParams[i].QuorumNumber] = true
+	}
+
+	requiredQuorums, err := v.cv.manager.QuorumNumbersRequired(nil)
+	if err != nil {
+		log.Warn("failed to get required quorum numbers", "err", err)
+	}
+
+	// ensure that required quorums are present in the confirmed ones
+	for _, quorum := range requiredQuorums {
+		if !confirmedQuorums[quorum] {
+			return fmt.Errorf("quorum %d is required but not present in confirmed quorums", quorum)
+		}
+	}
+
+	return nil
+}
+
+func (v *Verifier) getQuorumAdversaryThreshold(quorumNum uint8) (uint8, error) {
+	percentages, err := v.cv.manager.QuorumAdversaryThresholdPercentages(nil)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(percentages) > int(quorumNum) {
+		return percentages[quorumNum], nil
+	}
+
+	return 0, nil
 }

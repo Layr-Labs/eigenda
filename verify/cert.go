@@ -60,13 +60,27 @@ func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchH
 	return nil
 }
 
-// 2 - (TODO) merkle proof verification
+// VerifyMerkleProof
+func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, blobIndex uint32, blobHeader proxy_common.BlobHeader) error {
+	leafHash, err := HashEncodeBlobHeader(blobHeader)
+	if err != nil {
+		return err
+	}
 
-func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, rootHash []byte, leafHash []byte, index uint64) error {
+	generatedRoot, err := ProcessInclusionProof(inclusionProof, leafHash, uint64(blobIndex))
+	if err != nil {
+		return err
+	}
+
+	equal := proxy_common.EqualSlices(root, generatedRoot.Bytes())
+	if !equal {
+		return fmt.Errorf("root hash mismatch, expected: %x, got: %x", root, generatedRoot)
+	}
+
 	return nil
 }
 
 // 3 - (TODO) verify blob security params
-func (cv *CertVerifier) Verify(inclusionProof []byte, rootHash []byte, leafHash []byte, index uint64) error {
+func (cv *CertVerifier) VerifyBlobParams(inclusionProof []byte, rootHash []byte, leafHash []byte, index uint64) error {
 	return nil
 }

@@ -3,6 +3,7 @@ package verify
 import (
 	"encoding/binary"
 
+	common "github.com/Layr-Labs/eigenda-proxy/common"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	geth_common "github.com/ethereum/go-ethereum/common"
@@ -94,4 +95,51 @@ func HashBatchHashedMetadata(batchHeaderHash [32]byte, signatoryRecordHash [32]b
 	headerHash := crypto.Keccak256Hash(bytes)
 
 	return headerHash, nil
+}
+
+// HashBlobHeader function to hash BlobHeader
+func HashBlobHeader(blobHeader common.BlobHeader) (geth_common.Hash, error) {
+
+	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
+			{Name: "X", Type: "uint256"},
+			{Name: "Y", Type: "uint256"},
+		}},
+		{Name: "dataLength", Type: "uint32"},
+		{Name: "quorumBlobParams", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
+			{Name: "quorumNumber", Type: "uint8"},
+			{Name: "adversaryThresholdPercentage", Type: "uint8"},
+			{Name: "confirmationThresholdPercentage", Type: "uint8"},
+			{Name: "chunkLength", Type: "uint32"},
+		}},
+	})
+	if err != nil {
+		return geth_common.Hash{}, err
+	}
+
+	// Create ABI arguments
+	arguments := abi.Arguments{
+		{Type: blobHeaderType},
+	}
+
+	// Pack the BlobHeader
+	bytes, err := arguments.Pack(blobHeader)
+	if err != nil {
+		return geth_common.Hash{}, err
+	}
+	// Hash the packed bytes using Keccak256
+	hash := crypto.Keccak256Hash(bytes)
+	return hash, nil
+}
+
+// Function to hash and encode header
+func HashEncodeBlobHeader(header common.BlobHeader) (geth_common.Hash, error) {
+	// Hash the BlobHeader
+	blobHash, err := HashBlobHeader(header)
+	if err != nil {
+		return geth_common.Hash{}, err
+	}
+
+	finalHash := crypto.Keccak256Hash(blobHash.Bytes())
+	return finalHash, nil
 }
