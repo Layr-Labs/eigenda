@@ -1,4 +1,4 @@
-package dataapi
+package ejector
 
 import (
 	"context"
@@ -16,11 +16,32 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
+	"google.golang.org/grpc/codes"
 )
 
 const (
 	maxSendTransactionRetry = 3
 	queryTickerDuration     = 3 * time.Second
+)
+
+type EjectionResponse struct {
+	TransactionHash string `json:"transaction_hash"`
+}
+
+type NonSignerMetric struct {
+	OperatorId           string  `json:"operator_id"`
+	OperatorAddress      string  `json:"operator_address"`
+	QuorumId             uint8   `json:"quorum_id"`
+	TotalUnsignedBatches int     `json:"total_unsigned_batches"`
+	Percentage           float64 `json:"percentage"`
+	StakePercentage      float64 `json:"stake_percentage"`
+}
+
+type Mode string
+
+const (
+	PeriodicMode Mode = "periodic"
+	UrgentMode   Mode = "urgent"
 )
 
 // stakeShareToSLA returns the SLA for a given stake share in a quorum.
@@ -49,7 +70,7 @@ func operatorPerfScore(stakeShare float64, nonsigningRate float64) float64 {
 	return perf / (1.0 + perf)
 }
 
-func computePerfScore(metric *OperatorNonsigningPercentageMetrics) float64 {
+func computePerfScore(metric *NonSignerMetric) float64 {
 	return operatorPerfScore(metric.StakePercentage, metric.Percentage)
 }
 
@@ -78,12 +99,12 @@ func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logg
 	}
 }
 
-func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigningPercentage) (*EjectionResponse, error) {
+func (e *Ejector) Eject(ctx context.Context, nonsignerMetrics []*NonSignerMetric, mode Mode) (*EjectionResponse, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	nonsigners := make([]*OperatorNonsigningPercentageMetrics, 0)
-	for _, metric := range nonsigningRate.Data {
+	nonsigners := make([]*NonSignerMetric, 0)
+	for _, metric := range nonsignerMetrics {
 		// If nonsigningRateThreshold is set and valid, we will only eject operators with
 		// nonsigning rate >= nonsigningRateThreshold.
 		if e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100 && metric.Percentage < float64(e.nonsigningRateThreshold) {
@@ -110,11 +131,13 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 
 	operatorsByQuorum, err := e.convertOperators(nonsigners)
 	if err != nil {
+		e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 		return nil, err
 	}
 
 	txn, err := e.transactor.BuildEjectOperatorsTxn(ctx, operatorsByQuorum)
 	if err != nil {
+		e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 		e.logger.Error("Failed to build ejection transaction", "err", err)
 		return nil, err
 	}
@@ -124,11 +147,13 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 	for retryFromFailure < maxSendTransactionRetry {
 		gasTipCap, gasFeeCap, err := e.ethClient.GetLatestGasCaps(ctx)
 		if err != nil {
+			e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 			return nil, fmt.Errorf("failed to get latest gas caps: %w", err)
 		}
 
 		txn, err = e.ethClient.UpdateGas(ctx, txn, big.NewInt(0), gasTipCap, gasFeeCap)
 		if err != nil {
+			e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 			return nil, fmt.Errorf("failed to update gas price: %w", err)
 		}
 		txID, err = e.wallet.SendTransaction(ctx, txn)
@@ -142,6 +167,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 			retryFromFailure++
 			continue
 		} else if err != nil {
+			e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 			return nil, fmt.Errorf("failed to send txn %s: %w", txn.Hash().Hex(), err)
 		} else {
 			e.logger.Debug("successfully sent txn", "txID", txID, "txHash", txn.Hash().Hex())
@@ -165,9 +191,11 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 		} else if errors.Is(err, walletsdk.ErrNotYetBroadcasted) {
 			e.logger.Warn("Transaction has not been broadcasted to network but attempted to retrieve receipt", "err", err)
 		} else if errors.Is(err, walletsdk.ErrTransactionFailed) {
+			e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 			e.logger.Error("Transaction failed", "txID", txID, "txHash", txn.Hash().Hex(), "err", err)
 			return nil, err
 		} else {
+			e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 			e.logger.Error("Transaction receipt retrieval failed", "err", err)
 			return nil, err
 		}
@@ -175,6 +203,7 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 		// Wait for the next round.
 		select {
 		case <-ctxWithTimeout.Done():
+			e.metrics.IncrementEjectionRequest(mode, codes.Internal)
 			return nil, ctxWithTimeout.Err()
 		case <-queryTicker.C:
 		}
@@ -189,10 +218,11 @@ func (e *Ejector) Eject(ctx context.Context, nonsigningRate *OperatorsNonsigning
 		TransactionHash: receipt.TxHash.Hex(),
 	}
 
+	e.metrics.IncrementEjectionRequest(mode, codes.OK)
 	return ejectionResponse, nil
 }
 
-func (e *Ejector) convertOperators(nonsigners []*OperatorNonsigningPercentageMetrics) ([][]core.OperatorID, error) {
+func (e *Ejector) convertOperators(nonsigners []*NonSignerMetric) ([][]core.OperatorID, error) {
 	var maxQuorumId uint8
 	for _, metric := range nonsigners {
 		if metric.QuorumId > maxQuorumId {

@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	"github.com/Layr-Labs/eigenda/operators/ejector"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
@@ -124,7 +125,7 @@ func RunDataApi(ctx *cli.Context) error {
 			subgraphClient,
 			tx,
 			chainState,
-			dataapi.NewEjector(wallet, client, logger, tx, metrics, config.TxnTimeout, config.NonsigningRateThreshold),
+			ejector.NewEjector(wallet, client, logger, tx, metrics.EjectorMetrics, config.TxnTimeout, config.NonsigningRateThreshold),
 			logger,
 			metrics,
 			nil,

@@ -15,8 +15,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/operators/ejector"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -94,10 +94,6 @@ type (
 		Timestamp  uint64  `json:"timestamp"`
 	}
 
-	EjectionResponse struct {
-		TransactionHash string `json:"transaction_hash"`
-	}
-
 	Meta struct {
 		Size int `json:"size"`
 	}
@@ -170,7 +166,7 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
-		ejector        *Ejector
+		ejector        *ejector.Ejector
 		ejectionToken  string
 
 		metrics                   *Metrics
@@ -189,7 +185,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
-	ejector *Ejector,
+	ejector *ejector.Ejector,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -344,9 +340,9 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 		return
 	}
 
-	mode := "periodic"
-	if c.Query("mode") != "" {
-		mode = c.Query("mode")
+	mode := ejector.PeriodicMode
+	if c.Query("mode") == "urgent" {
+		mode = ejector.UrgentMode
 	}
 
 	endTime := time.Now()
@@ -355,7 +351,6 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("EjectOperators")
-			s.metrics.IncrementEjectionRequest(mode, codes.InvalidArgument)
 			errorResponse(c, err)
 			return
 		}
@@ -367,18 +362,27 @@ func (s *server) EjectOperatorsHandler(c *gin.Context) {
 	}
 
 	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
-	var ejectionResponse *EjectionResponse
+	var ejectionResponse *ejector.EjectionResponse
 	if err == nil {
-		ejectionResponse, err = s.ejector.Eject(c.Request.Context(), nonSigningRate)
+		nonSigningMetrics := make([]*ejector.NonSignerMetric, 0)
+		for _, metric := range nonSigningRate.Data {
+			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
+				OperatorId:           metric.OperatorId,
+				OperatorAddress:      metric.OperatorAddress,
+				QuorumId:             metric.QuorumId,
+				TotalUnsignedBatches: metric.TotalUnsignedBatches,
+				Percentage:           metric.Percentage,
+				StakePercentage:      metric.StakePercentage,
+			})
+		}
+		ejectionResponse, err = s.ejector.Eject(c.Request.Context(), nonSigningMetrics, mode)
 	}
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("EjectOperators")
-		s.metrics.IncrementEjectionRequest(mode, codes.Internal)
 		errorResponse(c, err)
 		return
 	}
 	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
-	s.metrics.IncrementEjectionRequest(mode, codes.OK)
 	c.JSON(http.StatusOK, ejectionResponse)
 }
 
