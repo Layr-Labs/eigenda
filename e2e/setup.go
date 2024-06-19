@@ -46,7 +46,7 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 
 	// load node url from environment
 	ethRPC := os.Getenv(ethRPC)
-	if ethRPC != "" && !useMemory {
+	if ethRPC == "" && !useMemory {
 		t.Fatal("ETHEREUM_RPC environment variable is not set")
 	}
 
