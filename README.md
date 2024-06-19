@@ -38,7 +38,8 @@ An ephemeral memory store backend can be used for faster feedback testing when p
 ## Running Locally
 
 1. Compile binary: `make eigenda-proxy`
-2. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path e2e/resources/kzg/g1.point --eigenda-g2-tau-path e2e/resources/kzg/g2.point.powerOf2 --eigenda-use-tls true`
+2. Generate a new private key and save it as `EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX` env var without the `0x` prefix.
+3. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path e2e/resources/kzg/g1.point --eigenda-g2-tau-path e2e/resources/kzg/g2.point.powerOf2 --eigenda-max-blob-length='90Kib'`
 
 **Env File**
 An env file can be provided to the binary for runtime process ingestion; e.g:
