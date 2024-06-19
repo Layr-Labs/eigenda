@@ -14,7 +14,7 @@ import (
 
 const (
 	// NOTE: this will need to be updated as plasma's implementation changes
-	decodingOffset = 2
+	decodingOffset = 3
 )
 
 // TODO: Add support for custom http client option
@@ -71,7 +71,7 @@ func (c *client) GetData(ctx context.Context, cert *common.Certificate, domain c
 	}
 
 	// encode prefix bytes
-	b = eigenda.GenericPrefix(eigenda.Commitment(b).Encode())
+	b = eigenda.Commitment(b).Encode()
 
 	url := fmt.Sprintf("%s/get/0x%x?domain=%s", c.cfg.URL, b, domain.String())
 
