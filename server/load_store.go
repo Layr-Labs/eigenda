@@ -34,7 +34,7 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store,
 		return store.NewMemStore(ctx, &cfg.MemStoreCfg, verifier, log, maxBlobLength)
 	}
 
-	log.Info("Using eigenda backend")
+	log.Info("Using EigenDA backend")
 	client, err := clients.NewEigenDAClient(log, daCfg.ClientConfig)
 	if err != nil {
 		return nil, err
