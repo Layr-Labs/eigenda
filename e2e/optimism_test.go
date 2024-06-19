@@ -73,7 +73,7 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 	plasmaCfg, err := sd.RollupCfg.GetOPPlasmaConfig()
 	require.NoError(t, err)
 
-	plasmaCfg.ChallengeWindow = 1000
+	plasmaCfg.CommitmentType = plasma.GenericCommitmentType
 
 	daMgr := plasma.NewPlasmaDAWithStorage(log, plasmaCfg, storage, &plasma.NoopMetrics{})
 
@@ -91,7 +91,6 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 		storage:   storage,
 		daMgr:     daMgr,
 		plasmaCfg: plasmaCfg,
-		// contract:  contract,
 		batcher:   batcher,
 		sequencer: sequencer,
 		engine:    engine,
