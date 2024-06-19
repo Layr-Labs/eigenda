@@ -149,12 +149,6 @@ func TestOptimism(gt *testing.T) {
 
 	// verify
 	op_stack.sequencer.ActL2PipelineFull(t)
-
-	// expire the challenge window so these blocks can no longer be challenged
-	op_stack.ActL1Blocks(t, op_stack.plasmaCfg.ChallengeWindow)
-
-	// advance derivation and finalize plasma via the L1 signal
-	op_stack.sequencer.ActL2PipelineFull(t)
 	op_stack.ActL1Finalized(t)
 
 	// assert that EigenDA proxy's was written and read from
