@@ -72,7 +72,7 @@ func (v *Verifier) VerifyCert(cert *proxy_common.Certificate) error {
 		return err
 	}
 
-	// 2 - verify merkle proof
+	// 2 - verify merkle inclusion proof
 	err = v.cv.VerifyMerkleProof(cert.Proof().GetInclusionProof(), cert.BatchHeaderRoot(), cert.Proof().GetBlobIndex(), cert.ReadBlobHeader())
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 	return nil
 }
 
-// VerifySecurityParams
+// VerifySecurityParams ensures that returned security parameters are valid
 func (v *Verifier) VerifySecurityParams(blobHeader proxy_common.BlobHeader, batchHeader binding.IEigenDAServiceManagerBatchHeader) error {
 
 	confirmedQuorums := make(map[uint8]bool)
@@ -181,6 +181,8 @@ func (v *Verifier) VerifySecurityParams(blobHeader proxy_common.BlobHeader, batc
 	return nil
 }
 
+// getQuorumAdversaryThreshold reads the adversarial threshold percentage for a given quorum number
+// returns 0 if DNE
 func (v *Verifier) getQuorumAdversaryThreshold(quorumNum uint8) (uint8, error) {
 	percentages, err := v.cv.manager.QuorumAdversaryThresholdPercentages(nil)
 	if err != nil {
