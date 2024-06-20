@@ -458,6 +458,9 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 			if err != nil {
 				return nil, err
 			}
+			if quorum < 0 || 255 < quorum {
+				return nil, fmt.Errorf("Given quorum ID %d is not between 0 and 255", quorum)
+			}
 			quorumNumbers = append(quorumNumbers, uint8(quorum))
 		}
 		parsed[i] = &OperatorQuorum{

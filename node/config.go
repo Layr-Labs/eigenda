@@ -93,6 +93,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		if val < 0 || 255 < val {
+			return nil, fmt.Errorf("Given quorum ID %d is not between 0 and 255", val)
+		}
 		ids = append(ids, core.QuorumID(val))
 	}
 	if len(ids) == 0 {
