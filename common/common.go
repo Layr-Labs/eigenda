@@ -14,7 +14,7 @@ var (
 
 type Certificate = disperser.BlobInfo
 
-// DomainType is a enumeration type for the different data domains for which a
+// DomainType is an enumeration type for the different data domains for which a
 // blob can exist between
 type DomainType uint8
 
