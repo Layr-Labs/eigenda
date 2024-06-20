@@ -10,12 +10,18 @@ import (
 )
 
 func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store, error) {
-	log.Info("Using eigenda backend")
 	daCfg := cfg.EigenDAConfig
+	vCfg := daCfg.VerificationCfg()
 
-	verifier, err := verify.NewVerifier(daCfg.KzgConfig())
+	verifier, err := verify.NewVerifier(vCfg, log)
 	if err != nil {
 		return nil, err
+	}
+
+	if vCfg.Verify {
+		log.Info("Certificate verification with Ethereum enabled")
+	} else {
+		log.Warn("Verification disabled")
 	}
 
 	maxBlobLength, err := daCfg.GetMaxBlobLength()
@@ -28,6 +34,7 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (store.Store,
 		return store.NewMemStore(ctx, &cfg.MemStoreCfg, verifier, log, maxBlobLength)
 	}
 
+	log.Info("Using eigenda backend")
 	client, err := clients.NewEigenDAClient(log, daCfg.ClientConfig)
 	if err != nil {
 		return nil, err

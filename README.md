@@ -28,12 +28,27 @@ Additional CLI args are provided for targeting an EigenDA network backend:
 * `--eigenda-cache-path`: Directory path to dump cached SRS tables
 * `--eigenda-max-blob-length`: The maximum blob length that this EigenDA sidecar proxy should expect to be written or read from EigenDA. This configuration setting is used to determine how many SRS points should be loaded into memory for generating/verifying KZG commitments returned by the EigenDA disperser. Valid byte units are either base-2 or base-10 byte amounts (not bits), e.g. `30 MiB`, `4Kb`, `30MB`. The maximum blob size is a little more than `1GB`.
 
+
+### Certificate verification
+For additional security, there is a cert verification feature which verifies the blob metadata read from the disperser to ensure that:
+1. The respective batch hash can be computed locally and matches the one persisted on-chain in the `ServiceManager` contract
+2. The blob inclusion proof can be merkalized to generate the proper batch root
+3. All quorum params are adequately defined and expressed when compared to their on-chain counterparts
+
+To target this feature, the following CLI args should be provided:
+* `--eigenda-svc-manager-addr`: The deployed EigenDA service manager address. The list can be found [here](https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment).
+* `--eigenda-eth-rpc` : JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list [here](https://docs.eigenlayer.xyz/eigenda/networks/).
+
+
 ### In-Memory Storage
 
 An ephemeral memory store backend can be used for faster feedback testing when performing rollup integrations. The following cli args can be used to target the feature:
 
 * `--memstore.enabled`: Boolean feature flag
 * `--memstore.expiration`: Duration for which a blob will exist
+
+## Metrics 
+To the see list of available metrics, run `./bin/eigenda-proxy doc metrics`
 
 ## Running Locally
 

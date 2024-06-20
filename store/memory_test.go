@@ -29,7 +29,13 @@ func TestGetSet(t *testing.T) {
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
-	verifier, err := verify.NewVerifier(kzgConfig)
+
+	cfg := &verify.Config{
+		Verify:    false,
+		KzgConfig: kzgConfig,
+	}
+
+	verifier, err := verify.NewVerifier(cfg, nil)
 	assert.NoError(t, err)
 
 	ms, err := NewMemStore(
@@ -68,7 +74,13 @@ func TestExpiration(t *testing.T) {
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
-	verifier, err := verify.NewVerifier(kzgConfig)
+
+	cfg := &verify.Config{
+		Verify:    false,
+		KzgConfig: kzgConfig,
+	}
+
+	verifier, err := verify.NewVerifier(cfg, nil)
 	assert.NoError(t, err)
 
 	ms, err := NewMemStore(

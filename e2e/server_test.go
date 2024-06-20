@@ -36,7 +36,7 @@ func TestPlasmaClient(t *testing.T) {
 
 	// 1 - write arbitrary data to EigenDA
 
-	var testPreimage = []byte("inter-subjective and not objective!")
+	var testPreimage = []byte("feel the rain on your skin!")
 
 	t.Log("Setting input data on proxy server...")
 	commit, err := daClient.SetInput(ts.Ctx, testPreimage)

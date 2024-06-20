@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVerification(t *testing.T) {
+func TestCommitmentVerification(t *testing.T) {
 	t.Parallel()
 
 	var data = []byte("inter-subjective and not objective!")
@@ -36,19 +36,24 @@ func TestVerification(t *testing.T) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	v, err := NewVerifier(kzgConfig)
+	cfg := &Config{
+		Verify:    false,
+		KzgConfig: kzgConfig,
+	}
+
+	v, err := NewVerifier(cfg, nil)
 	assert.NoError(t, err)
 
 	// Happy path verification
 	codec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
 	blob, err := codec.EncodeBlob(data)
 	assert.NoError(t, err)
-	err = v.Verify(c, blob)
+	err = v.VerifyCommitment(c, blob)
 	assert.NoError(t, err)
 
 	// failure with wrong data
 	fakeData, err := codec.EncodeBlob([]byte("I am an imposter!!"))
 	assert.NoError(t, err)
-	err = v.Verify(c, fakeData)
+	err = v.VerifyCommitment(c, fakeData)
 	assert.Error(t, err)
 }
