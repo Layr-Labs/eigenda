@@ -42,7 +42,7 @@ func New(cfg *Config) ProxyClient {
 	}
 }
 
-// Health indicates if server is operational; useful for event based awaits
+// Health indicates if the server is operational; useful for event based awaits
 // when integration testing
 func (c *client) Health() error {
 	url := c.cfg.URL + "/health"

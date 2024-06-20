@@ -31,7 +31,7 @@ func TestPlasmaClient(t *testing.T) {
 
 	daClient := op_plasma.NewDAClient(ts.Address(), false, false)
 	t.Log("Waiting for client to establish connection with plasma server...")
-	// wait for server to come online after starting
+	// wait for the server to come online after starting
 	time.Sleep(5 * time.Second)
 
 	// 1 - write arbitrary data to EigenDA
