@@ -88,7 +88,7 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	return bytes, nil
 }
 
-// Entries is a no-op for EigenDA Store
+// Entries are a no-op for EigenDA Store
 func (e EigenDAStore) Stats() *common.Stats {
 	return nil
 }
