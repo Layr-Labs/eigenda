@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	RPCFlagName                          = "eigenda-rpc"
+	EigenDADisperserRPCFlagName          = "eigenda-disperser-rpc"
 	EthRPCFlagName                       = "eigenda-eth-rpc"
 	SvcManagerAddrFlagName               = "eigenda-svc-manager-addr"
 	StatusQueryRetryIntervalFlagName     = "eigenda-status-query-retry-interval"
@@ -118,7 +118,7 @@ func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
 		ClientConfig: clients.EigenDAClientConfig{
 			/* Required Flags */
-			RPC:                          ctx.String(RPCFlagName),
+			RPC:                          ctx.String(EigenDADisperserRPCFlagName),
 			StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
 			StatusQueryTimeout:           ctx.Duration(StatusQueryTimeoutFlagName),
 			DisableTLS:                   ctx.Bool(DisableTlsFlagName),
@@ -152,9 +152,9 @@ func CLIFlags(envPrefix string) []cli.Flag {
 	}
 	return []cli.Flag{
 		&cli.StringFlag{
-			Name:    RPCFlagName,
+			Name:    EigenDADisperserRPCFlagName,
 			Usage:   "RPC endpoint of the EigenDA disperser.",
-			EnvVars: prefixEnvVars("RPC"),
+			EnvVars: prefixEnvVars("EIGENDA_DISPERSER_RPC"),
 		},
 		&cli.DurationFlag{
 			Name:    StatusQueryTimeoutFlagName,
@@ -213,16 +213,19 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    G1PathFlagName,
 			Usage:   "Directory path to g1.point file",
 			EnvVars: prefixEnvVars("TARGET_KZG_G1_PATH"),
+			Value:   "resources/g1.point",
 		},
 		&cli.StringFlag{
 			Name:    G2TauFlagName,
 			Usage:   "Directory path to g2.point.powerOf2 file",
 			EnvVars: prefixEnvVars("TARGET_G2_TAU_PATH"),
+			Value:   "resources/g2.point.powerOf2",
 		},
 		&cli.StringFlag{
 			Name:    CachePathFlagName,
 			Usage:   "Directory path to SRS tables",
 			EnvVars: prefixEnvVars("TARGET_CACHE_PATH"),
+			Value:   "resources/SRSTables/",
 		},
 		&cli.StringFlag{
 			Name:    EthRPCFlagName,

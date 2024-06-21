@@ -1,3 +1,0 @@
-[submodule "operator-setup"]
-	path = operator-setup
-	url = https://github.com/Layr-Labs/eigenda-operator-setup.git

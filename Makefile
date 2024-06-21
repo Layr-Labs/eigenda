@@ -54,11 +54,6 @@ gosec:
 submodules:
 	git submodule update --init --recursive
 
-srs:
-	if ! test -f /operator-setup/resources/g1.point; then \
-		cd operator-setup && ./srs_setup.sh; \
-	fi
-
 op-devnet-allocs:
 	@echo "Generating devnet allocs..."
 	@./scripts/op-devnet-allocs.sh

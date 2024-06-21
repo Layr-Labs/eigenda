@@ -16,10 +16,10 @@ func TestCommitmentVerification(t *testing.T) {
 
 	var data = []byte("inter-subjective and not objective!")
 
-	x, err := hex.DecodeString("2fc55f968a2d29d22aebf55b382528d1d9401577c166483e162355b19d8bc446")
+	x, err := hex.DecodeString("1021d699eac68ce312196d480266e8b82fd5fe5c4311e53313837b64db6df178")
 	assert.NoError(t, err)
 
-	y, err := hex.DecodeString("149e2241c21c391e069b9f317710c7f57f31ee88245a5e61f0d294b11acf9aff")
+	y, err := hex.DecodeString("02efa5a7813233ae13f32bae9b8f48252fa45c1b06a5d70bed471a9bea8d98ae")
 	assert.NoError(t, err)
 
 	c := &common.G1Commitment{
@@ -28,9 +28,9 @@ func TestCommitmentVerification(t *testing.T) {
 	}
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../e2e/resources/kzg/g1.point",
-		G2PowerOf2Path:  "../e2e/resources/kzg/g2.point.powerOf2",
-		CacheDir:        "../e2e/resources/kzg/SRSTables",
+		G1Path:          "../resources/g1.point",
+		G2PowerOf2Path:  "../resources/g2.point.powerOf2",
+		CacheDir:        "../resources/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
