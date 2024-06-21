@@ -197,6 +197,7 @@ func TestEncodeDecodeChunks(t *testing.T) {
 			_, _ = cryptorand.Read(chunk)
 			chunks[i] = chunk
 		}
+		// Compact encoding
 		encoded, err := node.EncodeChunks(chunks)
 		assert.Nil(t, err)
 		decoded, err := node.DecodeChunks(encoded)
@@ -204,6 +205,15 @@ func TestEncodeDecodeChunks(t *testing.T) {
 		for i := 0; i < numChunks; i++ {
 			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
 		}
+		// Uncompact encoding
+		encoded, err = node.EncodeChunksUncompact(chunks)
+		assert.Nil(t, err)
+		decoded, err = node.DecodeChunks(encoded)
+		assert.Nil(t, err)
+		for i := 0; i < numChunks; i++ {
+			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
+		}
+
 	}
 }
 

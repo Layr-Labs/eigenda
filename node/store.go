@@ -19,6 +19,11 @@ const (
 	// How many batches to delete in one atomic operation during the expiration
 	// garbage collection.
 	numBatchesToDeleteAtomically = 8
+
+	// Chunks encoding masks.
+	uncompactedFormat = byte(0b00000000)
+	compactedFormat   = byte(0b00100000)
+	formatMask        = byte(0b11100000)
 )
 
 var ErrBatchAlreadyExist = errors.New("batch already exists")
@@ -357,8 +362,39 @@ func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
 
 // Flattens an array of byte arrays (chunks) into a single byte array
 //
-// EncodeChunks(chunks) = (len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)
+// The first 3 bits of the result are indicating the encoding format, currently
+// support:
+//   - 000: The chunks are encoded as
+//     (000 <61 bits for len(chunk[0])>, chunks[0], <64 bits len(chunks[1])>, chunks[1], ...)
+//   - 001: The chunks are encoded as
+//     (001 <61 bits for len(chunk([0])> chunks[0], chunk[1], ...)
+//
+// The second format assumes the same size for all chunks.
+// In either case, the chunk size has to be less than 2^61.
+//
+// EncodeChunks implements encoding format "001"
 func EncodeChunks(chunks [][]byte) ([]byte, error) {
+	totalSize := 0
+	for _, chunk := range chunks {
+		totalSize += len(chunk)
+	}
+	result := make([]byte, totalSize+8)
+	if len(chunks) == 0 {
+		return result, nil
+	}
+	buf := result
+	chunkSize := uint64(len(chunks[0])) | (1 << 61)
+	binary.LittleEndian.PutUint64(buf, chunkSize)
+	buf = buf[8:]
+	for _, chunk := range chunks {
+		copy(buf, chunk)
+		buf = buf[len(chunk):]
+	}
+	return result, nil
+}
+
+// EncodeChunksUncompact implements encoding format "000"
+func EncodeChunksUncompact(chunks [][]byte) ([]byte, error) {
 	totalSize := 0
 	for _, chunk := range chunks {
 		totalSize += len(chunk) + 8 // Add size of uint64 for length
@@ -374,11 +410,7 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 	return result, nil
 }
 
-// Converts a flattened array of chunks into an array of its constituent chunks,
-// throwing an error in case the chunks were not serialized correctly
-//
-// DecodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
-func DecodeChunks(data []byte) ([][]byte, error) {
+func decodeUncompactedChunks(data []byte) ([][]byte, error) {
 	chunks := make([][]byte, 0)
 	buf := data
 	for len(buf) > 0 {
@@ -391,13 +423,50 @@ func DecodeChunks(data []byte) ([][]byte, error) {
 		if len(buf) < int(chunkSize) {
 			return nil, errors.New("invalid data to decode")
 		}
-		chunk := buf[:chunkSize]
+		chunks = append(chunks, buf[:chunkSize])
 		buf = buf[chunkSize:]
-
-		chunks = append(chunks, chunk)
 	}
-
 	return chunks, nil
+}
+
+func decodeCompactedChunks(data []byte) ([][]byte, error) {
+	if len(data) < 8 {
+		return nil, errors.New("invalid compact data to decode")
+	}
+	// Parse the chunk size
+	meta := make([]byte, 8)
+	for i := 0; i < 8; i++ {
+		meta[i] = data[i]
+	}
+	meta[7] &= ^formatMask
+	chunkSize := binary.LittleEndian.Uint64(meta)
+	// Decode
+	chunks := make([][]byte, 0)
+	buf := data[8:]
+	for len(buf) > 0 {
+		if len(buf) < int(chunkSize) {
+			return nil, errors.New("invalid compact data to decode")
+		}
+		chunks = append(chunks, buf[:chunkSize])
+		buf = buf[chunkSize:]
+	}
+	return chunks, nil
+}
+
+// Converts a flattened array of chunks into an array of its constituent chunks,
+// throwing an error in case the chunks were not serialized correctly
+func DecodeChunks(data []byte) ([][]byte, error) {
+	if len(data) < 8 {
+		return nil, errors.New("data must have at least 8 bytes")
+	}
+	switch data[7] & formatMask {
+	case uncompactedFormat:
+		return decodeUncompactedChunks(data)
+	case compactedFormat:
+		return decodeCompactedChunks(data)
+	default:
+		return nil, errors.New("unrecognized chunks encoding format")
+	}
 }
 
 func copyBytes(src []byte) []byte {
