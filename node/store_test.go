@@ -213,8 +213,34 @@ func TestEncodeDecodeChunks(t *testing.T) {
 		for i := 0; i < numChunks; i++ {
 			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
 		}
-
 	}
+}
+
+func TestDecodeCompactChunks(t *testing.T) {
+	_, err := node.DecodeChunks([]byte{byte(0b01000000)})
+	assert.EqualError(t, err, "data must have at least 8 bytes")
+	invalid := make([]byte, 0, 8)
+	for i := 0; i < 7; i++ {
+		invalid = append(invalid, byte(0))
+	}
+	invalid = append(invalid, byte(0b01000000))
+	_, err = node.DecodeChunks(invalid)
+	assert.EqualError(t, err, "unrecognized chunks encoding format")
+	data := make([]byte, 0, 9)
+	for i := 0; i < 6; i++ {
+		data = append(data, byte(0))
+	}
+	data = append(data, byte(2))
+	data = append(data, byte(0b00100000))
+	data = append(data, byte(0))
+	_, err = node.DecodeChunks(data)
+	assert.EqualError(t, err, "invalid compact data to decode")
+	data = append(data, byte(0))
+	chunks, err := node.DecodeChunks(data)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(chunks))
+	assert.Equal(t, byte(0), chunks[0])
+	assert.Equal(t, byte(1), chunks[1])
 }
 
 func TestStoringBlob(t *testing.T) {
