@@ -192,6 +192,13 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 				return err
 			}
 		}
+		for _, bundle := range blob.Bundles {
+			for _, chunk := range bundle.Chunks {
+				if len(chunk) != len(bundle.Chunks[0]) {
+					return api.NewInvalidArgError("chunks of the same quorum for a blob must be the same")
+				}
+			}
+		}
 	}
 	return nil
 }
