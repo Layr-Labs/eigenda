@@ -374,14 +374,14 @@ func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
 //
 // EncodeChunks implements encoding format "001"
 func EncodeChunks(chunks [][]byte) ([]byte, error) {
+	if len(chunks) == 0 {
+		return []byte{}, nil
+	}
 	totalSize := 0
 	for _, chunk := range chunks {
 		totalSize += len(chunk)
 	}
 	result := make([]byte, totalSize+8)
-	if len(chunks) == 0 {
-		return result, nil
-	}
 	buf := result
 	chunkSize := uint64(len(chunks[0])) | (1 << 61)
 	binary.LittleEndian.PutUint64(buf, chunkSize)
