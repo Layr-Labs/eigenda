@@ -71,7 +71,7 @@ func (t *MockTransactor) UpdateOperatorSocket(ctx context.Context, socket string
 }
 
 func (t *MockTransactor) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Transaction, error) {
-	args := t.Called()
+	args := t.Called(ctx, operatorsByQuorum)
 	result := args.Get(0)
 	return result.(*types.Transaction), args.Error(1)
 }
