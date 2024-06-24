@@ -16,23 +16,25 @@ func TestSerDeserGnark(t *testing.T) {
 	_, err = YCoord.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
 	assert.NoError(t, err)
 
+	numCoeffs := 64
 	var f encoding.Frame
 	f.Proof = encoding.Proof{
 		X: XCoord,
 		Y: YCoord,
 	}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < numCoeffs; i++ {
 		f.Coeffs = append(f.Coeffs, fr.NewElement(uint64(i)))
 	}
 
 	gnark, err := f.SerializeGnark()
 	assert.Nil(t, err)
-	// The gob encoding via f.Serialize() will generate 318 bytes
-	// whereas gnark only 128 bytes
-	assert.Equal(t, 128, len(gnark))
+	// The gnark encoding via f.Serialize() will generate less bytes
+	// than gob.
+	assert.Equal(t, 32*(1+numCoeffs), len(gnark))
 	gob, err := f.Serialize()
 	assert.Nil(t, err)
-	assert.Equal(t, 318, len(gob))
+	// 2080 with gnark v.s. 2574 with gob
+	assert.Equal(t, 2574, len(gob))
 
 	// Verify the deserialization can get back original data
 	c, err := new(encoding.Frame).DeserializeGnark(gnark)
