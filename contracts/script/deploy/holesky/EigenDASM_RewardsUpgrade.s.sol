@@ -35,8 +35,8 @@ import {EigenDAServiceManager} from "../../../src/core/EigenDAServiceManager.sol
  */
 contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
     // Hardcode these values to your needs
-    address public serviceManager = 0x70Ea1434d78271Bc1e152AD6c9F46323ca3dAf2a;
-    address public serviceManagerImplementation = 0x0F90D5C82DF783513FaA6a9961AdD248F3cF66cf;
+    address public serviceManager = 0x54A03db2784E3D0aCC08344D05385d0b62d4F432;
+    address public serviceManagerImplementation = 0x798c05C4002Fb0769c5A79f34052c7c2ef322532;
 
     ProxyAdmin public avsProxyAdmin = ProxyAdmin(0x9Fd7E279f5bD692Dc04792151E14Ad814FC60eC1);
     address deployerAddress = 0xDA29BB71669f46F2a779b4b62f03644A84eE3479;
@@ -46,10 +46,10 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
     function run(string memory deployArg) external {
         // 1. Setup and parse existing EigenLayer Holesky preprod contracts
         _parseInitialDeploymentParams(
-            "script/deploy/holesky/config/eigenlayer.config.json"
+            "script/deploy/holesky/config/eigenlayer_preprod.config.json"
         );
         _parseDeployedContracts(
-            "script/deploy/holesky/config/eigenlayer_addresses.config.json"
+            "script/deploy/holesky/config/eigenlayer_preprod_addresses.config.json"
         );
 
         // 2. broadcast deployment
@@ -136,23 +136,23 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
         
         uint256 mockTokenInitialSupply = 1e30;
         // actual strategy addresses
-        address stETHStrategy = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
-        address rETHStrategy = 0x3A8fBdf9e77DFc25d09741f51d3E181b25d0c4E0;
+        address stETHStrategy = 0x5C8b55722f421556a2AAfb7A3EA63d4c3e514312;
+        address rETHStrategy = 0x87f6C7d24b109919eB38295e3F8298425e6331D9;
 
         IRewardsCoordinator.StrategyAndMultiplier[] memory strategyAndMultipliers = new IRewardsCoordinator.StrategyAndMultiplier[](2);
         // Strategy addresses must be in ascending order
         strategyAndMultipliers[0] = IRewardsCoordinator.StrategyAndMultiplier({
-            strategy: IStrategy(rETHStrategy),
+            strategy: IStrategy(stETHStrategy),
             multiplier: 1e18
         });
         strategyAndMultipliers[1] = IRewardsCoordinator.StrategyAndMultiplier({
-            strategy: IStrategy(stETHStrategy),
+            strategy: IStrategy(rETHStrategy),
             multiplier: 1e18
         });
 
         IERC20 token = new ERC20PresetFixedSupply(
-            "dog wif hat",
-            "MOCK1",
+            "HARRYPOTTEROBAMASONIC10INU",
+            "BITCOIN",
             mockTokenInitialSupply,
             msg.sender
         );
@@ -175,7 +175,7 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
         });
 
         // Set rewardsInitiator
-        EigenDAServiceManager(serviceManager).setRewardsInitiator(msg.sender);
+        // EigenDAServiceManager(serviceManager).setRewardsInitiator(msg.sender);
 
         token.approve(serviceManager, amount);
         EigenDAServiceManager(serviceManager).createAVSRewardsSubmission(rewardsSubmissions);
@@ -185,7 +185,7 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
     function _verifyUpgrade() internal virtual {
         // Preprod RewardsCoordinator
         require(
-            address(rewardsCoordinator) == 0xAcc1fb458a1317E886dB376Fc8141540537E68fE,
+            address(rewardsCoordinator) == 0xb22Ef643e1E067c994019A4C19e403253C05c2B0,
             "ServiceManagerBaseUpgrade: RewardsCoordinator address is incorrect"
         );
         require(
