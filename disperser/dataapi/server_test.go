@@ -342,7 +342,7 @@ func TestEjectOperatorHandler(t *testing.T) {
 	addr2 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
 	mockTx.On("BatchOperatorIDToAddress").Return([]gethcommon.Address{addr1, addr2}, nil)
 	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return([]*big.Int{big.NewInt(3), big.NewInt(0)}, nil)
-	mockTx.On("BuildEjectOperatorsTxn").Return(types.NewTransaction(0, gethcommon.HexToAddress("0x1"), big.NewInt(0), 0, big.NewInt(0), []byte{}), nil)
+	mockTx.On("BuildEjectOperatorsTxn", mock.Anything, mock.Anything).Return(types.NewTransaction(0, gethcommon.HexToAddress("0x1"), big.NewInt(0), 0, big.NewInt(0), []byte{}), nil)
 	mockTx.On("EjectOperators").Return(&types.Receipt{
 		GasUsed: uint64(10),
 	}, nil)
