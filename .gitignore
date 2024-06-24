@@ -24,7 +24,7 @@ go.work
 .env
 
 ## kzg cache
-e2e/resources/kzg/SRSTables/
+resources/SRSTables/
  
 ## Vscode 
 /.vscode

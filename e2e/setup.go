@@ -67,11 +67,11 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		},
 		EthRPC:                 ethRPC,
 		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
-		CacheDir:               "../operator-setup/resources/SRSTables",
-		G1Path:                 "../operator-setup/resources/g1_abbr.point",
-		G2Path:                 "../test/resources/kzg/g2.point", // do we need this?
+		CacheDir:               "../resources/SRSTables",
+		G1Path:                 "../resources/g1.point",
+		G2Path:                 "",
 		MaxBlobLength:          "90kib",
-		G2PowerOfTauPath:       "../operator-setup/resources/kzg/g2_abbr.point.powerOf2",
+		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
 		PutBlobEncodingVersion: 0x00,
 	}
 

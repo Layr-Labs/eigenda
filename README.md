@@ -14,7 +14,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 
 Additional CLI args are provided for targeting an EigenDA network backend:
 
-* `--eigenda-rpc`: RPC host of disperser service. (e.g, on holesky this is `disperser-holesky.eigenda.xyz:443`, full network list [here](https://docs.eigenlayer.xyz/eigenda/networks/))
+* `--eigenda-disperser-rpc`: RPC host of disperser service. (e.g, on holesky this is `disperser-holesky.eigenda.xyz:443`, full network list [here](https://docs.eigenlayer.xyz/eigenda/networks/))
 * `--eigenda-status-query-timeout`: (default: 30m) Duration for which a client will wait for a blob to finalize after being sent for dispersal.
 * `--eigenda-status-query-retry-interval`: (default: 5s) How often a client will attempt a retry when awaiting network blob finalization.
 * `--eigenda-disable-tls`: (default: false) Whether to disable TLS for grpc communication with disperser.
@@ -28,17 +28,18 @@ Additional CLI args are provided for targeting an EigenDA network backend:
 * `--eigenda-cache-path`: Directory path to dump cached SRS tables
 * `--eigenda-max-blob-length`: The maximum blob length that this EigenDA sidecar proxy should expect to be written or read from EigenDA. This configuration setting is used to determine how many SRS points should be loaded into memory for generating/verifying KZG commitments returned by the EigenDA disperser. Valid byte units are either base-2 or base-10 byte amounts (not bits), e.g. `30 MiB`, `4Kb`, `30MB`. The maximum blob size is a little more than `1GB`.
 
-
 ### Certificate verification
+
 For additional security, there is a cert verification feature which verifies the blob metadata read from the disperser to ensure that:
+
 1. The respective batch hash can be computed locally and matches the one persisted on-chain in the `ServiceManager` contract
 2. The blob inclusion proof can be merkalized to generate the proper batch root
 3. All quorum params are adequately defined and expressed when compared to their on-chain counterparts
 
 To target this feature, the following CLI args should be provided:
+
 * `--eigenda-svc-manager-addr`: The deployed EigenDA service manager address. The list can be found [here](https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment).
 * `--eigenda-eth-rpc` : JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list [here](https://docs.eigenlayer.xyz/eigenda/networks/).
-
 
 ### In-Memory Storage
 
@@ -47,14 +48,15 @@ An ephemeral memory store backend can be used for faster feedback testing when p
 * `--memstore.enabled`: Boolean feature flag
 * `--memstore.expiration`: Duration for which a blob will exist
 
-## Metrics 
+## Metrics
+
 To the see list of available metrics, run `./bin/eigenda-proxy doc metrics`
 
 ## Running Locally
 
 1. Compile binary: `make eigenda-proxy`
 2. Generate a new private key and save it as `EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX` env var without the `0x` prefix.
-3. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-rpc 127.0.0.1:443 --eigenda-status-query-timeout 45m --eigenda-g1-path e2e/resources/kzg/g1.point --eigenda-g2-tau-path e2e/resources/kzg/g2.point.powerOf2 --eigenda-max-blob-length='90Kib'`
+3. Run binary; e.g: `./bin/eigenda-proxy --addr 127.0.0.1 --port 5050 --eigenda-disperser-rpc disperser-holesky.eigenda.xyz:443 --eigenda-status-query-timeout 45m --eigenda-max-blob-length='90Kib'`
 
 **Env File**
 An env file can be provided to the binary for runtime process ingestion; e.g:
@@ -84,23 +86,18 @@ The `raw commitment` for EigenDA is encoding certificate and kzg fields.
 ## Testing
 
 ### Unit
+
 Unit tests can be ran via invoking `make test`.
 
 ### Holesky
+
 A holesky integration test can be ran using `make holesky-test` to assert proper dispersal/retrieval against a public network. Please **note** that EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
 
-
 ### Optimism
+
 An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation. These tests can be ran via `make optimism-test`.
 
-**NOTE:** 
-
-## Downloading Mainnet SRS
-
-KZG commitment verification requires constructing the SRS string from the proper trusted setup values (g1, g2, g2.power_of_tau). These values can be downloaded locally using the [operator-setup](https://github.com/Layr-Labs/eigenda-operator-setup) submodule via the following commands.
-
-1. `make submodules`
-2. `make srs`
+**NOTE:**
 
 ## Hardware Requirements
 
