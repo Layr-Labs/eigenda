@@ -24,7 +24,7 @@ func (c *Frame) Deserialize(data []byte) (*Frame, error) {
 }
 
 func (c *Frame) SerializeGnark() ([]byte, error) {
-	coded := make([]byte, 0)
+	coded := make([]byte, 0, 32*(1+len(c.Coeffs)))
 	// This is compressed format with just 32 bytes.
 	proofBytes := c.Proof.Bytes()
 	coded = append(coded, proofBytes[:]...)
