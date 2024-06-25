@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -20,6 +21,41 @@ func (c *Frame) Deserialize(data []byte) (*Frame, error) {
 	}
 
 	return c, err
+}
+
+func (c *Frame) SerializeGnark() ([]byte, error) {
+	coded := make([]byte, 0, bn254.SizeOfG1AffineCompressed+BYTES_PER_SYMBOL*len(c.Coeffs))
+	// This is compressed format with just 32 bytes.
+	proofBytes := c.Proof.Bytes()
+	coded = append(coded, proofBytes[:]...)
+	for _, coeff := range c.Coeffs {
+		coded = append(coded, coeff.Marshal()...)
+	}
+	return coded, nil
+}
+
+func (c *Frame) DeserializeGnark(data []byte) (*Frame, error) {
+	var f Frame
+	buf := data
+	err := f.Proof.Unmarshal(buf[:bn254.SizeOfG1AffineCompressed])
+	if err != nil {
+		return nil, err
+	}
+	buf = buf[bn254.SizeOfG1AffineCompressed:]
+	if len(buf)%BYTES_PER_SYMBOL != 0 {
+		return nil, errors.New("invalid chunk length")
+	}
+	f.Coeffs = make([]Symbol, len(buf)/BYTES_PER_SYMBOL)
+	i := 0
+	for len(buf) > 0 {
+		if len(buf) < BYTES_PER_SYMBOL {
+			return nil, errors.New("invalid chunk length")
+		}
+		f.Coeffs[i].Unmarshal(buf[:BYTES_PER_SYMBOL])
+		i++
+		buf = buf[BYTES_PER_SYMBOL:]
+	}
+	return &f, nil
 }
 
 func (f *Frame) Encode() ([]byte, error) {
