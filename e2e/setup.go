@@ -49,6 +49,13 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		t.Fatal("ETHEREUM_RPC environment variable is not set")
 	}
 
+	var pollInterval time.Duration
+	if useMemory {
+		pollInterval = time.Second * 1
+	} else {
+		pollInterval = time.Minute * 1
+	}
+
 	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
 		Level:  log.LevelDebug,
 		Format: oplog.FormatLogFmt,
@@ -59,7 +66,7 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		ClientConfig: clients.EigenDAClientConfig{
 			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
-			StatusQueryRetryInterval: time.Second * 1,
+			StatusQueryRetryInterval: pollInterval,
 			DisableTLS:               false,
 			SignerPrivateKeyHex:      pk,
 		},
@@ -72,6 +79,7 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		PutBlobEncodingVersion: 0x00,
 		MemstoreEnabled:        useMemory,
 		MemstoreBlobExpiration: 14 * 24 * time.Hour,
+		EthConfirmationDepth:   6,
 	}
 
 	store, err := server.LoadStore(

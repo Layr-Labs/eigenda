@@ -20,8 +20,8 @@ github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.2 h1:vUG4lAyuPCXO0TLbXvPv7EB7cNK1QV/luu55UHLrrn8=
 github.com/DataDog/zstd v1.5.2/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/Layr-Labs/eigenda v0.7.2-0.20240606180508-e90cb7432ca5 h1:PGcoSXnIlZYhwfrzqG1F2E/Sqc3ZGRqa5owryswax2s=
-github.com/Layr-Labs/eigenda v0.7.2-0.20240606180508-e90cb7432ca5/go.mod h1:gG5KSp5gGY0lywj6aZwaK9ZEF8eEVX4ilo679pFpvAA=
+github.com/Layr-Labs/eigenda v0.7.5-0.20240626225853-1645ffe3489e h1:vibQgDKVXvuKZKqdyvIuCx8MH1B5uOGrKITAUp3bzJg=
+github.com/Layr-Labs/eigenda v0.7.5-0.20240626225853-1645ffe3489e/go.mod h1:gG5KSp5gGY0lywj6aZwaK9ZEF8eEVX4ilo679pFpvAA=
 github.com/Layr-Labs/eigensdk-go v0.1.7-0.20240507215523-7e4891d5099a h1:L/UsJFw9M31FD/WgXTPFB0oxbq9Cu4Urea1xWPMQS7Y=
 github.com/Layr-Labs/eigensdk-go v0.1.7-0.20240507215523-7e4891d5099a/go.mod h1:OF9lmS/57MKxS0xpSpX0qHZl0SKkDRpvJIvsGvMN1y8=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=

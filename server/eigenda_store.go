@@ -2,27 +2,40 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+type EigenDAStoreConfig struct {
+	MaxBlobSizeBytes     uint64
+	EthConfirmationDepth uint64
+
+	// The total amount of time that the client will spend waiting for EigenDA to confirm a blob
+	StatusQueryTimeout time.Duration
+}
+
 // EigenDAStore does storage interactions and verifications for blobs with DA.
 type EigenDAStore struct {
-	client           *clients.EigenDAClient
-	verifier         *verify.Verifier
-	maxBlobSizeBytes uint64
+	client   *clients.EigenDAClient
+	verifier *verify.Verifier
+	cfg      *EigenDAStoreConfig
+	log      log.Logger
 }
 
 var _ Store = (*EigenDAStore)(nil)
 
-func NewEigenDAStore(ctx context.Context, client *clients.EigenDAClient, v *verify.Verifier, maxBlobSizeBytes uint64) (*EigenDAStore, error) {
+func NewEigenDAStore(ctx context.Context, client *clients.EigenDAClient, v *verify.Verifier, log log.Logger, cfg *EigenDAStoreConfig) (*EigenDAStore, error) {
 	return &EigenDAStore{
-		client:           client,
-		verifier:         v,
-		maxBlobSizeBytes: maxBlobSizeBytes,
+		client:   client,
+		verifier: v,
+		log:      log,
+		cfg:      cfg,
 	}, nil
 }
 
@@ -50,11 +63,6 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte, domain DomainType) ([
 		return nil, err
 	}
 
-	err = e.verifier.VerifyCert(&cert)
-	if err != nil {
-		return nil, err
-	}
-
 	switch domain {
 	case BinaryDomain:
 		return decodedBlob, nil
@@ -67,13 +75,16 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte, domain DomainType) ([
 
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
 func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err error) {
-	if uint64(len(value)) > e.maxBlobSizeBytes {
-		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.maxBlobSizeBytes)
+	if uint64(len(value)) > e.cfg.MaxBlobSizeBytes {
+		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.cfg.MaxBlobSizeBytes)
 	}
-	cert, err := e.client.PutBlob(ctx, value)
+
+	dispersalStart := time.Now()
+	blobInfo, err := e.client.PutBlob(ctx, value)
 	if err != nil {
 		return nil, err
 	}
+	cert := (*verify.Certificate)(blobInfo)
 
 	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
 	if err != nil {
@@ -82,6 +93,31 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
 		return nil, err
+	}
+
+	dispersalDuration := time.Since(dispersalStart)
+	remainingTimeout := e.cfg.StatusQueryTimeout - dispersalDuration
+
+	ticker := time.NewTicker(12 * time.Second)
+	defer ticker.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), remainingTimeout)
+	defer cancel()
+
+	done := false
+	for !done {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+			err = e.verifier.VerifyCert(cert)
+			if err == nil {
+				done = true
+			} else if !errors.Is(err, verify.ErrBatchMetadataHashNotFound) {
+				return nil, err
+			} else {
+				e.log.Info("Blob confirmed, waiting for sufficient confirmation depth...", "targetDepth", e.cfg.EthConfirmationDepth)
+			}
+		}
 	}
 
 	bytes, err := rlp.EncodeToBytes(cert)

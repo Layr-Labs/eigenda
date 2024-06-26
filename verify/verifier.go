@@ -17,10 +17,11 @@ import (
 )
 
 type Config struct {
-	Verify         bool
-	RPCURL         string
-	SvcManagerAddr string
-	KzgConfig      *kzg.KzgConfig
+	Verify               bool
+	RPCURL               string
+	SvcManagerAddr       string
+	KzgConfig            *kzg.KzgConfig
+	EthConfirmationDepth uint64
 }
 
 type Verifier struct {

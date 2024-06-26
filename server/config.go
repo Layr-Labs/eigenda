@@ -19,6 +19,7 @@ const (
 	EigenDADisperserRPCFlagName          = "eigenda-disperser-rpc"
 	EthRPCFlagName                       = "eigenda-eth-rpc"
 	SvcManagerAddrFlagName               = "eigenda-svc-manager-addr"
+	EthConfirmationDepthFlagName         = "eigenda-eth-confirmation-depth"
 	StatusQueryRetryIntervalFlagName     = "eigenda-status-query-retry-interval"
 	StatusQueryTimeoutFlagName           = "eigenda-status-query-timeout"
 	DisableTlsFlagName                   = "eigenda-disable-tls"
@@ -50,8 +51,9 @@ type Config struct {
 	PutBlobEncodingVersion codecs.BlobEncodingVersion
 
 	// ETH vars
-	EthRPC         string
-	SvcManagerAddr string
+	EthRPC               string
+	SvcManagerAddr       string
+	EthConfirmationDepth uint64
 
 	// KZG vars
 	CacheDir string
@@ -111,10 +113,11 @@ func (c *Config) VerificationCfg() *verify.Config {
 	}
 
 	return &verify.Config{
-		Verify:         true,
-		RPCURL:         c.EthRPC,
-		SvcManagerAddr: c.SvcManagerAddr,
-		KzgConfig:      kzgCfg,
+		Verify:               true,
+		RPCURL:               c.EthRPC,
+		SvcManagerAddr:       c.SvcManagerAddr,
+		KzgConfig:            kzgCfg,
+		EthConfirmationDepth: c.EthConfirmationDepth,
 	}
 
 }
@@ -140,9 +143,11 @@ func ReadConfig(ctx *cli.Context) Config {
 		MaxBlobLength:          ctx.String(MaxBlobLengthFlagName),
 		SvcManagerAddr:         ctx.String(SvcManagerAddrFlagName),
 		EthRPC:                 ctx.String(EthRPCFlagName),
+		EthConfirmationDepth:   ctx.Uint64(EthConfirmationDepthFlagName),
 		MemstoreEnabled:        ctx.Bool(MemstoreFlagName),
 		MemstoreBlobExpiration: ctx.Duration(MemstoreExpirationFlagName),
 	}
+	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth != 0)
 	return cfg
 }
 
@@ -244,6 +249,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    SvcManagerAddrFlagName,
 			Usage:   "The deployed EigenDA service manager address. The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
 			EnvVars: prefixEnvVars("SERVICE_MANAGER_ADDR"),
+		},
+		&cli.Uint64Flag{
+			Name:    EthConfirmationDepthFlagName,
+			Usage:   "The number of Ethereum blocks of confirmation that the DA briging transaction must have before it is assumed by the proxy to be final. The value of `0` indicates that the proxy should wait for weak-subjectivity finalization (12-14 minutes).",
+			EnvVars: prefixEnvVars("ETH_CONFIRMATION_DEPTH"),
+			Value:   6,
 		},
 		&cli.BoolFlag{
 			Name:    MemstoreFlagName,
