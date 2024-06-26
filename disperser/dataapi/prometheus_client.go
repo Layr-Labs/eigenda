@@ -48,6 +48,7 @@ func (pc *prometheusClient) QueryDisperserBlobSizeBytesPerSecond(ctx context.Con
 
 func (pc *prometheusClient) QueryDisperserAvgThroughputBlobSizeBytes(ctx context.Context, start time.Time, end time.Time) (*PrometheusResult, error) {
 	query := fmt.Sprintf("sum by (job) (rate(eigenda_batcher_blobs_total{state=\"confirmed\",data=\"size\",cluster=\"%s\"}[$$__rate_interval]))", pc.cluster)
+	fmt.Printf("Query: %s\n", query)
 	return pc.queryRange(ctx, query, start, end)
 }
 
