@@ -37,6 +37,9 @@ type EigenDAClientConfig struct {
 	// the commitment. With this mode disabled, you will need to supply the entire blob to perform a verification
 	// that any part of the data matches the KZG commitment.
 	DisablePointVerificationMode bool
+
+	// If true, will wait for the blob to finalize, if false, will wait only for the blob to confirm.
+	WaitForFinalization bool
 }
 
 func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
