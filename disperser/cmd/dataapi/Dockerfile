@@ -4,6 +4,7 @@ RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
 # build data api server with local monorepo go modules
 COPY ./disperser /app/disperser
+COPY operators/ejector /app/operators/ejector
 COPY common /app/common
 COPY contracts /app/contracts
 COPY core /app/core
