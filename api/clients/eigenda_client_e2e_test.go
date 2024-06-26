@@ -29,6 +29,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		StatusQueryRetryInterval: 5 * time.Second,
 		CustomQuorumIDs:          []uint{},
 		SignerPrivateKeyHex:      "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1",
+		WaitForFinalization:      true,
 	})
 	data := "hello world!"
 	assert.NoError(t, err)

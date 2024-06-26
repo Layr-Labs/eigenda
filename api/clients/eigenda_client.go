@@ -180,7 +180,13 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with insufficient signatures, requestID=%s: %w", base64RequestID, err)
 				return
 			case grpcdisperser.BlobStatus_CONFIRMED:
-				m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
+				if m.Config.WaitForFinalization {
+					m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
+				} else {
+					m.Log.Info("EigenDA blob confirmed", "requestID", base64RequestID)
+					resultChan <- statusRes.Info
+					return
+				}
 			case grpcdisperser.BlobStatus_FINALIZED:
 				batchHeaderHashHex := fmt.Sprintf("0x%s", hex.EncodeToString(statusRes.Info.BlobVerificationProof.BatchMetadata.BatchHeaderHash))
 				m.Log.Info("Successfully dispersed blob to EigenDA", "requestID", base64RequestID, "batchHeaderHash", batchHeaderHashHex)
