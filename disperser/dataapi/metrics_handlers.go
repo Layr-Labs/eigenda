@@ -79,7 +79,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 }
 
 func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*Throughput, error) {
-	result, err := s.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(start, 0), time.Unix(end, 0), avgThroughputWindowSize)
+	result, err := s.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(start, 0), time.Unix(end, 0))
 	if err != nil {
 		return nil, err
 	}
