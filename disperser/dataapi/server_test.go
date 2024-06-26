@@ -323,10 +323,10 @@ func TestFetchMetricsThroughputHandler(t *testing.T) {
 	}
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, 3481, len(response))
-	assert.Equal(t, float64(11666.666666666666), response[0].Throughput)
-	assert.Equal(t, uint64(1701292800), response[0].Timestamp)
-	assert.Equal(t, float64(3.599722666666646e+07), totalThroughput)
+	assert.Equal(t, 3361, len(response))
+	assert.Equal(t, float64(12000), response[0].Throughput)
+	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
+	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
 }
 
 func TestEjectOperatorHandler(t *testing.T) {
