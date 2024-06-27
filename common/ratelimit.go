@@ -48,7 +48,7 @@ type GlobalRateParams struct {
 	// `BucketSizes[i]` at a rate of 1, and emptied by an amount equal to `(size of request)/RateParam` each time a
 	// request is processed.
 	BucketSizes []time.Duration
-	// Multipliers speicify how much the supplied rate limit should be relaxed for each time scale.
+	// Multipliers specify how much the supplied rate limit should be relaxed for each time scale.
 	// For i'th BuckeSize, the RateParam*Multiplier[i] will be applied.
 	Multipliers []float32
 	// CountFailed indicates whether failed requests should be counted towards the rate limit.

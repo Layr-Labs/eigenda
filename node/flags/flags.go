@@ -166,7 +166,7 @@ var (
 
 	// This flag is used to control if the DA Node registers itself when it starts.
 	// This is useful for testing and for hosted node where we don't want to have
-	// mannual operation with CLI to register.
+	// manual operation with CLI to register.
 	// By default, it will not register itself at start.
 	RegisterAtNodeStartFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "register-at-node-start"),
