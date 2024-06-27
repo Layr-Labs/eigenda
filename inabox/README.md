@@ -21,6 +21,14 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
     ```
     go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
     ```
+- Build binaries
+    ```
+    make build
+    ```
+- and contracts
+    ```
+    (cd contracts && forge build)
+    ```
 
 ## Run a complete end-to-end test
 
