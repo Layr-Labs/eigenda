@@ -8,16 +8,15 @@ import (
 )
 
 const (
-	G1PathFlagName            = "kzg.g1-path"
-	G2PathFlagName            = "kzg.g2-path"
-	CachePathFlagName         = "kzg.cache-path"
-	SRSOrderFlagName          = "kzg.srs-order"
-	NumWorkerFlagName         = "kzg.num-workers"
-	VerboseFlagName           = "kzg.verbose"
-	PreloadEncoderFlagName    = "kzg.preload-encoder"
-	CacheEncodedBlobsFlagName = "cache-encoded-blobs"
-	SRSLoadingNumberFlagName  = "kzg.srs-load"
-	G2PowerOf2PathFlagName    = "kzg.g2-power-of-2-path"
+	G1PathFlagName           = "kzg.g1-path"
+	G2PathFlagName           = "kzg.g2-path"
+	CachePathFlagName        = "kzg.cache-path"
+	SRSOrderFlagName         = "kzg.srs-order"
+	NumWorkerFlagName        = "kzg.num-workers"
+	VerboseFlagName          = "kzg.verbose"
+	PreloadEncoderFlagName   = "kzg.preload-encoder"
+	SRSLoadingNumberFlagName = "kzg.srs-load"
+	G2PowerOf2PathFlagName   = "kzg.g2-power-of-2-path"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -64,12 +63,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "Enable to see verbose output for encoding/decoding",
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "VERBOSE"),
-		},
-		cli.BoolFlag{
-			Name:     CacheEncodedBlobsFlagName,
-			Usage:    "Enable to cache encoded results",
-			Required: false,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "CACHE_ENCODED_BLOBS"),
 		},
 		cli.BoolFlag{
 			Name:     PreloadEncoderFlagName,
