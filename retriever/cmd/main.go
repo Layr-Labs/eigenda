@@ -18,7 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
-	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	RETRIEVEReth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -134,7 +134,7 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	chainClient := retrivereth.NewChainClient(gethClient, logger)
+	chainClient := RETRIEVEReth.NewChainClient(gethClient, logger)
 	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
 	if err = retrieverServiceServer.Start(context.Background()); err != nil {
 		log.Fatalln("failed to start retriever service server", err)

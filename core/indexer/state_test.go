@@ -83,7 +83,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIEVER, op.NODE_EIGENDA_SERVICE_MANAGER)
 	Expect(err).To(BeNil())
 	return tx
 
@@ -118,7 +118,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *indexedstate.IndexedChainState {
 	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
-	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
+	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetriever, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	var (
