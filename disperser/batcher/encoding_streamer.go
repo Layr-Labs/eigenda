@@ -261,11 +261,6 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 	}
 	metadatas = e.validateMetadataQuorums(metadatas, state)
 
-	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata, 0)
-	for _, metadata := range metadatas {
-		metadataByKey[metadata.GetBlobKey()] = metadata
-	}
-
 	stageTimer = time.Now()
 	blobs, err := e.blobStore.GetBlobsByMetadata(ctx, metadatas)
 	if err != nil {
