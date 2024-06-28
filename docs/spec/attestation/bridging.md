@@ -5,7 +5,7 @@
 ### L1 Bridging
 
 Bridging a DA attestation for a specific blob requires the following stages:
-- *Bridging the batch attestation*. This involves checking the aggregate signature of the DA nodes for the batch, and tallying up the total amount of stake the signing nodes.
+- *Bridging the batch attestation*. This involves checking the aggregate signature of the DA nodes for the batch, and tallying up the total amount of stake of the signing nodes.
 - *Verifying the blob inclusion*. Each batch contains a root of a Merkle tree whose leaves correspond to the blob headers contained in the batch. To verify blob inclusion, the associate Merkle proof must be supplied and evaluated. Furthermore, the specific quorum threshold requirement for the blob must be checked against the total amount of signing stake for the batch. 
 
 For the first stage, EigenDA makes use of the EigenLayer's default utilities for managing operator state, verifying aggregate BLS signatures, and checking the total stake held by the signing operators.
@@ -29,4 +29,4 @@ These requirements result in the following design choices:
 The first and second decisions satisfy requirements 1 and 2. The three decisions together satisfy requirement 3.
 
 Whenever the `confirmBatch` method of the ServiceManager.sol is called, the following checks are used to ensure that only finalized registration state is utilized:
-- Stake staleness check. The `referenceBlockNumber` is verified to be within `BLOCK_STALE_MEASURE` blocks before the confirmation block.This is to make sure that batches using outdated stakes are not confirmed. It is assured that stakes from within `BLOCK_STALE_MEASURE` blocks before confirmation are valid by delaying removal of stakes by `BLOCK_STALE_MEASURE + MAX_DURATION_BLOCKS`.
+- Stake staleness check. The `referenceBlockNumber` is verified to be within `BLOCK_STALE_MEASURE` blocks before the confirmation block. This is to make sure that batches using outdated stakes are not confirmed. It is assured that stakes from within `BLOCK_STALE_MEASURE` blocks before confirmation are valid by delaying removal of stakes by `BLOCK_STALE_MEASURE + MAX_DURATION_BLOCKS`.
