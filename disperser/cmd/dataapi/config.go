@@ -35,9 +35,10 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
-	DisperserHostname  string
-	ChurnerHostname    string
-	BatcherHealthEndpt string
+	EigenDASvcAvailabilityCheck bool
+	DisperserHostname           string
+	ChurnerHostname             string
+	BatcherHealthEndpt          string
 
 	TxnTimeout time.Duration
 }
@@ -85,9 +86,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		},
-		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
-		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
-		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
+		EigenDASvcAvailabilityCheck: ctx.GlobalBool(flags.EnableEigenDASvcAvailabilityCheck.Name),
+		DisperserHostname:           ctx.GlobalString(flags.DisperserHostnameFlag.Name),
+		ChurnerHostname:             ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
+		BatcherHealthEndpt:          ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 
 		TxnTimeout: ctx.GlobalDuration(flags.TxnTimeoutFlag.Name),
 	}

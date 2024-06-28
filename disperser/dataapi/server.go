@@ -198,13 +198,16 @@ func NewServer(
 		grpcConn = &GRPCDialerSkipTLS{}
 	}
 
-	if eigenDAGRPCServiceChecker == nil {
+	if config.EigenDASvcAvailabilityCheck {
 
-		eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
-	}
+		if eigenDAGRPCServiceChecker == nil {
 
-	if eigenDAHttpServiceChecker == nil {
-		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
+			eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
+		}
+
+		if eigenDAHttpServiceChecker == nil {
+			eigenDAHttpServiceChecker = &HttpServiceAvailability{}
+		}
 	}
 
 	return &server{
@@ -258,9 +261,11 @@ func (s *server) Start() error {
 			metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
 			metrics.GET("/non-signers", s.FetchNonSigners)
 			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
-			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
-			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
+			if s.eigenDAHttpServiceChecker != nil && s.eigenDAGRPCServiceChecker != nil {
+				metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
+				metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
+				metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
+			}
 		}
 		ejection := v1.Group("/ejection")
 		ejection.POST("/operators", s.EjectOperatorsHandler)
@@ -768,15 +773,22 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 
 // FetchDisperserServiceAvailability godoc
 //
-//	@Summary	Get status of EigenDA Disperser service.
-//	@Tags		ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/disperser-service-availability [get]
+//	@Summary		Get status of EigenDA Disperser service.
+//	@Description	This endpoint is available only if `AvailabilityCheck` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.
+//	@Tags			Disperser ServiceAvailability
+//	@Produce		json
+//	@Success		200	{object}	ServiceAvailabilityResponse	"Service is available"
+//	@Failure		400	{object}	ErrorResponse				"error: Bad request"
+//	@Failure		404	{object}	ErrorResponse				"error: Not found"
+//	@Failure		500	{object}	ErrorResponse				"error: Server error"
+//	@Failure		501	{object}	ErrorResponse				"error: EigenDA Service checker not initialized"
+//	@Router			/metrics/disperser-service-availability [get]
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
+
+	if s.eigenDAGRPCServiceChecker == nil {
+		c.JSON(http.StatusNotImplemented, errors.New("service availability check not enabled"))
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchDisperserServiceAvailability", f*1000) // make milliseconds
 	}))
@@ -822,15 +834,22 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 // FetchChurnerServiceAvailability godoc
 //
-//	@Summary	Get status of EigenDA churner service.
-//	@Tags		Churner ServiceAvailability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/churner-service-availability [get]
+//	@Summary		Get status of EigenDA churner service.
+//	@Tags			Churner ServiceAvailability
+//	@Description	This endpoint is available only if `AvailabilityCheck` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.
+//	@Produce		json
+//	@Success		200	{object}	ServiceAvailabilityResponse	"Service is available"
+//	@Failure		400	{object}	ErrorResponse				"error: Bad request"
+//	@Failure		404	{object}	ErrorResponse				"error: Not found"
+//	@Failure		500	{object}	ErrorResponse				"error: Server error"
+//	@Failure		501	{object}	ErrorResponse				"error: EigenDA Service checker not initialized"
+//	@Router			/metrics/churner-service-availability [get]
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
+
+	if s.eigenDAGRPCServiceChecker == nil {
+		c.JSON(http.StatusNotImplemented, errors.New("service availability check not enabled"))
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", f*1000) // make milliseconds
 	}))
@@ -876,15 +895,22 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 // FetchBatcherAvailability godoc
 //
-//	@Summary	Get status of EigenDA batcher.
-//	@Tags		Batcher Availability
-//	@Produce	json
-//	@Success	200	{object}	ServiceAvailabilityResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/metrics/batcher-service-availability [get]
+//	@Summary		Get status of EigenDA batcher.
+//	@Tags			Batcher Availability
+//	@Description	This endpoint is available only if `AvailabilityCheck` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.
+//	@Produce		json
+//	@Success		200	{object}	ServiceAvailabilityResponse	"Service is available"
+//	@Failure		400	{object}	ErrorResponse				"error: Bad request"
+//	@Failure		404	{object}	ErrorResponse				"error: Not found"
+//	@Failure		500	{object}	ErrorResponse				"error: Server error"
+//	@Failure		501	{object}	ErrorResponse				"error: EigenDA Service checker not initialized"
+//	@Router			/metrics/batcher-service-availability [get]
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
+
+	if s.eigenDAHttpServiceChecker == nil {
+		c.JSON(http.StatusNotImplemented, errors.New("service availability check not enabled"))
+	}
+
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchBatcherAvailability", f*1000) // make milliseconds
 	}))
