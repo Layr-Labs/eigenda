@@ -48,6 +48,7 @@ interface IEigenDAServiceManager is IServiceManager {
         bytes signedStakeForQuorums; // every bytes is an amount less than 100 specifying the percentage of stake 
                                      // that has signed in the corresponding quorum in `quorumNumbers` 
         uint32 referenceBlockNumber;
+        bytes batchHeaderHash; // the hash of the batch header - used for blob lookups against DA on a rollup
     }
     
     // Relevant metadata for a given datastore
