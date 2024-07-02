@@ -125,13 +125,13 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	gc := node.NewDispersalClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
+	start := time.Now()
 	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader)
 	if err != nil {
 		return nil, err
 	}
-
+	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize, "request message size", proto.Size(request), "num blobs", len(blobs), "request serialization time", time.Since(start))
 	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
-	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "size", totalSize, "request message size", proto.Size(request))
 	reply, err := gc.StoreChunks(ctx, request, opt)
 
 	if err != nil {
