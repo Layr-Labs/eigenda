@@ -389,10 +389,12 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 }
 
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
+	start := time.Now()
 	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, header.ReferenceBlockNumber, n.Config.ID)
 	if err != nil {
 		return err
 	}
+	getStateDuration := time.Since(start)
 
 	pool := workerpool.New(n.Config.NumBatchValidators)
 	err = n.Validator.ValidateBatch(header, blobs, operatorState, pool)
@@ -408,6 +410,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 		}
 		return fmt.Errorf("failed to validate batch with operator state %x: %w", strings.Join(hStr, ","), err)
 	}
+	n.Logger.Debug("ValidateBatch completed", "get operator state duration", getStateDuration, "total duration", time.Since(start))
 	return nil
 }
 
