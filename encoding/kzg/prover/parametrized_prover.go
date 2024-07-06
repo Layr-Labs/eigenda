@@ -3,7 +3,6 @@ package prover
 import (
 	"fmt"
 	"log"
-	"math"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -11,8 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
-	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -28,11 +25,9 @@ type ParametrizedProver struct {
 	Ks         *kzg.KZGSettings
 	SFs        *fft.FFTSettings   // fft used for submatrix product helper
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
-}
 
-type WorkerResult struct {
-	points []bn254.G1Affine
-	err    error
+	UseGpu   bool
+	Computer ProofComputer
 }
 
 // just a wrapper to take bytes not Fr Element
@@ -46,70 +41,57 @@ func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *b
 
 func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
 
+	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
+		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	}
+
 	startTime := time.Now()
+	// compute chunks
 	poly, frames, indices, err := g.Encoder.Encode(inputFr)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-
-	if len(poly.Coeffs) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(poly.Coeffs), int(g.KzgConfig.SRSNumberToLoad))
-	}
+	rsEncodeDone := time.Now()
 
 	// compute commit for the full poly
-	commit, err := g.Commit(poly.Coeffs)
+	commit, err := g.Computer.ComputeCommitment(poly.Coeffs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+	commitDone := time.Now()
 
-	config := ecc.MultiExpConfig{}
-
-	var lengthCommitment bn254.G2Affine
-	_, err = lengthCommitment.MultiExp(g.Srs.G2[:len(poly.Coeffs)], poly.Coeffs, config)
+	lengthCommitment, err := g.Computer.ComputeLengthCommitment(poly.Coeffs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+	lengthCommitDone := time.Now()
 
-	intermediate := time.Now()
-
-	chunkLength := uint64(len(inputFr))
-
-	if g.Verbose {
-		log.Printf("    Commiting takes  %v\n", time.Since(intermediate))
-		intermediate = time.Now()
-
-		log.Printf("shift %v\n", g.SRSOrder-chunkLength)
-		log.Printf("order %v\n", len(g.Srs.G2))
-		log.Println("low degree verification info")
-	}
-
-	shiftedSecret := g.G2Trailing[g.KzgConfig.SRSNumberToLoad-chunkLength:]
-
-	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
-	var lengthProof bn254.G2Affine
-	_, err = lengthProof.MultiExp(shiftedSecret, poly.Coeffs, config)
+	lengthProof, err := g.Computer.ComputeLengthProof(poly.Coeffs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-
-	if g.Verbose {
-		log.Printf("    Generating Length Proof takes  %v\n", time.Since(intermediate))
-		intermediate = time.Now()
-	}
+	lengthProofDone := time.Now()
 
 	// compute proofs
 	paddedCoeffs := make([]fr.Element, g.NumEvaluations())
+	// polyCoeffs has less points than paddedCoeffs in general due to erasure redundancy
 	copy(paddedCoeffs, poly.Coeffs)
-
-	proofs, err := g.ProveAllCosetThreads(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+	proofs, err := g.Computer.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
 	}
+	multiProofDone := time.Now()
 
 	if g.Verbose {
-		log.Printf("    Proving takes    %v\n", time.Since(intermediate))
+		log.Printf("    RS encode     takes  %v\n", rsEncodeDone.Sub(startTime))
+		log.Printf("    Commiting     takes  %v\n", commitDone.Sub(rsEncodeDone))
+		log.Printf("    LengthCommit  takes  %v\n", lengthCommitDone.Sub(commitDone))
+		log.Printf("    lengthProof   takes  %v\n", lengthProofDone.Sub(lengthCommitDone))
+		log.Printf("    multiProof    takes  %v\n", multiProofDone.Sub(lengthProofDone))
+		log.Printf("Meta infro. order %v. shift %v\n", len(g.Srs.G2), g.SRSOrder-uint64(len(inputFr)))
 	}
 
+	// assemble frames
 	kzgFrames := make([]encoding.Frame, len(frames))
 	for i, index := range indices {
 		kzgFrames[i] = encoding.Frame{
@@ -121,153 +103,5 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	if g.Verbose {
 		log.Printf("Total encoding took      %v\n", time.Since(startTime))
 	}
-	return &commit, &lengthCommitment, &lengthProof, kzgFrames, indices, nil
-}
-
-func (g *ParametrizedProver) Commit(polyFr []fr.Element) (bn254.G1Affine, error) {
-	commit, err := g.Ks.CommitToPoly(polyFr)
-	return *commit, err
-}
-
-func (p *ParametrizedProver) ProveAllCosetThreads(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
-	begin := time.Now()
-	// Robert: Standardizing this to use the same math used in precomputeSRS
-	dimE := numChunks
-	l := chunkLen
-
-	sumVec := make([]bn254.G1Affine, dimE*2)
-
-	jobChan := make(chan uint64, numWorker)
-	results := make(chan WorkerResult, numWorker)
-
-	// create storage for intermediate fft outputs
-	coeffStore := make([][]fr.Element, dimE*2)
-	for i := range coeffStore {
-		coeffStore[i] = make([]fr.Element, l)
-	}
-
-	for w := uint64(0); w < numWorker; w++ {
-		go p.proofWorker(polyFr, jobChan, l, dimE, coeffStore, results)
-	}
-
-	for j := uint64(0); j < l; j++ {
-		jobChan <- j
-	}
-	close(jobChan)
-
-	// return last error
-	var err error
-	for w := uint64(0); w < numWorker; w++ {
-		wr := <-results
-		if wr.err != nil {
-			err = wr.err
-		}
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("proof worker error: %v", err)
-	}
-
-	t0 := time.Now()
-
-	// compute proof by multi scaler multiplication
-	msmErrors := make(chan error, dimE*2)
-	for i := uint64(0); i < dimE*2; i++ {
-
-		go func(k uint64) {
-			_, err := sumVec[k].MultiExp(p.FFTPointsT[k], coeffStore[k], ecc.MultiExpConfig{})
-			// handle error
-			msmErrors <- err
-		}(i)
-	}
-
-	for i := uint64(0); i < dimE*2; i++ {
-		err := <-msmErrors
-		if err != nil {
-			fmt.Println("Error. MSM while adding points", err)
-			return nil, err
-		}
-	}
-
-	t1 := time.Now()
-
-	// only 1 ifft is needed
-	sumVecInv, err := p.Fs.FFTG1(sumVec, true)
-	if err != nil {
-		return nil, fmt.Errorf("fft error: %v", err)
-	}
-
-	t2 := time.Now()
-
-	// outputs is out of order - buttefly
-	proofs, err := p.Fs.FFTG1(sumVecInv[:dimE], false)
-	if err != nil {
-		return nil, err
-	}
-
-	t3 := time.Now()
-
-	fmt.Printf("mult-th %v, msm %v,fft1 %v, fft2 %v,\n", t0.Sub(begin), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2))
-
-	return proofs, nil
-}
-
-func (p *ParametrizedProver) proofWorker(
-	polyFr []fr.Element,
-	jobChan <-chan uint64,
-	l uint64,
-	dimE uint64,
-	coeffStore [][]fr.Element,
-	results chan<- WorkerResult,
-) {
-
-	for j := range jobChan {
-		coeffs, err := p.GetSlicesCoeff(polyFr, dimE, j, l)
-		if err != nil {
-			results <- WorkerResult{
-				points: nil,
-				err:    err,
-			}
-		} else {
-			for i := 0; i < len(coeffs); i++ {
-				coeffStore[i][j] = coeffs[i]
-			}
-		}
-	}
-
-	results <- WorkerResult{
-		err: nil,
-	}
-}
-
-// output is in the form see primeField toeplitz
-//
-// phi ^ (coset size ) = 1
-//
-// implicitly pad slices to power of 2
-func (p *ParametrizedProver) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
-	// there is a constant term
-	m := uint64(len(polyFr)) - 1
-	dim := (m - j) / l
-
-	toeV := make([]fr.Element, 2*dimE-1)
-	for i := uint64(0); i < dim; i++ {
-
-		toeV[i].Set(&polyFr[m-(j+i*l)])
-	}
-
-	// use precompute table
-	tm, err := toeplitz.NewToeplitz(toeV, p.SFs)
-	if err != nil {
-		return nil, err
-	}
-	return tm.GetFFTCoeff()
-}
-
-/*
-returns the power of 2 which is immediately bigger than the input
-*/
-func CeilIntPowerOf2Num(d uint64) uint64 {
-	nextPower := math.Ceil(math.Log2(float64(d)))
-	return uint64(math.Pow(2.0, nextPower))
+	return commit, lengthCommitment, lengthProof, kzgFrames, indices, nil
 }
