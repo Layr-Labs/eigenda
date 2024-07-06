@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/hashicorp/go-multierror"
 
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -20,34 +20,13 @@ type ParametrizedProver struct {
 	*kzg.KzgConfig
 	Ks *kzg.KZGSettings
 
-	Computer ProofComputer
-}
+	Fs         *fft.FFTSettings
+	Ks         *kzg.KZGSettings
+	SFs        *fft.FFTSettings   // fft used for submatrix product helper
+	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 
-type RsEncodeResult struct {
-	Frames   []rs.Frame
-	Indices  []uint32
-	Duration time.Duration
-	Err      error
-}
-type LengthCommitmentResult struct {
-	LengthCommitment bn254.G2Affine
-	Duration         time.Duration
-	Err              error
-}
-type LengthProofResult struct {
-	LengthProof bn254.G2Affine
-	Duration    time.Duration
-	Err         error
-}
-type CommitmentResult struct {
-	Commitment bn254.G1Affine
-	Duration   time.Duration
-	Err        error
-}
-type ProofsResult struct {
-	Proofs   []bn254.G1Affine
-	Duration time.Duration
-	Err      error
+	UseGpu   bool
+	Computer ProofComputer
 }
 
 // just a wrapper to take bytes not Fr Element
@@ -65,113 +44,63 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
 	}
 
-	encodeStart := time.Now()
-
-	rsChan := make(chan RsEncodeResult, 1)
-	lengthCommitmentChan := make(chan LengthCommitmentResult, 1)
-	lengthProofChan := make(chan LengthProofResult, 1)
-	commitmentChan := make(chan CommitmentResult, 1)
-	proofChan := make(chan ProofsResult, 1)
-
-	// inputFr is untouched
+	startTime := time.Now()
 	// compute chunks
-	go func() {
-		start := time.Now()
-		frames, indices, err := g.Encoder.Encode(inputFr)
-		rsChan <- RsEncodeResult{
-			Frames:   frames,
-			Indices:  indices,
-			Err:      err,
-			Duration: time.Since(start),
-		}
-	}()
+	poly, frames, indices, err := g.Encoder.Encode(inputFr)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	rsEncodeDone := time.Now()
 
 	// compute commit for the full poly
-	go func() {
-		start := time.Now()
-		commit, err := g.Computer.ComputeCommitment(inputFr)
-		commitmentChan <- CommitmentResult{
-			Commitment: *commit,
-			Err:        err,
-			Duration:   time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		lengthCommitment, err := g.Computer.ComputeLengthCommitment(inputFr)
-		lengthCommitmentChan <- LengthCommitmentResult{
-			LengthCommitment: *lengthCommitment,
-			Err:              err,
-			Duration:         time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		lengthProof, err := g.Computer.ComputeLengthProof(inputFr)
-		lengthProofChan <- LengthProofResult{
-			LengthProof: *lengthProof,
-			Err:         err,
-			Duration:    time.Since(start),
-		}
-	}()
-
-	go func() {
-		start := time.Now()
-		// compute proofs
-		paddedCoeffs := make([]fr.Element, g.NumEvaluations())
-		// polyCoeffs has less points than paddedCoeffs in general due to erasure redundancy
-		copy(paddedCoeffs, inputFr)
-
-		numBlob := 1
-		flatpaddedCoeffs := make([]fr.Element, 0, numBlob*len(paddedCoeffs))
-		for i := 0; i < numBlob; i++ {
-			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
-		}
-
-		proofs, err := g.Computer.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
-		proofChan <- ProofsResult{
-			Proofs:   proofs,
-			Err:      err,
-			Duration: time.Since(start),
-		}
-	}()
-
-	lengthProofResult := <-lengthProofChan
-	lengthCommitmentResult := <-lengthCommitmentChan
-	commitmentResult := <-commitmentChan
-	rsResult := <-rsChan
-	proofsResult := <-proofChan
-
-	if lengthProofResult.Err != nil || lengthCommitmentResult.Err != nil ||
-		commitmentResult.Err != nil || rsResult.Err != nil ||
-		proofsResult.Err != nil {
-		return nil, nil, nil, nil, nil, multierror.Append(lengthProofResult.Err, lengthCommitmentResult.Err, commitmentResult.Err, rsResult.Err, proofsResult.Err)
+	commit, err := g.Computer.ComputeCommitment(poly.Coeffs)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
-	totalProcessingTime := time.Since(encodeStart)
+	commitDone := time.Now()
 
-	log.Printf("\n\t\tRS encode     %-v\n\t\tCommiting     %-v\n\t\tLengthCommit  %-v\n\t\tlengthProof   %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
-		rsResult.Duration,
-		commitmentResult.Duration,
-		lengthCommitmentResult.Duration,
-		lengthProofResult.Duration,
-		proofsResult.Duration,
-		g.SRSOrder,
-		g.SRSOrder-uint64(len(inputFr)),
-	)
+	lengthCommitment, err := g.Computer.ComputeLengthCommitment(poly.Coeffs)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	lengthCommitDone := time.Now()
+
+	lengthProof, err := g.Computer.ComputeLengthProof(poly.Coeffs)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	lengthProofDone := time.Now()
+
+	// compute proofs
+	paddedCoeffs := make([]fr.Element, g.NumEvaluations())
+	// polyCoeffs has less points than paddedCoeffs in general due to erasure redundancy
+	copy(paddedCoeffs, poly.Coeffs)
+	proofs, err := g.Computer.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not generate proofs: %v", err)
+	}
+	multiProofDone := time.Now()
+
+	if g.Verbose {
+		log.Printf("    RS encode     takes  %v\n", rsEncodeDone.Sub(startTime))
+		log.Printf("    Commiting     takes  %v\n", commitDone.Sub(rsEncodeDone))
+		log.Printf("    LengthCommit  takes  %v\n", lengthCommitDone.Sub(commitDone))
+		log.Printf("    lengthProof   takes  %v\n", lengthProofDone.Sub(lengthCommitDone))
+		log.Printf("    multiProof    takes  %v\n", multiProofDone.Sub(lengthProofDone))
+		log.Printf("Meta infro. order %v. shift %v\n", len(g.Srs.G2), g.SRSOrder-uint64(len(inputFr)))
+	}
 
 	// assemble frames
-	kzgFrames := make([]encoding.Frame, len(rsResult.Frames))
-	for i, index := range rsResult.Indices {
+	kzgFrames := make([]encoding.Frame, len(frames))
+	for i, index := range indices {
 		kzgFrames[i] = encoding.Frame{
-			Proof:  proofsResult.Proofs[index],
-			Coeffs: rsResult.Frames[i].Coeffs,
+			Proof:  proofs[index],
+			Coeffs: frames[i].Coeffs,
 		}
 	}
 
 	if g.Verbose {
-		log.Printf("Total encoding took      %v\n", totalProcessingTime)
+		log.Printf("Total encoding took      %v\n", time.Since(startTime))
 	}
-	return &commitmentResult.Commitment, &lengthCommitmentResult.LengthCommitment, &lengthProofResult.LengthProof, kzgFrames, rsResult.Indices, nil
+	return commit, lengthCommitment, lengthProof, kzgFrames, indices, nil
 }

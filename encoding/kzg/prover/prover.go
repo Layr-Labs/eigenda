@@ -14,6 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/cpu"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/gpu"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
@@ -28,6 +30,7 @@ type Prover struct {
 	LoadG2Points bool
 
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
+	UseGpu              bool
 }
 
 var _ encoding.Prover = &Prover{}
@@ -236,20 +239,36 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
-	computer := &CpuProofComputer{
-		Fs:         fs,
-		FFTPointsT: fftPointsT,
-		SFs:        sfs,
-		Srs:        g.Srs,
-		G2Trailing: g.G2Trailing,
-		KzgConfig:  g.KzgConfig,
+	var computer ProofComputer
+	if !g.UseGpu {
+		computer = &cpu.CpuComputer{
+			Fs:         fs,
+			FFTPointsT: fftPointsT,
+			SFs:        sfs,
+			Srs:        g.Srs,
+			G2Trailing: g.G2Trailing,
+			KzgConfig:  g.KzgConfig,
+		}
+	} else {
+		computer = &gpu.GpuComputer{
+			Fs:         fs,
+			FFTPointsT: fftPointsT,
+			SFs:        sfs,
+			Srs:        g.Srs,
+			G2Trailing: g.G2Trailing,
+			KzgConfig:  g.KzgConfig,
+		}
 	}
 
 	return &ParametrizedProver{
-		Encoder:   encoder,
-		KzgConfig: g.KzgConfig,
-		Ks:        ks,
-		Computer:  computer,
+		Encoder:    encoder,
+		KzgConfig:  g.KzgConfig,
+		Srs:        g.Srs,
+		G2Trailing: g.G2Trailing,
+		Fs:         fs,
+		FFTPointsT: fftPointsT,
+		UseGpu:     g.UseGpu,
+		Computer:   computer,
 	}, nil
 }
 

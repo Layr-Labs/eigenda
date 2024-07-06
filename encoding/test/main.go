@@ -51,7 +51,7 @@ func readpoints() {
 */
 
 func TestKzgRs() {
-	numSymbols := 1024
+	numSymbols := 4
 	// encode parameters
 	numNode := uint64(4) // 200
 	numSys := uint64(2)  // 180
@@ -63,8 +63,8 @@ func TestKzgRs() {
 	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
+		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
+		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
 		CacheDir:        "SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
@@ -75,7 +75,9 @@ func TestKzgRs() {
 	// create encoding object
 	p, _ := prover.NewProver(kzgConfig, true)
 
-	params := encoding.EncodingParams{NumChunks: numNode, ChunkLength: uint64(numSymbols) / numSys}
+	p.UseGpu = true
+
+	params := encoding.EncodingParams{NumChunks: numNode, ChunkLength: uint64(numSymbols) / uint64(numSys)}
 	enc, _ := p.GetKzgEncoder(params)
 
 	//inputFr := kzg.ToFrArray(inputBytes)
@@ -86,7 +88,7 @@ func TestKzgRs() {
 	}
 
 	fmt.Printf("Input \n")
-	printFr(inputFr)
+	//printFr(inputFr)
 
 	//inputSize := uint64(len(inputFr))
 	commit, lengthCommit, lengthProof, frames, fIndices, err := enc.Encode(inputFr)
@@ -142,8 +144,8 @@ func TestKzgRs() {
 	//if err != nil {
 	//log.Fatalf("%v", err)
 	//}
-
-	fmt.Println(dataFr)
+	_ = dataFr
+	//fmt.Println(dataFr)
 	// printFr(dataFr)
 	//deData := kzg.ToByteArray(dataFr, inputByteSize)
 	//fmt.Println("dataFr")
