@@ -22,13 +22,13 @@ type WorkerResult struct {
 
 type GpuComputeDevice struct {
 	*kzg.KzgConfig
-	Fs         *fft.FFTSettings
-	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
-	SFs        *fft.FFTSettings
-	Srs        *kzg.SRS
-	G2Trailing []bn254.G2Affine
-	NttCfg     core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
-	GpuLock    *sync.Mutex // lock whenever gpu is needed,
+	Fs             *fft.FFTSettings
+	FlatFFTPointsT []bn254_icicle.Affine
+	SFs            *fft.FFTSettings
+	Srs            *kzg.SRS
+	G2Trailing     []bn254.G2Affine
+	NttCfg         core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	GpuLock        *sync.Mutex // lock whenever gpu is needed,
 }
 
 // benchmarks shows cpu commit on 2MB blob only takes 24.165562ms. For now, use cpu
@@ -76,6 +76,7 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 	dimE := numChunks
 	l := chunkLen
 	numPoly := uint64(len(polyFr)) / dimE / chunkLen
+	fmt.Println("numPoly", numPoly)
 
 	begin := time.Now()
 
@@ -117,32 +118,34 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 	defer p.GpuLock.Unlock()
 
 	// Compute NTT on the coeff matrix
-	p.NttCfg.BatchSize = int32(l)
-	coeffStoreFFT, e := p.NTT(coeffStore)
+	p.NttCfg.BatchSize = int32(l * numPoly)
+	coeffStoreFft, e := p.NTT(coeffStore)
 	if e != nil {
 		return nil, e
 	}
 	nttDone := time.Now()
 
-	// transpose the FFT tranformed matrix
-	coeffStoreFFTT := make([][]fr.Element, dimE*2*numPoly)
-	for i := range coeffStoreFFTT {
-		coeffStoreFFTT[i] = make([]fr.Element, l)
-	}
-
-	for k := uint64(0); k < numPoly; k++ {
-		step := int(k * dimE * 2)
-		for i := 0; i < int(l); i++ {
-			vec := coeffStoreFFT[i+int(k*l)]
-			for j := 0; j < int(dimE*2); j++ {
-				coeffStoreFFTT[j+step][i] = vec[j]
+	/*
+		fmt.Println("after fft")
+		vec := gpu_utils.ConvertScalarFieldsToFrBytes(coeffStoreFft)
+		for i := 0; i < int(l*numPoly); i++ {
+			length := int(dimE) * 2
+			for j := 0; j < length; j++ {
+				fmt.Printf("%v ", vec[i*length+j].String())
 			}
+			fmt.Println()
 		}
+	*/
+
+	// transpose the FFT tranformed matrix
+	coeffStoreFftTranspose, err := Transpose(coeffStoreFft, int(l), int(numPoly), int(dimE)*2)
+	if err != nil {
+		return nil, e
 	}
 	transposingDone := time.Now()
 
 	// compute msm on each rows of the transposed matrix
-	sumVec, err := p.MsmBatch(coeffStoreFFTT, p.FFTPointsT)
+	sumVec, err := p.MsmBatch(coeffStoreFftTranspose, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 	if err != nil {
 		return nil, err
 	}
@@ -150,27 +153,39 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 
 	// compute the first ecntt, and set new batch size for ntt
 	p.NttCfg.BatchSize = int32(numPoly)
-	sumVecInv, err := p.ECNtt(sumVec, true)
+	sumVecInv, err := p.ECNtt(sumVec, true, int(dimE)*2*int(numPoly))
 	if err != nil {
 		return nil, err
 	}
 	firstECNttDone := time.Now()
+	sumVec.Free()
 
-	// remove half points per poly
-	batchInv := make([]bn254.G1Affine, len(sumVecInv)/2)
+	// extract proofs
+	prunedSumVecInv := core.HostSliceWithValue(bn254_icicle.Projective{}, len(sumVecInv)/2)
 	k := 0
 	for i := 0; i < int(numPoly); i++ {
 		for j := 0; j < int(dimE); j++ {
-			batchInv[k] = sumVecInv[i*int(dimE)*2+j]
+			prunedSumVecInv[k] = sumVecInv[i*int(dimE)*2+j]
 			k += 1
 		}
 	}
 
 	// compute the second ecntt on the reduced size array
-	flatProofsBatch, err := p.ECNtt(batchInv, false)
+	flatProofsBatch, err := p.ECNttToGnark(prunedSumVecInv, false, int(numPoly)*int(dimE))
 	if err != nil {
 		return nil, fmt.Errorf("second ECNtt error: %w", err)
 	}
+
+	/*
+		// debug
+		for i := 0; i < int(numPoly); i++ {
+			for j := 0; j < int(dimE); j++ {
+				fmt.Printf("%v ", flatProofsBatch[i*int(dimE)+j].String())
+			}
+			fmt.Println()
+		}
+	*/
+
 	secondECNttDone := time.Now()
 
 	fmt.Printf("Multiproof Time Decomp \n\t\ttotal   %-20v \n\t\tpreproc %-20v \n\t\tntt     %-20v \n\t\ttranspose %-20v \n\t\tmsm     %-v \n\t\tfft1    %-v \n\t\tfft2    %-v,\n",
@@ -183,6 +198,7 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 		secondECNttDone.Sub(firstECNttDone),
 	)
 
+	// only takes the first half
 	return flatProofsBatch, nil
 }
 

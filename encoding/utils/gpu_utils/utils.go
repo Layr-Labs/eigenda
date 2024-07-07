@@ -1,9 +1,13 @@
 package gpu_utils
 
 import (
+	"math"
+	"sync"
+
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
 	bn254_icicle "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254"
 )
 
@@ -76,4 +80,56 @@ func IcicleProjectiveToGnarkAffine(p bn254_icicle.Projective) bn254.G1Affine {
 	y.Mul(&py, zInv)
 
 	return bn254.G1Affine{X: *x, Y: *y}
+}
+
+func HostSliceIcicleProjectiveToGnarkAffine(ps core.HostSlice[bn254_icicle.Projective], numWorker int) []bn254.G1Affine {
+	output := make([]bn254.G1Affine, len(ps))
+
+	var wg sync.WaitGroup
+
+	interval := int(math.Ceil(float64(len(ps)) / float64(numWorker)))
+
+	for w := 0; w < numWorker; w++ {
+		wg.Add(1)
+		start := w * interval
+		end := (w + 1) * interval
+		if len(ps) < end {
+			end = len(ps)
+		}
+
+		go func(workerStart, workerEnd int) {
+			defer wg.Done()
+			for i := workerStart; i < workerEnd; i++ {
+				output[i] = IcicleProjectiveToGnarkAffine(ps[i])
+			}
+
+		}(start, end)
+	}
+	wg.Wait()
+	return output
+}
+
+func ConvertFrToScalarFieldsBytesThread(data []fr.Element, numWorker int) []bn254_icicle.ScalarField {
+	scalars := make([]bn254_icicle.ScalarField, len(data))
+
+	var wg sync.WaitGroup
+
+	interval := int(math.Ceil(float64(len(data)) / float64(numWorker)))
+
+	for w := 0; w < numWorker; w++ {
+		wg.Add(1)
+		start := w * interval
+		end := (w + 1) * interval
+		if len(data) < end {
+			end = len(data)
+		}
+
+		go func(workerStart, workerEnd int) {
+			defer wg.Done()
+			output := ConvertFrToScalarFieldsBytes(data[workerStart:workerEnd])
+			copy(scalars[workerStart:workerEnd], output[:])
+		}(start, end)
+	}
+	wg.Wait()
+	return scalars
 }

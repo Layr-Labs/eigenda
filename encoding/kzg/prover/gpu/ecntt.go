@@ -12,33 +12,31 @@ import (
 	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
 )
 
-func (c *GpuComputeDevice) ECNtt(batchPoints []bn254.G1Affine, isInverse bool) ([]bn254.G1Affine, error) {
-	totalNumSym := len(batchPoints)
+func (c *GpuComputeDevice) ECNttToGnark(batchPoints core.HostOrDeviceSlice, isInverse bool, totalSize int) ([]bn254.G1Affine, error) {
+	output, err := c.ECNtt(batchPoints, isInverse, totalSize)
+	if err != nil {
+		return nil, err
+	}
 
-	// convert gnark affine to icicle projective on slice
-	pointsIcileProjective := gpu_utils.BatchConvertGnarkAffineToIcicleProjective(batchPoints)
-	pointsCopy := core.HostSliceFromElements[icicle_bn254.Projective](pointsIcileProjective)
+	// convert icicle projective to gnark affine
+	gpuFFTBatch := gpu_utils.HostSliceIcicleProjectiveToGnarkAffine(output, int(c.NumWorker))
 
-	output := make(core.HostSlice[icicle_bn254.Projective], int(totalNumSym))
+	return gpuFFTBatch, nil
+}
 
-	// compute
+func (c *GpuComputeDevice) ECNtt(batchPoints core.HostOrDeviceSlice, isInverse bool, totalSize int) (core.HostSlice[icicle_bn254.Projective], error) {
+	output := make(core.HostSlice[icicle_bn254.Projective], totalSize)
+
 	if isInverse {
-		err := ecntt.ECNtt(pointsCopy, core.KInverse, &c.NttCfg, output)
+		err := ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, output)
 		if err.CudaErrorCode != cr.CudaSuccess || err.IcicleErrorCode != core.IcicleSuccess {
 			return nil, fmt.Errorf("inverse ecntt failed")
 		}
 	} else {
-		err := ecntt.ECNtt(pointsCopy, core.KForward, &c.NttCfg, output)
+		err := ecntt.ECNtt(batchPoints, core.KForward, &c.NttCfg, output)
 		if err.CudaErrorCode != cr.CudaSuccess || err.IcicleErrorCode != core.IcicleSuccess {
 			return nil, fmt.Errorf("forward ecntt failed")
 		}
 	}
-
-	// convert icicle projective to gnark affine
-	gpuFFTBatch := make([]bn254.G1Affine, len(batchPoints))
-	for j := 0; j < totalNumSym; j++ {
-		gpuFFTBatch[j] = gpu_utils.IcicleProjectiveToGnarkAffine(output[j])
-	}
-
-	return gpuFFTBatch, nil
+	return output, nil
 }

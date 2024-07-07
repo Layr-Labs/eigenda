@@ -130,7 +130,14 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		paddedCoeffs := make([]fr.Element, g.NumEvaluations())
 		// polyCoeffs has less points than paddedCoeffs in general due to erasure redundancy
 		copy(paddedCoeffs, inputFr)
-		proofs, err := g.Computer.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+
+		numBlob := 1
+		flatpaddedCoeffs := make([]fr.Element, 0, numBlob*len(paddedCoeffs))
+		for i := 0; i < numBlob; i++ {
+			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
+		}
+
+		proofs, err := g.Computer.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 		proofChan <- ProofsResult{
 			Proofs:   proofs,
 			Err:      err,

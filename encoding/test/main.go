@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"time"
 
 	"runtime"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -20,7 +20,7 @@ import (
 
 func main() {
 	TestKzgRs()
-	//err := kzg.WriteGeneratorPoints(30000)
+	//err := kzg.WriteGeneratorPoints(600000)
 	//if err != nil {
 	//	log.Println("WriteGeneratorPoints failed:", err)
 	//}
@@ -64,8 +64,8 @@ func TestKzgRs() {
 	fmt.Println("num device ", numDevices)
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
-		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
+		G1Path:          "../../inabox/resources/kzg/g1.point.600000",
+		G2Path:          "../../inabox/resources/kzg/g2.point.600000",
 		CacheDir:        "SRSTables",
 		SRSOrder:        300000,
 		SRSNumberToLoad: 300000,
@@ -117,10 +117,14 @@ func TestKzgRs() {
 	commit, lengthCommit, lengthProof, frames, fIndices, err := enc.Encode(inputFr)
 	_ = lengthProof
 	_ = lengthCommit
+	_ = commit
+	_ = frames
+	_ = fIndices
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Optionally verify
+
 	startVerify := time.Now()
 
 	//os.Exit(0)
@@ -167,6 +171,7 @@ func TestKzgRs() {
 	//log.Fatalf("%v", err)
 	//}
 	_ = dataFr
+
 	//fmt.Println(dataFr)
 	// printFr(dataFr)
 	//deData := kzg.ToByteArray(dataFr, inputByteSize)

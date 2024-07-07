@@ -10,7 +10,7 @@ import (
 	bn254_icicle_ntt "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/ntt"
 )
 
-func (c *GpuComputeDevice) NTT(batchFr [][]fr.Element) ([][]fr.Element, error) {
+func (c *GpuComputeDevice) NTT(batchFr [][]fr.Element) (core.HostSlice[bn254_icicle.ScalarField], error) {
 	if len(batchFr) == 0 {
 		return nil, fmt.Errorf("input to NTT contains no blob")
 	}
@@ -25,19 +25,12 @@ func (c *GpuComputeDevice) NTT(batchFr [][]fr.Element) ([][]fr.Element, error) {
 	for i := 0; i < len(batchFr); i++ {
 		flattenBatchFr = append(flattenBatchFr, batchFr[i]...)
 	}
-	flattenBatchSf := gpu_utils.ConvertFrToScalarFieldsBytes(flattenBatchFr)
+	flattenBatchSf := gpu_utils.ConvertFrToScalarFieldsBytesThread(flattenBatchFr, int(c.NumWorker))
 	scalarsCopy := core.HostSliceFromElements[bn254_icicle.ScalarField](flattenBatchSf)
 
 	// run ntt
 	output := make(core.HostSlice[bn254_icicle.ScalarField], totalSize)
 	bn254_icicle_ntt.Ntt(scalarsCopy, core.KForward, &c.NttCfg, output)
-	flattenBatchFrOutput := gpu_utils.ConvertScalarFieldsToFrBytes(output)
 
-	// convert ntt output from icicle to gnark
-	nttOutput := make([][]fr.Element, len(batchFr))
-	for i := 0; i < len(batchFr); i++ {
-		nttOutput[i] = flattenBatchFrOutput[i*numSymbol : (i+1)*numSymbol]
-	}
-
-	return nttOutput, nil
+	return output, nil
 }
