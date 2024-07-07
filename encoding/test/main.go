@@ -52,7 +52,7 @@ func readpoints() {
 func TestKzgRs() {
 	isSmallTest := false
 
-	numSymbols := 4096 * 8
+	numSymbols := 4096 / 8
 	// encode parameters
 	numNode := uint64(4096) // 200
 	numSys := uint64(512)   // 180
@@ -72,7 +72,7 @@ func TestKzgRs() {
 	}
 
 	if isSmallTest {
-		numSymbols = 4
+		numSymbols = 2
 		numNode = 4
 		numSys = 2
 		numPar = numNode - numSys
@@ -96,7 +96,7 @@ func TestKzgRs() {
 	// create encoding object
 	p, _ := prover.NewProver(kzgConfig, true)
 
-	p.UseGpu = true
+	p.UseGpu = false
 
 	params := encoding.EncodingParams{NumChunks: numNode, ChunkLength: uint64(numSymbols) / uint64(numSys)}
 	enc, _ := p.GetKzgEncoder(params)
@@ -137,6 +137,11 @@ func TestKzgRs() {
 
 		if j != q {
 			log.Fatal("leading coset inconsistency")
+		}
+
+		// special case when chunk Len =1, we need to artificially use root doubled
+		if params.ChunkLength == uint64(1) {
+			j *= 2
 		}
 
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
