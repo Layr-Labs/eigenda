@@ -1,7 +1,6 @@
 package rs
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -37,22 +36,22 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	start := time.Now()
 	intermediate := time.Now()
 
-	polyCoeffs := inputFr
+	pdCoeffs, err := g.PadPolyEval(inputFr)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
-	// extend data based on Sys, Par ratio. The returned fullCoeffsPoly is padded with 0 to ease proof
-	polyEvals, _, err := g.ExtendPolyEval(polyCoeffs)
+	polyEvals, err := g.Computer.ExtendPolyEval(pdCoeffs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	poly := &GlobalPoly{
 		Values: polyEvals,
-		Coeffs: polyCoeffs,
+		Coeffs: inputFr,
 	}
 
-	if g.verbose {
-		log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
-	}
+	log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
 
 	// create frames to group relevant info
 	frames, indices, err := g.MakeFrames(polyEvals)
@@ -122,27 +121,31 @@ func (g *Encoder) MakeFrames(
 	return frames, indices, nil
 }
 
-// Encoding Reed Solomon using FFT
-func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Element, error) {
-
+func (g *Encoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 	if len(coeffs) > int(g.NumEvaluations()) {
-		return nil, nil, errors.New("the provided encoding parameters are not sufficient for the size of the data input")
+		return nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
 	}
 
 	pdCoeffs := make([]fr.Element, g.NumEvaluations())
 	for i := 0; i < len(coeffs); i++ {
 		pdCoeffs[i].Set(&coeffs[i])
 	}
+	// Padding to GPU
 	for i := len(coeffs); i < len(pdCoeffs); i++ {
 		pdCoeffs[i].SetZero()
 	}
+	return pdCoeffs, nil
+}
 
-	evals, err := g.Fs.FFT(pdCoeffs, false)
+// Encoding Reed Solomon using FFT
+func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+
+	evals, err := g.Fs.FFT(coeffs, false)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return evals, pdCoeffs, nil
+	return evals, nil
 }
 
 type JobRequest struct {

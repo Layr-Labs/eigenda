@@ -1,4 +1,4 @@
-package gpu
+package gpu_utils
 
 import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"

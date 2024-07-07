@@ -3,6 +3,7 @@ package gpu
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
@@ -20,13 +21,13 @@ func (c *GpuComputer) MsmBatch(rowsFr [][]fr.Element, rowsG1 [][]bn254.G1Affine)
 
 	// Prepare scalar fields
 	for _, row := range rowsFr {
-		rowsSfIcicle = append(rowsSfIcicle, ConvertFrToScalarFieldsBytes(row)...)
+		rowsSfIcicle = append(rowsSfIcicle, gpu_utils.ConvertFrToScalarFieldsBytes(row)...)
 	}
 	rowsFrIcicleCopy := core.HostSliceFromElements[icicle_bn254.ScalarField](rowsSfIcicle)
 
 	// Prepare icicle g1 affines
 	for _, row := range rowsG1 {
-		rowsAffineIcicle = append(rowsAffineIcicle, BatchConvertGnarkAffineToIcicleAffine(row)...)
+		rowsAffineIcicle = append(rowsAffineIcicle, gpu_utils.BatchConvertGnarkAffineToIcicleAffine(row)...)
 	}
 	rowsG1IcicleCopy := core.HostSliceFromElements[icicle_bn254.Affine](rowsAffineIcicle)
 
@@ -52,7 +53,7 @@ func (c *GpuComputer) MsmBatch(rowsFr [][]fr.Element, rowsG1 [][]bn254.G1Affine)
 	// convert data back to gnark format
 	gnarkOuts := make([]bn254.G1Affine, numBatchEle)
 	for i := 0; i < numBatchEle; i++ {
-		gnarkOuts[i] = IcicleProjectiveToGnarkAffine(outHost[i])
+		gnarkOuts[i] = gpu_utils.IcicleProjectiveToGnarkAffine(outHost[i])
 	}
 
 	return gnarkOuts, nil
