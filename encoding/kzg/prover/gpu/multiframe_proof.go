@@ -26,7 +26,7 @@ type GpuComputer struct {
 	SFs        *fft.FFTSettings
 	Srs        *kzg.SRS
 	G2Trailing []bn254.G2Affine
-	cfg        core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	NttCfg        core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
 }
 
 // benchmarks shows cpu commit on 2MB blob only takes 24.165562ms. For now, use cpu
@@ -67,33 +67,26 @@ func (p *GpuComputer) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Aff
 	return &lengthCommitment, nil
 }
 
+// This function supports batching over multiple blobs.
+// All blobs must have same size and concatenated passed as polyFr
 func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
 	l := chunkLen
 	numPoly := uint64(len(polyFr)) / dimE / chunkLen
 
-	p.cfg = SetupNTT()
-
 	begin := time.Now()
+
+	// create storage for intermediate coefficients matrix
 	jobChan := make(chan uint64, numWorker)
 	results := make(chan WorkerResult, numWorker)
 
-	// create storage for intermediate coefficients
 	coeffStore := make([][]fr.Element, l*numPoly)
 	for i := range coeffStore {
 		coeffStore[i] = make([]fr.Element, dimE*2)
 	}
 
-	fmt.Println("numPoly", numPoly)
-	fmt.Println("numChunks, ", numChunks)
-	fmt.Println("chunkLen", chunkLen)
-
-	for j := 0; j < len(polyFr); j++ {
-		fmt.Printf("%v ", polyFr[j].String())
-	}
-	fmt.Println("len(polyFr)", len(polyFr))
-
+	// Preprpcessing use CPU to compute those coefficients based on polyFr
 	for w := uint64(0); w < numWorker; w++ {
 		go p.proofWorkerGPU(polyFr, jobChan, l, dimE, coeffStore, results)
 	}
@@ -111,36 +104,25 @@ func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 			err = wr.err
 		}
 	}
-	t_prepare := time.Now()
-
+	// Preprpcessing Completed
 	if err != nil {
 		return nil, fmt.Errorf("proof worker error: %v", err)
 	}
+	preprocessDone := time.Now()
 
-	fmt.Println("coeffStore")
-	for i := 0; i < len(coeffStore); i++ {
-		a := coeffStore[i]
-		for j := 0; j < len(a); j++ {
-			fmt.Printf("%v ", a[j].String())
-		}
-		fmt.Println()
-	}
-
-	fmt.Println("NTT")
-	// setup batch size for NTT
-	p.cfg.BatchSize = int32(dimE * 2)
+	// Compute NTT on the coeff matrix
+	p.NttCfg.BatchSize = int32(l)
 	coeffStoreFFT, e := p.NTT(coeffStore)
 	if e != nil {
 		return nil, e
 	}
+	nttDone := time.Now()
 
-	// transpose it
+	// transpose the FFT tranformed matrix
 	coeffStoreFFTT := make([][]fr.Element, dimE*2*numPoly)
 	for i := range coeffStoreFFTT {
 		coeffStoreFFTT[i] = make([]fr.Element, l)
 	}
-
-	t_ntt := time.Now()
 
 	for k := uint64(0); k < numPoly; k++ {
 		step := int(k * dimE * 2)
@@ -151,38 +133,25 @@ func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 			}
 		}
 	}
+	transposingDone := time.Now()
 
-	fmt.Println("Transposed FFT")
-	for i := 0; i < len(coeffStoreFFTT); i++ {
-		vec := coeffStoreFFTT[i]
-		for j := 0; j < len(vec); j++ {
-			fmt.Printf("%v ", vec[j].String())
-		}
-		fmt.Println()
-	}
-
-	t0 := time.Now()
-	fmt.Println("MsmBatch")
+	// compute msm on each rows of the transposed matrix
 	sumVec, err := p.MsmBatch(coeffStoreFFTT, p.FFTPointsT)
 	if err != nil {
 		return nil, err
 	}
+	msmDone := time.Now()
 
-	t1 := time.Now()
-
-	fmt.Println("ECNTT inverse")
-	// set new batch size for ntt, this equals to number of blobs
-	p.cfg.BatchSize = int32(numPoly)
+	// compute the first ecntt, and set new batch size for ntt
+	p.NttCfg.BatchSize = int32(numPoly)
 	sumVecInv, err := p.ECNtt(sumVec, true)
 	if err != nil {
 		return nil, err
 	}
-
-	t2 := time.Now()
+	firstECNttDone := time.Now()
 
 	// remove half points per poly
 	batchInv := make([]bn254.G1Affine, len(sumVecInv)/2)
-	// outputs is out of order - buttefly
 	k := 0
 	for i := 0; i < int(numPoly); i++ {
 		for j := 0; j < int(dimE); j++ {
@@ -190,22 +159,23 @@ func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 			k += 1
 		}
 	}
-	fmt.Println("ECNTT last")
+
+	// compute the second ecntt on the reduced size array
 	flatProofsBatch, err := p.ECNtt(batchInv, false)
 	if err != nil {
 		return nil, fmt.Errorf("second ECNtt error: %w", err)
 	}
+	secondECNttDone := time.Now()
 
-	t3 := time.Now()
-
-	fmt.Println("flatProofsBatch")
-
-	for j := 0; j < len(flatProofsBatch); j++ {
-		fmt.Printf("%v ", flatProofsBatch[j].String())
-	}
-
-	fmt.Printf("prepare %v, ntt %v,\n", t_prepare.Sub(begin), t_ntt.Sub(t_prepare))
-	fmt.Printf("total %v mult-th %v, msm %v,fft1 %v, fft2 %v,\n", t3.Sub(begin), t0.Sub(begin), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2))
+	fmt.Printf("Multiproof Time Decomp \n\t\ttotal   %-20v \n\t\tpreproc %-20v \n\t\tntt     %-20v \n\t\ttranspose %-20v \n\t\tmsm     %-v \n\t\tfft1    %-v \n\t\tfft2    %-v,\n",
+		secondECNttDone.Sub(begin),
+		preprocessDone.Sub(begin),
+		nttDone.Sub(preprocessDone),
+		transposingDone.Sub(nttDone),
+		msmDone.Sub(transposingDone),
+		firstECNttDone.Sub(msmDone),
+		secondECNttDone.Sub(firstECNttDone),
+	)
 
 	return flatProofsBatch, nil
 }
@@ -237,26 +207,6 @@ func (p *GpuComputer) proofWorkerGPU(
 	}
 }
 
-func (p *GpuComputer) GetSlicesCoeffWithoutFFT(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
-	// there is a constant term
-	m := uint64(len(polyFr)) - 1
-	dim := (m - j) / l
-
-	toeV := make([]fr.Element, 2*dimE-1)
-	for i := uint64(0); i < dim; i++ {
-
-		toeV[i].Set(&polyFr[m-(j+i*l)])
-	}
-
-	// use precompute table
-	tm, err := toeplitz.NewToeplitz(toeV, p.SFs)
-	if err != nil {
-		return nil, err
-	}
-	return tm.GetCoeff()
-}
-
-/*
 // capable of batching blobs
 func (p *GpuComputer) GetSlicesCoeffWithoutFFT(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
@@ -277,4 +227,3 @@ func (p *GpuComputer) GetSlicesCoeffWithoutFFT(polyFr []fr.Element, dimE, j, l u
 	}
 	return tm.GetCoeff()
 }
-*/

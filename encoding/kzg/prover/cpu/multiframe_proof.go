@@ -103,15 +103,6 @@ func (p *CpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 
 	t0 := time.Now()
 
-	fmt.Println("Transposed FFT")
-	for i := 0; i < len(coeffStore); i++ {
-		vec := coeffStore[i]
-		for j := 0; j < len(vec); j++ {
-			fmt.Printf("%v ", vec[j].String())
-		}
-		fmt.Println()
-	}
-
 	// compute proof by multi scaler multiplication
 	msmErrors := make(chan error, dimE*2)
 	for i := uint64(0); i < dimE*2; i++ {

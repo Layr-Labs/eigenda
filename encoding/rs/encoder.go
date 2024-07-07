@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type Encoder struct {
@@ -16,6 +17,12 @@ type Encoder struct {
 	verbose bool
 
 	NumRSWorker int
+
+	Computer RSComputer
+}
+
+type RSComputer interface {
+	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
 }
 
 // The function creates a high level struct that determines the encoding the a data of a

@@ -17,6 +17,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/gpu"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
+	rs_gpu "github.com/Layr-Labs/eigenda/encoding/rs/gpu"
+	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
 	_ "go.uber.org/automaxprocs"
@@ -239,6 +242,10 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
+	// Set RS computer
+	var rsComputer rs.RSComputer
+
+	// Set KZG Prover computer
 	var computer ProofComputer
 	if !g.UseGpu {
 		computer = &cpu.CpuComputer{
@@ -249,7 +256,13 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 			G2Trailing: g.G2Trailing,
 			KzgConfig:  g.KzgConfig,
 		}
+		rsComputer = &rs_cpu.CpuComputer{
+			Fs:             fs,
+			EncodingParams: params,
+		}
 	} else {
+		nttCfg := gpu_utils.SetupNTT()
+
 		computer = &gpu.GpuComputer{
 			Fs:         fs,
 			FFTPointsT: fftPointsT,
@@ -257,8 +270,16 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 			Srs:        g.Srs,
 			G2Trailing: g.G2Trailing,
 			KzgConfig:  g.KzgConfig,
+			NttCfg:     nttCfg,
+		}
+
+		rsComputer = &rs_gpu.GpuComputer{
+			Fs:             fs,
+			EncodingParams: params,
+			NttCfg:         nttCfg,
 		}
 	}
+	encoder.Computer = rsComputer
 
 	return &ParametrizedProver{
 		Encoder:    encoder,

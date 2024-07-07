@@ -82,12 +82,15 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	multiProofDone := time.Now()
 
 	if g.Verbose {
-		log.Printf("    RS encode     takes  %v\n", rsEncodeDone.Sub(startTime))
-		log.Printf("    Commiting     takes  %v\n", commitDone.Sub(rsEncodeDone))
-		log.Printf("    LengthCommit  takes  %v\n", lengthCommitDone.Sub(commitDone))
-		log.Printf("    lengthProof   takes  %v\n", lengthProofDone.Sub(lengthCommitDone))
-		log.Printf("    multiProof    takes  %v\n", multiProofDone.Sub(lengthProofDone))
-		log.Printf("Meta infro. order %v. shift %v\n", len(g.Srs.G2), g.SRSOrder-uint64(len(inputFr)))
+		log.Printf("\n\t\tRS encode     %-v\n\t\tCommiting     %-v\n\t\tLengthCommit  %-v\n\t\tlengthProof   %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
+			rsEncodeDone.Sub(startTime),
+			commitDone.Sub(rsEncodeDone),
+			lengthCommitDone.Sub(commitDone),
+			lengthProofDone.Sub(lengthCommitDone),
+			multiProofDone.Sub(lengthProofDone),
+			len(g.Srs.G2),
+			g.SRSOrder-uint64(len(inputFr)),
+		)
 	}
 
 	// assemble frames
