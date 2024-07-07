@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	cr "github.com/ingonyama-zk/icicle/v2/wrappers/golang/cuda_runtime"
 )
 
 func main() {
@@ -51,26 +52,48 @@ func readpoints() {
 */
 
 func TestKzgRs() {
-	numSymbols := 4
+	isSmallTest := false
+
+	numSymbols := 4096 * 8
 	// encode parameters
-	numNode := uint64(4) // 200
-	numSys := uint64(2)  // 180
+	numNode := uint64(4096) // 200
+	numSys := uint64(512)   // 180
 	numPar := numNode - numSys
-	// Prepare data
-	fmt.Printf("* Task Starts\n")
-	fmt.Printf("    Num Sys: %v\n", numSys)
-	fmt.Printf("    Num Par: %v\n", numPar)
-	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
+
+	numDevices, _ := cr.GetDeviceCount()
+	fmt.Println("num device ", numDevices)
 
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
 		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
 		CacheDir:        "SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
+		SRSOrder:        300000,
+		SRSNumberToLoad: 300000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		Verbose:         true,
 	}
+
+	if isSmallTest {
+		numSymbols = 4
+		numNode = 4
+		numSys = 2
+		numPar = numNode - numSys
+		kzgConfig = &kzg.KzgConfig{
+			G1Path:          "../../inabox/resources/kzg/g1.point.300000",
+			G2Path:          "../../inabox/resources/kzg/g2.point.300000",
+			CacheDir:        "SRSTables",
+			SRSOrder:        3000,
+			SRSNumberToLoad: 3000,
+			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+			Verbose:         true,
+		}
+	}
+
+	// Prepare data
+	fmt.Printf("* Task Starts\n")
+	fmt.Printf("    Num Sys: %v\n", numSys)
+	fmt.Printf("    Num Par: %v\n", numPar)
+	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
 
 	// create encoding object
 	p, _ := prover.NewProver(kzgConfig, true)
@@ -114,7 +137,6 @@ func TestKzgRs() {
 			log.Fatal("leading coset inconsistency")
 		}
 
-		fmt.Printf("frame %v leading coset %v\n", i, j)
 		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
 
 		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)

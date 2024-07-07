@@ -11,11 +11,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type GlobalPoly struct {
-	Coeffs []fr.Element
-	Values []fr.Element
-}
-
 // just a wrapper to take bytes not Fr Element
 func (g *Encoder) EncodeBytes(inputBytes []byte) ([]Frame, []uint32, error) {
 	inputFr, err := ToFrArray(inputBytes)
@@ -38,17 +33,12 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 
 	pdCoeffs, err := g.PadPolyEval(inputFr)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	polyEvals, err := g.Computer.ExtendPolyEval(pdCoeffs)
 	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	poly := &GlobalPoly{
-		Values: polyEvals,
-		Coeffs: inputFr,
+		return nil, nil, err
 	}
 
 	log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))

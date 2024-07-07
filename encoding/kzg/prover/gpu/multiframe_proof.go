@@ -2,6 +2,7 @@ package gpu
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -19,18 +20,19 @@ type WorkerResult struct {
 	err    error
 }
 
-type GpuComputer struct {
+type GpuComputeDevice struct {
 	*kzg.KzgConfig
 	Fs         *fft.FFTSettings
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 	SFs        *fft.FFTSettings
 	Srs        *kzg.SRS
 	G2Trailing []bn254.G2Affine
-	NttCfg        core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	NttCfg     core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	GpuLock    *sync.Mutex // lock whenever gpu is needed,
 }
 
 // benchmarks shows cpu commit on 2MB blob only takes 24.165562ms. For now, use cpu
-func (p *GpuComputer) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *GpuComputeDevice) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	inputLength := uint64(len(coeffs))
 	shiftedSecret := p.G2Trailing[p.KzgConfig.SRSNumberToLoad-inputLength:]
 	config := ecc.MultiExpConfig{}
@@ -44,7 +46,7 @@ func (p *GpuComputer) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, 
 }
 
 // benchmarks shows cpu commit on 2MB blob only takes 11.673738ms. For now, use cpu
-func (p *GpuComputer) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
+func (p *GpuComputeDevice) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
 	// compute commit for the full poly
 	config := ecc.MultiExpConfig{}
 	var commitment bn254.G1Affine
@@ -56,7 +58,7 @@ func (p *GpuComputer) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, e
 }
 
 // benchmarks shows cpu commit on 2MB blob only takes 31.318661ms. For now, use cpu
-func (p *GpuComputer) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *GpuComputeDevice) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	config := ecc.MultiExpConfig{}
 
 	var lengthCommitment bn254.G2Affine
@@ -69,7 +71,7 @@ func (p *GpuComputer) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Aff
 
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
-func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
 	l := chunkLen
@@ -109,6 +111,10 @@ func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 		return nil, fmt.Errorf("proof worker error: %v", err)
 	}
 	preprocessDone := time.Now()
+
+	// Start using GPU
+	p.GpuLock.Lock()
+	defer p.GpuLock.Unlock()
 
 	// Compute NTT on the coeff matrix
 	p.NttCfg.BatchSize = int32(l)
@@ -180,7 +186,7 @@ func (p *GpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 	return flatProofsBatch, nil
 }
 
-func (p *GpuComputer) proofWorkerGPU(
+func (p *GpuComputeDevice) proofWorkerGPU(
 	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
@@ -208,7 +214,7 @@ func (p *GpuComputer) proofWorkerGPU(
 }
 
 // capable of batching blobs
-func (p *GpuComputer) GetSlicesCoeffWithoutFFT(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+func (p *GpuComputeDevice) GetSlicesCoeffWithoutFFT(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(dimE*l) - 1
 	dim := (m - j%l) / l

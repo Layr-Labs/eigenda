@@ -12,7 +12,7 @@ import (
 	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
 )
 
-func (c *GpuComputer) ECNtt(batchPoints []bn254.G1Affine, isInverse bool) ([]bn254.G1Affine, error) {
+func (c *GpuComputeDevice) ECNtt(batchPoints []bn254.G1Affine, isInverse bool) ([]bn254.G1Affine, error) {
 	totalNumSym := len(batchPoints)
 
 	// convert gnark affine to icicle projective on slice
