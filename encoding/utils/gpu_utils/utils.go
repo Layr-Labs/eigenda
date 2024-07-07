@@ -85,6 +85,10 @@ func IcicleProjectiveToGnarkAffine(p bn254_icicle.Projective) bn254.G1Affine {
 func HostSliceIcicleProjectiveToGnarkAffine(ps core.HostSlice[bn254_icicle.Projective], numWorker int) []bn254.G1Affine {
 	output := make([]bn254.G1Affine, len(ps))
 
+	if len(ps) < numWorker {
+		numWorker = len(ps)
+	}
+
 	var wg sync.WaitGroup
 
 	interval := int(math.Ceil(float64(len(ps)) / float64(numWorker)))
@@ -111,6 +115,10 @@ func HostSliceIcicleProjectiveToGnarkAffine(ps core.HostSlice[bn254_icicle.Proje
 
 func ConvertFrToScalarFieldsBytesThread(data []fr.Element, numWorker int) []bn254_icicle.ScalarField {
 	scalars := make([]bn254_icicle.ScalarField, len(data))
+
+	if len(data) < numWorker {
+		numWorker = len(data)
+	}
 
 	var wg sync.WaitGroup
 

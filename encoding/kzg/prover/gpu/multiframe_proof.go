@@ -77,6 +77,8 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 	l := chunkLen
 	numPoly := uint64(len(polyFr)) / dimE / chunkLen
 	fmt.Println("numPoly", numPoly)
+	fmt.Println("dimE", dimE)
+	fmt.Println("l", l)
 
 	begin := time.Now()
 
@@ -113,6 +115,16 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 	}
 	preprocessDone := time.Now()
 
+	/*
+		for i := 0; i < int(l*numPoly); i++ {
+			vec := coeffStore[i]
+			for j := 0; j < len(vec); j++ {
+				fmt.Printf("%v ", vec[j].String())
+			}
+			fmt.Println()
+		}
+	*/
+
 	// Start using GPU
 	p.GpuLock.Lock()
 	defer p.GpuLock.Unlock()
@@ -124,18 +136,6 @@ func (p *GpuComputeDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 		return nil, e
 	}
 	nttDone := time.Now()
-
-	/*
-		fmt.Println("after fft")
-		vec := gpu_utils.ConvertScalarFieldsToFrBytes(coeffStoreFft)
-		for i := 0; i < int(l*numPoly); i++ {
-			length := int(dimE) * 2
-			for j := 0; j < length; j++ {
-				fmt.Printf("%v ", vec[i*length+j].String())
-			}
-			fmt.Println()
-		}
-	*/
 
 	// transpose the FFT tranformed matrix
 	coeffStoreFftTranspose, err := Transpose(coeffStoreFft, int(l), int(numPoly), int(dimE)*2)
