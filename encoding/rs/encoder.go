@@ -18,10 +18,10 @@ type Encoder struct {
 
 	NumRSWorker int
 
-	Computer RSComputer
+	Computer RsComputeDevice
 }
 
-type RSComputer interface {
+type RsComputeDevice interface {
 	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
 }
 

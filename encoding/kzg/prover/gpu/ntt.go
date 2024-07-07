@@ -1,6 +1,8 @@
 package gpu
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
@@ -8,7 +10,11 @@ import (
 	bn254_icicle_ntt "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/ntt"
 )
 
-func (c *GpuComputer) NTT(batchFr [][]fr.Element) ([][]fr.Element, error) {
+func (c *GpuComputeDevice) NTT(batchFr [][]fr.Element) ([][]fr.Element, error) {
+	if len(batchFr) == 0 {
+		return nil, fmt.Errorf("input to NTT contains no blob")
+	}
+
 	numSymbol := len(batchFr[0])
 	batchSize := len(batchFr)
 

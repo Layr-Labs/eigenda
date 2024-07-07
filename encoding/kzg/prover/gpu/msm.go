@@ -13,7 +13,7 @@ import (
 )
 
 // MsmBatch function supports batch across blobs
-func (c *GpuComputer) MsmBatch(rowsFr [][]fr.Element, rowsG1 [][]bn254.G1Affine) ([]bn254.G1Affine, error) {
+func (c *GpuComputeDevice) MsmBatch(rowsFr [][]fr.Element, rowsG1 [][]bn254.G1Affine) ([]bn254.G1Affine, error) {
 	msmCfg := icicle_bn254_msm.GetDefaultMSMConfig()
 	rowsSfIcicle := make([]icicle_bn254.ScalarField, 0)
 	rowsAffineIcicle := make([]icicle_bn254.Affine, 0)

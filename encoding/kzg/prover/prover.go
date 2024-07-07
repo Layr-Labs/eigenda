@@ -243,10 +243,10 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	sfs := fft.NewFFTSettings(t)
 
 	// Set RS computer
-	var rsComputer rs.RSComputer
+	var RsComputeDevice rs.RsComputeDevice
 
 	// Set KZG Prover computer
-	var computer ProofComputer
+	var computer ProofComputeDevice
 	if !g.UseGpu {
 		computer = &cpu.CpuComputer{
 			Fs:         fs,
@@ -256,14 +256,14 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 			G2Trailing: g.G2Trailing,
 			KzgConfig:  g.KzgConfig,
 		}
-		rsComputer = &rs_cpu.CpuComputer{
+		RsComputeDevice = &rs_cpu.CpuComputer{
 			Fs:             fs,
 			EncodingParams: params,
 		}
 	} else {
 		nttCfg := gpu_utils.SetupNTT()
-
-		computer = &gpu.GpuComputer{
+		GpuLock := sync.Mutex{}
+		computer = &gpu.GpuComputeDevice{
 			Fs:         fs,
 			FFTPointsT: fftPointsT,
 			SFs:        sfs,
@@ -271,15 +271,17 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 			G2Trailing: g.G2Trailing,
 			KzgConfig:  g.KzgConfig,
 			NttCfg:     nttCfg,
+			GpuLock:    &GpuLock,
 		}
 
-		rsComputer = &rs_gpu.GpuComputer{
+		RsComputeDevice = &rs_gpu.GpuComputeDevice{
 			Fs:             fs,
 			EncodingParams: params,
 			NttCfg:         nttCfg,
+			GpuLock:        &GpuLock,
 		}
 	}
-	encoder.Computer = rsComputer
+	encoder.Computer = RsComputeDevice
 
 	return &ParametrizedProver{
 		Encoder:    encoder,

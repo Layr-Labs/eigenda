@@ -20,7 +20,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		}
 
 		//encode the data
-		_, frames, _, err := enc.EncodeBytes(input)
+		frames, _, err := enc.EncodeBytes(input)
 		if err != nil {
 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
 		}

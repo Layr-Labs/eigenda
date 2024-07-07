@@ -1,7 +1,7 @@
 package gpu
 
 import (
-	"errors"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -12,32 +12,24 @@ import (
 	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/ntt"
 )
 
-type GpuComputer struct {
+type GpuComputeDevice struct {
 	Fs *fft.FFTSettings
 	encoding.EncodingParams
-	NttCfg core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	NttCfg  core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	GpuLock *sync.Mutex
 }
 
 // Encoding Reed Solomon using FFT
-func (g *GpuComputer) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+func (g *GpuComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 
-	if len(coeffs) > int(g.NumEvaluations()) {
-		return nil, errors.New("the provided encoding parameters are not sufficient for the size of the data input")
-	}
+	g.GpuLock.Lock()
+	defer g.GpuLock.Unlock()
 
-	pdCoeffs := make([]fr.Element, g.NumEvaluations())
-	for i := 0; i < len(coeffs); i++ {
-		pdCoeffs[i].Set(&coeffs[i])
-	}
-	for i := len(coeffs); i < len(pdCoeffs); i++ {
-		pdCoeffs[i].SetZero()
-	}
-
-	scalarsSF := gpu_utils.ConvertFrToScalarFieldsBytes(pdCoeffs)
+	scalarsSF := gpu_utils.ConvertFrToScalarFieldsBytes(coeffs)
 
 	scalars := core.HostSliceFromElements[bn254_icicle.ScalarField](scalarsSF)
 
-	outputDevice := make(core.HostSlice[bn254_icicle.ScalarField], len(pdCoeffs))
+	outputDevice := make(core.HostSlice[bn254_icicle.ScalarField], len(coeffs))
 
 	ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
 

@@ -5,7 +5,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type ProofComputer interface {
+type ProofComputeDevice interface {
 	// blobFr are coefficients
 	ComputeCommitment(blobFr []fr.Element) (*bn254.G1Affine, error)
 	ComputeMultiFrameProof(blobFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error)
