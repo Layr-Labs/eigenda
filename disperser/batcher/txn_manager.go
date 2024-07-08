@@ -208,7 +208,7 @@ func (t *txnManager) ensureAnyTransactionBroadcasted(ctx context.Context, txs []
 	for {
 		for _, tx := range txs {
 			_, err := t.wallet.GetTransactionReceipt(ctx, tx.TxID)
-			if err == nil || errors.Is(err, walletsdk.ErrReceiptNotYetAvailable) {
+			if err == nil || errors.Is(err, ethereum.NotFound) || errors.Is(err, walletsdk.ErrReceiptNotYetAvailable) {
 				t.metrics.ObserveLatency("broadcasted", float64(time.Since(tx.requestedAt).Milliseconds()))
 				return nil
 			}
