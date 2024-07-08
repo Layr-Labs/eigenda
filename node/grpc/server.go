@@ -209,7 +209,7 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 		}
 	}
 	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf message (over about 2GiB).
-	s.node.Logger.Info("StoreChunks RPC request recieved", "num of blobs", len(in.Blobs), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
+	s.node.Logger.Info("StoreChunks RPC request received", "num of blobs", len(in.Blobs), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
 
 	// Validate the request.
 	if err := s.validateStoreChunkRequest(in); err != nil {
