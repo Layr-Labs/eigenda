@@ -25,6 +25,9 @@ FROM alpine:3.16
 WORKDIR /app
 COPY --from=builder /app/bin/eigenda-proxy .
 
+# Copy srs values
+COPY --from=builder /resources/ /resources/
+
 # API & metrics servers
 EXPOSE 4242 7300
 
