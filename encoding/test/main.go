@@ -26,6 +26,7 @@ func main() {
 	//readpoints()
 }
 
+/*
 func readpoints() {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../inabox/resources/kzg/g1.point",
@@ -47,6 +48,7 @@ func readpoints() {
 		fmt.Println("start with gen")
 	}
 }
+*/
 
 func TestKzgRs() {
 	numSymbols := 1024
