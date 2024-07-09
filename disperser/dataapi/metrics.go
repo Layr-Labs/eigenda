@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/operators/ejector"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -23,9 +22,8 @@ type MetricsConfig struct {
 type Metrics struct {
 	registry *prometheus.Registry
 
-	NumRequests    *prometheus.CounterVec
-	Latency        *prometheus.SummaryVec
-	EjectorMetrics *ejector.Metrics
+	NumRequests *prometheus.CounterVec
+	Latency     *prometheus.SummaryVec
 
 	httpPort string
 	logger   logging.Logger
@@ -55,10 +53,9 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 			},
 			[]string{"method"},
 		),
-		EjectorMetrics: ejector.NewMetrics(reg, logger),
-		registry:       reg,
-		httpPort:       httpPort,
-		logger:         logger.With("component", "DataAPIMetrics"),
+		registry: reg,
+		httpPort: httpPort,
+		logger:   logger.With("component", "DataAPIMetrics"),
 	}
 	return metrics
 }

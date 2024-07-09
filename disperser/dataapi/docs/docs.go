@@ -15,63 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/ejector/operators": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Ejector"
-                ],
-                "summary": "Eject operators who violate the SLAs during the given time interval",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Lookback window for operator ejection [default: 86400]",
-                        "name": "interval",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "End time for evaluating operator ejection [default: now]",
-                        "name": "end",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Whether it's periodic or urgent ejection request [default: periodic]",
-                        "name": "mode",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.EjectionResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -699,14 +642,6 @@ const docTemplate = `{
                 },
                 "meta": {
                     "$ref": "#/definitions/dataapi.Meta"
-                }
-            }
-        },
-        "dataapi.EjectionResponse": {
-            "type": "object",
-            "properties": {
-                "transaction_hash": {
-                    "type": "string"
                 }
             }
         },
