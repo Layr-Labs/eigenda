@@ -1,11 +1,13 @@
 package core
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 type AccountID = string
@@ -33,6 +35,8 @@ const (
 	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
 	// different IDs).
 	MaxQuorumID = 254
+
+	GnarkBundleEncodingFormat = 1
 )
 
 func (s *SecurityParam) String() string {
@@ -163,6 +167,67 @@ func (b Bundle) Size() uint64 {
 		size += chunk.Size()
 	}
 	return size
+}
+
+func (b Bundle) Serialize() ([]byte, error) {
+	if len(b) == 0 {
+		return []byte{}, nil
+	}
+	if len(b[0].Coeffs) == 0 {
+		return nil, errors.New("invalid bundle: the coeffs length is zero")
+	}
+	size := 0
+	for _, f := range b {
+		if len(f.Coeffs) != len(b[0].Coeffs) {
+			return nil, errors.New("invalid bundle: all chunks should have the same length")
+		}
+		size += bn254.SizeOfG1AffineCompressed + encoding.BYTES_PER_SYMBOL*len(f.Coeffs)
+	}
+	result := make([]byte, size+8)
+	buf := result
+	metadata := uint64(GnarkBundleEncodingFormat) | (uint64(len(b[0].Coeffs)) << 8)
+	binary.LittleEndian.PutUint64(buf, metadata)
+	buf = buf[8:]
+	for _, f := range b {
+		chunk, err := f.SerializeGnark()
+		if err != nil {
+			return nil, err
+		}
+		copy(buf, chunk)
+		buf = buf[len(chunk):]
+	}
+	return result, nil
+}
+
+func (b Bundle) Deserialize(data []byte) (Bundle, error) {
+	if len(data) < 8 {
+		return nil, errors.New("bundle data must have at least 8 bytes")
+	}
+	// Parse metadata
+	meta := binary.LittleEndian.Uint64(data)
+	if (meta & 0xFF) != GnarkBundleEncodingFormat {
+		return nil, errors.New("invalid bundle data encoding format")
+	}
+	chunkLen := meta >> 8
+	chunkSize := bn254.SizeOfG1AffineCompressed + encoding.BYTES_PER_SYMBOL*int(chunkLen)
+	if (len(data)-8)%chunkSize != 0 {
+		return nil, errors.New("bundle data is invalid")
+	}
+	// Decode
+	bundle := make([]*encoding.Frame, 0, (len(data)-8)/chunkSize)
+	buf := data[8:]
+	for len(buf) > 0 {
+		if len(buf) < chunkSize {
+			return nil, errors.New("bundle data is invalid")
+		}
+		f, err := new(encoding.Frame).DeserializeGnark(buf[:chunkSize])
+		if err != nil {
+			return nil, err
+		}
+		bundle = append(bundle, f)
+		buf = buf[chunkSize:]
+	}
+	return bundle, nil
 }
 
 // Serialize encodes a batch of chunks into a byte array
