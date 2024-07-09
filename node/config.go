@@ -33,7 +33,7 @@ var (
 		0: "eth_quorum",
 		1: "permissioned_quorum",
 	}
-	SemVer    = "v0.0.0"
+	SemVer    = "0.0.0"
 	GitCommit = ""
 	GitDate   = ""
 )

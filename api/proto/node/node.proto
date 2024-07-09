@@ -14,6 +14,8 @@ service Dispersal {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
+    // Retrieve version into metadata
+	rpc VersionInfo(VersionInfoRequest) returns (VersionInfoReply) {}
 }
 
 service Retrieval {
@@ -21,6 +23,8 @@ service Retrieval {
 	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
+    // Retrieve version into metadata
+	rpc VersionInfo(VersionInfoRequest) returns (VersionInfoReply) {}
 }
 
 // Requests and replies
@@ -152,4 +156,13 @@ message BatchHeader {
 	bytes batch_root = 1;
 	// The Ethereum block number at which the batch is dispersed.
 	uint32 reference_block_number = 3;
+}
+
+// Version info request
+message VersionInfoRequest {
+}
+
+// Version info reply
+message VersionInfoReply {
+    string semver = 1;
 }

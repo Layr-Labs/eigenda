@@ -19,8 +19,17 @@ build: clean
 	go mod tidy
 	go build -o ./bin/node ./cmd
 
+proto:
+	cd .. && make protoc
+
 clean:
 	rm -rf ./bin
+
+lint:
+	golangci-lint run
+
+test:
+	go test -short ./...
 
 docker: docker-node docker-plugin
 

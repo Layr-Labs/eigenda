@@ -130,6 +130,10 @@ func (s *Server) serveRetrieval() error {
 
 }
 
+func (s *Server) VersionInfo(ctx context.Context, in *pb.VersionInfoRequest) (*pb.VersionInfoReply, error) {
+	return &pb.VersionInfoReply{Semver: node.SemVer}, nil
+}
+
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	start := time.Now()
 
