@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -19,13 +18,9 @@ type ParametrizedProver struct {
 	*rs.Encoder
 
 	*kzg.KzgConfig
-	Srs        *kzg.SRS
-	G2Trailing []bn254.G2Affine
+	Ks *kzg.KZGSettings
 
-	Fs         *fft.FFTSettings
-	Ks         *kzg.KZGSettings
-	SFs        *fft.FFTSettings   // fft used for submatrix product helper
-	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
+	Computer ProofComputeDevice
 }
 
 type RsEncodeResult struct {
@@ -94,7 +89,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 	// compute commit for the full poly
 	go func() {
 		start := time.Now()
-		commit, err := g.ComputeCommitment(inputFr)
+		commit, err := g.Computer.ComputeCommitment(inputFr)
 		commitmentChan <- CommitmentResult{
 			Commitment: *commit,
 			Err:        err,
@@ -104,7 +99,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	go func() {
 		start := time.Now()
-		lengthCommitment, err := g.ComputeLengthCommitment(inputFr)
+		lengthCommitment, err := g.Computer.ComputeLengthCommitment(inputFr)
 		lengthCommitmentChan <- LengthCommitmentResult{
 			LengthCommitment: *lengthCommitment,
 			Err:              err,
@@ -114,7 +109,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	go func() {
 		start := time.Now()
-		lengthProof, err := g.ComputeLengthProof(inputFr)
+		lengthProof, err := g.Computer.ComputeLengthProof(inputFr)
 		lengthProofChan <- LengthProofResult{
 			LengthProof: *lengthProof,
 			Err:         err,
@@ -135,7 +130,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
 		}
 
-		proofs, err := g.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+		proofs, err := g.Computer.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 		proofChan <- ProofsResult{
 			Proofs:   proofs,
 			Err:      err,
@@ -162,7 +157,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		lengthCommitmentResult.Duration,
 		lengthProofResult.Duration,
 		proofsResult.Duration,
-		len(g.Srs.G2),
+		g.SRSOrder,
 		g.SRSOrder-uint64(len(inputFr)),
 	)
 
