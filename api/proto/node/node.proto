@@ -14,7 +14,7 @@ service Dispersal {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
-    // Retrieve version into metadata
+	// Retrieve version info metadata
 	rpc VersionInfo(VersionInfoRequest) returns (VersionInfoReply) {}
 }
 
@@ -23,7 +23,7 @@ service Retrieval {
 	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
-    // Retrieve version into metadata
+	// Retrieve version info metadata
 	rpc VersionInfo(VersionInfoRequest) returns (VersionInfoReply) {}
 }
 

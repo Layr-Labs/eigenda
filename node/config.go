@@ -31,7 +31,7 @@ var (
 	// this is used for eigen metrics
 	QuorumNames = map[core.QuorumID]string{
 		0: "eth_quorum",
-		1: "permissioned_quorum",
+		1: "eignen_quorum",
 	}
 	SemVer    = "0.0.0"
 	GitCommit = ""
