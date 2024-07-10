@@ -169,6 +169,19 @@ func (b Bundle) Size() uint64 {
 	return size
 }
 
+// Serialize returns the serialized bytes of the bundle.
+//
+// The bytes are packed in this format:
+// <8 bytes header><chunk 1 bytes>chunk 2 bytes>...
+//
+// The header format:
+//   - First byte: describes the encoding format. Currently, only GnarkBundleEncodingFormat (1)
+//     is supported.
+//   - Remaining 7 bytes: describes the information about chunks.
+//
+// The chunk format will depend on the encoding format. With the GnarkBundleEncodingFormat,
+// each chunk is formated as <32 bytes proof><32 bytes coeff>...<32 bytes coefff>, where the
+// proof and coeffs are all encoded with Gnark.
 func (b Bundle) Serialize() ([]byte, error) {
 	if len(b) == 0 {
 		return []byte{}, nil
@@ -209,6 +222,9 @@ func (b Bundle) Deserialize(data []byte) (Bundle, error) {
 		return nil, errors.New("invalid bundle data encoding format")
 	}
 	chunkLen := meta >> 8
+	if chunkLen == 0 {
+		return nil, errors.New("chunk length must be greater than zero")
+	}
 	chunkSize := bn254.SizeOfG1AffineCompressed + encoding.BYTES_PER_SYMBOL*int(chunkLen)
 	if (len(data)-8)%chunkSize != 0 {
 		return nil, errors.New("bundle data is invalid")

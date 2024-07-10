@@ -49,13 +49,21 @@ func TestInvalidBundleDeser(t *testing.T) {
 	_, err := new(core.Bundle).Deserialize(tooSmallBytes)
 	assert.EqualError(t, err, "bundle data must have at least 8 bytes")
 
-	invalidBundle := make([]byte, 0, 8)
+	invalidFormat := make([]byte, 0, 8)
 	for i := 0; i < 7; i++ {
-		invalidBundle = append(invalidBundle, byte(0))
+		invalidFormat = append(invalidFormat, byte(0))
 	}
-	invalidBundle = append(invalidBundle, byte(0b01000000))
-	_, err = new(core.Bundle).Deserialize(invalidBundle)
+	invalidFormat = append(invalidFormat, byte(0b01000000))
+	_, err = new(core.Bundle).Deserialize(invalidFormat)
 	assert.EqualError(t, err, "invalid bundle data encoding format")
+
+	invliadChunkLen := make([]byte, 0, 8)
+	invliadChunkLen = append(invliadChunkLen, byte(1))
+	for i := 0; i < 7; i++ {
+		invliadChunkLen = append(invliadChunkLen, byte(0))
+	}
+	_, err = new(core.Bundle).Deserialize(invliadChunkLen)
+	assert.EqualError(t, err, "chunk length must be greater than zero")
 
 	data := make([]byte, 0, 9)
 	data = append(data, byte(1))
