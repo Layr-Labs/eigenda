@@ -20,7 +20,7 @@ type ParametrizedProver struct {
 	*kzg.KzgConfig
 	Ks *kzg.KZGSettings
 
-	Computer ProofComputeDevice
+	Computer ProofComputer
 }
 
 type RsEncodeResult struct {

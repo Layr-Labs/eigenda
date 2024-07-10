@@ -183,7 +183,10 @@ func (p *CpuComputer) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l
 
-	toeV := make([]fr.Element, 2*dimE-1)
+	// maximal number of unique values from a toeplitz matrix
+	tDim := 2*dimE - 1
+
+	toeV := make([]fr.Element, tDim)
 	for i := uint64(0); i < dim; i++ {
 
 		toeV[i].Set(&polyFr[m-(j+i*l)])
