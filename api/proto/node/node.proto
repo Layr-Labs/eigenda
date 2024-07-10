@@ -164,9 +164,9 @@ message NodeInfoRequest {
 
 // Node info reply
 message NodeInfoReply {
-    string semver = 1;
-    string arch = 2;
-    string os = 3;
-    uint32 num_cpu = 4;
+	string semver = 1;
+	string arch = 2;
+	string os = 3;
+	uint32 num_cpu = 4;
 	uint64 mem_bytes = 5; 
 }
