@@ -259,6 +259,13 @@ var (
 		Value:    "",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CLIENT_IP_HEADER"),
 	}
+
+	DisableNodeInfoResourcesFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-node-info-resources"),
+		Usage:    "Disable system resource information (OS, architecture, CPU, memory) on the NodeInfo API",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_NODE_INFO_RESOURCES"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -299,6 +306,7 @@ var optionalFlags = []cli.Flag{
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
 	DataApiUrlFlag,
+	DisableNodeInfoResourcesFlag,
 }
 
 func init() {
