@@ -136,7 +136,7 @@ func (s *Server) serveRetrieval() error {
 
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.NodeInfoReply{Semver: node.SemVer, Os: "", Arch: "", NumCpu: 0, MemBytes: 0}, nil
+		return &pb.NodeInfoReply{Semver: node.SemVer}, nil
 	}
 
 	memBytes := uint64(0)
