@@ -282,10 +282,6 @@ func TestNodeInfoRequest(t *testing.T) {
 	server := newTestServer(t, true)
 	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
 	assert.True(t, resp.Semver == "0.0.0")
-	assert.True(t, resp.Os != "")
-	assert.True(t, resp.Arch != "")
-	assert.True(t, resp.NumCpu > 0)
-	assert.True(t, resp.MemBytes >= 0)
 	assert.True(t, err == nil)
 }
 

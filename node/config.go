@@ -72,6 +72,7 @@ type Config struct {
 	ClientIPHeader                 string
 	UseSecureGrpc                  bool
 	ReachabilityPollIntervalSec    uint64
+	DisableNodeInfoResources       bool
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
@@ -201,5 +202,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		NumBatchDeserializationWorkers: ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
 		ClientIPHeader:                 ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                  ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		DisableNodeInfoResources:       ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 	}, nil
 }
