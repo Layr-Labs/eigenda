@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/shirou/gopsutil/mem"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -130,8 +132,14 @@ func (s *Server) serveRetrieval() error {
 
 }
 
-func (s *Server) VersionInfo(ctx context.Context, in *pb.VersionInfoRequest) (*pb.VersionInfoReply, error) {
-	return &pb.VersionInfoReply{Semver: node.SemVer}, nil
+func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
+	memBytes := uint64(0)
+	v, err := mem.VirtualMemory()
+	if err == nil {
+		memBytes = v.Total
+	}
+
+	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.NumCPU()), MemBytes: memBytes}, nil
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {

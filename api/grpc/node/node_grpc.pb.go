@@ -25,8 +25,8 @@ type DispersalClient interface {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
-	// Retrieve version into metadata
-	VersionInfo(ctx context.Context, in *VersionInfoRequest, opts ...grpc.CallOption) (*VersionInfoReply, error)
+	// Retrieve node info metadata
+	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
 
 type dispersalClient struct {
@@ -46,9 +46,9 @@ func (c *dispersalClient) StoreChunks(ctx context.Context, in *StoreChunksReques
 	return out, nil
 }
 
-func (c *dispersalClient) VersionInfo(ctx context.Context, in *VersionInfoRequest, opts ...grpc.CallOption) (*VersionInfoReply, error) {
-	out := new(VersionInfoReply)
-	err := c.cc.Invoke(ctx, "/node.Dispersal/VersionInfo", in, out, opts...)
+func (c *dispersalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
+	out := new(NodeInfoReply)
+	err := c.cc.Invoke(ctx, "/node.Dispersal/NodeInfo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +66,8 @@ type DispersalServer interface {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
-	// Retrieve version into metadata
-	VersionInfo(context.Context, *VersionInfoRequest) (*VersionInfoReply, error)
+	// Retrieve node info metadata
+	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }
 
@@ -78,8 +78,8 @@ type UnimplementedDispersalServer struct {
 func (UnimplementedDispersalServer) StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StoreChunks not implemented")
 }
-func (UnimplementedDispersalServer) VersionInfo(context.Context, *VersionInfoRequest) (*VersionInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method VersionInfo not implemented")
+func (UnimplementedDispersalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
 }
 func (UnimplementedDispersalServer) mustEmbedUnimplementedDispersalServer() {}
 
@@ -112,20 +112,20 @@ func _Dispersal_StoreChunks_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Dispersal_VersionInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VersionInfoRequest)
+func _Dispersal_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NodeInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DispersalServer).VersionInfo(ctx, in)
+		return srv.(DispersalServer).NodeInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/node.Dispersal/VersionInfo",
+		FullMethod: "/node.Dispersal/NodeInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DispersalServer).VersionInfo(ctx, req.(*VersionInfoRequest))
+		return srv.(DispersalServer).NodeInfo(ctx, req.(*NodeInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -142,8 +142,8 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Dispersal_StoreChunks_Handler,
 		},
 		{
-			MethodName: "VersionInfo",
-			Handler:    _Dispersal_VersionInfo_Handler,
+			MethodName: "NodeInfo",
+			Handler:    _Dispersal_NodeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -158,8 +158,8 @@ type RetrievalClient interface {
 	RetrieveChunks(ctx context.Context, in *RetrieveChunksRequest, opts ...grpc.CallOption) (*RetrieveChunksReply, error)
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	GetBlobHeader(ctx context.Context, in *GetBlobHeaderRequest, opts ...grpc.CallOption) (*GetBlobHeaderReply, error)
-	// Retrieve version into metadata
-	VersionInfo(ctx context.Context, in *VersionInfoRequest, opts ...grpc.CallOption) (*VersionInfoReply, error)
+	// Retrieve node info metadata
+	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
 
 type retrievalClient struct {
@@ -188,9 +188,9 @@ func (c *retrievalClient) GetBlobHeader(ctx context.Context, in *GetBlobHeaderRe
 	return out, nil
 }
 
-func (c *retrievalClient) VersionInfo(ctx context.Context, in *VersionInfoRequest, opts ...grpc.CallOption) (*VersionInfoReply, error) {
-	out := new(VersionInfoReply)
-	err := c.cc.Invoke(ctx, "/node.Retrieval/VersionInfo", in, out, opts...)
+func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
+	out := new(NodeInfoReply)
+	err := c.cc.Invoke(ctx, "/node.Retrieval/NodeInfo", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -205,8 +205,8 @@ type RetrievalServer interface {
 	RetrieveChunks(context.Context, *RetrieveChunksRequest) (*RetrieveChunksReply, error)
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error)
-	// Retrieve version into metadata
-	VersionInfo(context.Context, *VersionInfoRequest) (*VersionInfoReply, error)
+	// Retrieve node info metadata
+	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedRetrievalServer()
 }
 
@@ -220,8 +220,8 @@ func (UnimplementedRetrievalServer) RetrieveChunks(context.Context, *RetrieveChu
 func (UnimplementedRetrievalServer) GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlobHeader not implemented")
 }
-func (UnimplementedRetrievalServer) VersionInfo(context.Context, *VersionInfoRequest) (*VersionInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method VersionInfo not implemented")
+func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
 }
 func (UnimplementedRetrievalServer) mustEmbedUnimplementedRetrievalServer() {}
 
@@ -272,20 +272,20 @@ func _Retrieval_GetBlobHeader_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_VersionInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VersionInfoRequest)
+func _Retrieval_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NodeInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RetrievalServer).VersionInfo(ctx, in)
+		return srv.(RetrievalServer).NodeInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/node.Retrieval/VersionInfo",
+		FullMethod: "/node.Retrieval/NodeInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrievalServer).VersionInfo(ctx, req.(*VersionInfoRequest))
+		return srv.(RetrievalServer).NodeInfo(ctx, req.(*NodeInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -306,8 +306,8 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Retrieval_GetBlobHeader_Handler,
 		},
 		{
-			MethodName: "VersionInfo",
-			Handler:    _Retrieval_VersionInfo_Handler,
+			MethodName: "NodeInfo",
+			Handler:    _Retrieval_NodeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
