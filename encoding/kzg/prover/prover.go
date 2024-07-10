@@ -236,7 +236,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
-	computer := &CpuComputer{
+	computer := &CpuProofComputer{
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,

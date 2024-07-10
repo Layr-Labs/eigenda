@@ -26,28 +26,28 @@ type ParametrizedProver struct {
 type RsEncodeResult struct {
 	Frames   []rs.Frame
 	Indices  []uint32
-	Err      error
 	Duration time.Duration
+	Err      error
 }
 type LengthCommitmentResult struct {
 	LengthCommitment bn254.G2Affine
-	Err              error
 	Duration         time.Duration
+	Err              error
 }
 type LengthProofResult struct {
 	LengthProof bn254.G2Affine
-	Err         error
 	Duration    time.Duration
+	Err         error
 }
 type CommitmentResult struct {
 	Commitment bn254.G1Affine
-	Err        error
 	Duration   time.Duration
+	Err        error
 }
 type ProofsResult struct {
 	Proofs   []bn254.G1Affine
-	Err      error
 	Duration time.Duration
+	Err      error
 }
 
 // just a wrapper to take bytes not Fr Element

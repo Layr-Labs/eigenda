@@ -13,7 +13,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type CpuComputer struct {
+type CpuProofComputer struct {
 	*kzg.KzgConfig
 	Fs         *fft.FFTSettings
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
@@ -27,7 +27,7 @@ type WorkerResult struct {
 	err    error
 }
 
-func (p *CpuComputer) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *CpuProofComputer) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	inputLength := uint64(len(coeffs))
 	shiftedSecret := p.G2Trailing[p.KzgConfig.SRSNumberToLoad-inputLength:]
 	config := ecc.MultiExpConfig{}
@@ -40,7 +40,7 @@ func (p *CpuComputer) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, 
 	return &lengthProof, nil
 }
 
-func (p *CpuComputer) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
+func (p *CpuProofComputer) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
 	// compute commit for the full poly
 	config := ecc.MultiExpConfig{}
 	var commitment bn254.G1Affine
@@ -51,7 +51,7 @@ func (p *CpuComputer) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, e
 	return &commitment, nil
 }
 
-func (p *CpuComputer) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *CpuProofComputer) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	config := ecc.MultiExpConfig{}
 
 	var lengthCommitment bn254.G2Affine
@@ -62,7 +62,7 @@ func (p *CpuComputer) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Aff
 	return &lengthCommitment, nil
 }
 
-func (p *CpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *CpuProofComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
@@ -145,7 +145,7 @@ func (p *CpuComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chu
 	return proofs, nil
 }
 
-func (p *CpuComputer) proofWorker(
+func (p *CpuProofComputer) proofWorker(
 	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
@@ -178,7 +178,7 @@ func (p *CpuComputer) proofWorker(
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-func (p *CpuComputer) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+func (p *CpuProofComputer) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l
