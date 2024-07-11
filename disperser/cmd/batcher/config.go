@@ -31,6 +31,8 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+
+	EnableMinibatch bool
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -85,6 +87,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,
+		EnableMinibatch:               ctx.Bool(flags.EnableMinibatchFlag.Name),
 	}
 	return config, nil
 }

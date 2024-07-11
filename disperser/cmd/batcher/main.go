@@ -230,10 +230,6 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 	finalizer := batcher.NewFinalizer(config.TimeoutConfig.ChainReadTimeout, config.BatcherConfig.FinalizerInterval, queue, client, rpcClient, config.BatcherConfig.MaxNumRetriesPerBlob, 1000, config.BatcherConfig.FinalizerPoolSize, logger, metrics.FinalizerMetrics)
 	txnManager := batcher.NewTxnManager(client, wallet, config.EthClientConfig.NumConfirmations, 20, config.TimeoutConfig.TxnBroadcastTimeout, config.TimeoutConfig.ChainWriteTimeout, logger, metrics.TxnManagerMetrics)
-	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
-	if err != nil {
-		return err
-	}
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
@@ -242,18 +238,25 @@ func RunBatcher(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Batcher", "socket", httpSocket)
 	}
 
-	err = batcher.Start(context.Background())
-	if err != nil {
-		return err
+	if config.EnableMinibatch {
+		// TODO: implement and run batchConfirmer for minibatch
+		return errors.New("minibatch is not supported")
+	} else {
+		batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
+		if err != nil {
+			return err
+		}
+		err = batcher.Start(context.Background())
+		if err != nil {
+			return err
+		}
 	}
 
 	// Signal readiness
 	if _, err := os.Create(readinessProbePath); err != nil {
 		log.Printf("Failed to create readiness file: %v at path %v \n", err, readinessProbePath)
 	}
-
 	return nil
-
 }
 
 // process liveness signal from handleBatch Go Routine
