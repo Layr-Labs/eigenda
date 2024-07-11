@@ -26,7 +26,7 @@ WORKDIR /app
 COPY --from=builder /app/bin/eigenda-proxy .
 
 # Copy srs values
-COPY --from=builder /app/resources/ /resources/
+COPY --from=builder /app/resources/ /app/resources/
 
 # API & metrics servers
 EXPOSE 4242 7300
