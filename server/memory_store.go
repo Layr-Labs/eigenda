@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -149,35 +150,44 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	mockBatchHeaderHash := crypto.Keccak256Hash(entropy)
+	mockBatchRoot := crypto.Keccak256Hash(entropy)
+	blockNum, _ := rand.Int(rand.Reader, big.NewInt(1000))
 
-	// only filling out commitment fields for now
+	num := uint32(blockNum.Uint64())
+
 	cert := &verify.Certificate{
 		BlobHeader: &disperser.BlobHeader{
 			Commitment: &common.G1Commitment{
 				X: commitment.X.Marshal(),
 				Y: commitment.Y.Marshal(),
 			},
-			// DataLength: ,
-			// BlobQuorumParams: ,
+			DataLength: uint32(len(encodedVal)),
+			BlobQuorumParams: []*disperser.BlobQuorumParam{
+				{
+					QuorumNumber:                    1,
+					AdversaryThresholdPercentage:    29,
+					ConfirmationThresholdPercentage: 30,
+					ChunkLength:                     300,
+				},
+			},
 		},
 		BlobVerificationProof: &disperser.BlobVerificationProof{
 			BatchMetadata: &disperser.BatchMetadata{
 				BatchHeader: &disperser.BatchHeader{
-					// BatchRoot: ,
-					// QuorumNumbers: ,
-					// QuorumSignedPercentages: ,
-					// ReferenceBlockNumber: ,
+					BatchRoot:               mockBatchRoot[:],
+					QuorumNumbers:           []byte{0x1, 0x0},
+					QuorumSignedPercentages: []byte{0x60, 0x90},
+					ReferenceBlockNumber:    num,
 				},
-				// SignatoryRecordHash: ,
-				// Fee: ,
-				// ConfirmationBlockNumber: ,
-				BatchHeaderHash: mockBatchHeaderHash[:],
+				SignatoryRecordHash:     mockBatchRoot[:],
+				Fee:                     []byte{},
+				ConfirmationBlockNumber: num,
+				BatchHeaderHash:         []byte{},
 			},
-			// BatchId: ,
-			// BlobIndex: ,
-			// InclusionProof: ,
-			// QuorumIndexes: ,
+			BatchId:        69,
+			BlobIndex:      420,
+			InclusionProof: entropy,
+			QuorumIndexes:  []byte{0x1, 0x0},
 		},
 	}
 
@@ -185,7 +195,10 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	certStr := string(certBytes)
+	// construct key
+	bytesKeys := append([]byte{0x4}, cert.BlobVerificationProof.InclusionProof...)
+
+	certStr := string(bytesKeys)
 
 	if _, exists := e.store[certStr]; exists {
 		return nil, fmt.Errorf("commitment key already exists")
