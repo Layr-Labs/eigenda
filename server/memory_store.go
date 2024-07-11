@@ -196,7 +196,7 @@ func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 		return nil, err
 	}
 	// construct key
-	bytesKeys := append([]byte{0x4}, cert.BlobVerificationProof.InclusionProof...)
+	bytesKeys := cert.BlobVerificationProof.InclusionProof
 
 	certStr := string(bytesKeys)
 
