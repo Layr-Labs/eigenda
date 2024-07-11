@@ -105,7 +105,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte, domain DomainType) ([
 
 	var encodedBlob []byte
 	var exists bool
-	if encodedBlob, exists = e.store[string(commit)]; !exists {
+	if encodedBlob, exists = e.store[string(cert.BlobVerificationProof.InclusionProof)]; !exists {
 		return nil, fmt.Errorf("commitment key not found")
 	}
 
