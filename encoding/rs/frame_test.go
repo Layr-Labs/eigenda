@@ -17,7 +17,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	enc, _ := rs.NewEncoder(params, true)
 	require.NotNil(t, enc)
 
-	_, frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 

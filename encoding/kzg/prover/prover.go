@@ -236,15 +236,20 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
-	return &ParametrizedProver{
-		Encoder:    encoder,
-		KzgConfig:  g.KzgConfig,
+	computer := &CpuProofComputer{
+		Fs:         fs,
+		FFTPointsT: fftPointsT,
+		SFs:        sfs,
 		Srs:        g.Srs,
 		G2Trailing: g.G2Trailing,
-		Fs:         fs,
-		Ks:         ks,
-		SFs:        sfs,
-		FFTPointsT: fftPointsT,
+		KzgConfig:  g.KzgConfig,
+	}
+
+	return &ParametrizedProver{
+		Encoder:   encoder,
+		KzgConfig: g.KzgConfig,
+		Ks:        ks,
+		Computer:  computer,
 	}, nil
 }
 
