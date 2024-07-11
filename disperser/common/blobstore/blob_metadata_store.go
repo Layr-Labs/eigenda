@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	statusIndexName = "StatusIndex"
-	batchIndexName  = "BatchIndex"
+	statusIndexName               = "StatusIndex"
+	batchIndexName                = "BatchIndex"
+	accountIDRequestedAtIndexName = "AccountID-RequestedAt-Index"
 )
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -164,6 +165,30 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		return nil, nil, err
 	}
 	return metadata, exclusiveStartKey, nil
+}
+
+// GetBlobMetadataByAccountIdRequestedAt returns all the metadata with the given accountID after the given requestedAt timestamp
+func (s *BlobMetadataStore) GetBlobMetadataByAccountIdRequestedAt(ctx context.Context, accountID string, requestedAt uint64) ([]*disperser.BlobMetadata, error) {
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, accountIDRequestedAtIndexName, "AccountID = :account_id AND RequestedAt > :requested_at", commondynamodb.ExpresseionValues{
+		":account_id": &types.AttributeValueMemberS{
+			Value: accountID,
+		},
+		":requested_at": &types.AttributeValueMemberN{
+			Value: strconv.Itoa(int(requestedAt)),
+		}})
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := make([]*disperser.BlobMetadata, len(items))
+	for i, item := range items {
+		metadata[i], err = UnmarshalBlobMetadata(item)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return metadata, nil
 }
 
 func (s *BlobMetadataStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
