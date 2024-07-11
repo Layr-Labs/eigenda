@@ -58,6 +58,13 @@ message RetrieveChunksRequest {
 message RetrieveChunksReply {
 	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
 	repeated bytes chunks = 1;
+	// Describes how the chunks above are encoded.
+	enum ChunkEncoding {
+		UNKNOWN = 0;
+		GNARK = 1;
+		GOB = 2;
+	}
+	ChunkEncoding encoding = 2;
 }
 
 
@@ -109,6 +116,8 @@ message Bundle {
 	// Each chunk corresponds to a collection of points on the polynomial.
 	// Each chunk has same number of points.
 	repeated bytes chunks = 1;
+	// All chunks of the bundle encoded in a byte array.
+	bytes bundle = 2;
 }
 
 message G2Commitment {
