@@ -113,7 +113,7 @@ message Bundle {
 	// Each chunk corresponds to a collection of points on the polynomial.
 	// Each chunk has same number of points.
 	repeated bytes chunks = 1;
-	// All chunks of the bundle encoded in an byte array.
+	// All chunks of the bundle encoded in a byte array.
 	bytes bundle = 2;
 }
 
