@@ -18,10 +18,10 @@ type GlobalPoly struct {
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32, error) {
+func (g *Encoder) EncodeBytes(inputBytes []byte) ([]Frame, []uint32, error) {
 	inputFr, err := ToFrArray(inputBytes)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
+		return nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
 	return g.Encode(inputFr)
 }
@@ -33,7 +33,7 @@ func (g *Encoder) EncodeBytes(inputBytes []byte) (*GlobalPoly, []Frame, []uint32
 // frame, the multireveal interpolating coefficients are identical to the part of input bytes
 // in the form of field element. The extra returned integer list corresponds to which leading
 // coset root of unity, the frame is proving against, which can be deduced from a frame's index
-func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, error) {
+func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
 
@@ -42,12 +42,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	// extend data based on Sys, Par ratio. The returned fullCoeffsPoly is padded with 0 to ease proof
 	polyEvals, _, err := g.ExtendPolyEval(polyCoeffs)
 	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	poly := &GlobalPoly{
-		Values: polyEvals,
-		Coeffs: polyCoeffs,
+		return nil, nil, err
 	}
 
 	if g.verbose {
@@ -57,13 +52,13 @@ func (g *Encoder) Encode(inputFr []fr.Element) (*GlobalPoly, []Frame, []uint32, 
 	// create frames to group relevant info
 	frames, indices, err := g.MakeFrames(polyEvals)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	log.Printf("  SUMMARY: RSEncode %v byte among %v numChunks with chunkLength %v takes %v\n",
 		len(inputFr)*encoding.BYTES_PER_SYMBOL, g.NumChunks, g.ChunkLength, time.Since(start))
 
-	return poly, frames, indices, nil
+	return frames, indices, nil
 }
 
 // MakeFrames function takes extended evaluation data and bundles relevant information into Frame.

@@ -278,6 +278,13 @@ func storeChunks(t *testing.T, server *grpc.Server) ([32]byte, [32]byte, []*core
 	return batchHeaderHash, batchRoot, blobHeaders, blobHeadersProto
 }
 
+func TestNodeInfoRequest(t *testing.T) {
+	server := newTestServer(t, true)
+	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
+	assert.True(t, resp.Semver == "0.0.0")
+	assert.True(t, err == nil)
+}
+
 func TestStoreChunksRequestValidation(t *testing.T) {
 	server := newTestServer(t, true)
 
