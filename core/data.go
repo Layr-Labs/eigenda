@@ -36,11 +36,14 @@ const (
 	// different IDs).
 	MaxQuorumID = 254
 
-	// How many bits for the bundler's header.
+	// How many bits for the bundle's header.
 	NumBundleHeaderBits = 64
 	// How many bits (out of header) for representing the bundle's encoding format.
 	NumBundleEncodingFormatBits = 8
-	// The encoding format for bundle. Values must be in range [0, 255].
+
+	// The list of supported encoding formats for bundle.
+	// Values must be in range [0, 255].
+	GobBundleEncodingFormat   = 0
 	GnarkBundleEncodingFormat = 1
 )
 

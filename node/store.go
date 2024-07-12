@@ -435,6 +435,16 @@ func DecodeGnarkChunks(data []byte) ([][]byte, error) {
 
 // DecodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
 func DecodeGobChunks(data []byte) ([][]byte, error) {
+	format, chunkLen, err := parseHeader(data)
+	if err != nil {
+		return nil, err
+	}
+	if format != core.GobBundleEncodingFormat {
+		return nil, errors.New("invalid bundle data encoding format")
+	}
+	if chunkLen == 0 {
+		return nil, errors.New("chunk length must be greater than zero")
+	}
 	chunks := make([][]byte, 0)
 	buf := data
 	for len(buf) > 0 {
@@ -475,6 +485,10 @@ func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
 	if err != nil {
 		return nil, node.ChunkEncoding_UNKNOWN, err
 	}
+
+	// Note: the encoding format IDs may not be the same as the field ID in protobuf.
+	// For example, GobBundleEncodingFormat which is 1 has node.ChunkEncoding_GOB which
+	// has proto field ID 2.
 	switch format {
 	case 0:
 		chunks, err := DecodeGobChunks(data)
