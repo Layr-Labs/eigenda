@@ -63,10 +63,7 @@ func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMes
 						resultChan <- err
 						return
 					}
-					bundles[uint8(quorumID)] = make([]*encoding.Frame, len(bundleMsg))
-					for k := 0; k < len(bundleMsg); k++ {
-						bundles[uint8(quorumID)][k] = bundleMsg[k]
-					}
+					bundles[uint8(quorumID)] = bundleMsg
 				} else {
 					bundles[uint8(quorumID)] = make([]*encoding.Frame, len(bundle.GetChunks()))
 					for k, data := range bundle.GetChunks() {

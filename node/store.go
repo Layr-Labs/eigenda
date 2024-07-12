@@ -264,13 +264,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				if len(bundle.GetChunks()) > 0 && len(bundle.GetChunks()[0]) > 0 {
 					return nil, errors.New("chunks of a bundle are encoded together already")
 				}
-				// The bundle may be empty if the operator is not in a quorum (operators can
-				// be in just a subset of quorums). We need to store only the non-empty
-				// quorums.
-				if len(bundle.GetBundle()) > 0 {
-					rawBundles[quorumID] = bundle.GetBundle()
-				}
-			} else if len(bundle.GetChunks()) > 0 {
+				rawBundles[quorumID] = bundle.GetBundle()
+			} else {
 				rawChunks[quorumID] = make([][]byte, len(bundle.GetChunks()))
 				for j, chunk := range bundle.GetChunks() {
 					rawChunks[quorumID][j] = chunk
@@ -300,6 +295,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				}
 				chunksBytes, ok := rawChunks[quorumID]
 				if ok {
+
 					bundleRaw := make([][]byte, len(bundle))
 					for i := 0; i < len(bundle); i++ {
 						bundleRaw[i] = chunksBytes[i]
@@ -458,6 +454,10 @@ func DecodeGobChunks(data []byte) ([][]byte, error) {
 // Converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly.
 func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
+	// Empty chunk is valid, but there is nothing to decode.
+	if len(data) == 0 {
+		return [][]byte{}, node.ChunkEncoding_UNKNOWN, nil
+	}
 	if len(data) < 8 {
 		return nil, node.ChunkEncoding_UNKNOWN, errors.New("data must have at least 8 bytes")
 	}

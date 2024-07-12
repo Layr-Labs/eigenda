@@ -225,6 +225,11 @@ func createStore(t *testing.T) *node.Store {
 }
 
 func TestEncodeDecodeChunks(t *testing.T) {
+	decoded, format, err := node.DecodeChunks([]byte{})
+	assert.Nil(t, err)
+	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, format)
+	assert.Equal(t, 0, len(decoded))
+
 	numSamples := 32
 	numChunks := 10
 	chunkSize := 2 * 1024
