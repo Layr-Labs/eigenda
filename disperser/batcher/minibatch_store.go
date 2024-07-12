@@ -1,6 +1,7 @@
 package batcher
 
 import (
+	"context"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -30,6 +31,7 @@ type DispersalRequest struct {
 	MinibatchIndex uint
 	core.OperatorID
 	OperatorAddress gcommon.Address
+	Socket          string
 	NumBlobs        uint
 	RequestedAt     time.Time
 }
@@ -42,13 +44,15 @@ type DispersalResponse struct {
 }
 
 type MinibatchStore interface {
-	PutBatch(batch *BatchRecord) error
-	GetBatch(batchID uuid.UUID) (*BatchRecord, error)
-	PutMiniBatch(minibatch *MinibatchRecord) error
-	GetMiniBatch(batchID uuid.UUID, minibatchIndex uint) (*MinibatchRecord, error)
-	PutDispersalRequest(request *DispersalRequest) error
-	GetDispersalRequest(batchID uuid.UUID, minibatchIndex uint) (*DispersalRequest, error)
-	PutDispersalResponse(response *DispersalResponse) error
-	GetDispersalResponse(batchID uuid.UUID, minibatchIndex uint) (*DispersalResponse, error)
-	GetPendingBatch() (*BatchRecord, error)
+	PutBatch(ctx context.Context, batch *BatchRecord) error
+	GetBatch(ctx context.Context, batchID uuid.UUID) (*BatchRecord, error)
+	PutMinibatch(ctx context.Context, minibatch *MinibatchRecord) error
+	GetMinibatch(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) (*MinibatchRecord, error)
+	PutDispersalRequest(ctx context.Context, request *DispersalRequest) error
+	GetDispersalRequest(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, opID core.OperatorID) (*DispersalRequest, error)
+	GetDispersalRequests(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*DispersalRequest, error)
+	PutDispersalResponse(ctx context.Context, response *DispersalResponse) error
+	GetDispersalResponse(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, opID core.OperatorID) (*DispersalResponse, error)
+	GetDispersalResponses(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*DispersalResponse, error)
+	GetPendingBatch(ctx context.Context) (*BatchRecord, error)
 }

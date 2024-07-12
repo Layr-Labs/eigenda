@@ -201,6 +201,27 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_MINIBATCH"),
 	}
+	MinibatcherPullIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "minibatcher-pull-interval"),
+		Usage:    "Interval at which to pull from the queue and disperse a minibatch. Only used when minibatching is enabled. Defaults to 5s.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MINIBATCHER_PULL_INTERVAL"),
+		Value:    5 * time.Second,
+	}
+	MaxNodeConnectionsFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-node-connections"),
+		Usage:    "Maximum number of connections to the node. Only used when minibatching is enabled. Defaults to 1024.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NODE_CONNECTIONS"),
+	}
+	MaxNumRetriesPerDispersalFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-num-retries-per-dispersal"),
+		Usage:    "Maximum number of retries to disperse a minibatch. Only used when minibatching is enabled. Defaults to 3.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_RETRIES_PER_DISPERSAL"),
+		Value:    3,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -234,6 +255,9 @@ var optionalFlags = []cli.Flag{
 	MaxBlobsToFetchFromStoreFlag,
 	FinalizationBlockDelayFlag,
 	EnableMinibatchFlag,
+	MinibatcherPullIntervalFlag,
+	MaxNodeConnectionsFlag,
+	MaxNumRetriesPerDispersalFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
