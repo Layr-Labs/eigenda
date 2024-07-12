@@ -193,6 +193,14 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZATION_BLOCK_DELAY"),
 		Value:    75,
 	}
+	// EnableMinibatchFlag is a flag to enable minibatch processing
+	// Defaults to false
+	EnableMinibatchFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-minibatch"),
+		Usage:    "Enable minibatch processing",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_MINIBATCH"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -225,6 +233,7 @@ var optionalFlags = []cli.Flag{
 	TargetNumChunksFlag,
 	MaxBlobsToFetchFromStoreFlag,
 	FinalizationBlockDelayFlag,
+	EnableMinibatchFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
