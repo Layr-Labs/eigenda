@@ -41,6 +41,9 @@ var (
 		MaxNumConnections:         3,
 		MaxNumRetriesPerDispersal: 3,
 	}
+)
+
+const (
 	initialBlock = uint(10)
 )
 
@@ -213,7 +216,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	_, _ = queueBlob(t, ctx, &blob1, c.blobStore)
 	_, _ = queueBlob(t, ctx, &blob2, c.blobStore)
 
-	err = c.encodingStreamer.UpdateReferenecBlock(initialBlock + 10)
+	err = c.encodingStreamer.UpdateReferenceBlock(initialBlock + 10)
 	assert.NoError(t, err)
 	err = c.encodingStreamer.RequestEncoding(ctx, out)
 	assert.NoError(t, err)

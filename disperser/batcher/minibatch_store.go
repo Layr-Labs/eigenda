@@ -20,7 +20,8 @@ type BatchStatus uint
 // The batch lifecycle is as follows:
 // Pending -> Formed -> Attested
 // \              /
-//  \-> Failed <-/
+//
+//	\-> Failed <-/
 const (
 	BatchStatusPending BatchStatus = iota
 	BatchStatusFormed
