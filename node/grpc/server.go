@@ -294,13 +294,13 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, errors.New("request rate limited")
 	}
 
-	chunks, ok := s.node.Store.GetChunks(ctx, batchHeaderHash, int(in.GetBlobIndex()), uint8(in.GetQuorumId()))
+	chunks, format, ok := s.node.Store.GetChunks(ctx, batchHeaderHash, int(in.GetBlobIndex()), uint8(in.GetQuorumId()))
 	if !ok {
 		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure", time.Since(start))
 		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", batchHeaderHash, in.GetBlobIndex(), in.GetQuorumId())
 	}
 	s.node.Metrics.RecordRPCRequest("RetrieveChunks", "success", time.Since(start))
-	return &pb.RetrieveChunksReply{Chunks: chunks}, nil
+	return &pb.RetrieveChunksReply{Chunks: chunks, Encoding: format}, nil
 }
 
 func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest) (*pb.GetBlobHeaderReply, error) {

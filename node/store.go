@@ -9,8 +9,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node/leveldb"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"google.golang.org/protobuf/proto"
 )
@@ -241,12 +243,38 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		if len(rawBlob.GetBundles()) != len(blob.Bundles) {
 			return nil, errors.New("internal error: the number of bundles in parsed blob must be the same as in raw blob")
 		}
+		// We expect all the bundles of the blob are either using combined bundle
+		// (with all chunks in a single byte array) or separate chunks, no mixed
+		// use.
+		usingBundleBytes := false
+		for _, bundle := range rawBlob.GetBundles() {
+			// If the blob is using combined bundle encoding, there must be at least
+			// one non-empty bundle (i.e. the node is in at least one quorum otherwise
+			// it shouldn't have received this blob).
+			if len(bundle.GetBundle()) > 0 {
+				usingBundleBytes = true
+				break
+			}
+		}
+		rawBundles := make(map[core.QuorumID][]byte)
 		rawChunks := make(map[core.QuorumID][][]byte)
-		for i, chunks := range rawBlob.GetBundles() {
+		for i, bundle := range rawBlob.GetBundles() {
 			quorumID := uint8(rawBlob.GetHeader().GetQuorumHeaders()[i].GetQuorumId())
-			rawChunks[quorumID] = make([][]byte, len(chunks.GetChunks()))
-			for j, chunk := range chunks.GetChunks() {
-				rawChunks[quorumID][j] = chunk
+			if usingBundleBytes {
+				if len(bundle.GetChunks()) > 0 && len(bundle.GetChunks()[0]) > 0 {
+					return nil, errors.New("chunks of a bundle are encoded together already")
+				}
+				// The bundle may be empty if the operator is not in a quorum (operators can
+				// be in just a subset of quorums). We need to store only the non-empty
+				// quorums.
+				if len(bundle.GetBundle()) > 0 {
+					rawBundles[quorumID] = bundle.GetBundle()
+				}
+			} else if len(bundle.GetChunks()) > 0 {
+				rawChunks[quorumID] = make([][]byte, len(bundle.GetChunks()))
+				for j, chunk := range bundle.GetChunks() {
+					rawChunks[quorumID][j] = chunk
+				}
 			}
 		}
 		serializationDuration += time.Since(start)
@@ -258,22 +286,33 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				log.Error("Cannot generate the key for storing blob:", "err", err)
 				return nil, err
 			}
-			if len(rawChunks[quorumID]) != len(bundle) {
-				return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
-			}
 
-			bundleRaw := make([][]byte, len(bundle))
-			for i := 0; i < len(bundle); i++ {
-				bundleRaw[i] = rawChunks[quorumID][i]
+			if usingBundleBytes {
+				rawBundle, ok := rawBundles[quorumID]
+				if ok {
+					size += int64(len(rawBundle))
+					keys = append(keys, key)
+					values = append(values, rawBundle)
+				}
+			} else {
+				if len(rawChunks[quorumID]) != len(bundle) {
+					return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
+				}
+				chunksBytes, ok := rawChunks[quorumID]
+				if ok {
+					bundleRaw := make([][]byte, len(bundle))
+					for i := 0; i < len(bundle); i++ {
+						bundleRaw[i] = chunksBytes[i]
+					}
+					chunkBytes, err := EncodeChunks(bundleRaw)
+					if err != nil {
+						return nil, err
+					}
+					size += int64(len(chunkBytes))
+					keys = append(keys, key)
+					values = append(values, chunkBytes)
+				}
 			}
-			chunkBytes, err := EncodeChunks(bundleRaw)
-			if err != nil {
-				return nil, err
-			}
-			size += int64(len(chunkBytes))
-
-			keys = append(keys, key)
-			values = append(values, chunkBytes)
 		}
 		encodingDuration += time.Since(start)
 	}
@@ -321,24 +360,24 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 
 // GetChunks returns the list of byte arrays stored for given blobKey along with a boolean
 // indicating if the read was unsuccessful or the chunks were serialized correctly
-func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, bool) {
+func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncoding, bool) {
 	log := s.logger
 
 	blobKey, err := EncodeBlobKey(batchHeaderHash, blobIndex, quorumID)
 	if err != nil {
-		return nil, false
+		return nil, node.ChunkEncoding_UNKNOWN, false
 	}
 	data, err := s.db.Get(blobKey)
 	if err != nil {
-		return nil, false
+		return nil, node.ChunkEncoding_UNKNOWN, false
 	}
 	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
-	chunks, err := DecodeChunks(data)
+	chunks, format, err := DecodeChunks(data)
 	if err != nil {
-		return nil, false
+		return nil, format, false
 	}
-	return chunks, true
+	return chunks, format, true
 }
 
 // HasKey returns if a given key has been stored.
@@ -374,11 +413,30 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 	return result, nil
 }
 
-// Converts a flattened array of chunks into an array of its constituent chunks,
-// throwing an error in case the chunks were not serialized correctly
-//
+func DecodeGnarkChunks(data []byte) ([][]byte, error) {
+	meta := binary.LittleEndian.Uint64(data)
+	if (meta >> 56) != core.GnarkBundleEncodingFormat {
+		return nil, errors.New("invalid bundle data encoding format")
+	}
+	chunkLen := meta << 8 >> 8
+	if chunkLen == 0 {
+		return nil, errors.New("chunk length must be greater than zero")
+	}
+	chunkSize := bn254.SizeOfG1AffineCompressed + encoding.BYTES_PER_SYMBOL*int(chunkLen)
+	chunks := make([][]byte, 0)
+	buf := data[8:]
+	for len(buf) > 0 {
+		if len(buf) < chunkSize {
+			return nil, errors.New("invalid data to decode")
+		}
+		chunks = append(chunks, buf[:chunkSize])
+		buf = buf[chunkSize:]
+	}
+	return chunks, nil
+}
+
 // DecodeChunks((len(chunks[0]), chunks[0], len(chunks[1]), chunks[1], ...)) = chunks
-func DecodeChunks(data []byte) ([][]byte, error) {
+func DecodeGobChunks(data []byte) ([][]byte, error) {
 	chunks := make([][]byte, 0)
 	buf := data
 	for len(buf) > 0 {
@@ -391,13 +449,29 @@ func DecodeChunks(data []byte) ([][]byte, error) {
 		if len(buf) < int(chunkSize) {
 			return nil, errors.New("invalid data to decode")
 		}
-		chunk := buf[:chunkSize]
+		chunks = append(chunks, buf[:chunkSize])
 		buf = buf[chunkSize:]
-
-		chunks = append(chunks, chunk)
 	}
-
 	return chunks, nil
+}
+
+// Converts a flattened array of chunks into an array of its constituent chunks,
+// throwing an error in case the chunks were not serialized correctly.
+func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
+	if len(data) < 8 {
+		return nil, node.ChunkEncoding_UNKNOWN, errors.New("data must have at least 8 bytes")
+	}
+	format := binary.LittleEndian.Uint64(data) >> 56
+	switch format {
+	case 0:
+		chunks, err := DecodeGobChunks(data)
+		return chunks, node.ChunkEncoding_GOB, err
+	case 1:
+		chunks, err := DecodeGnarkChunks(data)
+		return chunks, node.ChunkEncoding_GNARK, err
+	default:
+		return nil, node.ChunkEncoding_UNKNOWN, errors.New("invalid data encoding format")
+	}
 }
 
 func copyBytes(src []byte) []byte {

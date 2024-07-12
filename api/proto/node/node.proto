@@ -55,18 +55,20 @@ message RetrieveChunksRequest {
 	uint32 quorum_id = 3;
 }
 
+// This describes the chunks returned in RetrieveChunksReply are encoded.
+// Used to facilitate the decoding of chunks.
+enum ChunkEncoding {
+	UNKNOWN = 0;
+	GNARK = 1;
+	GOB = 2;
+}
+
 message RetrieveChunksReply {
 	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
 	repeated bytes chunks = 1;
-	// Describes how the chunks above are encoded.
-	enum ChunkEncoding {
-		UNKNOWN = 0;
-		GNARK = 1;
-		GOB = 2;
-	}
+	// How the above chunks encoded.
 	ChunkEncoding encoding = 2;
 }
-
 
 // See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
 message GetBlobHeaderRequest {
@@ -177,5 +179,5 @@ message NodeInfoReply {
 	string arch = 2;
 	string os = 3;
 	uint32 num_cpu = 4;
-	uint64 mem_bytes = 5; 
+	uint64 mem_bytes = 5;
 }

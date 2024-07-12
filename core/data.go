@@ -36,6 +36,7 @@ const (
 	// different IDs).
 	MaxQuorumID = 254
 
+	// The encoding format for bundle. Values must be in range [0, 255].
 	GnarkBundleEncodingFormat = 1
 )
 
@@ -198,7 +199,7 @@ func (b Bundle) Serialize() ([]byte, error) {
 	}
 	result := make([]byte, size+8)
 	buf := result
-	metadata := uint64(GnarkBundleEncodingFormat) | (uint64(len(b[0].Coeffs)) << 8)
+	metadata := (uint64(GnarkBundleEncodingFormat) << 56) | uint64(len(b[0].Coeffs))
 	binary.LittleEndian.PutUint64(buf, metadata)
 	buf = buf[8:]
 	for _, f := range b {
@@ -218,10 +219,10 @@ func (b Bundle) Deserialize(data []byte) (Bundle, error) {
 	}
 	// Parse metadata
 	meta := binary.LittleEndian.Uint64(data)
-	if (meta & 0xFF) != GnarkBundleEncodingFormat {
+	if (meta >> 56) != GnarkBundleEncodingFormat {
 		return nil, errors.New("invalid bundle data encoding format")
 	}
-	chunkLen := meta >> 8
+	chunkLen := meta << 8 >> 8
 	if chunkLen == 0 {
 		return nil, errors.New("chunk length must be greater than zero")
 	}
