@@ -410,11 +410,13 @@ func EncodeChunks(chunks [][]byte) ([]byte, error) {
 }
 
 func DecodeGnarkChunks(data []byte) ([][]byte, error) {
-	meta := binary.LittleEndian.Uint64(data)
-	if (meta >> 56) != core.GnarkBundleEncodingFormat {
+	format, chunkLen, err := parseHeader(data)
+	if err != nil {
+		return nil, err
+	}
+	if format != core.GnarkBundleEncodingFormat {
 		return nil, errors.New("invalid bundle data encoding format")
 	}
-	chunkLen := meta << 8 >> 8
 	if chunkLen == 0 {
 		return nil, errors.New("chunk length must be greater than zero")
 	}
@@ -451,6 +453,17 @@ func DecodeGobChunks(data []byte) ([][]byte, error) {
 	return chunks, nil
 }
 
+// Parses the header and returns the encoding format and the chunk length.
+func parseHeader(data []byte) (node.ChunkEncoding, uint64, error) {
+	if len(data) < 8 {
+		return 0, 0, errors.New("no header found, the data size is less 8 bytes")
+	}
+	meta := binary.LittleEndian.Uint64(data)
+	format := binary.LittleEndian.Uint64(data) >> (core.NumBundleHeaderBits - core.NumBundleEncodingFormatBits)
+	chunkLen := meta << core.NumBundleEncodingFormatBits >> core.NumBundleEncodingFormatBits
+	return node.ChunkEncoding(format), chunkLen, nil
+}
+
 // Converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly.
 func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
@@ -458,10 +471,10 @@ func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
 	if len(data) == 0 {
 		return [][]byte{}, node.ChunkEncoding_UNKNOWN, nil
 	}
-	if len(data) < 8 {
-		return nil, node.ChunkEncoding_UNKNOWN, errors.New("data must have at least 8 bytes")
+	format, _, err := parseHeader(data)
+	if err != nil {
+		return nil, node.ChunkEncoding_UNKNOWN, err
 	}
-	format := binary.LittleEndian.Uint64(data) >> 56
 	switch format {
 	case 0:
 		chunks, err := DecodeGobChunks(data)
