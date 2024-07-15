@@ -243,24 +243,12 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		if len(rawBlob.GetBundles()) != len(blob.Bundles) {
 			return nil, errors.New("internal error: the number of bundles in parsed blob must be the same as in raw blob")
 		}
-		// We expect all the bundles of the blob are either using combined bundle
-		// (with all chunks in a single byte array) or separate chunks, no mixed
-		// use.
-		usingBundleBytes := false
-		for _, bundle := range rawBlob.GetBundles() {
-			// If the blob is using combined bundle encoding, there must be at least
-			// one non-empty bundle (i.e. the node is in at least one quorum otherwise
-			// it shouldn't have received this blob).
-			if len(bundle.GetBundle()) > 0 {
-				usingBundleBytes = true
-				break
-			}
-		}
+		format := GetBundleEncodingFormat(rawBlob)
 		rawBundles := make(map[core.QuorumID][]byte)
 		rawChunks := make(map[core.QuorumID][][]byte)
 		for i, bundle := range rawBlob.GetBundles() {
 			quorumID := uint8(rawBlob.GetHeader().GetQuorumHeaders()[i].GetQuorumId())
-			if usingBundleBytes {
+			if format == core.GnarkBundleEncodingFormat {
 				if len(bundle.GetChunks()) > 0 && len(bundle.GetChunks()[0]) > 0 {
 					return nil, errors.New("chunks of a bundle are encoded together already")
 				}
@@ -282,7 +270,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				return nil, err
 			}
 
-			if usingBundleBytes {
+			if format == core.GnarkBundleEncodingFormat {
 				rawBundle, ok := rawBundles[quorumID]
 				if ok {
 					size += int64(len(rawBundle))
@@ -463,18 +451,18 @@ func DecodeGobChunks(data []byte) ([][]byte, error) {
 	return chunks, nil
 }
 
-// Parses the header and returns the encoding format and the chunk length.
-func parseHeader(data []byte) (node.ChunkEncoding, uint64, error) {
+// parseHeader parses the header and returns the encoding format and the chunk length.
+func parseHeader(data []byte) (core.BundleEncodingFormat, uint64, error) {
 	if len(data) < 8 {
 		return 0, 0, errors.New("no header found, the data size is less 8 bytes")
 	}
 	meta := binary.LittleEndian.Uint64(data)
 	format := binary.LittleEndian.Uint64(data) >> (core.NumBundleHeaderBits - core.NumBundleEncodingFormatBits)
-	chunkLen := meta << core.NumBundleEncodingFormatBits >> core.NumBundleEncodingFormatBits
-	return node.ChunkEncoding(format), chunkLen, nil
+	chunkLen := (meta << core.NumBundleEncodingFormatBits) >> core.NumBundleEncodingFormatBits
+	return uint8(format), chunkLen, nil
 }
 
-// Converts a flattened array of chunks into an array of its constituent chunks,
+// DecodeChunks converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly.
 func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
 	// Empty chunk is valid, but there is nothing to decode.
@@ -487,8 +475,8 @@ func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
 	}
 
 	// Note: the encoding format IDs may not be the same as the field ID in protobuf.
-	// For example, GobBundleEncodingFormat which is 1 has node.ChunkEncoding_GOB which
-	// has proto field ID 2.
+	// For example, GobBundleEncodingFormat is 1 but node.ChunkEncoding_GOB has proto
+	// field ID 2.
 	switch format {
 	case 0:
 		chunks, err := DecodeGobChunks(data)

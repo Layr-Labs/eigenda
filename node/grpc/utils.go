@@ -54,10 +54,11 @@ func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMes
 				return
 			}
 
+			format := node.GetBundleEncodingFormat(blob)
 			bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
 			for j, bundle := range blob.GetBundles() {
 				quorumID := blob.GetHeader().GetQuorumHeaders()[j].GetQuorumId()
-				if len(bundle.GetBundle()) > 0 {
+				if format == core.GnarkBundleEncodingFormat {
 					bundleMsg, err := new(core.Bundle).Deserialize(bundle.GetBundle())
 					if err != nil {
 						resultChan <- err

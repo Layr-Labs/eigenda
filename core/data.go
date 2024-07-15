@@ -30,6 +30,8 @@ type SecurityParam struct {
 	QuorumRate common.RateParam
 }
 
+type BundleEncodingFormat = uint8
+
 const (
 	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
 	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
@@ -43,8 +45,8 @@ const (
 
 	// The list of supported encoding formats for bundle.
 	// Values must be in range [0, 255].
-	GobBundleEncodingFormat   = 0
-	GnarkBundleEncodingFormat = 1
+	GobBundleEncodingFormat   BundleEncodingFormat = 0
+	GnarkBundleEncodingFormat BundleEncodingFormat = 1
 )
 
 func (s *SecurityParam) String() string {
@@ -226,10 +228,10 @@ func (b Bundle) Deserialize(data []byte) (Bundle, error) {
 	}
 	// Parse metadata
 	meta := binary.LittleEndian.Uint64(data)
-	if (meta >> (NumBundleHeaderBits - NumBundleEncodingFormatBits)) != GnarkBundleEncodingFormat {
+	if (meta >> (NumBundleHeaderBits - NumBundleEncodingFormatBits)) != uint64(GnarkBundleEncodingFormat) {
 		return nil, errors.New("invalid bundle data encoding format")
 	}
-	chunkLen := meta << NumBundleEncodingFormatBits >> NumBundleEncodingFormatBits
+	chunkLen := (meta << NumBundleEncodingFormatBits) >> NumBundleEncodingFormatBits
 	if chunkLen == 0 {
 		return nil, errors.New("chunk length must be greater than zero")
 	}
