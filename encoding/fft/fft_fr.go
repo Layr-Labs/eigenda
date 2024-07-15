@@ -132,7 +132,7 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 	}
 }
 
-// Returns true if the provided integer v is a power of 2.
+// IsPowerOfTwo Returns true if the provided integer v is a power of 2.
 func IsPowerOfTwo(v uint64) bool {
 	return (v&(v-1) == 0) && (v != 0)
 }
