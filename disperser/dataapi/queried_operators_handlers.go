@@ -11,7 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
-	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type OperatorOnlineStatus struct {
@@ -182,6 +183,11 @@ func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*Op
 	dispersalSocket := operatorSocket.GetDispersalSocket()
 	dispersalOnline := checkIsOperatorOnline(dispersalSocket, 3, s.logger)
 
+	if dispersalOnline {
+		// collect node info if online
+		getNodeInfo(dispersalSocket, operatorId, s.logger)
+	}
+
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
 		OperatorId:      operatorId,
@@ -199,12 +205,21 @@ func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*Op
 }
 
 // query operator host info endpoint if available
-func (s *Server) checkNodeInfo(socket string, operatorId string, timeoutSecs int, logger logging.Logger) (*node.NodeInfoReply, error) {
-	var client node.NodeInfoRequest
+func getNodeInfo(socket string, operatorId string, logger logging.Logger) {
+	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error("Failed to dial grpc operator socket", "operatorId", operatorId, "socket", socket, "error", err)
+		return
+	}
+	defer conn.Close()
+	client := node.NewDispersalClient(conn)
+	reply, err := client.NodeInfo(context.Background(), &node.NodeInfoRequest{})
+	if err != nil {
+		logger.Info("NodeInfo", "operatorId", operatorId, "semver", "unknown")
+		return
+	}
 
-	client = grpc_health_v1.NewHealthClient(s.disperserConn)
-
-	return client.Check(ctx, &node.NodeInfoReply{})
+	logger.Info("NodeInfo", "operatorId", operatorId, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
 }
 
 // method to check if operator is online via socket dial
