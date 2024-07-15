@@ -222,6 +222,7 @@ const docTemplate = `{
         },
         "/metrics/batcher-service-availability": {
             "get": {
+                "description": "This endpoint is available only if ` + "`" + `AvailabilityCheck` + "`" + ` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.",
                 "produces": [
                     "application/json"
                 ],
@@ -231,7 +232,7 @@ const docTemplate = `{
                 "summary": "Get status of EigenDA batcher.",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Service is available",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
                         }
@@ -250,6 +251,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "error: EigenDA Service checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
@@ -259,6 +266,7 @@ const docTemplate = `{
         },
         "/metrics/churner-service-availability": {
             "get": {
+                "description": "This endpoint is available only if ` + "`" + `AvailabilityCheck` + "`" + ` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.",
                 "produces": [
                     "application/json"
                 ],
@@ -268,7 +276,7 @@ const docTemplate = `{
                 "summary": "Get status of EigenDA churner service.",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Service is available",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
                         }
@@ -287,6 +295,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "error: EigenDA Service checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }
@@ -296,16 +310,17 @@ const docTemplate = `{
         },
         "/metrics/disperser-service-availability": {
             "get": {
+                "description": "This endpoint is available only if ` + "`" + `AvailabilityCheck` + "`" + ` is enabled. This endpoint will not function and a 503 Service Unavailable error is returned.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "ServiceAvailability"
+                    "Disperser ServiceAvailability"
                 ],
                 "summary": "Get status of EigenDA Disperser service.",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Service is available",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
                         }
@@ -324,6 +339,12 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "error: EigenDA Service checker not initialized",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
                         }

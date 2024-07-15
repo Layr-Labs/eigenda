@@ -381,11 +381,13 @@ paths:
       - Metrics
   /metrics/batcher-service-availability:
     get:
+      description: This endpoint is available only if `AvailabilityCheck` is enabled.
+        This endpoint will not function and a 503 Service Unavailable error is returned.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Service is available
           schema:
             $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
         "400":
@@ -398,6 +400,10 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
         "500":
           description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "501":
+          description: 'error: EigenDA Service checker not initialized'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA batcher.
@@ -405,11 +411,13 @@ paths:
       - Batcher Availability
   /metrics/churner-service-availability:
     get:
+      description: This endpoint is available only if `AvailabilityCheck` is enabled.
+        This endpoint will not function and a 503 Service Unavailable error is returned.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Service is available
           schema:
             $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
         "400":
@@ -422,6 +430,10 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
         "500":
           description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "501":
+          description: 'error: EigenDA Service checker not initialized'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA churner service.
@@ -429,11 +441,13 @@ paths:
       - Churner ServiceAvailability
   /metrics/disperser-service-availability:
     get:
+      description: This endpoint is available only if `AvailabilityCheck` is enabled.
+        This endpoint will not function and a 503 Service Unavailable error is returned.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Service is available
           schema:
             $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
         "400":
@@ -448,9 +462,13 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
+        "501":
+          description: 'error: EigenDA Service checker not initialized'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA Disperser service.
       tags:
-      - ServiceAvailability
+      - Disperser ServiceAvailability
   /metrics/non-signers:
     get:
       parameters:
