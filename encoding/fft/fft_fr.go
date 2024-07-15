@@ -109,9 +109,9 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 	}
 	if inv {
 		var invLen fr.Element
-		
+
 		invLen.SetInt64(int64(n))
-		
+
 		invLen.Inverse(&invLen)
 		rootz := fs.ReverseRootsOfUnity[:fs.MaxWidth]
 		stride := fs.MaxWidth / n
@@ -132,6 +132,7 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 	}
 }
 
+// IsPowerOfTwo returns true if the provided integer v is a power of 2.
 func IsPowerOfTwo(v uint64) bool {
-	return v&(v-1) == 0
+	return (v&(v-1) == 0) && (v != 0)
 }
