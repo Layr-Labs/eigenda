@@ -14,7 +14,12 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/cpu"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/gpu"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
+	rs_gpu "github.com/Layr-Labs/eigenda/encoding/rs/gpu"
+	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
 	_ "go.uber.org/automaxprocs"
@@ -28,6 +33,7 @@ type Prover struct {
 	LoadG2Points bool
 
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
+	UseGpu              bool
 }
 
 var _ encoding.Prover = &Prover{}
@@ -236,20 +242,57 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
-	computer := &CpuProofComputer{
-		Fs:         fs,
-		FFTPointsT: fftPointsT,
-		SFs:        sfs,
-		Srs:        g.Srs,
-		G2Trailing: g.G2Trailing,
-		KzgConfig:  g.KzgConfig,
+	// Set RS computer
+	var RsComputeDevice rs.RsComputeDevice
+
+	// Set KZG Prover computer
+	var computer ProofComputeDevice
+	if !g.UseGpu {
+		computer = &cpu.CpuComputer{
+			Fs:         fs,
+			FFTPointsT: fftPointsT,
+			SFs:        sfs,
+			Srs:        g.Srs,
+			G2Trailing: g.G2Trailing,
+			KzgConfig:  g.KzgConfig,
+		}
+		RsComputeDevice = &rs_cpu.CpuComputer{
+			Fs:             fs,
+			EncodingParams: params,
+		}
+	} else {
+		nttCfg := gpu_utils.SetupNTT()
+		flatFftPointsT := gpu_utils.SetupMsm(fftPointsT)
+		GpuLock := sync.Mutex{}
+		computer = &gpu.GpuComputeDevice{
+			Fs:             fs,
+			FlatFFTPointsT: flatFftPointsT,
+			SFs:            sfs,
+			Srs:            g.Srs,
+			G2Trailing:     g.G2Trailing,
+			KzgConfig:      g.KzgConfig,
+			NttCfg:         nttCfg,
+			GpuLock:        &GpuLock,
+		}
+
+		RsComputeDevice = &rs_gpu.GpuComputeDevice{
+			Fs:             fs,
+			EncodingParams: params,
+			NttCfg:         nttCfg,
+			GpuLock:        &GpuLock,
+		}
 	}
+	encoder.Computer = RsComputeDevice
 
 	return &ParametrizedProver{
-		Encoder:   encoder,
-		KzgConfig: g.KzgConfig,
-		Ks:        ks,
-		Computer:  computer,
+		Encoder:    encoder,
+		KzgConfig:  g.KzgConfig,
+		Fs:         fs,
+		Ks:         ks,
+		SFs:        sfs,
+		FFTPointsT: fftPointsT,
+		UseGpu:     g.UseGpu,
+		Computer:   computer,
 	}, nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -18,36 +19,41 @@ type ParametrizedProver struct {
 	*rs.Encoder
 
 	*kzg.KzgConfig
-	Ks *kzg.KZGSettings
 
-	Computer ProofComputer
+	Fs         *fft.FFTSettings
+	Ks         *kzg.KZGSettings
+	SFs        *fft.FFTSettings   // fft used for submatrix product helper
+	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
+
+	UseGpu   bool
+	Computer ProofComputeDevice
 }
 
 type RsEncodeResult struct {
 	Frames   []rs.Frame
 	Indices  []uint32
-	Duration time.Duration
 	Err      error
+	Duration time.Duration
 }
 type LengthCommitmentResult struct {
 	LengthCommitment bn254.G2Affine
-	Duration         time.Duration
 	Err              error
+	Duration         time.Duration
 }
 type LengthProofResult struct {
 	LengthProof bn254.G2Affine
-	Duration    time.Duration
 	Err         error
+	Duration    time.Duration
 }
 type CommitmentResult struct {
 	Commitment bn254.G1Affine
-	Duration   time.Duration
 	Err        error
+	Duration   time.Duration
 }
 type ProofsResult struct {
 	Proofs   []bn254.G1Affine
-	Duration time.Duration
 	Err      error
+	Duration time.Duration
 }
 
 // just a wrapper to take bytes not Fr Element
@@ -150,16 +156,17 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		return nil, nil, nil, nil, nil, multierror.Append(lengthProofResult.Err, lengthCommitmentResult.Err, commitmentResult.Err, rsResult.Err, proofsResult.Err)
 	}
 	totalProcessingTime := time.Since(encodeStart)
-
-	log.Printf("\n\t\tRS encode     %-v\n\t\tCommiting     %-v\n\t\tLengthCommit  %-v\n\t\tlengthProof   %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
-		rsResult.Duration,
-		commitmentResult.Duration,
-		lengthCommitmentResult.Duration,
-		lengthProofResult.Duration,
-		proofsResult.Duration,
-		g.SRSOrder,
-		g.SRSOrder-uint64(len(inputFr)),
-	)
+	if g.Verbose {
+		log.Printf("\n\t\tRS encode     %-v\n\t\tCommiting     %-v\n\t\tLengthCommit  %-v\n\t\tlengthProof   %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
+			rsResult.Duration,
+			commitmentResult.Duration,
+			lengthCommitmentResult.Duration,
+			lengthProofResult.Duration,
+			proofsResult.Duration,
+			g.SRSOrder,
+			g.SRSOrder-uint64(len(inputFr)),
+		)
+	}
 
 	// assemble frames
 	kzgFrames := make([]encoding.Frame, len(rsResult.Frames))
