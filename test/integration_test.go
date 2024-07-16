@@ -129,11 +129,8 @@ type TestDisperser struct {
 }
 
 func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger logging.Logger) TestDisperser {
-	dispatcherConfig := &dispatcher.Config{
-		Timeout: time.Second,
-	}
 	batcherMetrics := batcher.NewMetrics("9100", logger)
-	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger, batcherMetrics.DispatcherMetrics)
+	dispatcher := dispatcher.NewDispatcher(logger, batcherMetrics.DispatcherMetrics)
 
 	transactor := &coremock.MockTransactor{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)

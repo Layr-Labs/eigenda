@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -176,7 +177,12 @@ type BlobStore interface {
 }
 
 type Dispatcher interface {
-	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader) chan core.SigningMessage
+	// DisperseBatch sends the blobs to the operators in the state and returns a channel to receive the signing messages
+	// Attestation timeout needs to be configured in the parameter to set the correct timeout for each dispersal request
+	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader, time.Duration) chan core.SigningMessage
+	// SendChunksToOperator sends the blobs to the operator and returns the signature and error
+	// It uses the context in the parameter to send the dispersal requests
+	SendChunksToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error)
 }
 
 // GenerateReverseIndexKey returns the key used to store the blob key in the reverse index
