@@ -36,7 +36,7 @@ import {EigenDAServiceManager} from "../../../src/core/EigenDAServiceManager.sol
 contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
     // Hardcode these values to your needs
     address public serviceManager = 0xD4A7E1Bd8015057293f0D0A557088c286942e84b;
-    address public serviceManagerImplementation = 0xB355B24871241ee666Cb03a35848F1fe8EEDDEB7;
+    address public serviceManagerImplementation = 0xdBFd6C8582b58590C4AFF40BdF15488A086bC672;
 
     ProxyAdmin public avsProxyAdmin = ProxyAdmin(0xB043055dd967A382577c2f5261fA6428f2905c15);
     address deployerAddress = 0xDA29BB71669f46F2a779b4b62f03644A84eE3479;
@@ -150,18 +150,22 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
             multiplier: 1e18
         });
 
-        IERC20 token = new ERC20PresetFixedSupply(
-            "HARRYPOTTEROBAMASONIC10INU",
-            "BITCOIN",
-            mockTokenInitialSupply,
-            msg.sender
-        );
+        // IERC20 token = new ERC20PresetFixedSupply(
+        //     "HARRYPOTTEROBAMASONIC10INU",
+        //     "BITCOIN",
+        //     mockTokenInitialSupply,
+        //     msg.sender
+        // );
+
+        IERC20 token = IERC20(0x3B78576F7D6837500bA3De27A60c7f594934027E);
+
+
         // must be in multiples of weeks i.e startTimestamp % 604800 == 0
-        uint32 startTimestamp = 1714608000;
+        uint32 startTimestamp = 1714608000 + 8 weeks;
         // must be in multiples of weeks i.e duration % 604800 == 0
-        uint32 duration = 1 weeks;
+        uint32 duration = 10 weeks;
         // amount <= 1e38 - 1
-        uint256 amount = 100e18;
+        uint256 amount = 5000000e18;
 
         // Create RewardsSubmission input param
         IRewardsCoordinator.RewardsSubmission[]

@@ -45,7 +45,7 @@
     "strategyManager": "0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6",
     "strategyManagerImplementation": "0x59f766A603C53f3AC8Be43bBe158c1519b193a18",
     "rewardsCoordinator": "0xAcc1fb458a1317E886dB376Fc8141540537E68fE",
-    "rewardsCoordinatorImplementation": "0x123C1A3543DBCA3f704E703dDda7FAAaA8e43D02",
+    "rewardsCoordinatorImplementation": "0xe54625095656206AC1B42819875343453c447f97",
     "token": {
       "tokenProxyAdmin": "0x67482666771e82C9a73BB9e9A22B2B597f448BBf",
       "EIGEN": "0x3B78576F7D6837500bA3De27A60c7f594934027E",
