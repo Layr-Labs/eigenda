@@ -19,7 +19,6 @@ type ParametrizedProver struct {
 	*rs.Encoder
 
 	*kzg.KzgConfig
-	Ks *kzg.KZGSettings
 
 	Fs         *fft.FFTSettings
 	Ks         *kzg.KZGSettings
@@ -164,7 +163,7 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 			lengthCommitmentResult.Duration,
 			lengthProofResult.Duration,
 			proofsResult.Duration,
-			len(g.Srs.G2),
+			g.SRSOrder,
 			g.SRSOrder-uint64(len(inputFr)),
 		)
 	}
