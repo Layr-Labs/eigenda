@@ -6,7 +6,7 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
 - Go path is in system path. [Instructions for installing go](https://go.dev/doc/install).
 - Ensure all submodules are initialized and checked out
     ```
-    git submodule update --init --recursive
+    $ git submodule update --init --recursive
     ```
 - Docker is installed. [Instructions for installing docker](https://www.docker.com/products/docker-desktop/).
 - Ensure foundry is installed (comes with `anvil` which we use as a test chain and `forge` which we use for deployment scripting):
@@ -21,16 +21,16 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
     ```
 - `grpcurl` is installed:
     ```
-    go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+    $ brew install grpcurl
     ```
 - `aws` is installed, follow instructions [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 - `npm` is installed
    ```
-  brew install node
+   $ brew install node
    ```
 - `yarn` is installed
    ```
-  npm install --global yarn
+   $ npm install --global yarn
    ```
 
 ## Run a complete end-to-end test
