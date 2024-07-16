@@ -15,7 +15,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/operators/ejector"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
@@ -33,8 +32,7 @@ const (
 	maxWorkerPoolLimit   = 10
 	maxQueryBatchesLimit = 2
 
-	ejectionTokenParam = "X-Ejection-Token"
-	cacheControlParam  = "Cache-Control"
+	cacheControlParam = "Cache-Control"
 
 	// Cache control for responses.
 	// The time unit is second for max age.
@@ -166,8 +164,6 @@ type (
 		subgraphClient SubgraphClient
 		transactor     core.Transactor
 		chainState     core.ChainState
-		ejector        *ejector.Ejector
-		ejectionToken  string
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -185,7 +181,6 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
-	ejector *ejector.Ejector,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -218,8 +213,6 @@ func NewServer(
 		transactor:                transactor,
 		chainState:                chainState,
 		metrics:                   metrics,
-		ejector:                   ejector,
-		ejectionToken:             config.EjectionToken,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
@@ -262,8 +255,6 @@ func (s *server) Start() error {
 			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
 			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
 		}
-		ejection := v1.Group("/ejection")
-		ejection.POST("/operators", s.EjectOperatorsHandler)
 		swagger := v1.Group("/swagger")
 		{
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
@@ -313,77 +304,6 @@ func (s *server) Shutdown() error {
 	}
 
 	return nil
-}
-
-// EjectOperatorsHandler godoc
-//
-//	@Summary	Eject operators who violate the SLAs during the given time interval
-//	@Tags		Ejector
-//	@Produce	json
-//	@Param		interval	query		int		false	"Lookback window for operator ejection [default: 86400]"
-//	@Param		end			query		int		false	"End time for evaluating operator ejection [default: now]"
-//	@Param		mode		query		string	false	"Whether it's periodic or urgent ejection request [default: periodic]"
-//	@Success	200			{object}	EjectionResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/ejector/operators [post]
-func (s *server) EjectOperatorsHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("EjectOperators", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
-	token := c.GetHeader(ejectionTokenParam)
-	if token != s.ejectionToken {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	mode := ejector.PeriodicMode
-	if c.Query("mode") == "urgent" {
-		mode = ejector.UrgentMode
-	}
-
-	endTime := time.Now()
-	if c.Query("end") != "" {
-		var err error
-		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
-		if err != nil {
-			s.metrics.IncrementFailedRequestNum("EjectOperators")
-			errorResponse(c, err)
-			return
-		}
-	}
-
-	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "86400"), 10, 64)
-	if err != nil || interval == 0 {
-		interval = 86400
-	}
-
-	nonSigningRate, err := s.getOperatorNonsigningRate(c.Request.Context(), endTime.Unix()-interval, endTime.Unix(), true)
-	var ejectionResponse *ejector.EjectionResponse
-	if err == nil {
-		nonSigningMetrics := make([]*ejector.NonSignerMetric, 0)
-		for _, metric := range nonSigningRate.Data {
-			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
-				OperatorId:           metric.OperatorId,
-				OperatorAddress:      metric.OperatorAddress,
-				QuorumId:             metric.QuorumId,
-				TotalUnsignedBatches: metric.TotalUnsignedBatches,
-				Percentage:           metric.Percentage,
-				StakePercentage:      metric.StakePercentage,
-			})
-		}
-		ejectionResponse, err = s.ejector.Eject(c.Request.Context(), nonSigningMetrics, mode)
-	}
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("EjectOperators")
-		errorResponse(c, err)
-		return
-	}
-	s.metrics.IncrementSuccessfulRequestNum("EjectOperators")
-	c.JSON(http.StatusOK, ejectionResponse)
 }
 
 // FetchBlobHandler godoc

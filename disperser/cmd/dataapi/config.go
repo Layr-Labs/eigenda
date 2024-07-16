@@ -1,9 +1,6 @@
 package main
 
 import (
-	"errors"
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -18,7 +15,6 @@ type Config struct {
 	AwsClientConfig  aws.ClientConfig
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
-	FireblocksConfig common.FireblocksConfig
 	LoggerConfig     common.LoggerConfig
 	PrometheusConfig prometheus.Config
 	MetricsConfig    dataapi.MetricsConfig
@@ -29,8 +25,6 @@ type Config struct {
 	SubgraphApiOperatorStateAddr string
 	ServerMode                   string
 	AllowOrigins                 []string
-	EjectionToken                string
-	NonsigningRateThreshold      int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -38,8 +32,6 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
-
-	TxnTimeout time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -47,15 +39,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	ejectionToken := ctx.GlobalString(flags.EjectionTokenFlag.Name)
-	if len(ejectionToken) < 20 {
-		return Config{}, errors.New("the ejection token length must be at least 20")
-	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
-	fireblocksConfig := common.ReadFireblocksCLIConfig(ctx, flags.FlagPrefix)
-	if !fireblocksConfig.Disable {
-		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
-	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -63,7 +47,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		EthClientConfig:               ethClientConfig,
-		FireblocksConfig:              fireblocksConfig,
 		LoggerConfig:                  *loggerConfig,
 		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
@@ -77,9 +60,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			Secret:    ctx.GlobalString(flags.PrometheusServerSecretFlag.Name),
 			Cluster:   ctx.GlobalString(flags.PrometheusMetricsClusterLabelFlag.Name),
 		},
-		AllowOrigins:            ctx.GlobalStringSlice(flags.AllowOriginsFlag.Name),
-		EjectionToken:           ejectionToken,
-		NonsigningRateThreshold: ctx.GlobalInt(flags.NonsigningRateThresholdFlag.Name),
+		AllowOrigins: ctx.GlobalStringSlice(flags.AllowOriginsFlag.Name),
 
 		MetricsConfig: dataapi.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
@@ -88,8 +69,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
-
-		TxnTimeout: ctx.GlobalDuration(flags.TxnTimeoutFlag.Name),
 	}
 	return config, nil
 }
