@@ -55,7 +55,7 @@ message RetrieveChunksRequest {
 	uint32 quorum_id = 3;
 }
 
-// This describes the chunks returned in RetrieveChunksReply are encoded.
+// This describes how the chunks returned in RetrieveChunksReply are encoded.
 // Used to facilitate the decoding of chunks.
 enum ChunkEncoding {
 	UNKNOWN = 0;

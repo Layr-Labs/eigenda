@@ -65,7 +65,7 @@ func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMes
 						return
 					}
 					bundles[uint8(quorumID)] = bundleMsg
-				} else {
+				} else if format == core.GobBundleEncodingFormat {
 					bundles[uint8(quorumID)] = make([]*encoding.Frame, len(bundle.GetChunks()))
 					for k, data := range bundle.GetChunks() {
 						chunk, err := new(encoding.Frame).Deserialize(data)
@@ -75,6 +75,9 @@ func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMes
 						}
 						bundles[uint8(quorumID)][k] = chunk
 					}
+				} else {
+					resultChan <- fmt.Errorf("invalid bundle encoding format: %d", format)
+					return
 				}
 			}
 

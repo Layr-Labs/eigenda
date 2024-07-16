@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -277,7 +278,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					keys = append(keys, key)
 					values = append(values, rawBundle)
 				}
-			} else {
+			} else if format == core.GobBundleEncodingFormat {
 				if len(rawChunks[quorumID]) != len(bundle) {
 					return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
 				}
@@ -296,6 +297,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					keys = append(keys, key)
 					values = append(values, chunkBytes)
 				}
+			} else {
+				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
 			}
 		}
 		encodingDuration += time.Since(start)
