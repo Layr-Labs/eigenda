@@ -3,24 +3,35 @@
 Notice: The scripts for setting up a local geth chain are currently broken. The instructions below use anvil instead
 
 ## First time setup
-- Go path is in system path
+- Go path is in system path. [Instructions for installing go](https://go.dev/doc/install).
 - Ensure all submodules are initialized and checked out
     ```
     git submodule update --init --recursive
     ```
+- Docker is installed. [Instructions for installing docker](https://www.docker.com/products/docker-desktop/).
 - Ensure foundry is installed (comes with `anvil` which we use as a test chain and `forge` which we use for deployment scripting):
     ```
     $ curl -L https://foundry.paradigm.xyz | bash
     $ foundryup
     ```
+- `brew` is installed, see instructions [here](https://brew.sh/).
 - Localstack CLI is installed (simulates AWS stack on local machine; we also provide instructions for running localstack from docker without the CLI):
     ```
     $ brew install localstack/tap/localstack-cli
     ```
-- grpcurl is installed:
+- `grpcurl` is installed:
     ```
     go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
     ```
+- `aws` is installed, follow instructions [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+- `npm` is installed
+   ```
+  brew install node
+   ```
+- `yarn` is installed
+   ```
+  npm install --global yarn
+   ```
 
 ## Run a complete end-to-end test
 
