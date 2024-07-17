@@ -185,7 +185,7 @@ func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*Op
 
 	if dispersalOnline {
 		// collect node info if online
-		getNodeInfo(dispersalSocket, operatorId, 3, s.logger)
+		getNodeInfo(ctx, dispersalSocket, operatorId, s.logger)
 	}
 
 	// Create the metadata regardless of online status
@@ -205,7 +205,7 @@ func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*Op
 }
 
 // query operator host info endpoint if available
-func getNodeInfo(socket string, operatorId string, timeoutSecs int, logger logging.Logger) {
+func getNodeInfo(ctx context.Context, socket string, operatorId string, logger logging.Logger) {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Error("Failed to dial grpc operator socket", "operatorId", operatorId, "socket", socket, "error", err)
@@ -213,8 +213,6 @@ func getNodeInfo(socket string, operatorId string, timeoutSecs int, logger loggi
 	}
 	defer conn.Close()
 	client := node.NewDispersalClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
-	defer cancel()
 	reply, err := client.NodeInfo(ctx, &node.NodeInfoRequest{})
 	if err != nil {
 		logger.Info("NodeInfo", "operatorId", operatorId, "semver", "unknown")
