@@ -10,14 +10,22 @@ import (
 	"github.com/urfave/cli"
 )
 
+// Config configures a traffic generator.
 type Config struct {
 	clients.Config
 
-	NumInstances           uint
-	RequestInterval        time.Duration
-	DataSize               uint64
-	LoggingConfig          common.LoggerConfig
-	RandomizeBlobs         bool
+	// The number of worker threads that generate write traffic.
+	NumInstances uint
+	// The period of the submission rate of new blobs for each worker thread.
+	RequestInterval time.Duration
+	// The size of each blob dispersed, in bytes.
+	DataSize uint64
+	// Configures logging for the traffic generator.
+	LoggingConfig common.LoggerConfig
+	// If true, then each blob will contain unique random data. If false, the same random data
+	// will be dispersed for each blob by a particular worker thread.
+	RandomizeBlobs bool
+	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
 
 	SignerPrivateKey string
