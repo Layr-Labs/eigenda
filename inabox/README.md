@@ -155,6 +155,15 @@ $ grpcurl -plaintext -d '{"data": "'$(tools/kzgpad/bin/kzgpad -e hello)'"}' \
   localhost:32003 disperser.Disperser/DisperseBlob
 ```
 
+This will return a message in the following form:
+
+```
+{
+  "result": "PROCESSING",
+  "requestId": "$REQUEST_ID"
+}
+```
+
 Look for logs such as the following to indicate that the disperser has successfully confirmed the batch:
 ```
 TRACE[10-12|22:02:13.365] [batcher] Aggregating signatures...      caller=batcher.go:178
@@ -166,6 +175,13 @@ TRACE[10-12|22:02:13.376] [batcher] AggregateSignatures took       duration=10.6
 TRACE[10-12|22:02:13.376] [batcher] Confirming batch...            caller=batcher.go:198
 ```
 
+To dispense that same blob (replace `$REQUEST_ID` with the request ID from the prior step):
+
+```
+grpcurl -plaintext -d '{"request_id": "$REQUEST_ID"}' \
+  localhost:32003 disperser.Disperser/GetBlobStatus
+```
+
 ### Cleanup
 
 If you followed [Option 1](#option-1-simplest) above, you can run the following command in order to clean up the test infra:
@@ -175,3 +191,5 @@ make stop-infra
 ```
 
 If you followed [Option 2](#option-2), you can stop the infra services by `Ctrl-C`'ing in each terminal. For the graph, it's also important to run `docker compose down -v` from within the `inabox/thegraph` directory to make sure that the containers are fully removed. 
+
+
