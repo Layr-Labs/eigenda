@@ -311,7 +311,9 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
 	}
-	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start), "total store batch duration", time.Since(storeBatchStart), "total bytes", size)
+	throughput := float64(size) / time.Since(start).Seconds()
+	s.metrics.StoringThroughput.Set(throughput)
+	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start), "write throughput (KB/s)", throughput/1000, "total store batch duration", time.Since(storeBatchStart), "total bytes", size)
 
 	return &keys, nil
 }
