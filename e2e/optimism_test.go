@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
-
 	"github.com/ethereum-optimism/optimism/op-e2e/actions"
 	"github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
@@ -40,7 +39,7 @@ func (a *L2PlasmaDA) ActL1Blocks(t actions.Testing, n uint64) {
 	}
 }
 
-func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
+func NewL2PlasmaDA(t actions.Testing, daHost string, altDA bool) *L2PlasmaDA {
 	p := &e2eutils.TestParams{
 		MaxSequencerDrift:   40,
 		SequencerWindowSize: 120,
@@ -65,7 +64,12 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 	engine := actions.NewL2Engine(t, log, sd.L2Cfg, sd.RollupCfg.Genesis.L1, jwtPath)
 	engCl := engine.EngineClient(t, sd.RollupCfg)
 
-	storage := plasma.NewDAClient(daHost, false, false)
+	var storage *plasma.DAClient
+	if !altDA {
+		storage =  plasma.NewDAClient(daHost, true, true)
+	} else {
+		storage = plasma.NewDAClient(daHost, false, false)
+	}
 
 	l1F, err := sources.NewL1Client(miner.RPCClient(), log, nil, sources.L1ClientDefaultConfig(sd.RollupCfg, false, sources.RPCKindBasic))
 	require.NoError(t, err)
@@ -73,7 +77,11 @@ func NewL2PlasmaDA(t actions.Testing, daHost string) *L2PlasmaDA {
 	plasmaCfg, err := sd.RollupCfg.GetOPPlasmaConfig()
 	require.NoError(t, err)
 
+	if altDA {
 	plasmaCfg.CommitmentType = plasma.GenericCommitmentType
+	} else {
+		plasmaCfg.CommitmentType = plasma.Keccak256CommitmentType
+	}
 
 	daMgr := plasma.NewPlasmaDAWithStorage(log, plasmaCfg, storage, &plasma.NoopMetrics{})
 
@@ -108,17 +116,18 @@ func (a *L2PlasmaDA) ActL1Finalized(t actions.Testing) {
 	a.sequencer.ActL1FinalizedSignal(t)
 }
 
-func TestOptimism(gt *testing.T) {
+
+func TestOptimismKeccak256Commitment(gt *testing.T) {
 	if !runIntegrationTests && !runTestnetIntegrationTests {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, close := e2e.CreateTestSuite(gt, true)
+	proxyTS, close := e2e.CreateTestSuite(gt, true, true)
 	defer close()
 
 	t := actions.NewDefaultTesting(gt)
 
-	op_stack := NewL2PlasmaDA(t, proxyTS.Address())
+	op_stack := NewL2PlasmaDA(t, proxyTS.Address(), false)
 
 	// build L1 block #1
 	op_stack.ActL1Blocks(t, 1)
@@ -155,7 +164,61 @@ func TestOptimism(gt *testing.T) {
 	op_stack.ActL1Finalized(t)
 
 	// assert that EigenDA proxy's was written and read from
-	stat := proxyTS.Server.Store().Stats()
+	stat := proxyTS.Server.GetS3Stats()
+
+	require.Equal(t, 1, stat.Entries)
+	require.Equal(t, 1, stat.Reads)
+}
+
+
+func TestOptimismAltDACommitment(gt *testing.T) {
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
+
+	proxyTS, close := e2e.CreateTestSuite(gt, true, false)
+	defer close()
+
+	t := actions.NewDefaultTesting(gt)
+
+	op_stack := NewL2PlasmaDA(t, proxyTS.Address(), true)
+
+	// build L1 block #1
+	op_stack.ActL1Blocks(t, 1)
+	op_stack.miner.ActL1SafeNext(t)
+
+	// Fill with l2 blocks up to the L1 head
+	op_stack.sequencer.ActL1HeadSignal(t)
+	op_stack.sequencer.ActBuildToL1Head(t)
+
+	op_stack.sequencer.ActL2PipelineFull(t)
+	op_stack.sequencer.ActL1SafeSignal(t)
+	require.Equal(t, uint64(1), op_stack.sequencer.SyncStatus().SafeL1.Number)
+
+	// add L1 block #2
+	op_stack.ActL1Blocks(t, 1)
+	op_stack.miner.ActL1SafeNext(t)
+	op_stack.miner.ActL1FinalizeNext(t)
+	op_stack.sequencer.ActL1HeadSignal(t)
+	op_stack.sequencer.ActBuildToL1Head(t)
+
+	// Catch up derivation
+	op_stack.sequencer.ActL2PipelineFull(t)
+	op_stack.sequencer.ActL1FinalizedSignal(t)
+	op_stack.sequencer.ActL1SafeSignal(t)
+
+	// commit all the l2 blocks to L1
+	op_stack.batcher.ActSubmitAll(t)
+	op_stack.miner.ActL1StartBlock(12)(t)
+	op_stack.miner.ActL1IncludeTx(op_stack.dp.Addresses.Batcher)(t)
+	op_stack.miner.ActL1EndBlock(t)
+
+	// verify
+	op_stack.sequencer.ActL2PipelineFull(t)
+	op_stack.ActL1Finalized(t)
+
+	// assert that EigenDA proxy's was written and read from
+	stat := proxyTS.Server.GetMemStats()
 
 	require.Equal(t, 1, stat.Entries)
 	require.Equal(t, 1, stat.Reads)

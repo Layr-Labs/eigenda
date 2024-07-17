@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/utils"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -35,6 +36,11 @@ const (
 	MaxBlobLengthFlagName      = "eigenda-max-blob-length"
 	MemstoreFlagName           = "memstore.enabled"
 	MemstoreExpirationFlagName = "memstore.expiration"
+	// S3 flags
+	S3BucketFlagName          = "s3.bucket"
+	S3EndpointFlagName        = "s3.endpoint"
+	S3AccessKeyIDFlagName     = "s3.access-key-id"
+	S3AccessKeySecretFlagName = "s3.access-key-secret"
 )
 
 const BytesPerSymbol = 31
@@ -45,6 +51,8 @@ var MaxSRSPoints = math.Pow(2, 28)
 var MaxAllowedBlobSize = uint64(MaxSRSPoints * BytesPerSymbol / MaxCodingRatio)
 
 type Config struct {
+	S3Config store.S3Config
+
 	ClientConfig clients.EigenDAClientConfig
 
 	// The blob encoding version to use when writing blobs from the high level interface.
@@ -125,6 +133,12 @@ func (c *Config) VerificationCfg() *verify.Config {
 // NewConfig parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
+		S3Config: store.S3Config{
+			Bucket: ctx.String(S3BucketFlagName),
+			Endpoint: ctx.String(S3EndpointFlagName),
+			AccessKeyID: ctx.String(S3AccessKeyIDFlagName),
+			AccessKeySecret: ctx.String(S3AccessKeySecretFlagName),
+		},
 		ClientConfig: clients.EigenDAClientConfig{
 			/* Required Flags */
 			RPC:                          ctx.String(EigenDADisperserRPCFlagName),
@@ -267,5 +281,27 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Value:   25 * time.Minute,
 			EnvVars: []string{"MEMSTORE_EXPIRATION"},
 		},
-	}
+		&cli.StringFlag{
+			Name:    S3BucketFlagName,
+			Usage:   "bucket name for S3 storage",
+			EnvVars: prefixEnvVars("S3_BUCKET"),
+		},
+		&cli.StringFlag{
+			Name:    S3EndpointFlagName,
+			Usage:   "endpoint for S3 storage",
+			Value:   "",
+			EnvVars: prefixEnvVars("S3_ENDPOINT"),
+		},
+		&cli.StringFlag{
+			Name:    S3AccessKeyIDFlagName,
+			Usage:   "access key id for S3 storage",
+			Value:   "",
+			EnvVars: prefixEnvVars("S3_ACCESS_KEY_ID"),
+		}, &cli.StringFlag{
+			Name:    S3AccessKeySecretFlagName,
+			Usage:   "access key secret for S3 storage",
+			Value:   "",
+			EnvVars: prefixEnvVars("S3_ACCESS_KEY_SECRET"),
+	},
+}
 }

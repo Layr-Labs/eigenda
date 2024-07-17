@@ -9,8 +9,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"golang.org/x/exp/rand"
 
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -33,7 +37,7 @@ type TestSuite struct {
 	Server *server.Server
 }
 
-func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
+func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func()) {
 
 	ctx := context.Background()
 
@@ -82,11 +86,37 @@ func CreateTestSuite(t *testing.T, useMemory bool) (TestSuite, func()) {
 		EthConfirmationDepth:   6,
 	}
 
-	store, err := server.LoadStore(
-		server.CLIConfig{
+	if useMemory {
+		eigendaCfg.ClientConfig.SignerPrivateKeyHex = "0000000000000000000100000000000000000000000000000000000000000000"
+	}
+
+	var cfg server.CLIConfig
+	if useS3 {
+		// generate random string
+		bucketName := "eigenda-proxy-test-" + RandString(10)
+		createS3Bucket(bucketName)
+
+		cfg = server.CLIConfig{
+			EigenDAConfig: eigendaCfg,
+			S3Config: store.S3Config{
+				Profiling: true,
+				Bucket:  bucketName,
+				Endpoint: "localhost:4566",
+				AccessKeySecret:   "minioadmin",
+				AccessKeyID: "minioadmin",
+			},
+		}
+	} else {
+
+		cfg = server.CLIConfig{
 			EigenDAConfig: eigendaCfg,
 			MetricsCfg:    opmetrics.CLIConfig{},
-		},
+		}
+
+	}
+
+	store, err := server.LoadStoreRouter(
+		cfg,
 		ctx,
 		log,
 	)
@@ -115,4 +145,47 @@ func (ts *TestSuite) Address() string {
 	port := ts.Server.Port()
 
 	return fmt.Sprintf("%s://%s:%d", transport, host, port)
+}
+
+
+func createS3Bucket(bucketName string) {
+	println("Creating S3 bucket: ", bucketName)
+	// Initialize minio client object.
+	endpoint := "localhost:4566"
+	accessKeyID := "minioadmin"
+	secretAccessKey := "minioadmin"
+	useSSL := false
+
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	location := "us-east-1"
+
+	ctx := context.Background()
+	err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{Region: location})
+	if err != nil {
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, errBucketExists := minioClient.BucketExists(ctx, bucketName)
+		if errBucketExists == nil && exists {
+			fmt.Printf("We already own %s\n", bucketName)
+		} else {
+			panic(err)
+		}
+	} else {
+		fmt.Printf("Successfully created %s\n", bucketName)
+	}
+}
+
+func RandString(n int) string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }

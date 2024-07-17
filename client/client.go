@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/Layr-Labs/eigenda-proxy/server"
 )
 
 // TODO: Add support for custom http client option
@@ -18,7 +16,7 @@ type Config struct {
 // ProxyClient is an interface for communicating with the EigenDA proxy server
 type ProxyClient interface {
 	Health() error
-	GetData(ctx context.Context, cert []byte, domain server.DomainType) ([]byte, error)
+	GetData(ctx context.Context, cert []byte) ([]byte, error)
 	SetData(ctx context.Context, b []byte) ([]byte, error)
 }
 
@@ -59,8 +57,8 @@ func (c *client) Health() error {
 }
 
 // GetData fetches blob data associated with a DA certificate
-func (c *client) GetData(ctx context.Context, comm []byte, domain server.DomainType) ([]byte, error) {
-	url := fmt.Sprintf("%s/get/0x%x?domain=%s&commitment_mode=simple", c.cfg.URL, comm, domain.String())
+func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
+	url := fmt.Sprintf("%s/get/0x%x?commitment_mode=simple", c.cfg.URL, comm)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

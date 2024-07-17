@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
@@ -54,6 +55,7 @@ func init() {
 var Flags []cli.Flag
 
 type CLIConfig struct {
+	S3Config store.S3Config
 	EigenDAConfig Config
 	MetricsCfg    opmetrics.CLIConfig
 }

@@ -1,90 +1,148 @@
 package commitments
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
-	"log"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// ErrInvalidCommitment is returned when the commitment cannot be parsed into a known commitment type.
+var ErrInvalidCommitment = errors.New("invalid commitment")
+
+// ErrCommitmentMismatch is returned when the commitment does not match the given input.
+var ErrCommitmentMismatch = errors.New("commitment mismatch")
+
+
+// OPCommitmentType is the commitment type prefix.
 type OPCommitmentType byte
 
+func CommitmentTypeFromString(s string) (OPCommitmentType, error) {
+	switch s {
+	case KeccakCommitmentString:
+		return Keccak256CommitmentType, nil
+	case GenericCommitmentString:
+		return GenericCommitmentType, nil
+	default:
+		return 0, fmt.Errorf("invalid commitment type: %s", s)
+	}
+}
+
+// CommitmentType describes the binary format of the commitment.
+// KeccakCommitmentStringType is the default commitment type for the centralized DA storage.
+// GenericCommitmentType indicates an opaque bytestring that the op-node never opens.
 const (
-	// Keccak256CommitmentTypeByte represents a commitment using Keccak256 hashing.
-	Keccak256CommitmentTypeByte OPCommitmentType = 0
-	// GenericCommitmentTypeByte represents a commitment using a DA service.
-	GenericCommitmentTypeByte OPCommitmentType = 1
+	Keccak256CommitmentType OPCommitmentType = 0
+	GenericCommitmentType   OPCommitmentType = 1
+	KeccakCommitmentString  string         = "KeccakCommitment"
+	GenericCommitmentString string         = "GenericCommitment"
 )
 
-type OPCommitment struct {
-	keccak256Commitment []byte
-	genericCommitment   *DAServiceOPCommitment
+// OPCommitment is the binary representation of a commitment.
+type OPCommitment interface {
+	CommitmentType() OPCommitmentType
+	Encode() []byte
+	Verify(input []byte) error
 }
 
-var _ Commitment = (*OPCommitment)(nil)
+// Keccak256Commitment is an implementation of OPCommitment that uses Keccak256 as the commitment function.
+type Keccak256Commitment []byte
 
-func Keccak256Commitment(value []byte) OPCommitment {
-	return OPCommitment{keccak256Commitment: value}
-}
+// GenericCommitment is an implementation of OPCommitment that treats the commitment as an opaque bytestring.
+type GenericCommitment []byte
 
-func GenericCommitment(value DAServiceOPCommitment) OPCommitment {
-	return OPCommitment{genericCommitment: &value}
-}
-
-func (e OPCommitment) IsKeccak256Commitment() bool {
-	return e.keccak256Commitment != nil
-}
-
-func (e OPCommitment) IsGenericCommitment() bool {
-	return e.genericCommitment != nil
-}
-
-func (e OPCommitment) MustKeccak256CommitmentValue() []byte {
-	if e.keccak256Commitment != nil {
-		return e.keccak256Commitment
-	}
-	log.Panic("OPCommitment does not contain a Keccak256Commitment value")
-	return nil // This will never be reached, but is required for compilation.
-}
-
-func (e OPCommitment) MustGenericCommitmentValue() DAServiceOPCommitment {
-	if e.genericCommitment != nil {
-		return *e.genericCommitment
-	}
-	log.Panic("OPCommitment does not contain a DAServiceCommitment value")
-	return DAServiceOPCommitment{} // This will never be reached, but is required for compilation.
-}
-
-func (e OPCommitment) Marshal() ([]byte, error) {
-	if e.IsGenericCommitment() {
-		bytes, err := e.MustGenericCommitmentValue().Marshal()
-		if err != nil {
-			return nil, err
-		}
-		return append([]byte{byte(GenericCommitmentTypeByte)}, bytes...), nil
-	} else if e.IsKeccak256Commitment() {
-		return append([]byte{byte(Keccak256CommitmentTypeByte)}, e.MustKeccak256CommitmentValue()...), nil
-	} else {
-		return nil, fmt.Errorf("OPCommitment is neither a Keccak256 commitment nor a DA service commitment")
-	}
-}
-
-func (e *OPCommitment) Unmarshal(bz []byte) error {
-	if len(bz) < 1 {
-		return fmt.Errorf("OPCommitment does not contain a commitment type prefix byte")
-	}
-	head := OPCommitmentType(bz[0])
-	tail := bz[1:]
-	switch head {
-	case Keccak256CommitmentTypeByte:
-		e.keccak256Commitment = tail
-	case GenericCommitmentTypeByte:
-		daServiceCommitment := DAServiceOPCommitment{}
-		err := daServiceCommitment.Unmarshal(tail)
-		if err != nil {
-			return err
-		}
-		e.genericCommitment = &daServiceCommitment
+// NewOPCommitment creates a new commitment from the given input and desired type.
+func NewOPCommitment(t OPCommitmentType, input []byte) OPCommitment {
+	switch t {
+	case Keccak256CommitmentType:
+		return NewKeccak256Commitment(input)
+	case GenericCommitmentType:
+		return NewGenericCommitment(input)
 	default:
-		return fmt.Errorf("unrecognized commitment type byte: %x", bz[0])
+		return nil
 	}
+}
+
+// DecodeOPCommitment parses the commitment into a known commitment type.
+// The input type is determined by the first byte of the raw data.
+// The input type is discarded and the commitment is passed to the appropriate constructor.
+func DecodeOPCommitment(input []byte) (OPCommitment, error) {
+	if len(input) == 0 {
+		return nil, ErrInvalidCommitment
+	}
+	t := OPCommitmentType(input[0])
+	data := input[1:]
+	switch t {
+	case Keccak256CommitmentType:
+		return DecodeKeccak256(data)
+	case GenericCommitmentType:
+		return DecodeGenericCommitment(data)
+	default:
+		return nil, ErrInvalidCommitment
+	}
+}
+
+// NewKeccak256Commitment creates a new commitment from the given input.
+func NewKeccak256Commitment(input []byte) Keccak256Commitment {
+	return Keccak256Commitment(crypto.Keccak256(input))
+}
+
+// DecodeKeccak256 validates and casts the commitment into a Keccak256Commitment.
+func DecodeKeccak256(commitment []byte) (Keccak256Commitment, error) {
+	// guard against empty commitments
+	if len(commitment) == 0 {
+		return nil, ErrInvalidCommitment
+	}
+	// keccak commitments are always 32 bytes
+	if len(commitment) != 32 {
+		return nil, ErrInvalidCommitment
+	}
+	return commitment, nil
+}
+
+// CommitmentType returns the commitment type of Keccak256.
+func (c Keccak256Commitment) CommitmentType() OPCommitmentType {
+	return Keccak256CommitmentType
+}
+
+// Encode adds a commitment type prefix self describing the commitment.
+func (c Keccak256Commitment) Encode() []byte {
+	return append([]byte{byte(Keccak256CommitmentType)}, c...)
+}
+
+// Verify checks if the commitment matches the given input.
+func (c Keccak256Commitment) Verify(input []byte) error {
+	if !bytes.Equal(c, crypto.Keccak256(input)) {
+		return ErrCommitmentMismatch
+	}
+	return nil
+}
+
+// NewGenericCommitment creates a new commitment from the given input.
+func NewGenericCommitment(input []byte) GenericCommitment {
+	return GenericCommitment(input)
+}
+
+// DecodeGenericCommitment validates and casts the commitment into a GenericCommitment.
+func DecodeGenericCommitment(commitment []byte) (GenericCommitment, error) {
+	if len(commitment) == 0 {
+		return nil, ErrInvalidCommitment
+	}
+	return commitment[:], nil
+}
+
+// CommitmentType returns the commitment type of Generic Commitment.
+func (c GenericCommitment) CommitmentType() OPCommitmentType {
+	return GenericCommitmentType
+}
+
+// Encode adds a commitment type prefix self describing the commitment.
+func (c GenericCommitment) Encode() []byte {
+	return append([]byte{byte(GenericCommitmentType)}, c...)
+}
+
+// Verify always returns true for GenericCommitment because the DA Server must validate the data before returning it to the op-node.
+func (c GenericCommitment) Verify(input []byte) error {
 	return nil
 }

@@ -1,58 +1,41 @@
 package commitments
 
-import (
-	"fmt"
-	"log"
-)
 
-// Define the parent and child types
-type CertEncodingVersion byte
+type CertEncodingCommitment byte
 
 const (
-	CertEncodingV0 CertEncodingVersion = 0
+	CertV0 CertEncodingCommitment = 0
 )
 
-type EigenDACommitment struct {
-	certV0 []byte
+// OPCommitment is the binary representation of a commitment.
+type CertCommitment interface {
+	CommitmentType() CertEncodingCommitment
+	Encode() []byte
+	Verify(input []byte) error
 }
 
-var _ Commitment = (*EigenDACommitment)(nil)
+type CertCommitmentV0 []byte
 
-func EigenDACertV0(value []byte) EigenDACommitment {
-	return EigenDACommitment{certV0: value}
+
+// NewV0CertCommitment creates a new commitment from the given input.
+func NewV0CertCommitment(input []byte) CertCommitmentV0 {
+	return CertCommitmentV0(input)
 }
 
-func (e EigenDACommitment) IsCertV0() bool {
-	return e.certV0 != nil
-}
-
-func (e EigenDACommitment) MustCertV0Value() []byte {
-	if e.certV0 != nil {
-		return e.certV0
+// DecodeCertCommitment validates and casts the commitment into a Keccak256Commitment.
+func DecodeCertCommitment(commitment []byte) (CertCommitmentV0, error) {
+	if len(commitment) == 0 {
+		return nil, ErrInvalidCommitment
 	}
-	log.Panic("CommitmentEither does not contain a Keccak256Commitment value")
-	return nil // This will never be reached, but is required for compilation.
+	return commitment, nil
 }
 
-func (e EigenDACommitment) Marshal() ([]byte, error) {
-	if e.IsCertV0() {
-		return append([]byte{byte(CertEncodingV0)}, e.certV0...), nil
-	} else {
-		return nil, fmt.Errorf("EigenDADAServiceOPCommitment is of unknown type")
-	}
+// CommitmentType returns the commitment type of Keccak256.
+func (c CertCommitmentV0) CommitmentType() CertEncodingCommitment {
+	return CertV0
 }
 
-func (e *EigenDACommitment) Unmarshal(bz []byte) error {
-	if len(bz) < 1 {
-		return fmt.Errorf("OP commitment does not contain eigenda commitment encoding version prefix byte")
-	}
-	head := CertEncodingVersion(bz[0])
-	tail := bz[1:]
-	switch head {
-	case CertEncodingV0:
-		e.certV0 = tail
-	default:
-		return fmt.Errorf("unrecognized EigenDA commitment encoding type byte: %x", bz[0])
-	}
-	return nil
+// Encode adds a commitment type prefix self describing the commitment.
+func (c CertCommitmentV0) Encode() []byte {
+	return append([]byte{byte(CertV0)}, c...)
 }

@@ -1,4 +1,4 @@
-package server
+package store
 
 import (
 	"context"
@@ -41,7 +41,7 @@ func NewEigenDAStore(ctx context.Context, client *clients.EigenDAClient, v *veri
 
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e EigenDAStore) Get(ctx context.Context, key []byte, domain DomainType) ([]byte, error) {
+func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
@@ -63,14 +63,7 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte, domain DomainType) ([
 		return nil, err
 	}
 
-	switch domain {
-	case BinaryDomain:
-		return decodedBlob, nil
-	case PolyDomain:
-		return encodedBlob, nil
-	default:
-		return nil, fmt.Errorf("unexpected domain type: %d", domain)
-	}
+	return decodedBlob, nil
 }
 
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.

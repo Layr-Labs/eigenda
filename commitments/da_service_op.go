@@ -1,67 +1,43 @@
 package commitments
 
-import (
-	"fmt"
-	"log"
-)
+import "github.com/ethereum/go-ethereum/crypto"
 
 type DAServiceOPCommitmentType byte
 
 const (
-	EigenDAByte DAServiceOPCommitmentType = 0
+	EigenDACommitmentType DAServiceOPCommitmentType = 0
 )
 
-// DAServiceOPCommitment represents a value of one of two possible types (Keccak256Commitment or DAServiceCommitment).
-type DAServiceOPCommitment struct {
-	eigendaCommitment *EigenDACommitment
+// OPCommitment is the binary representation of a commitment.
+type DaSvcCommitment interface {
+	CommitmentType() DAServiceOPCommitmentType
+	Encode() []byte
+	Verify(input []byte) error
 }
 
-var _ Commitment = (*DAServiceOPCommitment)(nil)
+type EigenDASvcCommitment []byte
 
-func OptimismEigenDACommitment(value EigenDACommitment) DAServiceOPCommitment {
-	return DAServiceOPCommitment{eigendaCommitment: &value}
+
+// NewEigenDASvcCommitment creates a new commitment from the given input.
+func NewEigenDASvcCommitment(input []byte) EigenDASvcCommitment {
+	return EigenDASvcCommitment(crypto.Keccak256(input))
 }
 
-func (e DAServiceOPCommitment) IsEigenDA() bool {
-	return e.eigendaCommitment != nil
-}
-
-func (e DAServiceOPCommitment) MustEigenDAValue() EigenDACommitment {
-	if e.eigendaCommitment != nil {
-		return *e.eigendaCommitment
+// DecodeEigenDASvcCommitment validates and casts the commitment into a Keccak256Commitment.
+func DecodeEigenDASvcCommitment(commitment []byte) (EigenDASvcCommitment, error) {
+	// guard against empty commitments
+	if len(commitment) == 0 {
+		return nil, ErrInvalidCommitment
 	}
-	log.Panic("CommitmentEither does not contain a Keccak256Commitment value")
-	return EigenDACommitment{} // This will never be reached, but is required for compilation.
+	return commitment, nil
 }
 
-func (e DAServiceOPCommitment) Marshal() ([]byte, error) {
-	if e.IsEigenDA() {
-		eigenDABytes, err := e.MustEigenDAValue().Marshal()
-		if err != nil {
-			return nil, err
-		}
-		return append([]byte{byte(EigenDAByte)}, eigenDABytes...), nil
-	} else {
-		return nil, fmt.Errorf("DAServiceOPCommitment is neither a keccak256 commitment or a DA service commitment")
-	}
+// CommitmentType returns the commitment type of Keccak256.
+func (c EigenDASvcCommitment) CommitmentType() DAServiceOPCommitmentType {
+	return EigenDACommitmentType
 }
 
-func (e *DAServiceOPCommitment) Unmarshal(bz []byte) error {
-	if len(bz) < 1 {
-		return fmt.Errorf("OP commitment does not contain generic commitment type prefix byte")
-	}
-	head := DAServiceOPCommitmentType(bz[0])
-	tail := bz[1:]
-	switch head {
-	case EigenDAByte:
-		eigendaCommitment := EigenDACommitment{}
-		err := eigendaCommitment.Unmarshal(tail)
-		if err != nil {
-			return err
-		}
-		e.eigendaCommitment = &eigendaCommitment
-	default:
-		return fmt.Errorf("unrecognized generic commitment type byte: %x", bz[0])
-	}
-	return nil
+// Encode adds a commitment type prefix self describing the commitment.
+func (c EigenDASvcCommitment) Encode() []byte {
+	return append([]byte{byte(EigenDACommitmentType)}, c...)
 }

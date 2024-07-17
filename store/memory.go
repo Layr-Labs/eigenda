@@ -1,4 +1,4 @@
-package server
+package store
 
 import (
 	"context"
@@ -92,7 +92,7 @@ func (e *MemStore) pruneExpired() {
 }
 
 // Get fetches a value from the store.
-func (e *MemStore) Get(ctx context.Context, commit []byte, domain DomainType) ([]byte, error) {
+func (e *MemStore) Get(ctx context.Context, commit []byte) ([]byte, error) {
 	e.reads += 1
 	e.RLock()
 	defer e.RUnlock()
@@ -115,14 +115,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte, domain DomainType) ([
 		return nil, err
 	}
 
-	switch domain {
-	case BinaryDomain:
-		return e.codec.DecodeBlob(encodedBlob)
-	case PolyDomain:
-		return encodedBlob, nil
-	default:
-		return nil, fmt.Errorf("unexpected domain type: %d", domain)
-	}
+	return e.codec.DecodeBlob(encodedBlob)
 }
 
 // Put inserts a value into the store.

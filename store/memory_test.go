@@ -1,4 +1,4 @@
-package server
+package store
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func TestGetSet(t *testing.T) {
 	key, err := ms.Put(ctx, expected)
 	assert.NoError(t, err)
 
-	actual, err := ms.Get(ctx, key, BinaryDomain)
+	actual, err := ms.Get(ctx, key)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
 }
@@ -96,7 +96,7 @@ func TestExpiration(t *testing.T) {
 	// sleep 1 second and verify that older blob entries are removed
 	time.Sleep(time.Second * 1)
 
-	_, err = ms.Get(ctx, key, BinaryDomain)
+	_, err = ms.Get(ctx, key)
 	assert.Error(t, err)
 
 }
