@@ -7,9 +7,12 @@ import (
 	"sort"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type OperatorOnlineStatus struct {
@@ -180,6 +183,11 @@ func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*Op
 	dispersalSocket := operatorSocket.GetDispersalSocket()
 	dispersalOnline := checkIsOperatorOnline(dispersalSocket, 3, s.logger)
 
+	if dispersalOnline {
+		// collect node info if online
+		getNodeInfo(ctx, dispersalSocket, operatorId, s.logger)
+	}
+
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
 		OperatorId:      operatorId,
@@ -196,9 +204,25 @@ func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*Op
 	return portCheckResponse, nil
 }
 
-// method to check if operator is online
-// Note: This method is least intrusive way to check if operator is online
-// AlternateSolution: Should we add an endpt to check if operator is online?
+// query operator host info endpoint if available
+func getNodeInfo(ctx context.Context, socket string, operatorId string, logger logging.Logger) {
+	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Error("Failed to dial grpc operator socket", "operatorId", operatorId, "socket", socket, "error", err)
+		return
+	}
+	defer conn.Close()
+	client := node.NewDispersalClient(conn)
+	reply, err := client.NodeInfo(ctx, &node.NodeInfoRequest{})
+	if err != nil {
+		logger.Info("NodeInfo", "operatorId", operatorId, "semver", "unknown")
+		return
+	}
+
+	logger.Info("NodeInfo", "operatorId", operatorId, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+}
+
+// method to check if operator is online via socket dial
 func checkIsOperatorOnline(socket string, timeoutSecs int, logger logging.Logger) bool {
 	if !ValidOperatorIP(socket, logger) {
 		logger.Error("port check blocked invalid operator IP", "socket", socket)
