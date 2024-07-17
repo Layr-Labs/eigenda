@@ -14,17 +14,30 @@ import (
 type Config struct {
 	clients.Config
 
+	// TODO add to flags.go
+	// The number of worker threads that generate read traffic.
+	NumReadInstances uint
+	// The period of the submission rate of read requests for each read worker thread.
+	ReadRequestInterval time.Duration
+	// For each blob, how many times should it be downloaded? If between 0.0 and 1.0, blob will be downloaded
+	// 0 or 1 times with the specified probability (e.g. 0.2 means each blob has a 20% chance of being downloaded).
+	// If greater than 1.0, then each blob will be downloaded the specified number of times.
+	DownloadRate float64
+	// The minimum amount of time that must pass after a blob is written prior to the first read attempt being made.
+	ReadDelay time.Duration
+
 	// The number of worker threads that generate write traffic.
-	NumInstances uint
-	// The period of the submission rate of new blobs for each worker thread.
-	RequestInterval time.Duration
+	NumWriteInstances uint
+	// The period of the submission rate of new blobs for each write worker thread.
+	WriteRequestInterval time.Duration
 	// The size of each blob dispersed, in bytes.
 	DataSize uint64
-	// Configures logging for the traffic generator.
-	LoggingConfig common.LoggerConfig
 	// If true, then each blob will contain unique random data. If false, the same random data
 	// will be dispersed for each blob by a particular worker thread.
 	RandomizeBlobs bool
+
+	// Configures logging for the traffic generator.
+	LoggingConfig common.LoggerConfig
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
 
@@ -52,8 +65,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			ctx.Duration(flags.TimeoutFlag.Name),
 			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
 		),
-		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
-		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
+		NumWriteInstances:      ctx.GlobalUint(flags.NumWriteInstancesFlag.Name),
+		WriteRequestInterval:   ctx.Duration(flags.WriteRequestIntervalFlag.Name),
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
 		LoggingConfig:          *loggerConfig,
 		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),

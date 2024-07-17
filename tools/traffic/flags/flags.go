@@ -34,17 +34,17 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 		Value:    10 * time.Second,
 	}
-	NumInstancesFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "num-instances"),
-		Usage:    "Number of generator instances to run in parallel",
+	NumWriteInstancesFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "num-write-instances"),
+		Usage:    "Number of generator instances producing write traffic to run in parallel",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_INSTANCES"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_WRITE_INSTANCES"),
 	}
-	RequestIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "request-interval"),
-		Usage:    "Duration between requests",
+	WriteRequestIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "write-request-interval"),
+		Usage:    "Duration between write requests",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "REQUEST_INTERVAL"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "WRITE_REQUEST_INTERVAL"),
 		Value:    30 * time.Second,
 	}
 	DataSizeFlag = cli.Uint64Flag{
@@ -89,8 +89,8 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
-	NumInstancesFlag,
-	RequestIntervalFlag,
+	NumWriteInstancesFlag,
+	WriteRequestIntervalFlag,
 	DataSizeFlag,
 }
 

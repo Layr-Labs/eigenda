@@ -37,14 +37,15 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	}, nil
 }
 
+// Run instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
 func (g *TrafficGenerator) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	for i := 0; i < int(g.Config.NumInstances); i++ {
+	for i := 0; i < int(g.Config.NumWriteInstances); i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = g.StartTraffic(ctx)
+			_ = g.StartWriteWorker(ctx)
 		}()
 		time.Sleep(g.Config.InstanceLaunchInterval)
 	}
@@ -57,7 +58,29 @@ func (g *TrafficGenerator) Run() error {
 	return nil
 }
 
-func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
+// TODO maybe split reader/writer into separate files
+
+// StartReadWorker periodically requests to download random blobs at a configured rate.
+func (g *TrafficGenerator) StartReadWorker(ctx context.Context) error {
+	ticker := time.NewTicker(g.Config.WriteRequestInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			// TODO determine which blob to download
+			g.readRequest() // TODO add parameters
+		}
+	}
+}
+
+// readRequest reads a blob.
+func (g *TrafficGenerator) readRequest() {
+	// TODO
+}
+
+// StartWriteWorker periodically sends (possibly) random blobs to a disperser at a configured rate.
+func (g *TrafficGenerator) StartWriteWorker(ctx context.Context) error {
 	data := make([]byte, g.Config.DataSize)
 	_, err := rand.Read(data)
 	if err != nil {
@@ -66,7 +89,7 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 
 	paddedData := codec.ConvertByPaddingEmptyByte(data)
 
-	ticker := time.NewTicker(g.Config.RequestInterval)
+	ticker := time.NewTicker(g.Config.WriteRequestInterval)
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,13 +102,13 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 				}
 				paddedData = codec.ConvertByPaddingEmptyByte(data)
 
-				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				_, err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
 				if err != nil {
 					g.Logger.Error("failed to send blob request", "err:", err)
 				}
 				paddedData = nil
 			} else {
-				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				_, err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
 				if err != nil {
 					g.Logger.Error("failed to send blob request", "err:", err)
 				}
@@ -95,26 +118,26 @@ func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
 	}
 }
 
-func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
+// sendRequest sends a blob to a disperser.
+func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) ([]byte /* key */, error) {
 	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
 	defer cancel()
 
 	if g.Config.SignerPrivateKey != "" {
 		blobStatus, key, err := g.DisperserClient.DisperseBlobAuthenticated(ctxTimeout, data, g.Config.CustomQuorums)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		g.Logger.Info("successfully dispersed new blob", "authenticated", true, "key", hex.EncodeToString(key), "status", blobStatus.String())
-		return nil
+		return key, nil
 	} else {
 		blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, g.Config.CustomQuorums)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		g.Logger.Info("successfully dispersed new blob", "authenticated", false, "key", hex.EncodeToString(key), "status", blobStatus.String())
-		return nil
+		return key, nil
 	}
-
 }

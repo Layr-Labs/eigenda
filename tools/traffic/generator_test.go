@@ -23,8 +23,8 @@ func TestTrafficGenerator(t *testing.T) {
 			Config: clients.Config{
 				Timeout: 1 * time.Second,
 			},
-			DataSize:        1000_000,
-			RequestInterval: 2 * time.Second,
+			DataSize:             1000_000,
+			WriteRequestInterval: 2 * time.Second,
 		},
 		DisperserClient: disperserClient,
 	}
@@ -34,7 +34,7 @@ func TestTrafficGenerator(t *testing.T) {
 		Return(&processing, []byte{1}, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		_ = trafficGenerator.StartTraffic(ctx)
+		_ = trafficGenerator.StartWriteWorker(ctx)
 	}()
 	time.Sleep(5 * time.Second)
 	cancel()
@@ -51,9 +51,9 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 			Config: clients.Config{
 				Timeout: 1 * time.Second,
 			},
-			DataSize:         1000_000,
-			RequestInterval:  2 * time.Second,
-			SignerPrivateKey: "Hi",
+			DataSize:             1000_000,
+			WriteRequestInterval: 2 * time.Second,
+			SignerPrivateKey:     "Hi",
 		},
 		DisperserClient: disperserClient,
 	}
@@ -63,7 +63,7 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 		Return(&processing, []byte{1}, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		_ = trafficGenerator.StartTraffic(ctx)
+		_ = trafficGenerator.StartWriteWorker(ctx)
 	}()
 	time.Sleep(5 * time.Second)
 	cancel()
