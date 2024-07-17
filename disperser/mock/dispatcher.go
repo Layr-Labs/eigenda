@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -23,7 +24,7 @@ func NewDispatcher(state *coremock.PrivateOperatorState) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader) chan core.SigningMessage {
+func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, header *core.BatchHeader, timeout time.Duration) chan core.SigningMessage {
 	args := d.Called()
 	var nonSigners map[core.OperatorID]struct{}
 	if args.Get(0) != nil {
@@ -63,4 +64,9 @@ func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 	}()
 
 	return update
+}
+
+func (c *Dispatcher) SendChunksToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+	args := c.Called(ctx, blobs, batchHeader, op)
+	return args.Get(0).(*core.Signature), args.Error(1)
 }
