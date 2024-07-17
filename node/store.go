@@ -313,7 +313,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	}
 	throughput := float64(size) / time.Since(start).Seconds()
 	s.metrics.StoringThroughput.Set(throughput)
-	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "write batch duration", time.Since(start), "write throughput (MB/s)", throughput/1000_000, "total store batch duration", time.Since(storeBatchStart), "total bytes", size)
+	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "num blobs", len(blobs), "num of key-value pair entries", len(keys), "write batch duration", time.Since(start), "write throughput (MB/s)", throughput/1000_000, "total store batch duration", time.Since(storeBatchStart), "total bytes", size)
 
 	return &keys, nil
 }
