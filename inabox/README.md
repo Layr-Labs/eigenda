@@ -32,6 +32,10 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
    ```
    $ npm install --global yarn
    ```
+- The Graph is installed
+   ```
+   $ npm install -g @graphprotocol/graph-cli@latest
+   ```
 
 ## Run a complete end-to-end test
 
@@ -175,7 +179,7 @@ TRACE[10-12|22:02:13.376] [batcher] AggregateSignatures took       duration=10.6
 TRACE[10-12|22:02:13.376] [batcher] Confirming batch...            caller=batcher.go:198
 ```
 
-To dispense that same blob (replace `$REQUEST_ID` with the request ID from the prior step):
+To check the status of that same blob (replace `$REQUEST_ID` with the request ID from the prior step):
 
 ```
 grpcurl -plaintext -d '{"request_id": "$REQUEST_ID"}' \
