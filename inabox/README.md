@@ -3,24 +3,39 @@
 Notice: The scripts for setting up a local geth chain are currently broken. The instructions below use anvil instead
 
 ## First time setup
-- Go path is in system path
+- Go path is in system path. [Instructions for installing go](https://go.dev/doc/install).
 - Ensure all submodules are initialized and checked out
     ```
-    git submodule update --init --recursive
+    $ git submodule update --init --recursive
     ```
+- Docker is installed. [Instructions for installing docker](https://www.docker.com/products/docker-desktop/).
 - Ensure foundry is installed (comes with `anvil` which we use as a test chain and `forge` which we use for deployment scripting):
     ```
     $ curl -L https://foundry.paradigm.xyz | bash
     $ foundryup
     ```
+- `brew` is installed, see instructions [here](https://brew.sh/).
 - Localstack CLI is installed (simulates AWS stack on local machine; we also provide instructions for running localstack from docker without the CLI):
     ```
     $ brew install localstack/tap/localstack-cli
     ```
-- grpcurl is installed:
+- `grpcurl` is installed:
     ```
-    go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+    $ brew install grpcurl
     ```
+- `aws` is installed, follow instructions [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+- `npm` is installed
+   ```
+   $ brew install node
+   ```
+- `yarn` is installed
+   ```
+   $ npm install --global yarn
+   ```
+- The Graph is installed
+   ```
+   $ npm install -g @graphprotocol/graph-cli@latest
+   ```
 
 ## Run a complete end-to-end test
 
@@ -144,6 +159,15 @@ $ grpcurl -plaintext -d '{"data": "'$(tools/kzgpad/bin/kzgpad -e hello)'"}' \
   localhost:32003 disperser.Disperser/DisperseBlob
 ```
 
+This will return a message in the following form:
+
+```
+{
+  "result": "PROCESSING",
+  "requestId": "$REQUEST_ID"
+}
+```
+
 Look for logs such as the following to indicate that the disperser has successfully confirmed the batch:
 ```
 TRACE[10-12|22:02:13.365] [batcher] Aggregating signatures...      caller=batcher.go:178
@@ -155,6 +179,13 @@ TRACE[10-12|22:02:13.376] [batcher] AggregateSignatures took       duration=10.6
 TRACE[10-12|22:02:13.376] [batcher] Confirming batch...            caller=batcher.go:198
 ```
 
+To check the status of that same blob (replace `$REQUEST_ID` with the request ID from the prior step):
+
+```
+grpcurl -plaintext -d '{"request_id": "$REQUEST_ID"}' \
+  localhost:32003 disperser.Disperser/GetBlobStatus
+```
+
 ### Cleanup
 
 If you followed [Option 1](#option-1-simplest) above, you can run the following command in order to clean up the test infra:
@@ -164,3 +195,5 @@ make stop-infra
 ```
 
 If you followed [Option 2](#option-2), you can stop the infra services by `Ctrl-C`'ing in each terminal. For the graph, it's also important to run `docker compose down -v` from within the `inabox/thegraph` directory to make sure that the containers are fully removed. 
+
+
