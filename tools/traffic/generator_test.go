@@ -34,7 +34,7 @@ func TestTrafficGenerator(t *testing.T) {
 		Return(&processing, []byte{1}, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		_ = trafficGenerator.StartWriteWorker(ctx)
+		_ = trafficGenerator.StartBlobWriter(ctx)
 	}()
 	time.Sleep(5 * time.Second)
 	cancel()
@@ -63,7 +63,7 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 		Return(&processing, []byte{1}, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		_ = trafficGenerator.StartWriteWorker(ctx)
+		_ = trafficGenerator.StartBlobWriter(ctx)
 	}()
 	time.Sleep(5 * time.Second)
 	cancel()
