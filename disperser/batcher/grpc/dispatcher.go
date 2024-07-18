@@ -17,13 +17,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type Config struct {
+	Timeout time.Duration
+}
+
 type dispatcher struct {
+	*Config
+
 	logger  logging.Logger
 	metrics *batcher.DispatcherMetrics
 }
 
-func NewDispatcher(logger logging.Logger, metrics *batcher.DispatcherMetrics) *dispatcher {
+func NewDispatcher(cfg *Config, logger logging.Logger, metrics *batcher.DispatcherMetrics) *dispatcher {
 	return &dispatcher{
+		Config:  cfg,
 		logger:  logger.With("component", "Dispatcher"),
 		metrics: metrics,
 	}
@@ -31,16 +38,16 @@ func NewDispatcher(logger logging.Logger, metrics *batcher.DispatcherMetrics) *d
 
 var _ disperser.Dispatcher = (*dispatcher)(nil)
 
-func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, timeout time.Duration) chan core.SigningMessage {
+func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader) chan core.SigningMessage {
 	update := make(chan core.SigningMessage, len(state.IndexedOperators))
 
 	// Disperse
-	c.sendAllChunks(ctx, state, blobs, batchHeader, timeout, update)
+	c.sendAllChunks(ctx, state, blobs, batchHeader, update)
 
 	return update
 }
 
-func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, timeout time.Duration, update chan core.SigningMessage) {
+func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, update chan core.SigningMessage) {
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
 			blobMessages := make([]*core.BlobMessage, 0)
@@ -72,9 +79,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 			}
 
 			requestedAt := time.Now()
-			ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
-			sig, err := c.SendChunksToOperator(ctxWithTimeout, blobMessages, batchHeader, &op)
+			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			latencyMs := float64(time.Since(requestedAt).Milliseconds())
 			if err != nil {
 				update <- core.SigningMessage{
@@ -104,7 +109,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 	}
 }
 
-func (c *dispatcher) SendChunksToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
 	// TODO Add secure Grpc
 
 	conn, err := grpc.Dial(
@@ -118,6 +123,8 @@ func (c *dispatcher) SendChunksToOperator(ctx context.Context, blobs []*core.Blo
 	defer conn.Close()
 
 	gc := node.NewDispersalClient(conn)
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
+	defer cancel()
 	start := time.Now()
 	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader)
 	if err != nil {
