@@ -13,6 +13,7 @@ LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
 E2ETEST = INTEGRATION=true go test -timeout 1m -v ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
+HOLESKYTEST = TESTNET=true go test -timeout 50m -v ./e2e  -parallel 4 -deploy-config ../.devnet/devnetL1.json
 
 .PHONY: eigenda-proxy
 eigenda-proxy:
@@ -41,8 +42,10 @@ e2e-test: run-minio
 	$(E2ETEST); \
 	make stop-minio
 
-holesky-test:
-	TESTNET=true go test -timeout 50m -v ./e2e  -parallel 4 -deploy-config ../.devnet/devnetL1.json
+holesky-test: run-minio
+	$(HOLESKYTEST); \
+	make stop-minio
+	
 
 .PHONY: lint
 lint:

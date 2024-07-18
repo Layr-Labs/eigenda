@@ -39,8 +39,8 @@ const (
 	// S3 flags
 	S3BucketFlagName          = "s3.bucket"
 	S3EndpointFlagName        = "s3.endpoint"
-	S3AccessKeyIDFlagName     = "s3.access-key-id"
-	S3AccessKeySecretFlagName = "s3.access-key-secret"
+	S3AccessKeyIDFlagName     = "s3.access-key-id" // #nosec G101
+	S3AccessKeySecretFlagName = "s3.access-key-secret" // #nosec G101
 )
 
 const BytesPerSymbol = 31
