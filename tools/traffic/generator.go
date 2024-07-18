@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -87,6 +88,11 @@ func (g *TrafficGenerator) StartWriteWorker(ctx context.Context) error {
 		return err
 	}
 
+	// TODO configuration for this stuff
+	var table BlobTable = NewBlobTable()
+	var verifier StatusVerifier = NewStatusVerifier(&table, &g.DisperserClient, -1)
+	verifier.Start(ctx, time.Second)
+
 	paddedData := codec.ConvertByPaddingEmptyByte(data)
 
 	ticker := time.NewTicker(g.Config.WriteRequestInterval)
@@ -95,6 +101,7 @@ func (g *TrafficGenerator) StartWriteWorker(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
+			var key []byte
 			if g.Config.RandomizeBlobs {
 				_, err := rand.Read(data)
 				if err != nil {
@@ -102,18 +109,22 @@ func (g *TrafficGenerator) StartWriteWorker(ctx context.Context) error {
 				}
 				paddedData = codec.ConvertByPaddingEmptyByte(data)
 
-				_, err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				key, err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+
 				if err != nil {
 					g.Logger.Error("failed to send blob request", "err:", err)
 				}
 				paddedData = nil
 			} else {
-				_, err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
+				key, err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
 				if err != nil {
 					g.Logger.Error("failed to send blob request", "err:", err)
 				}
 			}
 
+			fmt.Println("passing key to verifier") // TODO remove
+			verifier.AddUnconfirmedKey(&key)
+			fmt.Println("done passing key") // TODO remove
 		}
 	}
 }
