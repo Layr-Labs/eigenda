@@ -98,7 +98,7 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	dispersalDuration := time.Since(dispersalStart)
 	remainingTimeout := e.cfg.StatusQueryTimeout - dispersalDuration
 
-	ticker := time.NewTicker(12 * time.Second)
+	ticker := time.NewTicker(12 * time.Second) // avg. eth block time
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), remainingTimeout)
 	defer cancel()
@@ -107,11 +107,12 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	for !done {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("timed out when trying to verify the DA certificate for a blob batch after dispersal")
 		case <-ticker.C:
 			err = e.verifier.VerifyCert(cert)
 			if err == nil {
 				done = true
+
 			} else if !errors.Is(err, verify.ErrBatchMetadataHashNotFound) {
 				return nil, err
 			} else {

@@ -46,7 +46,7 @@ func LoadStore(cfg CLIConfig, ctx context.Context, log log.Logger) (Store, error
 		log,
 		&EigenDAStoreConfig{
 			MaxBlobSizeBytes:     maxBlobLength,
-			EthConfirmationDepth: cfg.EigenDAConfig.EthConfirmationDepth,
+			EthConfirmationDepth: uint64(cfg.EigenDAConfig.EthConfirmationDepth),
 			StatusQueryTimeout:   cfg.EigenDAConfig.ClientConfig.StatusQueryTimeout,
 		},
 	)

@@ -53,7 +53,7 @@ type Config struct {
 	// ETH vars
 	EthRPC               string
 	SvcManagerAddr       string
-	EthConfirmationDepth uint64
+	EthConfirmationDepth int64
 
 	// KZG vars
 	CacheDir string
@@ -117,7 +117,7 @@ func (c *Config) VerificationCfg() *verify.Config {
 		RPCURL:               c.EthRPC,
 		SvcManagerAddr:       c.SvcManagerAddr,
 		KzgConfig:            kzgCfg,
-		EthConfirmationDepth: c.EthConfirmationDepth,
+		EthConfirmationDepth: uint64(c.EthConfirmationDepth),
 	}
 
 }
@@ -143,11 +143,11 @@ func ReadConfig(ctx *cli.Context) Config {
 		MaxBlobLength:          ctx.String(MaxBlobLengthFlagName),
 		SvcManagerAddr:         ctx.String(SvcManagerAddrFlagName),
 		EthRPC:                 ctx.String(EthRPCFlagName),
-		EthConfirmationDepth:   ctx.Uint64(EthConfirmationDepthFlagName),
+		EthConfirmationDepth:   ctx.Int64(EthConfirmationDepthFlagName),
 		MemstoreEnabled:        ctx.Bool(MemstoreFlagName),
 		MemstoreBlobExpiration: ctx.Duration(MemstoreExpirationFlagName),
 	}
-	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth != 0)
+	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth < 0)
 	return cfg
 }
 
@@ -252,7 +252,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		&cli.Uint64Flag{
 			Name:    EthConfirmationDepthFlagName,
-			Usage:   "The number of Ethereum blocks of confirmation that the DA briging transaction must have before it is assumed by the proxy to be final. The value of `0` indicates that the proxy should wait for weak-subjectivity finalization (12-14 minutes).",
+			Usage:   "The number of Ethereum blocks of confirmation that the DA briging transaction must have before it is assumed by the proxy to be final. The value of `0` indicates that the proxy shouldn't wait for any confirmations.",
 			EnvVars: prefixEnvVars("ETH_CONFIRMATION_DEPTH"),
 			Value:   6,
 		},
