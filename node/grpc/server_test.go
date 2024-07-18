@@ -340,6 +340,36 @@ func TestStoreChunksRequestValidation(t *testing.T) {
 	assert.True(t, strings.Contains(err.Error(), "adversary threshold equals 0"))
 }
 
+func TestStoreBlobs(t *testing.T) {
+	server := newTestServer(t, true)
+
+	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy.BatchHeader = nil
+	req := &pb.StoreBlobsRequest{
+		Blobs:                reqToCopy.Blobs,
+		ReferenceBlockNumber: 1,
+	}
+	reply, err := server.StoreBlobs(context.Background(), req)
+	assert.Nil(t, reply)
+	assert.Error(t, err)
+	assert.Equal(t, strings.Compare(err.Error(), "StoreBlobs is not implemented"), 0)
+}
+
+func TestAttestBatch(t *testing.T) {
+	server := newTestServer(t, true)
+
+	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy.BatchHeader = nil
+	req := &pb.AttestBatchRequest{
+		BatchHeader:      reqToCopy.BatchHeader,
+		BlobHeaderHashes: [][]byte{},
+	}
+	reply, err := server.AttestBatch(context.Background(), req)
+	assert.Nil(t, reply)
+	assert.Error(t, err)
+	assert.Equal(t, strings.Compare(err.Error(), "AttestBatch is not implemented"), 0)
+}
+
 func TestRetrieveChunks(t *testing.T) {
 	server := newTestServer(t, true)
 	batchHeaderHash, _, _, _ := storeChunks(t, server)
