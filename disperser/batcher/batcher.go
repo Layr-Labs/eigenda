@@ -417,7 +417,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// Dispatch encoded batch
 	log.Debug("Dispatching encoded batch...")
 	stageTimer = time.Now()
-	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader, b.AttestationTimeout)
+	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer))
 	h, err := batch.State.OperatorState.Hash()
 	if err != nil {
