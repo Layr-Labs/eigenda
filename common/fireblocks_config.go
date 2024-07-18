@@ -106,7 +106,7 @@ func ReadFireblocksCLIConfig(ctx *cli.Context, flagPrefix string) FireblocksConf
 func NewFireblocksWallet(config *FireblocksConfig, ethClient EthClient, logger logging.Logger) (walletsdk.Wallet, error) {
 	if config.Disable {
 		logger.Info("Fireblocks wallet disabled")
-		return nil, fmt.Errorf("fireblocks wallet is disabled")
+		return nil, errors.New("fireblocks wallet is disabled")
 	}
 
 	validConfigflag := len(config.APIKeyName) > 0 &&

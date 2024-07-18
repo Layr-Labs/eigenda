@@ -2,7 +2,6 @@ package openCommitment
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc"
@@ -18,10 +17,10 @@ func ComputeKzgProof(
 	rootOfUnities []fr.Element,
 ) (*bn254.G1Affine, *fr.Element, error) {
 	if len(evalFr) != len(rootOfUnities) {
-		return nil, nil, fmt.Errorf("inconsistent length between blob and root of unities")
+		return nil, nil, errors.New("inconsistent length between blob and root of unities")
 	}
 	if index < 0 || index >= len(evalFr) {
-		return nil, nil, fmt.Errorf("the function only opens points within a blob")
+		return nil, nil, errors.New("the function only opens points within a blob")
 	}
 
 	polyShift := make([]fr.Element, len(evalFr))

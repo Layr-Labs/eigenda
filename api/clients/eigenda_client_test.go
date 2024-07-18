@@ -2,7 +2,7 @@ package clients_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -224,7 +224,7 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 func TestPutBlobFailDispersal(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil, fmt.Errorf("error dispersing")))
+		Return(nil, nil, errors.New("error dispersing")))
 	logger := log.NewLogger(log.DiscardHandler())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,

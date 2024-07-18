@@ -219,7 +219,7 @@ func validateBatchHeaderRoot(batchHeader *BatchHeader, blobs []*BlobMessage) err
 	}
 
 	if batchHeader.BatchRoot != derivedHeader.BatchRoot {
-		return fmt.Errorf("batch header root does not match computed root")
+		return errors.New("batch header root does not match computed root")
 	}
 
 	return nil

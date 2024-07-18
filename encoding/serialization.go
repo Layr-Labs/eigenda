@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -17,7 +16,7 @@ func (c *Frame) Serialize() ([]byte, error) {
 func (c *Frame) Deserialize(data []byte) (*Frame, error) {
 	err := decode(data, c)
 	if !c.Proof.IsInSubGroup() {
-		return nil, fmt.Errorf("proof is in not the subgroup")
+		return nil, errors.New("proof is in not the subgroup")
 	}
 
 	return c, err
@@ -102,7 +101,7 @@ func (c *G1Commitment) UnmarshalJSON(data []byte) error {
 	c.Y = g1Point.Y
 
 	if !(*bn254.G1Affine)(c).IsInSubGroup() {
-		return fmt.Errorf("G1Commitment not in the subgroup")
+		return errors.New("G1Commitment not in the subgroup")
 	}
 
 	return nil
@@ -132,7 +131,7 @@ func (c *G2Commitment) UnmarshalJSON(data []byte) error {
 	c.Y = g2Point.Y
 
 	if !(*bn254.G2Affine)(c).IsInSubGroup() {
-		return fmt.Errorf("G2Commitment not in the subgroup")
+		return errors.New("G2Commitment not in the subgroup")
 	}
 	return nil
 }

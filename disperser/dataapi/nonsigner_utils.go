@@ -1,6 +1,7 @@
 package dataapi
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 )
@@ -184,7 +185,7 @@ func validateQuorumEvents(added []*OperatorQuorum, removed []*OperatorQuorum, st
 				return fmt.Errorf("quorum events must be in range [%d, %d]", startBlock+1, endBlock)
 			}
 			if i > 0 && events[i].BlockNumber < events[i-1].BlockNumber {
-				return fmt.Errorf("quorum events must be in ascending order by block number")
+				return errors.New("quorum events must be in ascending order by block number")
 			}
 		}
 		return nil

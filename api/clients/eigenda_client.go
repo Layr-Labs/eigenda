@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -82,7 +83,7 @@ func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blob
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf("blob has length zero")
+		return nil, errors.New("blob has length zero")
 	}
 
 	decodedData, err := m.Codec.DecodeBlob(data)
@@ -118,7 +119,7 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 
 	// encode blob
 	if m.Codec == nil {
-		errChan <- fmt.Errorf("Codec cannot be nil")
+		errChan <- errors.New("Codec cannot be nil")
 		return
 	}
 
