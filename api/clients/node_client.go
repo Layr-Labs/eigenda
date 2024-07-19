@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -129,7 +130,7 @@ func (c client) GetChunks(
 		case node.ChunkEncoding_UNKNOWN:
 			chunksChan <- RetrievedChunks{
 				OperatorID: opID,
-				Err:        err,
+				Err:        errors.New("UNKNOWN chunk encoding format"),
 				Chunks:     nil,
 			}
 		}
