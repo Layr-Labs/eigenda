@@ -10,8 +10,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/gammazero/workerpool"
-	"github.com/wealdtech/go-merkletree"
-	"github.com/wealdtech/go-merkletree/keccak256"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
 type RetrievalClient interface {
