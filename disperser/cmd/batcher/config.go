@@ -33,6 +33,8 @@ type Config struct {
 	EigenDAServiceManagerAddr     string
 
 	EnableMinibatch bool
+
+	EnableGnarkBundleEncoding bool
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -88,6 +90,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,
 		EnableMinibatch:               ctx.Bool(flags.EnableMinibatchFlag.Name),
+		EnableGnarkBundleEncoding:     ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 	}
 	return config, nil
 }
