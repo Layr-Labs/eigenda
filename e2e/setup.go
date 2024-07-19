@@ -28,7 +28,7 @@ const (
 	transport  = "http"
 	svcName    = "eigenda_proxy"
 	host       = "127.0.0.1"
-	holeskyDA  = "disperser-holesky.eigenda.xyz:443"
+	holeskyDA  = "localhost:32003"
 )
 
 type TestSuite struct {
@@ -71,19 +71,19 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
 			StatusQueryRetryInterval: pollInterval,
-			DisableTLS:               false,
+			DisableTLS:               true,
 			SignerPrivateKeyHex:      pk,
 		},
 		EthRPC:                 ethRPC,
-		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
+		SvcManagerAddr:         "0xc96304e3c037f81dA488ed9dEa1D8F2a48278a75", // incompatible with non holeskly networks
 		CacheDir:               "../resources/SRSTables",
 		G1Path:                 "../resources/g1.point",
-		MaxBlobLength:          "90kib",
+		MaxBlobLength:          "2mib",
 		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
 		PutBlobEncodingVersion: 0x00,
 		MemstoreEnabled:        useMemory,
 		MemstoreBlobExpiration: 14 * 24 * time.Hour,
-		EthConfirmationDepth:   6,
+		EthConfirmationDepth:   0,
 	}
 
 	if useMemory {
