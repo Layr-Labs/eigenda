@@ -25,16 +25,12 @@ func TestOptimismClientWithS3Backend(t *testing.T) {
 	defer kill()
 
 	daClient := op_plasma.NewDAClient(ts.Address(), false, true)
-	t.Log("Waiting for client to establish connection with plasma server...")
-	// wait for the server to come online after starting
-	// 1 - write arbitrary data to EigenDA
 
 	testPreimage := []byte(e2e.RandString(100))
 
 	commit, err := daClient.SetInput(ts.Ctx, testPreimage)
 	require.NoError(t, err)
 
-	// 2 - fetch data from EigenDA for generated commitment key
 	preimage, err := daClient.GetInput(ts.Ctx, commit)
 	require.NoError(t, err)
 	require.Equal(t, testPreimage, preimage)
@@ -53,7 +49,6 @@ func TestOptimismClientWithEigenDABackend(t *testing.T) {
 	defer kill()
 
 	daClient := op_plasma.NewDAClient(ts.Address(), false, false)
-	t.Log("Waiting for client to establish connection with plasma server...")
 
 	testPreimage := []byte(e2e.RandString(100))
 
@@ -81,7 +76,7 @@ func TestProxyClient(t *testing.T) {
 		URL: ts.Address(),
 	}
 	daClient := client.New(cfg)
-	t.Log("Waiting for client to establish connection with plasma server...")
+
 	testPreimage := []byte(e2e.RandString(100))
 
 	t.Log("Setting input data on proxy server...")

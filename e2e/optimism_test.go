@@ -122,7 +122,7 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, close := e2e.CreateTestSuite(gt, true, true)
+	proxyTS, close := e2e.CreateTestSuite(gt, useMemory(), true)
 	defer close()
 
 	t := actions.NewDefaultTesting(gt)
@@ -176,7 +176,7 @@ func TestOptimismAltDACommitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, close := e2e.CreateTestSuite(gt, true, false)
+	proxyTS, close := e2e.CreateTestSuite(gt, useMemory(), false)
 	defer close()
 
 	t := actions.NewDefaultTesting(gt)
