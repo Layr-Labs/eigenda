@@ -120,7 +120,19 @@ func (c client) GetChunks(
 
 	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
 	for i, data := range reply.GetChunks() {
-		chunk, err := new(encoding.Frame).Deserialize(data)
+		var chunk *encoding.Frame
+		switch reply.GetEncoding() {
+		case node.ChunkEncoding_GNARK:
+			chunk, err = new(encoding.Frame).DeserializeGnark(data)
+		case node.ChunkEncoding_GOB:
+			chunk, err = new(encoding.Frame).Deserialize(data)
+		case node.ChunkEncoding_UNKNOWN:
+			chunksChan <- RetrievedChunks{
+				OperatorID: opID,
+				Err:        err,
+				Chunks:     nil,
+			}
+		}
 		if err != nil {
 			chunksChan <- RetrievedChunks{
 				OperatorID: opID,

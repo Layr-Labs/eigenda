@@ -207,6 +207,7 @@ func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.
 
 	bundles := make([]*node.Bundle, len(quorumHeaders))
 	if useGnarkBundleEncoding {
+		// the ordering of quorums in bundles must be same as in quorumHeaders
 		for i, quorumHeader := range quorumHeaders {
 			quorum := quorumHeader.QuorumId
 			if bundle, ok := blob.Bundles[uint8(quorum)]; ok {
@@ -229,7 +230,6 @@ func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.
 		if err != nil {
 			return nil, err
 		}
-		bundles := make([]*node.Bundle, len(quorumHeaders))
 		// the ordering of quorums in bundles must be same as in quorumHeaders
 		for i, quorumHeader := range quorumHeaders {
 			quorum := quorumHeader.QuorumId
