@@ -1,5 +1,6 @@
 syntax = "proto3";
 package node;
+import "google/protobuf/wrappers.proto";
 import "common/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node";
 
@@ -14,6 +15,13 @@ service Dispersal {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
+	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
+	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+	rpc StoreBlobs(StoreBlobsRequest) returns (StoreBlobsReply) {}
+	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
+	// It will return a signature at the end to attest to the aggregated batch.
+	rpc AttestBatch(AttestBatchRequest) returns (AttestBatchReply) {}
 	// Retrieve node info metadata
 	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
 }
@@ -38,6 +46,31 @@ message StoreChunksRequest {
 
 message StoreChunksReply {
 	// The operator's BLS signature signed on the batch header hash.
+	bytes signature = 1;
+}
+
+message StoreBlobsRequest {
+	// Blobs to store
+	repeated Blob blobs = 1;
+	// The reference block number whose state is used to encode the blobs
+	uint32 reference_block_number = 2;
+}
+
+message StoreBlobsReply {
+	// The operator's BLS sgnature signed on the blob header hashes.
+	// The ordering of the signatures must match the ordering of the blobs sent 
+	// in the request, with empty signatures in the places for discarded blobs.
+	repeated google.protobuf.BytesValue signatures = 1;
+}
+
+message AttestBatchRequest {
+	// header of the batch
+	BatchHeader batch_header = 1;
+	// the header hashes of all blobs in the batch
+	repeated bytes blob_header_hashes = 2;
+}
+
+message AttestBatchReply {
 	bytes signature = 1;
 }
 
@@ -149,6 +182,8 @@ message BlobHeader {
 	repeated BlobQuorumInfo quorum_headers = 5;
 	// The ID of the user who is dispersing this blob to EigenDA.
 	string account_id = 6;
+	// The reference block number whose state is used to encode the blob
+	uint32 reference_block_number = 7;
 }
 
 // See BlobQuorumParam as defined in
