@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	bipMultiplier     = big.NewInt(10000)
-	secondsTillExpiry = 3600 * time.Second
+	bipMultiplier = big.NewInt(10000)
 )
 
 type ChurnRequest struct {
@@ -50,9 +49,10 @@ type churner struct {
 	Transactor  core.Transactor
 	QuorumCount uint8
 
-	privateKey *ecdsa.PrivateKey
-	logger     logging.Logger
-	metrics    *Metrics
+	privateKey            *ecdsa.PrivateKey
+	logger                logging.Logger
+	metrics               *Metrics
+	churnApprovalInterval time.Duration
 }
 
 func NewChurner(
@@ -72,9 +72,10 @@ func NewChurner(
 		Transactor:  transactor,
 		QuorumCount: 0,
 
-		privateKey: privateKey,
-		logger:     logger.With("component", "Churner"),
-		metrics:    metrics,
+		privateKey:            privateKey,
+		logger:                logger.With("component", "Churner"),
+		metrics:               metrics,
+		churnApprovalInterval: config.ChurnApprovalInterval,
 	}, nil
 }
 
@@ -285,8 +286,8 @@ func (c *churner) sign(ctx context.Context, operatorToRegisterAddress gethcommon
 	var salt [32]byte
 	copy(salt[:], saltKeccak256)
 
-	// set expiry to 3600s in the future
-	expiry := big.NewInt(now.Add(secondsTillExpiry).Unix())
+	// set expiry to ChurnApprovalInterval (15mins by default) in the future
+	expiry := big.NewInt(now.Add(c.churnApprovalInterval).Unix())
 
 	// sign and return signature
 	hashToSign, err := c.Transactor.CalculateOperatorChurnApprovalDigestHash(ctx, operatorToRegisterAddress, operatorToRegisterId, operatorsToChurn, salt, expiry)
