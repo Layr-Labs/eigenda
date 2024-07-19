@@ -45,7 +45,7 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 
 	generator, err := traffic.NewTrafficGenerator(config, signer)
 	if err != nil {
-		panic("failed to create new traffic generator")
+		panic(fmt.Sprintf("failed to create new traffic generator\n%s", err))
 	}
 
 	return generator.Run()

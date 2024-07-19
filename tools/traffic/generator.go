@@ -2,6 +2,8 @@ package traffic
 
 import (
 	"context"
+	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"os"
 	"os/signal"
 	"sync"
@@ -17,7 +19,7 @@ import (
 // TrafficGenerator simulates read/write traffic to the DA service.
 //
 //	┌------------┐                                       ┌------------┐
-//	|  writer    |-┐             ┌------------┐          |  reader    |-┐
+//	|   writer   |-┐             ┌------------┐          |   reader   |-┐
 //	└------------┘ |-┐  -------> |  verifier  | -------> └------------┘ |-┐
 //	  └------------┘ |           └------------┘            └------------┘ |
 //	    └------------┘                                       └------------┘
@@ -26,13 +28,13 @@ import (
 // that write blobs, a verifier that polls the dispenser service until blobs are confirmed,
 // and one or more readers that read blobs.
 //
-// When a writer finishes writing a blob, it
-// sends information about that blob to the verifier. When the verifier observes that a blob
-// has been confirmed, it sends information about the blob to the readers. The readers
-// only attempt to read blobs that have been confirmed by the verifier.
+// When a writer finishes writing a blob, it sends information about that blob to the verifier.
+// When the verifier observes that a blob has been confirmed, it sends information about the blob
+// to the readers. The readers only attempt to read blobs that have been confirmed by the verifier.
 type TrafficGenerator struct {
 	Logger          logging.Logger
 	DisperserClient clients.DisperserClient
+	EigenDAClient   *clients.EigenDAClient
 	Config          *Config
 }
 
@@ -43,9 +45,28 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		return nil, err
 	}
 
+	fmt.Printf("Signer private key: '%s', length: %d\n", config.SignerPrivateKey, len(config.SignerPrivateKey))
+
+	clientConfig := clients.EigenDAClientConfig{
+		RPC:                 "localhost:32003", // TODO make this configurable
+		DisableTLS:          true,              // TODO config
+		SignerPrivateKeyHex: config.SignerPrivateKey,
+	}
+	err = clientConfig.CheckAndSetDefaults()
+	if err != nil {
+		return nil, err
+	}
+
+	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true)) // TODO
+	client, err := clients.NewEigenDAClient(logger2, clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TrafficGenerator{
 		Logger:          logger,
 		DisperserClient: clients.NewDisperserClient(&config.Config, signer),
+		EigenDAClient:   client,
 		Config:          config,
 	}, nil
 }

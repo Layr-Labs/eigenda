@@ -68,14 +68,24 @@ func (reader *BlobReader) randomRead() {
 		return
 	}
 
-	// TODO convert this to a proper read
-	data, err := reader.generator.DisperserClient.RetrieveBlob(*reader.ctx, *metadata.batchHeaderHash, metadata.blobIndex)
+	// TODO
+	//data, err := reader.generator.DisperserClient.RetrieveBlob(*reader.ctx, *metadata.batchHeaderHash, metadata.blobIndex)
+	//if err != nil {
+	//	fmt.Println("Error reading blob:", err) // TODO
+	//	return
+	//}
+
+	fmt.Println("attempting to read blob")
+	fmt.Println("batch header hash:", *metadata.batchHeaderHash)
+	fmt.Println("blob index:", metadata.blobIndex)
+	fmt.Println("client: ", reader.generator.EigenDAClient)
+	data, err := reader.generator.EigenDAClient.GetBlob(*reader.ctx, *metadata.batchHeaderHash, metadata.blobIndex)
 	if err != nil {
 		fmt.Println("Error reading blob:", err) // TODO
 		return
 	}
 
-	// TODO it would be nice to do some verification, perhaps just of the hash of the blob
+	// TODO verify blob data
 
 	fmt.Println("Read blob:", data) // TODO
 }
