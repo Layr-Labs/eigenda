@@ -204,17 +204,22 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		}
 	}
 
-	data, err := blob.Bundles.Serialize()
-	if err != nil {
-		return nil, err
-	}
+	// data, err := blob.Bundles.Serialize()
+	// if err != nil {
+	// 	return nil, err
+	// }
 	bundles := make([]*node.Bundle, len(quorumHeaders))
 	// the ordering of quorums in bundles must be same as in quorumHeaders
 	for i, quorumHeader := range quorumHeaders {
 		quorum := quorumHeader.QuorumId
-		if _, ok := blob.Bundles[uint8(quorum)]; ok {
+		if bundle, ok := blob.Bundles[uint8(quorum)]; ok {
+			bundleBytes, err := bundle.Serialize()
+			if err != nil {
+				return nil, err
+			}
 			bundles[i] = &node.Bundle{
-				Chunks: data[quorum],
+				// Chunks: data[quorum],
+				Bundle: bundleBytes,
 			}
 		} else {
 			bundles[i] = &node.Bundle{
