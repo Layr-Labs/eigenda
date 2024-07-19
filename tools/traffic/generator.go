@@ -16,11 +16,11 @@ import (
 
 // TrafficGenerator simulates read/write traffic to the DA service.
 //
-//		┌------------┐                                       ┌------------┐
-//		|  writer    |-┐             ┌------------┐          |  reader    |-┐
-//	 └------------┘ |-┐  -------> |  verifier  | -------> └------------┘ |-┐
-//	   └------------┘ |           └------------┘            └------------┘ |
-//	     └------------┘                                       └------------┘
+//	┌------------┐                                       ┌------------┐
+//	|  writer    |-┐             ┌------------┐          |  reader    |-┐
+//	└------------┘ |-┐  -------> |  verifier  | -------> └------------┘ |-┐
+//	  └------------┘ |           └------------┘            └------------┘ |
+//	    └------------┘                                       └------------┘
 //
 // The traffic generator is built from three principal components: one or more writers
 // that write blobs, a verifier that polls the dispenser service until blobs are confirmed,
