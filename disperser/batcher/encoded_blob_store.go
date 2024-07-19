@@ -133,6 +133,32 @@ func (e *encodedBlobStore) DeleteEncodingResult(blobKey disperser.BlobKey, quoru
 	e.encodedResultSize -= getChunksSize(encodedResult)
 }
 
+// PopLatestEncodingResults returns all the encoded results that are pending dispersal and deletes them along with stale results that are older than the given reference block
+func (e *encodedBlobStore) PopLatestEncodingResults(refBlockNumber uint) []*EncodingResult {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	fetched := make([]*EncodingResult, 0)
+	staleCount := 0
+	for k, encodedResult := range e.encoded {
+		if encodedResult.ReferenceBlockNumber == refBlockNumber {
+			fetched = append(fetched, encodedResult)
+			// this is safe: https://go.dev/doc/effective_go#for
+			delete(e.encoded, k)
+			e.encodedResultSize -= getChunksSize(encodedResult)
+		} else if encodedResult.ReferenceBlockNumber < refBlockNumber {
+			delete(e.encoded, k)
+			staleCount++
+			e.encodedResultSize -= getChunksSize(encodedResult)
+		} else {
+			e.logger.Error("unexpected case", "refBlockNumber", encodedResult.ReferenceBlockNumber, "refBlockNumber", refBlockNumber)
+		}
+	}
+	e.logger.Debug("consumed encoded results", "fetched", len(fetched), "stale", staleCount, "refBlockNumber", refBlockNumber, "encodedSize", e.encodedResultSize)
+
+	return fetched
+}
+
 // GetNewAndDeleteStaleEncodingResults returns all the fresh encoded results that are pending dispersal, and deletes all the stale results that are older than the given block number
 func (e *encodedBlobStore) GetNewAndDeleteStaleEncodingResults(blockNumber uint) []*EncodingResult {
 	e.mu.Lock()

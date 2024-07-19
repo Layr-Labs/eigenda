@@ -249,6 +249,14 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 	return reply, err
 }
 
+func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.StoreBlobsReply, error) {
+	return nil, errors.New("StoreBlobs is not implemented")
+}
+
+func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*pb.AttestBatchReply, error) {
+	return nil, errors.New("AttestBatch is not implemented")
+}
+
 func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksRequest) (*pb.RetrieveChunksReply, error) {
 	start := time.Now()
 
