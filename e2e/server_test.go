@@ -41,6 +41,8 @@ func TestOptimismClientWithS3Backend(t *testing.T) {
 }
 
 func TestOptimismClientWithEigenDABackend(t *testing.T) {
+	// this test asserts that the data can be posted/read to EigenDA with a concurrent S3 backend configured
+
 	if !runIntegrationTests && !runTestnetIntegrationTests {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}

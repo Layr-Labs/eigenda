@@ -149,7 +149,6 @@ func (ts *TestSuite) Address() string {
 
 
 func createS3Bucket(bucketName string) {
-	println("Creating S3 bucket: ", bucketName)
 	// Initialize minio client object.
 	endpoint := "localhost:4566"
 	accessKeyID := "minioadmin"

@@ -28,9 +28,6 @@ func NewRouter(eigenda *EigenDAStore, mem *MemStore, s3 *S3Store, l log.Logger) 
 	}, nil
 }
 
-// The general pseudo-opinionated way of processing commitments is as follows:
-// 1. generic --> EigenDA
-// 2. Optimism --> EigenDA || S3  (if not EigenDA) 
 func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentMode) ([]byte, error) {
 
 	switch cm {
@@ -40,14 +37,25 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 			return nil, errors.New("expected S3 backend for OP keccak256 commitment type, but none configured")
 		}
 
-		r.log.Debug("Fetching data from S3 backend")
-		return r.s3.Get(ctx, key)
+		r.log.Debug("Retrieving data from S3 backend")
+		value, err := r.s3.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+
+		if actualHash := crypto.Keccak256(value); !utils.EqualSlices(actualHash, key) {
+			return nil, fmt.Errorf("expected key %s to be the hash of value %s, but got %s", hexutil.Encode(key), hexutil.Encode(value), hexutil.Encode(actualHash))
+		}
+
+		return value, nil
 
 	case commitments.SimpleCommitmentMode, commitments.OptimismAltDA:
 		if r.mem != nil {
+			r.log.Debug("Retrieving data from memstore")
 			return r.mem.Get(ctx, key)
 		}
 		
+		r.log.Debug("Retrieving data from eigenda")
 		return r.eigenda.Get(ctx, key)
 
 	default:
@@ -101,7 +109,6 @@ func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, e
 
 // PutWithKey is only supported for S3 storage backends using OP's alt-da keccak256 commitment type 
 func (r *Router) PutWithKey(ctx context.Context, key []byte, value []byte) ([]byte, error) {
-	println("Storing to s3 with key")
 	if r.s3 == nil {
 		return nil, errors.New("S3 is disabled but is only supported for posting known commitment keys")
 	}

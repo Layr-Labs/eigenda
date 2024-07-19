@@ -70,6 +70,7 @@ func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error, m metr
 	}
 }
 
+// WithLogging is a middleware that logs the request method and URL.
 func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error, log log.Logger) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Info("request", "method", r.Method, "url", r.URL)
@@ -188,7 +189,7 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 	key := path.Base(r.URL.Path)
 	var commitment []byte
 
-	if len(key) > 0 && key != "put" { // commitment key pre-provided (keccak256)
+	if len(key) > 0 && key != "put" { // commitment key already provided (keccak256)
 		comm, err := commitments.StringToDecodedCommitment(key, ct)
 		if err != nil {
 			svr.log.Info("failed to decode commitment", "err", err, "key", key)
@@ -203,14 +204,12 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 		}
 
 	} else { // without
-		svr.log.Info("Put without key")
 		commitment, err = svr.router.PutWithoutKey(context.Background(), input)
 		if err != nil {
 			return err
 		}
 	}
 
-	println("Encoding commitment: ", hexutil.Encode(commitment))
 	comm, err := commitments.EncodeCommitment(commitment, ct)
 	if err != nil {
 		svr.log.Info("failed to encode commitment", "err", err)
@@ -263,11 +262,8 @@ func ReadCommitmentMode(r *http.Request) (commitments.CommitmentMode, error) {
 				return commitments.SimpleCommitmentMode, err
 			}
 
-			println("byte", decodedCommit[0])
-
 			switch decodedCommit[0] {
 			case byte(commitments.GenericCommitmentType):
-				println("Returning generic commitment")
 				return commitments.OptimismAltDA, nil
 
 			case byte(commitments.Keccak256CommitmentType):
@@ -277,7 +273,6 @@ func ReadCommitmentMode(r *http.Request) (commitments.CommitmentMode, error) {
 				return commitments.SimpleCommitmentMode, fmt.Errorf("unknown commit byte prefix")
 	
 			}
-
 		}
 
 		return commitments.OptimismAltDA, nil
