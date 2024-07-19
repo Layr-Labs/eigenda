@@ -14,6 +14,22 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// TrafficGenerator simulates read/write traffic to the DA service.
+//
+//		┌------------┐                                       ┌------------┐
+//		|  writer    |-┐             ┌------------┐          |  reader    |-┐
+//	 └------------┘ |-┐  -------> |  verifier  | -------> └------------┘ |-┐
+//	   └------------┘ |           └------------┘            └------------┘ |
+//	     └------------┘                                       └------------┘
+//
+// The traffic generator is built from three principal components: one or more writers
+// that write blobs, a verifier that polls the dispenser service until blobs are confirmed,
+// and one or more readers that read blobs.
+//
+// When a writer finishes writing a blob, it
+// sends information about that blob to the verifier. When the verifier observes that a blob
+// has been confirmed, it sends information about the blob to the readers. The readers
+// only attempt to read blobs that have been confirmed by the verifier.
 type TrafficGenerator struct {
 	Logger          logging.Logger
 	DisperserClient clients.DisperserClient
@@ -44,11 +60,17 @@ func (g *TrafficGenerator) Run() error {
 	verifier.Start(ctx, time.Second)
 
 	var wg sync.WaitGroup
+
 	for i := 0; i < int(g.Config.NumWriteInstances); i++ {
 		writer := NewBlobWriter(&ctx, &wg, g, &verifier)
 		writer.Start()
 		time.Sleep(g.Config.InstanceLaunchInterval)
 	}
+
+	// TODO start multiple readers
+	reader := NewBlobReader(&ctx, &wg, g, &table)
+	reader.Start()
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	<-signals
@@ -56,25 +78,4 @@ func (g *TrafficGenerator) Run() error {
 	cancel()
 	wg.Wait()
 	return nil
-}
-
-// TODO maybe split reader/writer into separate files
-
-// StartReadWorker periodically requests to download random blobs at a configured rate.
-func (g *TrafficGenerator) StartReadWorker(ctx context.Context) error {
-	ticker := time.NewTicker(g.Config.WriteRequestInterval)
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			// TODO determine which blob to download
-			g.readRequest() // TODO add parameters
-		}
-	}
-}
-
-// readRequest reads a blob.
-func (g *TrafficGenerator) readRequest() {
-	// TODO
 }

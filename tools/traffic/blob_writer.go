@@ -13,10 +13,17 @@ import (
 
 // BlobWriter sends blobs to a disperser at a configured rate.
 type BlobWriter struct {
-	ctx       *context.Context
+	// The context for the generator. All work should cease when this context is cancelled.
+	ctx *context.Context
+
+	// Tracks the number of active goroutines within the generator.
 	waitGroup *sync.WaitGroup
+
+	// TODO this type should be refactored maybe
 	generator *TrafficGenerator
-	verifier  *StatusVerifier
+
+	// Responsible for polling on the status of a recently written blob until it becomes confirmed.
+	verifier *StatusVerifier
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData *[]byte

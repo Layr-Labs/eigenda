@@ -46,9 +46,7 @@ func NewStatusVerifier(
 
 // AddUnconfirmedKey adds a key to the list of unconfirmed keys.
 func (verifier *StatusVerifier) AddUnconfirmedKey(key *[]byte) {
-	fmt.Println("Adding unconfirmed key") // TODO remove
 	verifier.keyChannel <- key
-	fmt.Println("Finished adding unconfirmed key") // TODO remove
 }
 
 // Start begins the status goroutine, which periodically polls
@@ -59,20 +57,15 @@ func (verifier *StatusVerifier) Start(ctx context.Context, period time.Duration)
 
 // monitor periodically polls the disperser service to verify the status of blobs.
 func (verifier *StatusVerifier) monitor(ctx context.Context, period time.Duration) {
-	fmt.Println("::: Starting status verifier :::") // TODO remove
-
 	ticker := time.NewTicker(period)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case key := <-verifier.keyChannel:
-			fmt.Println("Got unconfirmed key") // TODO remove
 			verifier.unconfirmedKeys = append(verifier.unconfirmedKeys, key)
 		case <-ticker.C:
-			fmt.Println("polling") // TODO remove
 			verifier.poll(ctx)
-			fmt.Println("done polling") // TODO remove
 		}
 	}
 }
@@ -99,7 +92,7 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 		return false
 	}
 
-	// TODO other statuses?
+	// TODO other statuses
 	if status.GetStatus() == disperser.BlobStatus_CONFIRMED {
 
 		fmt.Println(">>>>>>>>>>>>>>>>>>>>>> Confirmed key", key) // TODO remove
