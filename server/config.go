@@ -102,14 +102,12 @@ func (c *Config) VerificationCfg() *verify.Config {
 		panic(fmt.Errorf("Check() was not called on config object, err is not nil: %w", err))
 	}
 
-	numPointsNeeded := uint64(math.Ceil(float64(numBytes) / BytesPerSymbol))
-
 	kzgCfg := &kzg.KzgConfig{
 		G1Path:          c.G1Path,
 		G2PowerOf2Path:  c.G2PowerOfTauPath,
 		CacheDir:        c.CacheDir,
-		SRSOrder:        numPointsNeeded,
-		SRSNumberToLoad: numPointsNeeded,
+		SRSOrder:        268435456, // 2 ^ 32 
+		SRSNumberToLoad: numBytes / 32, // # of fp.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
@@ -162,6 +160,12 @@ func ReadConfig(ctx *cli.Context) Config {
 		MemstoreBlobExpiration: ctx.Duration(MemstoreExpirationFlagName),
 	}
 	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth < 0)
+
+
+	if cfg.EthConfirmationDepth >= 0 && (cfg.SvcManagerAddr == "" || cfg.EthRPC == "") {
+		panic("Eth Confirmation Depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
+	}
+
 	return cfg
 }
 
