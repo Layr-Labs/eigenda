@@ -75,7 +75,7 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 			SignerPrivateKeyHex:      pk,
 		},
 		EthRPC:                 ethRPC,
-		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
+		SvcManagerAddr:         "0xc96304e3c037f81dA488ed9dEa1D8F2a48278a75", // incompatible with non holeskly networks
 		CacheDir:               "../resources/SRSTables",
 		G1Path:                 "../resources/g1.point",
 		MaxBlobLength:          "2mib",
