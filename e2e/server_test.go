@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -140,12 +141,22 @@ func TestProxyClientWithOversizedBlob(t *testing.T) {
 	blobInfo, err := daClient.SetData(ts.Ctx, testPreimage)
 	require.Empty(t, blobInfo)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "blob is larger than max blob size")
+
+	oversizedError := false
+	if strings.Contains(err.Error(), "blob is larger than max blob size") {
+		oversizedError = true
+	}
+
+	if strings.Contains(err.Error(), "blob size cannot exceed 2 MiB") {
+		oversizedError = true
+	}
+
+	require.True(t, oversizedError)
 
 }
 
 func TestProxyClient_MultiSameContentBlobs_SameBatch(t *testing.T) {
-		t.Skip("Skipping test until fix is applied to holesky")
+	t.Skip("Skipping test until fix is applied to holesky")
 
 
 	t.Parallel()
