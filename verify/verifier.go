@@ -87,8 +87,10 @@ func (v *Verifier) VerifyCert(cert *Certificate) error {
 }
 
 func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
+	// ChunkLength and TotalChunks aren't relevant for computing data
+	// commitment which is why they're currently set arbitrarily
 	encoder, err := v.kzgProver.GetKzgEncoder(
-		encoding.ParamsFromSysPar(1, 1, uint64(len(blob))),
+		encoding.ParamsFromSysPar(420, 69, uint64(len(blob))),
 	)
 	if err != nil {
 		return nil, err

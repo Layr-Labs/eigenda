@@ -68,6 +68,10 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
 func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err error) {
+	if uint64(len(value)) > e.cfg.MaxBlobSizeBytes {
+		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.cfg.MaxBlobSizeBytes)
+	}
+
 	dispersalStart := time.Now()
 	blobInfo, err := e.client.PutBlob(ctx, value)
 	if err != nil {
@@ -79,11 +83,6 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
 	}
-	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("encoded blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.cfg.MaxBlobSizeBytes)
-	}
-
-
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
 		return nil, err
