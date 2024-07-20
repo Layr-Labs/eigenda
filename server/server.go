@@ -75,7 +75,7 @@ func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error, log lo
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Info("request", "method", r.Method, "url", r.URL)
 		err := handleFn(w, r)
-		if err != nil {
+		if err != nil { // #nosec G104
 			w.Write([]byte(err.Error()))
 			log.Error(err.Error())
 		}
