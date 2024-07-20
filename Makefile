@@ -39,13 +39,12 @@ test:
 	go test -v ./... -parallel 4 
 
 e2e-test: run-minio
-	$(E2ETEST); \
+	$(E2ETEST) && \
 	make stop-minio
 
 holesky-test: run-minio
-	$(HOLESKYTEST); \
+	$(HOLESKYTEST) && \
 	make stop-minio
-	
 
 .PHONY: lint
 lint:

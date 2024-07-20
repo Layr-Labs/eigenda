@@ -119,7 +119,32 @@ func TestProxyClientWithLargeBlob(t *testing.T) {
 	require.Equal(t, testPreimage, preimage)
 }
 
-func TestProxyClientMultiSameContentBlobsSameBatch(t *testing.T) {
+func TestProxyClientWithOversizedBlob(t *testing.T) {
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
+
+	t.Parallel()
+
+	ts, kill := e2e.CreateTestSuite(t, useMemory(), false)
+	defer kill()
+
+	cfg := &client.Config{
+		URL: ts.Address(),
+	}
+	daClient := client.New(cfg)
+	//  2MB blob
+	testPreimage := []byte(e2e.RandString(200000000))
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.Ctx, testPreimage)
+	require.Empty(t, blobInfo)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "blob is larger than max blob size")
+
+}
+
+func TestProxyClient_MultiSameContentBlobs_SameBatch(t *testing.T) {
 		t.Skip("Skipping test until fix is applied to holesky")
 
 

@@ -73,11 +73,17 @@ func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received unexpected response code: %d", resp.StatusCode)
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	return io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("received error response, code=%d, msg = %s", resp.StatusCode, string(b))
+	}
+
+	return b, nil
+
 }
 
 // SetData writes raw byte data to DA and returns the respective certificate
@@ -93,13 +99,14 @@ func (c *client) SetData(ctx context.Context, b []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to store data: %v", resp.StatusCode)
-	}
 
 	b, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to store data: %v, err = %s", resp.StatusCode, string(b))
 	}
 
 	if len(b) == 0 {

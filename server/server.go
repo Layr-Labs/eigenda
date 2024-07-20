@@ -76,6 +76,7 @@ func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error, log lo
 		log.Info("request", "method", r.Method, "url", r.URL)
 		err := handleFn(w, r)
 		if err != nil {
+			w.Write([]byte(err.Error()))
 			log.Error(err.Error())
 		}
 	}
@@ -200,12 +201,14 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 		commitment, err = svr.router.PutWithKey(context.Background(), comm, input)
 		if err != nil {
 			svr.log.Info("failed to put with key", "err", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return err
 		}
 
 	} else { // without
 		commitment, err = svr.router.PutWithoutKey(context.Background(), input)
 		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			return err
 		}
 	}

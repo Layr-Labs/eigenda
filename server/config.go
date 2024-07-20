@@ -138,7 +138,6 @@ func ReadConfig(ctx *cli.Context) Config {
 			AccessKeySecret: ctx.String(S3AccessKeySecretFlagName),
 		},
 		ClientConfig: clients.EigenDAClientConfig{
-			/* Required Flags */
 			RPC:                          ctx.String(EigenDADisperserRPCFlagName),
 			StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
 			StatusQueryTimeout:           ctx.Duration(StatusQueryTimeoutFlagName),
@@ -161,19 +160,40 @@ func ReadConfig(ctx *cli.Context) Config {
 	}
 	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth < 0)
 
-
-	if cfg.EthConfirmationDepth >= 0 && (cfg.SvcManagerAddr == "" || cfg.EthRPC == "") {
-		panic("Eth Confirmation Depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
-	}
-
 	return cfg
 }
 
-func (m Config) Check() error {
-	_, err := m.GetMaxBlobLength()
+// Check ... verifies that configuration values are adequately set
+func (cfg *Config) Check() error {
+	l, err := cfg.GetMaxBlobLength()
 	if err != nil {
 		return err
 	}
+
+	if l == 0 {
+		return fmt.Errorf("max blob length is 0")
+	}
+
+	if cfg.SvcManagerAddr != "" && cfg.EthRPC == "" {
+		return fmt.Errorf("svc manager address is set, but Eth RPC is not set")
+	}
+
+	if cfg.EthRPC != "" && cfg.SvcManagerAddr == "" {
+		return fmt.Errorf("eth rpc is set, but svc manager address is not set")
+	}
+	
+	if cfg.EthConfirmationDepth >= 0 && (cfg.SvcManagerAddr == "" || cfg.EthRPC == "") {
+		return fmt.Errorf("eth confirmation depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
+	}
+
+	if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
+		return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
+	}
+
+	if !cfg.MemstoreEnabled && cfg.ClientConfig.RPC == "" {
+		return fmt.Errorf("eigenda disperser rpc url is not set")
+	}
+
 	return nil
 }
 
@@ -268,11 +288,11 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "The deployed EigenDA service manager address. The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
 			EnvVars: prefixEnvVars("SERVICE_MANAGER_ADDR"),
 		},
-		&cli.Uint64Flag{
+		&cli.Int64Flag{
 			Name:    EthConfirmationDepthFlagName,
-			Usage:   "The number of Ethereum blocks of confirmation that the DA briging transaction must have before it is assumed by the proxy to be final. The value of `0` indicates that the proxy shouldn't wait for any confirmations.",
+			Usage:   "The number of Ethereum blocks of confirmation that the DA batch submission tx must have before it is assumed by the proxy to be final. The value of `0` indicates that the proxy shouldn't wait for any confirmations.",
 			EnvVars: prefixEnvVars("ETH_CONFIRMATION_DEPTH"),
-			Value:   6,
+			Value:   -1,
 		},
 		&cli.BoolFlag{
 			Name:    MemstoreFlagName,

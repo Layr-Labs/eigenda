@@ -28,7 +28,7 @@ const (
 	transport  = "http"
 	svcName    = "eigenda_proxy"
 	host       = "127.0.0.1"
-	holeskyDA  = "localhost:32003"
+	holeskyDA  = "disperser-holesky.eigenda.xyz:443"
 )
 
 type TestSuite struct {
@@ -71,7 +71,7 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
 			StatusQueryRetryInterval: pollInterval,
-			DisableTLS:               true,
+			DisableTLS:               false,
 			SignerPrivateKeyHex:      pk,
 		},
 		EthRPC:                 ethRPC,

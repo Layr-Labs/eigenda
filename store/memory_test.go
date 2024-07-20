@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -35,7 +35,7 @@ func TestGetSet(t *testing.T) {
 	}
 
 	verifier, err := verify.NewVerifier(cfg, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ms, err := NewMemStore(
 		ctx,
@@ -45,15 +45,15 @@ func TestGetSet(t *testing.T) {
 		time.Hour*1000,
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	expected := []byte(testPreimage)
 	key, err := ms.Put(ctx, expected)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	actual, err := ms.Get(ctx, key)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
 
 func TestExpiration(t *testing.T) {
@@ -77,7 +77,7 @@ func TestExpiration(t *testing.T) {
 	}
 
 	verifier, err := verify.NewVerifier(cfg, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ms, err := NewMemStore(
 		ctx,
@@ -87,16 +87,16 @@ func TestExpiration(t *testing.T) {
 		time.Millisecond*10,
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	preimage := []byte(testPreimage)
 	key, err := ms.Put(ctx, preimage)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// sleep 1 second and verify that older blob entries are removed
 	time.Sleep(time.Second * 1)
 
 	_, err = ms.Get(ctx, key)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 }
