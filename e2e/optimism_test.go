@@ -66,7 +66,7 @@ func NewL2PlasmaDA(t actions.Testing, daHost string, altDA bool) *L2PlasmaDA {
 
 	var storage *plasma.DAClient
 	if !altDA {
-		storage =  plasma.NewDAClient(daHost, true, true)
+		storage = plasma.NewDAClient(daHost, true, true)
 	} else {
 		storage = plasma.NewDAClient(daHost, false, false)
 	}
@@ -78,7 +78,7 @@ func NewL2PlasmaDA(t actions.Testing, daHost string, altDA bool) *L2PlasmaDA {
 	require.NoError(t, err)
 
 	if altDA {
-	plasmaCfg.CommitmentType = plasma.GenericCommitmentType
+		plasmaCfg.CommitmentType = plasma.GenericCommitmentType
 	} else {
 		plasmaCfg.CommitmentType = plasma.Keccak256CommitmentType
 	}
@@ -115,7 +115,6 @@ func (a *L2PlasmaDA) ActL1Finalized(t actions.Testing) {
 	a.miner.ActL1Finalize(t, latest)
 	a.sequencer.ActL1FinalizedSignal(t)
 }
-
 
 func TestOptimismKeccak256Commitment(gt *testing.T) {
 	if !runIntegrationTests && !runTestnetIntegrationTests {
@@ -170,7 +169,6 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 	require.Equal(t, 1, stat.Reads)
 }
 
-
 func TestOptimismAltDACommitment(gt *testing.T) {
 	if !runIntegrationTests && !runTestnetIntegrationTests {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
@@ -218,8 +216,10 @@ func TestOptimismAltDACommitment(gt *testing.T) {
 	op_stack.ActL1Finalized(t)
 
 	// assert that EigenDA proxy's was written and read from
-	stat := proxyTS.Server.GetMemStats()
 
-	require.Equal(t, 1, stat.Entries)
-	require.Equal(t, 1, stat.Reads)
+	if useMemory() {
+		stat := proxyTS.Server.GetMemStats()
+		require.Equal(t, 1, stat.Entries)
+		require.Equal(t, 1, stat.Reads)
+	}
 }
