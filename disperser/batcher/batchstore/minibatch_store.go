@@ -50,6 +50,14 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeName: aws.String("SK"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
+			{
+				AttributeName: aws.String("OperatorID"),
+				AttributeType: types.ScalarAttributeTypeB,
+			},
+			{
+				AttributeName: aws.String("RequestedAt"),
+				AttributeType: types.ScalarAttributeTypeN,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -61,8 +69,29 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				KeyType:       types.KeyTypeRange,
 			},
 		},
-		TableName:              aws.String(tableName),
-		GlobalSecondaryIndexes: nil,
+		TableName: aws.String(tableName),
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
+			{
+				IndexName: aws.String("OperatorID_RequestedAt_Index"),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("OperatorID"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("RequestedAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(readCapacityUnits),
 			WriteCapacityUnits: aws.Int64(writeCapacityUnits),
@@ -109,7 +138,8 @@ func MarshalDispersalResponse(response *batcher.DispersalResponse) (map[string]t
 	}
 	fields["PK"] = &types.AttributeValueMemberS{Value: batchKey + response.BatchID.String()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: dispersalResponseKey + fmt.Sprintf("%d", response.MinibatchIndex)}
-	fields["RespondedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", response.RequestedAt.UTC().Unix())}
+	fields["RespondedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", response.RespondedAt.UTC().Unix())}
+	fields["RequestedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", response.DispersalRequest.RequestedAt.UTC().Unix())}
 	return fields, nil
 }
 func UnmarshalBatchRecord(item commondynamodb.Item) (*batcher.BatchRecord, error) {
@@ -135,8 +165,9 @@ func UnmarshalDispersalRequest(item commondynamodb.Item) (*batcher.DispersalRequ
 	request := batcher.DispersalRequest{}
 	err := attributevalue.UnmarshalMap(item, &request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal dispersal request from DynamoDB: %v", err)
 	}
+
 	request.RequestedAt = request.RequestedAt.UTC()
 	return &request, nil
 }
@@ -148,6 +179,7 @@ func UnmarshalDispersalResponse(item commondynamodb.Item) (*batcher.DispersalRes
 		return nil, err
 	}
 	response.RespondedAt = response.RespondedAt.UTC()
+	response.DispersalRequest.RequestedAt = response.DispersalRequest.RequestedAt.UTC()
 	return &response, nil
 }
 

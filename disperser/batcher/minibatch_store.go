@@ -47,9 +47,9 @@ type MinibatchRecord struct {
 }
 
 type DispersalRequest struct {
-	BatchID        uuid.UUID
-	MinibatchIndex uint
-	core.OperatorID
+	BatchID         uuid.UUID
+	MinibatchIndex  uint
+	OperatorID      [32]byte
 	OperatorAddress gcommon.Address
 	Socket          string
 	NumBlobs        uint
