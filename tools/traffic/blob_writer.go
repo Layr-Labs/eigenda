@@ -3,7 +3,7 @@ package traffic
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
+	"fmt"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"sync"
 	"time"
@@ -77,12 +77,14 @@ func (writer *BlobWriter) run() {
 		case <-(*writer.ctx).Done():
 			return
 		case <-ticker.C:
-			key, err := writer.sendRequest(*writer.getRandomData())
+			data := writer.getRandomData()
+			key, err := writer.sendRequest(*data)
 
 			if err != nil {
 				writer.generator.Logger.Error("failed to send blob request", "err:", err)
 				continue
 			}
+			fmt.Println("Sent blob with length", len(*data)) // TODO remove
 
 			writer.verifier.AddUnconfirmedKey(&key)
 		}
@@ -128,21 +130,23 @@ func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
 	defer cancel()
 
 	if writer.generator.Config.SignerPrivateKey != "" {
-		blobStatus, key, err :=
+		_, key, err :=
 			writer.generator.DisperserClient.DisperseBlobAuthenticated(ctxTimeout, data, writer.generator.Config.CustomQuorums)
 		if err != nil {
 			return nil, err
 		}
 
-		writer.generator.Logger.Info("successfully dispersed new blob", "authenticated", true, "key", hex.EncodeToString(key), "status", blobStatus.String())
+		// TODO
+		//writer.generator.Logger.Info("successfully dispersed new blob", "authenticated", true, "key", hex.EncodeToString(key), "status", blobStatus.String())
 		return key, nil
 	} else {
-		blobStatus, key, err := writer.generator.DisperserClient.DisperseBlob(ctxTimeout, data, writer.generator.Config.CustomQuorums)
+		_, key, err := writer.generator.DisperserClient.DisperseBlob(ctxTimeout, data, writer.generator.Config.CustomQuorums)
 		if err != nil {
 			return nil, err
 		}
 
-		writer.generator.Logger.Info("successfully dispersed new blob", "authenticated", false, "key", hex.EncodeToString(key), "status", blobStatus.String())
+		// TODO
+		//writer.generator.Logger.Info("successfully dispersed new blob", "authenticated", false, "key", hex.EncodeToString(key), "status", blobStatus.String())
 		return key, nil
 	}
 }

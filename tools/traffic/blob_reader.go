@@ -75,10 +75,9 @@ func (reader *BlobReader) randomRead() {
 	//	return
 	//}
 
+	// TODO use NodeClient
+
 	fmt.Println("attempting to read blob")
-	fmt.Println("batch header hash:", *metadata.batchHeaderHash)
-	fmt.Println("blob index:", metadata.blobIndex)
-	fmt.Println("client: ", reader.generator.EigenDAClient)
 	data, err := reader.generator.EigenDAClient.GetBlob(*reader.ctx, *metadata.batchHeaderHash, metadata.blobIndex)
 	if err != nil {
 		fmt.Println("Error reading blob:", err) // TODO

@@ -73,6 +73,9 @@ func (verifier *StatusVerifier) monitor(ctx context.Context, period time.Duratio
 // poll checks all unconfirmed keys to see if they have been confirmed by the disperser service.
 // If a key is confirmed, it is added to the blob table and removed from the list of unconfirmed keys.
 func (verifier *StatusVerifier) poll(ctx context.Context) {
+
+	// TODO If the number of unconfirmed blobs is high and the time to confirm his high, this is not efficient.
+
 	unconfirmedKeys := make([]*[]byte, 0)
 	for _, key := range verifier.unconfirmedKeys {
 		confirmed := verifier.checkStatusForBlob(ctx, key)
@@ -83,7 +86,7 @@ func (verifier *StatusVerifier) poll(ctx context.Context) {
 	verifier.unconfirmedKeys = unconfirmedKeys
 }
 
-// checkStatusForBlob checks the status of a blob. Returns true if the blob is confirmed, false otherwise.
+// checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
 func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]byte) bool {
 	status, err := (*verifier.dispenser).GetBlobStatus(ctx, *key)
 
@@ -92,21 +95,36 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 		return false
 	}
 
-	// TODO other statuses
-	if status.GetStatus() == disperser.BlobStatus_CONFIRMED {
+	switch status.GetStatus() {
 
-		fmt.Println(">>>>>>>>>>>>>>>>>>>>>> Confirmed key", key) // TODO remove
+	case disperser.BlobStatus_UNKNOWN:
+		fallthrough
+	case disperser.BlobStatus_PROCESSING:
+		fallthrough
+	case disperser.BlobStatus_DISPERSING:
+		// Final status is not yet known. Check it again later.
+		return false
 
+	case disperser.BlobStatus_FAILED:
+		fallthrough
+	case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
+		fmt.Println("Blob dispersal failed:", status.GetStatus()) // TODO use logger
+		return true
+
+	case disperser.BlobStatus_CONFIRMED:
+		fallthrough
+	case disperser.BlobStatus_FINALIZED:
 		batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
 		blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 
 		blobMetadata := NewBlobMetadata(key, &batchHeaderHash, blobIndex, -1) // TODO permits
 		verifier.table.Add(blobMetadata)
+		fmt.Println("Confirmed blob")
 
 		return true
-	} else {
-		fmt.Println("-------------- key not yet confirmed") // TODO remove
-	}
 
-	return false
+	default:
+		fmt.Println("Unknown blob status:", status.GetStatus()) // TODO use logger
+		return true
+	}
 }
