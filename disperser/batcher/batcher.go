@@ -18,7 +18,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/wealdtech/go-merkletree"
+	"github.com/wealdtech/go-merkletree/v2"
 )
 
 const (
@@ -262,15 +262,8 @@ func (b *Batcher) updateConfirmationInfo(
 				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
 				continue
 			}
-			blobHeader := batchData.blobHeaders[blobIndex]
 
-			blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
-			if err != nil {
-				b.logger.Error("HandleSingleBatch: failed to get blob header hash", "err", err)
-				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
-				continue
-			}
-			merkleProof, err := batchData.merkleTree.GenerateProof(blobHeaderHash[:], 0)
+			merkleProof, err := batchData.merkleTree.GenerateProofWithIndex(uint64(blobIndex), 0)
 			if err != nil {
 				b.logger.Error("HandleSingleBatch: failed to generate blob header inclusion proof", "err", err)
 				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
