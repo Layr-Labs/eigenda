@@ -14,7 +14,11 @@ import (
 	"github.com/wealdtech/go-merkletree/keccak256"
 )
 
+// RetrievalClient is an object that can retrieve blobs from the network.
 type RetrievalClient interface {
+
+	// RetrieveBlob fetches a blob from the network. This method is equivalent to calling
+	// RetrieveBlobChunks to get the chunks and then CombineChunks to recombine those chunks into the original blob.
 	RetrieveBlob(
 		ctx context.Context,
 		batchHeaderHash [32]byte,
@@ -22,6 +26,28 @@ type RetrievalClient interface {
 		referenceBlockNumber uint,
 		batchRoot [32]byte,
 		quorumID core.QuorumID) ([]byte, error)
+
+	// RetrieveBlobChunks downloads the chunks of a blob from the network but do not recombine them.
+	RetrieveBlobChunks(
+		ctx context.Context,
+		batchHeaderHash [32]byte,
+		blobIndex uint32,
+		referenceBlockNumber uint,
+		batchRoot [32]byte,
+		quorumID core.QuorumID) (*BlobChunks, error)
+
+	// CombineChunks recombines the chunks into the original blob.
+	CombineChunks(chunks *BlobChunks) ([]byte, error)
+}
+
+// BlobChunks is a collection of chunks retrieved from the network which can be recombined into a blob.
+type BlobChunks struct {
+	chunks           []*encoding.Frame
+	indices          []encoding.ChunkNumber
+	encodingParams   encoding.EncodingParams
+	blobHeaderLength uint
+	assignments      map[core.OperatorID]core.Assignment
+	assignmentInfo   core.AssignmentInfo
 }
 
 type retrievalClient struct {
@@ -33,16 +59,17 @@ type retrievalClient struct {
 	numConnections        int
 }
 
+// TODO can this line be deleted?
 var _ RetrievalClient = (*retrievalClient)(nil)
 
+// NewRetrievalClient creates a new retrieval client.
 func NewRetrievalClient(
 	logger logging.Logger,
 	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	verifier encoding.Verifier,
-	numConnections int,
-) (RetrievalClient, error) {
+	numConnections int) (RetrievalClient, error) {
 
 	return &retrievalClient{
 		logger:                logger.With("component", "RetrievalClient"),
@@ -54,6 +81,7 @@ func NewRetrievalClient(
 	}, nil
 }
 
+// RetrieveBlob retrieves a blob from the network.
 func (r *retrievalClient) RetrieveBlob(
 	ctx context.Context,
 	batchHeaderHash [32]byte,
@@ -61,6 +89,22 @@ func (r *retrievalClient) RetrieveBlob(
 	referenceBlockNumber uint,
 	batchRoot [32]byte,
 	quorumID core.QuorumID) ([]byte, error) {
+
+	chunks, err := r.RetrieveBlobChunks(ctx, batchHeaderHash, blobIndex, referenceBlockNumber, batchRoot, quorumID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.CombineChunks(chunks)
+}
+
+// RetrieveBlobChunks retrieves the chunks of a blob from the network but does not recombine them.
+func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
+	batchHeaderHash [32]byte,
+	blobIndex uint32,
+	referenceBlockNumber uint,
+	batchRoot [32]byte,
+	quorumID core.QuorumID) (*BlobChunks, error) {
 
 	fmt.Printf("                                getting indexed operator state, referenceBlockNumber: %d, quorumId: %d\n", referenceBlockNumber, quorumID) // TODO
 	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, referenceBlockNumber, []core.QuorumID{quorumID})
@@ -176,5 +220,19 @@ func (r *retrievalClient) RetrieveBlob(
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
+	return &BlobChunks{
+		chunks:           chunks,
+		indices:          indices,
+		encodingParams:   encodingParams,
+		blobHeaderLength: blobHeader.Length,
+	}, nil
+}
+
+// CombineChunks recombines the chunks into the original blob.
+func (r *retrievalClient) CombineChunks(chunks *BlobChunks) ([]byte, error) {
+	return r.verifier.Decode(
+		chunks.chunks,
+		chunks.indices,
+		chunks.encodingParams,
+		uint64(chunks.blobHeaderLength)*encoding.BYTES_PER_SYMBOL)
 }

@@ -96,7 +96,7 @@ func (reader *BlobReader) randomRead() {
 	copy(batchHeaderHash[:], *metadata.batchHeaderHash)
 
 	fmt.Printf("attempting to read blob, header hash: %x, index: %d\n, batch header: %+v\n", *metadata.batchHeaderHash, metadata.blobIndex, batchHeader)
-	data, err := reader.retriever.RetrieveBlob(
+	chunks, err := reader.retriever.RetrieveBlobChunks(
 		*reader.ctx,
 		batchHeaderHash,
 		metadata.blobIndex,
@@ -106,6 +106,13 @@ func (reader *BlobReader) randomRead() {
 
 	if err != nil {
 		fmt.Println("Error reading blob:", err) // TODO
+		return
+	}
+
+	data, err := reader.retriever.CombineChunks(chunks)
+
+	if err != nil {
+		fmt.Println("Error combining chunks:", err) // TODO
 		return
 	}
 

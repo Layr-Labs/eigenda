@@ -35,3 +35,21 @@ func (c *MockRetrievalClient) RetrieveBlob(
 	result := args.Get(0)
 	return result.([]byte), args.Error(1)
 }
+
+func (c *MockRetrievalClient) RetrieveBlobChunks(
+	ctx context.Context,
+	batchHeaderHash [32]byte,
+	blobIndex uint32,
+	referenceBlockNumber uint,
+	batchRoot [32]byte,
+	quorumID core.QuorumID) (*clients.BlobChunks, error) {
+
+	return nil, nil // TODO
+}
+
+func (c *MockRetrievalClient) CombineChunks(chunks *clients.BlobChunks) ([]byte, error) {
+	args := c.Called()
+
+	result := args.Get(0)
+	return result.([]byte), args.Error(1)
+}
