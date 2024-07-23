@@ -245,7 +245,7 @@ func (g *Metrics) collectOnchainMetrics() {
 			for opId, opInfo := range operators {
 				opStake := new(big.Float).SetInt(opInfo.Stake)
 				share, _ := new(big.Float).Quo(
-					new(big.Float).Mul(opStake, big.NewFloat(100000)),
+					new(big.Float).Mul(opStake, big.NewFloat(10000)),
 					totalStake).Float64()
 				operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{operatorId: opId, stakeShare: share})
 			}
