@@ -3,9 +3,12 @@ package traffic
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"sync"
 	"time"
 )
+
+// TODO for all of these new types, decide if variables need to be pointers or not
 
 // BlobReader reads blobs from a disperser at a configured rate.
 type BlobReader struct {
@@ -15,8 +18,8 @@ type BlobReader struct {
 	// Tracks the number of active goroutines within the generator.
 	waitGroup *sync.WaitGroup
 
-	// TODO this type should be refactored maybe
-	generator *TrafficGenerator
+	// TODO use code from this class
+	retriever clients.RetrievalClient
 
 	// table of blobs to read from.
 	table *BlobTable
@@ -26,13 +29,13 @@ type BlobReader struct {
 func NewBlobReader(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
-	generator *TrafficGenerator,
+	retriever clients.RetrievalClient,
 	table *BlobTable) BlobReader {
 
 	return BlobReader{
 		ctx:       ctx,
 		waitGroup: waitGroup,
-		generator: generator,
+		retriever: retriever,
 		table:     table,
 	}
 }
@@ -78,7 +81,15 @@ func (reader *BlobReader) randomRead() {
 	// TODO use NodeClient
 
 	fmt.Println("attempting to read blob")
-	data, err := reader.generator.EigenDAClient.GetBlob(*reader.ctx, *metadata.batchHeaderHash, metadata.blobIndex)
+	// TODO arguments probably not right
+	data, err := reader.retriever.RetrieveBlob(
+		*reader.ctx,
+		[32]byte(*metadata.batchHeaderHash),
+		metadata.blobIndex,
+		0,
+		[32]byte{},
+		0)
+
 	if err != nil {
 		fmt.Println("Error reading blob:", err) // TODO
 		return

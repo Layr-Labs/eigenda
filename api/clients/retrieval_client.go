@@ -42,7 +42,7 @@ func NewRetrievalClient(
 	nodeClient NodeClient,
 	verifier encoding.Verifier,
 	numConnections int,
-) (*retrievalClient, error) {
+) (RetrievalClient, error) {
 
 	return &retrievalClient{
 		logger:                logger.With("component", "RetrievalClient"),

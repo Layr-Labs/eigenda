@@ -2,6 +2,7 @@ package traffic
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -119,7 +120,8 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 
 		blobMetadata := NewBlobMetadata(key, &batchHeaderHash, blobIndex, -1) // TODO permits
 		verifier.table.Add(blobMetadata)
-		fmt.Println("Confirmed blob")
+		fmt.Printf("Confirmed blob, batch header hash: %s, blobIndex %d\n", base64.StdEncoding.EncodeToString(batchHeaderHash), blobIndex)
+		//fmt.Println("Confirmed blob")
 
 		return true
 

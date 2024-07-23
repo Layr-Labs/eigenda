@@ -3,7 +3,15 @@ package traffic
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/indexer"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
 	"os"
 	"os/signal"
 	"sync"
@@ -71,6 +79,87 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	}, nil
 }
 
+// buildRetriever creates a retriever client for the traffic generator.
+func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
+
+	loggerConfig := common.LoggerConfig{
+		Format: "text",
+	}
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		panic(err) // TODO
+	}
+
+	ethClientConfig := geth.EthClientConfig{
+		RPCURLs: []string{"http://localhost:8545"},
+	}
+	gethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
+
+	tx, err := eth.NewTransactor(
+		logger,
+		gethClient,
+		"0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154",
+		"0x851356ae760d987E095750cCeb3bC6014560891C")
+
+	cs := eth.NewChainState(tx, gethClient)
+
+	rpcClient, err := rpc.Dial("http://localhost:8545")
+
+	indexerConfig := indexer.Config{
+		PullInterval: time.Second,
+	}
+	indexer, err := coreindexer.CreateNewIndexer(
+		&indexerConfig,
+		gethClient,
+		rpcClient,
+		"0x851356ae760d987E095750cCeb3bC6014560891C",
+		logger,
+	)
+	if err != nil {
+		panic(err) // TODO
+	}
+	chainState, err := coreindexer.NewIndexedChainState(cs, indexer)
+	if err != nil {
+		panic(err) // TODO
+	}
+
+	//chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
+
+	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
+
+	nodeClient := clients.NewNodeClient(10 * time.Second)
+
+	encoderConfig := kzg.KzgConfig{
+		G1Path:          "../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../inabox/resources/kzg/g2.point",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       12,
+	}
+	v, err := verifier.NewVerifier(&encoderConfig, true)
+	if err != nil {
+		panic(err) // TODO
+	}
+
+	numConnections := 20
+
+	//var retriever *clients.RetrievalClient
+	retriever, err := clients.NewRetrievalClient(
+		logger,
+		chainState,
+		assignmentCoordinator,
+		nodeClient,
+		v,
+		numConnections)
+
+	if err != nil {
+		panic(err) // TODO
+	}
+
+	return retriever
+}
+
 // Run instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
 func (g *TrafficGenerator) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -89,7 +178,7 @@ func (g *TrafficGenerator) Run() error {
 	}
 
 	// TODO start multiple readers
-	reader := NewBlobReader(&ctx, &wg, g, &table)
+	reader := NewBlobReader(&ctx, &wg, g.buildRetriever(), &table)
 	reader.Start()
 
 	signals := make(chan os.Signal, 1)
