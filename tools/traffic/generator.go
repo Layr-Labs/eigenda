@@ -110,7 +110,7 @@ func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retriveret
 
 	// This is the indexer when config.UseGraph is true
 	chainStateConfig := thegraph.Config{
-		Endpoint:     "localhost:8000",
+		Endpoint:     "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state",
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
