@@ -751,3 +751,59 @@ func TestBlobAttestationFailures2(t *testing.T) {
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
 }
+
+func TestBatcherRecoverState(t *testing.T) {
+	blob0 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 50,
+		},
+	})
+
+	blob1 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
+	components, batcher, _ := makeBatcher(t)
+
+	blobStore := components.blobStore
+	ctx := context.Background()
+	_, key1 := queueBlob(t, ctx, &blob0, blobStore)
+	_, _ = queueBlob(t, ctx, &blob1, blobStore)
+
+	err := blobStore.MarkBlobDispersing(ctx, key1)
+	assert.NoError(t, err)
+	processingBlobs, err := blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Len(t, processingBlobs, 1)
+
+	dispersingBlobs, err := blobStore.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
+	assert.NoError(t, err)
+	assert.Len(t, dispersingBlobs, 1)
+
+	err = batcher.RecoverState(context.Background())
+	assert.NoError(t, err)
+
+	processingBlobs, err = blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Len(t, processingBlobs, 2)
+
+	dispersingBlobs, err = blobStore.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
+	assert.NoError(t, err)
+	assert.Len(t, dispersingBlobs, 0)
+}
