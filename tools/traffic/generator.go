@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/indexer"
+	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -80,7 +81,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 }
 
 // buildRetriever creates a retriever client for the traffic generator.
-func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
+func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 
 	loggerConfig := common.LoggerConfig{
 		Format: "text",
@@ -91,7 +92,8 @@ func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
 	}
 
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs: []string{"http://localhost:8545"},
+		RPCURLs:    []string{"http://localhost:8545"},
+		NumRetries: 2,
 	}
 	gethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
 
@@ -103,8 +105,18 @@ func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
 
 	cs := eth.NewChainState(tx, gethClient)
 
-	rpcClient, err := rpc.Dial("http://localhost:8545")
+	// -------------
 
+	// This is the indexer when config.UseGraph is true
+	//chainStateConfig := thegraph.Config{
+	//	Endpoint:     "localhost:8000",
+	//	PullInterval: 100 * time.Millisecond,
+	//	MaxRetries:   5,
+	//}
+	//chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
+
+	// This is the indexer when config.UseGraph is false.
+	rpcClient, err := rpc.Dial("http://localhost:8545")
 	indexerConfig := indexer.Config{
 		PullInterval: time.Second,
 	}
@@ -112,7 +124,7 @@ func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
 		&indexerConfig,
 		gethClient,
 		rpcClient,
-		"0x851356ae760d987E095750cCeb3bC6014560891C",
+		"0x851356ae760d987E095750cCeb3bC6014560891C", // eigenDaServeManagerAddr
 		logger,
 	)
 	if err != nil {
@@ -123,7 +135,7 @@ func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
 		panic(err) // TODO
 	}
 
-	//chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
+	// -------------
 
 	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 
@@ -157,7 +169,9 @@ func (g *TrafficGenerator) buildRetriever() clients.RetrievalClient {
 		panic(err) // TODO
 	}
 
-	return retriever
+	chainClient := retrivereth.NewChainClient(gethClient, logger)
+
+	return retriever, chainClient
 }
 
 // Run instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
@@ -177,8 +191,10 @@ func (g *TrafficGenerator) Run() error {
 		time.Sleep(g.Config.InstanceLaunchInterval)
 	}
 
+	retriever, chainClient := g.buildRetriever()
+
 	// TODO start multiple readers
-	reader := NewBlobReader(&ctx, &wg, g.buildRetriever(), &table)
+	reader := NewBlobReader(&ctx, &wg, retriever, chainClient, &table)
 	reader.Start()
 
 	signals := make(chan os.Signal, 1)

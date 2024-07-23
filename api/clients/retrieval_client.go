@@ -61,13 +61,16 @@ func (r *retrievalClient) RetrieveBlob(
 	referenceBlockNumber uint,
 	batchRoot [32]byte,
 	quorumID core.QuorumID) ([]byte, error) {
+
+	fmt.Printf("                                getting indexed operator state, referenceBlockNumber: %d, quorumId: %d\n", referenceBlockNumber, quorumID) // TODO
 	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, referenceBlockNumber, []core.QuorumID{quorumID})
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("getting operators") // TODO
 	operators, ok := indexedOperatorState.Operators[quorumID]
 	if !ok {
-		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
+		return nil, fmt.Errorf("                                no quorum with ID: %d", quorumID)
 	}
 
 	// Get blob header from any operator

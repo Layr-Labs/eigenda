@@ -93,9 +93,10 @@ func (writer *BlobWriter) run() {
 
 // getRandomData returns a slice of random data to be used for a blob.
 func (writer *BlobWriter) getRandomData() *[]byte {
-	if *writer.fixedRandomData != nil {
-		return writer.fixedRandomData
-	}
+	// TODO
+	//if *writer.fixedRandomData != nil {
+	//	return writer.fixedRandomData
+	//}
 
 	data := make([]byte, writer.generator.Config.DataSize)
 	_, err := rand.Read(data)

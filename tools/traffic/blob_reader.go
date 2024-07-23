@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/retriever/eth"
+	gcommon "github.com/ethereum/go-ethereum/common"
+	"math/big"
 	"sync"
 	"time"
 )
@@ -19,7 +23,8 @@ type BlobReader struct {
 	waitGroup *sync.WaitGroup
 
 	// TODO use code from this class
-	retriever clients.RetrievalClient
+	retriever   clients.RetrievalClient
+	chainClient eth.ChainClient
 
 	// table of blobs to read from.
 	table *BlobTable
@@ -30,13 +35,15 @@ func NewBlobReader(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	retriever clients.RetrievalClient,
+	chainClient eth.ChainClient,
 	table *BlobTable) BlobReader {
 
 	return BlobReader{
-		ctx:       ctx,
-		waitGroup: waitGroup,
-		retriever: retriever,
-		table:     table,
+		ctx:         ctx,
+		waitGroup:   waitGroup,
+		retriever:   retriever,
+		chainClient: chainClient,
+		table:       table,
 	}
 }
 
@@ -71,24 +78,31 @@ func (reader *BlobReader) randomRead() {
 		return
 	}
 
-	// TODO
-	//data, err := reader.generator.DisperserClient.RetrieveBlob(*reader.ctx, *metadata.batchHeaderHash, metadata.blobIndex)
-	//if err != nil {
-	//	fmt.Println("Error reading blob:", err) // TODO
-	//	return
-	//}
-
 	// TODO use NodeClient
 
-	fmt.Println("attempting to read blob")
-	// TODO arguments probably not right
+	batchHeader, err := reader.chainClient.FetchBatchHeader(
+		*reader.ctx,
+		gcommon.HexToAddress("0x851356ae760d987E095750cCeb3bC6014560891C"),
+		*metadata.batchHeaderHash,
+		big.NewInt(int64(0)),
+		nil)
+	if err != nil {
+		fmt.Println("Error fetching batch header:", err) // TODO
+		return
+	}
+
+	// TODO is this correct?
+	var batchHeaderHash [32]byte
+	copy(batchHeaderHash[:], *metadata.batchHeaderHash)
+
+	fmt.Printf("attempting to read blob, header hash: %x, index: %d\n, batch header: %+v\n", *metadata.batchHeaderHash, metadata.blobIndex, batchHeader)
 	data, err := reader.retriever.RetrieveBlob(
 		*reader.ctx,
-		[32]byte(*metadata.batchHeaderHash),
+		batchHeaderHash,
 		metadata.blobIndex,
-		0,
-		[32]byte{},
-		0)
+		uint(batchHeader.ReferenceBlockNumber),
+		batchHeader.BlobHeadersRoot,
+		core.QuorumID(0))
 
 	if err != nil {
 		fmt.Println("Error reading blob:", err) // TODO

@@ -3,6 +3,7 @@ package indexer
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
@@ -35,12 +36,12 @@ func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, block
 
 	pubkeys, sockets, err := ics.getObjects(blockNumber)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to complete ics.getObjects(%d): %s)", blockNumber, err)
 	}
 
 	operatorState, err := ics.ChainState.GetOperatorState(ctx, blockNumber, quorums)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to complete ics.ChainState.GetOperatorState(%d, %v): %s", blockNumber, quorums, err)
 	}
 
 	ops := make(map[core.OperatorID]*core.IndexedOperatorInfo, len(pubkeys.Operators))
@@ -92,7 +93,7 @@ func (ics *IndexedChainState) getObjects(blockNumber uint) (*OperatorPubKeys, Op
 
 	obj, err := ics.Indexer.GetObject(queryHeader, 0)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("(1) unable to call Indexer.GetObject({Number = %d}, 0): %s", blockNumber, err)
 	}
 
 	pubkeys, ok := obj.(*OperatorPubKeys)
@@ -102,7 +103,7 @@ func (ics *IndexedChainState) getObjects(blockNumber uint) (*OperatorPubKeys, Op
 
 	obj, err = ics.Indexer.GetObject(queryHeader, 1)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("(2) unable to call Indexer.GetObject(%v, 1): %s", queryHeader, err)
 	}
 
 	sockets, ok := obj.(OperatorSockets)
