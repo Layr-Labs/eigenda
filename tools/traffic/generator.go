@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/indexer"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
 	"os"
 	"os/signal"
 	"sync"
@@ -83,9 +81,12 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 // buildRetriever creates a retriever client for the traffic generator.
 func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 
-	loggerConfig := common.LoggerConfig{
-		Format: "text",
-	}
+	//loggerConfig := common.LoggerConfig{
+	//	Format: "text",
+	// }
+
+	loggerConfig := common.DefaultLoggerConfig()
+
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		panic(err) // TODO
@@ -108,32 +109,32 @@ func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retriveret
 	// -------------
 
 	// This is the indexer when config.UseGraph is true
-	//chainStateConfig := thegraph.Config{
-	//	Endpoint:     "localhost:8000",
-	//	PullInterval: 100 * time.Millisecond,
-	//	MaxRetries:   5,
-	//}
-	//chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
+	chainStateConfig := thegraph.Config{
+		Endpoint:     "localhost:8000",
+		PullInterval: 100 * time.Millisecond,
+		MaxRetries:   5,
+	}
+	chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
 
 	// This is the indexer when config.UseGraph is false.
-	rpcClient, err := rpc.Dial("http://localhost:8545")
-	indexerConfig := indexer.Config{
-		PullInterval: time.Second,
-	}
-	indexer, err := coreindexer.CreateNewIndexer(
-		&indexerConfig,
-		gethClient,
-		rpcClient,
-		"0x851356ae760d987E095750cCeb3bC6014560891C", // eigenDaServeManagerAddr
-		logger,
-	)
-	if err != nil {
-		panic(err) // TODO
-	}
-	chainState, err := coreindexer.NewIndexedChainState(cs, indexer)
-	if err != nil {
-		panic(err) // TODO
-	}
+	//rpcClient, err := rpc.Dial("http://localhost:8545")
+	//indexerConfig := indexer.Config{
+	//	PullInterval: time.Second,
+	//}
+	//indexer, err := coreindexer.CreateNewIndexer(
+	//	&indexerConfig,
+	//	gethClient,
+	//	rpcClient,
+	//	"0x851356ae760d987E095750cCeb3bC6014560891C", // eigenDaServeManagerAddr
+	//	logger,
+	//)
+	//if err != nil {
+	//	panic(err) // TODO
+	//}
+	//chainState, err := coreindexer.NewIndexedChainState(cs, indexer)
+	//if err != nil {
+	//	panic(err) // TODO
+	//}
 
 	// -------------
 
