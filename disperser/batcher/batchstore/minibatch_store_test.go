@@ -28,7 +28,7 @@ var (
 	dockertestResource *dockertest.Resource
 
 	deployLocalStack bool
-	localStackPort   = "4570"
+	localStackPort   = "4566"
 
 	dynamoClient   *dynamodb.Client
 	minibatchStore *batchstore.MinibatchStore
@@ -165,5 +165,4 @@ func TestPutDispersalResponse(t *testing.T) {
 	r, err := minibatchStore.GetDispersalResponse(ctx, response.BatchID, response.MinibatchIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, response, r)
-	assert.Error(t, err)
 }
