@@ -173,7 +173,7 @@ type AccumulatorObject interface{
 
 type Accumulator interface{
 
-    // IndexHeaders accepts a list of incoming headers. Will throw an error is the accumulator does not have an existing header which can form a chain with the incoming headers. The Accumulator will discard any orphaned headers. 
+    // IndexHeaders accepts a list of incoming headers. Will throw an error if the accumulator does not have an existing header which can form a chain with the incoming headers. The Accumulator will discard any orphaned headers. 
     ProcessHeaders(headers []Headers) error
 
     // GetAccumulator accepts a header and returns the value of the accumulator at that header. Either the Number or BlockHash fields of the header can be used. 
