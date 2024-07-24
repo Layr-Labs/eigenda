@@ -28,20 +28,42 @@ type StatusVerifier struct {
 
 	// Newly added keys that require verification.
 	keyChannel chan *[]byte
+
+	getStatusLatencyMetric            LatencyMetric
+	getStatusErrorCountMetric         CountMetric
+	unknownCountMetric                CountMetric
+	processingCountMetric             CountMetric
+	dispersingCountMetric             CountMetric
+	failedCountMetric                 CountMetric
+	insufficientSignaturesCountMetric CountMetric
+	confirmedCountMetric              CountMetric
+	finalizedCountMetric              CountMetric
+
+	// TODO metric for average time for blob to become confirmed
 }
 
 // NewStatusVerifier creates a new StatusVerifier instance.
 func NewStatusVerifier(
 	table *BlobTable,
 	disperser *clients.DisperserClient,
-	blobReadLimit int32) StatusVerifier {
+	blobReadLimit int32,
+	metrics *Metrics) StatusVerifier {
 
 	return StatusVerifier{
-		table:           table,
-		blobReadLimit:   blobReadLimit,
-		dispenser:       disperser,
-		unconfirmedKeys: make([]*[]byte, 0),
-		keyChannel:      make(chan *[]byte),
+		table:                             table,
+		blobReadLimit:                     blobReadLimit,
+		dispenser:                         disperser,
+		unconfirmedKeys:                   make([]*[]byte, 0),
+		keyChannel:                        make(chan *[]byte),
+		getStatusLatencyMetric:            metrics.NewLatencyMetric("getStatus"),
+		getStatusErrorCountMetric:         metrics.NewCountMetric("getStatusError"),
+		unknownCountMetric:                metrics.NewCountMetric("getStatusUnknown"),
+		processingCountMetric:             metrics.NewCountMetric("getStatusProcessing"),
+		dispersingCountMetric:             metrics.NewCountMetric("getStatusDispersing"),
+		failedCountMetric:                 metrics.NewCountMetric("getStatusFailed"),
+		insufficientSignaturesCountMetric: metrics.NewCountMetric("getStatusInsufficientSignatures"),
+		confirmedCountMetric:              metrics.NewCountMetric("getStatusConfirmed"),
+		finalizedCountMetric:              metrics.NewCountMetric("getStatusFinalized"),
 	}
 }
 
@@ -93,28 +115,36 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 
 	if err != nil {
 		fmt.Println("Error getting blob status:", err) // TODO is this proper?
+		verifier.getStatusErrorCountMetric.Increment()
 		return false
 	}
 
 	switch status.GetStatus() {
 
 	case disperser.BlobStatus_UNKNOWN:
-		fallthrough
+		verifier.unknownCountMetric.Increment()
+		return false
 	case disperser.BlobStatus_PROCESSING:
-		fallthrough
+		verifier.processingCountMetric.Increment()
+		return false
 	case disperser.BlobStatus_DISPERSING:
-		// Final status is not yet known. Check it again later.
+		verifier.dispersingCountMetric.Increment()
 		return false
 
 	case disperser.BlobStatus_FAILED:
-		fallthrough
+		verifier.failedCountMetric.Increment()
+		fmt.Println("Blob dispersal failed:", status.GetStatus()) // TODO use logger
+		return true
 	case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
+		verifier.insufficientSignaturesCountMetric.Increment()
 		fmt.Println("Blob dispersal failed:", status.GetStatus()) // TODO use logger
 		return true
 
 	case disperser.BlobStatus_CONFIRMED:
-		fallthrough
+		verifier.confirmedCountMetric.Increment()
+		return true
 	case disperser.BlobStatus_FINALIZED:
+		verifier.finalizedCountMetric.Increment()
 		batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
 		blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 

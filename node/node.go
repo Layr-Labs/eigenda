@@ -300,7 +300,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
 	}
 
-	// Measure num batches received and its size in bytes
+	// Invoke num batches received and its size in bytes
 	batchSize := uint64(0)
 	for _, blob := range blobs {
 		for quorumID, bundle := range blob.Bundles {
@@ -326,7 +326,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// Defined only if the batch not already exists and gets stored to database successfully.
 		keys *[][]byte
 
-		// Latency to store the batch.
+		// latency to store the batch.
 		// Defined only if the batch not already exists and gets stored to database successfully.
 		latency time.Duration
 	}

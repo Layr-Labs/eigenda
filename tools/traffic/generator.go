@@ -179,15 +179,18 @@ func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retriveret
 func (g *TrafficGenerator) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	metrics := NewMetrics("9101", g.Logger) // TODO config
+	metrics.Start(ctx)
+
 	// TODO add configuration
 	table := NewBlobTable()
-	verifier := NewStatusVerifier(&table, &g.DisperserClient, -1)
+	verifier := NewStatusVerifier(&table, &g.DisperserClient, -1, metrics)
 	verifier.Start(ctx, time.Second)
 
 	var wg sync.WaitGroup
 
 	for i := 0; i < int(g.Config.NumWriteInstances); i++ {
-		writer := NewBlobWriter(&ctx, &wg, g, &verifier)
+		writer := NewBlobWriter(&ctx, &wg, g, &verifier, metrics)
 		writer.Start()
 		time.Sleep(g.Config.InstanceLaunchInterval)
 	}

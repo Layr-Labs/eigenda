@@ -27,6 +27,15 @@ type BlobWriter struct {
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData *[]byte
+
+	// writeLatencyMetric is used to record latency for write requests.
+	writeLatencyMetric LatencyMetric
+
+	// writeSuccessMetric is used to record the number of successful write requests.
+	writeSuccessMetric CountMetric
+
+	// writeFailureMetric is used to record the number of failed write requests.
+	writeFailureMetric CountMetric
 }
 
 // NewBlobWriter creates a new BlobWriter instance.
@@ -34,7 +43,8 @@ func NewBlobWriter(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	generator *TrafficGenerator,
-	verifier *StatusVerifier) BlobWriter {
+	verifier *StatusVerifier,
+	metrics *Metrics) BlobWriter {
 
 	var fixedRandomData []byte
 	if generator.Config.RandomizeBlobs {
@@ -51,11 +61,14 @@ func NewBlobWriter(
 	}
 
 	return BlobWriter{
-		ctx:             ctx,
-		waitGroup:       waitGroup,
-		generator:       generator,
-		verifier:        verifier,
-		fixedRandomData: &fixedRandomData,
+		ctx:                ctx,
+		waitGroup:          waitGroup,
+		generator:          generator,
+		verifier:           verifier,
+		fixedRandomData:    &fixedRandomData,
+		writeLatencyMetric: metrics.NewLatencyMetric("write"),
+		writeSuccessMetric: metrics.NewCountMetric("write_success"),
+		writeFailureMetric: metrics.NewCountMetric("write_failure"),
 	}
 }
 
@@ -78,12 +91,16 @@ func (writer *BlobWriter) run() {
 			return
 		case <-ticker.C:
 			data := writer.getRandomData()
-			key, err := writer.sendRequest(*data)
-
+			key, err := InvokeAndReportLatency(&writer.writeLatencyMetric, func() ([]byte, error) {
+				return writer.sendRequest(*data)
+			})
 			if err != nil {
+				writer.writeFailureMetric.Increment()
 				writer.generator.Logger.Error("failed to send blob request", "err:", err)
 				continue
 			}
+
+			writer.writeSuccessMetric.Increment()
 			fmt.Println("Sent blob with length", len(*data)) // TODO remove
 
 			writer.verifier.AddUnconfirmedKey(&key)
