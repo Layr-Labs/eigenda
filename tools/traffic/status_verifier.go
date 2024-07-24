@@ -2,7 +2,6 @@ package traffic
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -115,11 +114,13 @@ func (verifier *StatusVerifier) poll(ctx context.Context) {
 // checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
 func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]byte) bool {
 
-	// TODO add timeout
+	// TODO add timeout config
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
 
 	status, err := InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
-			return (*verifier.dispenser).GetBlobStatus(ctx, *key)
+			return (*verifier.dispenser).GetBlobStatus(ctxTimeout, *key)
 		})
 
 	if err != nil {
@@ -149,21 +150,24 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 
 	case disperser.BlobStatus_CONFIRMED:
 		verifier.confirmedCountMetric.Increment()
+		verifier.forwardToReader(key, status)
 		return true
 	case disperser.BlobStatus_FINALIZED:
 		verifier.finalizedCountMetric.Increment()
-		batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
-		blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
-
-		blobMetadata := NewBlobMetadata(key, &batchHeaderHash, blobIndex, -1) // TODO permits
-		verifier.table.Add(blobMetadata)
-		fmt.Printf("Confirmed blob, batch header hash: %s, blobIndex %d\n", base64.StdEncoding.EncodeToString(batchHeaderHash), blobIndex)
-		//fmt.Println("Confirmed blob")
-
+		verifier.forwardToReader(key, status)
 		return true
 
 	default:
 		fmt.Println("Unknown blob status:", status.GetStatus()) // TODO use logger
 		return true
 	}
+}
+
+// forwardToReader forwards a blob to the reader. Only called once the blob is ready to be read.
+func (verifier *StatusVerifier) forwardToReader(key *[]byte, status *disperser.BlobStatusReply) {
+	batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
+	blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
+
+	blobMetadata := NewBlobMetadata(key, &batchHeaderHash, blobIndex, -1) // TODO permits
+	verifier.table.Add(blobMetadata)
 }

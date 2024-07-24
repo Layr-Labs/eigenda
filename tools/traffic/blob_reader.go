@@ -106,18 +106,22 @@ func (reader *BlobReader) randomRead() {
 	metadata := reader.table.GetRandom(true)
 	if metadata == nil {
 		// There are no blobs to read, do nothing.
+		fmt.Println("no blobs to read")
 		return
 	}
 
+	// TODO add timeout config
+	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, time.Second*5)
 	batchHeader, err := InvokeAndReportLatency(&reader.fetchBatchHeaderMetric,
 		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
 			return reader.chainClient.FetchBatchHeader(
-				*reader.ctx,
+				ctxTimeout,
 				gcommon.HexToAddress("0x851356ae760d987E095750cCeb3bC6014560891C"),
 				*metadata.batchHeaderHash,
 				big.NewInt(int64(0)),
 				nil)
 		})
+	cancel()
 	if err != nil {
 		// TODO log
 		reader.fetchBatchHeaderFailure.Increment()
@@ -128,22 +132,25 @@ func (reader *BlobReader) randomRead() {
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], *metadata.batchHeaderHash)
 
+	// TODO add timeout config
+	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, time.Second*5)
 	chunks, err := InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return reader.retriever.RetrieveBlobChunks(
-			*reader.ctx,
+			ctxTimeout,
 			batchHeaderHash,
 			metadata.blobIndex,
 			uint(batchHeader.ReferenceBlockNumber),
 			batchHeader.BlobHeadersRoot,
 			core.QuorumID(0))
 	})
+	cancel()
 
 	if err != nil {
 		// TODO log
 		reader.readFailureMetric.Increment()
 		return
 	}
-	reader.readFailureMetric.Increment()
+	reader.readSuccessMetric.Increment()
 
 	chunkCount := chunks.AssignmentInfo.TotalChunks
 
