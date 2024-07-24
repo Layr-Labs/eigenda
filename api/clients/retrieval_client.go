@@ -27,7 +27,8 @@ type RetrievalClient interface {
 		batchRoot [32]byte,
 		quorumID core.QuorumID) ([]byte, error)
 
-	// RetrieveBlobChunks downloads the chunks of a blob from the network but do not recombine them.
+	// RetrieveBlobChunks downloads the chunks of a blob from the network but do not recombine them. Use this method
+	// if detailed information about which node returned which chunk is needed. Otherwise, use RetrieveBlob.
 	RetrieveBlobChunks(
 		ctx context.Context,
 		batchHeaderHash [32]byte,
@@ -42,12 +43,12 @@ type RetrievalClient interface {
 
 // BlobChunks is a collection of chunks retrieved from the network which can be recombined into a blob.
 type BlobChunks struct {
-	chunks           []*encoding.Frame
-	indices          []encoding.ChunkNumber
-	encodingParams   encoding.EncodingParams
-	blobHeaderLength uint
-	assignments      map[core.OperatorID]core.Assignment
-	assignmentInfo   core.AssignmentInfo
+	Chunks           []*encoding.Frame
+	Indices          []encoding.ChunkNumber
+	EncodingParams   encoding.EncodingParams
+	BlobHeaderLength uint
+	Assignments      map[core.OperatorID]core.Assignment
+	AssignmentInfo   core.AssignmentInfo
 }
 
 type retrievalClient struct {
@@ -221,18 +222,20 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	}
 
 	return &BlobChunks{
-		chunks:           chunks,
-		indices:          indices,
-		encodingParams:   encodingParams,
-		blobHeaderLength: blobHeader.Length,
+		Chunks:           chunks,
+		Indices:          indices,
+		EncodingParams:   encodingParams,
+		BlobHeaderLength: blobHeader.Length,
+		Assignments:      assignments,
+		AssignmentInfo:   info,
 	}, nil
 }
 
 // CombineChunks recombines the chunks into the original blob.
 func (r *retrievalClient) CombineChunks(chunks *BlobChunks) ([]byte, error) {
 	return r.verifier.Decode(
-		chunks.chunks,
-		chunks.indices,
-		chunks.encodingParams,
-		uint64(chunks.blobHeaderLength)*encoding.BYTES_PER_SYMBOL)
+		chunks.Chunks,
+		chunks.Indices,
+		chunks.EncodingParams,
+		uint64(chunks.BlobHeaderLength)*encoding.BYTES_PER_SYMBOL)
 }

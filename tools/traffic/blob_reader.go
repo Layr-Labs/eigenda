@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"math/big"
@@ -109,6 +110,11 @@ func (reader *BlobReader) randomRead() {
 		return
 	}
 
+	chunkCount := chunks.AssignmentInfo.TotalChunks
+
+	var assignments map[core.OperatorID]core.Assignment
+	assignments = chunks.Assignments
+
 	data, err := reader.retriever.CombineChunks(chunks)
 
 	if err != nil {
@@ -118,5 +124,23 @@ func (reader *BlobReader) randomRead() {
 
 	// TODO verify blob data
 
-	fmt.Println("Read blob:", data) // TODO
+	fmt.Printf("=====================================\nRead blob. Total chunk count = %d\nRetrieved chunk count = %d\nData length = %d\n",
+		chunkCount, len(chunks.Chunks), len(data)) // TODO
+
+	indexSet := make(map[encoding.ChunkNumber]bool)
+	for index := range chunks.Indices {
+		indexSet[chunks.Indices[index]] = true
+	}
+
+	for id, assignment := range assignments {
+		fmt.Printf("  - Operator ID: %d, Start Index: %d, Num Chunks: %d\n", id, assignment.StartIndex, assignment.NumChunks)
+		for index := assignment.StartIndex; index < assignment.StartIndex+assignment.NumChunks; index++ {
+			if !indexSet[index] {
+				fmt.Printf("    - Missing chunk: %d\n", index)
+			} else {
+				fmt.Printf("    - Chunk found: %d\n", index)
+			}
+		}
+	}
+
 }
