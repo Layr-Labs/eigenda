@@ -81,14 +81,13 @@ func (metrics *Metrics) Start(ctx context.Context) { // TODO context?
 	metrics.logger.Info("Starting metrics server at ", "port", metrics.httpPort)
 	addr := fmt.Sprintf(":%s", metrics.httpPort)
 	go func() {
-		log := metrics.logger
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.HandlerFor(
 			metrics.registry,
 			promhttp.HandlerOpts{},
 		))
 		err := http.ListenAndServe(addr, mux)
-		log.Error("Prometheus server failed", "err", err)
+		panic(fmt.Sprintf("Prometheus server failed: %s", err))
 	}()
 }
 

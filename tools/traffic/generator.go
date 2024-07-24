@@ -49,6 +49,10 @@ type TrafficGenerator struct {
 	disperserClient clients.DisperserClient
 	eigenDAClient   *clients.EigenDAClient
 	config          *Config
+
+	writers  []*BlobWriter
+	verifier *StatusVerifier
+	readers  []*BlobReader
 }
 
 func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*TrafficGenerator, error) {
@@ -80,7 +84,49 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	waitGroup := sync.WaitGroup{}
 
 	metrics := NewMetrics("9101", logger) // TODO config
-	metrics.Start(ctx)
+
+	// TODO add configuration
+
+	table := NewBlobTable()
+
+	disperserClient := clients.NewDisperserClient(&config.Config, signer)
+	statusVerifier := NewStatusVerifier(
+		&ctx,
+		&waitGroup,
+		logger,
+		&table,
+		&disperserClient,
+		-1,
+		metrics)
+
+	writers := make([]*BlobWriter, 0)
+	for i := 0; i < int(config.NumWriteInstances); i++ {
+		writer := NewBlobWriter(
+			&ctx,
+			&waitGroup,
+			logger,
+			config,
+			&disperserClient,
+			&statusVerifier,
+			metrics)
+		writers = append(writers, &writer)
+	}
+
+	retriever, chainClient := buildRetriever()
+
+	readers := make([]*BlobReader, 0)
+	//int(config.NumReadInstances) // TODO
+	for i := 0; i < 1; i++ {
+		reader := NewBlobReader(
+			&ctx,
+			&waitGroup,
+			logger,
+			retriever,
+			chainClient,
+			&table,
+			metrics)
+		readers = append(readers, &reader)
+	}
 
 	return &TrafficGenerator{
 		ctx:             &ctx,
@@ -91,11 +137,14 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		disperserClient: clients.NewDisperserClient(&config.Config, signer),
 		eigenDAClient:   client,
 		config:          config,
+		writers:         writers,
+		verifier:        &statusVerifier,
+		readers:         readers,
 	}, nil
 }
 
 // buildRetriever creates a retriever client for the traffic generator.
-func (generator *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
+func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 
 	//loggerConfig := common.LoggerConfig{
 	//	Format: "text",
@@ -171,42 +220,19 @@ func (generator *TrafficGenerator) buildRetriever() (clients.RetrievalClient, re
 func (generator *TrafficGenerator) Start() error {
 
 	// TODO add configuration
-	table := NewBlobTable()
-	statusVerifier := NewStatusVerifier(
-		generator.ctx,
-		generator.waitGroup,
-		*generator.logger,
-		&table,
-		&generator.disperserClient,
-		-1,
-		generator.metrics)
-	statusVerifier.Start(time.Second)
 
-	for i := 0; i < int(generator.config.NumWriteInstances); i++ {
-		writer := NewBlobWriter(
-			generator.ctx,
-			generator.waitGroup,
-			*generator.logger,
-			generator.config,
-			&generator.disperserClient,
-			&statusVerifier,
-			generator.metrics)
+	generator.metrics.Start(*generator.ctx) // TODO put context into metrics constructor
+	generator.verifier.Start(time.Second)
+
+	for _, writer := range generator.writers {
 		writer.Start()
 		time.Sleep(generator.config.InstanceLaunchInterval)
 	}
 
-	retriever, chainClient := generator.buildRetriever()
-
-	// TODO start multiple readers
-	reader := NewBlobReader(
-		generator.ctx,
-		generator.waitGroup,
-		*generator.logger,
-		retriever,
-		chainClient,
-		&table,
-		generator.metrics)
-	reader.Start()
+	for _, reader := range generator.readers {
+		reader.Start()
+		time.Sleep(generator.config.InstanceLaunchInterval)
+	}
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
