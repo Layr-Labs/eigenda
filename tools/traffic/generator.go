@@ -198,7 +198,7 @@ func (g *TrafficGenerator) Run() error {
 	retriever, chainClient := g.buildRetriever()
 
 	// TODO start multiple readers
-	reader := NewBlobReader(&ctx, &wg, retriever, chainClient, &table)
+	reader := NewBlobReader(&ctx, &wg, retriever, chainClient, &table, metrics)
 	reader.Start()
 
 	signals := make(chan os.Signal, 1)

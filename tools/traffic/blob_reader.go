@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
+	contractEigenDAServiceManager "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
@@ -29,6 +30,20 @@ type BlobReader struct {
 
 	// table of blobs to read from.
 	table *BlobTable
+
+	metrics *Metrics
+
+	fetchBatchHeaderMetric  LatencyMetric
+	fetchBatchHeaderSuccess CountMetric
+	fetchBatchHeaderFailure CountMetric
+	readLatencyMetric       LatencyMetric
+	readSuccessMetric       CountMetric
+	readFailureMetric       CountMetric
+	recombinationSuccess    CountMetric
+	recombinationFailure    CountMetric
+	operatorSuccessMetrics  map[core.OperatorID]CountMetric
+	operatorFailureMetrics  map[core.OperatorID]CountMetric
+	candidatePoolSize       GaugeMetric
 }
 
 // NewBlobReader creates a new BlobReader instance.
@@ -37,14 +52,27 @@ func NewBlobReader(
 	waitGroup *sync.WaitGroup,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
-	table *BlobTable) BlobReader {
+	table *BlobTable,
+	metrics *Metrics) BlobReader {
 
 	return BlobReader{
-		ctx:         ctx,
-		waitGroup:   waitGroup,
-		retriever:   retriever,
-		chainClient: chainClient,
-		table:       table,
+		ctx:                     ctx,
+		waitGroup:               waitGroup,
+		retriever:               retriever,
+		chainClient:             chainClient,
+		table:                   table,
+		metrics:                 metrics,
+		fetchBatchHeaderMetric:  metrics.NewLatencyMetric("fetch_batch_header"),
+		fetchBatchHeaderSuccess: metrics.NewCountMetric("fetch_batch_header_success"),
+		fetchBatchHeaderFailure: metrics.NewCountMetric("fetch_batch_header_failure"),
+		recombinationSuccess:    metrics.NewCountMetric("recombination_success"),
+		recombinationFailure:    metrics.NewCountMetric("recombination_failure"),
+		readLatencyMetric:       metrics.NewLatencyMetric("read"),
+		readSuccessMetric:       metrics.NewCountMetric("read_success"),
+		readFailureMetric:       metrics.NewCountMetric("read_failure"),
+		operatorSuccessMetrics:  make(map[core.OperatorID]CountMetric),
+		operatorFailureMetrics:  make(map[core.OperatorID]CountMetric),
+		candidatePoolSize:       metrics.NewGaugeMetric("candidate_pool_size"),
 	}
 }
 
@@ -73,42 +101,49 @@ func (reader *BlobReader) run() {
 // randomRead reads a random blob.
 func (reader *BlobReader) randomRead() {
 
+	reader.candidatePoolSize.Set(float64(reader.table.Size()))
+
 	metadata := reader.table.GetRandom(true)
 	if metadata == nil {
 		// There are no blobs to read, do nothing.
 		return
 	}
 
-	// TODO use NodeClient
-
-	batchHeader, err := reader.chainClient.FetchBatchHeader(
-		*reader.ctx,
-		gcommon.HexToAddress("0x851356ae760d987E095750cCeb3bC6014560891C"),
-		*metadata.batchHeaderHash,
-		big.NewInt(int64(0)),
-		nil)
+	batchHeader, err := InvokeAndReportLatency(&reader.fetchBatchHeaderMetric,
+		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
+			return reader.chainClient.FetchBatchHeader(
+				*reader.ctx,
+				gcommon.HexToAddress("0x851356ae760d987E095750cCeb3bC6014560891C"),
+				*metadata.batchHeaderHash,
+				big.NewInt(int64(0)),
+				nil)
+		})
 	if err != nil {
-		fmt.Println("Error fetching batch header:", err) // TODO
+		// TODO log
+		reader.fetchBatchHeaderFailure.Increment()
 		return
 	}
+	reader.fetchBatchHeaderSuccess.Increment()
 
-	// TODO is this correct?
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], *metadata.batchHeaderHash)
 
-	fmt.Printf("attempting to read blob, header hash: %x, index: %d\n, batch header: %+v\n", *metadata.batchHeaderHash, metadata.blobIndex, batchHeader)
-	chunks, err := reader.retriever.RetrieveBlobChunks(
-		*reader.ctx,
-		batchHeaderHash,
-		metadata.blobIndex,
-		uint(batchHeader.ReferenceBlockNumber),
-		batchHeader.BlobHeadersRoot,
-		core.QuorumID(0))
+	chunks, err := InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
+		return reader.retriever.RetrieveBlobChunks(
+			*reader.ctx,
+			batchHeaderHash,
+			metadata.blobIndex,
+			uint(batchHeader.ReferenceBlockNumber),
+			batchHeader.BlobHeadersRoot,
+			core.QuorumID(0))
+	})
 
 	if err != nil {
-		fmt.Println("Error reading blob:", err) // TODO
+		// TODO log
+		reader.readFailureMetric.Increment()
 		return
 	}
+	reader.readFailureMetric.Increment()
 
 	chunkCount := chunks.AssignmentInfo.TotalChunks
 
@@ -119,8 +154,10 @@ func (reader *BlobReader) randomRead() {
 
 	if err != nil {
 		fmt.Println("Error combining chunks:", err) // TODO
+		reader.recombinationFailure.Increment()
 		return
 	}
+	reader.recombinationSuccess.Increment()
 
 	// TODO verify blob data
 
@@ -135,12 +172,33 @@ func (reader *BlobReader) randomRead() {
 	for id, assignment := range assignments {
 		fmt.Printf("  - Operator ID: %d, Start Index: %d, Num Chunks: %d\n", id, assignment.StartIndex, assignment.NumChunks)
 		for index := assignment.StartIndex; index < assignment.StartIndex+assignment.NumChunks; index++ {
-			if !indexSet[index] {
-				fmt.Printf("    - Missing chunk: %d\n", index)
+			if indexSet[index] {
+				reader.reportChunk(id)
 			} else {
-				fmt.Printf("    - Chunk found: %d\n", index)
+				reader.reportMissingChunk(id)
 			}
 		}
 	}
+}
 
+// reportChunk reports a successful chunk read.
+func (reader *BlobReader) reportChunk(operatorId core.OperatorID) {
+	metric, exists := reader.operatorSuccessMetrics[operatorId]
+	if !exists {
+		metric = reader.metrics.NewCountMetric(fmt.Sprintf("operator_%x_returned_chunk", operatorId))
+		reader.operatorSuccessMetrics[operatorId] = metric
+	}
+
+	metric.Increment()
+}
+
+// reportMissingChunk reports a missing chunk.
+func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
+	metric, exists := reader.operatorFailureMetrics[operatorId]
+	if !exists {
+		metric = reader.metrics.NewCountMetric(fmt.Sprintf("operator_%x_witheld_chunk", operatorId))
+		reader.operatorFailureMetrics[operatorId] = metric
+	}
+
+	metric.Increment()
 }

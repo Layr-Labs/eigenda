@@ -18,6 +18,7 @@ type Metrics struct {
 
 	count   *prometheus.CounterVec
 	latency *prometheus.SummaryVec
+	gauge   *prometheus.GaugeVec
 
 	httpPort string
 	logger   logging.Logger
@@ -35,6 +36,11 @@ type CountMetric struct {
 	description string
 }
 
+type GaugeMetric struct {
+	metrics     *Metrics
+	description string
+}
+
 // NewMetrics creates a new Metrics instance.
 func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_generator"
@@ -47,19 +53,22 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "event_count",
-				Help:      "the count of various types of events",
 			},
-			[]string{"event"},
+			[]string{"label"},
 		),
 		latency: promauto.With(reg).NewSummaryVec(
 			prometheus.SummaryOpts{
 				Namespace:  namespace,
 				Name:       "latency_s",
-				Help:       "latency in seconds",
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
-			[]string{"operation"},
+			[]string{"label"},
 		),
+		gauge: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "gauge",
+			}, []string{"label"}),
 		registry: reg,
 		httpPort: httpPort,
 		logger:   logger.With("component", "GeneratorMetrics"),
@@ -122,7 +131,18 @@ func (metrics *Metrics) NewCountMetric(description string) CountMetric {
 
 // Increment increments the count of a type of event.
 func (metric *CountMetric) Increment() {
-	metric.metrics.count.With(prometheus.Labels{
-		"event": metric.description,
-	}).Inc()
+	metric.metrics.count.WithLabelValues(metric.description).Inc()
+}
+
+// NewGaugeMetric creates a new GaugeMetric instance.
+func (metrics *Metrics) NewGaugeMetric(description string) GaugeMetric {
+	return GaugeMetric{
+		metrics:     metrics,
+		description: description,
+	}
+}
+
+// Set sets the value of a gauge metric.
+func (metric GaugeMetric) Set(value float64) {
+	metric.metrics.gauge.WithLabelValues(metric.description).Set(value)
 }

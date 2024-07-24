@@ -29,6 +29,7 @@ type StatusVerifier struct {
 	// Newly added keys that require verification.
 	keyChannel chan *[]byte
 
+	blobsInFlightMetric               GaugeMetric
 	getStatusLatencyMetric            LatencyMetric
 	getStatusErrorCountMetric         CountMetric
 	unknownCountMetric                CountMetric
@@ -55,6 +56,7 @@ func NewStatusVerifier(
 		dispenser:                         disperser,
 		unconfirmedKeys:                   make([]*[]byte, 0),
 		keyChannel:                        make(chan *[]byte),
+		blobsInFlightMetric:               metrics.NewGaugeMetric("blobsInFlight"),
 		getStatusLatencyMetric:            metrics.NewLatencyMetric("getStatus"),
 		getStatusErrorCountMetric:         metrics.NewCountMetric("getStatusError"),
 		unknownCountMetric:                metrics.NewCountMetric("getStatusUnknown"),
@@ -107,11 +109,18 @@ func (verifier *StatusVerifier) poll(ctx context.Context) {
 		}
 	}
 	verifier.unconfirmedKeys = unconfirmedKeys
+	verifier.blobsInFlightMetric.Set(float64(len(verifier.unconfirmedKeys)))
 }
 
 // checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
 func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]byte) bool {
-	status, err := (*verifier.dispenser).GetBlobStatus(ctx, *key)
+
+	// TODO add timeout
+
+	status, err := InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,
+		func() (*disperser.BlobStatusReply, error) {
+			return (*verifier.dispenser).GetBlobStatus(ctx, *key)
+		})
 
 	if err != nil {
 		fmt.Println("Error getting blob status:", err) // TODO is this proper?
@@ -133,11 +142,9 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 
 	case disperser.BlobStatus_FAILED:
 		verifier.failedCountMetric.Increment()
-		fmt.Println("Blob dispersal failed:", status.GetStatus()) // TODO use logger
 		return true
 	case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
 		verifier.insufficientSignaturesCountMetric.Increment()
-		fmt.Println("Blob dispersal failed:", status.GetStatus()) // TODO use logger
 		return true
 
 	case disperser.BlobStatus_CONFIRMED:

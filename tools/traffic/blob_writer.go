@@ -3,13 +3,10 @@ package traffic
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"sync"
 	"time"
 )
-
-// TODO document
 
 // BlobWriter sends blobs to a disperser at a configured rate.
 type BlobWriter struct {
@@ -101,8 +98,6 @@ func (writer *BlobWriter) run() {
 			}
 
 			writer.writeSuccessMetric.Increment()
-			fmt.Println("Sent blob with length", len(*data)) // TODO remove
-
 			writer.verifier.AddUnconfirmedKey(&key)
 		}
 	}
