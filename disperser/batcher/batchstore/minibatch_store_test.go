@@ -127,17 +127,18 @@ func TestPutDispersalRequest(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.NoError(t, err)
 	ts := time.Now().Truncate(time.Second).UTC()
+	opID := core.OperatorID([32]byte{123})
 	request := &batcher.DispersalRequest{
 		BatchID:         id,
 		MinibatchIndex:  0,
-		OperatorID:      core.OperatorID([32]byte{123}),
+		OperatorID:      opID,
 		OperatorAddress: gcommon.HexToAddress("0x0"),
 		NumBlobs:        1,
 		RequestedAt:     ts,
 	}
 	err = minibatchStore.PutDispersalRequest(ctx, request)
 	assert.NoError(t, err)
-	r, err := minibatchStore.GetDispersalRequest(ctx, request.BatchID, request.MinibatchIndex)
+	r, err := minibatchStore.GetDispersalRequest(ctx, request.BatchID, request.MinibatchIndex, opID)
 	assert.NoError(t, err)
 	assert.Equal(t, request, r)
 }
@@ -147,11 +148,12 @@ func TestPutDispersalResponse(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.NoError(t, err)
 	ts := time.Now().Truncate(time.Second).UTC()
+	opID := core.OperatorID([32]byte{123})
 	response := &batcher.DispersalResponse{
 		DispersalRequest: batcher.DispersalRequest{
 			BatchID:         id,
 			MinibatchIndex:  0,
-			OperatorID:      core.OperatorID([32]byte{1}),
+			OperatorID:      opID,
 			OperatorAddress: gcommon.HexToAddress("0x0"),
 			NumBlobs:        1,
 			RequestedAt:     ts,
@@ -162,7 +164,7 @@ func TestPutDispersalResponse(t *testing.T) {
 	}
 	err = minibatchStore.PutDispersalResponse(ctx, response)
 	assert.NoError(t, err)
-	r, err := minibatchStore.GetDispersalResponse(ctx, response.BatchID, response.MinibatchIndex)
+	r, err := minibatchStore.GetDispersalResponse(ctx, response.BatchID, response.MinibatchIndex, opID)
 	assert.NoError(t, err)
 	assert.Equal(t, response, r)
 }

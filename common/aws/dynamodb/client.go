@@ -166,6 +166,20 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	return response.Items, nil
 }
 
+// Query returns all items in the primary index that match the given expression
+func (c *Client) Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpresseionValues) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeValues: expAttributeValues,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Items, nil
+}
+
 // QueryIndexCount returns the count of the items in the index that match the given key
 func (c *Client) QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues) (int32, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
