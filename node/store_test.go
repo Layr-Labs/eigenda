@@ -331,12 +331,11 @@ func TestStoringBlob(t *testing.T) {
 
 func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncoding) []*encoding.Frame {
 	ctx := context.Background()
-	chunks, format, ok := s.GetChunks(ctx, batchHeaderHash, blobIdx, 0)
-	assert.True(t, ok)
+	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, blobIdx, 0)
+	assert.Nil(t, err)
 	assert.Equal(t, 1, len(chunks))
 	assert.Equal(t, chunkEncoding, format)
 	var f *encoding.Frame
-	var err error
 	switch chunkEncoding {
 	case pb.ChunkEncoding_GOB:
 		f, err = new(encoding.Frame).Deserialize(chunks[0])

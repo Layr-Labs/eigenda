@@ -347,26 +347,26 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 	return data, nil
 }
 
-// GetChunks returns the list of byte arrays stored for given blobKey along with a boolean
-// indicating if the read was unsuccessful or the chunks were serialized correctly
-func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncoding, bool) {
+// GetChunks returns the list of byte arrays stored for given blobKey along with the encoding
+// format of the bytes.
+func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncoding, error) {
 	log := s.logger
 
 	blobKey, err := EncodeBlobKey(batchHeaderHash, blobIndex, quorumID)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, false
+		return nil, node.ChunkEncoding_UNKNOWN, err
 	}
 	data, err := s.db.Get(blobKey)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, false
+		return nil, node.ChunkEncoding_UNKNOWN, err
 	}
 	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
 	chunks, format, err := DecodeChunks(data)
 	if err != nil {
-		return nil, format, false
+		return nil, format, err
 	}
-	return chunks, format, true
+	return chunks, format, nil
 }
 
 // HasKey returns if a given key has been stored.
