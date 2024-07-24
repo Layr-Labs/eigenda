@@ -118,25 +118,11 @@ func (writer *BlobWriter) getRandomData() *[]byte {
 	// TODO: get explanation why this is necessary
 	data = codec.ConvertByPaddingEmptyByte(data)
 
-	// TODO remove
-	//if !fft.IsPowerOfTwo(uint64(len(data))) {
-	//	p := uint32(math.Log2(float64(len(data)))) + 1
-	//	newSize := 1 << p
-	//	bytesToAdd := newSize - len(data)
-	//	for i := 0; i < bytesToAdd; i++ {
-	//		data = append(data, 0)
-	//	}
-	//}
-
 	return &data
 }
 
 // sendRequest sends a blob to a disperser.
 func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
-	// TODO remove
-	//if !fft.IsPowerOfTwo(uint64(len(data))) {
-	//	return nil, fmt.Errorf("data length must be a power of two, data size = %d", len(data))
-	//}
 
 	// TODO add timeout to other types of requests
 	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.generator.Config.Timeout)

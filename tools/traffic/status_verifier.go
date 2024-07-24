@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// unconfirmedKey is a key that has not yet been confirmed by the disperser service.
+type unconfirmedKey struct {
+	key            *[]byte
+	submissionTime time.Time
+}
+
 // StatusVerifier periodically polls the disperser service to verify the status of blobs that were recently written.
 // When blobs become confirmed, the status verifier updates the blob table accordingly.
 // This is a thread safe data structure.
@@ -23,13 +29,14 @@ type StatusVerifier struct {
 	dispenser *clients.DisperserClient
 
 	// The keys of blobs that have not yet been confirmed by the disperser service.
-	unconfirmedKeys []*[]byte
+	unconfirmedKeys []*unconfirmedKey
 
 	// Newly added keys that require verification.
-	keyChannel chan *[]byte
+	keyChannel chan *unconfirmedKey
 
 	blobsInFlightMetric               GaugeMetric
 	getStatusLatencyMetric            LatencyMetric
+	confirmationLatencyMetric         LatencyMetric
 	getStatusErrorCountMetric         CountMetric
 	unknownCountMetric                CountMetric
 	processingCountMetric             CountMetric
@@ -53,10 +60,11 @@ func NewStatusVerifier(
 		table:                             table,
 		blobReadLimit:                     blobReadLimit,
 		dispenser:                         disperser,
-		unconfirmedKeys:                   make([]*[]byte, 0),
-		keyChannel:                        make(chan *[]byte),
+		unconfirmedKeys:                   make([]*unconfirmedKey, 0),
+		keyChannel:                        make(chan *unconfirmedKey),
 		blobsInFlightMetric:               metrics.NewGaugeMetric("blobsInFlight"),
 		getStatusLatencyMetric:            metrics.NewLatencyMetric("getStatus"),
+		confirmationLatencyMetric:         metrics.NewLatencyMetric("confirmation"),
 		getStatusErrorCountMetric:         metrics.NewCountMetric("getStatusError"),
 		unknownCountMetric:                metrics.NewCountMetric("getStatusUnknown"),
 		processingCountMetric:             metrics.NewCountMetric("getStatusProcessing"),
@@ -70,7 +78,10 @@ func NewStatusVerifier(
 
 // AddUnconfirmedKey adds a key to the list of unconfirmed keys.
 func (verifier *StatusVerifier) AddUnconfirmedKey(key *[]byte) {
-	verifier.keyChannel <- key
+	verifier.keyChannel <- &unconfirmedKey{
+		key:            key,
+		submissionTime: time.Now(),
+	}
 }
 
 // Start begins the status goroutine, which periodically polls
@@ -100,7 +111,7 @@ func (verifier *StatusVerifier) poll(ctx context.Context) {
 
 	// TODO If the number of unconfirmed blobs is high and the time to confirm his high, this is not efficient.
 
-	unconfirmedKeys := make([]*[]byte, 0)
+	unconfirmedKeys := make([]*unconfirmedKey, 0)
 	for _, key := range verifier.unconfirmedKeys {
 		confirmed := verifier.checkStatusForBlob(ctx, key)
 		if !confirmed {
@@ -112,7 +123,7 @@ func (verifier *StatusVerifier) poll(ctx context.Context) {
 }
 
 // checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
-func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]byte) bool {
+func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *unconfirmedKey) bool {
 
 	// TODO add timeout config
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*5)
@@ -120,7 +131,7 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 
 	status, err := InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
-			return (*verifier.dispenser).GetBlobStatus(ctxTimeout, *key)
+			return (*verifier.dispenser).GetBlobStatus(ctxTimeout, *key.key)
 		})
 
 	if err != nil {
@@ -164,10 +175,14 @@ func (verifier *StatusVerifier) checkStatusForBlob(ctx context.Context, key *[]b
 }
 
 // forwardToReader forwards a blob to the reader. Only called once the blob is ready to be read.
-func (verifier *StatusVerifier) forwardToReader(key *[]byte, status *disperser.BlobStatusReply) {
+func (verifier *StatusVerifier) forwardToReader(key *unconfirmedKey, status *disperser.BlobStatusReply) {
 	batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
 	blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 
-	blobMetadata := NewBlobMetadata(key, &batchHeaderHash, blobIndex, -1) // TODO permits
+	confirmationTime := time.Now()
+	confirmationLatency := confirmationTime.Sub(key.submissionTime)
+	verifier.confirmationLatencyMetric.ReportLatency(confirmationLatency)
+
+	blobMetadata := NewBlobMetadata(key.key, &batchHeaderHash, blobIndex, -1) // TODO permits
 	verifier.table.Add(blobMetadata)
 }

@@ -106,7 +106,6 @@ func (reader *BlobReader) randomRead() {
 	metadata := reader.table.GetRandom(true)
 	if metadata == nil {
 		// There are no blobs to read, do nothing.
-		fmt.Println("no blobs to read")
 		return
 	}
 

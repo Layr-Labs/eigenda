@@ -106,8 +106,6 @@ func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retriveret
 
 	cs := eth.NewChainState(tx, gethClient)
 
-	// -------------
-
 	// This is the indexer when config.UseGraph is true
 	chainStateConfig := thegraph.Config{
 		Endpoint:     "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state",
@@ -115,28 +113,6 @@ func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retriveret
 		MaxRetries:   5,
 	}
 	chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
-
-	// This is the indexer when config.UseGraph is false.
-	//rpcClient, err := rpc.Dial("http://localhost:8545")
-	//indexerConfig := indexer.Config{
-	//	PullInterval: time.Second,
-	//}
-	//indexer, err := coreindexer.CreateNewIndexer(
-	//	&indexerConfig,
-	//	gethClient,
-	//	rpcClient,
-	//	"0x851356ae760d987E095750cCeb3bC6014560891C", // eigenDaServeManagerAddr
-	//	logger,
-	//)
-	//if err != nil {
-	//	panic(err) // TODO
-	//}
-	//chainState, err := coreindexer.NewIndexedChainState(cs, indexer)
-	//if err != nil {
-	//	panic(err) // TODO
-	//}
-
-	// -------------
 
 	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 
