@@ -227,7 +227,7 @@ func createStore(t *testing.T) *node.Store {
 func TestEncodeDecodeChunks(t *testing.T) {
 	decoded, format, err := node.DecodeChunks([]byte{})
 	assert.Nil(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, format)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, format)
 	assert.Equal(t, 0, len(decoded))
 
 	numSamples := 32
@@ -244,7 +244,7 @@ func TestEncodeDecodeChunks(t *testing.T) {
 		assert.Nil(t, err)
 		decoded, format, err := node.DecodeChunks(encoded)
 		assert.Nil(t, err)
-		assert.Equal(t, pb.ChunkEncoding_GOB, format)
+		assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
 		for i := 0; i < numChunks; i++ {
 			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
 		}
@@ -329,7 +329,7 @@ func TestStoringBlob(t *testing.T) {
 	assert.False(t, s.HasKey(ctx, blobKey2))
 }
 
-func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncoding) []*encoding.Frame {
+func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncodingFormat) []*encoding.Frame {
 	ctx := context.Background()
 	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, blobIdx, 0)
 	assert.Nil(t, err)
@@ -337,10 +337,10 @@ func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx
 	assert.Equal(t, chunkEncoding, format)
 	var f *encoding.Frame
 	switch chunkEncoding {
-	case pb.ChunkEncoding_GOB:
+	case pb.ChunkEncodingFormat_GOB:
 		f, err = new(encoding.Frame).Deserialize(chunks[0])
 		assert.Nil(t, err)
-	case pb.ChunkEncoding_GNARK:
+	case pb.ChunkEncodingFormat_GNARK:
 		f, err = new(encoding.Frame).DeserializeGnark(chunks[0])
 		assert.Nil(t, err)
 	}
@@ -375,12 +375,12 @@ func TestBundleEncodingEquivalence(t *testing.T) {
 	batchHeaderHash, err := batchHeader1.GetBatchHeaderHash()
 	assert.Nil(t, err)
 	// The first blob
-	bundle1 := decodeChunks(t, s1, batchHeaderHash, 0, pb.ChunkEncoding_GNARK)
-	bundle2 := decodeChunks(t, s2, batchHeaderHash, 0, pb.ChunkEncoding_GOB)
+	bundle1 := decodeChunks(t, s1, batchHeaderHash, 0, pb.ChunkEncodingFormat_GNARK)
+	bundle2 := decodeChunks(t, s2, batchHeaderHash, 0, pb.ChunkEncodingFormat_GOB)
 	checkBundleEquivalence(t, bundle1, bundle2)
 	// The second blob
-	bundle1 = decodeChunks(t, s1, batchHeaderHash, 1, pb.ChunkEncoding_GNARK)
-	bundle2 = decodeChunks(t, s2, batchHeaderHash, 1, pb.ChunkEncoding_GOB)
+	bundle1 = decodeChunks(t, s1, batchHeaderHash, 1, pb.ChunkEncodingFormat_GNARK)
+	bundle2 = decodeChunks(t, s2, batchHeaderHash, 1, pb.ChunkEncodingFormat_GOB)
 	checkBundleEquivalence(t, bundle1, bundle2)
 }
 

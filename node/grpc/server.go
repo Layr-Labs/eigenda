@@ -309,7 +309,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", hex.EncodeToString(batchHeaderHash[:]), in.GetBlobIndex(), in.GetQuorumId())
 	}
 	s.node.Metrics.RecordRPCRequest("RetrieveChunks", "success", time.Since(start))
-	return &pb.RetrieveChunksReply{Chunks: chunks, Encoding: format}, nil
+	return &pb.RetrieveChunksReply{Chunks: chunks, ChunkEncodingFormat: format}, nil
 }
 
 func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest) (*pb.GetBlobHeaderReply, error) {
