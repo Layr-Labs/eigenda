@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"runtime"
@@ -302,10 +303,10 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, errors.New("request rate limited")
 	}
 
-	chunks, format, ok := s.node.Store.GetChunks(ctx, batchHeaderHash, int(in.GetBlobIndex()), uint8(in.GetQuorumId()))
-	if !ok {
+	chunks, format, err := s.node.Store.GetChunks(ctx, batchHeaderHash, int(in.GetBlobIndex()), uint8(in.GetQuorumId()))
+	if err != nil {
 		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure", time.Since(start))
-		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", batchHeaderHash, in.GetBlobIndex(), in.GetQuorumId())
+		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", hex.EncodeToString(batchHeaderHash[:]), in.GetBlobIndex(), in.GetQuorumId())
 	}
 	s.node.Metrics.RecordRPCRequest("RetrieveChunks", "success", time.Since(start))
 	return &pb.RetrieveChunksReply{Chunks: chunks, Encoding: format}, nil
