@@ -48,5 +48,5 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 		panic(fmt.Sprintf("failed to create new traffic generator\n%s", err))
 	}
 
-	return generator.Run()
+	return generator.Start()
 }

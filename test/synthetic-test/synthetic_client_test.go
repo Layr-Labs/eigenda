@@ -51,7 +51,7 @@ type GrpcClient struct {
 	Hostname string
 	GrpcPort string
 	Timeout  time.Duration
-	Client   interface{} // This can be a specific client type (disperser_rpc.DisperserClient, retriever_rpc.RetrieverClient, etc.)
+	Client   interface{} // This can be a specific client type (disperser_rpc.disperserClient, retriever_rpc.RetrieverClient, etc.)
 }
 
 type RetrieverClientConfig struct {
@@ -178,7 +178,7 @@ func TestMain(m *testing.M) {
 	retrieverCachePath := os.Getenv("RETRIEVER_CACHE_PATH")
 	batcherPullInterval := os.Getenv("BATCHER_PULL_INTERVAL")
 
-	// Retriever Config
+	// Retriever config
 	retrieverClientConfig := &RetrieverClientConfig{
 		Bls_Operator_State_Retriever:     blsOperatorStateRetriever,
 		EigenDA_ServiceManager_Retriever: eigenDAServiceManagerRetreiever,
@@ -204,9 +204,9 @@ func TestMain(m *testing.M) {
 	logger.Println("Retriever Client Enabled...", isRetrieverClientEnabled)
 
 	logger.Println("Running Test Client...")
-	// Run the tests and get the exit code
+	// Start the tests and get the exit code
 	exitCode := m.Run()
-	logger.Printf("Exiting Test Client Run with Code:%d", exitCode)
+	logger.Printf("Exiting Test Client Start with Code:%d", exitCode)
 	// Exit with the test result code
 	os.Exit(exitCode)
 }

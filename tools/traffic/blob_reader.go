@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"sync"
@@ -22,7 +23,10 @@ type BlobReader struct {
 	ctx *context.Context
 
 	// Tracks the number of active goroutines within the generator.
-	waitGroup *sync.WaitGroup
+	waitGroup *sync.WaitGroup // TODO other things should use this too
+
+	// All logs should be written using this logger.
+	logger logging.Logger
 
 	// TODO use code from this class
 	retriever   clients.RetrievalClient
@@ -31,8 +35,7 @@ type BlobReader struct {
 	// table of blobs to read from.
 	table *BlobTable
 
-	metrics *Metrics
-
+	metrics                 *Metrics
 	fetchBatchHeaderMetric  LatencyMetric
 	fetchBatchHeaderSuccess CountMetric
 	fetchBatchHeaderFailure CountMetric
@@ -50,6 +53,7 @@ type BlobReader struct {
 func NewBlobReader(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
+	logger logging.Logger,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
 	table *BlobTable,
@@ -58,6 +62,7 @@ func NewBlobReader(
 	return BlobReader{
 		ctx:                     ctx,
 		waitGroup:               waitGroup,
+		logger:                  logger,
 		retriever:               retriever,
 		chainClient:             chainClient,
 		table:                   table,
@@ -122,7 +127,7 @@ func (reader *BlobReader) randomRead() {
 		})
 	cancel()
 	if err != nil {
-		// TODO log
+		reader.logger.Error("failed to get batch header", "err:", err)
 		reader.fetchBatchHeaderFailure.Increment()
 		return
 	}
@@ -143,32 +148,25 @@ func (reader *BlobReader) randomRead() {
 			core.QuorumID(0))
 	})
 	cancel()
-
 	if err != nil {
-		// TODO log
+		reader.logger.Error("failed to read chunks", "err:", err)
 		reader.readFailureMetric.Increment()
 		return
 	}
 	reader.readSuccessMetric.Increment()
 
-	chunkCount := chunks.AssignmentInfo.TotalChunks
-
 	var assignments map[core.OperatorID]core.Assignment
 	assignments = chunks.Assignments
 
 	data, err := reader.retriever.CombineChunks(chunks)
-
 	if err != nil {
-		fmt.Println("Error combining chunks:", err) // TODO
+		reader.logger.Error("failed to combine chunks", "err:", err)
 		reader.recombinationFailure.Increment()
 		return
 	}
 	reader.recombinationSuccess.Increment()
 
-	// TODO verify blob data
-
-	fmt.Printf("=====================================\nRead blob. Total chunk count = %d\nRetrieved chunk count = %d\nData length = %d\n",
-		chunkCount, len(chunks.Chunks), len(data)) // TODO
+	reader.verifyBlob(data)
 
 	indexSet := make(map[encoding.ChunkNumber]bool)
 	for index := range chunks.Indices {
@@ -176,7 +174,6 @@ func (reader *BlobReader) randomRead() {
 	}
 
 	for id, assignment := range assignments {
-		fmt.Printf("  - Operator ID: %d, Start Index: %d, Num Chunks: %d\n", id, assignment.StartIndex, assignment.NumChunks)
 		for index := assignment.StartIndex; index < assignment.StartIndex+assignment.NumChunks; index++ {
 			if indexSet[index] {
 				reader.reportChunk(id)
@@ -207,4 +204,9 @@ func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
 	}
 
 	metric.Increment()
+}
+
+// verifyBlob performs sanity checks on the blob.
+func (reader *BlobReader) verifyBlob(blob []byte) {
+	// TODO
 }

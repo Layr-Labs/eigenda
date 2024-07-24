@@ -18,15 +18,15 @@ func TestTrafficGenerator(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
 	logger := logging.NewNoopLogger()
 	trafficGenerator := &traffic.TrafficGenerator{
-		Logger: logger,
-		Config: &traffic.Config{
+		logger: logger,
+		config: &traffic.Config{
 			Config: clients.Config{
 				Timeout: 1 * time.Second,
 			},
 			DataSize:             1000_000,
 			WriteRequestInterval: 2 * time.Second,
 		},
-		DisperserClient: disperserClient,
+		disperserClient: disperserClient,
 	}
 
 	processing := disperser.Processing
@@ -46,8 +46,8 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 	logger := logging.NewNoopLogger()
 
 	trafficGenerator := &traffic.TrafficGenerator{
-		Logger: logger,
-		Config: &traffic.Config{
+		logger: logger,
+		config: &traffic.Config{
 			Config: clients.Config{
 				Timeout: 1 * time.Second,
 			},
@@ -55,7 +55,7 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 			WriteRequestInterval: 2 * time.Second,
 			SignerPrivateKey:     "Hi",
 		},
-		DisperserClient: disperserClient,
+		disperserClient: disperserClient,
 	}
 
 	processing := disperser.Processing

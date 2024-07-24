@@ -158,7 +158,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	resultCh := make(chan *pb.AuthenticatedRequest)
 	errCh := make(chan error)
 
-	// Run stream.Recv() in a goroutine
+	// Start stream.Recv() in a goroutine
 	go func() {
 		in, err := stream.Recv()
 		if err != nil {

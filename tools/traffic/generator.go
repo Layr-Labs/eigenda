@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"os"
@@ -20,8 +21,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 )
+
+// TODO use consistent snake case on metrics
 
 // TrafficGenerator simulates read/write traffic to the DA service.
 //
@@ -39,10 +41,14 @@ import (
 // When the verifier observes that a blob has been confirmed, it sends information about the blob
 // to the readers. The readers only attempt to read blobs that have been confirmed by the verifier.
 type TrafficGenerator struct {
-	Logger          logging.Logger
-	DisperserClient clients.DisperserClient
-	EigenDAClient   *clients.EigenDAClient
-	Config          *Config
+	ctx             *context.Context
+	cancel          *context.CancelFunc
+	waitGroup       *sync.WaitGroup
+	metrics         *Metrics
+	logger          *logging.Logger
+	disperserClient clients.DisperserClient
+	eigenDAClient   *clients.EigenDAClient
+	config          *Config
 }
 
 func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*TrafficGenerator, error) {
@@ -70,16 +76,26 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	waitGroup := sync.WaitGroup{}
+
+	metrics := NewMetrics("9101", logger) // TODO config
+	metrics.Start(ctx)
+
 	return &TrafficGenerator{
-		Logger:          logger,
-		DisperserClient: clients.NewDisperserClient(&config.Config, signer),
-		EigenDAClient:   client,
-		Config:          config,
+		ctx:             &ctx,
+		cancel:          &cancel,
+		waitGroup:       &waitGroup,
+		metrics:         metrics,
+		logger:          &logger,
+		disperserClient: clients.NewDisperserClient(&config.Config, signer),
+		eigenDAClient:   client,
+		config:          config,
 	}, nil
 }
 
 // buildRetriever creates a retriever client for the traffic generator.
-func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
+func (generator *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 
 	//loggerConfig := common.LoggerConfig{
 	//	Format: "text",
@@ -151,37 +167,52 @@ func (g *TrafficGenerator) buildRetriever() (clients.RetrievalClient, retriveret
 	return retriever, chainClient
 }
 
-// Run instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
-func (g *TrafficGenerator) Run() error {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	metrics := NewMetrics("9101", g.Logger) // TODO config
-	metrics.Start(ctx)
+// Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
+func (generator *TrafficGenerator) Start() error {
 
 	// TODO add configuration
 	table := NewBlobTable()
-	verifier := NewStatusVerifier(&table, &g.DisperserClient, -1, metrics)
-	verifier.Start(ctx, time.Second)
+	statusVerifier := NewStatusVerifier(
+		generator.ctx,
+		generator.waitGroup,
+		*generator.logger,
+		&table,
+		&generator.disperserClient,
+		-1,
+		generator.metrics)
+	statusVerifier.Start(time.Second)
 
-	var wg sync.WaitGroup
-
-	for i := 0; i < int(g.Config.NumWriteInstances); i++ {
-		writer := NewBlobWriter(&ctx, &wg, g, &verifier, metrics)
+	for i := 0; i < int(generator.config.NumWriteInstances); i++ {
+		writer := NewBlobWriter(
+			generator.ctx,
+			generator.waitGroup,
+			*generator.logger,
+			generator.config,
+			&generator.disperserClient,
+			&statusVerifier,
+			generator.metrics)
 		writer.Start()
-		time.Sleep(g.Config.InstanceLaunchInterval)
+		time.Sleep(generator.config.InstanceLaunchInterval)
 	}
 
-	retriever, chainClient := g.buildRetriever()
+	retriever, chainClient := generator.buildRetriever()
 
 	// TODO start multiple readers
-	reader := NewBlobReader(&ctx, &wg, retriever, chainClient, &table, metrics)
+	reader := NewBlobReader(
+		generator.ctx,
+		generator.waitGroup,
+		*generator.logger,
+		retriever,
+		chainClient,
+		&table,
+		generator.metrics)
 	reader.Start()
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	<-signals
 
-	cancel()
-	wg.Wait()
+	(*generator.cancel)()
+	generator.waitGroup.Wait()
 	return nil
 }

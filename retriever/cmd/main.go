@@ -64,7 +64,7 @@ func RetrieverMain(ctx *cli.Context) error {
 		grpc.ChainUnaryInterceptor(
 		// TODO(ian-shim): Add interceptors
 		// correlation.UnaryServerInterceptor(),
-		// logger.UnaryServerInterceptor(*s.logger.Logger),
+		// logger.UnaryServerInterceptor(*s.logger.logger),
 		),
 	)
 

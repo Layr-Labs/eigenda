@@ -314,7 +314,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHashHex, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
 
 	// Store the batch.
-	// Run this in a goroutine so we can parallelize the batch storing and batch
+	// Start this in a goroutine so we can parallelize the batch storing and batch
 	// verifaction work.
 	// This should be able to improve latency without needing more CPUs, because batch
 	// storing is an IO operation.

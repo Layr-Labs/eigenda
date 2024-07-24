@@ -129,7 +129,7 @@ func RunDataApi(ctx *cli.Context) error {
 	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Run server in a separate goroutine so that it doesn't block.
+	// Start server in a separate goroutine so that it doesn't block.
 	go func() {
 		if err := server.Start(); err != nil {
 			logger.Fatalf("Failed to start server: %v", err)
