@@ -54,6 +54,8 @@ type DispersalRequest struct {
 	Socket          string
 	NumBlobs        uint
 	RequestedAt     time.Time
+	BlobHash        string
+	MetadataHash    string
 }
 
 type DispersalResponse struct {
