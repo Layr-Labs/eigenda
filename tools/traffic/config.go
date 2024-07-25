@@ -12,12 +12,12 @@ import (
 
 // Config configures a traffic generator.
 type Config struct {
-	// Configures logging for the traffic generator.
 	LoggingConfig common.LoggerConfig
-	// Configures the DA clients.
 	clients.Config
 	SignerPrivateKey string
 	CustomQuorums    []uint8
+	DisableTlS       bool
+	MetricsHTTPPort  string
 
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
@@ -68,13 +68,15 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		),
 		SignerPrivateKey: ctx.String(flags.SignerPrivateKeyFlag.Name),
 		CustomQuorums:    customQuorumsUint8,
+		DisableTlS:       ctx.GlobalBool(flags.DisableTLSFlag.Name),
+		MetricsHTTPPort:  ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 
 		NumWriteInstances:    ctx.GlobalUint(flags.NumWriteInstancesFlag.Name),
 		WriteRequestInterval: ctx.Duration(flags.WriteRequestIntervalFlag.Name),
 		DataSize:             ctx.GlobalUint64(flags.DataSizeFlag.Name),
-		RandomizeBlobs:       ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
+		RandomizeBlobs:       !ctx.GlobalBool(flags.UniformBlobsFlag.Name),
 
 		NumReadInstances:    ctx.GlobalUint(flags.NumReadInstancesFlag.Name),
 		ReadRequestInterval: ctx.Duration(flags.ReadRequestIntervalFlag.Name),

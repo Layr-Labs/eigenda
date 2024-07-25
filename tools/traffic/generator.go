@@ -65,8 +65,8 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	fmt.Printf("Signer private key: '%s', length: %d\n", config.SignerPrivateKey, len(config.SignerPrivateKey))
 
 	clientConfig := clients.EigenDAClientConfig{
-		RPC:                 "localhost:32003", // TODO make this configurable
-		DisableTLS:          true,              // TODO config
+		RPC:                 config.Config.Hostname + ":" + config.Config.Port,
+		DisableTLS:          config.DisableTlS,
 		SignerPrivateKeyHex: config.SignerPrivateKey,
 	}
 	err = clientConfig.CheckAndSetDefaults()
@@ -83,9 +83,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
 
-	metrics := NewMetrics("9101", logger) // TODO config
-
-	// TODO add configuration
+	metrics := NewMetrics(config.MetricsHTTPPort, logger)
 
 	table := NewBlobTable()
 
@@ -145,16 +143,11 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 
 // buildRetriever creates a retriever client for the traffic generator.
 func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
-
-	//loggerConfig := common.LoggerConfig{
-	//	Format: "text",
-	// }
-
 	loggerConfig := common.DefaultLoggerConfig()
 
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		panic(err) // TODO
+		panic(fmt.Sprintf("Unable to instantiate logger: %s", err))
 	}
 
 	ethClientConfig := geth.EthClientConfig{
@@ -193,12 +186,11 @@ func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 	}
 	v, err := verifier.NewVerifier(&encoderConfig, true)
 	if err != nil {
-		panic(err) // TODO
+		panic(fmt.Sprintf("Unable to build verifier: %s", err))
 	}
 
 	numConnections := 20
 
-	//var retriever *clients.RetrievalClient
 	retriever, err := clients.NewRetrievalClient(
 		logger,
 		chainState,
@@ -208,7 +200,7 @@ func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 		numConnections)
 
 	if err != nil {
-		panic(err) // TODO
+		panic(fmt.Sprintf("Unable to build retriever: %s", err))
 	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
