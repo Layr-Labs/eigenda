@@ -98,7 +98,7 @@ func (table *BlobTable) GetRandom(decrement bool) (*BlobMetadata, bool) {
 // remove a blob from the requiredReads.
 func (table *BlobTable) remove(blob *BlobMetadata) {
 	if table.blobs[blob.index] != blob {
-		panic(fmt.Sprintf("blob %x is not not present in the requiredReads at index %d", blob.Key, blob.index))
+		panic(fmt.Sprintf("blob %x is not not present in the requiredReads at index %d", blob.Key(), blob.index))
 	}
 
 	if table.size == 1 {
