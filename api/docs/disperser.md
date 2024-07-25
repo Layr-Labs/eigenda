@@ -154,7 +154,7 @@ replay attacks in the event that a signature is leaked.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | commitment | [common.G1Commitment](#common-G1Commitment) |  | KZG commitment of the blob. |
-| data_length | [uint32](#uint32) |  | The length of the blob in symbols (each symbol is 31 bytes). |
+| data_length | [uint32](#uint32) |  | The length of the blob in symbols (each symbol is 32 bytes). |
 | blob_quorum_params | [BlobQuorumParam](#disperser-BlobQuorumParam) | repeated | The params of the quorums that this blob participates in. |
 
 
@@ -270,7 +270,7 @@ BlobStatusRequest is used to query the status of a blob.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 2MiB. |
+| data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 2MiB. Every 32 bytes of data chunk is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617 containing slightly less than 254 bits and more than 253 bits. If any one of the 32 bytes chunk is outside the range, the whole request is deemed as invalid, and rejected. |
 | custom_quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob will be sent, in addition to the required quorums which are configured on the EigenDA smart contract. If required quorums are included here, an error will be returned. The disperser will ensure that the encoded blobs for each quorum are all processed within the same batch. |
 | account_id | [string](#string) |  | The account ID of the client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobAuthHeader. |
 
@@ -315,7 +315,17 @@ RetrieveBlobRequest contains parameters to retrieve the blob.
 <a name="disperser-BlobStatus"></a>
 
 ### BlobStatus
-
+BlobStatus represents the status of a blob.
+The status of a blob is updated as the blob is processed by the disperser.
+The status of a blob can be queried by the client using the GetBlobStatus API.
+Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+- PROCESSING
+- DISPERSING
+- CONFIRMED
+Terminal states are states that will not be updated to a different state:
+- FAILED
+- FINALIZED
+- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -325,6 +335,7 @@ RetrieveBlobRequest contains parameters to retrieve the blob.
 | FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state) |
 | FINALIZED | 4 | FINALIZED means that the block containing the blob&#39;s confirmation transaction has been finalized on Ethereum |
 | INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum. |
+| DISPERSING | 6 | DISPERSING means that the blob is currently being dispersed to DA Nodes and being confirmed onchain |
 
 
  
@@ -339,7 +350,7 @@ Disperser defines the public APIs for dispersing blobs.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| DisperseBlob | [DisperseBlobRequest](#disperser-DisperseBlobRequest) | [DisperseBlobReply](#disperser-DisperseBlobReply) | This API accepts blob to disperse from clients. This executes the dispersal async, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the processing status of the blob. |
+| DisperseBlob | [DisperseBlobRequest](#disperser-DisperseBlobRequest) | [DisperseBlobReply](#disperser-DisperseBlobReply) | This API accepts blob to disperse from clients. This executes the dispersal async, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the the processing status of the blob. |
 | DisperseBlobAuthenticated | [AuthenticatedRequest](#disperser-AuthenticatedRequest) stream | [AuthenticatedReply](#disperser-AuthenticatedReply) stream | DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the client to authenticate itself via the AuthenticationData message. The protoco is as follows: 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message 2. The Disperser sends back a BlobAuthHeader message containing information for the client to verify and sign. 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 	 AuthenticationData message. 4. The Disperser verifies the signature and returns a DisperseBlobReply message. |
 | GetBlobStatus | [BlobStatusRequest](#disperser-BlobStatusRequest) | [BlobStatusReply](#disperser-BlobStatusReply) | This API is meant to be polled for the blob status. |
 | RetrieveBlob | [RetrieveBlobRequest](#disperser-RetrieveBlobRequest) | [RetrieveBlobReply](#disperser-RetrieveBlobReply) | This retrieves the requested blob from the Disperser&#39;s backend. This is a more efficient way to retrieve blobs than directly retrieving from the DA Nodes (see detail about this approach in api/proto/retriever/retriever.proto). The blob should have been initially dispersed via this Disperser service for this API to work. |
