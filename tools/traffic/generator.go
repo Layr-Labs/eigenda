@@ -51,7 +51,7 @@ type TrafficGenerator struct {
 	config          *Config
 
 	writers  []*BlobWriter
-	verifier *StatusVerifier
+	verifier *BlobVerifier
 	readers  []*BlobReader
 }
 

@@ -29,7 +29,7 @@ type BlobWriter struct {
 	disperser *clients.DisperserClient
 
 	// Responsible for polling on the status of a recently written blob until it becomes confirmed.
-	verifier *StatusVerifier
+	verifier *BlobVerifier
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData *[]byte
@@ -51,7 +51,7 @@ func NewBlobWriter(
 	logger logging.Logger,
 	config *Config,
 	disperser *clients.DisperserClient,
-	verifier *StatusVerifier,
+	verifier *BlobVerifier,
 	metrics *Metrics) BlobWriter {
 
 	var fixedRandomData []byte

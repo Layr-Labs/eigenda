@@ -15,10 +15,10 @@ type unconfirmedKey struct {
 	submissionTime time.Time
 }
 
-// StatusVerifier periodically polls the disperser service to verify the status of blobs that were recently written.
+// BlobVerifier periodically polls the disperser service to verify the status of blobs that were recently written.
 // When blobs become confirmed, the status verifier updates the blob table accordingly.
 // This is a thread safe data structure.
-type StatusVerifier struct {
+type BlobVerifier struct {
 
 	// The context for the generator. All work should cease when this context is cancelled.
 	ctx *context.Context
@@ -57,7 +57,7 @@ type StatusVerifier struct {
 	finalizedCountMetric              CountMetric
 }
 
-// NewStatusVerifier creates a new StatusVerifier instance.
+// NewStatusVerifier creates a new BlobVerifier instance.
 func NewStatusVerifier(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
@@ -65,9 +65,9 @@ func NewStatusVerifier(
 	table *BlobTable,
 	disperser *clients.DisperserClient,
 	blobReadLimit int32,
-	metrics *Metrics) StatusVerifier {
+	metrics *Metrics) BlobVerifier {
 
-	return StatusVerifier{
+	return BlobVerifier{
 		ctx:                               ctx,
 		waitGroup:                         waitGroup,
 		logger:                            logger,
@@ -91,7 +91,7 @@ func NewStatusVerifier(
 }
 
 // AddUnconfirmedKey adds a key to the list of unconfirmed keys.
-func (verifier *StatusVerifier) AddUnconfirmedKey(key *[]byte) {
+func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte) {
 	verifier.keyChannel <- &unconfirmedKey{
 		key:            key,
 		submissionTime: time.Now(),
@@ -100,13 +100,13 @@ func (verifier *StatusVerifier) AddUnconfirmedKey(key *[]byte) {
 
 // Start begins the status goroutine, which periodically polls
 // the disperser service to verify the status of blobs.
-func (verifier *StatusVerifier) Start(period time.Duration) {
+func (verifier *BlobVerifier) Start(period time.Duration) {
 	verifier.waitGroup.Add(1)
 	go verifier.monitor(period)
 }
 
 // monitor periodically polls the disperser service to verify the status of blobs.
-func (verifier *StatusVerifier) monitor(period time.Duration) {
+func (verifier *BlobVerifier) monitor(period time.Duration) {
 	ticker := time.NewTicker(period)
 	for {
 		select {
@@ -123,7 +123,7 @@ func (verifier *StatusVerifier) monitor(period time.Duration) {
 
 // poll checks all unconfirmed keys to see if they have been confirmed by the disperser service.
 // If a key is confirmed, it is added to the blob table and removed from the list of unconfirmed keys.
-func (verifier *StatusVerifier) poll() {
+func (verifier *BlobVerifier) poll() {
 
 	// TODO If the number of unconfirmed blobs is high and the time to confirm his high, this is not efficient.
 
@@ -139,7 +139,7 @@ func (verifier *StatusVerifier) poll() {
 }
 
 // checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
-func (verifier *StatusVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
+func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 
 	// TODO add timeout config
 	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, time.Second*5)
@@ -191,7 +191,7 @@ func (verifier *StatusVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 }
 
 // forwardToReader forwards a blob to the reader. Only called once the blob is ready to be read.
-func (verifier *StatusVerifier) forwardToReader(key *unconfirmedKey, status *disperser.BlobStatusReply) {
+func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *disperser.BlobStatusReply) {
 	batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
 	blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 
