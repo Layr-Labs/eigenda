@@ -54,8 +54,7 @@ type TrafficGenerator struct {
 }
 
 func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*TrafficGenerator, error) {
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
+	logger, err := common.NewLogger(config.LoggingConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +62,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	fmt.Printf("Signer private key: '%s', length: %d\n", config.SignerPrivateKey, len(config.SignerPrivateKey))
 
 	clientConfig := clients.EigenDAClientConfig{
-		RPC:                 config.Config.Hostname + ":" + config.Config.Port,
+		RPC:                 config.DisperserHostname + ":" + config.DisperserPort,
 		DisableTLS:          config.DisableTlS,
 		SignerPrivateKeyHex: config.SignerPrivateKey,
 	}
@@ -72,7 +71,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		return nil, err
 	}
 
-	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true)) // TODO
+	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
 	client, err := clients.NewEigenDAClient(logger2, clientConfig)
 	if err != nil {
 		return nil, err
@@ -85,7 +84,13 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 
 	table := NewBlobTable()
 
-	disperserClient := clients.NewDisperserClient(&config.Config, signer)
+	disperserConfig := clients.Config{
+		Hostname:          config.DisperserHostname,
+		Port:              config.DisperserPort,
+		Timeout:           config.DisperserTimeout,
+		UseSecureGrpcFlag: config.DisperserUseSecureGrpcFlag,
+	}
+	disperserClient := clients.NewDisperserClient(&disperserConfig, signer)
 	statusVerifier := NewStatusVerifier(
 		&ctx,
 		&waitGroup,
@@ -130,7 +135,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		waitGroup:       &waitGroup,
 		metrics:         metrics,
 		logger:          &logger,
-		disperserClient: clients.NewDisperserClient(&config.Config, signer),
+		disperserClient: clients.NewDisperserClient(&disperserConfig, signer),
 		eigenDAClient:   client,
 		config:          config,
 		writers:         writers,

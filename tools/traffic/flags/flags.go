@@ -19,26 +19,26 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-hostname"),
 		Usage:    "Hostname at which disperser service is available.",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "HOSTNAME"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DISPERSER_HOSTNAME"),
 	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-port"),
 		Usage:    "Port at which a disperser listens for grpc calls.",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "GRPC_PORT"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DISPERSER_PORT"),
 	}
 	TimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
 		Usage:    "Amount of time to wait for grpc.",
 		Required: false,
 		Value:    10 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DISPERSER_TIMEOUT"),
 	}
 	UseSecureGrpcFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-secure-grpc"),
 		Usage:    "Whether to use secure grpc.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "USE_SECURE_GRPC"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DISPERSER_USE_SECURE_GRPC"),
 	}
 	SignerPrivateKeyFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "signer-private-key-hex"),

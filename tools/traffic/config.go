@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/tools/traffic/flags"
 	"github.com/urfave/cli"
@@ -14,8 +13,14 @@ import (
 type Config struct {
 	// Logging configuration.
 	LoggingConfig common.LoggerConfig
-	// Configuration for DA clients.
-	clients.Config // TODO for uniformity, don't use this nested config type
+	// The hostname of the disperser.
+	DisperserHostname string
+	// The port of the disperser.
+	DisperserPort string
+	// The timeout for the disperser.
+	DisperserTimeout time.Duration
+	// Whether to use a secure gRPC connection to the disperser.
+	DisperserUseSecureGrpcFlag bool
 	// The private key to use for signing requests.
 	SignerPrivateKey string
 	// Custom quorum numbers to use for the traffic generator.
@@ -98,34 +103,33 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 		customQuorumsUint8[i] = uint8(q)
 	}
+
 	return &Config{
-		LoggingConfig: *loggerConfig,
-		Config: *clients.NewConfig(
-			ctx.GlobalString(flags.HostnameFlag.Name),
-			ctx.GlobalString(flags.GrpcPortFlag.Name),
-			ctx.Duration(flags.TimeoutFlag.Name),
-			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
-		),
-		SignerPrivateKey:          ctx.String(flags.SignerPrivateKeyFlag.Name),
-		CustomQuorums:             customQuorumsUint8,
-		DisableTlS:                ctx.GlobalBool(flags.DisableTLSFlag.Name),
-		MetricsHTTPPort:           ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
-		EthClientHostname:         ctx.GlobalString(flags.EthClientHostnameFlag.Name),
-		EthClientPort:             ctx.GlobalString(flags.EthClientPortFlag.Name),
-		BlsOperatorStateRetriever: ctx.String(flags.BLSOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManager:     ctx.String(flags.EigenDAServiceManagerFlag.Name),
-		EthClientRetries:          ctx.Uint(flags.EthClientRetriesFlag.Name),
-		TheGraphUrl:               ctx.String(flags.TheGraphUrlFlag.Name),
-		TheGraphPullInterval:      ctx.Duration(flags.TheGraphPullIntervalFlag.Name),
-		TheGraphRetries:           ctx.Uint(flags.TheGraphRetriesFlag.Name),
-		EncoderG1Path:             ctx.String(flags.EncoderG1PathFlag.Name),
-		EncoderG2Path:             ctx.String(flags.EncoderG2PathFlag.Name),
-		EncoderCacheDir:           ctx.String(flags.EncoderCacheDirFlag.Name),
-		EncoderSRSOrder:           ctx.Uint64(flags.EncoderSRSOrderFlag.Name),
-		EncoderSRSNumberToLoad:    ctx.Uint64(flags.EncoderSRSNumberToLoadFlag.Name),
-		EncoderNumWorkers:         ctx.Uint64(flags.EncoderNumWorkersFlag.Name),
-		RetrieverNumConnections:   ctx.Uint(flags.RetrieverNumConnectionsFlag.Name),
-		NodeClientTimeout:         ctx.Duration(flags.NodeClientTimeoutFlag.Name),
+		LoggingConfig:              *loggerConfig,
+		DisperserHostname:          ctx.GlobalString(flags.HostnameFlag.Name),
+		DisperserPort:              ctx.GlobalString(flags.GrpcPortFlag.Name),
+		DisperserTimeout:           ctx.Duration(flags.TimeoutFlag.Name),
+		DisperserUseSecureGrpcFlag: ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
+		SignerPrivateKey:           ctx.String(flags.SignerPrivateKeyFlag.Name),
+		CustomQuorums:              customQuorumsUint8,
+		DisableTlS:                 ctx.GlobalBool(flags.DisableTLSFlag.Name),
+		MetricsHTTPPort:            ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
+		EthClientHostname:          ctx.GlobalString(flags.EthClientHostnameFlag.Name),
+		EthClientPort:              ctx.GlobalString(flags.EthClientPortFlag.Name),
+		BlsOperatorStateRetriever:  ctx.String(flags.BLSOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManager:      ctx.String(flags.EigenDAServiceManagerFlag.Name),
+		EthClientRetries:           ctx.Uint(flags.EthClientRetriesFlag.Name),
+		TheGraphUrl:                ctx.String(flags.TheGraphUrlFlag.Name),
+		TheGraphPullInterval:       ctx.Duration(flags.TheGraphPullIntervalFlag.Name),
+		TheGraphRetries:            ctx.Uint(flags.TheGraphRetriesFlag.Name),
+		EncoderG1Path:              ctx.String(flags.EncoderG1PathFlag.Name),
+		EncoderG2Path:              ctx.String(flags.EncoderG2PathFlag.Name),
+		EncoderCacheDir:            ctx.String(flags.EncoderCacheDirFlag.Name),
+		EncoderSRSOrder:            ctx.Uint64(flags.EncoderSRSOrderFlag.Name),
+		EncoderSRSNumberToLoad:     ctx.Uint64(flags.EncoderSRSNumberToLoadFlag.Name),
+		EncoderNumWorkers:          ctx.Uint64(flags.EncoderNumWorkersFlag.Name),
+		RetrieverNumConnections:    ctx.Uint(flags.RetrieverNumConnectionsFlag.Name),
+		NodeClientTimeout:          ctx.Duration(flags.NodeClientTimeoutFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 

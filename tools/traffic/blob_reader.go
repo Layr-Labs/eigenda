@@ -23,7 +23,7 @@ type BlobReader struct {
 	ctx *context.Context
 
 	// Tracks the number of active goroutines within the generator.
-	waitGroup *sync.WaitGroup // TODO other things should use this too
+	waitGroup *sync.WaitGroup
 
 	// All logs should be written using this logger.
 	logger logging.Logger
@@ -31,7 +31,6 @@ type BlobReader struct {
 	// config contains the configuration for the generator.
 	config *Config
 
-	// TODO use code from this class
 	retriever   clients.RetrievalClient
 	chainClient eth.ChainClient
 
