@@ -32,7 +32,7 @@ import (
 
 const systemAccountKey = "system"
 
-const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
+const maxBlobSize = 8 * 1024 * 1024 // 8 MiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
@@ -276,6 +276,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			return nil, err
 		}
 	}
+
+	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blob Size", blobSize)
 
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
@@ -727,6 +729,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 
 	// Check throughout rate limit
 	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
+
+	s.logger.Debug("received a new blob retrieval request", "origin", origin, "blob Size", blobSize)
 
 	if s.ratelimiter != nil {
 		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
