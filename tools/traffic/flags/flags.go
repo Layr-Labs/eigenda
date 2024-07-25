@@ -238,7 +238,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "read-request-interval"),
 		Usage:    "Time between read requests.",
 		Required: false,
-		Value:    time.Second / 3,
+		Value:    time.Second / 5,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "READ_REQUEST_INTERVAL"),
 	}
 	RequiredDownloadsFlag = cli.Float64Flag{
@@ -248,6 +248,13 @@ var (
 		Required: false,
 		Value:    3.0,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "REQUIRED_DOWNLOADS"),
+	}
+	ReadOverflowTableSizeFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "read-overflow-table-size"),
+		Usage:    "Size of the overflow table for read requests.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "READ_OVERFLOW_TABLE_SIZE"),
 	}
 	FetchBatchHeaderTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "fetch-batch-header-timeout"),
@@ -305,6 +312,7 @@ var optionalFlags = []cli.Flag{
 	FetchBatchHeaderTimeoutFlag,
 	RetrieveBlobChunksTimeoutFlag,
 	GetBlobStatusTimeoutFlag,
+	ReadOverflowTableSizeFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

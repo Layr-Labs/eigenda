@@ -17,7 +17,7 @@ type unconfirmedKey struct {
 }
 
 // BlobVerifier periodically polls the disperser service to verify the status of blobs that were recently written.
-// When blobs become confirmed, the status verifier updates the blob table accordingly.
+// When blobs become confirmed, the status verifier updates the blob requiredReads accordingly.
 // This is a thread safe data structure.
 type BlobVerifier struct {
 

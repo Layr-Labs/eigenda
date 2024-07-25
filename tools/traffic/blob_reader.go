@@ -32,8 +32,11 @@ type BlobReader struct {
 	retriever   clients.RetrievalClient
 	chainClient eth.ChainClient
 
-	// table of blobs to read from.
-	table *BlobTable
+	// requiredReads blobs we are required to read a certain number of times.
+	requiredReads *BlobTable
+
+	// optionalReads blobs we are not required to read, but can choose to read if we want.
+	optionalReads *BlobTable
 
 	metrics                 *Metrics
 	fetchBatchHeaderMetric  LatencyMetric
@@ -46,7 +49,8 @@ type BlobReader struct {
 	recombinationFailure    CountMetric
 	operatorSuccessMetrics  map[core.OperatorID]CountMetric
 	operatorFailureMetrics  map[core.OperatorID]CountMetric
-	candidatePoolSize       GaugeMetric
+	requiredReadPoolSize    GaugeMetric
+	optionalReadPoolSize    GaugeMetric
 }
 
 // NewBlobReader creates a new BlobReader instance.
@@ -60,6 +64,8 @@ func NewBlobReader(
 	table *BlobTable,
 	metrics *Metrics) BlobReader {
 
+	optionalReads := NewBlobTable()
+
 	return BlobReader{
 		ctx:                     ctx,
 		waitGroup:               waitGroup,
@@ -67,7 +73,8 @@ func NewBlobReader(
 		config:                  config,
 		retriever:               retriever,
 		chainClient:             chainClient,
-		table:                   table,
+		requiredReads:           table,
+		optionalReads:           &optionalReads,
 		metrics:                 metrics,
 		fetchBatchHeaderMetric:  metrics.NewLatencyMetric("fetch_batch_header"),
 		fetchBatchHeaderSuccess: metrics.NewCountMetric("fetch_batch_header_success"),
@@ -79,7 +86,8 @@ func NewBlobReader(
 		readFailureMetric:       metrics.NewCountMetric("read_failure"),
 		operatorSuccessMetrics:  make(map[core.OperatorID]CountMetric),
 		operatorFailureMetrics:  make(map[core.OperatorID]CountMetric),
-		candidatePoolSize:       metrics.NewGaugeMetric("candidate_pool_size"),
+		requiredReadPoolSize:    metrics.NewGaugeMetric("required_read_pool_size"),
+		optionalReadPoolSize:    metrics.NewGaugeMetric("optional_read_pool_size"),
 	}
 }
 
@@ -108,12 +116,20 @@ func (reader *BlobReader) run() {
 // randomRead reads a random blob.
 func (reader *BlobReader) randomRead() {
 
-	reader.candidatePoolSize.Set(float64(reader.table.Size()))
+	reader.requiredReadPoolSize.Set(float64(reader.requiredReads.Size()))
 
-	metadata := reader.table.GetRandom(true)
+	metadata, removed := reader.requiredReads.GetRandom(true)
 	if metadata == nil {
-		// There are no blobs to read, do nothing.
-		return
+		// There are no blobs that we are required to read. Get a random blob from the optionalReads.
+		metadata, _ = reader.optionalReads.GetRandom(false)
+		if metadata == nil {
+			// No blobs to read.
+			return
+		}
+	} else if removed {
+		// We have removed a blob from the requiredReads. Add it to the optionalReads.
+		reader.optionalReads.addOrReplace(metadata, reader.config.ReadOverflowTableSize)
+		reader.optionalReadPoolSize.Set(float64(reader.optionalReads.Size()))
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
