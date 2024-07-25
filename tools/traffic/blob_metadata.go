@@ -5,6 +5,9 @@ type BlobMetadata struct {
 	// key of the blob, set when the blob is initially uploaded.
 	key *[]byte
 
+	// checksum of the blob.
+	checksum *[16]byte
+
 	// batchHeaderHash of the blob.
 	batchHeaderHash *[]byte
 
@@ -23,12 +26,14 @@ type BlobMetadata struct {
 // remaining reads permitted against this blob. If -1 then an unlimited number of reads are permitted.
 func NewBlobMetadata(
 	key *[]byte,
+	checksum *[16]byte,
 	batchHeaderHash *[]byte,
 	blobIndex uint32,
 	readPermits int32) *BlobMetadata {
 
 	return &BlobMetadata{
 		key:                  key,
+		checksum:             checksum,
 		batchHeaderHash:      batchHeaderHash,
 		blobIndex:            blobIndex,
 		remainingReadPermits: readPermits,
@@ -50,5 +55,3 @@ func (blob *BlobMetadata) BatchHeaderHash() *[]byte {
 func (blob *BlobMetadata) BlobIndex() uint32 {
 	return blob.blobIndex
 }
-
-// TODO method for decrementing read permits

@@ -2,11 +2,13 @@ package traffic
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	contractEigenDAServiceManager "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -38,19 +40,21 @@ type BlobReader struct {
 	// optionalReads blobs we are not required to read, but can choose to read if we want.
 	optionalReads *BlobTable
 
-	metrics                 *Metrics
-	fetchBatchHeaderMetric  LatencyMetric
-	fetchBatchHeaderSuccess CountMetric
-	fetchBatchHeaderFailure CountMetric
-	readLatencyMetric       LatencyMetric
-	readSuccessMetric       CountMetric
-	readFailureMetric       CountMetric
-	recombinationSuccess    CountMetric
-	recombinationFailure    CountMetric
-	operatorSuccessMetrics  map[core.OperatorID]CountMetric
-	operatorFailureMetrics  map[core.OperatorID]CountMetric
-	requiredReadPoolSize    GaugeMetric
-	optionalReadPoolSize    GaugeMetric
+	metrics                    *Metrics
+	fetchBatchHeaderMetric     LatencyMetric
+	fetchBatchHeaderSuccess    CountMetric
+	fetchBatchHeaderFailure    CountMetric
+	readLatencyMetric          LatencyMetric
+	readSuccessMetric          CountMetric
+	readFailureMetric          CountMetric
+	recombinationSuccessMetric CountMetric
+	recombinationFailureMetric CountMetric
+	validBlobMetric            CountMetric
+	invalidBlobMetric          CountMetric
+	operatorSuccessMetrics     map[core.OperatorID]CountMetric
+	operatorFailureMetrics     map[core.OperatorID]CountMetric
+	requiredReadPoolSizeMetric GaugeMetric
+	optionalReadPoolSizeMetric GaugeMetric
 }
 
 // NewBlobReader creates a new BlobReader instance.
@@ -67,27 +71,29 @@ func NewBlobReader(
 	optionalReads := NewBlobTable()
 
 	return BlobReader{
-		ctx:                     ctx,
-		waitGroup:               waitGroup,
-		logger:                  logger,
-		config:                  config,
-		retriever:               retriever,
-		chainClient:             chainClient,
-		requiredReads:           table,
-		optionalReads:           &optionalReads,
-		metrics:                 metrics,
-		fetchBatchHeaderMetric:  metrics.NewLatencyMetric("fetch_batch_header"),
-		fetchBatchHeaderSuccess: metrics.NewCountMetric("fetch_batch_header_success"),
-		fetchBatchHeaderFailure: metrics.NewCountMetric("fetch_batch_header_failure"),
-		recombinationSuccess:    metrics.NewCountMetric("recombination_success"),
-		recombinationFailure:    metrics.NewCountMetric("recombination_failure"),
-		readLatencyMetric:       metrics.NewLatencyMetric("read"),
-		readSuccessMetric:       metrics.NewCountMetric("read_success"),
-		readFailureMetric:       metrics.NewCountMetric("read_failure"),
-		operatorSuccessMetrics:  make(map[core.OperatorID]CountMetric),
-		operatorFailureMetrics:  make(map[core.OperatorID]CountMetric),
-		requiredReadPoolSize:    metrics.NewGaugeMetric("required_read_pool_size"),
-		optionalReadPoolSize:    metrics.NewGaugeMetric("optional_read_pool_size"),
+		ctx:                        ctx,
+		waitGroup:                  waitGroup,
+		logger:                     logger,
+		config:                     config,
+		retriever:                  retriever,
+		chainClient:                chainClient,
+		requiredReads:              table,
+		optionalReads:              &optionalReads,
+		metrics:                    metrics,
+		fetchBatchHeaderMetric:     metrics.NewLatencyMetric("fetch_batch_header"),
+		fetchBatchHeaderSuccess:    metrics.NewCountMetric("fetch_batch_header_success"),
+		fetchBatchHeaderFailure:    metrics.NewCountMetric("fetch_batch_header_failure"),
+		recombinationSuccessMetric: metrics.NewCountMetric("recombination_success"),
+		recombinationFailureMetric: metrics.NewCountMetric("recombination_failure"),
+		readLatencyMetric:          metrics.NewLatencyMetric("read"),
+		validBlobMetric:            metrics.NewCountMetric("valid_blob"),
+		invalidBlobMetric:          metrics.NewCountMetric("invalid_blob"),
+		readSuccessMetric:          metrics.NewCountMetric("read_success"),
+		readFailureMetric:          metrics.NewCountMetric("read_failure"),
+		operatorSuccessMetrics:     make(map[core.OperatorID]CountMetric),
+		operatorFailureMetrics:     make(map[core.OperatorID]CountMetric),
+		requiredReadPoolSizeMetric: metrics.NewGaugeMetric("required_read_pool_size"),
+		optionalReadPoolSizeMetric: metrics.NewGaugeMetric("optional_read_pool_size"),
 	}
 }
 
@@ -116,7 +122,7 @@ func (reader *BlobReader) run() {
 // randomRead reads a random blob.
 func (reader *BlobReader) randomRead() {
 
-	reader.requiredReadPoolSize.Set(float64(reader.requiredReads.Size()))
+	reader.requiredReadPoolSizeMetric.Set(float64(reader.requiredReads.Size()))
 
 	metadata, removed := reader.requiredReads.GetRandom(true)
 	if metadata == nil {
@@ -128,8 +134,8 @@ func (reader *BlobReader) randomRead() {
 		}
 	} else if removed {
 		// We have removed a blob from the requiredReads. Add it to the optionalReads.
-		reader.optionalReads.addOrReplace(metadata, reader.config.ReadOverflowTableSize)
-		reader.optionalReadPoolSize.Set(float64(reader.optionalReads.Size()))
+		reader.optionalReads.AddOrReplace(metadata, reader.config.ReadOverflowTableSize)
+		reader.optionalReadPoolSizeMetric.Set(float64(reader.optionalReads.Size()))
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
@@ -177,12 +183,12 @@ func (reader *BlobReader) randomRead() {
 	data, err := reader.retriever.CombineChunks(chunks)
 	if err != nil {
 		reader.logger.Error("failed to combine chunks", "err:", err)
-		reader.recombinationFailure.Increment()
+		reader.recombinationFailureMetric.Increment()
 		return
 	}
-	reader.recombinationSuccess.Increment()
+	reader.recombinationSuccessMetric.Increment()
 
-	reader.verifyBlob(data)
+	reader.verifyBlob(metadata, data)
 
 	indexSet := make(map[encoding.ChunkNumber]bool)
 	for index := range chunks.Indices {
@@ -223,6 +229,14 @@ func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
 }
 
 // verifyBlob performs sanity checks on the blob.
-func (reader *BlobReader) verifyBlob(blob []byte) {
-	// TODO: do sanity checks on the data returned
+func (reader *BlobReader) verifyBlob(metadata *BlobMetadata, blob []byte) {
+	recomputedChecksum := md5.Sum(codec.RemoveEmptyByteFromPaddedBytes(blob))
+
+	fmt.Printf("metadata.checksum: %x, recomputed checksum: %x\n", *metadata.checksum, recomputedChecksum)
+
+	if *metadata.checksum == recomputedChecksum {
+		reader.validBlobMetric.Increment()
+	} else {
+		reader.invalidBlobMetric.Increment()
+	}
 }

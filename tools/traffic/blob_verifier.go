@@ -12,7 +12,11 @@ import (
 
 // unconfirmedKey is a key that has not yet been confirmed by the disperser service.
 type unconfirmedKey struct {
-	key            *[]byte
+	// The key of the blob.
+	key *[]byte
+	// The checksum of the blob.
+	checksum *[16]byte
+	// The time the blob was submitted to the disperser service.
 	submissionTime time.Time
 }
 
@@ -92,9 +96,10 @@ func NewStatusVerifier(
 }
 
 // AddUnconfirmedKey adds a key to the list of unconfirmed keys.
-func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte) {
+func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte, checksum *[16]byte) {
 	verifier.keyChannel <- &unconfirmedKey{
 		key:            key,
+		checksum:       checksum,
 		submissionTime: time.Now(),
 	}
 }
@@ -221,6 +226,6 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 		downloadCount = int32(requiredDownloads)
 	}
 
-	blobMetadata := NewBlobMetadata(key.key, &batchHeaderHash, blobIndex, downloadCount)
+	blobMetadata := NewBlobMetadata(key.key, key.checksum, &batchHeaderHash, blobIndex, downloadCount)
 	verifier.table.Add(blobMetadata)
 }

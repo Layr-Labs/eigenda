@@ -51,9 +51,9 @@ func (table *BlobTable) Add(blob *BlobMetadata) {
 	table.size++
 }
 
-// addOrReplace adds a blob to the requiredReads if there is capacity or replaces an existing blob at random
+// AddOrReplace adds a blob to the requiredReads if there is capacity or replaces an existing blob at random
 // if the requiredReads is full. This method is a no-op if maximumCapacity is 0.
-func (table *BlobTable) addOrReplace(blob *BlobMetadata, maximumCapacity uint32) {
+func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint32) {
 	if maximumCapacity == 0 {
 		return
 	}

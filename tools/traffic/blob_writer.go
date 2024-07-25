@@ -2,6 +2,7 @@ package traffic
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -111,7 +112,9 @@ func (writer *BlobWriter) run() {
 			}
 
 			writer.writeSuccessMetric.Increment()
-			writer.verifier.AddUnconfirmedKey(&key)
+
+			checksum := md5.Sum(*data)
+			writer.verifier.AddUnconfirmedKey(&key, &checksum)
 		}
 	}
 }
