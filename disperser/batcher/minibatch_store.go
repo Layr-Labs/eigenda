@@ -32,7 +32,7 @@ type BatchRecord struct {
 	ID                   uuid.UUID `dynamodbav:"-"`
 	CreatedAt            time.Time
 	ReferenceBlockNumber uint
-	Status               BatchStatus `dynamodbav:"-"`
+	Status               BatchStatus `dynamodbav:"BatchStatus"`
 	HeaderHash           [32]byte
 	AggregatePubKey      *core.G2Point
 	AggregateSignature   *core.Signature

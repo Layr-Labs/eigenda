@@ -110,7 +110,6 @@ func MarshalBatchRecord(batch *batcher.BatchRecord) (map[string]types.AttributeV
 		return nil, err
 	}
 	fields["BatchID"] = &types.AttributeValueMemberS{Value: batch.ID.String()}
-	fields["BatchStatus"] = &types.AttributeValueMemberN{Value: strconv.Itoa(int(batch.Status))}
 	fields["SK"] = &types.AttributeValueMemberS{Value: batchSKPrefix + batch.ID.String()}
 	fields["CreatedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", batch.CreatedAt.UTC().Unix())}
 	return fields, nil
@@ -170,22 +169,6 @@ func UnmarshalBatchID(item commondynamodb.Item) (*uuid.UUID, error) {
 	return &batchID, nil
 }
 
-func UnmarshalBatchStatus(item commondynamodb.Item) (*batcher.BatchStatus, error) {
-	type BatchStatus struct {
-		BatchStatus uint
-	}
-
-	batch := BatchStatus{}
-	err := attributevalue.UnmarshalMap(item, &batch)
-	if err != nil {
-		return nil, err
-	}
-
-	status := batcher.BatchStatus(batch.BatchStatus)
-
-	return &status, nil
-}
-
 func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
 	type OperatorID struct {
 		OperatorID string
@@ -217,12 +200,6 @@ func UnmarshalBatchRecord(item commondynamodb.Item) (*batcher.BatchRecord, error
 		return nil, err
 	}
 	batch.ID = *batchID
-
-	batchStatus, err := UnmarshalBatchStatus(item)
-	if err != nil {
-		return nil, err
-	}
-	batch.Status = *batchStatus
 
 	batch.CreatedAt = batch.CreatedAt.UTC()
 	return &batch, nil
