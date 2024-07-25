@@ -155,6 +155,44 @@ var (
 		Value:    5,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_RETRIES"),
 	}
+	EncoderG1PathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-g1-path"),
+		Usage:    "Path to the encoder G1 binary.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_G1_PATH"),
+	}
+	EncoderG2PathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-g2-path"),
+		Usage:    "Path to the encoder G2 binary.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_G2_PATH"),
+	}
+	EncoderCacheDirFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-cache-dir"),
+		Usage:    "Path to the encoder cache directory.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_CACHE_DIR"),
+	}
+	EncoderSRSOrderFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-srs-order"),
+		Usage:    "The SRS order to use for the encoder.",
+		Required: false,
+		Value:    3000,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_SRS_ORDER"),
+	}
+	EncoderSRSNumberToLoadFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-srs-number-to-load"),
+		Usage:    "The SRS number to load for the encoder.",
+		Required: false,
+		Value:    3000,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_SRS_NUMBER_TO_LOAD"),
+	}
+	EncoderNumWorkersFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-num-workers"),
+		Usage:    "The number of worker threads to use for the encoder.",
+		Required: false,
+		Value:    4,
+	}
 
 	/* Configuration for the blob validator. */
 
@@ -192,6 +230,9 @@ var requiredFlags = []cli.Flag{
 	BLSOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	TheGraphUrlFlag,
+	EncoderG1PathFlag,
+	EncoderG2PathFlag,
+	EncoderCacheDirFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -212,6 +253,9 @@ var optionalFlags = []cli.Flag{
 	EthClientRetriesFlag,
 	TheGraphPullIntervalFlag,
 	TheGraphRetriesFlag,
+	EncoderSRSOrderFlag,
+	EncoderSRSNumberToLoadFlag,
+	EncoderNumWorkersFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

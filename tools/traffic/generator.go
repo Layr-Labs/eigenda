@@ -177,12 +177,12 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 	nodeClient := clients.NewNodeClient(10 * time.Second)
 
 	encoderConfig := kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
-		CacheDir:        "../../inabox/resources/kzg/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
-		NumWorker:       12,
+		G1Path:          config.EncoderG1Path,
+		G2Path:          config.EncoderG2Path,
+		CacheDir:        config.EncoderCacheDir,
+		SRSOrder:        config.EncoderSRSOrder,
+		SRSNumberToLoad: config.EncoderSRSNumberToLoad,
+		NumWorker:       config.EncoderNumWorkers,
 	}
 	v, err := verifier.NewVerifier(&encoderConfig, true)
 	if err != nil {
@@ -190,7 +190,6 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 	}
 
 	numConnections := 20
-
 	retriever, err := clients.NewRetrievalClient(
 		logger,
 		chainState,

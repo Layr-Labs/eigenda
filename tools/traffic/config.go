@@ -40,6 +40,18 @@ type Config struct {
 	TheGraphPullInterval time.Duration
 	// The number of times to retry a subgraph request.
 	TheGraphRetries uint
+	// The path to the encoder G1 binary.
+	EncoderG1Path string
+	// The path to the encoder G2 binary.
+	EncoderG2Path string
+	// The path to the encoder cache directory.
+	EncoderCacheDir string
+	// The SRS order to use for the encoder.
+	EncoderSRSOrder uint64
+	// The SRS number to load for the encoder.
+	EncoderSRSNumberToLoad uint64
+	// The number of worker threads to use for the encoder.
+	EncoderNumWorkers uint64
 
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
@@ -100,6 +112,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		TheGraphUrl:               ctx.String(flags.TheGraphUrlFlag.Name),
 		TheGraphPullInterval:      ctx.Duration(flags.TheGraphPullIntervalFlag.Name),
 		TheGraphRetries:           ctx.Uint(flags.TheGraphRetriesFlag.Name),
+		EncoderG1Path:             ctx.String(flags.EncoderG1PathFlag.Name),
+		EncoderG2Path:             ctx.String(flags.EncoderG2PathFlag.Name),
+		EncoderCacheDir:           ctx.String(flags.EncoderCacheDirFlag.Name),
+		EncoderSRSOrder:           ctx.Uint64(flags.EncoderSRSOrderFlag.Name),
+		EncoderSRSNumberToLoad:    ctx.Uint64(flags.EncoderSRSNumberToLoadFlag.Name),
+		EncoderNumWorkers:         ctx.Uint64(flags.EncoderNumWorkersFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 

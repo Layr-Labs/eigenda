@@ -21,6 +21,9 @@ run: build
 	TRAFFIC_GENERATOR_BLS_OPERATOR_STATE_RETRIEVER=0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154 \
 	TRAFFIC_GENERATOR_EIGENDA_SERVICE_MANAGER=0x851356ae760d987E095750cCeb3bC6014560891C \
 	TRAFFIC_GENERATOR_THE_GRAPH_URL=http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state \
+	TRAFFIC_GENERATOR_ENCODER_G1_PATH=../../inabox/resources/kzg/g1.point \
+	TRAFFIC_GENERATOR_ENCODER_G2_PATH=../../inabox/resources/kzg/g2.point \
+	TRAFFIC_GENERATOR_ENCODER_CACHE_DIR=../../inabox/resources/kzg/SRSTables \
 	./bin/server
 
 # TODO do not merge change TRAFFIC_GENERATOR_GRPC_PORT=32003
