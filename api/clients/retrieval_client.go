@@ -107,12 +107,10 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	batchRoot [32]byte,
 	quorumID core.QuorumID) (*BlobChunks, error) {
 
-	fmt.Printf("                                getting indexed operator state, referenceBlockNumber: %d, quorumId: %d\n", referenceBlockNumber, quorumID) // TODO
 	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, referenceBlockNumber, []core.QuorumID{quorumID})
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("getting operators") // TODO
 	operators, ok := indexedOperatorState.Operators[quorumID]
 	if !ok {
 		return nil, fmt.Errorf("                                no quorum with ID: %d", quorumID)

@@ -12,19 +12,15 @@ import (
 
 // Config configures a traffic generator.
 type Config struct {
+	// Configures logging for the traffic generator.
+	LoggingConfig common.LoggerConfig
+	// Configures the DA clients.
 	clients.Config
+	SignerPrivateKey string
+	CustomQuorums    []uint8
 
-	// TODO add to flags.go
-	// The number of worker threads that generate read traffic.
-	NumReadInstances uint
-	// The period of the submission rate of read requests for each read worker thread.
-	ReadRequestInterval time.Duration
-	// For each blob, how many times should it be downloaded? If between 0.0 and 1.0, blob will be downloaded
-	// 0 or 1 times with the specified probability (e.g. 0.2 means each blob has a 20% chance of being downloaded).
-	// If greater than 1.0, then each blob will be downloaded the specified number of times.
-	DownloadRate float64
-	// The minimum amount of time that must pass after a blob is written prior to the first read attempt being made.
-	ReadDelay time.Duration
+	// The amount of time to sleep after launching each worker thread.
+	InstanceLaunchInterval time.Duration
 
 	// The number of worker threads that generate write traffic.
 	NumWriteInstances uint
@@ -36,13 +32,17 @@ type Config struct {
 	// will be dispersed for each blob by a particular worker thread.
 	RandomizeBlobs bool
 
-	// Configures logging for the traffic generator.
-	LoggingConfig common.LoggerConfig
-	// The amount of time to sleep after launching each worker thread.
-	InstanceLaunchInterval time.Duration
-
-	SignerPrivateKey string
-	CustomQuorums    []uint8
+	// TODO add to flags.go
+	// The number of worker threads that generate read traffic.
+	NumReadInstances uint
+	// The period of the submission rate of read requests for each read worker thread.
+	ReadRequestInterval time.Duration
+	// For each blob, how many times should it be downloaded? If between 0.0 and 1.0, blob will be downloaded
+	// 0 or 1 times with the specified probability (e.g. 0.2 means each blob has a 20% chance of being downloaded).
+	// If greater than 1.0, then each blob will be downloaded the specified number of times.
+	RequiredDownloads float64
+	// The minimum amount of time that must pass after a blob is written prior to the first read attempt being made.
+	ReadDelay time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -59,19 +59,25 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		customQuorumsUint8[i] = uint8(q)
 	}
 	return &Config{
+		LoggingConfig: *loggerConfig,
 		Config: *clients.NewConfig(
 			ctx.GlobalString(flags.HostnameFlag.Name),
 			ctx.GlobalString(flags.GrpcPortFlag.Name),
 			ctx.Duration(flags.TimeoutFlag.Name),
 			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
 		),
-		NumWriteInstances:      ctx.GlobalUint(flags.NumWriteInstancesFlag.Name),
-		WriteRequestInterval:   ctx.Duration(flags.WriteRequestIntervalFlag.Name),
-		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),
-		LoggingConfig:          *loggerConfig,
-		RandomizeBlobs:         ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
+		SignerPrivateKey: ctx.String(flags.SignerPrivateKeyFlag.Name),
+		CustomQuorums:    customQuorumsUint8,
+
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
-		SignerPrivateKey:       ctx.String(flags.SignerPrivateKeyFlag.Name),
-		CustomQuorums:          customQuorumsUint8,
+
+		NumWriteInstances:    ctx.GlobalUint(flags.NumWriteInstancesFlag.Name),
+		WriteRequestInterval: ctx.Duration(flags.WriteRequestIntervalFlag.Name),
+		DataSize:             ctx.GlobalUint64(flags.DataSizeFlag.Name),
+		RandomizeBlobs:       ctx.GlobalBool(flags.RandomizeBlobsFlag.Name),
+
+		NumReadInstances:    ctx.GlobalUint(flags.NumReadInstancesFlag.Name),
+		ReadRequestInterval: ctx.Duration(flags.ReadRequestIntervalFlag.Name),
+		RequiredDownloads:   ctx.Float64(flags.RequiredDownloadsFlag.Name),
 	}, nil
 }

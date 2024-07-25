@@ -28,6 +28,9 @@ type BlobReader struct {
 	// All logs should be written using this logger.
 	logger logging.Logger
 
+	// config contains the configuration for the generator.
+	config *Config
+
 	// TODO use code from this class
 	retriever   clients.RetrievalClient
 	chainClient eth.ChainClient
@@ -54,6 +57,7 @@ func NewBlobReader(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
+	config *Config,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
 	table *BlobTable,
@@ -63,6 +67,7 @@ func NewBlobReader(
 		ctx:                     ctx,
 		waitGroup:               waitGroup,
 		logger:                  logger,
+		config:                  config,
 		retriever:               retriever,
 		chainClient:             chainClient,
 		table:                   table,
@@ -92,7 +97,7 @@ func (reader *BlobReader) Start() {
 
 // run periodically performs reads on blobs.
 func (reader *BlobReader) run() {
-	ticker := time.NewTicker(time.Second) // TODO setting
+	ticker := time.NewTicker(reader.config.ReadRequestInterval)
 	for {
 		select {
 		case <-(*reader.ctx).Done():

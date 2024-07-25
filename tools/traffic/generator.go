@@ -94,9 +94,9 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		&ctx,
 		&waitGroup,
 		logger,
+		config,
 		&table,
 		&disperserClient,
-		-1,
 		metrics)
 
 	writers := make([]*BlobWriter, 0)
@@ -115,12 +115,12 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	retriever, chainClient := buildRetriever()
 
 	readers := make([]*BlobReader, 0)
-	//int(config.NumReadInstances) // TODO
-	for i := 0; i < 1; i++ {
+	for i := 0; i < int(config.NumReadInstances); i++ {
 		reader := NewBlobReader(
 			&ctx,
 			&waitGroup,
 			logger,
+			config,
 			retriever,
 			chainClient,
 			&table,

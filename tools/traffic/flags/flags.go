@@ -13,7 +13,7 @@ const (
 )
 
 var (
-	/* Required Flags */
+	/* Configuration for DA clients. */
 
 	HostnameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-hostname"),
@@ -31,40 +31,8 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
 		Usage:    "Amount of time to wait for GPRC",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 		Value:    10 * time.Second,
-	}
-	NumWriteInstancesFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "num-write-instances"),
-		Usage:    "Number of generator instances producing write traffic to run in parallel",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_WRITE_INSTANCES"),
-	}
-	WriteRequestIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "write-request-interval"),
-		Usage:    "Duration between write requests",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "WRITE_REQUEST_INTERVAL"),
-		Value:    30 * time.Second,
-	}
-	DataSizeFlag = cli.Uint64Flag{
-		Name:     common.PrefixFlag(FlagPrefix, "data-size"),
-		Usage:    "Size of the data blob",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "DATA_SIZE"),
-	}
-	RandomizeBlobsFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "randomize-blobs"),
-		Usage:    "Whether to randomzie blob data",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "RANDOMIZE_BLOBS"),
-	}
-	InstanceLaunchIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "instance-launch-interva"),
-		Usage:    "Duration between generator instance launches",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "INSTANCE_LAUNCH_INTERVAL"),
-		Value:    1 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 	}
 	UseSecureGrpcFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-secure-grpc"),
@@ -84,14 +52,78 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "CUSTOM_QUORUM_NUMBERS"),
 	}
+
+	/* Common Configuration. */
+
+	InstanceLaunchIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "instance-launch-interva"),
+		Usage:    "Duration between generator instance launches",
+		Required: false,
+		Value:    1 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "INSTANCE_LAUNCH_INTERVAL"),
+	}
+
+	/* Configuration for the blob writer. */
+
+	NumWriteInstancesFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "num-write-instances"),
+		Usage:    "Number of writer instances producing traffic to run in parallel",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_WRITE_INSTANCES"),
+	}
+	WriteRequestIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "write-request-interval"),
+		Usage:    "Time between write requests",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "WRITE_REQUEST_INTERVAL"),
+	}
+	DataSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "data-size"),
+		Usage:    "Size of the data blob",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DATA_SIZE"),
+	}
+	RandomizeBlobsFlag = cli.BoolFlag{ // TODO invert flag
+		Name:     common.PrefixFlag(FlagPrefix, "randomize-blobs"),
+		Usage:    "Whether to randomize each blob data",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "RANDOMIZE_BLOBS"),
+	}
+
+	/* Configuration for the blob validator. */
+
+	/* Configuration for the blob reader. */
+
+	NumReadInstancesFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "num-read-instances"),
+		Usage:    "Number of reader instances producing traffic to run in parallel",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_READ_INSTANCES"),
+	}
+	ReadRequestIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "read-request-interval"),
+		Usage:    "Time between read requests",
+		Required: false,
+		Value:    time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "READ_REQUEST_INTERVAL"),
+	}
+	RequiredDownloadsFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "required-downloads"),
+		Usage: "Number of required downloads. Numbers between 0.0 and 1.0 are treated as probabilities, " +
+			"numbers greater than 1.0 are treated as the number of downloads. -1 allows unlimited downloads.",
+		Required: false,
+		Value:    3.0,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "REQUIRED_DOWNLOADS"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
-	NumWriteInstancesFlag,
-	WriteRequestIntervalFlag,
-	DataSizeFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -101,6 +133,12 @@ var optionalFlags = []cli.Flag{
 	UseSecureGrpcFlag,
 	SignerPrivateKeyFlag,
 	CustomQuorumNumbersFlag,
+	NumWriteInstancesFlag,
+	WriteRequestIntervalFlag,
+	DataSizeFlag,
+	NumReadInstancesFlag,
+	ReadRequestIntervalFlag,
+	RequiredDownloadsFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

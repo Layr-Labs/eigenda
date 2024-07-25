@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -29,11 +30,11 @@ type BlobVerifier struct {
 	// All logs should be written using this logger.
 	logger logging.Logger
 
+	// config contains the configuration for the generator.
+	config *Config
+
 	// A table of confirmed blobs. Blobs are added here when they are confirmed by the disperser service.
 	table *BlobTable
-
-	// The maximum number of reads permitted against an individual blob, or -1 if unlimited.
-	blobReadLimit int32
 
 	// The disperser client used to monitor the disperser service.
 	dispenser *clients.DisperserClient
@@ -62,17 +63,17 @@ func NewStatusVerifier(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
+	config *Config,
 	table *BlobTable,
 	disperser *clients.DisperserClient,
-	blobReadLimit int32,
 	metrics *Metrics) BlobVerifier {
 
 	return BlobVerifier{
 		ctx:                               ctx,
 		waitGroup:                         waitGroup,
 		logger:                            logger,
+		config:                            config,
 		table:                             table,
-		blobReadLimit:                     blobReadLimit,
 		dispenser:                         disperser,
 		unconfirmedKeys:                   make([]*unconfirmedKey, 0),
 		keyChannel:                        make(chan *unconfirmedKey),
@@ -199,6 +200,28 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 	confirmationLatency := confirmationTime.Sub(key.submissionTime)
 	verifier.confirmationLatencyMetric.ReportLatency(confirmationLatency)
 
-	blobMetadata := NewBlobMetadata(key.key, &batchHeaderHash, blobIndex, -1) // TODO permits
+	requiredDownloads := verifier.config.RequiredDownloads
+	var downloadCount int32
+	if requiredDownloads <= 0 {
+		// Allow unlimited downloads.
+		downloadCount = -1
+	} else if requiredDownloads == 0 {
+		// Do not download blob.
+		return
+	} else if requiredDownloads < 1 {
+		// Download blob with probability equal to requiredDownloads.
+		if rand.Float64() < requiredDownloads {
+			// Download the blob once.
+			downloadCount = 1
+		} else {
+			// Do not download blob.
+			return
+		}
+	} else {
+		// Download blob requiredDownloads times.
+		downloadCount = int32(requiredDownloads)
+	}
+
+	blobMetadata := NewBlobMetadata(key.key, &batchHeaderHash, blobIndex, downloadCount)
 	verifier.table.Add(blobMetadata)
 }
