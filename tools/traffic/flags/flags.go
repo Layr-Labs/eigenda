@@ -64,6 +64,30 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
+	EthClientHostnameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eth-client-hostname"),
+		Usage:    "Hostname at which the Ethereum client is available.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_CLIENT_HOSTNAME"),
+	}
+	EthClientPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eth-client-port"),
+		Usage:    "Port at which the Ethereum client is available.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_CLIENT_PORT"),
+	}
+	BLSOperatorStateRetrieverFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage:    "Hex address of the BLS operator state retriever contract.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER"),
+	}
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Hex address of the EigenDA service manager contract.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
 
 	/* Common Configuration. */
 
@@ -120,7 +144,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "read-request-interval"),
 		Usage:    "Time between read requests.",
 		Required: false,
-		Value:    time.Second,
+		Value:    time.Second / 3,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "READ_REQUEST_INTERVAL"),
 	}
 	RequiredDownloadsFlag = cli.Float64Flag{
@@ -136,6 +160,10 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
+	EthClientHostnameFlag,
+	EthClientPortFlag,
+	BLSOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 var optionalFlags = []cli.Flag{

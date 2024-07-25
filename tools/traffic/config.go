@@ -14,10 +14,14 @@ import (
 type Config struct {
 	LoggingConfig common.LoggerConfig
 	clients.Config
-	SignerPrivateKey string
-	CustomQuorums    []uint8
-	DisableTlS       bool
-	MetricsHTTPPort  string
+	SignerPrivateKey          string
+	CustomQuorums             []uint8
+	DisableTlS                bool
+	MetricsHTTPPort           string
+	EthClientHostname         string
+	EthClientPort             string
+	BlsOperatorStateRetriever string
+	EigenDAServiceManager     string
 
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
@@ -66,10 +70,14 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			ctx.Duration(flags.TimeoutFlag.Name),
 			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
 		),
-		SignerPrivateKey: ctx.String(flags.SignerPrivateKeyFlag.Name),
-		CustomQuorums:    customQuorumsUint8,
-		DisableTlS:       ctx.GlobalBool(flags.DisableTLSFlag.Name),
-		MetricsHTTPPort:  ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
+		SignerPrivateKey:          ctx.String(flags.SignerPrivateKeyFlag.Name),
+		CustomQuorums:             customQuorumsUint8,
+		DisableTlS:                ctx.GlobalBool(flags.DisableTLSFlag.Name),
+		MetricsHTTPPort:           ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
+		EthClientHostname:         ctx.GlobalString(flags.EthClientHostnameFlag.Name),
+		EthClientPort:             ctx.GlobalString(flags.EthClientPortFlag.Name),
+		BlsOperatorStateRetriever: ctx.String(flags.BLSOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManager:     ctx.String(flags.EigenDAServiceManagerFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 

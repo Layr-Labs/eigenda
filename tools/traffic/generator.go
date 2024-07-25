@@ -110,7 +110,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		writers = append(writers, &writer)
 	}
 
-	retriever, chainClient := buildRetriever()
+	retriever, chainClient := buildRetriever(config)
 
 	readers := make([]*BlobReader, 0)
 	for i := 0; i < int(config.NumReadInstances); i++ {
@@ -142,7 +142,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 }
 
 // buildRetriever creates a retriever client for the traffic generator.
-func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
+func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainClient) {
 	loggerConfig := common.DefaultLoggerConfig()
 
 	logger, err := common.NewLogger(loggerConfig)
@@ -151,7 +151,7 @@ func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 	}
 
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:    []string{"http://localhost:8545"},
+		RPCURLs:    []string{config.EthClientHostname + ":" + config.EthClientPort},
 		NumRetries: 2,
 	}
 	gethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
@@ -159,8 +159,8 @@ func buildRetriever() (clients.RetrievalClient, retrivereth.ChainClient) {
 	tx, err := eth.NewTransactor(
 		logger,
 		gethClient,
-		"0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154",
-		"0x851356ae760d987E095750cCeb3bC6014560891C")
+		config.BlsOperatorStateRetriever,
+		config.EigenDAServiceManager)
 
 	cs := eth.NewChainState(tx, gethClient)
 
