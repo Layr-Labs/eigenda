@@ -110,7 +110,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	}
 	operators, ok := indexedOperatorState.Operators[quorumID]
 	if !ok {
-		return nil, fmt.Errorf("                                no quorum with ID: %d", quorumID)
+		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
 
 	// Get blob header from any operator
