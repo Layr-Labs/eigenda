@@ -105,6 +105,18 @@ func (c *Client) PutItem(ctx context.Context, tableName string, item Item) (err 
 	return nil
 }
 
+func (c *Client) PutItemWithCondition(ctx context.Context, tableName string, item Item, condition string) (err error) {
+	_, err = c.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(tableName), Item: item,
+		ConditionExpression: aws.String(condition),
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // PutItems puts items in batches of 25 items (which is a limit DynamoDB imposes)
 // It returns the items that failed to be put.
 func (c *Client) PutItems(ctx context.Context, tableName string, items []Item) ([]Item, error) {

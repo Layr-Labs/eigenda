@@ -38,6 +38,12 @@ var (
 )
 
 func setup(m *testing.M) {
+	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	fmt.Printf("deployLocalStack: %v\n", deployLocalStack)
+	if !deployLocalStack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+
 	if deployLocalStack {
 		var err error
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
@@ -99,17 +105,28 @@ func TestPutBatch(t *testing.T) {
 	}
 	err = minibatchStore.PutBatch(ctx, batch)
 	assert.NoError(t, err)
+	err = minibatchStore.PutBatch(ctx, batch)
+	assert.Error(t, err)
 	b, err := minibatchStore.GetBatch(ctx, batch.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, batch, b)
 	err = minibatchStore.UpdateBatchStatus(ctx, batch.ID, batcher.BatchStatusFormed)
 	assert.NoError(t, err)
-	err = minibatchStore.UpdateBatchStatus(ctx, batch.ID, 4)
-	assert.Error(t, err)
 	u, err := minibatchStore.GetBatch(ctx, batch.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, u.Status, batcher.BatchStatusFormed)
-	assert.Equal(t, batch, b)
+	assert.Equal(t, batcher.BatchStatusFormed, u.Status)
+	err = minibatchStore.UpdateBatchStatus(ctx, batch.ID, batcher.BatchStatusAttested)
+	assert.NoError(t, err)
+	u, err = minibatchStore.GetBatch(ctx, batch.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, batcher.BatchStatusAttested, u.Status)
+	err = minibatchStore.UpdateBatchStatus(ctx, batch.ID, batcher.BatchStatusFailed)
+	assert.NoError(t, err)
+	u, err = minibatchStore.GetBatch(ctx, batch.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, batcher.BatchStatusFailed, u.Status)
+	err = minibatchStore.UpdateBatchStatus(ctx, batch.ID, 4)
+	assert.Error(t, err)
 }
 
 func TestGetBatchesByStatus(t *testing.T) {
@@ -122,7 +139,7 @@ func TestGetBatchesByStatus(t *testing.T) {
 		ID:                   id1,
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
-		Status:               batcher.BatchStatusAttested,
+		Status:               batcher.BatchStatusFormed,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
@@ -132,7 +149,7 @@ func TestGetBatchesByStatus(t *testing.T) {
 		ID:                   id2,
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
-		Status:               batcher.BatchStatusAttested,
+		Status:               batcher.BatchStatusFormed,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
@@ -143,7 +160,7 @@ func TestGetBatchesByStatus(t *testing.T) {
 		ID:                   id3,
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
-		Status:               batcher.BatchStatusAttested,
+		Status:               batcher.BatchStatusFormed,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
@@ -151,24 +168,20 @@ func TestGetBatchesByStatus(t *testing.T) {
 	err = minibatchStore.PutBatch(ctx, batch3)
 	assert.NoError(t, err)
 
-	pending, err := minibatchStore.GetBatchesByStatus(ctx, batcher.BatchStatusAttested)
+	attested, err := minibatchStore.GetBatchesByStatus(ctx, batcher.BatchStatusAttested)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(pending))
-
-	err = minibatchStore.UpdateBatchStatus(ctx, id1, batcher.BatchStatusFormed)
-	assert.NoError(t, err)
+	assert.Equal(t, 0, len(attested))
 
 	formed, err := minibatchStore.GetBatchesByStatus(ctx, batcher.BatchStatusFormed)
 	assert.NoError(t, err)
+	assert.Equal(t, 3, len(formed))
+
+	err = minibatchStore.UpdateBatchStatus(ctx, id1, batcher.BatchStatusAttested)
+	assert.NoError(t, err)
+
+	formed, err = minibatchStore.GetBatchesByStatus(ctx, batcher.BatchStatusFormed)
+	assert.NoError(t, err)
 	assert.Equal(t, 2, len(formed))
-
-	pending, err = minibatchStore.GetBatchesByStatus(ctx, batcher.BatchStatusAttested)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(pending))
-
-	failed, err := minibatchStore.GetBatchesByStatus(ctx, batcher.BatchStatusFailed)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(failed))
 }
 
 func TestPutMinibatch(t *testing.T) {
