@@ -60,9 +60,6 @@ type retrievalClient struct {
 	numConnections        int
 }
 
-// TODO can this line be deleted?
-var _ RetrievalClient = (*retrievalClient)(nil)
-
 // NewRetrievalClient creates a new retrieval client.
 func NewRetrievalClient(
 	logger logging.Logger,

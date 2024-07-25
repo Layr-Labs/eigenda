@@ -300,7 +300,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
 	}
 
-	// Invoke num batches received and its size in bytes
+	// Measure num batches received and its size in bytes
 	batchSize := uint64(0)
 	for _, blob := range blobs {
 		for quorumID, bundle := range blob.Bundles {
@@ -314,7 +314,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHashHex, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
 
 	// Store the batch.
-	// Start this in a goroutine so we can parallelize the batch storing and batch
+	// Run this in a goroutine so we can parallelize the batch storing and batch
 	// verifaction work.
 	// This should be able to improve latency without needing more CPUs, because batch
 	// storing is an IO operation.
@@ -326,7 +326,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// Defined only if the batch not already exists and gets stored to database successfully.
 		keys *[][]byte
 
-		// latency to store the batch.
+		// Latency to store the batch.
 		// Defined only if the batch not already exists and gets stored to database successfully.
 		latency time.Duration
 	}

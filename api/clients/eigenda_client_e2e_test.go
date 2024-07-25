@@ -15,7 +15,7 @@ import (
 var runTestnetIntegrationTests bool
 
 func init() {
-	flag.BoolVar(&runTestnetIntegrationTests, "testnet-integration", false, "Start testnet-based integration tests")
+	flag.BoolVar(&runTestnetIntegrationTests, "testnet-integration", false, "Run testnet-based integration tests")
 }
 
 func TestClientUsingTestnet(t *testing.T) {
