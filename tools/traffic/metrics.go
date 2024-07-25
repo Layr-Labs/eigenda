@@ -40,9 +40,6 @@ type GaugeMetric struct {
 	description string
 }
 
-// TODO don't start metrics if httpPort is empty
-// TODO use consistent snake case on metrics
-
 // NewMetrics creates a new Metrics instance.
 func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_generator"
