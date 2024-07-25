@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -71,4 +72,20 @@ func (d *Dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.Blob
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*core.Signature), args.Error(1)
+}
+
+func (d *Dispatcher) AttestBatch(ctx context.Context, state *core.IndexedOperatorState, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader) (chan core.SigningMessage, error) {
+	args := d.Called(ctx, state, blobHeaderHashes, batchHeader)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(chan core.SigningMessage), args.Error(1)
+}
+
+func (d *Dispatcher) SendAttestBatchRequest(ctx context.Context, nodeDispersalClient node.DispersalClient, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+	args := d.Called(ctx, nodeDispersalClient, blobHeaderHashes, batchHeader, op)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*core.Signature), args.Error(1)
 }
