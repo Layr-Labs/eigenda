@@ -113,8 +113,10 @@ func (writer *BlobWriter) run() {
 
 			writer.writeSuccessMetric.Increment()
 
+			fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Data size = %d\n", len(*data))
+
 			checksum := md5.Sum(*data)
-			writer.verifier.AddUnconfirmedKey(&key, &checksum)
+			writer.verifier.AddUnconfirmedKey(&key, &checksum, uint(len(*data)))
 		}
 	}
 }

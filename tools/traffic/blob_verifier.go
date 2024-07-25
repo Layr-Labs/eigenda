@@ -14,6 +14,8 @@ import (
 type unconfirmedKey struct {
 	// The key of the blob.
 	key *[]byte
+	// The size of the blob in bytes.
+	size uint
 	// The checksum of the blob.
 	checksum *[16]byte
 	// The time the blob was submitted to the disperser service.
@@ -96,10 +98,11 @@ func NewStatusVerifier(
 }
 
 // AddUnconfirmedKey adds a key to the list of unconfirmed keys.
-func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte, checksum *[16]byte) {
+func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint) {
 	verifier.keyChannel <- &unconfirmedKey{
 		key:            key,
 		checksum:       checksum,
+		size:           size,
 		submissionTime: time.Now(),
 	}
 }
@@ -131,7 +134,8 @@ func (verifier *BlobVerifier) monitor(period time.Duration) {
 // If a key is confirmed, it is added to the blob table and removed from the list of unconfirmed keys.
 func (verifier *BlobVerifier) poll() {
 
-	// TODO If the number of unconfirmed blobs is high and the time to confirm his high, this is not efficient.
+	// FUTURE WORK If the number of unconfirmed blobs is high and the time to confirm is high, this is not efficient.
+	// Revisit this method if there are performance problems.
 
 	unconfirmedKeys := make([]*unconfirmedKey, 0)
 	for _, key := range verifier.unconfirmedKeys {
@@ -226,6 +230,6 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 		downloadCount = int32(requiredDownloads)
 	}
 
-	blobMetadata := NewBlobMetadata(key.key, key.checksum, &batchHeaderHash, blobIndex, downloadCount)
+	blobMetadata := NewBlobMetadata(key.key, key.checksum, key.size, &batchHeaderHash, blobIndex, downloadCount)
 	verifier.table.Add(blobMetadata)
 }

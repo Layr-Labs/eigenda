@@ -8,6 +8,9 @@ type BlobMetadata struct {
 	// checksum of the blob.
 	checksum *[16]byte
 
+	// batchHeaderHash of the blob in bytes.
+	size uint
+
 	// batchHeaderHash of the blob.
 	batchHeaderHash *[]byte
 
@@ -27,6 +30,7 @@ type BlobMetadata struct {
 func NewBlobMetadata(
 	key *[]byte,
 	checksum *[16]byte,
+	size uint,
 	batchHeaderHash *[]byte,
 	blobIndex uint32,
 	readPermits int32) *BlobMetadata {
@@ -34,6 +38,7 @@ func NewBlobMetadata(
 	return &BlobMetadata{
 		key:                  key,
 		checksum:             checksum,
+		size:                 size,
 		batchHeaderHash:      batchHeaderHash,
 		blobIndex:            blobIndex,
 		remainingReadPermits: readPermits,

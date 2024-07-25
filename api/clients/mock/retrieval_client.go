@@ -44,7 +44,7 @@ func (c *MockRetrievalClient) RetrieveBlobChunks(
 	batchRoot [32]byte,
 	quorumID core.QuorumID) (*clients.BlobChunks, error) {
 
-	return nil, nil // TODO
+	return nil, nil
 }
 
 func (c *MockRetrievalClient) CombineChunks(chunks *clients.BlobChunks) ([]byte, error) {

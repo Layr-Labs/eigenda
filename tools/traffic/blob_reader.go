@@ -8,7 +8,6 @@ import (
 	contractEigenDAServiceManager "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -188,7 +187,7 @@ func (reader *BlobReader) randomRead() {
 	}
 	reader.recombinationSuccessMetric.Increment()
 
-	reader.verifyBlob(metadata, data)
+	reader.verifyBlob(metadata, &data)
 
 	indexSet := make(map[encoding.ChunkNumber]bool)
 	for index := range chunks.Indices {
@@ -229,10 +228,10 @@ func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
 }
 
 // verifyBlob performs sanity checks on the blob.
-func (reader *BlobReader) verifyBlob(metadata *BlobMetadata, blob []byte) {
-	recomputedChecksum := md5.Sum(codec.RemoveEmptyByteFromPaddedBytes(blob))
-
-	fmt.Printf("metadata.checksum: %x, recomputed checksum: %x\n", *metadata.checksum, recomputedChecksum)
+func (reader *BlobReader) verifyBlob(metadata *BlobMetadata, blob *[]byte) {
+	// Trim off the padding.
+	truncatedBlob := (*blob)[:metadata.size]
+	recomputedChecksum := md5.Sum(truncatedBlob)
 
 	if *metadata.checksum == recomputedChecksum {
 		reader.validBlobMetric.Increment()
