@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-// TODO for all of these new types, decide if variables need to be pointers or not
-
 // BlobReader reads blobs from a disperser at a configured rate.
 type BlobReader struct {
 	// The context for the generator. All work should cease when this context is cancelled.
@@ -118,13 +116,12 @@ func (reader *BlobReader) randomRead() {
 		return
 	}
 
-	// TODO add timeout config
-	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, time.Second*5)
+	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
 	batchHeader, err := InvokeAndReportLatency(&reader.fetchBatchHeaderMetric,
 		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
 			return reader.chainClient.FetchBatchHeader(
 				ctxTimeout,
-				gcommon.HexToAddress("0x851356ae760d987E095750cCeb3bC6014560891C"),
+				gcommon.HexToAddress(reader.config.EigenDAServiceManager),
 				*metadata.batchHeaderHash,
 				big.NewInt(int64(0)),
 				nil)
@@ -140,8 +137,7 @@ func (reader *BlobReader) randomRead() {
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], *metadata.batchHeaderHash)
 
-	// TODO add timeout config
-	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, time.Second*5)
+	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, reader.config.RetrieveBlobChunksTimeout)
 	chunks, err := InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return reader.retriever.RetrieveBlobChunks(
 			ctxTimeout,
@@ -212,5 +208,5 @@ func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
 
 // verifyBlob performs sanity checks on the blob.
 func (reader *BlobReader) verifyBlob(blob []byte) {
-	// TODO
+	// TODO: do sanity checks on the data returned
 }

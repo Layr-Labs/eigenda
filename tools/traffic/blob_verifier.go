@@ -142,8 +142,7 @@ func (verifier *BlobVerifier) poll() {
 // checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
 func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 
-	// TODO add timeout config
-	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, time.Second*5)
+	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, verifier.config.GetBlobStatusTimeout)
 	defer cancel()
 
 	status, err := InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,

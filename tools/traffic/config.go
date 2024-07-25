@@ -77,6 +77,8 @@ type Config struct {
 
 	// The amount of time between attempts by the verifier to confirm the status of blobs.
 	VerifierInterval time.Duration
+	// The amount of time to wait for a blob status to be fetched.
+	GetBlobStatusTimeout time.Duration
 
 	// The number of worker threads that generate read traffic.
 	NumReadInstances uint
@@ -86,8 +88,10 @@ type Config struct {
 	// 0 or 1 times with the specified probability (e.g. 0.2 means each blob has a 20% chance of being downloaded).
 	// If greater than 1.0, then each blob will be downloaded the specified number of times.
 	RequiredDownloads float64
-	// The minimum amount of time that must pass after a blob is written prior to the first read attempt being made.
-	ReadDelay time.Duration
+	// The amount of time to wait for a batch header to be fetched.
+	FetchBatchHeaderTimeout time.Duration
+	// The amount of time to wait for a blob to be retrieved.
+	RetrieveBlobChunksTimeout time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -138,10 +142,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DataSize:             ctx.GlobalUint64(flags.DataSizeFlag.Name),
 		RandomizeBlobs:       !ctx.GlobalBool(flags.UniformBlobsFlag.Name),
 
-		VerifierInterval: ctx.Duration(flags.VerifierIntervalFlag.Name),
+		VerifierInterval:     ctx.Duration(flags.VerifierIntervalFlag.Name),
+		GetBlobStatusTimeout: ctx.Duration(flags.GetBlobStatusTimeoutFlag.Name),
 
-		NumReadInstances:    ctx.GlobalUint(flags.NumReadInstancesFlag.Name),
-		ReadRequestInterval: ctx.Duration(flags.ReadRequestIntervalFlag.Name),
-		RequiredDownloads:   ctx.Float64(flags.RequiredDownloadsFlag.Name),
+		NumReadInstances:          ctx.GlobalUint(flags.NumReadInstancesFlag.Name),
+		ReadRequestInterval:       ctx.Duration(flags.ReadRequestIntervalFlag.Name),
+		RequiredDownloads:         ctx.Float64(flags.RequiredDownloadsFlag.Name),
+		FetchBatchHeaderTimeout:   ctx.Duration(flags.FetchBatchHeaderTimeoutFlag.Name),
+		RetrieveBlobChunksTimeout: ctx.Duration(flags.RetrieveBlobChunksTimeoutFlag.Name),
 	}, nil
 }

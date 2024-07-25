@@ -135,7 +135,7 @@ func (writer *BlobWriter) getRandomData() *[]byte {
 // sendRequest sends a blob to a disperser.
 func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
 
-	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.DisperserTimeout) // TODO use different config
+	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.DisperserTimeout)
 	defer cancel()
 
 	var key []byte

@@ -59,8 +59,6 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		return nil, err
 	}
 
-	fmt.Printf("Signer private key: '%s', length: %d\n", config.SignerPrivateKey, len(config.SignerPrivateKey))
-
 	clientConfig := clients.EigenDAClientConfig{
 		RPC:                 config.DisperserHostname + ":" + config.DisperserPort,
 		DisableTLS:          config.DisableTlS,

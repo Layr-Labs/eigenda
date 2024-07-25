@@ -217,6 +217,13 @@ var (
 		Value:    time.Second,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "VERIFIER_INTERVAL"),
 	}
+	GetBlobStatusTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-blob-status-timeout"),
+		Usage:    "Amount of time to wait for a blob status to be fetched.",
+		Required: false,
+		Value:    5 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "GET_BLOB_STATUS_TIMEOUT"),
+	}
 
 	/* Configuration for the blob reader. */
 
@@ -241,6 +248,20 @@ var (
 		Required: false,
 		Value:    3.0,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "REQUIRED_DOWNLOADS"),
+	}
+	FetchBatchHeaderTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "fetch-batch-header-timeout"),
+		Usage:    "Amount of time to wait for a batch header to be fetched.",
+		Required: false,
+		Value:    5 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "FETCH_BATCH_HEADER_TIMEOUT"),
+	}
+	RetrieveBlobChunksTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "retrieve-blob-chunks-timeout"),
+		Usage:    "Amount of time to wait for a blob to be retrieved.",
+		Required: false,
+		Value:    5 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVE_BLOB_CHUNKS_TIMEOUT"),
 	}
 )
 
@@ -281,6 +302,9 @@ var optionalFlags = []cli.Flag{
 	RetrieverNumConnectionsFlag,
 	VerifierIntervalFlag,
 	NodeClientTimeoutFlag,
+	FetchBatchHeaderTimeoutFlag,
+	RetrieveBlobChunksTimeoutFlag,
+	GetBlobStatusTimeoutFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
