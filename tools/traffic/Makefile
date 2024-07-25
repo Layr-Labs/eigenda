@@ -26,4 +26,4 @@ run: build
 	TRAFFIC_GENERATOR_ENCODER_CACHE_DIR=../../inabox/resources/kzg/SRSTables \
 	./bin/server
 
-# TODO do not merge change TRAFFIC_GENERATOR_GRPC_PORT=32003
+# TODO figure out what the appropriate values are for this prior to merging. These are the values that worked for me locally.

@@ -17,7 +17,7 @@ import (
 func TestTrafficGenerator(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
 	logger := logging.NewNoopLogger()
-	trafficGenerator := &traffic.TrafficGenerator{
+	trafficGenerator := &traffic.Generator{
 		logger: logger,
 		config: &traffic.Config{
 			Config: clients.Config{
@@ -45,7 +45,7 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
 	logger := logging.NewNoopLogger()
 
-	trafficGenerator := &traffic.TrafficGenerator{
+	trafficGenerator := &traffic.Generator{
 		logger: logger,
 		config: &traffic.Config{
 			Config: clients.Config{

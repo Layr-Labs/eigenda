@@ -23,7 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// TrafficGenerator simulates read/write traffic to the DA service.
+// Generator simulates read/write traffic to the DA service.
 //
 //	┌------------┐                                       ┌------------┐
 //	|   writer   |-┐             ┌------------┐          |   reader   |-┐
@@ -38,7 +38,7 @@ import (
 // When a writer finishes writing a blob, it sends information about that blob to the verifier.
 // When the verifier observes that a blob has been confirmed, it sends information about the blob
 // to the readers. The readers only attempt to read blobs that have been confirmed by the verifier.
-type TrafficGenerator struct {
+type Generator struct {
 	ctx             *context.Context
 	cancel          *context.CancelFunc
 	waitGroup       *sync.WaitGroup
@@ -53,7 +53,7 @@ type TrafficGenerator struct {
 	readers  []*BlobReader
 }
 
-func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*TrafficGenerator, error) {
+func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Generator, error) {
 	logger, err := common.NewLogger(config.LoggingConfig)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		readers = append(readers, &reader)
 	}
 
-	return &TrafficGenerator{
+	return &Generator{
 		ctx:             &ctx,
 		cancel:          &cancel,
 		waitGroup:       &waitGroup,
@@ -208,7 +208,7 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 }
 
 // Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
-func (generator *TrafficGenerator) Start() error {
+func (generator *Generator) Start() error {
 
 	generator.metrics.Start()
 	generator.verifier.Start()

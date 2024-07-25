@@ -41,11 +41,6 @@ func (table *BlobTable) Add(blob *BlobMetadata) {
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
-	// TODO this calculation is probably a little wrong
-	if table.size == uint32(len(table.blobs)) {
-		panic(fmt.Sprintf("blob requiredReads is full, cannot add blob %x", blob.Key))
-	}
-
 	blob.index = table.size
 	table.blobs[table.size] = blob
 	table.size++
@@ -86,7 +81,7 @@ func (table *BlobTable) GetRandom(decrement bool) (*BlobMetadata, bool) {
 		return nil, false
 	}
 
-	blob := table.blobs[rand.Int31n(int32(table.size))] // TODO make sure we can get items if we overflow an int32
+	blob := table.blobs[rand.Int31n(int32(table.size))]
 
 	removed := false
 	if decrement && blob.remainingReadPermits != -1 {
