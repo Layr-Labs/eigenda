@@ -23,8 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// TODO use consistent snake case on metrics
-
 // TrafficGenerator simulates read/write traffic to the DA service.
 //
 //	┌------------┐                                       ┌------------┐
@@ -174,7 +172,7 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 
 	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 
-	nodeClient := clients.NewNodeClient(10 * time.Second)
+	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
 
 	encoderConfig := kzg.KzgConfig{
 		G1Path:          config.EncoderG1Path,
@@ -189,14 +187,13 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 		panic(fmt.Sprintf("Unable to build verifier: %s", err))
 	}
 
-	numConnections := 20
 	retriever, err := clients.NewRetrievalClient(
 		logger,
 		chainState,
 		assignmentCoordinator,
 		nodeClient,
 		v,
-		numConnections)
+		int(config.RetrieverNumConnections))
 
 	if err != nil {
 		panic(fmt.Sprintf("Unable to build retriever: %s", err))
@@ -210,10 +207,8 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 // Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
 func (generator *TrafficGenerator) Start() error {
 
-	// TODO add configuration
-
-	generator.metrics.Start(*generator.ctx) // TODO put context into metrics constructor
-	generator.verifier.Start(time.Second)
+	generator.metrics.Start()
+	generator.verifier.Start()
 
 	for _, writer := range generator.writers {
 		writer.Start()

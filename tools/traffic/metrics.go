@@ -1,7 +1,6 @@
 package traffic
 
 import (
-	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,6 +41,7 @@ type GaugeMetric struct {
 }
 
 // TODO don't start metrics if httpPort is empty
+// TODO use consistent snake case on metrics
 
 // NewMetrics creates a new Metrics instance.
 func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
@@ -79,7 +79,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 }
 
 // Start starts the metrics server.
-func (metrics *Metrics) Start(ctx context.Context) { // TODO context?
+func (metrics *Metrics) Start() {
 	metrics.logger.Info("Starting metrics server at ", "port", metrics.httpPort)
 	addr := fmt.Sprintf(":%s", metrics.httpPort)
 	go func() {

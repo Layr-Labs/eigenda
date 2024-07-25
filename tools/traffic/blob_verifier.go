@@ -101,9 +101,9 @@ func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte) {
 
 // Start begins the status goroutine, which periodically polls
 // the disperser service to verify the status of blobs.
-func (verifier *BlobVerifier) Start(period time.Duration) {
+func (verifier *BlobVerifier) Start() {
 	verifier.waitGroup.Add(1)
-	go verifier.monitor(period)
+	go verifier.monitor(verifier.config.VerifierInterval)
 }
 
 // monitor periodically polls the disperser service to verify the status of blobs.

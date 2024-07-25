@@ -52,6 +52,10 @@ type Config struct {
 	EncoderSRSNumberToLoad uint64
 	// The number of worker threads to use for the encoder.
 	EncoderNumWorkers uint64
+	// The number of connections to use for the retriever.
+	RetrieverNumConnections uint
+	// The timeout for the node client.
+	NodeClientTimeout time.Duration
 
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
@@ -66,7 +70,9 @@ type Config struct {
 	// will be dispersed for each blob by a particular worker thread.
 	RandomizeBlobs bool
 
-	// TODO add to flags.go
+	// The amount of time between attempts by the verifier to confirm the status of blobs.
+	VerifierInterval time.Duration
+
 	// The number of worker threads that generate read traffic.
 	NumReadInstances uint
 	// The period of the submission rate of read requests for each read worker thread.
@@ -118,6 +124,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EncoderSRSOrder:           ctx.Uint64(flags.EncoderSRSOrderFlag.Name),
 		EncoderSRSNumberToLoad:    ctx.Uint64(flags.EncoderSRSNumberToLoadFlag.Name),
 		EncoderNumWorkers:         ctx.Uint64(flags.EncoderNumWorkersFlag.Name),
+		RetrieverNumConnections:   ctx.Uint(flags.RetrieverNumConnectionsFlag.Name),
+		NodeClientTimeout:         ctx.Duration(flags.NodeClientTimeoutFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 
@@ -125,6 +133,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		WriteRequestInterval: ctx.Duration(flags.WriteRequestIntervalFlag.Name),
 		DataSize:             ctx.GlobalUint64(flags.DataSizeFlag.Name),
 		RandomizeBlobs:       !ctx.GlobalBool(flags.UniformBlobsFlag.Name),
+
+		VerifierInterval: ctx.Duration(flags.VerifierIntervalFlag.Name),
 
 		NumReadInstances:    ctx.GlobalUint(flags.NumReadInstancesFlag.Name),
 		ReadRequestInterval: ctx.Duration(flags.ReadRequestIntervalFlag.Name),

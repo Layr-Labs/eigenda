@@ -193,8 +193,30 @@ var (
 		Required: false,
 		Value:    4,
 	}
+	RetrieverNumConnectionsFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "retriever-num-connections"),
+		Usage:    "The number of connections to use for the retriever.",
+		Required: false,
+		Value:    20,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVER_NUM_CONNECTIONS"),
+	}
+	NodeClientTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "node-client-timeout"),
+		Usage:    "The timeout for the node client.",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "NODE_CLIENT_TIMEOUT"),
+	}
 
 	/* Configuration for the blob validator. */
+
+	VerifierIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "verifier-interval"),
+		Usage:    "Amount of time between verifier checks.",
+		Required: false,
+		Value:    time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "VERIFIER_INTERVAL"),
+	}
 
 	/* Configuration for the blob reader. */
 
@@ -256,6 +278,9 @@ var optionalFlags = []cli.Flag{
 	EncoderSRSOrderFlag,
 	EncoderSRSNumberToLoadFlag,
 	EncoderNumWorkersFlag,
+	RetrieverNumConnectionsFlag,
+	VerifierIntervalFlag,
+	NodeClientTimeoutFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
