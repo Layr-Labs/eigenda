@@ -100,14 +100,6 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeName: aws.String("CreatedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
-			{
-				AttributeName: aws.String("BlobHash"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
-			{
-				AttributeName: aws.String("MetadataHash"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -130,26 +122,6 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					},
 					{
 						AttributeName: aws.String("CreatedAt"),
-						KeyType:       types.KeyTypeRange,
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll,
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
-					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
-				},
-			},
-			{
-				IndexName: aws.String(blobMetadataIndexName),
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("BlobHash"),
-						KeyType:       types.KeyTypeHash,
-					},
-					{
-						AttributeName: aws.String("MetadataHash"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
@@ -495,7 +467,7 @@ func (m *MinibatchStore) GetLatestFormedBatch(ctx context.Context) (batch *batch
 	if len(formed) == 0 {
 		return nil, nil, nil
 	}
-	batch = formed[0]
+	batch = formed[len(formed)-1]
 	minibatches, err = m.GetMinibatches(ctx, batch.ID)
 	if err != nil {
 		return nil, nil, err
@@ -678,35 +650,6 @@ func (m *MinibatchStore) GetDispersalResponse(ctx context.Context, batchID uuid.
 		return nil, err
 	}
 	return response, nil
-}
-
-func (m *MinibatchStore) GetDispersalResponsesByBlobMetada(ctx context.Context, blobHash string, metadataHash string) ([]*batcher.DispersalResponse, error) {
-	items, err := m.dynamoDBClient.QueryIndex(ctx, m.tableName, blobMetadataIndexName, "BlobHash = :blobHash AND MetadataHash = :metadataHash", commondynamodb.ExpresseionValues{
-		":blobHash": &types.AttributeValueMemberS{
-			Value: blobHash,
-		},
-		":metadataHash": &types.AttributeValueMemberS{
-			Value: metadataHash,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(items) == 0 {
-		return nil, fmt.Errorf("no dispersal responses found for BlobHash %s MetadataHash %s", blobHash, metadataHash)
-	}
-
-	responses := make([]*batcher.DispersalResponse, len(items))
-	for i, item := range items {
-		responses[i], err = UnmarshalDispersalResponse(item)
-		if err != nil {
-			m.logger.Errorf("failed to unmarshal dispersal response at index %d: %v", i, err)
-			return nil, err
-		}
-	}
-
-	return responses, nil
 }
 
 func (m *MinibatchStore) GetDispersalResponses(ctx context.Context, batchID uuid.UUID) ([]*batcher.DispersalResponse, error) {

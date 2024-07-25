@@ -194,11 +194,12 @@ func TestGetLatestFormedBatch(t *testing.T) {
 	id1, _ := uuid.NewV7()
 	id2, _ := uuid.NewV7()
 	ts := time.Now().Truncate(time.Second).UTC()
+	ts2 := ts.Add(10 * time.Second)
 	batch1 := &batcher.BatchRecord{
 		ID:                   id1,
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
-		Status:               batcher.BatchStatusPending,
+		Status:               batcher.BatchStatusFormed,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
@@ -210,25 +211,25 @@ func TestGetLatestFormedBatch(t *testing.T) {
 		BatchSize:            1,
 		ReferenceBlockNumber: 1,
 	}
-	minibatch2 := &batcher.MinibatchRecord{
-		BatchID:              id1,
-		MinibatchIndex:       2,
-		BlobHeaderHashes:     [][32]byte{{1}},
-		BatchSize:            1,
-		ReferenceBlockNumber: 1,
-	}
 	batch2 := &batcher.BatchRecord{
 		ID:                   id2,
-		CreatedAt:            ts,
+		CreatedAt:            ts2,
 		ReferenceBlockNumber: 1,
-		Status:               batcher.BatchStatusPending,
+		Status:               batcher.BatchStatusFormed,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
 	}
-	minibatch3 := &batcher.MinibatchRecord{
+	minibatch2 := &batcher.MinibatchRecord{
 		BatchID:              id2,
 		MinibatchIndex:       1,
+		BlobHeaderHashes:     [][32]byte{{1}},
+		BatchSize:            1,
+		ReferenceBlockNumber: 1,
+	}
+	minibatch3 := &batcher.MinibatchRecord{
+		BatchID:              id2,
+		MinibatchIndex:       2,
 		BlobHeaderHashes:     [][32]byte{{1}},
 		BatchSize:            1,
 		ReferenceBlockNumber: 1,
@@ -237,25 +238,17 @@ func TestGetLatestFormedBatch(t *testing.T) {
 	assert.NoError(t, err)
 	err = minibatchStore.PutMinibatch(ctx, minibatch1)
 	assert.NoError(t, err)
-	err = minibatchStore.PutMinibatch(ctx, minibatch2)
-	assert.NoError(t, err)
 	err = minibatchStore.PutBatch(ctx, batch2)
+	assert.NoError(t, err)
+	err = minibatchStore.PutMinibatch(ctx, minibatch2)
 	assert.NoError(t, err)
 	err = minibatchStore.PutMinibatch(ctx, minibatch3)
 	assert.NoError(t, err)
 
 	batch, minibatches, err := minibatchStore.GetLatestFormedBatch(ctx)
 	assert.NoError(t, err)
-	//assert.Equal(t, (*batcher.BatchRecord)(nil), batch)
-	//assert.Equal(t, []*batcher.MinibatchRecord([]*batcher.MinibatchRecord(nil)), minibatches)
-
-	err = minibatchStore.UpdateBatchStatus(ctx, id1, batcher.BatchStatusFormed)
-	assert.NoError(t, err)
-
-	batch, minibatches, err = minibatchStore.GetLatestFormedBatch(ctx)
-	assert.NoError(t, err)
 	assert.Equal(t, 2, len(minibatches))
-	assert.Equal(t, batch.ID, batch1.ID)
+	assert.Equal(t, batch.ID, batch2.ID)
 }
 func TestPutDispersalRequest(t *testing.T) {
 	ctx := context.Background()
@@ -308,9 +301,6 @@ func TestPutDispersalResponse(t *testing.T) {
 	r, err := minibatchStore.GetDispersalResponse(ctx, response.BatchID, response.MinibatchIndex, opID)
 	assert.NoError(t, err)
 	assert.Equal(t, response, r)
-	rs, err := minibatchStore.GetDispersalResponsesByBlobMetada(ctx, blobHash, metadataHash)
-	assert.NoError(t, err)
-	assert.Equal(t, response, rs[0])
 }
 
 func TestDispersalStatus(t *testing.T) {
