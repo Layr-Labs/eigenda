@@ -12,16 +12,34 @@ import (
 
 // Config configures a traffic generator.
 type Config struct {
+	// Logging configuration.
 	LoggingConfig common.LoggerConfig
-	clients.Config
-	SignerPrivateKey          string
-	CustomQuorums             []uint8
-	DisableTlS                bool
-	MetricsHTTPPort           string
-	EthClientHostname         string
-	EthClientPort             string
+	// Configuration for DA clients.
+	clients.Config // TODO for uniformity, don't use this nested config type
+	// The private key to use for signing requests.
+	SignerPrivateKey string
+	// Custom quorum numbers to use for the traffic generator.
+	CustomQuorums []uint8
+	// Whether to disable TLS for an insecure connection.
+	DisableTlS bool
+	// The port at which the metrics server listens for HTTP requests.
+	MetricsHTTPPort string
+	// The hostname of the Ethereum client.
+	EthClientHostname string
+	// The port of the Ethereum client.
+	EthClientPort string
+	// The address of the BLS operator state retriever smart contract, in hex.
 	BlsOperatorStateRetriever string
-	EigenDAServiceManager     string
+	// The address of the EigenDA service manager smart contract, in hex.
+	EigenDAServiceManager string
+	// The number of times to retry an Ethereum client request.
+	EthClientRetries uint
+	// The URL of the subgraph instance.
+	TheGraphUrl string
+	// The interval at which to pull data from the subgraph.
+	TheGraphPullInterval time.Duration
+	// The number of times to retry a subgraph request.
+	TheGraphRetries uint
 
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
@@ -78,6 +96,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EthClientPort:             ctx.GlobalString(flags.EthClientPortFlag.Name),
 		BlsOperatorStateRetriever: ctx.String(flags.BLSOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManager:     ctx.String(flags.EigenDAServiceManagerFlag.Name),
+		EthClientRetries:          ctx.Uint(flags.EthClientRetriesFlag.Name),
+		TheGraphUrl:               ctx.String(flags.TheGraphUrlFlag.Name),
+		TheGraphPullInterval:      ctx.Duration(flags.TheGraphPullIntervalFlag.Name),
+		TheGraphRetries:           ctx.Uint(flags.TheGraphRetriesFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 

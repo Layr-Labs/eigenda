@@ -88,6 +88,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	EthClientRetriesFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eth-client-retries"),
+		Usage:    "Number of times to retry an Ethereum client request.",
+		Required: false,
+		Value:    2,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_CLIENT_RETRIES"),
+	}
 
 	/* Common Configuration. */
 
@@ -128,6 +135,26 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "UNIFORM_BLOBS"),
 	}
+	TheGraphUrlFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "the-graph-url"),
+		Usage:    "URL of the subgraph instance.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_URL"),
+	}
+	TheGraphPullIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "the-graph-pull-interval"),
+		Usage:    "Interval at which to pull data from the subgraph.",
+		Required: false,
+		Value:    100 * time.Millisecond,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_PULL_INTERVAL"),
+	}
+	TheGraphRetriesFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "the-graph-retries"),
+		Usage:    "Number of times to retry a subgraph request.",
+		Required: false,
+		Value:    5,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_RETRIES"),
+	}
 
 	/* Configuration for the blob validator. */
 
@@ -164,6 +191,7 @@ var requiredFlags = []cli.Flag{
 	EthClientPortFlag,
 	BLSOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	TheGraphUrlFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -181,6 +209,9 @@ var optionalFlags = []cli.Flag{
 	RequiredDownloadsFlag,
 	DisableTLSFlag,
 	MetricsHTTPPortFlag,
+	EthClientRetriesFlag,
+	TheGraphPullIntervalFlag,
+	TheGraphRetriesFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

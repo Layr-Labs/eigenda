@@ -152,7 +152,7 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:    []string{config.EthClientHostname + ":" + config.EthClientPort},
-		NumRetries: 2,
+		NumRetries: int(config.EthClientRetries),
 	}
 	gethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
 
@@ -166,9 +166,9 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 
 	// This is the indexer when config.UseGraph is true
 	chainStateConfig := thegraph.Config{
-		Endpoint:     "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state",
-		PullInterval: 100 * time.Millisecond,
-		MaxRetries:   5,
+		Endpoint:     config.TheGraphUrl,
+		PullInterval: config.TheGraphPullInterval,
+		MaxRetries:   int(config.TheGraphRetries),
 	}
 	chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
 
