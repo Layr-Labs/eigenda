@@ -105,6 +105,18 @@ func (c *Client) PutItem(ctx context.Context, tableName string, item Item) (err 
 	return nil
 }
 
+func (c *Client) PutItemWithCondition(ctx context.Context, tableName string, item Item, condition string) (err error) {
+	_, err = c.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(tableName), Item: item,
+		ConditionExpression: aws.String(condition),
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // PutItems puts items in batches of 25 items (which is a limit DynamoDB imposes)
 // It returns the items that failed to be put.
 func (c *Client) PutItems(ctx context.Context, tableName string, items []Item) ([]Item, error) {
@@ -156,6 +168,20 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(tableName),
 		IndexName:                 aws.String(indexName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeValues: expAttributeValues,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Items, nil
+}
+
+// Query returns all items in the primary index that match the given expression
+func (c *Client) Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpresseionValues) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
 		KeyConditionExpression:    aws.String(keyCondition),
 		ExpressionAttributeValues: expAttributeValues,
 	})

@@ -29,17 +29,17 @@ const (
 )
 
 type BatchRecord struct {
-	ID                   uuid.UUID
+	ID                   uuid.UUID `dynamodbav:"-"`
 	CreatedAt            time.Time
 	ReferenceBlockNumber uint
-	Status               BatchStatus
+	Status               BatchStatus `dynamodbav:"BatchStatus"`
 	HeaderHash           [32]byte
 	AggregatePubKey      *core.G2Point
 	AggregateSignature   *core.Signature
 }
 
 type MinibatchRecord struct {
-	BatchID              uuid.UUID
+	BatchID              uuid.UUID `dynamodbav:"-"`
 	MinibatchIndex       uint
 	BlobHeaderHashes     [][32]byte
 	BatchSize            uint64 // in bytes
@@ -47,13 +47,15 @@ type MinibatchRecord struct {
 }
 
 type DispersalRequest struct {
-	BatchID        uuid.UUID
-	MinibatchIndex uint
-	core.OperatorID
+	BatchID         uuid.UUID `dynamodbav:"-"`
+	MinibatchIndex  uint
+	core.OperatorID `dynamodbav:"-"`
 	OperatorAddress gcommon.Address
 	Socket          string
 	NumBlobs        uint
 	RequestedAt     time.Time
+	BlobHash        string
+	MetadataHash    string
 }
 
 type DispersalResponse struct {
