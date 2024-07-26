@@ -54,7 +54,7 @@ func NewBlobWriter(
 	config *Config,
 	disperser *clients.DisperserClient,
 	verifier *BlobVerifier,
-	metrics *metrics.Metrics) BlobWriter {
+	generatorMetrics metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
 	if config.RandomizeBlobs {
@@ -78,9 +78,9 @@ func NewBlobWriter(
 		disperser:          disperser,
 		verifier:           verifier,
 		fixedRandomData:    &fixedRandomData,
-		writeLatencyMetric: metrics.NewLatencyMetric("write"),
-		writeSuccessMetric: metrics.NewCountMetric("write_success"),
-		writeFailureMetric: metrics.NewCountMetric("write_failure"),
+		writeLatencyMetric: generatorMetrics.NewLatencyMetric("write"),
+		writeSuccessMetric: generatorMetrics.NewCountMetric("write_success"),
+		writeFailureMetric: generatorMetrics.NewCountMetric("write_failure"),
 	}
 }
 

@@ -153,6 +153,7 @@ func TestGetRandomWithRemoval(t *testing.T) {
 	assert.Equal(t, uint(0), table.Size())
 }
 
+// TestAddOrReplace tests adding blobs to a table with a maximum capacity. The table should replace blobs when full.
 func TestAddOrReplace(t *testing.T) {
 	initializeRandom()
 

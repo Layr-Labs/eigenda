@@ -74,7 +74,7 @@ func NewStatusVerifier(
 	config *Config,
 	table *table.BlobTable,
 	disperser *clients.DisperserClient,
-	metrics *metrics.Metrics) BlobVerifier {
+	generatorMetrics metrics.Metrics) BlobVerifier {
 
 	return BlobVerifier{
 		ctx:                               ctx,
@@ -85,17 +85,17 @@ func NewStatusVerifier(
 		dispenser:                         disperser,
 		unconfirmedKeys:                   make([]*unconfirmedKey, 0),
 		keyChannel:                        make(chan *unconfirmedKey),
-		blobsInFlightMetric:               metrics.NewGaugeMetric("blobs_in_flight"),
-		getStatusLatencyMetric:            metrics.NewLatencyMetric("get_status"),
-		confirmationLatencyMetric:         metrics.NewLatencyMetric("confirmation"),
-		getStatusErrorCountMetric:         metrics.NewCountMetric("get_status_ERROR"),
-		unknownCountMetric:                metrics.NewCountMetric("get_status_UNKNOWN"),
-		processingCountMetric:             metrics.NewCountMetric("get_status_PROCESSING"),
-		dispersingCountMetric:             metrics.NewCountMetric("get_status_DISPERSING"),
-		failedCountMetric:                 metrics.NewCountMetric("get_status_FAILED"),
-		insufficientSignaturesCountMetric: metrics.NewCountMetric("get_status_INSUFFICIENT_SIGNATURES"),
-		confirmedCountMetric:              metrics.NewCountMetric("get_status_CONFIRMED"),
-		finalizedCountMetric:              metrics.NewCountMetric("get_status_FINALIZED"),
+		blobsInFlightMetric:               generatorMetrics.NewGaugeMetric("blobs_in_flight"),
+		getStatusLatencyMetric:            generatorMetrics.NewLatencyMetric("get_status"),
+		confirmationLatencyMetric:         generatorMetrics.NewLatencyMetric("confirmation"),
+		getStatusErrorCountMetric:         generatorMetrics.NewCountMetric("get_status_ERROR"),
+		unknownCountMetric:                generatorMetrics.NewCountMetric("get_status_UNKNOWN"),
+		processingCountMetric:             generatorMetrics.NewCountMetric("get_status_PROCESSING"),
+		dispersingCountMetric:             generatorMetrics.NewCountMetric("get_status_DISPERSING"),
+		failedCountMetric:                 generatorMetrics.NewCountMetric("get_status_FAILED"),
+		insufficientSignaturesCountMetric: generatorMetrics.NewCountMetric("get_status_INSUFFICIENT_SIGNATURES"),
+		confirmedCountMetric:              generatorMetrics.NewCountMetric("get_status_CONFIRMED"),
+		finalizedCountMetric:              generatorMetrics.NewCountMetric("get_status_FINALIZED"),
 	}
 }
 

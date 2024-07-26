@@ -7,7 +7,7 @@ import (
 
 // GaugeMetric allows values to be reported.
 type GaugeMetric struct {
-	metrics     *Metrics
+	metrics     *metrics
 	description string
 }
 

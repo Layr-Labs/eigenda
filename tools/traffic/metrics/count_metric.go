@@ -7,7 +7,7 @@ import (
 
 // CountMetric tracks the count of a type of event.
 type CountMetric struct {
-	metrics     *Metrics
+	metrics     *metrics
 	description string
 }
 

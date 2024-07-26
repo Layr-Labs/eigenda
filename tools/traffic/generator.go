@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
-	metrics2 "github.com/Layr-Labs/eigenda/tools/traffic/metrics"
+	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -42,14 +42,14 @@ import (
 // When the verifier observes that a blob has been confirmed, it sends information about the blob
 // to the readers. The readers only attempt to read blobs that have been confirmed by the verifier.
 type Generator struct {
-	ctx             *context.Context
-	cancel          *context.CancelFunc
-	waitGroup       *sync.WaitGroup
-	metrics         *metrics2.Metrics
-	logger          *logging.Logger
-	disperserClient clients.DisperserClient
-	eigenDAClient   *clients.EigenDAClient
-	config          *Config
+	ctx              *context.Context
+	cancel           *context.CancelFunc
+	waitGroup        *sync.WaitGroup
+	generatorMetrics metrics.Metrics
+	logger           *logging.Logger
+	disperserClient  clients.DisperserClient
+	eigenDAClient    *clients.EigenDAClient
+	config           *Config
 
 	writers  []*workers.BlobWriter
 	verifier *workers.BlobVerifier
@@ -81,7 +81,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
 
-	metrics := metrics2.NewMetrics(config.MetricsHTTPPort, logger)
+	generatorMetrics := metrics.NewMetrics(config.MetricsHTTPPort, logger)
 
 	blobTable := table.NewBlobTable()
 
@@ -99,7 +99,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		&config.WorkerConfig,
 		&blobTable,
 		&disperserClient,
-		metrics)
+		generatorMetrics)
 
 	writers := make([]*workers.BlobWriter, 0)
 	for i := 0; i < int(config.WorkerConfig.NumWriteInstances); i++ {
@@ -110,7 +110,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 			&config.WorkerConfig,
 			&disperserClient,
 			&statusVerifier,
-			metrics)
+			generatorMetrics)
 		writers = append(writers, &writer)
 	}
 
@@ -126,22 +126,22 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 			retriever,
 			chainClient,
 			&blobTable,
-			metrics)
+			generatorMetrics)
 		readers = append(readers, &reader)
 	}
 
 	return &Generator{
-		ctx:             &ctx,
-		cancel:          &cancel,
-		waitGroup:       &waitGroup,
-		metrics:         metrics,
-		logger:          &logger,
-		disperserClient: clients.NewDisperserClient(&disperserConfig, signer),
-		eigenDAClient:   client,
-		config:          config,
-		writers:         writers,
-		verifier:        &statusVerifier,
-		readers:         readers,
+		ctx:              &ctx,
+		cancel:           &cancel,
+		waitGroup:        &waitGroup,
+		generatorMetrics: generatorMetrics,
+		logger:           &logger,
+		disperserClient:  clients.NewDisperserClient(&disperserConfig, signer),
+		eigenDAClient:    client,
+		config:           config,
+		writers:          writers,
+		verifier:         &statusVerifier,
+		readers:          readers,
 	}, nil
 }
 
@@ -219,7 +219,7 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 // Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
 func (generator *Generator) Start() error {
 
-	generator.metrics.Start()
+	generator.generatorMetrics.Start()
 	generator.verifier.Start()
 
 	for _, writer := range generator.writers {

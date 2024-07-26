@@ -8,7 +8,7 @@ import (
 
 // LatencyMetric tracks the latency of an operation.
 type LatencyMetric struct {
-	metrics     *Metrics
+	metrics     *metrics
 	description string
 }
 
