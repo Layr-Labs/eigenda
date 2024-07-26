@@ -193,6 +193,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZATION_BLOCK_DELAY"),
 		Value:    75,
 	}
+	EnableGnarkBundleEncodingFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-gnark-bundle-encoding"),
+		Usage:    "Enable Gnark bundle encoding for chunks",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
+	}
 	// EnableMinibatchFlag is a flag to enable minibatch processing
 	// Defaults to false
 	EnableMinibatchFlag = cli.BoolFlag{
@@ -201,11 +207,26 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_MINIBATCH"),
 	}
-	EnableGnarkBundleEncodingFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-gnark-bundle-encoding"),
-		Usage:    "Enable Gnark bundle encoding for chunks",
+	MinibatcherPullIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "minibatcher-pull-interval"),
+		Usage:    "Interval at which to pull from the queue and disperse a minibatch. Only used when minibatching is enabled. Defaults to 5s.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MINIBATCHER_PULL_INTERVAL"),
+		Value:    5 * time.Second,
+	}
+	MaxNodeConnectionsFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-node-connections"),
+		Usage:    "Maximum number of connections to the node. Only used when minibatching is enabled. Defaults to 1024.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NODE_CONNECTIONS"),
+	}
+	MaxNumRetriesPerDispersalFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-num-retries-per-dispersal"),
+		Usage:    "Maximum number of retries to disperse a minibatch. Only used when minibatching is enabled. Defaults to 3.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_RETRIES_PER_DISPERSAL"),
+		Value:    3,
 	}
 )
 
@@ -240,6 +261,9 @@ var optionalFlags = []cli.Flag{
 	MaxBlobsToFetchFromStoreFlag,
 	FinalizationBlockDelayFlag,
 	EnableMinibatchFlag,
+	MinibatcherPullIntervalFlag,
+	MaxNodeConnectionsFlag,
+	MaxNumRetriesPerDispersalFlag,
 	EnableGnarkBundleEncodingFlag,
 }
 

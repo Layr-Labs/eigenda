@@ -49,9 +49,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	config := Config{
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
-			GrpcPort:          ctx.GlobalString(flags.GrpcPortFlag.Name),
-			GrpcTimeout:       ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
-			EnableDualQuorums: ctx.GlobalBool(flags.EnableDualQuorums.Name),
+			GrpcPort:    ctx.GlobalString(flags.GrpcPortFlag.Name),
+			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),

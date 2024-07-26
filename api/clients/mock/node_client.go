@@ -6,7 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/mock"
-	"github.com/wealdtech/go-merkletree"
+	"github.com/wealdtech/go-merkletree/v2"
 )
 
 type MockNodeClient struct {
