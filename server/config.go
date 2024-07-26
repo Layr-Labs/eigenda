@@ -188,9 +188,9 @@ func (cfg *Config) Check() error {
 		return fmt.Errorf("eth confirmation depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
 	}
 
-	if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
-		return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
-	}
+	// if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
+	// 	return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
+	// }
 
 	if !cfg.MemstoreEnabled && cfg.ClientConfig.RPC == "" {
 		return fmt.Errorf("eigenda disperser rpc url is not set")
