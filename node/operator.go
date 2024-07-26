@@ -113,7 +113,7 @@ func UpdateOperatorSocket(ctx context.Context, transactor core.Transactor, socke
 // getQuorumIdsToRegister returns the quorum ids that the operator is not registered in.
 func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.Transactor) ([]core.QuorumID, error) {
 	if len(c.QuorumIDs) == 0 {
-		return nil, fmt.Errorf("an operator should be in at least one quorum to be useful")
+		return nil, errors.New("an operator should be in at least one quorum to be useful")
 	}
 
 	registeredQuorumIds, err := transactor.GetRegisteredQuorumIdsForOperator(ctx, c.OperatorId)

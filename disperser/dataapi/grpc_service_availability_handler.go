@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ type EigenDAServiceAvailabilityCheck struct {
 
 func (s *server) getServiceAvailability(ctx context.Context, services []string) ([]*ServiceAvailability, error) {
 	if services == nil {
-		return nil, fmt.Errorf("services cannot be nil")
+		return nil, errors.New("services cannot be nil")
 	}
 
 	availabilityStatuses := make([]*ServiceAvailability, len(services))
@@ -118,13 +119,13 @@ func (sac *EigenDAServiceAvailabilityCheck) CheckHealth(ctx context.Context, ser
 	case "disperser":
 
 		if sac.disperserConn == nil {
-			return nil, fmt.Errorf("disperser connection is nil")
+			return nil, errors.New("disperser connection is nil")
 		}
 		client = grpc_health_v1.NewHealthClient(sac.disperserConn)
 	case "churner":
 
 		if sac.churnerConn == nil {
-			return nil, fmt.Errorf("churner connection is nil")
+			return nil, errors.New("churner connection is nil")
 		}
 		client = grpc_health_v1.NewHealthClient(sac.churnerConn)
 	default:

@@ -1,6 +1,7 @@
 package verifier
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -172,7 +173,7 @@ func PairingCheck(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("PairingCheck pairing not ok. SRS is invalid")
+		return errors.New("PairingCheck pairing not ok. SRS is invalid")
 	}
 
 	return nil

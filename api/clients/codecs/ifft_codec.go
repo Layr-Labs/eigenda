@@ -1,6 +1,9 @@
 package codecs
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type IFFTCodec struct {
 	writeCodec BlobCodec
@@ -26,7 +29,7 @@ func (v IFFTCodec) EncodeBlob(data []byte) ([]byte, error) {
 
 func (v IFFTCodec) DecodeBlob(data []byte) ([]byte, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("blob has length 0, meaning it is malformed")
+		return nil, errors.New("blob has length 0, meaning it is malformed")
 	}
 	var err error
 	data, err = FFT(data)

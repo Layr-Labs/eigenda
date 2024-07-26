@@ -3,6 +3,7 @@ package codecs
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -36,7 +37,7 @@ func (v DefaultBlobCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 
 func (v DefaultBlobCodec) DecodeBlob(data []byte) ([]byte, error) {
 	if len(data) < 32 {
-		return nil, fmt.Errorf("blob does not contain 32 header bytes, meaning it is malformed")
+		return nil, errors.New("blob does not contain 32 header bytes, meaning it is malformed")
 	}
 
 	length := binary.BigEndian.Uint32(data[2:6])
@@ -52,7 +53,7 @@ func (v DefaultBlobCodec) DecodeBlob(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
 	}
 	if uint32(n) != length {
-		return nil, fmt.Errorf("data length does not match length prefix")
+		return nil, errors.New("data length does not match length prefix")
 	}
 
 	return rawData, nil

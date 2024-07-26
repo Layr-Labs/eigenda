@@ -910,10 +910,10 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	blobSize := len(data)
 	// The blob size in bytes must be in range [1, maxBlobSize].
 	if blobSize > maxBlobSize {
-		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
+		return nil, errors.New("blob size cannot exceed 2 MiB")
 	}
 	if blobSize == 0 {
-		return nil, fmt.Errorf("blob size must be greater than 0")
+		return nil, errors.New("blob size must be greater than 0")
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > 256 {
@@ -951,7 +951,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		}
 
 		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("custom_quorum_numbers must not contain duplicates")
+			return nil, errors.New("custom_quorum_numbers must not contain duplicates")
 		}
 		seenQuorums[quorumID] = struct{}{}
 
@@ -969,7 +969,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(seenQuorums) == 0 {
-		return nil, fmt.Errorf("the blob must be sent to at least one quorum")
+		return nil, errors.New("the blob must be sent to at least one quorum")
 	}
 
 	params := make([]*core.SecurityParam, len(seenQuorums))

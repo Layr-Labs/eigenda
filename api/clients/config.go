@@ -1,7 +1,7 @@
 package clients
 
 import (
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -53,10 +53,10 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 		c.ResponseTimeout = 30 * time.Second
 	}
 	if len(c.SignerPrivateKeyHex) != 64 {
-		return fmt.Errorf("EigenDAClientConfig.SignerPrivateKeyHex should be 64 hex characters long, should not have 0x prefix")
+		return errors.New("EigenDAClientConfig.SignerPrivateKeyHex should be 64 hex characters long, should not have 0x prefix")
 	}
 	if len(c.RPC) == 0 {
-		return fmt.Errorf("EigenDAClientConfig.RPC not set")
+		return errors.New("EigenDAClientConfig.RPC not set")
 	}
 	return nil
 }
