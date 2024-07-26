@@ -15,14 +15,14 @@ type BlobMetadata struct {
 	batchHeaderHash *[]byte
 
 	// blobIndex of the blob.
-	blobIndex uint32
+	blobIndex uint
 
 	// remainingReadPermits describes the maximum number of remaining reads permitted against this blob.
 	// If -1 then an unlimited number of reads are permitted.
-	remainingReadPermits int32
+	remainingReadPermits int
 
 	// index describes the position of this blob within the blobTable.
-	index uint32
+	index uint
 }
 
 // NewBlobMetadata creates a new BlobMetadata instance. The readPermits parameter describes the maximum number of
@@ -32,8 +32,8 @@ func NewBlobMetadata(
 	checksum *[16]byte,
 	size uint,
 	batchHeaderHash *[]byte,
-	blobIndex uint32,
-	readPermits int32) *BlobMetadata {
+	blobIndex uint,
+	readPermits int) *BlobMetadata {
 
 	return &BlobMetadata{
 		key:                  key,
@@ -67,6 +67,6 @@ func (blob *BlobMetadata) BatchHeaderHash() *[]byte {
 }
 
 // BlobIndex returns the blobIndex of the blob.
-func (blob *BlobMetadata) BlobIndex() uint32 {
+func (blob *BlobMetadata) BlobIndex() uint {
 	return blob.blobIndex
 }

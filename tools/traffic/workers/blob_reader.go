@@ -135,7 +135,7 @@ func (reader *BlobReader) randomRead() {
 		}
 	} else if removed {
 		// We have removed a blob from the requiredReads. Add it to the optionalReads.
-		reader.optionalReads.AddOrReplace(metadata, reader.config.ReadOverflowTableSize)
+		reader.optionalReads.AddOrReplace(metadata, uint(reader.config.ReadOverflowTableSize))
 		reader.optionalReadPoolSizeMetric.Set(float64(reader.optionalReads.Size()))
 	}
 
@@ -165,7 +165,7 @@ func (reader *BlobReader) randomRead() {
 		return reader.retriever.RetrieveBlobChunks(
 			ctxTimeout,
 			batchHeaderHash,
-			metadata.BlobIndex(),
+			uint32(metadata.BlobIndex()),
 			uint(batchHeader.ReferenceBlockNumber),
 			batchHeader.BlobHeadersRoot,
 			core.QuorumID(0))

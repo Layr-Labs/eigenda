@@ -232,6 +232,6 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 		downloadCount = int32(requiredDownloads)
 	}
 
-	blobMetadata := table.NewBlobMetadata(key.key, key.checksum, key.size, &batchHeaderHash, blobIndex, downloadCount)
+	blobMetadata := table.NewBlobMetadata(key.key, key.checksum, key.size, &batchHeaderHash, uint(blobIndex), int(downloadCount))
 	verifier.table.Add(blobMetadata)
 }

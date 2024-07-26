@@ -14,7 +14,7 @@ type BlobTable struct {
 
 	// size describes the total number of blobs currently tracked by the requiredReads.
 	// size may be smaller than the capacity of the blobs slice.
-	size uint32
+	size uint
 
 	// lock is used to synchronize access to the requiredReads.
 	lock sync.Mutex
@@ -29,11 +29,23 @@ func NewBlobTable() BlobTable {
 }
 
 // Size returns the total number of blobs currently tracked by the requiredReads.
-func (table *BlobTable) Size() uint32 {
+func (table *BlobTable) Size() uint {
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
 	return table.size
+}
+
+// Get returns the blob at the specified index. Returns nil if the index is out of bounds.
+func (table *BlobTable) Get(index uint) *BlobMetadata {
+	table.lock.Lock()
+	defer table.lock.Unlock()
+
+	if index >= table.size {
+		return nil
+	}
+
+	return table.blobs[index]
 }
 
 // Add a blob to the requiredReads.
@@ -48,7 +60,7 @@ func (table *BlobTable) Add(blob *BlobMetadata) {
 
 // AddOrReplace adds a blob to the requiredReads if there is capacity or replaces an existing blob at random
 // if the requiredReads is full. This method is a no-op if maximumCapacity is 0.
-func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint32) {
+func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint) {
 	if maximumCapacity == 0 {
 		return
 	}
@@ -60,7 +72,7 @@ func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint32)
 		// replace random existing blob
 		index := rand.Int31n(int32(table.size))
 		table.blobs[index] = blob
-		blob.index = uint32(index)
+		blob.index = uint(index)
 	} else {
 		// add new blob
 		blob.index = table.size
