@@ -95,18 +95,18 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		&ctx,
 		&waitGroup,
 		logger,
-		config,
+		&config.WorkerConfig,
 		&blobTable,
 		&disperserClient,
 		metrics)
 
 	writers := make([]*BlobWriter, 0)
-	for i := 0; i < int(config.NumWriteInstances); i++ {
+	for i := 0; i < int(config.WorkerConfig.NumWriteInstances); i++ {
 		writer := NewBlobWriter(
 			&ctx,
 			&waitGroup,
 			logger,
-			config,
+			&config.WorkerConfig,
 			&disperserClient,
 			&statusVerifier,
 			metrics)
@@ -116,12 +116,12 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 	retriever, chainClient := buildRetriever(config)
 
 	readers := make([]*BlobReader, 0)
-	for i := 0; i < int(config.NumReadInstances); i++ {
+	for i := 0; i < int(config.WorkerConfig.NumReadInstances); i++ {
 		reader := NewBlobReader(
 			&ctx,
 			&waitGroup,
 			logger,
-			config,
+			&config.WorkerConfig,
 			retriever,
 			chainClient,
 			&blobTable,

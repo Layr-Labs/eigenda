@@ -25,7 +25,7 @@ type BlobWriter struct {
 	logger logging.Logger
 
 	// Config contains the configuration for the generator.
-	config *Config
+	config *WorkerConfig
 
 	// disperser is the client used to send blobs to the disperser.
 	disperser *clients.DisperserClient
@@ -51,7 +51,7 @@ func NewBlobWriter(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	config *Config,
+	config *WorkerConfig,
 	disperser *clients.DisperserClient,
 	verifier *BlobVerifier,
 	metrics *metrics.Metrics) BlobWriter {
@@ -139,7 +139,7 @@ func (writer *BlobWriter) getRandomData() *[]byte {
 // sendRequest sends a blob to a disperser.
 func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
 
-	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.DisperserTimeout)
+	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.WriteTimeout)
 	defer cancel()
 
 	var key []byte

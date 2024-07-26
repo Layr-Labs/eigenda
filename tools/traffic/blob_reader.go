@@ -30,7 +30,7 @@ type BlobReader struct {
 	logger logging.Logger
 
 	// config contains the configuration for the generator.
-	config *Config
+	config *WorkerConfig
 
 	retriever   clients.RetrievalClient
 	chainClient eth.ChainClient
@@ -63,7 +63,7 @@ func NewBlobReader(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	config *Config,
+	config *WorkerConfig,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
 	blobTable *table.BlobTable,

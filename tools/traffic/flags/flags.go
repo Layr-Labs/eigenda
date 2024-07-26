@@ -135,6 +135,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "UNIFORM_BLOBS"),
 	}
+	WriteTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "write-timeout"),
+		Usage:    "Amount of time to wait for a blob to be written.",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "WRITE_TIMEOUT"),
+	}
 	TheGraphUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "the-graph-url"),
 		Usage:    "URL of the subgraph instance.",
@@ -313,6 +320,7 @@ var optionalFlags = []cli.Flag{
 	RetrieveBlobChunksTimeoutFlag,
 	GetBlobStatusTimeoutFlag,
 	ReadOverflowTableSizeFlag,
+	WriteTimeoutFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
