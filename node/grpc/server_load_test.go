@@ -103,7 +103,7 @@ func TestStoreChunks(t *testing.T) {
 		numTotalChunks += len(blobMessagesByOp[opID][i].Bundles[0])
 	}
 	t.Logf("Batch numTotalChunks: %d", numTotalChunks)
-	req, totalSize, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader)
+	req, totalSize, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader, false)
 	fmt.Println("totalSize", totalSize)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(26214400), totalSize)

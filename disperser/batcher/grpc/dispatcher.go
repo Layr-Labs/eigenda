@@ -19,7 +19,8 @@ import (
 )
 
 type Config struct {
-	Timeout time.Duration
+	Timeout                   time.Duration
+	EnableGnarkBundleEncoding bool
 }
 
 type dispatcher struct {
@@ -127,7 +128,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 	start := time.Now()
-	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader)
+	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader, c.EnableGnarkBundleEncoding)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +169,7 @@ func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.Blob
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 	start := time.Now()
-	request, totalSize, err := GetStoreBlobsRequest(blobs, batchHeader)
+	request, totalSize, err := GetStoreBlobsRequest(blobs, batchHeader, c.EnableGnarkBundleEncoding)
 	if err != nil {
 		return nil, err
 	}
@@ -279,12 +280,12 @@ func (c *dispatcher) SendAttestBatchRequest(ctx context.Context, nodeDispersalCl
 	return &core.Signature{G1Point: point}, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader) (*node.StoreChunksRequest, int64, error) {
+func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreChunksRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
 		var err error
-		blobs[i], err = getBlobMessage(blob)
+		blobs[i], err = getBlobMessage(blob, useGnarkBundleEncoding)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -299,12 +300,12 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 	return request, totalSize, nil
 }
 
-func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader) (*node.StoreBlobsRequest, int64, error) {
+func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreBlobsRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
 		var err error
-		blobs[i], err = getBlobMessage(blob)
+		blobs[i], err = getBlobMessage(blob, useGnarkBundleEncoding)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -319,7 +320,7 @@ func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.Ba
 	return request, totalSize, nil
 }
 
-func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
+func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
 	if blob.BlobHeader == nil {
 		return nil, errors.New("blob header is nil")
 	}
@@ -356,22 +357,43 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		}
 	}
 
-	data, err := blob.Bundles.Serialize()
-	if err != nil {
-		return nil, err
-	}
 	bundles := make([]*node.Bundle, len(quorumHeaders))
-	// the ordering of quorums in bundles must be same as in quorumHeaders
-	for i, quorumHeader := range quorumHeaders {
-		quorum := quorumHeader.QuorumId
-		if _, ok := blob.Bundles[uint8(quorum)]; ok {
-			bundles[i] = &node.Bundle{
-				Chunks: data[quorum],
+	if useGnarkBundleEncoding {
+		// the ordering of quorums in bundles must be same as in quorumHeaders
+		for i, quorumHeader := range quorumHeaders {
+			quorum := quorumHeader.QuorumId
+			if bundle, ok := blob.Bundles[uint8(quorum)]; ok {
+				bundleBytes, err := bundle.Serialize()
+				if err != nil {
+					return nil, err
+				}
+				bundles[i] = &node.Bundle{
+					Bundle: bundleBytes,
+				}
+			} else {
+				bundles[i] = &node.Bundle{
+					// empty bundle for quorums operators are not part of
+					Bundle: make([]byte, 0),
+				}
 			}
-		} else {
-			bundles[i] = &node.Bundle{
-				// empty bundle for quorums operators are not part of
-				Chunks: make([][]byte, 0),
+		}
+	} else {
+		data, err := blob.Bundles.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		// the ordering of quorums in bundles must be same as in quorumHeaders
+		for i, quorumHeader := range quorumHeaders {
+			quorum := quorumHeader.QuorumId
+			if _, ok := blob.Bundles[uint8(quorum)]; ok {
+				bundles[i] = &node.Bundle{
+					Chunks: data[quorum],
+				}
+			} else {
+				bundles[i] = &node.Bundle{
+					// empty bundle for quorums operators are not part of
+					Chunks: make([][]byte, 0),
+				}
 			}
 		}
 	}
