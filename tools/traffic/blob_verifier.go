@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"math/rand"
 	"sync"
@@ -40,7 +41,7 @@ type BlobVerifier struct {
 	config *Config
 
 	// A table of confirmed blobs. Blobs are added here when they are confirmed by the disperser service.
-	table *BlobTable
+	table *table.BlobTable
 
 	// The disperser client used to monitor the disperser service.
 	dispenser *clients.DisperserClient
@@ -70,7 +71,7 @@ func NewStatusVerifier(
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
 	config *Config,
-	table *BlobTable,
+	table *table.BlobTable,
 	disperser *clients.DisperserClient,
 	metrics *Metrics) BlobVerifier {
 
@@ -230,6 +231,6 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 		downloadCount = int32(requiredDownloads)
 	}
 
-	blobMetadata := NewBlobMetadata(key.key, key.checksum, key.size, &batchHeaderHash, blobIndex, downloadCount)
+	blobMetadata := table.NewBlobMetadata(key.key, key.checksum, key.size, &batchHeaderHash, blobIndex, downloadCount)
 	verifier.table.Add(blobMetadata)
 }

@@ -1,4 +1,4 @@
-package traffic
+package table
 
 import (
 	"fmt"

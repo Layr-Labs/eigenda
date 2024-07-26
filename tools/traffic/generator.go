@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -80,7 +81,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 
 	metrics := NewMetrics(config.MetricsHTTPPort, logger)
 
-	table := NewBlobTable()
+	blobTable := table.NewBlobTable()
 
 	disperserConfig := clients.Config{
 		Hostname:          config.DisperserHostname,
@@ -94,7 +95,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		&waitGroup,
 		logger,
 		config,
-		&table,
+		&blobTable,
 		&disperserClient,
 		metrics)
 
@@ -122,7 +123,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 			config,
 			retriever,
 			chainClient,
-			&table,
+			&blobTable,
 			metrics)
 		readers = append(readers, &reader)
 	}

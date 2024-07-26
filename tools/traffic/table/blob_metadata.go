@@ -1,4 +1,4 @@
-package traffic
+package table
 
 // BlobMetadata encapsulates various information about a blob written by the traffic generator.
 type BlobMetadata struct {
@@ -49,6 +49,16 @@ func NewBlobMetadata(
 // Key returns the key of the blob.
 func (blob *BlobMetadata) Key() *[]byte {
 	return blob.key
+}
+
+// Checksum returns the checksum of the blob.
+func (blob *BlobMetadata) Checksum() *[16]byte {
+	return blob.checksum
+}
+
+// Size returns the size of the blob, in bytes.
+func (blob *BlobMetadata) Size() uint {
+	return blob.size
 }
 
 // BatchHeaderHash returns the batchHeaderHash of the blob.

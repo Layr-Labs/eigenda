@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"math/big"
@@ -34,10 +35,10 @@ type BlobReader struct {
 	chainClient eth.ChainClient
 
 	// requiredReads blobs we are required to read a certain number of times.
-	requiredReads *BlobTable
+	requiredReads *table.BlobTable
 
 	// optionalReads blobs we are not required to read, but can choose to read if we want.
-	optionalReads *BlobTable
+	optionalReads *table.BlobTable
 
 	metrics                    *Metrics
 	fetchBatchHeaderMetric     LatencyMetric
@@ -64,10 +65,10 @@ func NewBlobReader(
 	config *Config,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
-	table *BlobTable,
+	blobTable *table.BlobTable,
 	metrics *Metrics) BlobReader {
 
-	optionalReads := NewBlobTable()
+	optionalReads := table.NewBlobTable()
 
 	return BlobReader{
 		ctx:                        ctx,
@@ -76,7 +77,7 @@ func NewBlobReader(
 		config:                     config,
 		retriever:                  retriever,
 		chainClient:                chainClient,
-		requiredReads:              table,
+		requiredReads:              blobTable,
 		optionalReads:              &optionalReads,
 		metrics:                    metrics,
 		fetchBatchHeaderMetric:     metrics.NewLatencyMetric("fetch_batch_header"),
@@ -143,7 +144,7 @@ func (reader *BlobReader) randomRead() {
 			return reader.chainClient.FetchBatchHeader(
 				ctxTimeout,
 				gcommon.HexToAddress(reader.config.EigenDAServiceManager),
-				*metadata.batchHeaderHash,
+				*metadata.BatchHeaderHash(),
 				big.NewInt(int64(0)),
 				nil)
 		})
@@ -156,14 +157,14 @@ func (reader *BlobReader) randomRead() {
 	reader.fetchBatchHeaderSuccess.Increment()
 
 	var batchHeaderHash [32]byte
-	copy(batchHeaderHash[:], *metadata.batchHeaderHash)
+	copy(batchHeaderHash[:], *metadata.BatchHeaderHash())
 
 	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, reader.config.RetrieveBlobChunksTimeout)
 	chunks, err := InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return reader.retriever.RetrieveBlobChunks(
 			ctxTimeout,
 			batchHeaderHash,
-			metadata.blobIndex,
+			metadata.BlobIndex(),
 			uint(batchHeader.ReferenceBlockNumber),
 			batchHeader.BlobHeadersRoot,
 			core.QuorumID(0))
@@ -227,12 +228,12 @@ func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
 }
 
 // verifyBlob performs sanity checks on the blob.
-func (reader *BlobReader) verifyBlob(metadata *BlobMetadata, blob *[]byte) {
+func (reader *BlobReader) verifyBlob(metadata *table.BlobMetadata, blob *[]byte) {
 	// Trim off the padding.
-	truncatedBlob := (*blob)[:metadata.size]
+	truncatedBlob := (*blob)[:metadata.Size()]
 	recomputedChecksum := md5.Sum(truncatedBlob)
 
-	if *metadata.checksum == recomputedChecksum {
+	if *metadata.Checksum() == recomputedChecksum {
 		reader.validBlobMetric.Increment()
 	} else {
 		reader.invalidBlobMetric.Increment()
