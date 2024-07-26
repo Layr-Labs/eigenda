@@ -156,12 +156,18 @@ func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainC
 		NumRetries: int(config.EthClientRetries),
 	}
 	gethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to instantiate geth client: %s", err))
+	}
 
 	tx, err := eth.NewTransactor(
 		logger,
 		gethClient,
 		config.BlsOperatorStateRetriever,
 		config.EigenDAServiceManager)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to instantiate transactor: %s", err))
+	}
 
 	cs := eth.NewChainState(tx, gethClient)
 

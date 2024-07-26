@@ -176,8 +176,7 @@ func (reader *BlobReader) randomRead() {
 	}
 	reader.readSuccessMetric.Increment()
 
-	var assignments map[core.OperatorID]core.Assignment
-	assignments = chunks.Assignments
+	assignments := chunks.Assignments
 
 	data, err := reader.retriever.CombineChunks(chunks)
 	if err != nil {

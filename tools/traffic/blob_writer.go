@@ -61,7 +61,7 @@ func NewBlobWriter(
 		fixedRandomData = nil
 	} else {
 		// Use this random data for each blob.
-		fixedRandomData := make([]byte, config.DataSize)
+		fixedRandomData = make([]byte, config.DataSize)
 		_, err := rand.Read(fixedRandomData)
 		if err != nil {
 			panic(fmt.Sprintf("unable to read random data: %s", err))
