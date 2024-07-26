@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync"
 	"time"
@@ -36,13 +37,13 @@ type BlobWriter struct {
 	fixedRandomData *[]byte
 
 	// writeLatencyMetric is used to record latency for write requests.
-	writeLatencyMetric LatencyMetric
+	writeLatencyMetric metrics.LatencyMetric
 
 	// writeSuccessMetric is used to record the number of successful write requests.
-	writeSuccessMetric CountMetric
+	writeSuccessMetric metrics.CountMetric
 
 	// writeFailureMetric is used to record the number of failed write requests.
-	writeFailureMetric CountMetric
+	writeFailureMetric metrics.CountMetric
 }
 
 // NewBlobWriter creates a new BlobWriter instance.
@@ -53,7 +54,7 @@ func NewBlobWriter(
 	config *Config,
 	disperser *clients.DisperserClient,
 	verifier *BlobVerifier,
-	metrics *Metrics) BlobWriter {
+	metrics *metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
 	if config.RandomizeBlobs {
@@ -102,7 +103,7 @@ func (writer *BlobWriter) run() {
 			return
 		case <-ticker.C:
 			data := writer.getRandomData()
-			key, err := InvokeAndReportLatency(&writer.writeLatencyMetric, func() ([]byte, error) {
+			key, err := metrics.InvokeAndReportLatency(&writer.writeLatencyMetric, func() ([]byte, error) {
 				return writer.sendRequest(*data)
 			})
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"math/rand"
@@ -52,17 +53,17 @@ type BlobVerifier struct {
 	// Newly added keys that require verification.
 	keyChannel chan *unconfirmedKey
 
-	blobsInFlightMetric               GaugeMetric
-	getStatusLatencyMetric            LatencyMetric
-	confirmationLatencyMetric         LatencyMetric
-	getStatusErrorCountMetric         CountMetric
-	unknownCountMetric                CountMetric
-	processingCountMetric             CountMetric
-	dispersingCountMetric             CountMetric
-	failedCountMetric                 CountMetric
-	insufficientSignaturesCountMetric CountMetric
-	confirmedCountMetric              CountMetric
-	finalizedCountMetric              CountMetric
+	blobsInFlightMetric               metrics.GaugeMetric
+	getStatusLatencyMetric            metrics.LatencyMetric
+	confirmationLatencyMetric         metrics.LatencyMetric
+	getStatusErrorCountMetric         metrics.CountMetric
+	unknownCountMetric                metrics.CountMetric
+	processingCountMetric             metrics.CountMetric
+	dispersingCountMetric             metrics.CountMetric
+	failedCountMetric                 metrics.CountMetric
+	insufficientSignaturesCountMetric metrics.CountMetric
+	confirmedCountMetric              metrics.CountMetric
+	finalizedCountMetric              metrics.CountMetric
 }
 
 // NewStatusVerifier creates a new BlobVerifier instance.
@@ -73,7 +74,7 @@ func NewStatusVerifier(
 	config *Config,
 	table *table.BlobTable,
 	disperser *clients.DisperserClient,
-	metrics *Metrics) BlobVerifier {
+	metrics *metrics.Metrics) BlobVerifier {
 
 	return BlobVerifier{
 		ctx:                               ctx,
@@ -155,7 +156,7 @@ func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, verifier.config.GetBlobStatusTimeout)
 	defer cancel()
 
-	status, err := InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,
+	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
 			return (*verifier.dispenser).GetBlobStatus(ctxTimeout, *key.key)
 		})

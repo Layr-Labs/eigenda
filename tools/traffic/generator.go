@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	metrics2 "github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -43,7 +44,7 @@ type Generator struct {
 	ctx             *context.Context
 	cancel          *context.CancelFunc
 	waitGroup       *sync.WaitGroup
-	metrics         *Metrics
+	metrics         *metrics2.Metrics
 	logger          *logging.Logger
 	disperserClient clients.DisperserClient
 	eigenDAClient   *clients.EigenDAClient
@@ -79,7 +80,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
 
-	metrics := NewMetrics(config.MetricsHTTPPort, logger)
+	metrics := metrics2.NewMetrics(config.MetricsHTTPPort, logger)
 
 	blobTable := table.NewBlobTable()
 

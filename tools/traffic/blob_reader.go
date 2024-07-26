@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	metrics2 "github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
@@ -40,21 +41,21 @@ type BlobReader struct {
 	// optionalReads blobs we are not required to read, but can choose to read if we want.
 	optionalReads *table.BlobTable
 
-	metrics                    *Metrics
-	fetchBatchHeaderMetric     LatencyMetric
-	fetchBatchHeaderSuccess    CountMetric
-	fetchBatchHeaderFailure    CountMetric
-	readLatencyMetric          LatencyMetric
-	readSuccessMetric          CountMetric
-	readFailureMetric          CountMetric
-	recombinationSuccessMetric CountMetric
-	recombinationFailureMetric CountMetric
-	validBlobMetric            CountMetric
-	invalidBlobMetric          CountMetric
-	operatorSuccessMetrics     map[core.OperatorID]CountMetric
-	operatorFailureMetrics     map[core.OperatorID]CountMetric
-	requiredReadPoolSizeMetric GaugeMetric
-	optionalReadPoolSizeMetric GaugeMetric
+	metrics                    *metrics2.Metrics
+	fetchBatchHeaderMetric     metrics2.LatencyMetric
+	fetchBatchHeaderSuccess    metrics2.CountMetric
+	fetchBatchHeaderFailure    metrics2.CountMetric
+	readLatencyMetric          metrics2.LatencyMetric
+	readSuccessMetric          metrics2.CountMetric
+	readFailureMetric          metrics2.CountMetric
+	recombinationSuccessMetric metrics2.CountMetric
+	recombinationFailureMetric metrics2.CountMetric
+	validBlobMetric            metrics2.CountMetric
+	invalidBlobMetric          metrics2.CountMetric
+	operatorSuccessMetrics     map[core.OperatorID]metrics2.CountMetric
+	operatorFailureMetrics     map[core.OperatorID]metrics2.CountMetric
+	requiredReadPoolSizeMetric metrics2.GaugeMetric
+	optionalReadPoolSizeMetric metrics2.GaugeMetric
 }
 
 // NewBlobReader creates a new BlobReader instance.
@@ -66,7 +67,7 @@ func NewBlobReader(
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
 	blobTable *table.BlobTable,
-	metrics *Metrics) BlobReader {
+	metrics *metrics2.Metrics) BlobReader {
 
 	optionalReads := table.NewBlobTable()
 
@@ -90,8 +91,8 @@ func NewBlobReader(
 		invalidBlobMetric:          metrics.NewCountMetric("invalid_blob"),
 		readSuccessMetric:          metrics.NewCountMetric("read_success"),
 		readFailureMetric:          metrics.NewCountMetric("read_failure"),
-		operatorSuccessMetrics:     make(map[core.OperatorID]CountMetric),
-		operatorFailureMetrics:     make(map[core.OperatorID]CountMetric),
+		operatorSuccessMetrics:     make(map[core.OperatorID]metrics2.CountMetric),
+		operatorFailureMetrics:     make(map[core.OperatorID]metrics2.CountMetric),
 		requiredReadPoolSizeMetric: metrics.NewGaugeMetric("required_read_pool_size"),
 		optionalReadPoolSizeMetric: metrics.NewGaugeMetric("optional_read_pool_size"),
 	}
@@ -139,7 +140,7 @@ func (reader *BlobReader) randomRead() {
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
-	batchHeader, err := InvokeAndReportLatency(&reader.fetchBatchHeaderMetric,
+	batchHeader, err := metrics2.InvokeAndReportLatency(&reader.fetchBatchHeaderMetric,
 		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
 			return reader.chainClient.FetchBatchHeader(
 				ctxTimeout,
@@ -160,7 +161,7 @@ func (reader *BlobReader) randomRead() {
 	copy(batchHeaderHash[:], *metadata.BatchHeaderHash())
 
 	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, reader.config.RetrieveBlobChunksTimeout)
-	chunks, err := InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
+	chunks, err := metrics2.InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return reader.retriever.RetrieveBlobChunks(
 			ctxTimeout,
 			batchHeaderHash,
