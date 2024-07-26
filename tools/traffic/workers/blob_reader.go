@@ -140,7 +140,7 @@ func (reader *BlobReader) randomRead() {
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
-	batchHeader, err := metrics.InvokeAndReportLatency(&reader.fetchBatchHeaderMetric,
+	batchHeader, err := metrics.InvokeAndReportLatency(reader.fetchBatchHeaderMetric,
 		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
 			return reader.chainClient.FetchBatchHeader(
 				ctxTimeout,
@@ -161,7 +161,7 @@ func (reader *BlobReader) randomRead() {
 	copy(batchHeaderHash[:], *metadata.BatchHeaderHash())
 
 	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, reader.config.RetrieveBlobChunksTimeout)
-	chunks, err := metrics.InvokeAndReportLatency(&reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
+	chunks, err := metrics.InvokeAndReportLatency(reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return reader.retriever.RetrieveBlobChunks(
 			ctxTimeout,
 			batchHeaderHash,

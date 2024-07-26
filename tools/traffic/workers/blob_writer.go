@@ -103,7 +103,7 @@ func (writer *BlobWriter) run() {
 			return
 		case <-ticker.C:
 			data := writer.getRandomData()
-			key, err := metrics.InvokeAndReportLatency(&writer.writeLatencyMetric, func() ([]byte, error) {
+			key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
 				return writer.sendRequest(*data)
 			})
 			if err != nil {

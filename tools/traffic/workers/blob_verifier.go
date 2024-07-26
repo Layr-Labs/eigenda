@@ -156,7 +156,7 @@ func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, verifier.config.GetBlobStatusTimeout)
 	defer cancel()
 
-	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](&verifier.getStatusLatencyMetric,
+	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
 			return (*verifier.dispenser).GetBlobStatus(ctxTimeout, *key.key)
 		})

@@ -24,7 +24,7 @@ func (metric *latencyMetric) ReportLatency(latency time.Duration) {
 
 // InvokeAndReportLatency performs an operation. If the operation does not produce an error, then the latency
 // of the operation is reported to the metrics framework.
-func InvokeAndReportLatency[T any](metric *latencyMetric, operation func() (T, error)) (T, error) {
+func InvokeAndReportLatency[T any](metric LatencyMetric, operation func() (T, error)) (T, error) {
 	start := time.Now()
 
 	t, err := operation()
