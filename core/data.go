@@ -45,6 +45,11 @@ const (
 
 	// The list of supported encoding formats for bundle.
 	// Values must be in range [0, 255].
+	// Note that the IDs here may not be the same as the ChunkEncodingFormat enum in
+	// the node.proto file. For eaxmple, GobBundleEncodingFormat is 0 here, but in
+	// ChunkEncodingFormat the GOB is 2 (and UNKNOWN is 0). The reason is because
+	// we need to set GobBundleEncodingFormat to 0 for backward compatibility (and
+	// in protobuf, UNKNOWN as 0 is a convention).
 	GobBundleEncodingFormat   BundleEncodingFormat = 0
 	GnarkBundleEncodingFormat BundleEncodingFormat = 1
 )
