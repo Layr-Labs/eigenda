@@ -313,6 +313,11 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVars: prefixEnvVars("S3_BUCKET"),
 		},
 		&cli.StringFlag{
+			Name:    S3PathFlagName,
+			Usage:   "path for S3 storage",
+			EnvVars: prefixEnvVars("S3_PATH"),
+		},
+		&cli.StringFlag{
 			Name:    S3EndpointFlagName,
 			Usage:   "endpoint for S3 storage",
 			Value:   "",
