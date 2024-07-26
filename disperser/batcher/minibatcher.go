@@ -63,8 +63,10 @@ func NewMinibatcher(
 		AssignmentCoordinator: assignmentCoordinator,
 		EncodingStreamer:      encodingStreamer,
 		Pool:                  workerpool,
-		ReferenceBlockNumber:  0,
-		MinibatchIndex:        0,
+
+		ReferenceBlockNumber: 0,
+		BatchID:              uuid.Nil,
+		MinibatchIndex:       0,
 
 		ethClient: ethClient,
 		logger:    logger.With("component", "Minibatcher"),
@@ -138,7 +140,18 @@ func (b *Minibatcher) HandleSingleBatch(ctx context.Context) error {
 	}
 	log.Debug("CreateMinibatch took", "duration", time.Since(stageTimer).String())
 
+	// Processing new full batch
 	if b.ReferenceBlockNumber < batch.BatchHeader.ReferenceBlockNumber {
+		// Update status of the previous batch
+		if b.BatchID != uuid.Nil {
+			err = b.MinibatchStore.UpdateBatchStatus(ctx, b.BatchID, BatchStatusFormed)
+			if err != nil {
+				_ = b.handleFailure(ctx, batch.BlobMetadata, FailReason("error updating batch status"))
+				return fmt.Errorf("error updating batch status: %w", err)
+			}
+		}
+
+		// Create new batch
 		b.BatchID, err = uuid.NewV7()
 		if err != nil {
 			_ = b.handleFailure(ctx, batch.BlobMetadata, FailReason("error generating batch UUID"))
@@ -212,22 +225,24 @@ func (b *Minibatcher) DisperseBatch(ctx context.Context, state *core.IndexedOper
 	for id, op := range state.IndexedOperators {
 		opInfo := op
 		opID := id
+		req := &DispersalRequest{
+			BatchID:        batchID,
+			MinibatchIndex: minibatchIndex,
+			OperatorID:     opID,
+			Socket:         op.Socket,
+			NumBlobs:       uint(len(blobs)),
+			RequestedAt:    time.Now().UTC(),
+		}
+		err := b.MinibatchStore.PutDispersalRequest(ctx, req)
+		if err != nil {
+			b.logger.Error("failed to put dispersal request", "err", err)
+			continue
+		}
 		b.Pool.Submit(func() {
-			req := &DispersalRequest{
-				BatchID:        batchID,
-				MinibatchIndex: minibatchIndex,
-				OperatorID:     opID,
-				Socket:         op.Socket,
-				NumBlobs:       uint(len(blobs)),
-				RequestedAt:    time.Now().UTC(),
-			}
-			err := b.MinibatchStore.PutDispersalRequest(ctx, req)
-			if err != nil {
-				b.logger.Error("failed to put dispersal request", "err", err)
-				return
-			}
 			signatures, err := b.SendBlobsToOperatorWithRetries(ctx, blobs, batchHeader, opInfo, opID, int(b.MaxNumRetriesPerDispersal))
-
+			if err != nil {
+				b.logger.Errorf("failed to send blobs to operator %s: %v", opID.Hex(), err)
+			}
 			// Update the minibatch state
 			err = b.MinibatchStore.PutDispersalResponse(ctx, &DispersalResponse{
 				DispersalRequest: *req,

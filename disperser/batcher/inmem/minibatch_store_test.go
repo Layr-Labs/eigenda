@@ -84,7 +84,7 @@ func TestPutDispersalRequest(t *testing.T) {
 	err = s.PutDispersalRequest(ctx, req2)
 	assert.NoError(t, err)
 
-	r, err := s.GetDispersalRequests(ctx, id, minibatchIndex)
+	r, err := s.GetMinibatchDispersalRequests(ctx, id, minibatchIndex)
 	assert.NoError(t, err)
 	assert.Len(t, r, 2)
 	assert.Equal(t, req1, r[0])
@@ -136,7 +136,7 @@ func TestPutDispersalResponse(t *testing.T) {
 	err = s.PutDispersalResponse(ctx, resp2)
 	assert.NoError(t, err)
 
-	r, err := s.GetDispersalResponses(ctx, id, minibatchIndex)
+	r, err := s.GetMinibatchDispersalResponses(ctx, id, minibatchIndex)
 	assert.NoError(t, err)
 	assert.Len(t, r, 2)
 

@@ -2,7 +2,8 @@ package inmem
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"sort"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -10,6 +11,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
 )
+
+var BatchNotFound = errors.New("batch not found")
 
 type minibatchStore struct {
 	// BatchRecords maps batch IDs to batch records
@@ -53,9 +56,37 @@ func (m *minibatchStore) GetBatch(ctx context.Context, batchID uuid.UUID) (*batc
 
 	b, ok := m.BatchRecords[batchID]
 	if !ok {
-		return nil, fmt.Errorf("batch not found")
+		return nil, BatchNotFound
 	}
 	return b, nil
+}
+
+func (m *minibatchStore) GetBatchesByStatus(ctx context.Context, status batcher.BatchStatus) ([]*batcher.BatchRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var batches []*batcher.BatchRecord
+	for _, b := range m.BatchRecords {
+		if b.Status == status {
+			batches = append(batches, b)
+		}
+	}
+	sort.Slice(batches, func(i, j int) bool {
+		return batches[i].CreatedAt.Before(batches[j].CreatedAt)
+	})
+	return batches, nil
+}
+
+func (m *minibatchStore) UpdateBatchStatus(ctx context.Context, batchID uuid.UUID, status batcher.BatchStatus) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	b, ok := m.BatchRecords[batchID]
+	if !ok {
+		return BatchNotFound
+	}
+	b.Status = status
+	return nil
 }
 
 func (m *minibatchStore) PutMinibatch(ctx context.Context, minibatch *batcher.MinibatchRecord) error {
@@ -75,9 +106,28 @@ func (m *minibatchStore) GetMinibatch(ctx context.Context, batchID uuid.UUID, mi
 	defer m.mu.RUnlock()
 
 	if _, ok := m.MinibatchRecords[batchID]; !ok {
-		return nil, nil
+		return nil, BatchNotFound
 	}
 	return m.MinibatchRecords[batchID][minibatchIndex], nil
+}
+
+func (m *minibatchStore) GetMinibatches(ctx context.Context, batchID uuid.UUID) ([]*batcher.MinibatchRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, ok := m.MinibatchRecords[batchID]; !ok {
+		return nil, nil
+	}
+
+	res := make([]*batcher.MinibatchRecord, 0, len(m.MinibatchRecords[batchID]))
+	for _, minibatch := range m.MinibatchRecords[batchID] {
+		res = append(res, minibatch)
+	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].MinibatchIndex < res[j].MinibatchIndex
+	})
+
+	return res, nil
 }
 
 func (m *minibatchStore) PutDispersalRequest(ctx context.Context, request *batcher.DispersalRequest) error {
@@ -109,7 +159,7 @@ func (m *minibatchStore) GetDispersalRequest(ctx context.Context, batchID uuid.U
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	requests, err := m.GetDispersalRequests(ctx, batchID, minibatchIndex)
+	requests, err := m.GetMinibatchDispersalRequests(ctx, batchID, minibatchIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +171,12 @@ func (m *minibatchStore) GetDispersalRequest(ctx context.Context, batchID uuid.U
 	return nil, nil
 }
 
-func (m *minibatchStore) GetDispersalRequests(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*batcher.DispersalRequest, error) {
+func (m *minibatchStore) GetMinibatchDispersalRequests(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*batcher.DispersalRequest, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	if _, ok := m.DispersalRequests[batchID]; !ok {
-		return nil, nil
+		return nil, BatchNotFound
 	}
 
 	return m.DispersalRequests[batchID][minibatchIndex], nil
@@ -161,7 +211,7 @@ func (m *minibatchStore) GetDispersalResponse(ctx context.Context, batchID uuid.
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	responses, err := m.GetDispersalResponses(ctx, batchID, minibatchIndex)
+	responses, err := m.GetMinibatchDispersalResponses(ctx, batchID, minibatchIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -173,20 +223,85 @@ func (m *minibatchStore) GetDispersalResponse(ctx context.Context, batchID uuid.
 	return nil, nil
 }
 
-func (m *minibatchStore) GetDispersalResponses(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*batcher.DispersalResponse, error) {
+func (m *minibatchStore) GetMinibatchDispersalResponses(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*batcher.DispersalResponse, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	if _, ok := m.DispersalResponses[batchID]; !ok {
-		return nil, nil
+		return nil, BatchNotFound
 	}
 
 	return m.DispersalResponses[batchID][minibatchIndex], nil
 }
 
-func (m *minibatchStore) GetPendingBatch(ctx context.Context) (*batcher.BatchRecord, error) {
+func (m *minibatchStore) GetLatestFormedBatch(ctx context.Context) (batch *batcher.BatchRecord, minibatches []*batcher.MinibatchRecord, err error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return nil, nil
+	batches, err := m.GetBatchesByStatus(ctx, batcher.BatchStatusFormed)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(batches) == 0 {
+		return nil, nil, nil
+	}
+
+	batch = batches[0]
+	minibatches, err = m.GetMinibatches(ctx, batches[0].ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return batch, minibatches, nil
+}
+
+func (m *minibatchStore) getDispersals(ctx context.Context, batchID uuid.UUID) ([]*batcher.DispersalRequest, []*batcher.DispersalResponse, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, ok := m.DispersalRequests[batchID]; !ok {
+		return nil, nil, BatchNotFound
+	}
+
+	if _, ok := m.DispersalResponses[batchID]; !ok {
+		return nil, nil, BatchNotFound
+	}
+
+	requests := make([]*batcher.DispersalRequest, 0)
+	for _, reqs := range m.DispersalRequests[batchID] {
+		requests = append(requests, reqs...)
+	}
+
+	responses := make([]*batcher.DispersalResponse, 0)
+	for _, resp := range m.DispersalResponses[batchID] {
+		responses = append(responses, resp...)
+	}
+
+	return requests, responses, nil
+}
+
+func (m *minibatchStore) BatchDispersed(ctx context.Context, batchID uuid.UUID) (bool, error) {
+	dispersed := true
+	requests, responses, err := m.getDispersals(ctx, batchID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(requests) == 0 || len(responses) == 0 {
+		return false, nil
+	}
+
+	if len(requests) != len(responses) {
+		m.logger.Info("number of minibatch dispersal requests does not match the number of responses", "batchID", batchID, "numRequests", len(requests), "numResponses", len(responses))
+		return false, nil
+	}
+
+	for _, resp := range responses {
+		if resp.RespondedAt.IsZero() {
+			dispersed = false
+			m.logger.Info("response pending", "batchID", batchID, "minibatchIndex", resp.MinibatchIndex, "operatorID", resp.OperatorID.Hex())
+		}
+	}
+
+	return dispersed, nil
 }
