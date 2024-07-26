@@ -61,9 +61,11 @@ type CLIConfig struct {
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
+	config := ReadConfig(ctx)
 	return CLIConfig{
-		EigenDAConfig: ReadConfig(ctx),
+		EigenDAConfig: config,
 		MetricsCfg:    opmetrics.ReadCLIConfig(ctx),
+		S3Config:      config.S3Config,
 	}
 }
 
