@@ -32,7 +32,7 @@ import (
 
 const systemAccountKey = "system"
 
-const maxBlobSize = 8 * 1024 * 1024 // 8 MiB
+const maxBlobSize = 32 * 1024 * 1024 // 32 MiB
 
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
