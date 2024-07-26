@@ -21,7 +21,7 @@ type Metrics interface {
 	NewGaugeMetric(description string) GaugeMetric
 }
 
-// Metrics encapsulates metrics for the traffic generator.
+// metrics is a standard implementation of the Metrics interface via prometheus.
 type metrics struct {
 	registry *prometheus.Registry
 
@@ -68,7 +68,7 @@ func (metrics *metrics) Start() {
 
 // NewLatencyMetric creates a new LatencyMetric instance.
 func (metrics *metrics) NewLatencyMetric(description string) LatencyMetric {
-	return LatencyMetric{
+	return &latencyMetric{
 		metrics:     metrics,
 		description: description,
 	}
@@ -76,7 +76,7 @@ func (metrics *metrics) NewLatencyMetric(description string) LatencyMetric {
 
 // NewCountMetric creates a new CountMetric instance.
 func (metrics *metrics) NewCountMetric(description string) CountMetric {
-	return CountMetric{
+	return &countMetric{
 		metrics:     metrics,
 		description: description,
 	}
@@ -84,7 +84,7 @@ func (metrics *metrics) NewCountMetric(description string) CountMetric {
 
 // NewGaugeMetric creates a new GaugeMetric instance.
 func (metrics *metrics) NewGaugeMetric(description string) GaugeMetric {
-	return GaugeMetric{
+	return &gaugeMetric{
 		metrics:     metrics,
 		description: description,
 	}

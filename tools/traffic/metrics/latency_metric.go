@@ -6,20 +6,25 @@ import (
 	"time"
 )
 
-// LatencyMetric tracks the latency of an operation.
-type LatencyMetric struct {
+// LatencyMetric allows the latency of an operation to be tracked.
+type LatencyMetric interface {
+	ReportLatency(latency time.Duration)
+}
+
+// latencyMetric is a standard implementation of the LatencyMetric interface via prometheus.
+type latencyMetric struct {
 	metrics     *metrics
 	description string
 }
 
 // ReportLatency reports the latency of an operation.
-func (metric *LatencyMetric) ReportLatency(latency time.Duration) {
+func (metric *latencyMetric) ReportLatency(latency time.Duration) {
 	metric.metrics.latency.WithLabelValues(metric.description).Observe(latency.Seconds())
 }
 
 // InvokeAndReportLatency performs an operation. If the operation does not produce an error, then the latency
 // of the operation is reported to the metrics framework.
-func InvokeAndReportLatency[T any](metric *LatencyMetric, operation func() (T, error)) (T, error) {
+func InvokeAndReportLatency[T any](metric *latencyMetric, operation func() (T, error)) (T, error) {
 	start := time.Now()
 
 	t, err := operation()

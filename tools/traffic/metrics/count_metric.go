@@ -5,14 +5,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// CountMetric tracks the count of a type of event.
-type CountMetric struct {
+// CountMetric allows the count of a type of event to be tracked.
+type CountMetric interface {
+	Increment()
+}
+
+// countMetric a standard implementation of the CountMetric interface via prometheus.
+type countMetric struct {
 	metrics     *metrics
 	description string
 }
 
 // Increment increments the count of a type of event.
-func (metric *CountMetric) Increment() {
+func (metric *countMetric) Increment() {
 	metric.metrics.count.WithLabelValues(metric.description).Inc()
 }
 
