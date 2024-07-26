@@ -11,6 +11,7 @@ import (
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	metrics2 "github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
+	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -50,9 +51,9 @@ type Generator struct {
 	eigenDAClient   *clients.EigenDAClient
 	config          *Config
 
-	writers  []*BlobWriter
-	verifier *BlobVerifier
-	readers  []*BlobReader
+	writers  []*workers.BlobWriter
+	verifier *workers.BlobVerifier
+	readers  []*workers.BlobReader
 }
 
 func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Generator, error) {
@@ -91,7 +92,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		UseSecureGrpcFlag: config.DisperserUseSecureGrpcFlag,
 	}
 	disperserClient := clients.NewDisperserClient(&disperserConfig, signer)
-	statusVerifier := NewStatusVerifier(
+	statusVerifier := workers.NewStatusVerifier(
 		&ctx,
 		&waitGroup,
 		logger,
@@ -100,9 +101,9 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		&disperserClient,
 		metrics)
 
-	writers := make([]*BlobWriter, 0)
+	writers := make([]*workers.BlobWriter, 0)
 	for i := 0; i < int(config.WorkerConfig.NumWriteInstances); i++ {
-		writer := NewBlobWriter(
+		writer := workers.NewBlobWriter(
 			&ctx,
 			&waitGroup,
 			logger,
@@ -115,9 +116,9 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 
 	retriever, chainClient := buildRetriever(config)
 
-	readers := make([]*BlobReader, 0)
+	readers := make([]*workers.BlobReader, 0)
 	for i := 0; i < int(config.WorkerConfig.NumReadInstances); i++ {
-		reader := NewBlobReader(
+		reader := workers.NewBlobReader(
 			&ctx,
 			&waitGroup,
 			logger,

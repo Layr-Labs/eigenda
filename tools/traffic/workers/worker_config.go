@@ -1,4 +1,4 @@
-package traffic
+package workers
 
 import "time"
 
