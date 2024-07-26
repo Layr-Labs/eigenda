@@ -66,6 +66,10 @@ type BlobVerifier struct {
 	finalizedCountMetric              metrics.CountMetric
 }
 
+type UnconfirmedKeyHandler interface {
+	AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint)
+}
+
 // NewStatusVerifier creates a new BlobVerifier instance.
 func NewStatusVerifier(
 	ctx *context.Context,

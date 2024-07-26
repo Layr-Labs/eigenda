@@ -30,8 +30,8 @@ type BlobWriter struct {
 	// disperser is the client used to send blobs to the disperser.
 	disperser *clients.DisperserClient
 
-	// Responsible for polling on the status of a recently written blob until it becomes confirmed.
-	verifier *BlobVerifier
+	// Unconfirmed keys are sent here.
+	unconfirmedKeyHandler UnconfirmedKeyHandler
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData *[]byte
@@ -53,7 +53,7 @@ func NewBlobWriter(
 	logger logging.Logger,
 	config *Config,
 	disperser *clients.DisperserClient,
-	verifier *BlobVerifier,
+	unconfirmedKeyHandler UnconfirmedKeyHandler,
 	generatorMetrics metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
@@ -71,16 +71,16 @@ func NewBlobWriter(
 	}
 
 	return BlobWriter{
-		ctx:                ctx,
-		waitGroup:          waitGroup,
-		logger:             logger,
-		config:             config,
-		disperser:          disperser,
-		verifier:           verifier,
-		fixedRandomData:    &fixedRandomData,
-		writeLatencyMetric: generatorMetrics.NewLatencyMetric("write"),
-		writeSuccessMetric: generatorMetrics.NewCountMetric("write_success"),
-		writeFailureMetric: generatorMetrics.NewCountMetric("write_failure"),
+		ctx:                   ctx,
+		waitGroup:             waitGroup,
+		logger:                logger,
+		config:                config,
+		disperser:             disperser,
+		unconfirmedKeyHandler: unconfirmedKeyHandler,
+		fixedRandomData:       &fixedRandomData,
+		writeLatencyMetric:    generatorMetrics.NewLatencyMetric("write"),
+		writeSuccessMetric:    generatorMetrics.NewCountMetric("write_success"),
+		writeFailureMetric:    generatorMetrics.NewCountMetric("write_failure"),
 	}
 }
 
@@ -115,7 +115,7 @@ func (writer *BlobWriter) run() {
 			writer.writeSuccessMetric.Increment()
 
 			checksum := md5.Sum(*data)
-			writer.verifier.AddUnconfirmedKey(&key, &checksum, uint(len(*data)))
+			writer.unconfirmedKeyHandler.AddUnconfirmedKey(&key, &checksum, uint(len(*data)))
 		}
 	}
 }
