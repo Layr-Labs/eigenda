@@ -105,7 +105,7 @@ func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
 			return err
 		}
 
-		g.Logger.Info("successfully dispersed new blob", "authenticated", true, "key", hex.EncodeToString(key), "status", blobStatus.String())
+		g.Logger.Info("successfully dispersed new blob", "authenticated", true, "key", hex.EncodeToString(key), "status", blobStatus.String(), "size", len(data))
 		return nil
 	} else {
 		blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, g.Config.CustomQuorums)
@@ -113,7 +113,7 @@ func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
 			return err
 		}
 
-		g.Logger.Info("successfully dispersed new blob", "authenticated", false, "key", hex.EncodeToString(key), "status", blobStatus.String())
+		g.Logger.Info("successfully dispersed new blob", "authenticated", false, "key", hex.EncodeToString(key), "status", blobStatus.String(), "size", len(data))
 		return nil
 	}
 
