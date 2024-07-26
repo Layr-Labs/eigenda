@@ -136,6 +136,7 @@ func (c client) GetChunks(
 					Err:        errors.New("UNKNOWN chunk encoding format"),
 					Chunks:     nil,
 				}
+				return
 			}
 		}
 		if err != nil {
