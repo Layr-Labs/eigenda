@@ -39,7 +39,7 @@ type BlobVerifier struct {
 	logger logging.Logger
 
 	// config contains the configuration for the generator.
-	config *WorkerConfig
+	config *Config
 
 	// A table of confirmed blobs. Blobs are added here when they are confirmed by the disperser service.
 	table *table.BlobTable
@@ -71,7 +71,7 @@ func NewStatusVerifier(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	config *WorkerConfig,
+	config *Config,
 	table *table.BlobTable,
 	disperser *clients.DisperserClient,
 	metrics *metrics.Metrics) BlobVerifier {

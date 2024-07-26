@@ -67,7 +67,7 @@ type Config struct {
 	InstanceLaunchInterval time.Duration
 
 	// Configures the traffic generator workers.
-	WorkerConfig workers.WorkerConfig
+	WorkerConfig workers.Config
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -113,7 +113,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 		InstanceLaunchInterval: ctx.Duration(flags.InstanceLaunchIntervalFlag.Name),
 
-		WorkerConfig: workers.WorkerConfig{
+		WorkerConfig: workers.Config{
 			NumWriteInstances:    ctx.GlobalUint(flags.NumWriteInstancesFlag.Name),
 			WriteRequestInterval: ctx.Duration(flags.WriteRequestIntervalFlag.Name),
 			DataSize:             ctx.GlobalUint64(flags.DataSizeFlag.Name),
