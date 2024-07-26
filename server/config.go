@@ -38,8 +38,9 @@ const (
 	MemstoreExpirationFlagName = "memstore.expiration"
 	// S3 flags
 	S3BucketFlagName          = "s3.bucket"
+	S3PathFlagName            = "s3.path"
 	S3EndpointFlagName        = "s3.endpoint"
-	S3AccessKeyIDFlagName     = "s3.access-key-id" // #nosec G101
+	S3AccessKeyIDFlagName     = "s3.access-key-id"     // #nosec G101
 	S3AccessKeySecretFlagName = "s3.access-key-secret" // #nosec G101
 )
 
@@ -106,7 +107,7 @@ func (c *Config) VerificationCfg() *verify.Config {
 		G1Path:          c.G1Path,
 		G2PowerOf2Path:  c.G2PowerOfTauPath,
 		CacheDir:        c.CacheDir,
-		SRSOrder:        268435456, // 2 ^ 32 
+		SRSOrder:        268435456,     // 2 ^ 32
 		SRSNumberToLoad: numBytes / 32, // # of fp.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
@@ -132,9 +133,10 @@ func (c *Config) VerificationCfg() *verify.Config {
 func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
 		S3Config: store.S3Config{
-			Bucket: ctx.String(S3BucketFlagName),
-			Endpoint: ctx.String(S3EndpointFlagName),
-			AccessKeyID: ctx.String(S3AccessKeyIDFlagName),
+			Bucket:          ctx.String(S3BucketFlagName),
+			Path:            ctx.String(S3PathFlagName),
+			Endpoint:        ctx.String(S3EndpointFlagName),
+			AccessKeyID:     ctx.String(S3AccessKeyIDFlagName),
 			AccessKeySecret: ctx.String(S3AccessKeySecretFlagName),
 		},
 		ClientConfig: clients.EigenDAClientConfig{
@@ -181,7 +183,7 @@ func (cfg *Config) Check() error {
 	if cfg.EthRPC != "" && cfg.SvcManagerAddr == "" {
 		return fmt.Errorf("eth rpc is set, but svc manager address is not set")
 	}
-	
+
 	if cfg.EthConfirmationDepth >= 0 && (cfg.SvcManagerAddr == "" || cfg.EthRPC == "") {
 		return fmt.Errorf("eth confirmation depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
 	}
@@ -326,6 +328,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "access key secret for S3 storage",
 			Value:   "",
 			EnvVars: prefixEnvVars("S3_ACCESS_KEY_SECRET"),
-	},
-}
+		},
+	}
 }

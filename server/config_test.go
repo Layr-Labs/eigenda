@@ -9,33 +9,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func validCfg() *Config{
+func validCfg() *Config {
 	return &Config{
 		S3Config: store.S3Config{
-			Bucket:        "test-bucket",
-			Endpoint:      "http://localhost:9000",
-			AccessKeyID:   "access-key-id",
+			Bucket:          "test-bucket",
+			Path:            "",
+			Endpoint:        "http://localhost:9000",
+			AccessKeyID:     "access-key-id",
 			AccessKeySecret: "access-key-secret",
 		},
 		ClientConfig: clients.EigenDAClientConfig{
-			RPC: "http://localhost:8545",
-			StatusQueryRetryInterval: 5 * time.Second,
-			StatusQueryTimeout:       30 * time.Minute,
-			DisableTLS:               true,
-			ResponseTimeout:          10 * time.Second,
-			CustomQuorumIDs:          []uint{1, 2, 3},
-			SignerPrivateKeyHex:      "private-key-hex",
-			PutBlobEncodingVersion:   0,
+			RPC:                          "http://localhost:8545",
+			StatusQueryRetryInterval:     5 * time.Second,
+			StatusQueryTimeout:           30 * time.Minute,
+			DisableTLS:                   true,
+			ResponseTimeout:              10 * time.Second,
+			CustomQuorumIDs:              []uint{1, 2, 3},
+			SignerPrivateKeyHex:          "private-key-hex",
+			PutBlobEncodingVersion:       0,
 			DisablePointVerificationMode: false,
 		},
-		G1Path: "path/to/g1",
-		G2PowerOfTauPath: "path/to/g2",
-		CacheDir: "path/to/cache",
-		MaxBlobLength: "2MiB",
-		SvcManagerAddr: "0x1234567890abcdef",
-		EthRPC: "http://localhost:8545",
-		EthConfirmationDepth: 12,
-		MemstoreEnabled: true,
+		G1Path:                 "path/to/g1",
+		G2PowerOfTauPath:       "path/to/g2",
+		CacheDir:               "path/to/cache",
+		MaxBlobLength:          "2MiB",
+		SvcManagerAddr:         "0x1234567890abcdef",
+		EthRPC:                 "http://localhost:8545",
+		EthConfirmationDepth:   12,
+		MemstoreEnabled:        true,
 		MemstoreBlobExpiration: 25 * time.Minute,
 	}
 }
@@ -63,7 +64,6 @@ func TestConfigVerification(t *testing.T) {
 		err := cfg.Check()
 		require.Error(t, err)
 	})
-
 
 	t.Run("MissingSvcManagerAddr", func(t *testing.T) {
 		cfg := validCfg()

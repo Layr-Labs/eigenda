@@ -13,16 +13,17 @@ import (
 
 type S3Config struct {
 	Bucket          string
+	Path            string
 	Endpoint        string
 	AccessKeyID     string
 	AccessKeySecret string
-	Profiling bool
+	Profiling       bool
 }
 
 type S3Store struct {
 	cfg    S3Config
 	client *minio.Client
-	stats *Stats
+	stats  *Stats
 }
 
 func NewS3(cfg S3Config) (*S3Store, error) {
@@ -38,14 +39,14 @@ func NewS3(cfg S3Config) (*S3Store, error) {
 		client: client,
 		stats: &Stats{
 			Entries: 0,
-			Reads: 0,
+			Reads:   0,
 		},
 	}, nil
 }
 
 func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 
-	result, err := s.client.GetObject(ctx, s.cfg.Bucket, hex.EncodeToString(key), minio.GetObjectOptions{})
+	result, err := s.client.GetObject(ctx, s.cfg.Bucket, s.cfg.Path+hex.EncodeToString(key), minio.GetObjectOptions{})
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
 		if errResponse.Code == "NoSuchKey" {
@@ -67,7 +68,7 @@ func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
-	_, err := s.client.PutObject(ctx, s.cfg.Bucket, hex.EncodeToString(key), bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
+	_, err := s.client.PutObject(ctx, s.cfg.Bucket, s.cfg.Path+hex.EncodeToString(key), bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
 	if err != nil {
 		return err
 	}
