@@ -1,6 +1,7 @@
 package inmem_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -25,13 +26,15 @@ func TestPutBatch(t *testing.T) {
 		ID:                   id,
 		CreatedAt:            time.Now().UTC(),
 		ReferenceBlockNumber: 1,
+		Status:               1,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
 	}
-	err = s.PutBatch(batch)
+	ctx := context.Background()
+	err = s.PutBatch(ctx, batch)
 	assert.NoError(t, err)
-	b, err := s.GetBatch(batch.ID)
+	b, err := s.GetBatch(ctx, batch.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, batch, b)
 }
@@ -47,9 +50,10 @@ func TestPutMiniBatch(t *testing.T) {
 		BatchSize:            1,
 		ReferenceBlockNumber: 1,
 	}
-	err = s.PutMiniBatch(minibatch)
+	ctx := context.Background()
+	err = s.PutMinibatch(ctx, minibatch)
 	assert.NoError(t, err)
-	m, err := s.GetMiniBatch(minibatch.BatchID, minibatch.MinibatchIndex)
+	m, err := s.GetMinibatch(ctx, minibatch.BatchID, minibatch.MinibatchIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, minibatch, m)
 }
@@ -58,41 +62,98 @@ func TestPutDispersalRequest(t *testing.T) {
 	s := newMinibatchStore()
 	id, err := uuid.NewV7()
 	assert.NoError(t, err)
-	request := &batcher.DispersalRequest{
+	minibatchIndex := uint(0)
+	ctx := context.Background()
+	req1 := &batcher.DispersalRequest{
 		BatchID:         id,
-		MinibatchIndex:  0,
+		MinibatchIndex:  minibatchIndex,
 		OperatorID:      core.OperatorID([32]byte{1}),
 		OperatorAddress: gcommon.HexToAddress("0x0"),
 		NumBlobs:        1,
 		RequestedAt:     time.Now().UTC(),
+		BlobHash:        "1a2b",
+		MetadataHash:    "3c4d",
 	}
-	err = s.PutDispersalRequest(request)
+	err = s.PutDispersalRequest(ctx, req1)
 	assert.NoError(t, err)
-	r, err := s.GetDispersalRequest(request.BatchID, request.MinibatchIndex)
+	req2 := &batcher.DispersalRequest{
+		BatchID:         id,
+		MinibatchIndex:  minibatchIndex,
+		OperatorID:      core.OperatorID([32]byte{2}),
+		OperatorAddress: gcommon.HexToAddress("0x0"),
+		NumBlobs:        1,
+		RequestedAt:     time.Now().UTC(),
+		BlobHash:        "1a2b",
+		MetadataHash:    "3c4d",
+	}
+	err = s.PutDispersalRequest(ctx, req2)
 	assert.NoError(t, err)
-	assert.Equal(t, request, r)
+
+	r, err := s.GetMinibatchDispersalRequests(ctx, id, minibatchIndex)
+	assert.NoError(t, err)
+	assert.Len(t, r, 2)
+	assert.Equal(t, req1, r[0])
+	assert.Equal(t, req2, r[1])
+
+	req, err := s.GetDispersalRequest(ctx, id, minibatchIndex, req1.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, req1, req)
+
+	req, err = s.GetDispersalRequest(ctx, id, minibatchIndex, req2.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, req2, req)
 }
 
 func TestPutDispersalResponse(t *testing.T) {
 	s := newMinibatchStore()
 	id, err := uuid.NewV7()
 	assert.NoError(t, err)
-	response := &batcher.DispersalResponse{
+	ctx := context.Background()
+	minibatchIndex := uint(0)
+	resp1 := &batcher.DispersalResponse{
 		DispersalRequest: batcher.DispersalRequest{
 			BatchID:         id,
-			MinibatchIndex:  0,
+			MinibatchIndex:  minibatchIndex,
 			OperatorID:      core.OperatorID([32]byte{1}),
 			OperatorAddress: gcommon.HexToAddress("0x0"),
 			NumBlobs:        1,
 			RequestedAt:     time.Now().UTC(),
+			BlobHash:        "1a2b",
+			MetadataHash:    "3c4d",
 		},
 		Signatures:  nil,
 		RespondedAt: time.Now().UTC(),
 		Error:       nil,
 	}
-	err = s.PutDispersalResponse(response)
+	resp2 := &batcher.DispersalResponse{
+		DispersalRequest: batcher.DispersalRequest{
+			BatchID:         id,
+			MinibatchIndex:  minibatchIndex,
+			OperatorID:      core.OperatorID([32]byte{2}),
+			OperatorAddress: gcommon.HexToAddress("0x0"),
+			NumBlobs:        1,
+			RequestedAt:     time.Now().UTC(),
+			BlobHash:        "0x0",
+			MetadataHash:    "0x0",
+		},
+		Signatures:  nil,
+		RespondedAt: time.Now().UTC(),
+		Error:       nil,
+	}
+	err = s.PutDispersalResponse(ctx, resp1)
 	assert.NoError(t, err)
-	r, err := s.GetDispersalResponse(response.BatchID, response.MinibatchIndex)
+	err = s.PutDispersalResponse(ctx, resp2)
 	assert.NoError(t, err)
-	assert.Equal(t, response, r)
+
+	r, err := s.GetMinibatchDispersalResponses(ctx, id, minibatchIndex)
+	assert.NoError(t, err)
+	assert.Len(t, r, 2)
+
+	resp, err := s.GetDispersalResponse(ctx, id, minibatchIndex, resp1.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, resp1, resp)
+
+	resp, err = s.GetDispersalResponse(ctx, id, minibatchIndex, resp2.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, resp2, resp)
 }

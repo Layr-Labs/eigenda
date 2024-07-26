@@ -11,13 +11,12 @@ In general, the `core` project contains implementation of all the important busi
 
 # Directory structure
 <pre>
-┌── <a href="../api">api</a> Protobuf definitions and contract bindings
-├── <a href="../clients">clients</a>: Client-side libraries for users to integrate with EigenDA
+┌── <a href="../api">api</a> Protobuf definitions, contract bindings and client-side libraries for users to integrate with EigenDA
 ├── <a href="../common">common</a>: Common utility libraries
 ├── <a href="../contracts">contracts</a>
 |   ├── <a href="../contracts/eignlayer-contracts">eigenlayer-contracts</a>: Contracts for the EigenLayer restaking platform
 ┌── <a href="../core">core</a>: Core logic of the EigenDA protocol
-├── <a href="../disperser">disperser</a>: Disperser service
+├── <a href="../disperser">disperser</a>: Disperser service including API server, encoder and batcher
 ├── <a href="../docs">docs</a>: Documentation and specification
 ├── <a href="../encoding">encoding</a>: Encoding libraries such as Reed-Solomon, KZG
 ├── <a href="../inabox">inabox</a>: Inabox test to run EigenDA system on a single machine

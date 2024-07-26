@@ -87,12 +87,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RATE_BUCKET_STORE_SIZE"),
 		Required: false,
 	}
-	EnableDualQuorums = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-dual-quorums"),
-		Usage:    "Whether to enable dual quorum staking. If false, only quorum 0 is used as required quorum",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_DUAL_QUORUMS"),
-	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -110,7 +104,6 @@ var optionalFlags = []cli.Flag{
 	EnableRatelimiter,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
-	EnableDualQuorums,
 }
 
 // Flags contains the list of configuration options available to the binary.

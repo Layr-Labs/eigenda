@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -18,7 +19,8 @@ import (
 )
 
 type Config struct {
-	Timeout time.Duration
+	Timeout                   time.Duration
+	EnableGnarkBundleEncoding bool
 }
 
 type dispatcher struct {
@@ -126,7 +128,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 	start := time.Now()
-	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader)
+	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader, c.EnableGnarkBundleEncoding)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +169,7 @@ func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.Blob
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 	start := time.Now()
-	request, totalSize, err := GetStoreBlobsRequest(blobs, batchHeader)
+	request, totalSize, err := GetStoreBlobsRequest(blobs, batchHeader, c.EnableGnarkBundleEncoding)
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +198,94 @@ func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.Blob
 	return signatures, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader) (*node.StoreChunksRequest, int64, error) {
+func (c *dispatcher) AttestBatch(ctx context.Context, state *core.IndexedOperatorState, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader) (chan core.SigningMessage, error) {
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	if err != nil {
+		return nil, err
+	}
+	responseChan := make(chan core.SigningMessage, len(state.IndexedOperators))
+
+	for id, op := range state.IndexedOperators {
+		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
+			conn, err := grpc.Dial(
+				core.OperatorSocket(op.Socket).GetDispersalSocket(),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			if err != nil {
+				c.logger.Error("disperser cannot connect to operator dispersal socket", "socket", core.OperatorSocket(op.Socket).GetDispersalSocket(), "err", err)
+				return
+			}
+			defer conn.Close()
+
+			nodeClient := node.NewDispersalClient(conn)
+
+			requestedAt := time.Now()
+			sig, err := c.SendAttestBatchRequest(ctx, nodeClient, blobHeaderHashes, batchHeader, &op)
+			latencyMs := float64(time.Since(requestedAt).Milliseconds())
+			if err != nil {
+				responseChan <- core.SigningMessage{
+					Err:                  err,
+					Signature:            nil,
+					Operator:             id,
+					BatchHeaderHash:      batchHeaderHash,
+					AttestationLatencyMs: latencyMs,
+				}
+				c.metrics.ObserveLatency(id.Hex(), false, latencyMs)
+			} else {
+				responseChan <- core.SigningMessage{
+					Signature:            sig,
+					Operator:             id,
+					BatchHeaderHash:      batchHeaderHash,
+					AttestationLatencyMs: latencyMs,
+					Err:                  nil,
+				}
+				c.metrics.ObserveLatency(id.Hex(), true, latencyMs)
+			}
+		}(core.IndexedOperatorInfo{
+			PubkeyG1: op.PubkeyG1,
+			PubkeyG2: op.PubkeyG2,
+			Socket:   op.Socket,
+		}, id)
+	}
+
+	return responseChan, nil
+}
+
+func (c *dispatcher) SendAttestBatchRequest(ctx context.Context, nodeDispersalClient node.DispersalClient, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
+	defer cancel()
+	// start := time.Now()
+	hashes := make([][]byte, len(blobHeaderHashes))
+	for i, hash := range blobHeaderHashes {
+		hashes[i] = hash[:]
+	}
+
+	request := &node.AttestBatchRequest{
+		BatchHeader:      getBatchHeaderMessage(batchHeader),
+		BlobHeaderHashes: hashes,
+	}
+
+	c.logger.Debug("sending AttestBatch request to operator", "operator", op.Socket, "numBlobs", len(blobHeaderHashes), "requestMessageSize", proto.Size(request), "referenceBlockNumber", batchHeader.ReferenceBlockNumber)
+	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
+	reply, err := nodeDispersalClient.AttestBatch(ctx, request, opt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send AttestBatch request to operator %s: %w", core.OperatorSocket(op.Socket).GetDispersalSocket(), err)
+	}
+
+	sigBytes := reply.GetSignature()
+	point, err := new(core.Signature).Deserialize(sigBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize signature: %w", err)
+	}
+	return &core.Signature{G1Point: point}, nil
+}
+
+func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreChunksRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
 		var err error
-		blobs[i], err = getBlobMessage(blob)
+		blobs[i], err = getBlobMessage(blob, useGnarkBundleEncoding)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -216,12 +300,12 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 	return request, totalSize, nil
 }
 
-func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader) (*node.StoreBlobsRequest, int64, error) {
+func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreBlobsRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
 		var err error
-		blobs[i], err = getBlobMessage(blob)
+		blobs[i], err = getBlobMessage(blob, useGnarkBundleEncoding)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -236,7 +320,7 @@ func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.Ba
 	return request, totalSize, nil
 }
 
-func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
+func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
 	if blob.BlobHeader == nil {
 		return nil, errors.New("blob header is nil")
 	}
@@ -273,22 +357,43 @@ func getBlobMessage(blob *core.BlobMessage) (*node.Blob, error) {
 		}
 	}
 
-	data, err := blob.Bundles.Serialize()
-	if err != nil {
-		return nil, err
-	}
 	bundles := make([]*node.Bundle, len(quorumHeaders))
-	// the ordering of quorums in bundles must be same as in quorumHeaders
-	for i, quorumHeader := range quorumHeaders {
-		quorum := quorumHeader.QuorumId
-		if _, ok := blob.Bundles[uint8(quorum)]; ok {
-			bundles[i] = &node.Bundle{
-				Chunks: data[quorum],
+	if useGnarkBundleEncoding {
+		// the ordering of quorums in bundles must be same as in quorumHeaders
+		for i, quorumHeader := range quorumHeaders {
+			quorum := quorumHeader.QuorumId
+			if bundle, ok := blob.Bundles[uint8(quorum)]; ok {
+				bundleBytes, err := bundle.Serialize()
+				if err != nil {
+					return nil, err
+				}
+				bundles[i] = &node.Bundle{
+					Bundle: bundleBytes,
+				}
+			} else {
+				bundles[i] = &node.Bundle{
+					// empty bundle for quorums operators are not part of
+					Bundle: make([]byte, 0),
+				}
 			}
-		} else {
-			bundles[i] = &node.Bundle{
-				// empty bundle for quorums operators are not part of
-				Chunks: make([][]byte, 0),
+		}
+	} else {
+		data, err := blob.Bundles.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		// the ordering of quorums in bundles must be same as in quorumHeaders
+		for i, quorumHeader := range quorumHeaders {
+			quorum := quorumHeader.QuorumId
+			if _, ok := blob.Bundles[uint8(quorum)]; ok {
+				bundles[i] = &node.Bundle{
+					Chunks: data[quorum],
+				}
+			} else {
+				bundles[i] = &node.Bundle{
+					// empty bundle for quorums operators are not part of
+					Chunks: make([][]byte, 0),
+				}
 			}
 		}
 	}

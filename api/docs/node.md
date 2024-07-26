@@ -4,6 +4,8 @@
 ## Table of Contents
 
 - [node/node.proto](#node_node-proto)
+    - [AttestBatchReply](#node-AttestBatchReply)
+    - [AttestBatchRequest](#node-AttestBatchRequest)
     - [BatchHeader](#node-BatchHeader)
     - [Blob](#node-Blob)
     - [BlobHeader](#node-BlobHeader)
@@ -13,10 +15,16 @@
     - [GetBlobHeaderReply](#node-GetBlobHeaderReply)
     - [GetBlobHeaderRequest](#node-GetBlobHeaderRequest)
     - [MerkleProof](#node-MerkleProof)
+    - [NodeInfoReply](#node-NodeInfoReply)
+    - [NodeInfoRequest](#node-NodeInfoRequest)
     - [RetrieveChunksReply](#node-RetrieveChunksReply)
     - [RetrieveChunksRequest](#node-RetrieveChunksRequest)
+    - [StoreBlobsReply](#node-StoreBlobsReply)
+    - [StoreBlobsRequest](#node-StoreBlobsRequest)
     - [StoreChunksReply](#node-StoreChunksReply)
     - [StoreChunksRequest](#node-StoreChunksRequest)
+  
+    - [ChunkEncoding](#node-ChunkEncoding)
   
     - [Dispersal](#node-Dispersal)
     - [Retrieval](#node-Retrieval)
@@ -32,6 +40,37 @@
 <p align="right"><a href="#top">Top</a></p>
 
 ## node/node.proto
+
+
+
+<a name="node-AttestBatchReply"></a>
+
+### AttestBatchReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| signature | [bytes](#bytes) |  |  |
+
+
+
+
+
+
+<a name="node-AttestBatchRequest"></a>
+
+### AttestBatchRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| batch_header | [BatchHeader](#node-BatchHeader) |  | header of the batch |
+| blob_header_hashes | [bytes](#bytes) | repeated | the header hashes of all blobs in the batch |
+
+
+
 
 
 
@@ -86,6 +125,7 @@ single operator node.
 | length | [uint32](#uint32) |  | The length of the original blob in number of symbols (in the field where the polynomial is defined). |
 | quorum_headers | [BlobQuorumInfo](#node-BlobQuorumInfo) | repeated | The params of the quorums that this blob participates in. |
 | account_id | [string](#string) |  | The ID of the user who is dispersing this blob to EigenDA. |
+| reference_block_number | [uint32](#uint32) |  | The reference block number whose state is used to encode the blob |
 
 
 
@@ -122,6 +162,7 @@ operator and a single quorum.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | chunks | [bytes](#bytes) | repeated | Each chunk corresponds to a collection of points on the polynomial. Each chunk has same number of points. |
+| bundle | [bytes](#bytes) |  | All chunks of the bundle encoded in a byte array. |
 
 
 
@@ -195,6 +236,35 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 
 
 
+<a name="node-NodeInfoReply"></a>
+
+### NodeInfoReply
+Node info reply
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| semver | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| num_cpu | [uint32](#uint32) |  |  |
+| mem_bytes | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="node-NodeInfoRequest"></a>
+
+### NodeInfoRequest
+Node info request
+
+
+
+
+
+
 <a name="node-RetrieveChunksReply"></a>
 
 ### RetrieveChunksReply
@@ -204,6 +274,7 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
+| encoding | [ChunkEncoding](#node-ChunkEncoding) |  | How the above chunks encoded. |
 
 
 
@@ -221,6 +292,37 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 | batch_header_hash | [bytes](#bytes) |  | The hash of the ReducedBatchHeader defined onchain, see: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43 This identifies which batch to retrieve for. |
 | blob_index | [uint32](#uint32) |  | Which blob in the batch to retrieve for (note: a batch is logically an ordered list of blobs). |
 | quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
+
+
+
+
+
+
+<a name="node-StoreBlobsReply"></a>
+
+### StoreBlobsReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| signatures | [google.protobuf.BytesValue](#google-protobuf-BytesValue) | repeated | The operator&#39;s BLS sgnature signed on the blob header hashes. The ordering of the signatures must match the ordering of the blobs sent in the request, with empty signatures in the places for discarded blobs. |
+
+
+
+
+
+
+<a name="node-StoreBlobsRequest"></a>
+
+### StoreBlobsRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blobs | [Blob](#node-Blob) | repeated | Blobs to store |
+| reference_block_number | [uint32](#uint32) |  | The reference block number whose state is used to encode the blobs |
 
 
 
@@ -259,6 +361,20 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 
  
 
+
+<a name="node-ChunkEncoding"></a>
+
+### ChunkEncoding
+This describes how the chunks returned in RetrieveChunksReply are encoded.
+Used to facilitate the decoding of chunks.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| UNKNOWN | 0 |  |
+| GNARK | 1 |  |
+| GOB | 2 |  |
+
+
  
 
  
@@ -272,6 +388,9 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed. |
+| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. |
+| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. |
+| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
 
 
 <a name="node-Retrieval"></a>
@@ -282,7 +401,8 @@ See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRe
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node. |
-| GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | Similar to RetrieveChunks, this just returns the header of the blob. |
+| GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob. |
+| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
 
  
 
