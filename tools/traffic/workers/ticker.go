@@ -32,7 +32,7 @@ type MockTicker struct {
 }
 
 // NewMockTicker creates a new InterceptableTicker that can be deterministically controlled in tests.
-func NewMockTicker(now time.Time) InterceptableTicker {
+func NewMockTicker(now time.Time) *MockTicker {
 	return &MockTicker{
 		channel: make(chan time.Time),
 		now:     now,

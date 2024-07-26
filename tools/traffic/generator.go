@@ -107,6 +107,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 			&ctx,
 			&waitGroup,
 			logger,
+			workers.NewTicker(config.WorkerConfig.WriteRequestInterval),
 			&config.WorkerConfig,
 			&disperserClient,
 			&statusVerifier,

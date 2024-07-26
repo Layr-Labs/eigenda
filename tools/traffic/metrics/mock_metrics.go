@@ -18,22 +18,13 @@ type MockMetrics struct {
 	lock sync.Mutex
 }
 
-// MockLatencyMetric implements LatencyMetric, useful for testing.
-type MockLatencyMetric struct {
-	metrics     *MockMetrics
-	description string
-}
-
-// MockCountMetric implements CountMetric, useful for testing.
-type MockCountMetric struct {
-	metrics     *MockMetrics
-	description string
-}
-
-// MockGaugeMetric implements GaugeMetric, useful for testing.
-type MockGaugeMetric struct {
-	metrics     *MockMetrics
-	description string
+// NewMockMetrics creates a new MockMetrics instance.
+func NewMockMetrics() *MockMetrics {
+	return &MockMetrics{
+		counts:    make(map[string]float64),
+		gauges:    make(map[string]float64),
+		latencies: make(map[string]time.Duration),
+	}
 }
 
 // GetCount returns the count of a type of event.
@@ -62,39 +53,57 @@ func (m *MockMetrics) Start() {
 }
 
 func (m *MockMetrics) NewLatencyMetric(description string) LatencyMetric {
-	return &MockLatencyMetric{
+	return &mockLatencyMetric{
 		metrics:     m,
 		description: description,
 	}
 }
 
-func (m *MockLatencyMetric) ReportLatency(latency time.Duration) {
+func (m *MockMetrics) NewCountMetric(description string) CountMetric {
+	return &mockCountMetric{
+		metrics:     m,
+		description: description,
+	}
+}
+
+func (m *MockMetrics) NewGaugeMetric(description string) GaugeMetric {
+	return &mockGaugeMetric{
+		metrics:     m,
+		description: description,
+	}
+}
+
+// mockLatencyMetric implements LatencyMetric, useful for testing.
+type mockLatencyMetric struct {
+	metrics     *MockMetrics
+	description string
+}
+
+func (m *mockLatencyMetric) ReportLatency(latency time.Duration) {
 	m.metrics.lock.Lock()
 	m.metrics.latencies[m.description] = latency
 	m.metrics.lock.Unlock()
 }
 
-func (m *MockMetrics) NewCountMetric(description string) CountMetric {
-	return &MockCountMetric{
-		metrics:     m,
-		description: description,
-	}
+// mockCountMetric implements CountMetric, useful for testing.
+type mockCountMetric struct {
+	metrics     *MockMetrics
+	description string
 }
 
-func (m *MockCountMetric) Increment() {
+func (m *mockCountMetric) Increment() {
 	m.metrics.lock.Lock()
 	m.metrics.counts[m.description]++
 	m.metrics.lock.Unlock()
 }
 
-func (m *MockMetrics) NewGaugeMetric(description string) GaugeMetric {
-	return &MockGaugeMetric{
-		metrics:     m,
-		description: description,
-	}
+// mockGaugeMetric implements GaugeMetric, useful for testing.
+type mockGaugeMetric struct {
+	metrics     *MockMetrics
+	description string
 }
 
-func (m *MockGaugeMetric) Set(value float64) {
+func (m *mockGaugeMetric) Set(value float64) {
 	m.metrics.lock.Lock()
 	m.metrics.gauges[m.description] = value
 	m.metrics.lock.Unlock()
