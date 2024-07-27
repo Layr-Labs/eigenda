@@ -49,8 +49,9 @@ var (
 	blobMetadataStore *blobstore.BlobMetadataStore
 	sharedStorage     *blobstore.SharedBlobStore
 
-	UUID              = uuid.New()
-	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	UUID                    = uuid.New()
+	metadataTableName       = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	shadowMetadataTableName = fmt.Sprintf("test-BlobMetadata-Shadow-%v", UUID)
 )
 
 func TestMain(m *testing.M) {
@@ -90,13 +91,21 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb table: " + err.Error())
 	}
 
+	if shadowMetadataTableName != "" {
+		_, err = test_utils.CreateTable(context.Background(), cfg, shadowMetadataTableName, blobstore.GenerateTableSchema(shadowMetadataTableName, 10, 10))
+		if err != nil {
+			teardown()
+			panic("failed to create shadow dynamodb table: " + err.Error())
+		}
+	}
+
 	dynamoClient, err = dynamodb.NewClient(cfg, logger)
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
+	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
 	sharedStorage = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 }
 
