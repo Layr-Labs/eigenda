@@ -21,6 +21,15 @@ type MinibatcherConfig struct {
 	MaxNumRetriesPerDispersal uint
 }
 
+type BatchState struct {
+	BatchID              uuid.UUID
+	ReferenceBlockNumber uint
+	BlobHeaders          []*core.BlobHeader
+	BlobMetadata         []*disperser.BlobMetadata
+	OperatorState        *core.IndexedOperatorState
+	NumMinibatches       uint
+}
+
 type Minibatcher struct {
 	MinibatcherConfig
 
@@ -33,8 +42,9 @@ type Minibatcher struct {
 	Pool                  common.WorkerPool
 
 	// local state
+	Batches              map[uuid.UUID]*BatchState
 	ReferenceBlockNumber uint
-	BatchID              uuid.UUID
+	CurrentBatchID       uuid.UUID
 	MinibatchIndex       uint
 
 	ethClient common.EthClient
@@ -48,7 +58,6 @@ func NewMinibatcher(
 	dispatcher disperser.Dispatcher,
 	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
-	// aggregator core.SignatureAggregator,
 	encodingStreamer *EncodingStreamer,
 	ethClient common.EthClient,
 	workerpool common.WorkerPool,
@@ -64,8 +73,9 @@ func NewMinibatcher(
 		EncodingStreamer:      encodingStreamer,
 		Pool:                  workerpool,
 
+		Batches:              make(map[uuid.UUID]*BatchState),
 		ReferenceBlockNumber: 0,
-		BatchID:              uuid.Nil,
+		CurrentBatchID:       uuid.Nil,
 		MinibatchIndex:       0,
 
 		ethClient: ethClient,
@@ -104,6 +114,15 @@ func (b *Minibatcher) Start(ctx context.Context) error {
 	return nil
 }
 
+func (b *Minibatcher) PopBatchState(batchID uuid.UUID) *BatchState {
+	batchState, ok := b.Batches[batchID]
+	if !ok {
+		return nil
+	}
+	delete(b.Batches, batchID)
+	return batchState
+}
+
 func (b *Minibatcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.BlobMetadata, reason FailReason) error {
 	var result *multierror.Error
 	numPermanentFailures := 0
@@ -139,42 +158,50 @@ func (b *Minibatcher) HandleSingleBatch(ctx context.Context) error {
 		return err
 	}
 	log.Debug("CreateMinibatch took", "duration", time.Since(stageTimer).String())
-
 	// Processing new full batch
 	if b.ReferenceBlockNumber < batch.BatchHeader.ReferenceBlockNumber {
 		// Update status of the previous batch
-		if b.BatchID != uuid.Nil {
-			err = b.MinibatchStore.UpdateBatchStatus(ctx, b.BatchID, BatchStatusFormed)
+		if b.CurrentBatchID != uuid.Nil {
+			err = b.MinibatchStore.UpdateBatchStatus(ctx, b.CurrentBatchID, BatchStatusFormed)
 			if err != nil {
 				_ = b.handleFailure(ctx, batch.BlobMetadata, FailReason("error updating batch status"))
 				return fmt.Errorf("error updating batch status: %w", err)
 			}
 		}
 
-		// Create new batch
-		b.BatchID, err = uuid.NewV7()
+		// Reset local batch state and create new batch
+		b.CurrentBatchID, err = uuid.NewV7()
 		if err != nil {
 			_ = b.handleFailure(ctx, batch.BlobMetadata, FailReason("error generating batch UUID"))
 			return fmt.Errorf("error generating batch ID: %w", err)
 		}
-		batchHeaderHash, err := batch.BatchHeader.GetBatchHeaderHash()
-		if err != nil {
-			_ = b.handleFailure(ctx, batch.BlobMetadata, FailReason("error getting batch header hash"))
-			return fmt.Errorf("error getting batch header hash: %w", err)
-		}
 		b.MinibatchIndex = 0
 		b.ReferenceBlockNumber = batch.BatchHeader.ReferenceBlockNumber
 		err = b.MinibatchStore.PutBatch(ctx, &BatchRecord{
-			ID:                   b.BatchID,
+			ID:                   b.CurrentBatchID,
 			CreatedAt:            time.Now().UTC(),
 			ReferenceBlockNumber: b.ReferenceBlockNumber,
-			HeaderHash:           batchHeaderHash,
+			Status:               BatchStatusPending,
 		})
 		if err != nil {
 			_ = b.handleFailure(ctx, batch.BlobMetadata, FailReason("error storing batch record"))
 			return fmt.Errorf("error storing batch record: %w", err)
 		}
+		b.Batches[b.CurrentBatchID] = &BatchState{
+			BatchID:              b.CurrentBatchID,
+			ReferenceBlockNumber: b.ReferenceBlockNumber,
+			BlobHeaders:          make([]*core.BlobHeader, 0),
+			BlobMetadata:         make([]*disperser.BlobMetadata, 0),
+			OperatorState:        batch.State,
+			NumMinibatches:       0,
+		}
 	}
+
+	// Accumulate batch metadata
+	batchState := b.Batches[b.CurrentBatchID]
+	batchState.BlobHeaders = append(batchState.BlobHeaders, batch.BlobHeaders...)
+	batchState.BlobMetadata = append(batchState.BlobMetadata, batch.BlobMetadata...)
+	batchState.NumMinibatches++
 
 	// Store minibatch record
 	blobHeaderHashes := make([][32]byte, 0, len(batch.EncodedBlobs))
@@ -189,7 +216,7 @@ func (b *Minibatcher) HandleSingleBatch(ctx context.Context) error {
 		batchSize += blob.BlobHeader.EncodedSizeAllQuorums()
 	}
 	err = b.MinibatchStore.PutMinibatch(ctx, &MinibatchRecord{
-		BatchID:              b.BatchID,
+		BatchID:              b.CurrentBatchID,
 		MinibatchIndex:       b.MinibatchIndex,
 		BlobHeaderHashes:     blobHeaderHashes,
 		BatchSize:            uint64(batchSize),
@@ -201,9 +228,9 @@ func (b *Minibatcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	// Dispatch encoded batch
-	log.Debug("Dispatching encoded batch...", "batchID", b.BatchID, "minibatchIndex", b.MinibatchIndex, "referenceBlockNumber", b.ReferenceBlockNumber, "numBlobs", len(batch.EncodedBlobs))
+	log.Debug("Dispatching encoded batch...", "batchID", b.CurrentBatchID, "minibatchIndex", b.MinibatchIndex, "referenceBlockNumber", b.ReferenceBlockNumber, "numBlobs", len(batch.EncodedBlobs))
 	stageTimer = time.Now()
-	b.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader, b.BatchID, b.MinibatchIndex)
+	b.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer).String())
 
 	h, err := batch.State.OperatorState.Hash()
