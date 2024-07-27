@@ -30,6 +30,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMODB_TABLE_NAME"),
 	}
+	ShadowTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "shadow-table-name"),
+		Usage:    "Name of the dynamodb table to shadow write blob metadata",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SHADOW_TABLE_NAME"),
+		Value:    "",
+	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "Port at which disperser listens for grpc calls",
