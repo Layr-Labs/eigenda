@@ -111,6 +111,7 @@ var optionalFlags = []cli.Flag{
 	EnableRatelimiter,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
+	ShadowTableNameFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
