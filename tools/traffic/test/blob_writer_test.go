@@ -74,10 +74,10 @@ func TestBlobWriter(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		if rand.Float64() < errorProbability {
-			disperserClient.ErrorToReturn = fmt.Errorf("intentional error for testing purposes")
+			disperserClient.DispenseErrorToReturn = fmt.Errorf("intentional error for testing purposes")
 			errorCount++
 		} else {
-			disperserClient.ErrorToReturn = nil
+			disperserClient.DispenseErrorToReturn = nil
 		}
 
 		// This is the key that will be assigned to the next blob.
@@ -92,15 +92,18 @@ func TestBlobWriter(t *testing.T) {
 		tu.AssertEventuallyTrue(t, func() bool {
 			lock.Lock()
 			defer lock.Unlock()
-			return int(disperserClient.Count) > i && int(unconfirmedKeyHandler.Count)+errorCount > i
+			return int(disperserClient.DisperseCount) > i && int(unconfirmedKeyHandler.Count)+errorCount > i
 		}, time.Second)
 
 		// These methods should be called exactly once per tick if there are no errors.
 		// In the presence of errors, nothing should be passed to the unconfirmed key handler.
-		assert.Equal(t, uint(i+1), disperserClient.Count)
+		assert.Equal(t, uint(i+1), disperserClient.DisperseCount)
 		assert.Equal(t, uint(i+1-errorCount), unconfirmedKeyHandler.Count)
 
-		if disperserClient.ErrorToReturn == nil {
+		// This method should not be called in this test.
+		assert.Equal(t, uint(0), disperserClient.GetStatusCount)
+
+		if disperserClient.DispenseErrorToReturn == nil {
 			assert.NotNil(t, disperserClient.ProvidedData)
 			assert.Equal(t, customQuorum, disperserClient.ProvidedQuorum)
 

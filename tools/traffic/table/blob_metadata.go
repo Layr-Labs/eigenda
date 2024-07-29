@@ -70,3 +70,8 @@ func (blob *BlobMetadata) BatchHeaderHash() *[]byte {
 func (blob *BlobMetadata) BlobIndex() uint {
 	return blob.blobIndex
 }
+
+// RemainingReadPermits returns the maximum number of remaining reads permitted against this blob.
+func (blob *BlobMetadata) RemainingReadPermits() int {
+	return blob.remainingReadPermits
+}
