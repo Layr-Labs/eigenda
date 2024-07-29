@@ -101,8 +101,18 @@ func TestConfigVerification(t *testing.T) {
 	t.Run("MissingS3AccessKeys", func(t *testing.T) {
 		cfg := validCfg()
 
+		cfg.S3Config.S3CredentialType = store.S3CredentialStatic
 		cfg.S3Config.Endpoint = "http://localhost:9000"
 		cfg.S3Config.AccessKeyID = ""
+
+		err := cfg.Check()
+		require.Error(t, err)
+	})
+
+	t.Run("MissingS3Credential", func(t *testing.T) {
+		cfg := validCfg()
+
+		cfg.S3Config.S3CredentialType = store.S3CredentialUnknown
 
 		err := cfg.Check()
 		require.Error(t, err)

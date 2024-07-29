@@ -11,13 +11,21 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+const (
+	S3CredentialStatic  S3CredentialType = "static"
+	S3CredentialIAM     S3CredentialType = "iam"
+	S3CredentialUnknown S3CredentialType = "unknown"
+)
+
+type S3CredentialType string
 type S3Config struct {
-	Bucket          string
-	Path            string
-	Endpoint        string
-	AccessKeyID     string
-	AccessKeySecret string
-	Profiling       bool
+	S3CredentialType S3CredentialType
+	Bucket           string
+	Path             string
+	Endpoint         string
+	AccessKeyID      string
+	AccessKeySecret  string
+	Profiling        bool
 }
 
 type S3Store struct {
@@ -27,13 +35,26 @@ type S3Store struct {
 }
 
 func NewS3(cfg S3Config) (*S3Store, error) {
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewIAM(""),
-		Secure: false,
-	})
-	if err != nil {
-		return nil, err
+	var client *minio.Client
+	var err error
+	if cfg.S3CredentialType == S3CredentialIAM {
+		client, err = minio.New(cfg.Endpoint, &minio.Options{
+			Creds:  credentials.NewIAM(""),
+			Secure: false,
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		client, err = minio.New(cfg.Endpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, ""),
+			Secure: false,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return &S3Store{
 		cfg:    cfg,
 		client: client,

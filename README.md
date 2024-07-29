@@ -46,10 +46,14 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--metrics.enabled` | `false` | `$EIGENDA_PROXY_METRICS_ENABLED` | Enable the metrics server. |
 | `--metrics.port` | `7300` | `$EIGENDA_PROXY_METRICS_PORT` | Metrics listening port. |
 | `--port` | `3100` | `$EIGENDA_PROXY_PORT` | Server listening port. |
+| `--s3.credential-type` |  | `$EIGENDA_PROXY_S3_CREDENTIAL_TYPE` | Static or iam. |
+| `--s3.access-key-id` |  | `$EIGENDA_PROXY_S3_ACCESS_KEY_ID` | Access key id for S3 storage. |
 | `--s3.access-key-id` |  | `$EIGENDA_PROXY_S3_ACCESS_KEY_ID` | Access key id for S3 storage. |
 | `--s3.access-key-secret` |  | `$EIGENDA_PROXY_S3_ACCESS_KEY_SECRET` | Access key secret for S3 storage. |
 | `--s3.bucket` |  | `$EIGENDA_PROXY_S3_BUCKET` | Bucket name for S3 storage. |
+| `--s3.path` |  | `$EIGENDA_PROXY_S3_PATH` | Bucket path for S3 storage. |
 | `--s3.endpoint` |  | `$EIGENDA_PROXY_S3_ENDPOINT` | Endpoint for S3 storage. |
+| `--s3.backup` |  | `$EIGENDA_PROXY_S3_BACKUP` | Enable S3 backup with Eigenda disbursement. |
 | `--help, -h` | `false` |  | Show help. |
 | `--version, -v` | `false` |  | Print the version. |
 

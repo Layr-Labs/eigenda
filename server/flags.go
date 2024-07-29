@@ -55,7 +55,7 @@ func init() {
 var Flags []cli.Flag
 
 type CLIConfig struct {
-	S3Config store.S3Config
+	S3Config      store.S3Config
 	EigenDAConfig Config
 	MetricsCfg    opmetrics.CLIConfig
 }
