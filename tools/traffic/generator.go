@@ -92,10 +92,11 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		UseSecureGrpcFlag: config.DisperserUseSecureGrpcFlag,
 	}
 	disperserClient := clients.NewDisperserClient(&disperserConfig, signer)
-	statusVerifier := workers.NewStatusVerifier(
+	statusVerifier := workers.NewBlobVerifier(
 		&ctx,
 		&waitGroup,
 		logger,
+		workers.NewTicker(config.WorkerConfig.VerifierInterval),
 		&config.WorkerConfig,
 		&blobTable,
 		disperserClient,

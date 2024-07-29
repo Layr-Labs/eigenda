@@ -53,6 +53,9 @@ type BlobVerifier struct {
 	// Newly added keys that require verification.
 	keyChannel chan *unconfirmedKey
 
+	// ticker is used to control the rate at which blobs queried for status.
+	ticker InterceptableTicker
+
 	blobsInFlightMetric               metrics.GaugeMetric
 	getStatusLatencyMetric            metrics.LatencyMetric
 	confirmationLatencyMetric         metrics.LatencyMetric
@@ -70,11 +73,12 @@ type UnconfirmedKeyHandler interface {
 	AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint)
 }
 
-// NewStatusVerifier creates a new BlobVerifier instance.
-func NewStatusVerifier(
+// NewBlobVerifier creates a new BlobVerifier instance.
+func NewBlobVerifier(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
+	ticker InterceptableTicker,
 	config *Config,
 	table *table.BlobTable,
 	disperser clients.DisperserClient,
@@ -84,6 +88,7 @@ func NewStatusVerifier(
 		ctx:                               ctx,
 		waitGroup:                         waitGroup,
 		logger:                            logger,
+		ticker:                            ticker,
 		config:                            config,
 		table:                             table,
 		dispenser:                         disperser,
@@ -117,12 +122,12 @@ func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte, checksum *[16]byte,
 // the disperser service to verify the status of blobs.
 func (verifier *BlobVerifier) Start() {
 	verifier.waitGroup.Add(1)
-	go verifier.monitor(verifier.config.VerifierInterval)
+	go verifier.monitor()
 }
 
 // monitor periodically polls the disperser service to verify the status of blobs.
-func (verifier *BlobVerifier) monitor(period time.Duration) {
-	ticker := time.NewTicker(period)
+func (verifier *BlobVerifier) monitor() {
+	ticker := verifier.ticker.getTimeChannel()
 	for {
 		select {
 		case <-(*verifier.ctx).Done():
@@ -130,7 +135,7 @@ func (verifier *BlobVerifier) monitor(period time.Duration) {
 			return
 		case key := <-verifier.keyChannel:
 			verifier.unconfirmedKeys = append(verifier.unconfirmedKeys, key)
-		case <-ticker.C:
+		case <-ticker:
 			verifier.poll()
 		}
 	}
