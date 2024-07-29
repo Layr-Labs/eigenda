@@ -158,7 +158,7 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 		return nil, err
 	}
 
-	blobs, err := GetBlobMessages(in, s.node.Config.NumBatchDeserializationWorkers)
+	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,67 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 }
 
 func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.StoreBlobsReply, error) {
-	return nil, errors.New("StoreBlobs is not implemented")
+	start := time.Now()
+
+	// Validate the request
+	if in.GetReferenceBlockNumber() == 0 {
+		return nil, api.NewInvalidArgError("missing reference_block_number in request")
+	}
+
+	if len(in.GetBlobs()) == 0 {
+		return nil, api.NewInvalidArgError("missing blobs in request")
+	}
+	for _, blob := range in.Blobs {
+		if blob.GetHeader() == nil {
+			return nil, api.NewInvalidArgError("missing blob header in request")
+		}
+		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
+			return nil, api.NewInvalidArgError("invalid points contained in the blob header in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
+			return nil, api.NewInvalidArgError("missing quorum headers in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
+			return nil, api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+		}
+		for _, q := range blob.GetHeader().GetQuorumHeaders() {
+			if q.GetQuorumId() > core.MaxQuorumID {
+				return nil, api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+			}
+			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	blobHeadersSize := 0
+	bundleSize := 0
+	for _, blob := range in.Blobs {
+		blobHeadersSize += proto.Size(blob.GetHeader())
+		for _, bundle := range blob.GetBundles() {
+			bundleSize += proto.Size(bundle)
+		}
+	}
+	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf message (over about 2GiB).
+	s.node.Logger.Info("StoreBlobs RPC request received", "numBlobs", len(in.Blobs), "reqMsgSize", proto.Size(in), "blobHeadersSize", blobHeadersSize, "bundleSize", bundleSize)
+
+	// Process the request
+	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
+	if err != nil {
+		return nil, err
+	}
+
+	s.node.Metrics.ObserveLatency("StoreBlobs", "deserialization", float64(time.Since(start).Milliseconds()))
+	s.node.Logger.Info("StoreBlobsRequest deserialized", "duration", time.Since(start))
+
+	sig, err := s.node.ProcessBatch(ctx, batchHeader, blobs, in.GetBlobs())
+	if err != nil {
+		return nil, err
+	}
+
+	sigData := sig.Serialize()
+
+	return &pb.StoreChunksReply{Signature: sigData[:]}, nil
 }
 
 func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*pb.AttestBatchReply, error) {

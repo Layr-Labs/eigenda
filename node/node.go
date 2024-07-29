@@ -388,6 +388,112 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	return sig, nil
 }
 
+// ProcessBlobs validates the blobs are correct, stores data into the node's Store, and then returns a signature for each blob.
+//
+// Notes:
+//   - If the blob is stored already, it's no-op to store it more than once
+//   - If the blob is stored, but the processing fails after that, these data items will not be rollback
+//   - These data items will be garbage collected eventually when they become stale.
+func (n *Node) ProcessBlobs(ctx context.Context, blobs []*core.BlobMessage, rawBlobs []*node.Blob) (*core.Signature, error) {
+	start := time.Now()
+	log := n.Logger
+
+	if len(blobs) == 0 {
+		return nil, errors.New("number of blobs must be greater than zero")
+	}
+
+	if len(blobs) != len(rawBlobs) {
+		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
+	}
+
+	// Measure num batches received and its size in bytes
+	batchSize := uint64(0)
+	for _, blob := range blobs {
+		for quorumID, bundle := range blob.Bundles {
+			n.Metrics.AcceptBlobs(quorumID, bundle.Size())
+		}
+		batchSize += blob.Bundles.Size()
+	}
+	n.Metrics.AcceptBatches("received", batchSize)
+
+	batchHeaderHashHex := hex.EncodeToString(batchHeaderHash[:])
+	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHashHex, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
+
+	// Store the batch.
+	// Run this in a goroutine so we can parallelize the batch storing and batch
+	// verifaction work.
+	// This should be able to improve latency without needing more CPUs, because batch
+	// storing is an IO operation.
+	type storeResult struct {
+		// Whether StoreBatch failed.
+		err error
+
+		// The keys that are stored to database for a single batch.
+		// Defined only if the batch not already exists and gets stored to database successfully.
+		keys *[][]byte
+
+		// Latency to store the batch.
+		// Defined only if the batch not already exists and gets stored to database successfully.
+		latency time.Duration
+	}
+	storeChan := make(chan storeResult)
+	go func(n *Node) {
+		start := time.Now()
+		keys, err := n.Store.StoreBatch(ctx, header, blobs, rawBlobs)
+		if err != nil {
+			// If batch already exists, we don't store it again, but we should not
+			// error out in such case.
+			if errors.Is(err, ErrBatchAlreadyExist) {
+				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
+			} else {
+				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil, latency: 0}
+			}
+			return
+		}
+		storeChan <- storeResult{err: nil, keys: keys, latency: time.Since(start)}
+	}(n)
+
+	// Validate batch.
+	stageTimer := time.Now()
+	err = n.ValidateBatch(ctx, header, blobs)
+	if err != nil {
+		// If we have already stored the batch into database, but it's not valid, we
+		// revert all the keys for that batch.
+		result := <-storeChan
+		if result.keys != nil {
+			log.Debug("Batch validation failed, rolling back the key/value entries stored in database", "number of entires", len(*result.keys), "batchHeaderHash", batchHeaderHashHex)
+			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
+				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHashHex, "err", deleteKeysErr)
+			}
+		}
+		return nil, err
+	}
+	n.Metrics.RecordStoreChunksStage("validated", batchSize, time.Since(stageTimer))
+	log.Debug("Validate batch took", "duration:", time.Since(stageTimer))
+
+	// Before we sign the batch, we should first complete the batch storing successfully.
+	result := <-storeChan
+	if result.err != nil {
+		log.Error("Store batch failed", "batchHeaderHash", batchHeaderHashHex, "err", result.err)
+		return nil, err
+	}
+	if result.keys != nil {
+		n.Metrics.RecordStoreChunksStage("stored", batchSize, result.latency)
+		n.Logger.Debug("Store batch succeeded", "batchHeaderHash", batchHeaderHashHex, "duration:", result.latency)
+	} else {
+		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeaderHash", batchHeaderHashHex)
+	}
+
+	// Sign batch header hash if all validation checks pass and data items are written to database.
+	stageTimer = time.Now()
+	sig := n.KeyPair.SignMessage(batchHeaderHash)
+	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
+
+	log.Debug("Exiting process batch", "duration", time.Since(start))
+	return sig, nil
+}
+
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
 	start := time.Now()
 	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, header.ReferenceBlockNumber, n.Config.ID)
