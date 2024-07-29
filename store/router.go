@@ -13,18 +13,18 @@ import (
 )
 
 type Router struct {
-	log log.Logger
+	log     log.Logger
 	eigenda *EigenDAStore
-	mem *MemStore
-	s3 *S3Store
+	mem     *MemStore
+	s3      *S3Store
 }
 
 func NewRouter(eigenda *EigenDAStore, mem *MemStore, s3 *S3Store, l log.Logger) (*Router, error) {
 	return &Router{
-		log: l,
+		log:     l,
 		eigenda: eigenda,
-		mem: mem,
-		s3: s3,
+		mem:     mem,
+		s3:      s3,
 	}, nil
 }
 
@@ -54,7 +54,7 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 			r.log.Debug("Retrieving data from memstore")
 			return r.mem.Get(ctx, key)
 		}
-		
+
 		r.log.Debug("Retrieving data from eigenda")
 		return r.eigenda.Get(ctx, key)
 
@@ -70,7 +70,6 @@ func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, va
 	case commitments.OptimismGeneric:
 		return r.PutWithKey(ctx, key, value)
 
-	
 	case commitments.OptimismAltDA, commitments.SimpleCommitmentMode:
 		return r.PutWithoutKey(ctx, value)
 
@@ -80,7 +79,7 @@ func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, va
 
 }
 
-// PutWithoutKey ... 
+// PutWithoutKey ...
 func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, err error) {
 	if r.mem != nil {
 		r.log.Debug("Storing data to memstore")
@@ -89,7 +88,19 @@ func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, e
 
 	if r.eigenda != nil {
 		r.log.Debug("Storing data to eigenda backend")
-		return r.eigenda.Put(ctx, value)
+		result, err := r.eigenda.Put(ctx, value)
+		if err != nil {
+			if r.s3 != nil && r.s3.cfg.Backup {
+				r.log.Info("Storing data to S3 backend")
+				commitment := crypto.Keccak256(value)
+
+				err = r.s3.Put(ctx, commitment, value)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		return result, err
 	}
 
 	if r.s3 != nil {
@@ -106,8 +117,7 @@ func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, e
 
 }
 
-
-// PutWithKey is only supported for S3 storage backends using OP's alt-da keccak256 commitment type 
+// PutWithKey is only supported for S3 storage backends using OP's alt-da keccak256 commitment type
 func (r *Router) PutWithKey(ctx context.Context, key []byte, value []byte) ([]byte, error) {
 	if r.s3 == nil {
 		return nil, errors.New("S3 is disabled but is only supported for posting known commitment keys")

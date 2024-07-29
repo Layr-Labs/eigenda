@@ -26,6 +26,7 @@ type S3Config struct {
 	AccessKeyID      string
 	AccessKeySecret  string
 	Profiling        bool
+	Backup           bool
 }
 
 type S3Store struct {
