@@ -1,4 +1,4 @@
-package workers
+package test
 
 import (
 	"context"
@@ -8,38 +8,6 @@ import (
 	"sync"
 	"testing"
 )
-
-// mockUnconfirmedKeyHandler is a stand-in for the blob verifier's UnconfirmedKeyHandler.
-type mockUnconfirmedKeyHandler struct {
-	t *testing.T
-
-	ProvidedKey      []byte
-	ProvidedChecksum [16]byte
-	ProvidedSize     uint
-
-	// Incremented each time AddUnconfirmedKey is called.
-	Count uint
-
-	lock *sync.Mutex
-}
-
-func newMockUnconfirmedKeyHandler(t *testing.T, lock *sync.Mutex) *mockUnconfirmedKeyHandler {
-	return &mockUnconfirmedKeyHandler{
-		t:    t,
-		lock: lock,
-	}
-}
-
-func (m *mockUnconfirmedKeyHandler) AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.ProvidedKey = *key
-	m.ProvidedChecksum = *checksum
-	m.ProvidedSize = size
-
-	m.Count++
-}
 
 type mockDisperserClient struct {
 	t *testing.T

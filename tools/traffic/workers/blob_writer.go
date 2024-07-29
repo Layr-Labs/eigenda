@@ -33,7 +33,7 @@ type BlobWriter struct {
 	disperser clients.DisperserClient
 
 	// Unconfirmed keys are sent here.
-	unconfirmedKeyHandler UnconfirmedKeyHandler
+	unconfirmedKeyHandler KeyHandler
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData *[]byte
@@ -56,7 +56,7 @@ func NewBlobWriter(
 	ticker InterceptableTicker,
 	config *Config,
 	disperser clients.DisperserClient,
-	unconfirmedKeyHandler UnconfirmedKeyHandler,
+	unconfirmedKeyHandler KeyHandler,
 	generatorMetrics metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
@@ -104,7 +104,7 @@ func (writer *BlobWriter) run() {
 		select {
 		case <-(*writer.ctx).Done():
 			return
-		case <-writer.ticker.getTimeChannel():
+		case <-writer.ticker.GetTimeChannel():
 			data := writer.getRandomData()
 			key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
 				return writer.sendRequest(*data)

@@ -69,10 +69,6 @@ type BlobVerifier struct {
 	finalizedCountMetric              metrics.CountMetric
 }
 
-type UnconfirmedKeyHandler interface {
-	AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint)
-}
-
 // NewBlobVerifier creates a new BlobVerifier instance.
 func NewBlobVerifier(
 	ctx *context.Context,
@@ -127,7 +123,7 @@ func (verifier *BlobVerifier) Start() {
 
 // monitor periodically polls the disperser service to verify the status of blobs.
 func (verifier *BlobVerifier) monitor() {
-	ticker := verifier.ticker.getTimeChannel()
+	ticker := verifier.ticker.GetTimeChannel()
 	for {
 		select {
 		case <-(*verifier.ctx).Done():

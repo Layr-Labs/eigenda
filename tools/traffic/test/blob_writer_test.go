@@ -1,4 +1,4 @@
-package workers
+package test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
+	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
 	"sync"
@@ -23,7 +24,7 @@ func TestBlobWriter(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.Nil(t, err)
 	startTime := time.Unix(rand.Int63()%2_000_000_000, 0)
-	ticker := NewMockTicker(startTime)
+	ticker := newMockTicker(startTime)
 
 	dataSize := rand.Uint64()%1024 + 64
 
@@ -41,7 +42,7 @@ func TestBlobWriter(t *testing.T) {
 		customQuorum = []uint8{1, 2, 3}
 	}
 
-	config := &Config{
+	config := &workers.Config{
 		DataSize:         dataSize,
 		SignerPrivateKey: signerPrivateKey,
 		RandomizeBlobs:   randomizeBlobs,
@@ -51,11 +52,11 @@ func TestBlobWriter(t *testing.T) {
 	lock := sync.Mutex{}
 
 	disperserClient := newMockDisperserClient(t, &lock, authenticated)
-	unconfirmedKeyHandler := newMockUnconfirmedKeyHandler(t, &lock)
+	unconfirmedKeyHandler := newMockKeyHandler(t, &lock)
 
 	generatorMetrics := metrics.NewMockMetrics()
 
-	writer := NewBlobWriter(
+	writer := workers.NewBlobWriter(
 		&ctx,
 		&waitGroup,
 		logger,
