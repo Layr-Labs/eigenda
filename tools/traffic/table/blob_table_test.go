@@ -1,28 +1,11 @@
 package table
 
 import (
-	"fmt"
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
 	"testing"
-	"time"
 )
-
-// initializeRandom initializes the random number generator. Prints the seed so that the test can be rerun
-// deterministically. Replace a call to this method with a call to initializeRandomWithSeed to rerun a test
-// with a specific seed.
-func initializeRandom() {
-	rand.Seed(uint64(time.Now().UnixNano()))
-	seed := rand.Uint64()
-	fmt.Printf("Random seed: %d\n", seed)
-	rand.Seed(seed)
-}
-
-// initializeRandomWithSeed initializes the random number generator with a specific seed.
-func initializeRandomWithSeed(seed uint64) {
-	fmt.Printf("Random seed: %d\n", seed)
-	rand.Seed(seed)
-}
 
 // randomMetadata generates a random BlobMetadata instance.
 func randomMetadata(permits int) *BlobMetadata {
@@ -37,7 +20,7 @@ func randomMetadata(permits int) *BlobMetadata {
 
 // TestBasicOperation tests basic operations of the BlobTable. Adds blobs and iterates over them.
 func TestBasicOperation(t *testing.T) {
-	initializeRandom()
+	tu.InitializeRandom()
 
 	table := NewBlobTable()
 	assert.Equal(t, uint(0), table.Size())
@@ -61,7 +44,7 @@ func TestBasicOperation(t *testing.T) {
 
 // TestGetRandomWithRemoval tests getting a random blob data, but where the number of permits per blob is unlimited.
 func TestGetRandomNoRemovalByConfiguration(t *testing.T) {
-	initializeRandom()
+	tu.InitializeRandom()
 
 	table := NewBlobTable()
 	assert.Equal(t, uint(0), table.Size())
@@ -103,7 +86,7 @@ func TestGetRandomNoRemovalByConfiguration(t *testing.T) {
 
 // TestGetRandomWithRemoval tests getting a random blob data, where the number of permits per blob is limited.
 func TestGetRandomWithRemoval(t *testing.T) {
-	initializeRandom()
+	tu.InitializeRandom()
 
 	table := NewBlobTable()
 	assert.Equal(t, uint(0), table.Size())
@@ -155,7 +138,7 @@ func TestGetRandomWithRemoval(t *testing.T) {
 
 // TestAddOrReplace tests adding blobs to a table with a maximum capacity. The table should replace blobs when full.
 func TestAddOrReplace(t *testing.T) {
-	initializeRandom()
+	tu.InitializeRandom()
 
 	table := NewBlobTable()
 	assert.Equal(t, uint(0), table.Size())

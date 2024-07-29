@@ -6,6 +6,7 @@ import (
 	"fmt"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
@@ -16,56 +17,10 @@ import (
 	"time"
 )
 
-// TODO create test util package maybe
-
-// initializeRandom initializes the random number generator. Prints the seed so that the test can be rerun
-// deterministically. Replace a call to this method with a call to initializeRandomWithSeed to rerun a test
-// with a specific seed.
-func initializeRandom() {
-	rand.Seed(uint64(time.Now().UnixNano()))
-	seed := rand.Uint64()
-	fmt.Printf("Random seed: %d\n", seed)
-	rand.Seed(seed)
-}
-
-// initializeRandomWithSeed initializes the random number generator with a specific seed.
-func initializeRandomWithSeed(seed uint64) {
-	fmt.Printf("Random seed: %d\n", seed)
-	rand.Seed(seed)
-}
-
-// assertEventuallyTrue asserts that a condition is true within a given duration. Repeatably checks the condition.
-func assertEventuallyTrue(t *testing.T, condition func() bool, duration time.Duration) {
-	start := time.Now()
-	for time.Since(start) < duration {
-		if condition() {
-			return
-		}
-		time.Sleep(1 * time.Millisecond)
-	}
-	assert.True(t, condition(), "Condition did not become true within the given duration")
-}
-
-// executeWithTimeout executes a function with a timeout.
-// Panics if the function does not complete within the given duration.
-func executeWithTimeout(f func(), duration time.Duration) {
-	done := make(chan struct{})
-	go func() {
-		f()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(duration):
-		panic("function did not complete within the given duration")
-	}
-}
-
-// MockUnconfirmedKeyHandler is a stand-in for the blob verifier's UnconfirmedKeyHandler.
-type MockUnconfirmedKeyHandler struct {
+// mockUnconfirmedKeyHandler is a stand-in for the blob verifier's UnconfirmedKeyHandler.
+type mockUnconfirmedKeyHandler struct {
 	t *testing.T
 
-	// TODO rename
 	ProvidedKey      []byte
 	ProvidedChecksum [16]byte
 	ProvidedSize     uint
@@ -76,14 +31,14 @@ type MockUnconfirmedKeyHandler struct {
 	lock *sync.Mutex
 }
 
-func NewMockUnconfirmedKeyHandler(t *testing.T, lock *sync.Mutex) *MockUnconfirmedKeyHandler {
-	return &MockUnconfirmedKeyHandler{
+func newMockUnconfirmedKeyHandler(t *testing.T, lock *sync.Mutex) *mockUnconfirmedKeyHandler {
+	return &mockUnconfirmedKeyHandler{
 		t:    t,
 		lock: lock,
 	}
 }
 
-func (m *MockUnconfirmedKeyHandler) AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint) {
+func (m *mockUnconfirmedKeyHandler) AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -94,7 +49,7 @@ func (m *MockUnconfirmedKeyHandler) AddUnconfirmedKey(key *[]byte, checksum *[16
 	m.Count++
 }
 
-type MockDisperserClient struct {
+type mockDisperserClient struct {
 	t *testing.T
 	// if true, DisperseBlobAuthenticated is expected to be used, otherwise DisperseBlob is expected to be used
 	authenticated bool
@@ -114,15 +69,15 @@ type MockDisperserClient struct {
 	lock *sync.Mutex
 }
 
-func NewMockDisperserClient(t *testing.T, lock *sync.Mutex, authenticated bool) *MockDisperserClient {
-	return &MockDisperserClient{
+func newMockDisperserClient(t *testing.T, lock *sync.Mutex, authenticated bool) *mockDisperserClient {
+	return &mockDisperserClient{
 		t:             t,
 		lock:          lock,
 		authenticated: authenticated,
 	}
 }
 
-func (m *MockDisperserClient) DisperseBlob(
+func (m *mockDisperserClient) DisperseBlob(
 	ctx context.Context,
 	data []byte,
 	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
@@ -137,7 +92,7 @@ func (m *MockDisperserClient) DisperseBlob(
 	return &m.StatusToReturn, m.KeyToReturn, m.ErrorToReturn
 }
 
-func (m *MockDisperserClient) DisperseBlobAuthenticated(
+func (m *mockDisperserClient) DisperseBlobAuthenticated(
 	ctx context.Context,
 	data []byte,
 	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
@@ -152,17 +107,17 @@ func (m *MockDisperserClient) DisperseBlobAuthenticated(
 	return &m.StatusToReturn, m.KeyToReturn, m.ErrorToReturn
 }
 
-func (m *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error) {
+func (m *mockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error) {
 	panic("this method should not be called in this test")
 }
 
-func (m *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
+func (m *mockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
 	panic("this method should not be called in this test")
 }
 
 // TestBasicBehavior tests the basic behavior of the BlobWriter.
 func TestBasicBehavior(t *testing.T) {
-	initializeRandom()
+	tu.InitializeRandom()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
@@ -196,8 +151,8 @@ func TestBasicBehavior(t *testing.T) {
 
 	lock := sync.Mutex{}
 
-	disperserClient := NewMockDisperserClient(t, &lock, authenticated)
-	unconfirmedKeyHandler := NewMockUnconfirmedKeyHandler(t, &lock)
+	disperserClient := newMockDisperserClient(t, &lock, authenticated)
+	unconfirmedKeyHandler := newMockUnconfirmedKeyHandler(t, &lock)
 
 	generatorMetrics := metrics.NewMockMetrics()
 
@@ -234,7 +189,7 @@ func TestBasicBehavior(t *testing.T) {
 		ticker.Tick(1 * time.Second)
 
 		// Wait until the writer finishes its work.
-		assertEventuallyTrue(t, func() bool {
+		tu.AssertEventuallyTrue(t, func() bool {
 			lock.Lock()
 			defer lock.Unlock()
 			return int(disperserClient.Count) > i && int(unconfirmedKeyHandler.Count)+errorCount > i
@@ -278,7 +233,7 @@ func TestBasicBehavior(t *testing.T) {
 	}
 
 	cancel()
-	executeWithTimeout(func() {
+	tu.ExecuteWithTimeout(func() {
 		waitGroup.Wait()
 	}, time.Second)
 }
