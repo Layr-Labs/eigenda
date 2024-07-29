@@ -231,6 +231,13 @@ var (
 		Value:    5 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "GET_BLOB_STATUS_TIMEOUT"),
 	}
+	VerificationChannelCapacityFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "verification-channel-capacity"),
+		Usage:    "Size of the channel used to communicate between the writer and verifier.",
+		Required: false,
+		Value:    1000,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "VERIFICATION_CHANNEL_CAPACITY"),
+	}
 
 	/* Configuration for the blob reader. */
 
@@ -321,6 +328,7 @@ var optionalFlags = []cli.Flag{
 	GetBlobStatusTimeoutFlag,
 	ReadOverflowTableSizeFlag,
 	WriteTimeoutFlag,
+	VerificationChannelCapacityFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

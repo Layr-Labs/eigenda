@@ -45,7 +45,7 @@ type BlobVerifier struct {
 	table *table.BlobTable
 
 	// The disperser client used to monitor the disperser service.
-	dispenser *clients.DisperserClient
+	dispenser clients.DisperserClient
 
 	// The keys of blobs that have not yet been confirmed by the disperser service.
 	unconfirmedKeys []*unconfirmedKey
@@ -77,7 +77,7 @@ func NewStatusVerifier(
 	logger logging.Logger,
 	config *Config,
 	table *table.BlobTable,
-	disperser *clients.DisperserClient,
+	disperser clients.DisperserClient,
 	generatorMetrics metrics.Metrics) BlobVerifier {
 
 	return BlobVerifier{
@@ -88,7 +88,7 @@ func NewStatusVerifier(
 		table:                             table,
 		dispenser:                         disperser,
 		unconfirmedKeys:                   make([]*unconfirmedKey, 0),
-		keyChannel:                        make(chan *unconfirmedKey),
+		keyChannel:                        make(chan *unconfirmedKey, config.VerificationChannelCapacity),
 		blobsInFlightMetric:               generatorMetrics.NewGaugeMetric("blobs_in_flight"),
 		getStatusLatencyMetric:            generatorMetrics.NewLatencyMetric("get_status"),
 		confirmationLatencyMetric:         generatorMetrics.NewLatencyMetric("confirmation"),
@@ -162,7 +162,7 @@ func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 
 	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
-			return (*verifier.dispenser).GetBlobStatus(ctxTimeout, *key.key)
+			return verifier.dispenser.GetBlobStatus(ctxTimeout, *key.key)
 		})
 
 	if err != nil {

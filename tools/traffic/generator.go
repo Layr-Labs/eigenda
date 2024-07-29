@@ -98,7 +98,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 		logger,
 		&config.WorkerConfig,
 		&blobTable,
-		&disperserClient,
+		disperserClient,
 		generatorMetrics)
 
 	writers := make([]*workers.BlobWriter, 0)
@@ -109,7 +109,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 			logger,
 			workers.NewTicker(config.WorkerConfig.WriteRequestInterval),
 			&config.WorkerConfig,
-			&disperserClient,
+			disperserClient,
 			&statusVerifier,
 			generatorMetrics)
 		writers = append(writers, &writer)

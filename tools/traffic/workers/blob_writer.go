@@ -30,7 +30,7 @@ type BlobWriter struct {
 	config *Config
 
 	// disperser is the client used to send blobs to the disperser.
-	disperser *clients.DisperserClient
+	disperser clients.DisperserClient
 
 	// Unconfirmed keys are sent here.
 	unconfirmedKeyHandler UnconfirmedKeyHandler
@@ -55,7 +55,7 @@ func NewBlobWriter(
 	logger logging.Logger,
 	ticker InterceptableTicker,
 	config *Config,
-	disperser *clients.DisperserClient,
+	disperser clients.DisperserClient,
 	unconfirmedKeyHandler UnconfirmedKeyHandler,
 	generatorMetrics metrics.Metrics) BlobWriter {
 
@@ -148,12 +148,12 @@ func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
 	var key []byte
 	var err error
 	if writer.config.SignerPrivateKey != "" {
-		_, key, err = (*writer.disperser).DisperseBlobAuthenticated(
+		_, key, err = writer.disperser.DisperseBlobAuthenticated(
 			ctxTimeout,
 			data,
 			writer.config.CustomQuorums)
 	} else {
-		_, key, err = (*writer.disperser).DisperseBlob(
+		_, key, err = writer.disperser.DisperseBlob(
 			ctxTimeout,
 			data,
 			writer.config.CustomQuorums)

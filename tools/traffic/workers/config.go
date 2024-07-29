@@ -20,6 +20,8 @@ type Config struct {
 	VerifierInterval time.Duration
 	// The amount of time to wait for a blob status to be fetched.
 	GetBlobStatusTimeout time.Duration
+	// The size of the channel used to communicate between the writer and verifier.
+	VerificationChannelCapacity uint
 
 	// The number of worker threads that generate read traffic.
 	NumReadInstances uint
