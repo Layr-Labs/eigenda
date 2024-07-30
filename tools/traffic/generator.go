@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
@@ -49,14 +50,14 @@ type Generator struct {
 	logger           *logging.Logger
 	disperserClient  clients.DisperserClient
 	eigenDAClient    *clients.EigenDAClient
-	config           *Config
+	config           *config.Config
 
 	writers  []*workers.BlobWriter
 	verifier *workers.BlobVerifier
 	readers  []*workers.BlobReader
 }
 
-func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Generator, error) {
+func NewTrafficGenerator(config *config.Config, signer core.BlobRequestSigner) (*Generator, error) {
 	logger, err := common.NewLogger(config.LoggingConfig)
 	if err != nil {
 		return nil, err
@@ -149,7 +150,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 }
 
 // buildRetriever creates a retriever client for the traffic generator.
-func buildRetriever(config *Config) (clients.RetrievalClient, retrivereth.ChainClient) {
+func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth.ChainClient) {
 	loggerConfig := common.DefaultLoggerConfig()
 
 	logger, err := common.NewLogger(loggerConfig)
