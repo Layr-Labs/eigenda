@@ -15,7 +15,6 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"sync"
-	"time"
 )
 
 // BlobReader reads blobs from a disperser at a configured rate.
@@ -28,6 +27,9 @@ type BlobReader struct {
 
 	// All logs should be written using this logger.
 	logger logging.Logger
+
+	// ticker is used to control the rate at which blobs are read.
+	ticker InterceptableTicker
 
 	// config contains the configuration for the generator.
 	config *Config
@@ -63,6 +65,7 @@ func NewBlobReader(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
+	ticker InterceptableTicker,
 	config *Config,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
@@ -75,6 +78,7 @@ func NewBlobReader(
 		ctx:                        ctx,
 		waitGroup:                  waitGroup,
 		logger:                     logger,
+		ticker:                     ticker,
 		config:                     config,
 		retriever:                  retriever,
 		chainClient:                chainClient,
@@ -109,12 +113,12 @@ func (reader *BlobReader) Start() {
 
 // run periodically performs reads on blobs.
 func (reader *BlobReader) run() {
-	ticker := time.NewTicker(reader.config.ReadRequestInterval)
+	ticker := reader.ticker.GetTimeChannel()
 	for {
 		select {
 		case <-(*reader.ctx).Done():
 			return
-		case <-ticker.C:
+		case <-ticker:
 			reader.randomRead()
 		}
 	}
@@ -122,9 +126,6 @@ func (reader *BlobReader) run() {
 
 // randomRead reads a random blob.
 func (reader *BlobReader) randomRead() {
-
-	reader.requiredReadPoolSizeMetric.Set(float64(reader.requiredReads.Size()))
-
 	metadata, removed := reader.requiredReads.GetRandom(true)
 	if metadata == nil {
 		// There are no blobs that we are required to read. Get a random blob from the optionalReads.
@@ -135,9 +136,11 @@ func (reader *BlobReader) randomRead() {
 		}
 	} else if removed {
 		// We have removed a blob from the requiredReads. Add it to the optionalReads.
-		reader.optionalReads.AddOrReplace(metadata, uint(reader.config.ReadOverflowTableSize))
+		reader.optionalReads.AddOrReplace(metadata, reader.config.ReadOverflowTableSize)
 		reader.optionalReadPoolSizeMetric.Set(float64(reader.optionalReads.Size()))
 	}
+
+	reader.requiredReadPoolSizeMetric.Set(float64(reader.requiredReads.Size()))
 
 	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
 	batchHeader, err := metrics.InvokeAndReportLatency(reader.fetchBatchHeaderMetric,

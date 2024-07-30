@@ -124,6 +124,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Genera
 			&ctx,
 			&waitGroup,
 			logger,
+			workers.NewTicker(config.WorkerConfig.ReadRequestInterval),
 			&config.WorkerConfig,
 			retriever,
 			chainClient,

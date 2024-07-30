@@ -34,7 +34,7 @@ type Config struct {
 	// The size of a table of blobs to optionally read when we run out of blobs that we are required to read. Blobs
 	// that are no longer required are added to this table, and when the table is at capacity they are randomly retired.
 	// Set this to 0 to disable this feature.
-	ReadOverflowTableSize uint32
+	ReadOverflowTableSize uint
 	// The amount of time to wait for a batch header to be fetched.
 	FetchBatchHeaderTimeout time.Duration
 	// The amount of time to wait for a blob to be retrieved.

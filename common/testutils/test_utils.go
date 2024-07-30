@@ -25,7 +25,7 @@ func InitializeRandomWithSeed(seed uint64) {
 }
 
 // AssertEventuallyTrue asserts that a condition is true within a given duration. Repeatably checks the condition.
-func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Duration) {
+func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Duration, debugInfo ...any) {
 	start := time.Now()
 	for time.Since(start) < duration {
 		if condition() {
@@ -33,7 +33,25 @@ func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Dur
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
-	assert.True(t, condition(), "Condition did not become true within the given duration")
+
+	if len(debugInfo) == 0 {
+		assert.True(t, condition(), "Condition did not become true within the given duration") // TODO use this elsewhere
+	} else {
+		assert.True(t, condition(), debugInfo...)
+	}
+}
+
+// AssertEventuallyEquals asserts that a function returns a specific value within a given duration.
+func AssertEventuallyEquals(t *testing.T, expected any, actual func() any, duration time.Duration, debugInfo ...any) {
+	if len(debugInfo) == 0 {
+		debugInfo = append(debugInfo,
+			"Expected value did not match actual value within the given duration. Expected: %v, Actual: %v",
+			expected, actual())
+	}
+
+	AssertEventuallyTrue(t, func() bool {
+		return expected == actual()
+	}, duration, debugInfo...)
 }
 
 // ExecuteWithTimeout executes a function with a timeout.
