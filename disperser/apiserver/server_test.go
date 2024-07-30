@@ -44,11 +44,12 @@ var (
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	UUID               = uuid.New()
-	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
+	dockertestPool          *dockertest.Pool
+	dockertestResource      *dockertest.Resource
+	UUID                    = uuid.New()
+	metadataTableName       = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	shadowMetadataTableName = fmt.Sprintf("test-BlobMetadata-Shadow-%v", UUID)
+	bucketTableName         = fmt.Sprintf("test-BucketStore-%v", UUID)
 
 	deployLocalStack bool
 	localStackPort   = "4568"
@@ -585,7 +586,7 @@ func setup() {
 
 	}
 
-	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
+	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, shadowMetadataTableName, bucketTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
@@ -631,7 +632,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create dynamoDB client")
 	}
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
 
 	globalParams := common.GlobalRateParams{
 		CountFailed: false,

@@ -16,8 +16,9 @@ var (
 	localstackFlagName      = "localstack-port"
 	deployResourcesFlagName = "deploy-resources"
 
-	metadataTableName = "test-BlobMetadata"
-	bucketTableName   = "test-BucketStore"
+	metadataTableName       = "test-BlobMetadata"
+	shadowMetadataTableName = "" // not used
+	bucketTableName         = "test-BucketStore"
 
 	chainCmdName      = "chain"
 	localstackCmdName = "localstack"
@@ -137,7 +138,7 @@ func localstack(ctx *cli.Context) error {
 	}
 
 	if ctx.Bool(deployResourcesFlagName) {
-		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName)
+		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, shadowMetadataTableName, bucketTableName)
 	}
 
 	return nil
