@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	config2 "github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,7 +33,7 @@ type BlobReader struct {
 	ticker InterceptableTicker
 
 	// config contains the configuration for the generator.
-	config *Config
+	config *config2.WorkerConfig
 
 	retriever   clients.RetrievalClient
 	chainClient eth.ChainClient
@@ -66,7 +67,7 @@ func NewBlobReader(
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
 	ticker InterceptableTicker,
-	config *Config,
+	config *config2.WorkerConfig,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
 	blobTable *table.BlobTable,

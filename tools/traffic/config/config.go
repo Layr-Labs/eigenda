@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -66,7 +65,7 @@ type Config struct {
 	InstanceLaunchInterval time.Duration
 
 	// Configures the traffic generator workers.
-	WorkerConfig workers.Config
+	WorkerConfig WorkerConfig
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -112,7 +111,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 		InstanceLaunchInterval: ctx.Duration(InstanceLaunchIntervalFlag.Name),
 
-		WorkerConfig: workers.Config{
+		WorkerConfig: WorkerConfig{
 			NumWriteInstances:    ctx.GlobalUint(NumWriteInstancesFlag.Name),
 			WriteRequestInterval: ctx.Duration(WriteRequestIntervalFlag.Name),
 			DataSize:             ctx.GlobalUint64(DataSizeFlag.Name),

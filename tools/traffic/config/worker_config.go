@@ -1,9 +1,9 @@
-package workers
+package config
 
 import "time"
 
 // Config configures the traffic generator workers.
-type Config struct {
+type WorkerConfig struct {
 	// The number of worker threads that generate write traffic.
 	NumWriteInstances uint
 	// The period of the submission rate of new blobs for each write worker thread.

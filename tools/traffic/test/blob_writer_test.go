@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func TestBlobWriter(t *testing.T) {
 		customQuorum = []uint8{1, 2, 3}
 	}
 
-	config := &workers.Config{
+	config := &config.WorkerConfig{
 		DataSize:         dataSize,
 		SignerPrivateKey: signerPrivateKey,
 		RandomizeBlobs:   randomizeBlobs,

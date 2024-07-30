@@ -6,6 +6,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
@@ -64,7 +65,7 @@ func TestBlobVerifier(t *testing.T) {
 	ticker := newMockTicker(startTime)
 
 	requiredDownloads := rand.Intn(10)
-	config := &workers.Config{
+	config := &config.WorkerConfig{
 		RequiredDownloads: float64(requiredDownloads),
 	}
 

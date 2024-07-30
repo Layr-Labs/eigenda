@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	config2 "github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -39,7 +40,7 @@ type BlobVerifier struct {
 	logger logging.Logger
 
 	// config contains the configuration for the generator.
-	config *Config
+	config *config2.WorkerConfig
 
 	// A table of confirmed blobs. Blobs are added here when they are confirmed by the disperser service.
 	table *table.BlobTable
@@ -75,7 +76,7 @@ func NewBlobVerifier(
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
 	ticker InterceptableTicker,
-	config *Config,
+	config *config2.WorkerConfig,
 	table *table.BlobTable,
 	disperser clients.DisperserClient,
 	generatorMetrics metrics.Metrics) BlobVerifier {

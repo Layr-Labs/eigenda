@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
@@ -26,7 +27,7 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 	startTime := time.Unix(rand.Int63()%2_000_000_000, 0)
 	ticker := newMockTicker(startTime)
 
-	config := &workers.Config{
+	config := &config.WorkerConfig{
 		ReadOverflowTableSize: 0,
 	}
 
@@ -164,7 +165,7 @@ func TestBlobReaderWithOverflow(t *testing.T) {
 	blobCount := 100
 	overflowTableSize := uint(rand.Intn(blobCount-1) + 1)
 
-	config := &workers.Config{
+	config := &config.WorkerConfig{
 		ReadOverflowTableSize: overflowTableSize,
 	}
 
