@@ -35,7 +35,7 @@ func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Dur
 	}
 
 	if len(debugInfo) == 0 {
-		assert.True(t, condition(), "Condition did not become true within the given duration") // TODO use this elsewhere
+		assert.True(t, condition(), "Condition did not become true within the given duration")
 	} else {
 		assert.True(t, condition(), debugInfo...)
 	}
@@ -56,7 +56,7 @@ func AssertEventuallyEquals(t *testing.T, expected any, actual func() any, durat
 
 // ExecuteWithTimeout executes a function with a timeout.
 // Panics if the function does not complete within the given duration.
-func ExecuteWithTimeout(f func(), duration time.Duration) {
+func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 	done := make(chan struct{})
 	go func() {
 		f()
@@ -65,6 +65,10 @@ func ExecuteWithTimeout(f func(), duration time.Duration) {
 	select {
 	case <-done:
 	case <-time.After(duration):
+		if len(debugInfo) > 0 {
+			panic(fmt.Sprintf(debugInfo[0].(string), debugInfo[1:]...))
+		}
+
 		panic("function did not complete within the given duration")
 	}
 }
