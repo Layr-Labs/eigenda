@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
@@ -195,6 +196,58 @@ func TestBlobMetadataStoreOperationsWithPaginationNoStoredBlob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, processing)
 	assert.Nil(t, lastEvaluatedKey)
+}
+
+func TestShadowWriteBlobMetadata(t *testing.T) {
+	ctx := context.Background()
+
+	blobKey := disperser.BlobKey{
+		BlobHash:     "shadowblob",
+		MetadataHash: "shadowhash",
+	}
+	metadata := &disperser.BlobMetadata{
+		MetadataHash: blobKey.MetadataHash,
+		BlobHash:     blobKey.BlobHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+		ConfirmationInfo: &disperser.ConfirmationInfo{},
+	}
+
+	err := shadowBlobMetadataStore.QueueNewBlobMetadata(ctx, metadata)
+	assert.NoError(t, err)
+	assert.NoError(t, err)
+	err = blobMetadataStore.SetBlobStatus(context.Background(), blobKey, disperser.Dispersing)
+	assert.NoError(t, err)
+	primaryMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Dispersing, primaryMetadata.BlobStatus)
+
+	// Check that the shadow metadata exists but status has NOT been updated
+	shadowMetadataItem, err := dynamoClient.GetItem(ctx, shadowMetadataTableName, map[string]types.AttributeValue{
+		"MetadataHash": &types.AttributeValueMemberS{
+			Value: blobKey.MetadataHash,
+		},
+		"BlobHash": &types.AttributeValueMemberS{
+			Value: blobKey.BlobHash,
+		},
+	})
+	assert.NoError(t, err)
+	shadowMetadata := disperser.BlobMetadata{}
+	err = attributevalue.UnmarshalMap(shadowMetadataItem, &shadowMetadata)
+	assert.NoError(t, err)
+	assert.Equal(t, disperser.Processing, shadowMetadata.BlobStatus)
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey.BlobHash},
+		},
+	})
 }
 
 func deleteItems(t *testing.T, keys []commondynamodb.Key) {
