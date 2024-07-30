@@ -223,6 +223,13 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
+
+		// Blob index.
+		blobIndexIter := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
+		for blobIndexIter.Next() {
+			expiredKeys = append(expiredKeys, copyBytes(blobIndexIter.Key()))
+		}
+		blobIndexIter.Release()
 	}
 
 	// Perform the removal.
@@ -279,23 +286,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	keys = append(keys, batchHeaderKey)
 	values = append(values, batchHeaderBytes)
 
-	// Setting the expiration time for the batch.
-	curr := time.Now().Unix()
-	timeToExpire := (s.blockStaleMeasure + s.storeDurationBlocks) * 12 // 12s per block
-	// Why this expiration time is safe?
-	//
-	// The batch must be confirmed before referenceBlockNumber+blockStaleMeasure, otherwise
-	// it's stale and won't be accepted onchain. This means the blob's lifecycle will end
-	// before referenceBlockNumber+blockStaleMeasure+storeDurationBlocks.
-	// Since time@referenceBlockNumber < time.Now() (we always use a reference block that's
-	// already onchain), we have
-	// time@(referenceBlockNumber+blockStaleMeasure+storeDurationBlocks)
-	// = time@referenceBlockNumber + 12*(blockStaleMeasure+storeDurationBlocks)
-	// < time.Now() + 12*(blockStaleMeasure+storeDurationBlocks).
-	//
-	// Note if a batch is unconfirmed, it could be removed even earlier; here we treat its
-	// lifecycle the same as confirmed batches for simplicity.
-	expirationTime := curr + int64(timeToExpire)
+	expirationTime := s.expirationTime()
 	expirationKey := EncodeBatchExpirationKey(expirationTime)
 	keys = append(keys, expirationKey)
 	values = append(values, batchHeaderHash[:])
@@ -404,23 +395,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 	keys := make([][]byte, 0)
 	values := make([][]byte, 0)
 
-	// Setting the expiration time for the batch.
-	curr := time.Now().Unix()
-	timeToExpire := (s.blockStaleMeasure + s.storeDurationBlocks) * 12 // 12s per block
-	// Why this expiration time is safe?
-	//
-	// The batch must be confirmed before referenceBlockNumber+blockStaleMeasure, otherwise
-	// it's stale and won't be accepted onchain. This means the blob's lifecycle will end
-	// before referenceBlockNumber+blockStaleMeasure+storeDurationBlocks.
-	// Since time@referenceBlockNumber < time.Now() (we always use a reference block that's
-	// already onchain), we have
-	// time@(referenceBlockNumber+blockStaleMeasure+storeDurationBlocks)
-	// = time@referenceBlockNumber + 12*(blockStaleMeasure+storeDurationBlocks)
-	// < time.Now() + 12*(blockStaleMeasure+storeDurationBlocks).
-	//
-	// Note if a batch is unconfirmed, it could be removed even earlier; here we treat its
-	// lifecycle the same as confirmed batches for simplicity.
-	expirationTime := curr + int64(timeToExpire)
+	expirationTime := s.expirationTime()
 	expirationKey := EncodeBlobExpirationKey(expirationTime)
 	// expirationValue is a list of blob header hashes that are expired.
 	expirationValue := make([]byte, 0)
@@ -448,7 +423,6 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 			return nil, fmt.Errorf("failed to get blob header hash: %w", err)
 		}
 		blobHeaderKey := EncodeBlobHeaderKeyByHash(blobHeaderHash)
-
 		if s.HasKey(ctx, blobHeaderKey) {
 			s.logger.Warn("Blob already exists", "blobHeaderHash", hexutil.Encode(blobHeaderHash[:]))
 			continue
@@ -539,6 +513,50 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 	return &keys, nil
 }
 
+func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeaderHash [32]byte, blobHeaderHashes [][32]byte) error {
+	start := time.Now()
+	// The key/value pairs that need to be written to the local database.
+	keys := make([][]byte, 0)
+	values := make([][]byte, 0)
+
+	expirationTime := s.expirationTime()
+	expirationKey := EncodeBatchExpirationKey(expirationTime)
+	keys = append(keys, expirationKey)
+	values = append(values, batchHeaderHash[:])
+
+	for blobIndex, blobHeaderHash := range blobHeaderHashes {
+		blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
+		keys = append(keys, blobIndexKey)
+		values = append(values, copyBytes(blobHeaderHash[:]))
+	}
+	err := s.db.WriteBatch(keys, values)
+	if err != nil {
+		return fmt.Errorf("failed to write the blob index mappings into local database: %w", err)
+	}
+	s.logger.Debug("StoreBatchBlobMapping succeeded", "duration", time.Since(start))
+	return nil
+}
+
+func (s *Store) expirationTime() int64 {
+	// Setting the expiration time for the batch.
+	curr := time.Now().Unix()
+	timeToExpire := (s.blockStaleMeasure + s.storeDurationBlocks) * 12 // 12s per block
+	// Why this expiration time is safe?
+	//
+	// The batch must be confirmed before referenceBlockNumber+blockStaleMeasure, otherwise
+	// it's stale and won't be accepted onchain. This means the blob's lifecycle will end
+	// before referenceBlockNumber+blockStaleMeasure+storeDurationBlocks.
+	// Since time@referenceBlockNumber < time.Now() (we always use a reference block that's
+	// already onchain), we have
+	// time@(referenceBlockNumber+blockStaleMeasure+storeDurationBlocks)
+	// = time@referenceBlockNumber + 12*(blockStaleMeasure+storeDurationBlocks)
+	// < time.Now() + 12*(blockStaleMeasure+storeDurationBlocks).
+	//
+	// Note if a batch is unconfirmed, it could be removed even earlier; here we treat its
+	// lifecycle the same as confirmed batches for simplicity.
+	return curr + int64(timeToExpire)
+}
+
 // GetBatchHeader returns the batch header for the given batchHeaderHash.
 func (s *Store) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) ([]byte, error) {
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
@@ -602,6 +620,18 @@ func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobInd
 	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data), "chunk encoding format", format)
 
 	return chunks, format, nil
+}
+
+func (s *Store) GetBlobHeaderHashAtIndex(ctx context.Context, batchHeaderHash [32]byte, blobIndex int) ([]byte, error) {
+	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
+	data, err := s.db.Get(blobIndexKey)
+	if err != nil {
+		if errors.Is(err, leveldb.ErrNotFound) {
+			return nil, ErrKeyNotFound
+		}
+		return nil, err
+	}
+	return data, nil
 }
 
 // HasKey returns if a given key has been stored.

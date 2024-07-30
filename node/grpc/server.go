@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"reflect"
 	"runtime"
 	"sync"
 	"time"
@@ -21,6 +22,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 
 	_ "go.uber.org/automaxprocs"
 
@@ -155,12 +158,12 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 	start := time.Now()
 
 	// Get batch header hash
-	batchHeader, err := GetBatchHeader(in)
+	batchHeader, err := node.GetBatchHeader(in.GetBatchHeader())
 	if err != nil {
 		return nil, err
 	}
 
-	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
+	blobs, err := node.GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +199,7 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 		if blob.GetHeader() == nil {
 			return api.NewInvalidArgError("missing blob header in request")
 		}
-		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
+		if node.ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
 			return api.NewInvalidArgError("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
@@ -264,7 +267,7 @@ func (s *Server) validateStoreBlobsRequest(in *pb.StoreBlobsRequest) error {
 		if blob.GetHeader() == nil {
 			return api.NewInvalidArgError("missing blob header in request")
 		}
-		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
+		if node.ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
 			return api.NewInvalidArgError("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
@@ -308,7 +311,7 @@ func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.
 	s.node.Logger.Info("StoreBlobs RPC request received", "numBlobs", len(in.Blobs), "reqMsgSize", proto.Size(in), "blobHeadersSize", blobHeadersSize, "bundleSize", bundleSize, "referenceBlockNumber", in.GetReferenceBlockNumber())
 
 	// Process the request
-	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
+	blobs, err := node.GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +337,44 @@ func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.
 }
 
 func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*pb.AttestBatchReply, error) {
-	return nil, errors.New("AttestBatch is not implemented")
+	start := time.Now()
+
+	// Validate the batch root
+	blobHeaderHashes := make([][32]byte, len(in.GetBlobHeaderHashes()))
+	for i, hash := range in.GetBlobHeaderHashes() {
+		if len(hash) != 32 {
+			return nil, api.NewInvalidArgError("invalid blob header hash")
+		}
+		var h [32]byte
+		copy(h[:], hash)
+		blobHeaderHashes[i] = h
+	}
+	batchHeader, err := node.GetBatchHeader(in.GetBatchHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the batch header: %w", err)
+	}
+	err = s.node.ValidateBatchContents(ctx, blobHeaderHashes, batchHeader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate the batch header root: %w", err)
+	}
+
+	// Store the mapping from batch header + blob index to blob header hashes
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the batch header hash: %w", err)
+	}
+	err = s.node.Store.StoreBatchBlobMapping(ctx, batchHeaderHash, blobHeaderHashes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store the batch blob mapping: %w", err)
+	}
+
+	// Sign the batch header
+	sig := s.node.KeyPair.SignMessage(batchHeaderHash)
+
+	s.node.Logger.Info("AttestBatch complete", "duration", time.Since(start))
+	return &pb.AttestBatchReply{
+		Signature: sig.Serialize(),
+	}, nil
 }
 
 func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksRequest) (*pb.RetrieveChunksReply, error) {
@@ -445,6 +485,64 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 	}, nil
 }
 
+// rebuildMerkleTree rebuilds the merkle tree from the blob headers and batch header.
+func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte) (*merkletree.MerkleTree, error) {
+	batchHeaderBytes, err := s.node.Store.GetBatchHeader(context.Background(), batchHeaderHash)
+	if err != nil {
+		return nil, errors.New("failed to get the batch header from Store")
+	}
+
+	batchHeader, err := new(core.BatchHeader).Deserialize(batchHeaderBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	blobIndex := 0
+	leafs := make([][]byte, 0)
+	for {
+		blobHeaderBytes, err := s.node.Store.GetBlobHeader(context.Background(), batchHeaderHash, blobIndex)
+		if err != nil {
+			if errors.Is(err, node.ErrKeyNotFound) {
+				break
+			}
+			return nil, err
+		}
+
+		var protoBlobHeader pb.BlobHeader
+		err = proto.Unmarshal(blobHeaderBytes, &protoBlobHeader)
+		if err != nil {
+			return nil, err
+		}
+
+		blobHeader, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+		if err != nil {
+			return nil, err
+		}
+
+		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+		if err != nil {
+			return nil, err
+		}
+		leafs = append(leafs, blobHeaderHash[:])
+		blobIndex++
+	}
+
+	if len(leafs) == 0 {
+		return nil, errors.New("no blob header found")
+	}
+
+	tree, err := merkletree.NewTree(merkletree.WithData(leafs), merkletree.WithHashType(keccak256.New()))
+	if err != nil {
+		return nil, err
+	}
+
+	if !reflect.DeepEqual(tree.Root(), batchHeader.BatchRoot[:]) {
+		return nil, errors.New("invalid batch header")
+	}
+
+	return tree, nil
+}
+
 func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blobIndex int) (*core.BlobHeader, *pb.BlobHeader, error) {
 
 	blobHeaderBytes, err := s.node.Store.GetBlobHeader(ctx, batchHeaderHash, blobIndex)
@@ -458,7 +556,7 @@ func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, bl
 		return nil, nil, err
 	}
 
-	blobHeader, err := GetBlobHeaderFromProto(&protoBlobHeader)
+	blobHeader, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
 	if err != nil {
 		return nil, nil, err
 	}
