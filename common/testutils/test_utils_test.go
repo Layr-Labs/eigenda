@@ -16,10 +16,10 @@ func TestRandomSetup(t *testing.T) {
 	assert.NotEqual(t, x, y)
 
 	seed := uint64(rand.Int())
-	InitializeRandomWithSeed(seed)
+	InitializeRandom(seed)
 	a := rand.Int()
 
-	InitializeRandomWithSeed(seed)
+	InitializeRandom(seed)
 	b := rand.Int()
 
 	assert.Equal(t, a, b)
