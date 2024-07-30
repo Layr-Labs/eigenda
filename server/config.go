@@ -37,8 +37,8 @@ const (
 	MemstoreFlagName           = "memstore.enabled"
 	MemstoreExpirationFlagName = "memstore.expiration"
 	// S3 flags
-	S3CredentialTypeFlagName  = "s3.credential-type"
-	S3BucketFlagName          = "s3.bucket"
+	S3CredentialTypeFlagName  = "s3.credential-type" // #nosec G101
+	S3BucketFlagName          = "s3.bucket"          // #nosec G101
 	S3PathFlagName            = "s3.path"
 	S3EndpointFlagName        = "s3.endpoint"
 	S3AccessKeyIDFlagName     = "s3.access-key-id"     // #nosec G101
