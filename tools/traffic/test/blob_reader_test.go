@@ -64,12 +64,14 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 
 		blobData := make([]byte, blobSize)
 		_, err = rand.Read(blobData)
+		assert.Nil(t, err)
 
 		var checksum [16]byte
 		if i%10 == 0 {
 			// Simulate an invalid blob
 			invalidBlobCount++
 			_, err = rand.Read(checksum[:])
+			assert.Nil(t, err)
 		} else {
 			checksum = md5.Sum(blobData)
 		}
@@ -107,8 +109,6 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 		remainingPermits := uint(0)
 		for j := uint(0); j < blobTable.Size(); j++ {
 			blob := blobTable.Get(j)
-			if blob.RemainingReadPermits() != 2 {
-			}
 			remainingPermits += uint(blob.RemainingReadPermits())
 		}
 		assert.Equal(t, remainingPermits, expectedTotalReads-i-1)
@@ -201,12 +201,14 @@ func TestBlobReaderWithOverflow(t *testing.T) {
 
 		blobData := make([]byte, blobSize)
 		_, err = rand.Read(blobData)
+		assert.Nil(t, err)
 
 		var checksum [16]byte
 		if i%10 == 0 {
 			// Simulate an invalid blob
 			invalidBlobCount++
 			_, err = rand.Read(checksum[:])
+			assert.Nil(t, err)
 		} else {
 			checksum = md5.Sum(blobData)
 		}
@@ -244,8 +246,6 @@ func TestBlobReaderWithOverflow(t *testing.T) {
 		remainingPermits := uint(0)
 		for j := uint(0); j < blobTable.Size(); j++ {
 			blob := blobTable.Get(j)
-			if blob.RemainingReadPermits() != 2 {
-			}
 			remainingPermits += uint(blob.RemainingReadPermits())
 		}
 		assert.Equal(t, remainingPermits, expectedTotalReads-i-1)
