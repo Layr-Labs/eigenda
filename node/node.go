@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -587,6 +591,57 @@ func (n *Node) SignBlobs(blobs []*core.BlobMessage, referenceBlockNumber uint) (
 
 	n.Logger.Debug("SignBlobs completed", "duration", time.Since(start))
 	return signatures, nil
+}
+
+// ValidateBlobHeadersRoot validates the blob headers root hash
+// by comparing it with the merkle tree root hash of the blob headers.
+// It also checks if all blob headers have the same reference block number
+func (n *Node) ValidateBatchContents(ctx context.Context, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader) error {
+	leafs := make([][]byte, 0)
+	for _, blobHeaderHash := range blobHeaderHashes {
+		blobHeaderBytes, err := n.Store.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash)
+		if err != nil {
+			return fmt.Errorf("failed to get blob header by hash: %w", err)
+		}
+		if blobHeaderBytes == nil {
+			return fmt.Errorf("blob header not found for hash %x", blobHeaderHash)
+		}
+
+		var protoBlobHeader node.BlobHeader
+		err = proto.Unmarshal(blobHeaderBytes, &protoBlobHeader)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal blob header: %w", err)
+		}
+		if uint32(batchHeader.ReferenceBlockNumber) != protoBlobHeader.GetReferenceBlockNumber() {
+			return errors.New("blob headers have different reference block numbers")
+		}
+
+		blobHeader, err := GetBlobHeaderFromProto(&protoBlobHeader)
+		if err != nil {
+			return fmt.Errorf("failed to get blob header from proto: %w", err)
+		}
+
+		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+		if err != nil {
+			return fmt.Errorf("failed to get blob header hash: %w", err)
+		}
+		leafs = append(leafs, blobHeaderHash[:])
+	}
+
+	if len(leafs) == 0 {
+		return errors.New("no blob headers found")
+	}
+
+	tree, err := merkletree.NewTree(merkletree.WithData(leafs), merkletree.WithHashType(keccak256.New()))
+	if err != nil {
+		return fmt.Errorf("failed to create merkle tree: %w", err)
+	}
+
+	if !reflect.DeepEqual(tree.Root(), batchHeader.BatchRoot[:]) {
+		return errors.New("invalid batch header")
+	}
+
+	return nil
 }
 
 func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
