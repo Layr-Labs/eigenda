@@ -88,19 +88,7 @@ func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, e
 
 	if r.eigenda != nil {
 		r.log.Debug("Storing data to eigenda backend")
-		result, err := r.eigenda.Put(ctx, value)
-		if err != nil {
-			if r.s3 != nil && r.s3.cfg.Backup {
-				r.log.Info("Storing data to S3 backend")
-				commitment := crypto.Keccak256(value)
-
-				err = r.s3.Put(ctx, commitment, value)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-		return result, err
+		return r.eigenda.Put(ctx, value)
 	}
 
 	if r.s3 != nil {
