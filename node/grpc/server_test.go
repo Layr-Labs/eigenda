@@ -116,7 +116,7 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 
 	if mockValidator {
 		mockVal := coremock.NewMockShardValidator()
-		mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
+		mockVal.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		val = mockVal
 	} else {
@@ -229,9 +229,10 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
 	}
+	referenceBlockNumber := uint32(1)
 	batchHeader := core.BatchHeader{
 		BatchRoot:            [32]byte{0},
-		ReferenceBlockNumber: 1,
+		ReferenceBlockNumber: uint(referenceBlockNumber),
 	}
 
 	_, err = batchHeader.SetBatchRoot(blobHeaders)
@@ -240,8 +241,8 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 	assert.NoError(t, err)
 
-	blobHeaderProto0 := blobHeaderToProto(blobHeaders[0])
-	blobHeaderProto1 := blobHeaderToProto(blobHeaders[1])
+	blobHeaderProto0 := blobHeaderToProto(blobHeaders[0], referenceBlockNumber)
+	blobHeaderProto1 := blobHeaderToProto(blobHeaders[1], referenceBlockNumber)
 
 	var blob1Bundles, blob2Bundles []*pb.Bundle
 	if useGnarkBundleEncoding {
@@ -381,16 +382,33 @@ func TestStoreChunksRequestValidation(t *testing.T) {
 func TestStoreBlobs(t *testing.T) {
 	server := newTestServer(t, true)
 
-	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy, _, _, blobHeaders, _ := makeStoreChunksRequest(t, 66, 33)
 	reqToCopy.BatchHeader = nil
 	req := &pb.StoreBlobsRequest{
 		Blobs:                reqToCopy.Blobs,
 		ReferenceBlockNumber: 1,
 	}
 	reply, err := server.StoreBlobs(context.Background(), req)
-	assert.Nil(t, reply)
-	assert.Error(t, err)
-	assert.Equal(t, strings.Compare(err.Error(), "StoreBlobs is not implemented"), 0)
+	assert.NoError(t, err)
+	assert.NotNil(t, reply.GetSignatures())
+	assert.Len(t, reply.GetSignatures(), len(blobHeaders))
+	for i, sig := range reply.GetSignatures() {
+		assert.NotNil(t, sig)
+		assert.NotNil(t, sig.Value)
+		batchHeader := &core.BatchHeader{
+			ReferenceBlockNumber: 1,
+			BatchRoot:            [32]byte{},
+		}
+		_, err := batchHeader.SetBatchRoot([]*core.BlobHeader{blobHeaders[i]})
+		assert.NoError(t, err)
+		batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+		assert.NoError(t, err)
+		point, err := new(core.Signature).Deserialize(sig.Value)
+		assert.NoError(t, err)
+		s := &core.Signature{G1Point: point}
+		ok := s.Verify(keyPair.GetPubKeyG2(), batchHeaderHash)
+		assert.True(t, ok)
+	}
 }
 
 func TestAttestBatch(t *testing.T) {
@@ -587,7 +605,7 @@ func TestGetBlobHeader(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func blobHeaderToProto(blobHeader *core.BlobHeader) *pb.BlobHeader {
+func blobHeaderToProto(blobHeader *core.BlobHeader, referenceBlockNumber uint32) *pb.BlobHeader {
 	var lengthCommitment, lengthProof pb.G2Commitment
 	if blobHeader.LengthCommitment != nil {
 		lengthCommitment.XA0 = blobHeader.LengthCommitment.X.A0.Marshal()
@@ -616,9 +634,10 @@ func blobHeaderToProto(blobHeader *core.BlobHeader) *pb.BlobHeader {
 			X: blobHeader.Commitment.X.Marshal(),
 			Y: blobHeader.Commitment.Y.Marshal(),
 		},
-		LengthCommitment: &lengthCommitment,
-		LengthProof:      &lengthProof,
-		Length:           uint32(blobHeader.Length),
-		QuorumHeaders:    quorumHeaders,
+		LengthCommitment:     &lengthCommitment,
+		LengthProof:          &lengthProof,
+		Length:               uint32(blobHeader.Length),
+		QuorumHeaders:        quorumHeaders,
+		ReferenceBlockNumber: referenceBlockNumber,
 	}
 }

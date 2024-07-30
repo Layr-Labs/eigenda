@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/shirou/gopsutil/mem"
 
 	_ "go.uber.org/automaxprocs"
@@ -26,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const localhost = "0.0.0.0"
@@ -282,6 +284,9 @@ func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.
 				return nil, err
 			}
 		}
+		if in.GetReferenceBlockNumber() != blob.GetHeader().GetReferenceBlockNumber() {
+			return nil, api.NewInvalidArgError("reference_block_number must be the same for all blobs")
+		}
 	}
 
 	blobHeadersSize := 0
@@ -293,7 +298,7 @@ func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.
 		}
 	}
 	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf message (over about 2GiB).
-	s.node.Logger.Info("StoreBlobs RPC request received", "numBlobs", len(in.Blobs), "reqMsgSize", proto.Size(in), "blobHeadersSize", blobHeadersSize, "bundleSize", bundleSize)
+	s.node.Logger.Info("StoreBlobs RPC request received", "numBlobs", len(in.Blobs), "reqMsgSize", proto.Size(in), "blobHeadersSize", blobHeadersSize, "bundleSize", bundleSize, "referenceBlockNumber", in.GetReferenceBlockNumber())
 
 	// Process the request
 	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
@@ -304,14 +309,21 @@ func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.
 	s.node.Metrics.ObserveLatency("StoreBlobs", "deserialization", float64(time.Since(start).Milliseconds()))
 	s.node.Logger.Info("StoreBlobsRequest deserialized", "duration", time.Since(start))
 
-	sig, err := s.node.ProcessBatch(ctx, batchHeader, blobs, in.GetBlobs())
+	signatures, err := s.node.ProcessBlobs(ctx, blobs, in.GetBlobs())
 	if err != nil {
 		return nil, err
 	}
 
-	sigData := sig.Serialize()
+	signaturesBytes := make([]*wrappers.BytesValue, len(signatures))
+	for i, sig := range signatures {
+		if sig == nil {
+			signaturesBytes[i] = nil
+			continue
+		}
+		signaturesBytes[i] = wrapperspb.Bytes(sig.Serialize())
+	}
 
-	return &pb.StoreChunksReply{Signature: sigData[:]}, nil
+	return &pb.StoreBlobsReply{Signatures: signaturesBytes}, nil
 }
 
 func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*pb.AttestBatchReply, error) {

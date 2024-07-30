@@ -15,6 +15,7 @@ var (
 
 type ShardValidator interface {
 	ValidateBatch(*BatchHeader, []*BlobMessage, *OperatorState, common.WorkerPool) error
+	ValidateBlobs(blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error
 	UpdateOperatorID(OperatorID)
 }
 
@@ -87,12 +88,16 @@ func (v *shardValidator) UpdateOperatorID(operatorID OperatorID) {
 }
 
 func (v *shardValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
-
 	err := validateBatchHeaderRoot(batchHeader, blobs)
 	if err != nil {
 		return err
 	}
 
+	return v.ValidateBlobs(blobs, operatorState, pool)
+}
+
+func (v *shardValidator) ValidateBlobs(blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
+	var err error
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
