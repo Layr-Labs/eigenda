@@ -85,9 +85,7 @@ func (m *mockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*d
 		Status: status,
 		Info: &disperser_rpc.BlobInfo{
 			BlobVerificationProof: &disperser_rpc.BlobVerificationProof{
-				BatchMetadata: &disperser_rpc.BatchMetadata{
-					BatchHeaderHash: nil, // TODO
-				},
+				BatchMetadata: &disperser_rpc.BatchMetadata{},
 			},
 		},
 	}, nil
