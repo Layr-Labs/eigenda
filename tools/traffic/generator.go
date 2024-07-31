@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -56,24 +57,19 @@ type Generator struct {
 	readers  []*workers.BlobReader
 }
 
-func NewTrafficGenerator(config *config.Config, signer core.BlobRequestSigner) (*Generator, error) {
+func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 	logger, err := common.NewLogger(config.LoggingConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	clientConfig := clients.EigenDAClientConfig{
-		RPC:                 config.DisperserClientConfig.Hostname + ":" + config.DisperserClientConfig.Port,
-		DisableTLS:          config.DisableTlS,
-		SignerPrivateKeyHex: config.SignerPrivateKey,
-	}
-	err = clientConfig.CheckAndSetDefaults()
-	if err != nil {
-		return nil, err
+	var signer core.BlobRequestSigner
+	if config.EigenDaClientConfig.SignerPrivateKeyHex != "" {
+		signer = auth.NewLocalBlobRequestSigner(config.EigenDaClientConfig.SignerPrivateKeyHex)
 	}
 
 	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
-	client, err := clients.NewEigenDAClient(logger2, clientConfig)
+	client, err := clients.NewEigenDAClient(logger2, *config.EigenDaClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -167,13 +163,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	cs := eth.NewChainState(tx, gethClient)
 
-	// This is the indexer when config.UseGraph is true
-	chainStateConfig := thegraph.Config{
-		Endpoint:     config.TheGraphUrl,
-		PullInterval: config.TheGraphPullInterval,
-		MaxRetries:   int(config.TheGraphRetries),
-	}
-	chainState := thegraph.MakeIndexedChainState(chainStateConfig, cs, logger)
+	chainState := thegraph.MakeIndexedChainState(*config.TheGraphConfig, cs, logger)
 
 	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 

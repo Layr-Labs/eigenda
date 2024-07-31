@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"time"
@@ -25,47 +26,25 @@ type Config struct {
 	// Configuration for the retriever client.
 	RetrievalClientConfig *retriever.Config
 
-	//LoggerConfig     common.LoggerConfig
-	//IndexerConfig    indexer.Config
-	//MetricsConfig    MetricsConfig
-	//ChainStateConfig thegraph.Config
-	//
-	//IndexerDataDir                string
-	//Timeout                       time.Duration
-	//NumConnections                int
-	//BLSOperatorStateRetrieverAddr string
-	//EigenDAServiceManagerAddr     string
-	//UseGraph                      bool
+	// Configuration for the graph.
+	TheGraphConfig *thegraph.Config
 
-	// The private key to use for signing requests.
-	SignerPrivateKey string
-	// Custom quorum numbers to use for the traffic generator.
-	CustomQuorums []uint8
-	// Whether to disable TLS for an insecure connection.
-	DisableTlS bool
+	// Configuration for the EigenDA client.
+	EigenDaClientConfig *clients.EigenDAClientConfig
+
+	// Configures the traffic generator workers.
+	WorkerConfig WorkerConfig
+
 	// The port at which the metrics server listens for HTTP requests.
 	MetricsHTTPPort string
-
 	// The address of the BLS operator state retriever smart contract, in hex.
 	BlsOperatorStateRetriever string
-
-	// The URL of the subgraph instance.
-	TheGraphUrl string
-	// The interval at which to pull data from the subgraph.
-	TheGraphPullInterval time.Duration
-	// The number of times to retry a subgraph request.
-	TheGraphRetries uint
-
 	// The number of connections to use for the retriever.
 	RetrieverNumConnections uint
 	// The timeout for the node client.
 	NodeClientTimeout time.Duration
-
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
-
-	// Configures the traffic generator workers.
-	WorkerConfig WorkerConfig
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -82,7 +61,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		customQuorumsUint8[i] = uint8(q)
 	}
 
-	return &Config{
+	config := &Config{
 		DisperserClientConfig: &clients.Config{
 			Hostname:          ctx.GlobalString(HostnameFlag.Name),
 			Port:              ctx.GlobalString(GrpcPortFlag.Name),
@@ -107,17 +86,23 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			},
 		},
 
-		LoggingConfig:    *loggerConfig,
-		SignerPrivateKey: ctx.String(SignerPrivateKeyFlag.Name),
-		CustomQuorums:    customQuorumsUint8,
-		DisableTlS:       ctx.GlobalBool(DisableTLSFlag.Name),
-		MetricsHTTPPort:  ctx.GlobalString(MetricsHTTPPortFlag.Name),
+		TheGraphConfig: &thegraph.Config{
+			Endpoint:     ctx.String(TheGraphUrlFlag.Name),
+			PullInterval: ctx.Duration(TheGraphPullIntervalFlag.Name),
+			MaxRetries:   ctx.Int(TheGraphRetriesFlag.Name),
+		},
+
+		EigenDaClientConfig: &clients.EigenDAClientConfig{
+			RPC:                 fmt.Sprintf("%s:%s", ctx.GlobalString(HostnameFlag.Name), ctx.GlobalString(GrpcPortFlag.Name)),
+			SignerPrivateKeyHex: ctx.String(SignerPrivateKeyFlag.Name),
+			DisableTLS:          ctx.GlobalBool(DisableTLSFlag.Name),
+		},
+
+		LoggingConfig: *loggerConfig,
+
+		MetricsHTTPPort: ctx.GlobalString(MetricsHTTPPortFlag.Name),
 
 		BlsOperatorStateRetriever: ctx.String(BLSOperatorStateRetrieverFlag.Name),
-
-		TheGraphUrl:          ctx.String(TheGraphUrlFlag.Name),
-		TheGraphPullInterval: ctx.Duration(TheGraphPullIntervalFlag.Name),
-		TheGraphRetries:      ctx.Uint(TheGraphRetriesFlag.Name),
 
 		RetrieverNumConnections: ctx.Uint(RetrieverNumConnectionsFlag.Name),
 		NodeClientTimeout:       ctx.Duration(NodeClientTimeoutFlag.Name),
@@ -146,5 +131,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			SignerPrivateKey:      ctx.String(SignerPrivateKeyFlag.Name),
 			CustomQuorums:         customQuorumsUint8,
 		},
-	}, nil
+	}
+
+	err = config.EigenDaClientConfig.CheckAndSetDefaults()
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }

@@ -5,8 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/urfave/cli"
@@ -37,13 +35,7 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 		return err
 	}
 
-	var signer core.BlobRequestSigner
-	if generatorConfig.SignerPrivateKey != "" {
-		log.Println("Using signer private key")
-		signer = auth.NewLocalBlobRequestSigner(generatorConfig.SignerPrivateKey)
-	}
-
-	generator, err := traffic.NewTrafficGenerator(generatorConfig, signer)
+	generator, err := traffic.NewTrafficGenerator(generatorConfig)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create new traffic generator\n%s", err))
 	}
