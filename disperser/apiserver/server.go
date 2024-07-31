@@ -964,13 +964,8 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 		if _, ok := seenQuorums[quorumID]; ok {
 			return nil, fmt.Errorf("custom_quorum_numbers should not include the required quorums %v, but required quorum %d was found", quorumConfig.RequiredQuorums, quorumID)
 		}
-		if s.serverConfig.EnableDualQuorums {
-			seenQuorums[quorumID] = struct{}{}
-		} else if quorumID == 0 {
-			// If dual quorum staking is not enabled, we only consider the quorum 0 as the
-			// required quorum.
-			seenQuorums[quorumID] = struct{}{}
-		}
+
+		seenQuorums[quorumID] = struct{}{}
 	}
 
 	if len(seenQuorums) == 0 {

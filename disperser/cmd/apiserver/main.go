@@ -89,7 +89,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Creating blob store", "bucket", bucketName)
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, config.BlobstoreConfig.ShadowTableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
 	reg := prometheus.NewRegistry()

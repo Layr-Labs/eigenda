@@ -45,6 +45,8 @@ type Metrics struct {
 	EigenMetrics eigenmetrics.Metrics
 	// Reachability gauge to monitoring the reachability of the node's retrieval/dispersal sockets
 	ReachabilityGauge *prometheus.GaugeVec
+	// The throughput (bytes per second) at which the data is written to database.
+	DBWriteThroughput prometheus.Gauge
 
 	registry *prometheus.Registry
 	// socketAddr is the address at which the metrics server will be listening.
@@ -139,6 +141,14 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 			[]string{"service"},
 		),
+		DBWriteThroughput: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Name:      "db_write_throughput_bytes_per_second",
+				Help:      "the throughput (bytes per second) at which the data is written to database",
+			},
+		),
+
 		EigenMetrics:           eigenMetrics,
 		logger:                 logger.With("component", "NodeMetrics"),
 		registry:               reg,

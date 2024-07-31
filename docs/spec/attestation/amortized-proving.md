@@ -54,7 +54,7 @@ For the purposes of the KZG-FFT encoder, this means that we must choose $S$ to b
 
 ## Worked Example
 
-As a simple illustrative example, suppose that  `AssignmentCoordinator` provides the following parameters in order to meet the security requirements of given blob:
+As a simple illustrative example, suppose that  `AssignmentCoordinator` provides the following parameters in order to meet the security requirements of a given blob:
 - `ChunkLength` = 3
 - `NumChunks` = 4
 

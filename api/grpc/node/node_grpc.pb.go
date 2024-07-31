@@ -20,6 +20,8 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Dispersal_StoreChunks_FullMethodName = "/node.Dispersal/StoreChunks"
+	Dispersal_StoreBlobs_FullMethodName  = "/node.Dispersal/StoreBlobs"
+	Dispersal_AttestBatch_FullMethodName = "/node.Dispersal/AttestBatch"
 	Dispersal_NodeInfo_FullMethodName    = "/node.Dispersal/NodeInfo"
 )
 
@@ -34,6 +36,13 @@ type DispersalClient interface {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
+	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
+	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+	StoreBlobs(ctx context.Context, in *StoreBlobsRequest, opts ...grpc.CallOption) (*StoreBlobsReply, error)
+	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
+	// It will return a signature at the end to attest to the aggregated batch.
+	AttestBatch(ctx context.Context, in *AttestBatchRequest, opts ...grpc.CallOption) (*AttestBatchReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
@@ -49,6 +58,24 @@ func NewDispersalClient(cc grpc.ClientConnInterface) DispersalClient {
 func (c *dispersalClient) StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error) {
 	out := new(StoreChunksReply)
 	err := c.cc.Invoke(ctx, Dispersal_StoreChunks_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dispersalClient) StoreBlobs(ctx context.Context, in *StoreBlobsRequest, opts ...grpc.CallOption) (*StoreBlobsReply, error) {
+	out := new(StoreBlobsReply)
+	err := c.cc.Invoke(ctx, Dispersal_StoreBlobs_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dispersalClient) AttestBatch(ctx context.Context, in *AttestBatchRequest, opts ...grpc.CallOption) (*AttestBatchReply, error) {
+	out := new(AttestBatchReply)
+	err := c.cc.Invoke(ctx, Dispersal_AttestBatch_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +102,13 @@ type DispersalServer interface {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
+	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
+	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+	StoreBlobs(context.Context, *StoreBlobsRequest) (*StoreBlobsReply, error)
+	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
+	// It will return a signature at the end to attest to the aggregated batch.
+	AttestBatch(context.Context, *AttestBatchRequest) (*AttestBatchReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
@@ -86,6 +120,12 @@ type UnimplementedDispersalServer struct {
 
 func (UnimplementedDispersalServer) StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StoreChunks not implemented")
+}
+func (UnimplementedDispersalServer) StoreBlobs(context.Context, *StoreBlobsRequest) (*StoreBlobsReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StoreBlobs not implemented")
+}
+func (UnimplementedDispersalServer) AttestBatch(context.Context, *AttestBatchRequest) (*AttestBatchReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AttestBatch not implemented")
 }
 func (UnimplementedDispersalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
@@ -121,6 +161,42 @@ func _Dispersal_StoreChunks_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Dispersal_StoreBlobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreBlobsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispersalServer).StoreBlobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Dispersal_StoreBlobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispersalServer).StoreBlobs(ctx, req.(*StoreBlobsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Dispersal_AttestBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AttestBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispersalServer).AttestBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Dispersal_AttestBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispersalServer).AttestBatch(ctx, req.(*AttestBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Dispersal_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NodeInfoRequest)
 	if err := dec(in); err != nil {
@@ -149,6 +225,14 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StoreChunks",
 			Handler:    _Dispersal_StoreChunks_Handler,
+		},
+		{
+			MethodName: "StoreBlobs",
+			Handler:    _Dispersal_StoreBlobs_Handler,
+		},
+		{
+			MethodName: "AttestBatch",
+			Handler:    _Dispersal_AttestBatch_Handler,
 		},
 		{
 			MethodName: "NodeInfo",

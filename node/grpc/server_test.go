@@ -27,8 +27,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/wealdtech/go-merkletree"
-	"github.com/wealdtech/go-merkletree/keccak256"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/protobuf/proto"
 )
@@ -338,6 +338,36 @@ func TestStoreChunksRequestValidation(t *testing.T) {
 	_, err = server.StoreChunks(context.Background(), req)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "adversary threshold equals 0"))
+}
+
+func TestStoreBlobs(t *testing.T) {
+	server := newTestServer(t, true)
+
+	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy.BatchHeader = nil
+	req := &pb.StoreBlobsRequest{
+		Blobs:                reqToCopy.Blobs,
+		ReferenceBlockNumber: 1,
+	}
+	reply, err := server.StoreBlobs(context.Background(), req)
+	assert.Nil(t, reply)
+	assert.Error(t, err)
+	assert.Equal(t, strings.Compare(err.Error(), "StoreBlobs is not implemented"), 0)
+}
+
+func TestAttestBatch(t *testing.T) {
+	server := newTestServer(t, true)
+
+	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy.BatchHeader = nil
+	req := &pb.AttestBatchRequest{
+		BatchHeader:      reqToCopy.BatchHeader,
+		BlobHeaderHashes: [][]byte{},
+	}
+	reply, err := server.AttestBatch(context.Background(), req)
+	assert.Nil(t, reply)
+	assert.Error(t, err)
+	assert.Equal(t, strings.Compare(err.Error(), "AttestBatch is not implemented"), 0)
 }
 
 func TestRetrieveChunks(t *testing.T) {

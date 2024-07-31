@@ -89,7 +89,7 @@ func RunDataApi(ctx *cli.Context) error {
 
 	var (
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
-		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
+		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, config.BlobstoreConfig.ShadowTableName, 0)
 		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
 		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)

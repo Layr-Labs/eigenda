@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -91,4 +92,19 @@ func SocketAddress(ctx context.Context, provider pubip.Provider, dispersalPort s
 	}
 	socket := core.MakeOperatorSocket(ip, dispersalPort, retrievalPort)
 	return socket.String(), nil
+}
+
+func GetBundleEncodingFormat(blob *pb.Blob) core.BundleEncodingFormat {
+	// We expect all the bundles of the blob are either using combined bundle
+	// (with all chunks in a single byte array) or separate chunks, no mixed
+	// use.
+	for _, bundle := range blob.GetBundles() {
+		// If the blob is using combined bundle encoding, there must be at least
+		// one non-empty bundle (i.e. the node is in at least one quorum otherwise
+		// it shouldn't have received this blob).
+		if len(bundle.GetBundle()) > 0 {
+			return core.GnarkBundleEncodingFormat
+		}
+	}
+	return core.GobBundleEncodingFormat
 }

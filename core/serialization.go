@@ -14,8 +14,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/wealdtech/go-merkletree"
-	"github.com/wealdtech/go-merkletree/keccak256"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 	"golang.org/x/crypto/sha3"
 )
 

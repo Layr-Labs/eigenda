@@ -46,8 +46,9 @@ type SharedBlobStore struct {
 }
 
 type Config struct {
-	BucketName string
-	TableName  string
+	BucketName      string
+	TableName       string
+	ShadowTableName string
 }
 
 // This represents the s3 fetch result for a blob.
