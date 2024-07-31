@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"time"
 
@@ -61,6 +59,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		customQuorumsUint8[i] = uint8(q)
 	}
 
+	retrieverConfig := retriever.ReadRetrieverConfig(ctx)
+
 	config := &Config{
 		DisperserClientConfig: &clients.Config{
 			Hostname:          ctx.GlobalString(HostnameFlag.Name),
@@ -69,22 +69,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			UseSecureGrpcFlag: ctx.GlobalBool(UseSecureGrpcFlag.Name),
 		},
 
-		// TODO refactor flags
-		RetrievalClientConfig: &retriever.Config{
-			EigenDAServiceManagerAddr: ctx.String(EigenDAServiceManagerFlag.Name),
-			EncoderConfig: kzg.KzgConfig{
-				G1Path:          ctx.String(EncoderG1PathFlag.Name),
-				G2Path:          ctx.String(EncoderG2PathFlag.Name),
-				CacheDir:        ctx.String(EncoderCacheDirFlag.Name),
-				SRSOrder:        ctx.Uint64(EncoderSRSOrderFlag.Name),
-				SRSNumberToLoad: ctx.Uint64(EncoderSRSNumberToLoadFlag.Name),
-				NumWorker:       ctx.Uint64(EncoderNumWorkersFlag.Name),
-			},
-			EthClientConfig: geth.EthClientConfig{
-				RPCURLs:    []string{fmt.Sprintf("%s:%s", ctx.GlobalString(EthClientHostnameFlag.Name), ctx.GlobalString(EthClientPortFlag.Name))},
-				NumRetries: ctx.Int(EthClientRetriesFlag.Name),
-			},
-		},
+		RetrievalClientConfig: retrieverConfig,
 
 		TheGraphConfig: &thegraph.Config{
 			Endpoint:     ctx.String(TheGraphUrlFlag.Name),
@@ -127,7 +112,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			RetrieveBlobChunksTimeout:   ctx.Duration(RetrieveBlobChunksTimeoutFlag.Name),
 			VerificationChannelCapacity: ctx.Uint(VerificationChannelCapacityFlag.Name),
 
-			EigenDAServiceManager: ctx.String(EigenDAServiceManagerFlag.Name),
+			EigenDAServiceManager: retrieverConfig.EigenDAServiceManagerAddr,
 			SignerPrivateKey:      ctx.String(SignerPrivateKeyFlag.Name),
 			CustomQuorums:         customQuorumsUint8,
 		},

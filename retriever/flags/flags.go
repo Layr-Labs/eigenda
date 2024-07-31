@@ -76,26 +76,25 @@ var (
 	}
 )
 
-var requiredFlags = []cli.Flag{
-	HostnameFlag,
-	GrpcPortFlag,
-	TimeoutFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
-}
-
-var optionalFlags = []cli.Flag{
-	NumConnectionsFlag,
-	IndexerDataDirFlag,
-	MetricsHTTPPortFlag,
-	UseGraphFlag,
+func RetrieverFlags(envPrefix string) []cli.Flag {
+	return []cli.Flag{
+		HostnameFlag,
+		GrpcPortFlag,
+		TimeoutFlag,
+		BlsOperatorStateRetrieverFlag,
+		EigenDAServiceManagerFlag,
+		NumConnectionsFlag,
+		IndexerDataDirFlag,
+		MetricsHTTPPortFlag,
+		UseGraphFlag,
+	}
 }
 
 // Flags contains the list of configuration options available to the binary.
 var Flags []cli.Flag
 
 func init() {
-	Flags = append(requiredFlags, optionalFlags...)
+	Flags = append(Flags, RetrieverFlags(envPrefix)...)
 	Flags = append(Flags, kzg.CLIFlags(envPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
