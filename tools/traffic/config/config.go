@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -10,16 +11,13 @@ import (
 
 // Config configures a traffic generator.
 type Config struct {
+
 	// Logging configuration.
 	LoggingConfig common.LoggerConfig
-	// The hostname of the disperser.
-	DisperserHostname string
-	// The port of the disperser.
-	DisperserPort string
-	// The timeout for the disperser.
-	DisperserTimeout time.Duration
-	// Whether to use a secure gRPC connection to the disperser.
-	DisperserUseSecureGrpcFlag bool
+
+	// Configuration for the disperser client.
+	DisperserClientConfig *clients.Config
+
 	// The private key to use for signing requests.
 	SignerPrivateKey string
 	// Custom quorum numbers to use for the traffic generator.
@@ -83,31 +81,34 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
-		LoggingConfig:              *loggerConfig,
-		DisperserHostname:          ctx.GlobalString(HostnameFlag.Name),
-		DisperserPort:              ctx.GlobalString(GrpcPortFlag.Name),
-		DisperserTimeout:           ctx.Duration(TimeoutFlag.Name),
-		DisperserUseSecureGrpcFlag: ctx.GlobalBool(UseSecureGrpcFlag.Name),
-		SignerPrivateKey:           ctx.String(SignerPrivateKeyFlag.Name),
-		CustomQuorums:              customQuorumsUint8,
-		DisableTlS:                 ctx.GlobalBool(DisableTLSFlag.Name),
-		MetricsHTTPPort:            ctx.GlobalString(MetricsHTTPPortFlag.Name),
-		EthClientHostname:          ctx.GlobalString(EthClientHostnameFlag.Name),
-		EthClientPort:              ctx.GlobalString(EthClientPortFlag.Name),
-		BlsOperatorStateRetriever:  ctx.String(BLSOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManager:      ctx.String(EigenDAServiceManagerFlag.Name),
-		EthClientRetries:           ctx.Uint(EthClientRetriesFlag.Name),
-		TheGraphUrl:                ctx.String(TheGraphUrlFlag.Name),
-		TheGraphPullInterval:       ctx.Duration(TheGraphPullIntervalFlag.Name),
-		TheGraphRetries:            ctx.Uint(TheGraphRetriesFlag.Name),
-		EncoderG1Path:              ctx.String(EncoderG1PathFlag.Name),
-		EncoderG2Path:              ctx.String(EncoderG2PathFlag.Name),
-		EncoderCacheDir:            ctx.String(EncoderCacheDirFlag.Name),
-		EncoderSRSOrder:            ctx.Uint64(EncoderSRSOrderFlag.Name),
-		EncoderSRSNumberToLoad:     ctx.Uint64(EncoderSRSNumberToLoadFlag.Name),
-		EncoderNumWorkers:          ctx.Uint64(EncoderNumWorkersFlag.Name),
-		RetrieverNumConnections:    ctx.Uint(RetrieverNumConnectionsFlag.Name),
-		NodeClientTimeout:          ctx.Duration(NodeClientTimeoutFlag.Name),
+		DisperserClientConfig: &clients.Config{
+			Hostname:          ctx.GlobalString(HostnameFlag.Name),
+			Port:              ctx.GlobalString(GrpcPortFlag.Name),
+			Timeout:           ctx.Duration(TimeoutFlag.Name),
+			UseSecureGrpcFlag: ctx.GlobalBool(UseSecureGrpcFlag.Name),
+		},
+
+		LoggingConfig:             *loggerConfig,
+		SignerPrivateKey:          ctx.String(SignerPrivateKeyFlag.Name),
+		CustomQuorums:             customQuorumsUint8,
+		DisableTlS:                ctx.GlobalBool(DisableTLSFlag.Name),
+		MetricsHTTPPort:           ctx.GlobalString(MetricsHTTPPortFlag.Name),
+		EthClientHostname:         ctx.GlobalString(EthClientHostnameFlag.Name),
+		EthClientPort:             ctx.GlobalString(EthClientPortFlag.Name),
+		BlsOperatorStateRetriever: ctx.String(BLSOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManager:     ctx.String(EigenDAServiceManagerFlag.Name),
+		EthClientRetries:          ctx.Uint(EthClientRetriesFlag.Name),
+		TheGraphUrl:               ctx.String(TheGraphUrlFlag.Name),
+		TheGraphPullInterval:      ctx.Duration(TheGraphPullIntervalFlag.Name),
+		TheGraphRetries:           ctx.Uint(TheGraphRetriesFlag.Name),
+		EncoderG1Path:             ctx.String(EncoderG1PathFlag.Name),
+		EncoderG2Path:             ctx.String(EncoderG2PathFlag.Name),
+		EncoderCacheDir:           ctx.String(EncoderCacheDirFlag.Name),
+		EncoderSRSOrder:           ctx.Uint64(EncoderSRSOrderFlag.Name),
+		EncoderSRSNumberToLoad:    ctx.Uint64(EncoderSRSNumberToLoadFlag.Name),
+		EncoderNumWorkers:         ctx.Uint64(EncoderNumWorkersFlag.Name),
+		RetrieverNumConnections:   ctx.Uint(RetrieverNumConnectionsFlag.Name),
+		NodeClientTimeout:         ctx.Duration(NodeClientTimeoutFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(InstanceLaunchIntervalFlag.Name),
 

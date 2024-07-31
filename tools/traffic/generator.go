@@ -64,7 +64,7 @@ func NewTrafficGenerator(config *config.Config, signer core.BlobRequestSigner) (
 	}
 
 	clientConfig := clients.EigenDAClientConfig{
-		RPC:                 config.DisperserHostname + ":" + config.DisperserPort,
+		RPC:                 config.DisperserClientConfig.Hostname + ":" + config.DisperserClientConfig.Port,
 		DisableTLS:          config.DisableTlS,
 		SignerPrivateKeyHex: config.SignerPrivateKey,
 	}
@@ -86,13 +86,7 @@ func NewTrafficGenerator(config *config.Config, signer core.BlobRequestSigner) (
 
 	blobTable := table.NewBlobTable()
 
-	disperserConfig := clients.Config{
-		Hostname:          config.DisperserHostname,
-		Port:              config.DisperserPort,
-		Timeout:           config.DisperserTimeout,
-		UseSecureGrpcFlag: config.DisperserUseSecureGrpcFlag,
-	}
-	disperserClient := clients.NewDisperserClient(&disperserConfig, signer)
+	disperserClient := clients.NewDisperserClient(config.DisperserClientConfig, signer)
 	statusVerifier := workers.NewBlobVerifier(
 		&ctx,
 		&waitGroup,
@@ -140,7 +134,7 @@ func NewTrafficGenerator(config *config.Config, signer core.BlobRequestSigner) (
 		waitGroup:        &waitGroup,
 		generatorMetrics: generatorMetrics,
 		logger:           &logger,
-		disperserClient:  clients.NewDisperserClient(&disperserConfig, signer),
+		disperserClient:  clients.NewDisperserClient(config.DisperserClientConfig, signer),
 		eigenDAClient:    client,
 		config:           config,
 		writers:          writers,
