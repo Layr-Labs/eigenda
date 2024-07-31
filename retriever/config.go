@@ -28,15 +28,10 @@ type Config struct {
 	UseGraph                      bool
 }
 
-func NewConfig(ctx *cli.Context) (*Config, error) {
-	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
-	if err != nil {
-		return nil, err
-	}
+func ReadRetrieverConfig(ctx *cli.Context) *Config {
 	return &Config{
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
 		EthClientConfig: geth.ReadEthClientConfig(ctx),
-		LoggerConfig:    *loggerConfig,
 		IndexerConfig:   indexer.ReadIndexerConfig(ctx),
 		MetricsConfig: MetricsConfig{
 			HTTPPort: ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
@@ -48,5 +43,17 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		UseGraph:                      ctx.GlobalBool(flags.UseGraphFlag.Name),
-	}, nil
+	}
+}
+
+func NewConfig(ctx *cli.Context) (*Config, error) {
+	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	config := ReadRetrieverConfig(ctx)
+	config.LoggerConfig = *loggerConfig
+
+	return config, nil
 }

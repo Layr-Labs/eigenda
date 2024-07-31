@@ -1,6 +1,11 @@
 package config
 
 import (
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -63,37 +68,6 @@ var (
 		Usage:    "Port at which to expose metrics.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
-	}
-	EthClientHostnameFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eth-client-hostname"),
-		Usage:    "Hostname at which the Ethereum client is available.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_CLIENT_HOSTNAME"),
-	}
-	EthClientPortFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eth-client-port"),
-		Usage:    "Port at which the Ethereum client is available.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_CLIENT_PORT"),
-	}
-	BLSOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Hex address of the BLS operator state retriever contract.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Hex address of the EigenDA service manager contract.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
-	}
-	EthClientRetriesFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eth-client-retries"),
-		Usage:    "Number of times to retry an Ethereum client request.",
-		Required: false,
-		Value:    2,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ETH_CLIENT_RETRIES"),
 	}
 
 	/* Common Configuration. */
@@ -161,51 +135,6 @@ var (
 		Required: false,
 		Value:    5,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_RETRIES"),
-	}
-	EncoderG1PathFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "encoder-g1-path"),
-		Usage:    "Path to the encoder G1 binary.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_G1_PATH"),
-	}
-	EncoderG2PathFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "encoder-g2-path"),
-		Usage:    "Path to the encoder G2 binary.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_G2_PATH"),
-	}
-	EncoderCacheDirFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "encoder-cache-dir"),
-		Usage:    "Path to the encoder cache directory.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_CACHE_DIR"),
-	}
-	EncoderSRSOrderFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "encoder-srs-order"),
-		Usage:    "The SRS order to use for the encoder.",
-		Required: false,
-		Value:    3000,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_SRS_ORDER"),
-	}
-	EncoderSRSNumberToLoadFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "encoder-srs-number-to-load"),
-		Usage:    "The SRS number to load for the encoder.",
-		Required: false,
-		Value:    3000,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ENCODER_SRS_NUMBER_TO_LOAD"),
-	}
-	EncoderNumWorkersFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "encoder-num-workers"),
-		Usage:    "The number of worker threads to use for the encoder.",
-		Required: false,
-		Value:    4,
-	}
-	RetrieverNumConnectionsFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "retriever-num-connections"),
-		Usage:    "The number of connections to use for the retriever.",
-		Required: false,
-		Value:    20,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVER_NUM_CONNECTIONS"),
 	}
 	NodeClientTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "node-client-timeout"),
@@ -289,14 +218,7 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
-	EthClientHostnameFlag,
-	EthClientPortFlag,
-	BLSOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	TheGraphUrlFlag,
-	EncoderG1PathFlag,
-	EncoderG2PathFlag,
-	EncoderCacheDirFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -314,13 +236,8 @@ var optionalFlags = []cli.Flag{
 	RequiredDownloadsFlag,
 	DisableTLSFlag,
 	MetricsHTTPPortFlag,
-	EthClientRetriesFlag,
 	TheGraphPullIntervalFlag,
 	TheGraphRetriesFlag,
-	EncoderSRSOrderFlag,
-	EncoderSRSNumberToLoadFlag,
-	EncoderNumWorkersFlag,
-	RetrieverNumConnectionsFlag,
 	VerifierIntervalFlag,
 	NodeClientTimeoutFlag,
 	FetchBatchHeaderTimeoutFlag,
@@ -336,5 +253,10 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
+	Flags = append(Flags, flags.RetrieverFlags(envPrefix)...)
+	Flags = append(Flags, kzg.CLIFlags(envPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
+	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
+	Flags = append(Flags, indexer.CLIFlags(envPrefix)...)
+	Flags = append(Flags, thegraph.CLIFlags(envPrefix)...)
 }
