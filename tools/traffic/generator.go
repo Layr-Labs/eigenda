@@ -6,7 +6,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
@@ -152,11 +151,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 		panic(fmt.Sprintf("Unable to instantiate logger: %s", err))
 	}
 
-	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:    []string{config.EthClientHostname + ":" + config.EthClientPort},
-		NumRetries: int(config.EthClientRetries),
-	}
-	gethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
+	gethClient, err := geth.NewMultiHomingClient(config.RetrievalClientConfig.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to instantiate geth client: %s", err))
 	}
@@ -165,7 +160,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 		logger,
 		gethClient,
 		config.BlsOperatorStateRetriever,
-		config.EigenDAServiceManager)
+		config.RetrievalClientConfig.EigenDAServiceManagerAddr)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to instantiate transactor: %s", err))
 	}
@@ -184,15 +179,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
 
-	encoderConfig := kzg.KzgConfig{
-		G1Path:          config.EncoderG1Path,
-		G2Path:          config.EncoderG2Path,
-		CacheDir:        config.EncoderCacheDir,
-		SRSOrder:        config.EncoderSRSOrder,
-		SRSNumberToLoad: config.EncoderSRSNumberToLoad,
-		NumWorker:       config.EncoderNumWorkers,
-	}
-	v, err := verifier.NewVerifier(&encoderConfig, true)
+	v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, true)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to build verifier: %s", err))
 	}
