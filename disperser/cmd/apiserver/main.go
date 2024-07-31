@@ -115,7 +115,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		ratelimiter = ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 	}
 
-	if config.MaxBlobSize < 0 || config.MaxBlobSize > 64*1024*1024 {
+	if config.MaxBlobSize <= 0 || config.MaxBlobSize > 64*1024*1024 {
 		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
 	}
 
