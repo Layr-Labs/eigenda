@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"path"
 
 	"github.com/minio/minio-go/v7"
+
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
@@ -35,24 +37,12 @@ type S3Store struct {
 }
 
 func NewS3(cfg S3Config) (*S3Store, error) {
-	var client *minio.Client
-	var err error
-	if cfg.S3CredentialType == S3CredentialIAM {
-		client, err = minio.New(cfg.Endpoint, &minio.Options{
-			Creds:  credentials.NewIAM(""),
-			Secure: false,
-		})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		client, err = minio.New(cfg.Endpoint, &minio.Options{
-			Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, ""),
-			Secure: false,
-		})
-		if err != nil {
-			return nil, err
-		}
+	client, err := minio.New(cfg.Endpoint, &minio.Options{
+		Creds:  creds(cfg),
+		Secure: false,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &S3Store{
@@ -67,7 +57,7 @@ func NewS3(cfg S3Config) (*S3Store, error) {
 
 func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 
-	result, err := s.client.GetObject(ctx, s.cfg.Bucket, s.cfg.Path+hex.EncodeToString(key), minio.GetObjectOptions{})
+	result, err := s.client.GetObject(ctx, s.cfg.Bucket, path.Join(s.cfg.Path, hex.EncodeToString(key)), minio.GetObjectOptions{})
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
 		if errResponse.Code == "NoSuchKey" {
@@ -89,7 +79,7 @@ func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
-	_, err := s.client.PutObject(ctx, s.cfg.Bucket, s.cfg.Path+hex.EncodeToString(key), bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
+	_, err := s.client.PutObject(ctx, s.cfg.Bucket, path.Join(s.cfg.Path, hex.EncodeToString(key)), bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
 	if err != nil {
 		return err
 	}
@@ -103,4 +93,12 @@ func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
 
 func (s *S3Store) Stats() *Stats {
 	return s.stats
+}
+
+func creds(cfg S3Config) *credentials.Credentials {
+	if cfg.S3CredentialType == S3CredentialIAM {
+		return credentials.NewIAM("")
+	} else {
+		return credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, "")
+	}
 }

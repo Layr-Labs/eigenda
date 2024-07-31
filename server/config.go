@@ -167,12 +167,14 @@ func ReadConfig(ctx *cli.Context) Config {
 }
 
 func toS3CredentialType(s string) store.S3CredentialType {
-	if s == string(store.S3CredentialStatic) {
+	switch s {
+	case string(store.S3CredentialStatic):
 		return store.S3CredentialStatic
-	} else if s == string(store.S3CredentialIAM) {
+	case string(store.S3CredentialIAM):
 		return store.S3CredentialIAM
+	default:
+		return store.S3CredentialUnknown
 	}
-	return store.S3CredentialUnknown
 }
 
 // Check ... verifies that configuration values are adequately set
