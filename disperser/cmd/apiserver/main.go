@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -114,6 +115,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 		ratelimiter = ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 	}
 
+	if config.MaxBlobSize < 0 || config.MaxBlobSize > 64*1024*1024 {
+		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
+	}
+
+	if int64(math.Log2(float64(config.MaxBlobSize))) == int64(math.Log2(float64(config.MaxBlobSize-1))) {
+		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
+	}
+
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
 	server := apiserver.NewDispersalServer(
 		config.ServerConfig,
@@ -123,6 +132,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		metrics,
 		ratelimiter,
 		config.RateConfig,
+		config.MaxBlobSize,
 	)
 
 	// Enable Metrics Block

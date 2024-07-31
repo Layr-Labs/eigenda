@@ -94,6 +94,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RATE_BUCKET_STORE_SIZE"),
 		Required: false,
 	}
+	MaxBlobSize = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-blob-size"),
+		Usage:    "max blob size disperser is accepting",
+		Value:    2_097_152,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOB_SIZE"),
+		Required: false,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -112,6 +119,7 @@ var optionalFlags = []cli.Flag{
 	BucketStoreSize,
 	GrpcTimeoutFlag,
 	ShadowTableNameFlag,
+	MaxBlobSize,
 }
 
 // Flags contains the list of configuration options available to the binary.
