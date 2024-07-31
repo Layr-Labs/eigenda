@@ -69,12 +69,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
-	BLSOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Hex address of the BLS operator state retriever contract.",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER"),
-	}
 
 	/* Common Configuration. */
 
@@ -141,13 +135,6 @@ var (
 		Required: false,
 		Value:    5,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_RETRIES"),
-	}
-	RetrieverNumConnectionsFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "retriever-num-connections"),
-		Usage:    "The number of connections to use for the retriever.",
-		Required: false,
-		Value:    20,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVER_NUM_CONNECTIONS"),
 	}
 	NodeClientTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "node-client-timeout"),
@@ -231,7 +218,6 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
-	BLSOperatorStateRetrieverFlag,
 	TheGraphUrlFlag,
 }
 
@@ -252,7 +238,6 @@ var optionalFlags = []cli.Flag{
 	MetricsHTTPPortFlag,
 	TheGraphPullIntervalFlag,
 	TheGraphRetriesFlag,
-	RetrieverNumConnectionsFlag,
 	VerifierIntervalFlag,
 	NodeClientTimeoutFlag,
 	FetchBatchHeaderTimeoutFlag,

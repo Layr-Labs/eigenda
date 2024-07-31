@@ -155,7 +155,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 	tx, err := eth.NewTransactor(
 		logger,
 		gethClient,
-		config.BlsOperatorStateRetriever,
+		config.RetrievalClientConfig.BLSOperatorStateRetrieverAddr,
 		config.RetrievalClientConfig.EigenDAServiceManagerAddr)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to instantiate transactor: %s", err))
@@ -180,7 +180,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 		assignmentCoordinator,
 		nodeClient,
 		v,
-		int(config.RetrieverNumConnections))
+		config.RetrievalClientConfig.NumConnections)
 
 	if err != nil {
 		panic(fmt.Sprintf("Unable to build retriever: %s", err))

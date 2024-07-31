@@ -35,10 +35,6 @@ type Config struct {
 
 	// The port at which the metrics server listens for HTTP requests.
 	MetricsHTTPPort string
-	// The address of the BLS operator state retriever smart contract, in hex.
-	BlsOperatorStateRetriever string
-	// The number of connections to use for the retriever.
-	RetrieverNumConnections uint
 	// The timeout for the node client.
 	NodeClientTimeout time.Duration
 	// The amount of time to sleep after launching each worker thread.
@@ -85,12 +81,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 		LoggingConfig: *loggerConfig,
 
-		MetricsHTTPPort: ctx.GlobalString(MetricsHTTPPortFlag.Name),
-
-		BlsOperatorStateRetriever: ctx.String(BLSOperatorStateRetrieverFlag.Name),
-
-		RetrieverNumConnections: ctx.Uint(RetrieverNumConnectionsFlag.Name),
-		NodeClientTimeout:       ctx.Duration(NodeClientTimeoutFlag.Name),
+		MetricsHTTPPort:   ctx.GlobalString(MetricsHTTPPortFlag.Name),
+		NodeClientTimeout: ctx.Duration(NodeClientTimeoutFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(InstanceLaunchIntervalFlag.Name),
 
