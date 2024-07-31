@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -119,7 +119,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
 	}
 
-	if int64(math.Log2(float64(config.MaxBlobSize))) == int64(math.Log2(float64(config.MaxBlobSize-1))) {
+	if !fft.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
 		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
 	}
 
