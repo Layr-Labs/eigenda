@@ -804,7 +804,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, gs)
 
-	s.logger.Info("port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "maxBlobSize", s.maxBlobSize, "GRPC Listening")
+	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "maxBlobSize", s.maxBlobSize)
 
 	if err := gs.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")
