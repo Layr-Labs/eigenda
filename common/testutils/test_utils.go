@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
@@ -8,35 +9,37 @@ import (
 	"time"
 )
 
-// InitializeRandom initializes the random number generator. Prints the seed so that the test can be rerun
-// deterministically. Replace a call to this method with a call to initializeRandomWithSeed to rerun a test
-// with a specific seed.
-func InitializeRandom() {
-	rand.Seed(uint64(time.Now().UnixNano()))
-	seed := rand.Uint64()
-	fmt.Printf("Random seed: %d\n", seed)
-	rand.Seed(seed)
-}
+// InitializeRandom initializes the random number generator. If no arguments are provided, then the seed is randomly
+// generated. If a single argument is provided, then the seed is fixed to that value.
+func InitializeRandom(fixedSeed ...uint64) {
 
-// InitializeRandomWithSeed initializes the random number generator with a specific seed.
-func InitializeRandomWithSeed(seed uint64) {
+	var seed uint64
+	if len(fixedSeed) == 0 {
+		rand.Seed(uint64(time.Now().UnixNano()))
+		seed = rand.Uint64()
+	} else if len(fixedSeed) == 1 {
+		seed = fixedSeed[0]
+	} else {
+		panic("too many arguments, expected exactly one seed")
+	}
+
 	fmt.Printf("Random seed: %d\n", seed)
 	rand.Seed(seed)
 }
 
 // AssertEventuallyTrue asserts that a condition is true within a given duration. Repeatably checks the condition.
 func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Duration, debugInfo ...any) {
-	start := time.Now()
-	for time.Since(start) < duration {
+	if len(debugInfo) == 0 {
+		debugInfo = []any{"Condition did not become true within the given duration"}
+	}
+
+	ticker := time.NewTicker(1 * time.Millisecond)
+	select {
+	case <-ticker.C:
 		if condition() {
 			return
 		}
-		time.Sleep(1 * time.Millisecond)
-	}
-
-	if len(debugInfo) == 0 {
-		assert.True(t, condition(), "Condition did not become true within the given duration")
-	} else {
+	case <-time.After(duration):
 		assert.True(t, condition(), debugInfo...)
 	}
 }
@@ -44,31 +47,39 @@ func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Dur
 // AssertEventuallyEquals asserts that a function returns a specific value within a given duration.
 func AssertEventuallyEquals(t *testing.T, expected any, actual func() any, duration time.Duration, debugInfo ...any) {
 	if len(debugInfo) == 0 {
-		debugInfo = append(debugInfo,
+		debugInfo = []any{
 			"Expected value did not match actual value within the given duration. Expected: %v, Actual: %v",
-			expected, actual())
+			expected,
+			actual(),
+		}
 	}
 
-	AssertEventuallyTrue(t, func() bool {
+	condition := func() bool {
 		return expected == actual()
-	}, duration, debugInfo...)
+	}
+
+	AssertEventuallyTrue(t, condition, duration, debugInfo...)
 }
 
 // ExecuteWithTimeout executes a function with a timeout.
 // Panics if the function does not complete within the given duration.
 func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
-	done := make(chan struct{})
+	if len(debugInfo) == 0 {
+		debugInfo = []any{"Function did not complete within the given duration"}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+
+	finished := false
 	go func() {
 		f()
-		close(done)
+		finished = true
+		cancel()
 	}()
-	select {
-	case <-done:
-	case <-time.After(duration):
-		if len(debugInfo) > 0 {
-			panic(fmt.Sprintf(debugInfo[0].(string), debugInfo[1:]...))
-		}
 
-		panic("function did not complete within the given duration")
+	<-ctx.Done()
+
+	if !finished {
+		panic(fmt.Sprintf(debugInfo[0].(string), debugInfo[1:]...))
 	}
 }
