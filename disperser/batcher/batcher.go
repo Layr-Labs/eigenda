@@ -146,8 +146,26 @@ func NewBatcher(
 	}, nil
 }
 
+func (b *Batcher) RecoverState(ctx context.Context) error {
+	metas, err := b.Queue.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
+	if err != nil {
+		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
+	}
+	for _, meta := range metas {
+		err = b.Queue.MarkBlobProcessing(ctx, meta.GetBlobKey())
+		if err != nil {
+			return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
+		}
+	}
+	return nil
+}
+
 func (b *Batcher) Start(ctx context.Context) error {
-	err := b.ChainState.Start(ctx)
+	err := b.RecoverState(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to recover state: %w", err)
+	}
+	err = b.ChainState.Start(ctx)
 	if err != nil {
 		return err
 	}
