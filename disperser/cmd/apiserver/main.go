@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -114,6 +115,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 		ratelimiter = ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 	}
 
+	if config.MaxBlobSize <= 0 || config.MaxBlobSize > 32*1024*1024 {
+		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
+	}
+
+	if !fft.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
+		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
+	}
+
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
 	server := apiserver.NewDispersalServer(
 		config.ServerConfig,
@@ -123,6 +132,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		metrics,
 		ratelimiter,
 		config.RateConfig,
+		config.MaxBlobSize,
 	)
 
 	// Enable Metrics Block
