@@ -3,16 +3,13 @@ package table
 // BlobMetadata encapsulates various information about a blob written by the traffic generator.
 type BlobMetadata struct {
 	// key of the blob, set when the blob is initially uploaded.
-	key *[]byte
+	key []byte
 
 	// checksum of the blob.
 	checksum *[16]byte
 
 	// size of the blob, in bytes.
 	size uint
-
-	// batchHeaderHash of the blob.
-	batchHeaderHash *[]byte
 
 	// blobIndex of the blob.
 	blobIndex uint
@@ -28,10 +25,9 @@ type BlobMetadata struct {
 // NewBlobMetadata creates a new BlobMetadata instance. The readPermits parameter describes the maximum number of
 // remaining reads permitted against this blob. If -1 then an unlimited number of reads are permitted.
 func NewBlobMetadata(
-	key *[]byte,
+	key []byte,
 	checksum *[16]byte,
 	size uint,
-	batchHeaderHash *[]byte,
 	blobIndex uint,
 	readPermits int) *BlobMetadata {
 
@@ -43,7 +39,6 @@ func NewBlobMetadata(
 		key:                  key,
 		checksum:             checksum,
 		size:                 size,
-		batchHeaderHash:      batchHeaderHash,
 		blobIndex:            blobIndex,
 		remainingReadPermits: readPermits,
 		index:                0,
@@ -51,7 +46,7 @@ func NewBlobMetadata(
 }
 
 // Key returns the key of the blob.
-func (blob *BlobMetadata) Key() *[]byte {
+func (blob *BlobMetadata) Key() []byte {
 	return blob.key
 }
 
@@ -63,11 +58,6 @@ func (blob *BlobMetadata) Checksum() *[16]byte {
 // Size returns the size of the blob, in bytes.
 func (blob *BlobMetadata) Size() uint {
 	return blob.size
-}
-
-// BatchHeaderHash returns the batchHeaderHash of the blob.
-func (blob *BlobMetadata) BatchHeaderHash() *[]byte {
-	return blob.batchHeaderHash
 }
 
 // BlobIndex returns the blobIndex of the blob.
