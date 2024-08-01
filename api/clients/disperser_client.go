@@ -110,13 +110,9 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
-	options := make([]grpc.DialOption, 0)
-	options = append(options, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(100*1024*1024))) // 100MiB receive buffer
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
 
-	conn, err := grpc.Dial(
-		addr,
-		options...,
-	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -231,8 +227,11 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (
 
 func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-	dialOptions := c.getDialOptions()
-	conn, err := grpc.Dial(addr, dialOptions...)
+
+	options := make([]grpc.DialOption, 0)
+	options = append(options, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(100*1024*1024))) // 100MiB receive buffer
+
+	conn, err := grpc.Dial(addr, options...)
 	if err != nil {
 		return nil, err
 	}
