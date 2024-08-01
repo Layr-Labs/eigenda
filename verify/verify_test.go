@@ -3,12 +3,14 @@ package verify
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +63,7 @@ func TestCommitmentVerification(t *testing.T) {
 
 func TestCommitmentWithTooLargeBlob(t *testing.T) {
 
-	var dataRand [4000 * 32]byte
+	var dataRand [2000 * 32]byte
 	_, err := rand.Read(dataRand[:])
 	require.NoError(t, err)
 	data := dataRand[:]
@@ -98,9 +100,13 @@ func TestCommitmentWithTooLargeBlob(t *testing.T) {
 	// Happy path verification
 	codec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
 	blob, err := codec.EncodeBlob(data)
-
 	require.NoError(t, err)
+
+	inputFr, err := rs.ToFrArray(blob)
+	require.NoError(t, err)
+
 	err = v.VerifyCommitment(c, blob)
-	require.EqualError(t, err, "cannot verify commitment because the number of stored srs in the memory is insufficient")
+	msg := fmt.Sprintf("cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v", kzgConfig.SRSNumberToLoad, len(inputFr))
+	require.EqualError(t, err, msg)
 
 }

@@ -41,14 +41,14 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 		}
 	}
 
-	v, err := verifier.NewVerifier(cfg.KzgConfig, false)
+	kzgVerifier, err := verifier.NewVerifier(cfg.KzgConfig, false)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Verifier{
 		verifyCert:  cfg.Verify,
-		kzgVerifier: v,
+		kzgVerifier: kzgVerifier,
 		cv:          cv,
 	}, nil
 }
@@ -93,7 +93,7 @@ func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
 	}
 
 	if len(v.kzgVerifier.Srs.G1) < len(inputFr) {
-		return nil, fmt.Errorf("cannot verify commitment because the number of stored srs in the memory is insufficient")
+		return nil, fmt.Errorf("cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v", len(v.kzgVerifier.Srs.G1), len(inputFr))
 	}
 
 	config := ecc.MultiExpConfig{}
