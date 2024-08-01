@@ -8,7 +8,7 @@ type BlobMetadata struct {
 	// checksum of the blob.
 	checksum *[16]byte
 
-	// batchHeaderHash of the blob in bytes.
+	// size of the blob, in bytes.
 	size uint
 
 	// batchHeaderHash of the blob.

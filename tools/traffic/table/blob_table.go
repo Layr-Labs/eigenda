@@ -23,7 +23,7 @@ type BlobTable struct {
 // NewBlobTable creates a new BlobTable instance.
 func NewBlobTable() BlobTable {
 	return BlobTable{
-		blobs: make([]*BlobMetadata, 1024),
+		blobs: make([]*BlobMetadata, 0),
 		size:  0,
 	}
 }
@@ -54,7 +54,13 @@ func (table *BlobTable) Add(blob *BlobMetadata) {
 	defer table.lock.Unlock()
 
 	blob.index = table.size
-	table.blobs[table.size] = blob
+
+	if table.size == uint(len(table.blobs)) {
+		table.blobs = append(table.blobs, blob)
+	} else {
+		table.blobs[table.size] = blob
+	}
+
 	table.size++
 }
 
@@ -76,7 +82,11 @@ func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint) {
 	} else {
 		// add new blob
 		blob.index = table.size
-		table.blobs[table.size] = blob
+		if table.size == uint(len(table.blobs)) {
+			table.blobs = append(table.blobs, blob)
+		} else {
+			table.blobs[table.size] = blob
+		}
 		table.size++
 	}
 }
