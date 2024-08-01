@@ -283,7 +283,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    G1PathFlagName,
 			Usage:   "Directory path to g1.point file.",
 			EnvVars: prefixEnvVars("TARGET_KZG_G1_PATH"),
-			Value:   "resources/g1.point",
+			Value:   "resources/g1.point.1048576",
 		},
 		&cli.StringFlag{
 			Name:    G2TauFlagName,

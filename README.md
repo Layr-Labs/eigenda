@@ -27,7 +27,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--eigenda-disperser-rpc` |  | `$EIGENDA_PROXY_EIGENDA_DISPERSER_RPC` | RPC endpoint of the EigenDA disperser. |
 | `--eigenda-eth-confirmation-depth` | `6` | `$EIGENDA_PROXY_ETH_CONFIRMATION_DEPTH` | The number of Ethereum blocks of confirmation that the DA bridging transaction must have before it is assumed by the proxy to be final. If set negative the proxy will always wait for blob finalization. |
 | `--eigenda-eth-rpc` |  | `$EIGENDA_PROXY_ETH_RPC` | JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/ |
-| `--eigenda-g1-path` | `"resources/g1.point"` | `$EIGENDA_PROXY_TARGET_KZG_G1_PATH` | Directory path to g1.point file. |
+| `--eigenda-g1-path` | `"resources/g1.point.1048576"` | `$EIGENDA_PROXY_TARGET_KZG_G1_PATH` | Directory path to g1.point file. |
 | `--eigenda-g2-tau-path` | `"resources/g2.point.powerOf2"` | `$EIGENDA_PROXY_TARGET_G2_TAU_PATH` | Directory path to g2.point.powerOf2 file. |
 | `--eigenda-max-blob-length` | `"2MiB"` | `$EIGENDA_PROXY_MAX_BLOB_LENGTH` | Maximum blob length to be written or read from EigenDA. Determines the number of SRS points loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size slightly exceeds 1GB. |
 | `--eigenda-put-blob-encoding-version` | `0` | `$EIGENDA_PROXY_PUT_BLOB_ENCODING_VERSION` | Blob encoding version to use when writing blobs from the high-level interface. |
