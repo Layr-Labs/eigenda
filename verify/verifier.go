@@ -3,7 +3,7 @@ package verify
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/log"
@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
@@ -25,9 +25,9 @@ type Config struct {
 }
 
 type Verifier struct {
-	verifyCert bool
-	kzgProver     *prover.Prover
-	cv         *CertVerifier
+	verifyCert  bool
+	kzgVerifier *verifier.Verifier
+	cv          *CertVerifier
 }
 
 func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
@@ -41,15 +41,15 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 		}
 	}
 
-	prover, err := prover.NewProver(cfg.KzgConfig, false) // don't load G2 points
+	v, err := verifier.NewVerifier(cfg.KzgConfig, false)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Verifier{
-		verifyCert: cfg.Verify,
-		kzgProver:     prover,
-		cv:         cv,
+		verifyCert:  cfg.Verify,
+		kzgVerifier: v,
+		cv:          cv,
 	}, nil
 }
 
@@ -87,24 +87,23 @@ func (v *Verifier) VerifyCert(cert *Certificate) error {
 }
 
 func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
-	encoder, err := v.kzgProver.GetKzgEncoder(
-		encoding.ParamsFromSysPar(1, 1, uint64(len(blob))),
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	inputFr, err := rs.ToFrArray(blob)
 	if err != nil {
 		return nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
 
-	commit, err := encoder.Commit(inputFr)
+	if len(v.kzgVerifier.Srs.G1) < len(inputFr) {
+		return nil, fmt.Errorf("cannot verify commitment because the number of stored srs in the memory is insufficient")
+	}
+
+	config := ecc.MultiExpConfig{}
+	var commitment bn254.G1Affine
+	_, err = commitment.MultiExp(v.kzgVerifier.Srs.G1[:len(inputFr)], inputFr, config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &commit, nil
+	return &commitment, nil
 }
 
 // Verify regenerates a commitment from the blob and asserts equivalence
