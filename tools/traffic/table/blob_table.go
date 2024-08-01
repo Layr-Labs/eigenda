@@ -17,7 +17,7 @@ type BlobTable struct {
 	size uint
 
 	// lock is used to synchronize access to the requiredReads.
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 // NewBlobTable creates a new BlobTable instance.
@@ -30,16 +30,16 @@ func NewBlobTable() BlobTable {
 
 // Size returns the total number of blobs currently tracked by the requiredReads.
 func (table *BlobTable) Size() uint {
-	table.lock.Lock()
-	defer table.lock.Unlock()
+	table.lock.RLock()
+	defer table.lock.RUnlock()
 
 	return table.size
 }
 
 // Get returns the blob at the specified index. Returns nil if the index is out of bounds.
 func (table *BlobTable) Get(index uint) *BlobMetadata {
-	table.lock.Lock()
-	defer table.lock.Unlock()
+	table.lock.RLock()
+	defer table.lock.RUnlock()
 
 	if index >= table.size {
 		return nil
@@ -64,8 +64,8 @@ func (table *BlobTable) Add(blob *BlobMetadata) {
 	table.size++
 }
 
-// AddOrReplace adds a blob to the requiredReads if there is capacity or replaces an existing blob at random
-// if the requiredReads is full. This method is a no-op if maximumCapacity is 0.
+// AddOrReplace is equivalent to Add if there is capacity, or replaces an existing blob at random
+// if the is no remaining capacity. This method is a no-op if maximumCapacity is 0.
 func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint) {
 	if maximumCapacity == 0 {
 		return
@@ -96,8 +96,13 @@ func (table *BlobTable) AddOrReplace(blob *BlobMetadata, maximumCapacity uint) {
 // reaches 0, the blob is removed  from the requiredReads. Returns the blob metadata (if there is at least one blob
 // in the table) and a boolean indicating whether the blob was removed from the table as a result of this operation.
 func (table *BlobTable) GetRandom(decrement bool) (*BlobMetadata, bool) {
-	table.lock.Lock()
-	defer table.lock.Unlock()
+	if decrement {
+		table.lock.Lock()
+		defer table.lock.Unlock()
+	} else {
+		table.lock.RLock()
+		defer table.lock.RUnlock()
+	}
 
 	if table.size == 0 {
 		return nil, false

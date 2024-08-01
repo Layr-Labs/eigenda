@@ -35,6 +35,10 @@ func NewBlobMetadata(
 	blobIndex uint,
 	readPermits int) *BlobMetadata {
 
+	if readPermits == 0 {
+		panic("readPermits must be greater than 0, or -1 for unlimited reads")
+	}
+
 	return &BlobMetadata{
 		key:                  key,
 		checksum:             checksum,
