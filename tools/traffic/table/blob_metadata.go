@@ -1,5 +1,7 @@
 package table
 
+import "errors"
+
 // BlobMetadata encapsulates various information about a blob written by the traffic generator.
 type BlobMetadata struct {
 	// key of the blob, set when the blob is initially uploaded.
@@ -26,10 +28,10 @@ func NewBlobMetadata(
 	checksum *[16]byte,
 	size uint,
 	blobIndex uint,
-	readPermits int) *BlobMetadata {
+	readPermits int) (*BlobMetadata, error) {
 
 	if readPermits == 0 {
-		panic("readPermits must be greater than 0, or -1 for unlimited reads")
+		return nil, errors.New("read permits must not be zero")
 	}
 
 	return &BlobMetadata{
@@ -38,7 +40,7 @@ func NewBlobMetadata(
 		size:                 size,
 		blobIndex:            blobIndex,
 		remainingReadPermits: readPermits,
-	}
+	}, nil
 }
 
 // Key returns the key of the blob.

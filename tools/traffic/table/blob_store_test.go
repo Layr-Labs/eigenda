@@ -8,12 +8,15 @@ import (
 )
 
 // randomMetadata generates a random BlobMetadata instance.
-func randomMetadata(permits int) *BlobMetadata {
+func randomMetadata(t *testing.T, permits int) *BlobMetadata {
 	key := make([]byte, 32)
 	checksum := [16]byte{}
 	_, _ = rand.Read(key)
 	_, _ = rand.Read(checksum[:])
-	return NewBlobMetadata(key, &checksum, 1024, 0, permits)
+	metadata, err := NewBlobMetadata(key, &checksum, 1024, 0, permits)
+	assert.Nil(t, err)
+
+	return metadata
 }
 
 // TestBasicOperation tests basic operations of the BlobTable. Adds blobs and iterates over them.
@@ -26,7 +29,7 @@ func TestBasicOperation(t *testing.T) {
 	size := 1024
 	expectedMetadata := make([]*BlobMetadata, 0)
 	for i := 0; i < size; i++ {
-		metadata := randomMetadata(1)
+		metadata := randomMetadata(t, 1)
 		store.Add(metadata)
 		expectedMetadata = append(expectedMetadata, metadata)
 		assert.Equal(t, uint(i+1), store.Size())
@@ -51,7 +54,7 @@ func TestGetRandomNoRemoval(t *testing.T) {
 	expectedMetadata := make(map[string]*BlobMetadata)
 	size := 128
 	for i := 0; i < size; i++ {
-		metadata := randomMetadata(-1) // -1 == unlimited permits
+		metadata := randomMetadata(t, -1) // -1 == unlimited permits
 		table.Add(metadata)
 		expectedMetadata[string(metadata.key)] = metadata
 		assert.Equal(t, uint(i+1), table.Size())
@@ -89,7 +92,7 @@ func TestGetRandomWithRemoval(t *testing.T) {
 	size := 1024
 	expectedMetadata := make(map[string]uint)
 	for i := 0; i < size; i++ {
-		metadata := randomMetadata(permitCount)
+		metadata := randomMetadata(t, permitCount)
 		table.Add(metadata)
 		expectedMetadata[string(metadata.Key())] = 0
 		assert.Equal(t, uint(i+1), table.Size())
