@@ -6,10 +6,10 @@ import "sync"
 type BlobStore struct {
 
 	// blobs contains all blobs currently tracked by the store.
-	blobs map[int]*BlobMetadata
+	blobs map[uint64]*BlobMetadata
 
 	// nextKey describes the next key to used for the blobs map.
-	nextKey int
+	nextKey uint64
 
 	lock sync.Mutex
 }
@@ -17,7 +17,7 @@ type BlobStore struct {
 // NewBlobStore creates a new BlobStore instance.
 func NewBlobStore() *BlobStore {
 	return &BlobStore{
-		blobs:   make(map[int]*BlobMetadata),
+		blobs:   make(map[uint64]*BlobMetadata),
 		nextKey: 0,
 	}
 }
@@ -51,4 +51,12 @@ func (store *BlobStore) GetNext() *BlobMetadata {
 		return blob
 	}
 	return nil
+}
+
+// Size returns the number of blobs currently stored.
+func (store *BlobStore) Size() uint {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
+	return uint(len(store.blobs))
 }
