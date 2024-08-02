@@ -269,16 +269,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
-	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
-
-	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
-		if err != nil {
-			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
-			return nil, err
-		}
-	}
-
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
 	if err != nil {
@@ -289,6 +279,16 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		s.logger.Error("failed to store blob", "err", err)
 		return nil, api.NewInternalError("failed to store blob, please try again later")
+	}
+
+	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "), "metadataKey", metadataKey.String())
+
+	if s.ratelimiter != nil {
+		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
+		if err != nil {
+			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
+			return nil, err
+		}
 	}
 
 	for _, param := range securityParams {
