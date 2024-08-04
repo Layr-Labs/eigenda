@@ -58,6 +58,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--s3.bucket` |  | `$EIGENDA_PROXY_S3_BUCKET` | Bucket name for S3 storage. |
 | `--s3.path` |  | `$EIGENDA_PROXY_S3_PATH` | Bucket path for S3 storage. |
 | `--s3.endpoint` |  | `$EIGENDA_PROXY_S3_ENDPOINT` | Endpoint for S3 storage. |
+| `--s3.backup` |  | `$EIGENDA_PROXY_S3_BACKUP` | Enable backup to s3 that work with Eigenda. |
 | `--help, -h` | `false` |  | Show help. |
 | `--version, -v` | `false` |  | Print the version. |
 

@@ -43,6 +43,7 @@ const (
 	S3EndpointFlagName        = "s3.endpoint"
 	S3AccessKeyIDFlagName     = "s3.access-key-id"     // #nosec G101
 	S3AccessKeySecretFlagName = "s3.access-key-secret" // #nosec G101
+	S3BackupFlagName          = "s3.backup"
 )
 
 const BytesPerSymbol = 31
@@ -139,6 +140,7 @@ func ReadConfig(ctx *cli.Context) Config {
 			Endpoint:         ctx.String(S3EndpointFlagName),
 			AccessKeyID:      ctx.String(S3AccessKeyIDFlagName),
 			AccessKeySecret:  ctx.String(S3AccessKeySecretFlagName),
+			Backup:           ctx.Bool(S3BackupFlagName),
 		},
 		ClientConfig: clients.EigenDAClientConfig{
 			RPC:                          ctx.String(EigenDADisperserRPCFlagName),

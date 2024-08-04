@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
@@ -126,4 +125,30 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 // Entries are a no-op for EigenDA Store
 func (e EigenDAStore) Stats() *Stats {
 	return nil
+}
+
+// Key is used to recover certificate fields and that verifies blob
+// against commitment to ensure data is valid and non-tampered.
+func (e EigenDAStore) EncodeAndVerify(ctx context.Context, key []byte, value []byte) ([]byte, error) {
+	var cert verify.Certificate
+	err := rlp.DecodeBytes(key, &cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
+	}
+
+	// reencode blob for verification
+	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
+	if err != nil {
+		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
+	}
+	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
+		return nil, fmt.Errorf("encoded blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.cfg.MaxBlobSizeBytes)
+	}
+
+	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
 }
