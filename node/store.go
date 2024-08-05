@@ -70,29 +70,29 @@ func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeLimitSec)*time.Second)
 	defer cancel()
 
-	numBatchesDeleted = 0
-	numBlobsDeleted = 0
+	totalBatchesDeleted := 0
+	totalBlobsDeleted := 0
 	for {
 		select {
 		case <-ctx.Done():
-			return numBatchesDeleted, numBlobsDeleted, ctx.Err()
+			return totalBatchesDeleted, totalBlobsDeleted, ctx.Err()
 		default:
-			numDeleted, err := s.deleteExpiredBlobs(currentTimeUnixSec, numBatchesToDeleteAtomically)
+			blobsDeleted, err := s.deleteExpiredBlobs(currentTimeUnixSec, numBatchesToDeleteAtomically)
 			if err != nil {
-				return numBatchesDeleted, numBlobsDeleted, err
+				return totalBatchesDeleted, totalBlobsDeleted, err
 			}
-			numBlobsDeleted += numDeleted
+			totalBlobsDeleted += blobsDeleted
 
-			numDeleted, err = s.deleteNBatches(currentTimeUnixSec, numBatchesToDeleteAtomically)
+			batchesDeleted, err := s.deleteNBatches(currentTimeUnixSec, numBatchesToDeleteAtomically)
 			if err != nil {
-				return numBatchesDeleted, numBlobsDeleted, err
+				return totalBatchesDeleted, totalBlobsDeleted, err
 			}
+			totalBatchesDeleted += batchesDeleted
 			// When there is no error and we didn't delete any batch, it means we have
 			// no obsolete batches to delete, so we can return.
-			if numDeleted == 0 {
-				return numBatchesDeleted, numBlobsDeleted, nil
+			if blobsDeleted == 0 && batchesDeleted == 0 {
+				return totalBatchesDeleted, totalBlobsDeleted, nil
 			}
-			numBatchesDeleted += numDeleted
 		}
 	}
 }

@@ -252,41 +252,48 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 	return reply, err
 }
 
-func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.StoreBlobsReply, error) {
-	start := time.Now()
-
-	// Validate the request
+func (s *Server) validateStoreBlobsRequest(in *pb.StoreBlobsRequest) error {
 	if in.GetReferenceBlockNumber() == 0 {
-		return nil, api.NewInvalidArgError("missing reference_block_number in request")
+		return api.NewInvalidArgError("missing reference_block_number in request")
 	}
 
 	if len(in.GetBlobs()) == 0 {
-		return nil, api.NewInvalidArgError("missing blobs in request")
+		return api.NewInvalidArgError("missing blobs in request")
 	}
 	for _, blob := range in.Blobs {
 		if blob.GetHeader() == nil {
-			return nil, api.NewInvalidArgError("missing blob header in request")
+			return api.NewInvalidArgError("missing blob header in request")
 		}
 		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
-			return nil, api.NewInvalidArgError("invalid points contained in the blob header in request")
+			return api.NewInvalidArgError("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
-			return nil, api.NewInvalidArgError("missing quorum headers in request")
+			return api.NewInvalidArgError("missing quorum headers in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
-			return nil, api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
 			if q.GetQuorumId() > core.MaxQuorumID {
-				return nil, api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
 			}
 			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if in.GetReferenceBlockNumber() != blob.GetHeader().GetReferenceBlockNumber() {
-			return nil, api.NewInvalidArgError("reference_block_number must be the same for all blobs")
+			return api.NewInvalidArgError("reference_block_number must be the same for all blobs")
 		}
+	}
+	return nil
+}
+
+func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.StoreBlobsReply, error) {
+	start := time.Now()
+
+	err := s.validateStoreBlobsRequest(in)
+	if err != nil {
+		return nil, err
 	}
 
 	blobHeadersSize := 0
