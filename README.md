@@ -143,9 +143,9 @@ Commitments returned from the EigenDA Proxy adhere to the following byte encodin
 
 ```
  0        1        2        3        4                 N
- |--------|--------|--------|--------|-----------------|
-  commit   da layer  ext da   version  raw commitment
-  type       type    type      byte
+ |--------|--------|--------|-----------------|
+  commit   da layer  version  raw commitment
+  type       type     byte
 ```
 
 The `raw commitment` is an RLP-encoded [EigenDA certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168).
