@@ -14,7 +14,7 @@ To understand more about how EigenDA works and how it transforms the modern land
 
 To dive deep into the technical details, continue reading [EigenDA protocol spec](https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/overview.md).
 
-If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA questionnaire](https://docs.google.com/forms/d/e/1FAIpQLSez6PG-BL6C6Mc4QY1M--vbV219OGL_0Euv2zhJ1HmcUiU7cw/viewform).
+If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA Partner Registration](https://docs.google.com/forms/d/e/1FAIpQLSdXvfxgRfIHWYu90FqN-2yyhgrYm9oExr0jSy7ERzbMUimJew/viewform).
 
 ## API Documentation
 
@@ -38,4 +38,4 @@ We welcome all contributions! There are many ways to contribute to the project, 
 - [Open an Issue](https://github.com/Layr-Labs/eigenda/issues/new/choose)
 - [EigenLayer/EigenDA forum](https://forum.eigenlayer.xyz/c/eigenda/9)
 - [Email](mailto:eigenda-support@eigenlabs.org)
-- [Follow us on Twitter](https://twitter.com/eigenlayer)
+- [Follow us on Twitter](https://twitter.com/eigen_da)

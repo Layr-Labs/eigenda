@@ -32,8 +32,6 @@ import (
 
 const systemAccountKey = "system"
 
-const maxBlobSize = 2 * 1024 * 1024 // 2 MiB
-
 type DispersalServer struct {
 	pb.UnimplementedDisperserServer
 	mu *sync.RWMutex
@@ -49,6 +47,8 @@ type DispersalServer struct {
 	authenticator core.BlobRequestAuthenticator
 
 	metrics *disperser.Metrics
+
+	maxBlobSize int
 
 	logger logging.Logger
 }
@@ -70,6 +70,7 @@ func NewDispersalServer(
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
+	maxBlobSize int,
 ) *DispersalServer {
 	logger := _logger.With("component", "DispersalServer")
 	for account, rateInfoByQuorum := range rateConfig.Allowlist {
@@ -92,6 +93,7 @@ func NewDispersalServer(
 		authenticator: authenticator,
 		mu:            &sync.RWMutex{},
 		quorumConfig:  QuorumConfig{},
+		maxBlobSize:   maxBlobSize,
 	}
 }
 
@@ -267,7 +269,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
-	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "securityParams", strings.Join(securityParamsStrings, ", "))
+	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
@@ -802,7 +804,8 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, gs)
 
-	s.logger.Info("port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "maxBlobSize", s.maxBlobSize)
+
 	if err := gs.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")
 	}
@@ -909,8 +912,8 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	data := req.GetData()
 	blobSize := len(data)
 	// The blob size in bytes must be in range [1, maxBlobSize].
-	if blobSize > maxBlobSize {
-		return nil, fmt.Errorf("blob size cannot exceed 2 MiB")
+	if blobSize > s.maxBlobSize {
+		return nil, fmt.Errorf("blob size cannot exceed %v Bytes", s.maxBlobSize)
 	}
 	if blobSize == 0 {
 		return nil, fmt.Errorf("blob size must be greater than 0")

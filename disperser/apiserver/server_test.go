@@ -44,15 +44,17 @@ var (
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	UUID               = uuid.New()
-	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
+	dockertestPool          *dockertest.Pool
+	dockertestResource      *dockertest.Resource
+	UUID                    = uuid.New()
+	metadataTableName       = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	shadowMetadataTableName = fmt.Sprintf("test-BlobMetadata-Shadow-%v", UUID)
+	bucketTableName         = fmt.Sprintf("test-BucketStore-%v", UUID)
 
 	deployLocalStack bool
 	localStackPort   = "4568"
 	allowlistFile    *os.File
+	testMaxBlobSize  = 2 * 1024 * 1024
 )
 
 func TestMain(m *testing.M) {
@@ -420,7 +422,8 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		CustomQuorumNumbers: []uint32{0, 1},
 	})
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = blob size cannot exceed 2 MiB")
+	expectedErrMsg := fmt.Sprintf("rpc error: code = InvalidArgument desc = blob size cannot exceed %v Bytes", testMaxBlobSize)
+	assert.Equal(t, err.Error(), expectedErrMsg)
 }
 
 func TestParseAllowlist(t *testing.T) {
@@ -585,7 +588,7 @@ func setup() {
 
 	}
 
-	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
+	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, shadowMetadataTableName, bucketTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
@@ -631,7 +634,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create dynamoDB client")
 	}
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
 
 	globalParams := common.GlobalRateParams{
 		CountFailed: false,
@@ -698,7 +701,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

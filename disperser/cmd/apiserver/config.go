@@ -22,8 +22,10 @@ type Config struct {
 	RateConfig        apiserver.RateConfig
 	EnableRatelimiter bool
 	BucketTableName   string
+	ShadowTableName   string
 	BucketStoreSize   int
 	EthClientConfig   geth.EthClientConfig
+	MaxBlobSize       int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -53,8 +55,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			BucketName:      ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:       ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			ShadowTableName: ctx.GlobalString(flags.ShadowTableNameFlag.Name),
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{
@@ -67,6 +70,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
 		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
 		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:       ctx.GlobalInt(flags.MaxBlobSize.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),

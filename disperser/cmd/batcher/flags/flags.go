@@ -193,6 +193,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZATION_BLOCK_DELAY"),
 		Value:    75,
 	}
+	EnableGnarkBundleEncodingFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-gnark-bundle-encoding"),
+		Usage:    "Enable Gnark bundle encoding for chunks",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
+	}
 	// EnableMinibatchFlag is a flag to enable minibatch processing
 	// Defaults to false
 	EnableMinibatchFlag = cli.BoolFlag{
@@ -258,6 +264,7 @@ var optionalFlags = []cli.Flag{
 	MinibatcherPullIntervalFlag,
 	MaxNodeConnectionsFlag,
 	MaxNumRetriesPerDispersalFlag,
+	EnableGnarkBundleEncodingFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

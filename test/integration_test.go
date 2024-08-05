@@ -72,6 +72,7 @@ const (
 	encoderPort          = "3100"
 	q0AdversaryThreshold = uint8(80)
 	q0QuorumThreshold    = uint8(100)
+	testMaxBlobSize      = 2 * 1024 * 1024
 )
 
 func init() {
@@ -193,7 +194,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	tx := &coremock.MockTransactor{}
 	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
 	tx.On("GetQuorumCount").Return(1, nil)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig)
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
 		batcher:       batcher,

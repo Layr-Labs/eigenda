@@ -26,6 +26,7 @@ func TestPutBatch(t *testing.T) {
 		ID:                   id,
 		CreatedAt:            time.Now().UTC(),
 		ReferenceBlockNumber: 1,
+		Status:               1,
 		HeaderHash:           [32]byte{1},
 		AggregatePubKey:      nil,
 		AggregateSignature:   nil,
@@ -70,6 +71,8 @@ func TestPutDispersalRequest(t *testing.T) {
 		OperatorAddress: gcommon.HexToAddress("0x0"),
 		NumBlobs:        1,
 		RequestedAt:     time.Now().UTC(),
+		BlobHash:        "1a2b",
+		MetadataHash:    "3c4d",
 	}
 	err = s.PutDispersalRequest(ctx, req1)
 	assert.NoError(t, err)
@@ -80,11 +83,13 @@ func TestPutDispersalRequest(t *testing.T) {
 		OperatorAddress: gcommon.HexToAddress("0x0"),
 		NumBlobs:        1,
 		RequestedAt:     time.Now().UTC(),
+		BlobHash:        "1a2b",
+		MetadataHash:    "3c4d",
 	}
 	err = s.PutDispersalRequest(ctx, req2)
 	assert.NoError(t, err)
 
-	r, err := s.GetDispersalRequests(ctx, id, minibatchIndex)
+	r, err := s.GetMinibatchDispersalRequests(ctx, id, minibatchIndex)
 	assert.NoError(t, err)
 	assert.Len(t, r, 2)
 	assert.Equal(t, req1, r[0])
@@ -113,6 +118,8 @@ func TestPutDispersalResponse(t *testing.T) {
 			OperatorAddress: gcommon.HexToAddress("0x0"),
 			NumBlobs:        1,
 			RequestedAt:     time.Now().UTC(),
+			BlobHash:        "1a2b",
+			MetadataHash:    "3c4d",
 		},
 		Signatures:  nil,
 		RespondedAt: time.Now().UTC(),
@@ -126,6 +133,8 @@ func TestPutDispersalResponse(t *testing.T) {
 			OperatorAddress: gcommon.HexToAddress("0x0"),
 			NumBlobs:        1,
 			RequestedAt:     time.Now().UTC(),
+			BlobHash:        "0x0",
+			MetadataHash:    "0x0",
 		},
 		Signatures:  nil,
 		RespondedAt: time.Now().UTC(),
@@ -136,7 +145,7 @@ func TestPutDispersalResponse(t *testing.T) {
 	err = s.PutDispersalResponse(ctx, resp2)
 	assert.NoError(t, err)
 
-	r, err := s.GetDispersalResponses(ctx, id, minibatchIndex)
+	r, err := s.GetMinibatchDispersalResponses(ctx, id, minibatchIndex)
 	assert.NoError(t, err)
 	assert.Len(t, r, 2)
 

@@ -171,7 +171,7 @@ func TestDisperseMinibatch(t *testing.T) {
 
 	c.pool.StopWait()
 	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 2)
-	dispersalRequests, err := c.minibatchStore.GetDispersalRequests(ctx, c.minibatcher.BatchID, 0)
+	dispersalRequests, err := c.minibatchStore.GetMinibatchDispersalRequests(ctx, c.minibatcher.BatchID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, dispersalRequests, 2)
 	opIDs := make([]core.OperatorID, 2)
@@ -185,7 +185,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	}
 	assert.ElementsMatch(t, opIDs, []core.OperatorID{opId0, opId1})
 
-	dispersalResponses, err := c.minibatchStore.GetDispersalResponses(ctx, c.minibatcher.BatchID, 0)
+	dispersalResponses, err := c.minibatchStore.GetMinibatchDispersalResponses(ctx, c.minibatcher.BatchID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, dispersalResponses, 2)
 	for _, resp := range dispersalResponses {
@@ -262,7 +262,7 @@ func TestDisperseMinibatchFailure(t *testing.T) {
 
 	c.pool.StopWait()
 	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 2)
-	dispersalRequests, err := c.minibatchStore.GetDispersalRequests(ctx, c.minibatcher.BatchID, 0)
+	dispersalRequests, err := c.minibatchStore.GetMinibatchDispersalRequests(ctx, c.minibatcher.BatchID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, dispersalRequests, 2)
 	opIDs := make([]core.OperatorID, 2)
@@ -276,7 +276,7 @@ func TestDisperseMinibatchFailure(t *testing.T) {
 	}
 	assert.ElementsMatch(t, opIDs, []core.OperatorID{opId0, opId1})
 
-	dispersalResponses, err := c.minibatchStore.GetDispersalResponses(ctx, c.minibatcher.BatchID, 0)
+	dispersalResponses, err := c.minibatchStore.GetMinibatchDispersalResponses(ctx, c.minibatcher.BatchID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, dispersalResponses, 2)
 	for _, resp := range dispersalResponses {
