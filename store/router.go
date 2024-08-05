@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
+
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/utils"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -56,7 +56,7 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 		}
 		if r.s3 != nil && r.s3.cfg.Backup {
 			r.log.Info("Retrieving data from S3", "key", crypto.Keccak256(key))
-			ctx2, cancel := context.WithTimeout(ctx, time.Minute)
+			ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
 			defer cancel()
 			value, err := r.s3.Get(ctx2, crypto.Keccak256(key))
 			if err != nil {
@@ -104,10 +104,12 @@ func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, e
 		result, err := r.eigenda.Put(ctx, value)
 		if err == nil {
 			if r.s3 != nil && r.s3.cfg.Backup {
-				r.log.Info("Storing data to S3 backend with key", "key", crypto.Keccak256(result))
-				ctx2, cancel := context.WithTimeout(ctx, time.Minute)
-				err = r.s3.Put(ctx2, crypto.Keccak256(result), value)
-				cancel()
+				//we make a keccak of the commitment so that we get 32bytes (valid s3 key)
+				key := crypto.Keccak256(result)
+				r.log.Info("Storing data to S3 backend with key", "key", key)
+				ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
+				defer cancel()
+				err = r.s3.Put(ctx2, key, value)
 				if err != nil {
 					return nil, err
 				}

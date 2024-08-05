@@ -7,7 +7,7 @@ import (
 	"errors"
 	"io"
 	"path"
-
+	"time"
 	"github.com/minio/minio-go/v7"
 
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -29,6 +29,7 @@ type S3Config struct {
 	AccessKeySecret  string
 	Profiling        bool
 	Backup           bool
+	Timeout          time.Duration
 }
 
 type S3Store struct {

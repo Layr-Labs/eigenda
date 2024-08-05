@@ -2,7 +2,8 @@ package server
 
 import (
 	"context"
-
+	"fmt"
+	
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -18,6 +19,9 @@ func LoadStoreRouter(cfg CLIConfig, ctx context.Context, log log.Logger) (*store
 		if err != nil {
 			return nil, err
 		}
+	}
+	if s3 == nil && cfg.S3Config.Backup {
+		return nil, fmt.Errorf("S3 backup enabled but no valid S3 config present")
 	}
 
 	daCfg := cfg.EigenDAConfig
