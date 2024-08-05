@@ -128,14 +128,15 @@ func (c client) GetChunks(
 		case node.ChunkEncoding_GOB:
 			chunk, err = new(encoding.Frame).Deserialize(data)
 		case node.ChunkEncoding_UNKNOWN:
-			// For backward compatibility, we fallback the UNKNOWN to GNARK
-			chunk, err = new(encoding.Frame).DeserializeGnark(data)
+			// For backward compatibility, we fallback the UNKNOWN to GOB
+			chunk, err = new(encoding.Frame).Deserialize(data)
 			if err != nil {
 				chunksChan <- RetrievedChunks{
 					OperatorID: opID,
 					Err:        errors.New("UNKNOWN chunk encoding format"),
 					Chunks:     nil,
 				}
+				return
 			}
 		}
 		if err != nil {

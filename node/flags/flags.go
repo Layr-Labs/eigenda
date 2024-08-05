@@ -212,6 +212,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "NUM_BATCH_DESERIALIZATION_WORKERS"),
 		Value:    128,
 	}
+	EnableGnarkBundleEncodingFlag = cli.BoolFlag{
+		Name:     "enable-gnark-bundle-encoding",
+		Usage:    "Enable Gnark bundle encoding for chunks",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
+	}
 
 	// Test only, DO NOT USE the following flags in production
 
@@ -307,6 +313,7 @@ var optionalFlags = []cli.Flag{
 	EcdsaKeyPasswordFlag,
 	DataApiUrlFlag,
 	DisableNodeInfoResourcesFlag,
+	EnableGnarkBundleEncodingFlag,
 }
 
 func init() {
