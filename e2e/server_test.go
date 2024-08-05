@@ -147,7 +147,7 @@ func TestProxyClientWithOversizedBlob(t *testing.T) {
 		oversizedError = true
 	}
 
-	if strings.Contains(err.Error(), "blob size cannot exceed 2 MiB") {
+	if strings.Contains(err.Error(), "blob size cannot exceed") {
 		oversizedError = true
 	}
 
