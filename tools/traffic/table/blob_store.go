@@ -41,9 +41,9 @@ func (store *BlobStore) GetNext() *BlobMetadata {
 	for key, blob := range store.blobs {
 		// Always return the first blob found.
 
-		if blob.remainingReadPermits > 0 {
-			blob.remainingReadPermits--
-			if blob.remainingReadPermits == 0 {
+		if blob.RemainingReadPermits > 0 {
+			blob.RemainingReadPermits--
+			if blob.RemainingReadPermits == 0 {
 				delete(store.blobs, key)
 			}
 		}

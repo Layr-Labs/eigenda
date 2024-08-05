@@ -13,7 +13,7 @@ func randomMetadata(t *testing.T, permits int) *BlobMetadata {
 	checksum := [16]byte{}
 	_, _ = rand.Read(key)
 	_, _ = rand.Read(checksum[:])
-	metadata, err := NewBlobMetadata(key, &checksum, 1024, 0, permits)
+	metadata, err := NewBlobMetadata(key, checksum, 1024, 0, permits)
 	assert.Nil(t, err)
 
 	return metadata
@@ -56,7 +56,7 @@ func TestGetRandomNoRemoval(t *testing.T) {
 	for i := 0; i < size; i++ {
 		metadata := randomMetadata(t, -1) // -1 == unlimited permits
 		table.Add(metadata)
-		expectedMetadata[string(metadata.key)] = metadata
+		expectedMetadata[string(metadata.Key)] = metadata
 		assert.Equal(t, uint(i+1), table.Size())
 	}
 
@@ -66,8 +66,8 @@ func TestGetRandomNoRemoval(t *testing.T) {
 	for i := 0; i < size*8; i++ {
 		metadata := table.GetNext()
 		assert.NotNil(t, metadata)
-		assert.Equal(t, expectedMetadata[string(metadata.key)], metadata)
-		randomIndices[string(metadata.key)] = true
+		assert.Equal(t, expectedMetadata[string(metadata.Key)], metadata)
+		randomIndices[string(metadata.Key)] = true
 	}
 
 	// Sanity check: ensure that at least 10 different blobs were returned. This check is attempting to verify
@@ -94,7 +94,7 @@ func TestGetRandomWithRemoval(t *testing.T) {
 	for i := 0; i < size; i++ {
 		metadata := randomMetadata(t, permitCount)
 		table.Add(metadata)
-		expectedMetadata[string(metadata.Key())] = 0
+		expectedMetadata[string(metadata.Key)] = 0
 		assert.Equal(t, uint(i+1), table.Size())
 	}
 
@@ -104,7 +104,7 @@ func TestGetRandomWithRemoval(t *testing.T) {
 		metadata := table.GetNext()
 		assert.NotNil(t, metadata)
 
-		k := string(metadata.Key())
+		k := string(metadata.Key)
 		permitsUsed := expectedMetadata[k] + 1
 		expectedMetadata[k] = permitsUsed
 		assert.LessOrEqual(t, permitsUsed, uint(permitCount))
