@@ -57,8 +57,8 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 		if r.s3 != nil && r.s3.cfg.Backup {
 			r.log.Info("Retrieving data from S3", "key", crypto.Keccak256(key))
 			ctx2, cancel := context.WithTimeout(ctx, time.Minute)
+			defer cancel()
 			value, err := r.s3.Get(ctx2, crypto.Keccak256(key))
-			cancel()
 			if err != nil {
 				return nil, err
 			}
