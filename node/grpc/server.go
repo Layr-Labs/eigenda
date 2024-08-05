@@ -308,8 +308,8 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		s.node.Metrics.RecordRPCRequest("RetrieveChunks", "failure", time.Since(start))
 		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", hex.EncodeToString(batchHeaderHash[:]), in.GetBlobIndex(), in.GetQuorumId())
 	}
-	if !s.config.EnableGnarkBundleEncoding && format == pb.ChunkEncoding_GNARK {
-		format = pb.ChunkEncoding_GOB
+	if !s.config.EnableGnarkBundleEncoding && format == pb.ChunkEncodingFormat_GNARK {
+		format = pb.ChunkEncodingFormat_GOB
 		gobChunks := make([][]byte, 0, len(chunks))
 		for _, c := range chunks {
 			if len(c) == 0 {

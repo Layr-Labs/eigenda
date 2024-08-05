@@ -426,7 +426,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_GOB, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -439,7 +439,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -463,7 +463,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_GNARK, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_GNARK, retrievalReply.ChunkEncodingFormat)
 	recovered, err := new(encoding.Frame).DeserializeGnark(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).DeserializeGnark(gnarkEncodedChunk)
@@ -476,7 +476,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -498,7 +498,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_GOB, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -511,7 +511,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 

@@ -122,12 +122,12 @@ func (c client) GetChunks(
 	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
 	for i, data := range reply.GetChunks() {
 		var chunk *encoding.Frame
-		switch reply.GetEncoding() {
-		case node.ChunkEncoding_GNARK:
+		switch reply.GetChunkEncodingFormat() {
+		case node.ChunkEncodingFormat_GNARK:
 			chunk, err = new(encoding.Frame).DeserializeGnark(data)
-		case node.ChunkEncoding_GOB:
+		case node.ChunkEncodingFormat_GOB:
 			chunk, err = new(encoding.Frame).Deserialize(data)
-		case node.ChunkEncoding_UNKNOWN:
+		case node.ChunkEncodingFormat_UNKNOWN:
 			// For backward compatibility, we fallback the UNKNOWN to GOB
 			chunk, err = new(encoding.Frame).Deserialize(data)
 			if err != nil {
