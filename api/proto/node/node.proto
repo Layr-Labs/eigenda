@@ -58,7 +58,7 @@ message StoreBlobsRequest {
 
 message StoreBlobsReply {
 	// The operator's BLS sgnature signed on the blob header hashes.
-	// The ordering of the signatures must match the ordering of the blobs sent 
+	// The ordering of the signatures must match the ordering of the blobs sent
 	// in the request, with empty signatures in the places for discarded blobs.
 	repeated google.protobuf.BytesValue signatures = 1;
 }
@@ -90,7 +90,7 @@ message RetrieveChunksRequest {
 
 // This describes how the chunks returned in RetrieveChunksReply are encoded.
 // Used to facilitate the decoding of chunks.
-enum ChunkEncoding {
+enum ChunkEncodingFormat {
 	UNKNOWN = 0;
 	GNARK = 1;
 	GOB = 2;
@@ -99,8 +99,8 @@ enum ChunkEncoding {
 message RetrieveChunksReply {
 	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
 	repeated bytes chunks = 1;
-	// How the above chunks encoded.
-	ChunkEncoding encoding = 2;
+	// How the above chunks are encoded.
+	ChunkEncodingFormat chunk_encoding_format = 2;
 }
 
 // See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.

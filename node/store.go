@@ -349,16 +349,16 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 
 // GetChunks returns the list of byte arrays stored for given blobKey along with the encoding
 // format of the bytes.
-func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncoding, error) {
+func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncodingFormat, error) {
 	log := s.logger
 
 	blobKey, err := EncodeBlobKey(batchHeaderHash, blobIndex, quorumID)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, err
+		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
 	data, err := s.db.Get(blobKey)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, err
+		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
 	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
@@ -469,28 +469,28 @@ func parseHeader(data []byte) (core.BundleEncodingFormat, uint64, error) {
 
 // DecodeChunks converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly.
-func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
+func DecodeChunks(data []byte) ([][]byte, node.ChunkEncodingFormat, error) {
 	// Empty chunk is valid, but there is nothing to decode.
 	if len(data) == 0 {
-		return [][]byte{}, node.ChunkEncoding_UNKNOWN, nil
+		return [][]byte{}, node.ChunkEncodingFormat_UNKNOWN, nil
 	}
 	format, _, err := parseHeader(data)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, err
+		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
 
 	// Note: the encoding format IDs may not be the same as the field ID in protobuf.
-	// For example, GobBundleEncodingFormat is 1 but node.ChunkEncoding_GOB has proto
+	// For example, GobBundleEncodingFormat is 1 but node.ChunkEncodingFormat_GOB has proto
 	// field ID 2.
 	switch format {
 	case 0:
 		chunks, err := DecodeGobChunks(data)
-		return chunks, node.ChunkEncoding_GOB, err
+		return chunks, node.ChunkEncodingFormat_GOB, err
 	case 1:
 		chunks, err := DecodeGnarkChunks(data)
-		return chunks, node.ChunkEncoding_GNARK, err
+		return chunks, node.ChunkEncodingFormat_GNARK, err
 	default:
-		return nil, node.ChunkEncoding_UNKNOWN, errors.New("invalid data encoding format")
+		return nil, node.ChunkEncodingFormat_UNKNOWN, errors.New("invalid data encoding format")
 	}
 }
 
