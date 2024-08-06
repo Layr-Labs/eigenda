@@ -2,8 +2,20 @@ package traffic
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
+	"fmt"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
+	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
+	"github.com/Layr-Labs/eigenda/tools/traffic/table"
+	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"os"
 	"os/signal"
 	"sync"
@@ -13,108 +25,193 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-type TrafficGenerator struct {
-	Logger          logging.Logger
-	DisperserClient clients.DisperserClient
-	Config          *Config
+// Generator simulates read/write traffic to the DA service.
+//
+//	┌------------┐                                       ┌------------┐
+//	|   writer   |-┐             ┌------------┐          |   reader   |-┐
+//	└------------┘ |-┐  -------> |  verifier  | -------> └------------┘ |-┐
+//	  └------------┘ |           └------------┘            └------------┘ |
+//	    └------------┘                                       └------------┘
+//
+// The traffic generator is built from three principal components: one or more writers
+// that write blobs, a verifier that polls the dispenser service until blobs are confirmed,
+// and one or more readers that read blobs.
+//
+// When a writer finishes writing a blob, it sends information about that blob to the verifier.
+// When the verifier observes that a blob has been confirmed, it sends information about the blob
+// to the readers. The readers only attempt to read blobs that have been confirmed by the verifier.
+type Generator struct {
+	ctx              *context.Context
+	cancel           *context.CancelFunc
+	waitGroup        *sync.WaitGroup
+	generatorMetrics metrics.Metrics
+	logger           *logging.Logger
+	disperserClient  clients.DisperserClient
+	eigenDAClient    *clients.EigenDAClient
+	config           *config.Config
+
+	writers  []*workers.BlobWriter
+	verifier *workers.BlobVerifier
+	readers  []*workers.BlobReader
 }
 
-func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*TrafficGenerator, error) {
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
+func NewTrafficGenerator(config *config.Config) (*Generator, error) {
+	logger, err := common.NewLogger(config.LoggingConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TrafficGenerator{
-		Logger:          logger,
-		DisperserClient: clients.NewDisperserClient(&config.Config, signer),
-		Config:          config,
+	var signer core.BlobRequestSigner
+	if config.EigenDAClientConfig.SignerPrivateKeyHex != "" {
+		signer = auth.NewLocalBlobRequestSigner(config.EigenDAClientConfig.SignerPrivateKeyHex)
+	}
+
+	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
+	client, err := clients.NewEigenDAClient(logger2, *config.EigenDAClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	waitGroup := sync.WaitGroup{}
+
+	generatorMetrics := metrics.NewMetrics(config.MetricsHTTPPort, logger)
+
+	blobTable := table.NewBlobStore()
+
+	disperserClient := clients.NewDisperserClient(config.DisperserClientConfig, signer)
+	statusVerifier := workers.NewBlobVerifier(
+		&ctx,
+		&waitGroup,
+		logger,
+		workers.NewTicker(config.WorkerConfig.VerifierInterval),
+		&config.WorkerConfig,
+		blobTable,
+		disperserClient,
+		generatorMetrics)
+
+	writers := make([]*workers.BlobWriter, 0)
+	for i := 0; i < int(config.WorkerConfig.NumWriteInstances); i++ {
+		writer := workers.NewBlobWriter(
+			&ctx,
+			&waitGroup,
+			logger,
+			workers.NewTicker(config.WorkerConfig.WriteRequestInterval),
+			&config.WorkerConfig,
+			disperserClient,
+			&statusVerifier,
+			generatorMetrics)
+		writers = append(writers, &writer)
+	}
+
+	retriever, chainClient := buildRetriever(config)
+
+	readers := make([]*workers.BlobReader, 0)
+	for i := 0; i < int(config.WorkerConfig.NumReadInstances); i++ {
+		reader := workers.NewBlobReader(
+			&ctx,
+			&waitGroup,
+			logger,
+			workers.NewTicker(config.WorkerConfig.ReadRequestInterval),
+			&config.WorkerConfig,
+			retriever,
+			chainClient,
+			blobTable,
+			generatorMetrics)
+		readers = append(readers, &reader)
+	}
+
+	return &Generator{
+		ctx:              &ctx,
+		cancel:           &cancel,
+		waitGroup:        &waitGroup,
+		generatorMetrics: generatorMetrics,
+		logger:           &logger,
+		disperserClient:  clients.NewDisperserClient(config.DisperserClientConfig, signer),
+		eigenDAClient:    client,
+		config:           config,
+		writers:          writers,
+		verifier:         &statusVerifier,
+		readers:          readers,
 	}, nil
 }
 
-func (g *TrafficGenerator) Run() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-	for i := 0; i < int(g.Config.NumInstances); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_ = g.StartTraffic(ctx)
-		}()
-		time.Sleep(g.Config.InstanceLaunchInterval)
+// buildRetriever creates a retriever client for the traffic generator.
+func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth.ChainClient) {
+	loggerConfig := common.DefaultLoggerConfig()
+
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to instantiate logger: %s", err))
 	}
+
+	gethClient, err := geth.NewMultiHomingClient(config.RetrievalClientConfig.EthClientConfig, gethcommon.Address{}, logger)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to instantiate geth client: %s", err))
+	}
+
+	tx, err := eth.NewTransactor(
+		logger,
+		gethClient,
+		config.RetrievalClientConfig.BLSOperatorStateRetrieverAddr,
+		config.RetrievalClientConfig.EigenDAServiceManagerAddr)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to instantiate transactor: %s", err))
+	}
+
+	cs := eth.NewChainState(tx, gethClient)
+
+	chainState := thegraph.MakeIndexedChainState(*config.TheGraphConfig, cs, logger)
+
+	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
+
+	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
+
+	v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, true)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to build verifier: %s", err))
+	}
+
+	retriever, err := clients.NewRetrievalClient(
+		logger,
+		chainState,
+		assignmentCoordinator,
+		nodeClient,
+		v,
+		config.RetrievalClientConfig.NumConnections)
+
+	if err != nil {
+		panic(fmt.Sprintf("Unable to build retriever: %s", err))
+	}
+
+	chainClient := retrivereth.NewChainClient(gethClient, logger)
+
+	return retriever, chainClient
+}
+
+// Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
+func (generator *Generator) Start() error {
+
+	generator.generatorMetrics.Start()
+	generator.verifier.Start()
+
+	for _, writer := range generator.writers {
+		writer.Start()
+		time.Sleep(generator.config.InstanceLaunchInterval)
+	}
+
+	for _, reader := range generator.readers {
+		reader.Start()
+		time.Sleep(generator.config.InstanceLaunchInterval)
+	}
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	<-signals
 
-	cancel()
-	wg.Wait()
+	(*generator.cancel)()
+	generator.waitGroup.Wait()
 	return nil
-}
-
-func (g *TrafficGenerator) StartTraffic(ctx context.Context) error {
-	data := make([]byte, g.Config.DataSize)
-	_, err := rand.Read(data)
-	if err != nil {
-		return err
-	}
-
-	paddedData := codec.ConvertByPaddingEmptyByte(data)
-
-	ticker := time.NewTicker(g.Config.RequestInterval)
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			if g.Config.RandomizeBlobs {
-				_, err := rand.Read(data)
-				if err != nil {
-					return err
-				}
-				paddedData = codec.ConvertByPaddingEmptyByte(data)
-
-				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
-				if err != nil {
-					g.Logger.Error("failed to send blob request", "err:", err)
-				}
-				paddedData = nil
-			} else {
-				err = g.sendRequest(ctx, paddedData[:g.Config.DataSize])
-				if err != nil {
-					g.Logger.Error("failed to send blob request", "err:", err)
-				}
-			}
-
-		}
-	}
-}
-
-func (g *TrafficGenerator) sendRequest(ctx context.Context, data []byte) error {
-	ctxTimeout, cancel := context.WithTimeout(ctx, g.Config.Timeout)
-	defer cancel()
-
-	if g.Config.SignerPrivateKey != "" {
-		blobStatus, key, err := g.DisperserClient.DisperseBlobAuthenticated(ctxTimeout, data, g.Config.CustomQuorums)
-		if err != nil {
-			return err
-		}
-
-		g.Logger.Info("successfully dispersed new blob", "authenticated", true, "key", hex.EncodeToString(key), "status", blobStatus.String())
-		return nil
-	} else {
-		blobStatus, key, err := g.DisperserClient.DisperseBlob(ctxTimeout, data, g.Config.CustomQuorums)
-		if err != nil {
-			return err
-		}
-
-		g.Logger.Info("successfully dispersed new blob", "authenticated", false, "key", hex.EncodeToString(key), "status", blobStatus.String())
-		return nil
-	}
-
 }
