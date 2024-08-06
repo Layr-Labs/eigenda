@@ -148,7 +148,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	count, _ := c.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, 2, count)
 
-	err = c.minibatcher.HandleSingleBatch(ctx)
+	_, err = c.minibatcher.HandleSingleMinibatch(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, c.minibatcher.MinibatchIndex, uint(1))
@@ -159,6 +159,61 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].ReferenceBlockNumber, initialBlock)
 	assert.Len(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobHeaders, 2)
 	assert.ElementsMatch(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobMetadata, []*disperser.BlobMetadata{encoded1.BlobMetadata, encoded2.BlobMetadata})
+	blobKey1 := encoded1.BlobMetadata.GetBlobKey()
+	blobMinibatchMappings, err := c.minibatchStore.GetBlobMinibatchMappings(ctx, blobKey1)
+	assert.NoError(t, err)
+	assert.Len(t, blobMinibatchMappings, 1)
+	mapping1 := blobMinibatchMappings[0]
+	assert.Equal(t, mapping1.BlobKey, &blobKey1)
+	assert.Equal(t, mapping1.BatchID, c.minibatcher.CurrentBatchID)
+	assert.Equal(t, mapping1.MinibatchIndex, uint(0))
+	assert.Equal(t, mapping1.BlobQuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
+	serializedCommitment1, err := encoded1.Commitment.Commitment.Serialize()
+	assert.NoError(t, err)
+	expectedCommitment1, err := mapping1.Commitment.Serialize()
+	assert.NoError(t, err)
+	serializedLengthCommitment1, err := encoded1.Commitment.LengthCommitment.Serialize()
+	assert.NoError(t, err)
+	expectedLengthCommitment1, err := mapping1.LengthCommitment.Serialize()
+	assert.NoError(t, err)
+	serializedLengthProof1, err := encoded1.Commitment.LengthProof.Serialize()
+	assert.NoError(t, err)
+	expectedLengthProof1, err := mapping1.LengthProof.Serialize()
+	assert.NoError(t, err)
+	assert.Equal(t, serializedCommitment1, expectedCommitment1)
+	assert.Equal(t, serializedLengthCommitment1, expectedLengthCommitment1)
+	assert.Equal(t, serializedLengthProof1, expectedLengthProof1)
+	blobKey2 := encoded1.BlobMetadata.GetBlobKey()
+	blobMinibatchMappings, err = c.minibatchStore.GetBlobMinibatchMappings(ctx, blobKey2)
+	assert.NoError(t, err)
+	assert.Len(t, blobMinibatchMappings, 1)
+	mapping2 := blobMinibatchMappings[0]
+	assert.Equal(t, mapping2.BlobKey, &blobKey2)
+	assert.Equal(t, mapping2.BatchID, c.minibatcher.CurrentBatchID)
+	assert.Equal(t, mapping2.MinibatchIndex, uint(0))
+	assert.Equal(t, mapping2.BlobQuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
+	if mapping1.BlobIndex != 0 {
+		assert.Equal(t, mapping2.BlobIndex, uint(1))
+	} else if mapping1.BlobIndex != 1 {
+		assert.Equal(t, mapping2.BlobIndex, uint(0))
+	} else {
+		t.Fatal("invalid blob index")
+	}
+	serializedCommitment2, err := encoded2.Commitment.Commitment.Serialize()
+	assert.NoError(t, err)
+	expectedCommitment2, err := mapping2.Commitment.Serialize()
+	assert.NoError(t, err)
+	serializedLengthCommitment2, err := encoded2.Commitment.LengthCommitment.Serialize()
+	assert.NoError(t, err)
+	expectedLengthCommitment2, err := mapping2.LengthCommitment.Serialize()
+	assert.NoError(t, err)
+	serializedLengthProof2, err := encoded2.Commitment.LengthProof.Serialize()
+	assert.NoError(t, err)
+	expectedLengthProof2, err := mapping2.LengthProof.Serialize()
+	assert.NoError(t, err)
+	assert.Equal(t, serializedCommitment2, expectedCommitment2)
+	assert.Equal(t, serializedLengthCommitment2, expectedLengthCommitment2)
+	assert.Equal(t, serializedLengthProof2, expectedLengthProof2)
 
 	// Second minibatch
 	blob3 := makeTestBlob([]*core.SecurityParam{{
@@ -172,7 +227,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	encoded3 := <-out
 	err = c.encodingStreamer.ProcessEncodedBlobs(ctx, encoded3)
 	assert.NoError(t, err)
-	err = c.minibatcher.HandleSingleBatch(ctx)
+	_, err = c.minibatcher.HandleSingleMinibatch(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, c.minibatcher.MinibatchIndex, uint(2))
@@ -208,6 +263,16 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, uint64(7680), mb.BatchSize)
 	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, mb.ReferenceBlockNumber)
 
+	blobKey3 := encoded3.BlobMetadata.GetBlobKey()
+	blobMinibatchMappings, err = c.minibatchStore.GetBlobMinibatchMappings(ctx, blobKey3)
+	assert.NoError(t, err)
+	assert.Len(t, blobMinibatchMappings, 1)
+	mapping3 := blobMinibatchMappings[0]
+	assert.Equal(t, mapping3.BlobKey, &blobKey3)
+	assert.Equal(t, mapping3.BatchID, c.minibatcher.CurrentBatchID)
+	assert.Equal(t, mapping3.MinibatchIndex, uint(1))
+	assert.Equal(t, mapping3.BlobIndex, uint(0))
+
 	// Create a new minibatch with increased reference block number
 	// Test that the previous batch is marked as formed and that the new batch is created with the correct reference block number
 	_, _ = queueBlob(t, ctx, &blob1, c.blobStore)
@@ -223,7 +288,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	encoded5 := <-out
 	err = c.encodingStreamer.ProcessEncodedBlobs(ctx, encoded5)
 	assert.NoError(t, err)
-	err = c.minibatcher.HandleSingleBatch(ctx)
+	_, err = c.minibatcher.HandleSingleMinibatch(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, c.minibatcher.CurrentBatchID)
 
@@ -333,7 +398,7 @@ func TestDisperseMinibatchFailure(t *testing.T) {
 	count, _ := c.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, 2, count)
 
-	err = c.minibatcher.HandleSingleBatch(ctx)
+	_, err = c.minibatcher.HandleSingleMinibatch(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, c.minibatcher.MinibatchIndex, uint(1))
@@ -439,6 +504,47 @@ func TestSendBlobsToOperatorWithRetries(t *testing.T) {
 	assert.Nil(t, signatures)
 }
 
+func TestSendBlobsToOperatorWithRetriesCanceled(t *testing.T) {
+	c := newMinibatcher(t, defaultConfig)
+	ctx := context.Background()
+
+	blob := makeTestBlob([]*core.SecurityParam{{
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
+	}})
+	_, _ = queueBlob(t, ctx, &blob, c.blobStore)
+
+	out := make(chan batcher.EncodingResultOrStatus)
+	err := c.encodingStreamer.RequestEncoding(ctx, out)
+	assert.NoError(t, err)
+	err = c.encodingStreamer.ProcessEncodedBlobs(ctx, <-out)
+	assert.NoError(t, err)
+	batch, err := c.encodingStreamer.CreateMinibatch(ctx)
+	assert.NoError(t, err)
+	minibatchIndex := uint(12)
+	c.dispatcher.On("SendBlobsToOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, context.Canceled)
+	c.minibatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader, c.minibatcher.CurrentBatchID, minibatchIndex)
+	c.pool.StopWait()
+	requests, err := c.minibatchStore.GetMinibatchDispersalRequests(ctx, c.minibatcher.CurrentBatchID, minibatchIndex)
+	assert.NoError(t, err)
+	assert.Len(t, requests, 2)
+
+	responses, err := c.minibatchStore.GetMinibatchDispersalResponses(ctx, c.minibatcher.CurrentBatchID, minibatchIndex)
+	assert.NoError(t, err)
+	indexedState, err := mockChainState.GetIndexedOperatorState(ctx, initialBlock, []core.QuorumID{0})
+	assert.NoError(t, err)
+	assert.Len(t, responses, len(indexedState.IndexedOperators))
+	for _, response := range responses {
+		assert.ErrorContains(t, response.Error, "context canceled")
+		for _, request := range requests {
+			if request.OperatorID == response.OperatorID {
+				assert.GreaterOrEqual(t, response.RespondedAt, request.RequestedAt)
+			}
+		}
+	}
+}
+
 func TestMinibatcherTooManyPendingRequests(t *testing.T) {
 	c := newMinibatcher(t, defaultConfig)
 	ctx := context.Background()
@@ -447,6 +553,6 @@ func TestMinibatcherTooManyPendingRequests(t *testing.T) {
 	m, err := batcher.NewMinibatcher(defaultConfig, c.blobStore, c.minibatchStore, c.dispatcher, c.minibatcher.ChainState, c.assignmentCoordinator, c.encodingStreamer, c.ethClient, mockWorkerPool, c.logger)
 	assert.NoError(t, err)
 	mockWorkerPool.On("WaitingQueueSize").Return(int(defaultConfig.MaxNumConnections + 1)).Once()
-	err = m.HandleSingleBatch(ctx)
+	_, err = m.HandleSingleMinibatch(ctx)
 	assert.ErrorContains(t, err, "too many pending requests")
 }
