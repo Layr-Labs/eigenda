@@ -69,7 +69,7 @@ func TestBlobVerifier(t *testing.T) {
 		RequiredDownloads: float64(requiredDownloads),
 	}
 
-	blobTable := table.NewBlobTable()
+	blobTable := table.NewBlobStore()
 
 	verifierMetrics := metrics.NewMockMetrics()
 
@@ -83,7 +83,7 @@ func TestBlobVerifier(t *testing.T) {
 		logger,
 		ticker,
 		config,
-		&blobTable,
+		blobTable,
 		disperserClient,
 		verifierMetrics)
 
@@ -114,7 +114,7 @@ func TestBlobVerifier(t *testing.T) {
 			stringifiedKey := string(key)
 			disperserClient.StatusMap[stringifiedKey] = disperser_rpc.BlobStatus_UNKNOWN
 
-			verifier.AddUnconfirmedKey(&key, &checksum, uint(size))
+			verifier.AddUnconfirmedKey(key, checksum, uint(size))
 		}
 
 		// Choose some new statuses to be returned.
@@ -145,9 +145,9 @@ func TestBlobVerifier(t *testing.T) {
 
 			// Read the data in the table into a map for quick lookup.
 			tableData := make(map[string]*table.BlobMetadata)
-			for i := uint(0); i < blobTable.Size(); i++ {
-				metadata := blobTable.Get(i)
-				tableData[string(*metadata.Key())] = metadata
+
+			for _, metadata := range blobTable.GetAll() {
+				tableData[string(metadata.Key)] = metadata
 			}
 
 			blobsInFlight := 0
@@ -171,9 +171,9 @@ func TestBlobVerifier(t *testing.T) {
 
 				// Verify metadata.
 				if present {
-					assert.Equal(t, checksums[key], *metadata.Checksum())
-					assert.Equal(t, sizes[key], metadata.Size())
-					assert.Equal(t, requiredDownloads, metadata.RemainingReadPermits())
+					assert.Equal(t, checksums[key], metadata.Checksum)
+					assert.Equal(t, sizes[key], metadata.Size)
+					assert.Equal(t, requiredDownloads, metadata.RemainingReadPermits)
 				}
 			}
 

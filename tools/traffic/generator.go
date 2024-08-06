@@ -64,12 +64,12 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 	}
 
 	var signer core.BlobRequestSigner
-	if config.EigenDaClientConfig.SignerPrivateKeyHex != "" {
-		signer = auth.NewLocalBlobRequestSigner(config.EigenDaClientConfig.SignerPrivateKeyHex)
+	if config.EigenDAClientConfig.SignerPrivateKeyHex != "" {
+		signer = auth.NewLocalBlobRequestSigner(config.EigenDAClientConfig.SignerPrivateKeyHex)
 	}
 
 	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
-	client, err := clients.NewEigenDAClient(logger2, *config.EigenDaClientConfig)
+	client, err := clients.NewEigenDAClient(logger2, *config.EigenDAClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 
 	generatorMetrics := metrics.NewMetrics(config.MetricsHTTPPort, logger)
 
-	blobTable := table.NewBlobTable()
+	blobTable := table.NewBlobStore()
 
 	disperserClient := clients.NewDisperserClient(config.DisperserClientConfig, signer)
 	statusVerifier := workers.NewBlobVerifier(
@@ -88,7 +88,7 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 		logger,
 		workers.NewTicker(config.WorkerConfig.VerifierInterval),
 		&config.WorkerConfig,
-		&blobTable,
+		blobTable,
 		disperserClient,
 		generatorMetrics)
 
@@ -118,7 +118,7 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 			&config.WorkerConfig,
 			retriever,
 			chainClient,
-			&blobTable,
+			blobTable,
 			generatorMetrics)
 		readers = append(readers, &reader)
 	}

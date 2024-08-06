@@ -38,11 +38,8 @@ type BlobReader struct {
 	retriever   clients.RetrievalClient
 	chainClient eth.ChainClient
 
-	// requiredReads blobs we are required to read a certain number of times.
-	requiredReads *table.BlobTable
-
-	// optionalReads blobs we are not required to read, but can choose to read if we want.
-	optionalReads *table.BlobTable
+	// blobsToRead blobs we are required to read a certain number of times.
+	blobsToRead *table.BlobTable // TODO class to blob table (as opposed to changing names)
 
 	generatorMetrics           metrics.Metrics
 	fetchBatchHeaderMetric     metrics.LatencyMetric
@@ -73,8 +70,6 @@ func NewBlobReader(
 	blobTable *table.BlobTable,
 	generatorMetrics metrics.Metrics) BlobReader {
 
-	optionalReads := table.NewBlobTable()
-
 	return BlobReader{
 		ctx:                        ctx,
 		waitGroup:                  waitGroup,
@@ -83,8 +78,7 @@ func NewBlobReader(
 		config:                     config,
 		retriever:                  retriever,
 		chainClient:                chainClient,
-		requiredReads:              blobTable,
-		optionalReads:              &optionalReads,
+		blobsToRead:                blobTable,
 		generatorMetrics:           generatorMetrics,
 		fetchBatchHeaderMetric:     generatorMetrics.NewLatencyMetric("fetch_batch_header"),
 		fetchBatchHeaderSuccess:    generatorMetrics.NewCountMetric("fetch_batch_header_success"),
@@ -127,21 +121,13 @@ func (reader *BlobReader) run() {
 
 // randomRead reads a random blob.
 func (reader *BlobReader) randomRead() {
-	metadata, removed := reader.requiredReads.GetRandom(true)
+	metadata := reader.blobsToRead.GetNext()
 	if metadata == nil {
-		// There are no blobs that we are required to read. Get a random blob from the optionalReads.
-		metadata, _ = reader.optionalReads.GetRandom(false)
-		if metadata == nil {
-			// No blobs to read.
-			return
-		}
-	} else if removed {
-		// We have removed a blob from the requiredReads. Add it to the optionalReads.
-		reader.optionalReads.AddOrReplace(metadata, reader.config.ReadOverflowTableSize)
-		reader.optionalReadPoolSizeMetric.Set(float64(reader.optionalReads.Size()))
+		// There are no blobs that we are required to read.
+		return
 	}
 
-	reader.requiredReadPoolSizeMetric.Set(float64(reader.requiredReads.Size()))
+	reader.requiredReadPoolSizeMetric.Set(float64(reader.blobsToRead.Size()))
 
 	ctxTimeout, cancel := context.WithTimeout(*reader.ctx, reader.config.FetchBatchHeaderTimeout)
 	batchHeader, err := metrics.InvokeAndReportLatency(reader.fetchBatchHeaderMetric,
@@ -149,7 +135,7 @@ func (reader *BlobReader) randomRead() {
 			return reader.chainClient.FetchBatchHeader(
 				ctxTimeout,
 				gcommon.HexToAddress(reader.config.EigenDAServiceManager),
-				*metadata.BatchHeaderHash(),
+				metadata.BatchHeaderHash,
 				big.NewInt(int64(0)),
 				nil)
 		})
@@ -162,14 +148,14 @@ func (reader *BlobReader) randomRead() {
 	reader.fetchBatchHeaderSuccess.Increment()
 
 	var batchHeaderHash [32]byte
-	copy(batchHeaderHash[:], *metadata.BatchHeaderHash())
+	copy(batchHeaderHash[:], metadata.BatchHeaderHash)
 
 	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, reader.config.RetrieveBlobChunksTimeout)
 	chunks, err := metrics.InvokeAndReportLatency(reader.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return reader.retriever.RetrieveBlobChunks(
 			ctxTimeout,
 			batchHeaderHash,
-			uint32(metadata.BlobIndex()),
+			uint32(metadata.BlobIndex),
 			uint(batchHeader.ReferenceBlockNumber),
 			batchHeader.BlobHeadersRoot,
 			core.QuorumID(0))
@@ -235,10 +221,10 @@ func (reader *BlobReader) reportMissingChunk(operatorId core.OperatorID) {
 // verifyBlob performs sanity checks on the blob.
 func (reader *BlobReader) verifyBlob(metadata *table.BlobMetadata, blob *[]byte) {
 	// Trim off the padding.
-	truncatedBlob := (*blob)[:metadata.Size()]
+	truncatedBlob := (*blob)[:metadata.Size]
 	recomputedChecksum := md5.Sum(truncatedBlob)
 
-	if *metadata.Checksum() == recomputedChecksum {
+	if metadata.Checksum == recomputedChecksum {
 		reader.validBlobMetric.Increment()
 	} else {
 		reader.invalidBlobMetric.Increment()

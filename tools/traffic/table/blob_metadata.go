@@ -1,77 +1,49 @@
 package table
 
+import "errors"
+
 // BlobMetadata encapsulates various information about a blob written by the traffic generator.
 type BlobMetadata struct {
-	// key of the blob, set when the blob is initially uploaded.
-	key *[]byte
+	// Key of the blob, set when the blob is initially uploaded.
+	Key []byte
 
-	// checksum of the blob.
-	checksum *[16]byte
-
-	// batchHeaderHash of the blob in bytes.
-	size uint
+	// BlobIndex of the blob.
+	BlobIndex uint
 
 	// batchHeaderHash of the blob.
-	batchHeaderHash *[]byte
+	BatchHeaderHash []byte
 
-	// blobIndex of the blob.
-	blobIndex uint
+	// Checksum of the blob.
+	Checksum [16]byte
 
-	// remainingReadPermits describes the maximum number of remaining reads permitted against this blob.
+	// Size of the blob, in bytes.
+	Size uint
+
+	// RemainingReadPermits describes the maximum number of remaining reads permitted against this blob.
 	// If -1 then an unlimited number of reads are permitted.
-	remainingReadPermits int
-
-	// index describes the position of this blob within the blobTable.
-	index uint
+	RemainingReadPermits int
 }
 
 // NewBlobMetadata creates a new BlobMetadata instance. The readPermits parameter describes the maximum number of
 // remaining reads permitted against this blob. If -1 then an unlimited number of reads are permitted.
 func NewBlobMetadata(
-	key *[]byte,
-	checksum *[16]byte,
+	key []byte,
+	checksum [16]byte,
 	size uint,
-	batchHeaderHash *[]byte,
 	blobIndex uint,
-	readPermits int) *BlobMetadata {
+	batchHeaderHash []byte,
+	readPermits int) (*BlobMetadata, error) {
+
+	if readPermits == 0 {
+		return nil, errors.New("read permits must not be zero")
+	}
 
 	return &BlobMetadata{
-		key:                  key,
-		checksum:             checksum,
-		size:                 size,
-		batchHeaderHash:      batchHeaderHash,
-		blobIndex:            blobIndex,
-		remainingReadPermits: readPermits,
-		index:                0,
-	}
-}
-
-// Key returns the key of the blob.
-func (blob *BlobMetadata) Key() *[]byte {
-	return blob.key
-}
-
-// Checksum returns the checksum of the blob.
-func (blob *BlobMetadata) Checksum() *[16]byte {
-	return blob.checksum
-}
-
-// Size returns the size of the blob, in bytes.
-func (blob *BlobMetadata) Size() uint {
-	return blob.size
-}
-
-// BatchHeaderHash returns the batchHeaderHash of the blob.
-func (blob *BlobMetadata) BatchHeaderHash() *[]byte {
-	return blob.batchHeaderHash
-}
-
-// BlobIndex returns the blobIndex of the blob.
-func (blob *BlobMetadata) BlobIndex() uint {
-	return blob.blobIndex
-}
-
-// RemainingReadPermits returns the maximum number of remaining reads permitted against this blob.
-func (blob *BlobMetadata) RemainingReadPermits() int {
-	return blob.remainingReadPermits
+		Key:                  key,
+		Checksum:             checksum,
+		Size:                 size,
+		BlobIndex:            blobIndex,
+		BatchHeaderHash:      batchHeaderHash,
+		RemainingReadPermits: readPermits,
+	}, nil
 }

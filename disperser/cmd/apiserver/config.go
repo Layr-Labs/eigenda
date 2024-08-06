@@ -25,6 +25,7 @@ type Config struct {
 	ShadowTableName   string
 	BucketStoreSize   int
 	EthClientConfig   geth.EthClientConfig
+	MaxBlobSize       int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -69,6 +70,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
 		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
 		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:       ctx.GlobalInt(flags.MaxBlobSize.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),

@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// TestBlobReaderNoOptionalReads tests the BlobReader with only required reads.
-func TestBlobReaderNoOverflow(t *testing.T) {
+// TestBlobReaderNoOptionalReads tests the BlobReader's basic functionality'
+func TestBlobReader(t *testing.T) {
 	tu.InitializeRandom()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -31,7 +31,7 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 		ReadOverflowTableSize: 0,
 	}
 
-	blobTable := table.NewBlobTable()
+	blobTable := table.NewBlobStore()
 
 	readerMetrics := metrics.NewMockMetrics()
 
@@ -47,7 +47,7 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 		config,
 		retrievalClient,
 		chainClient,
-		&blobTable,
+		blobTable,
 		readerMetrics)
 
 	blobSize := 1024
@@ -81,13 +81,14 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 		_, err = rand.Read(batchHeaderHash)
 		assert.Nil(t, err)
 
-		blobMetadata := table.NewBlobMetadata(
-			&key,
-			&checksum,
+		blobMetadata, err := table.NewBlobMetadata(
+			key,
+			checksum,
 			uint(blobSize),
-			&batchHeaderHash,
 			uint(i),
+			batchHeaderHash,
 			readPermits)
+		assert.Nil(t, err)
 
 		retrievalClient.AddBlob(blobMetadata, blobData)
 
@@ -108,9 +109,8 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 		}, time.Second)
 
 		remainingPermits := uint(0)
-		for j := uint(0); j < blobTable.Size(); j++ {
-			blob := blobTable.Get(j)
-			remainingPermits += uint(blob.RemainingReadPermits())
+		for _, metadata := range blobTable.GetAll() {
+			remainingPermits += uint(metadata.RemainingReadPermits)
 		}
 		assert.Equal(t, remainingPermits, expectedTotalReads-i-1)
 
@@ -144,143 +144,6 @@ func TestBlobReaderNoOverflow(t *testing.T) {
 	assert.Equal(t, expectedTotalReads, uint(readerMetrics.GetCount("recombination_success")))
 	assert.Equal(t, expectedValidBlobs, uint(readerMetrics.GetCount("valid_blob")))
 	assert.Equal(t, expectedInvalidBlobs, uint(readerMetrics.GetCount("invalid_blob")))
-
-	cancel()
-	tu.ExecuteWithTimeout(func() {
-		waitGroup.Wait()
-	}, time.Second)
-}
-
-// TestBlobReaderWithOverflow tests the BlobReader with a non-zero sized overflow table.
-func TestBlobReaderWithOverflow(t *testing.T) {
-	tu.InitializeRandom()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	waitGroup := sync.WaitGroup{}
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.Nil(t, err)
-	startTime := time.Unix(rand.Int63()%2_000_000_000, 0)
-	ticker := newMockTicker(startTime)
-
-	blobCount := 100
-	overflowTableSize := uint(rand.Intn(blobCount-1) + 1)
-
-	config := &config.WorkerConfig{
-		ReadOverflowTableSize: overflowTableSize,
-	}
-
-	blobTable := table.NewBlobTable()
-
-	readerMetrics := metrics.NewMockMetrics()
-
-	lock := sync.Mutex{}
-	chainClient := newMockChainClient(&lock)
-	retrievalClient := newMockRetrievalClient(t, &lock)
-
-	blobReader := workers.NewBlobReader(
-		&ctx,
-		&waitGroup,
-		logger,
-		ticker,
-		config,
-		retrievalClient,
-		chainClient,
-		&blobTable,
-		readerMetrics)
-
-	blobSize := 1024
-	readPermits := 2
-
-	invalidBlobCount := 0
-
-	// Insert some blobs into the table.
-	for i := 0; i < blobCount; i++ {
-
-		key := make([]byte, 32)
-		_, err = rand.Read(key)
-		assert.Nil(t, err)
-
-		blobData := make([]byte, blobSize)
-		_, err = rand.Read(blobData)
-		assert.Nil(t, err)
-
-		var checksum [16]byte
-		if i%10 == 0 {
-			// Simulate an invalid blob
-			invalidBlobCount++
-			_, err = rand.Read(checksum[:])
-			assert.Nil(t, err)
-		} else {
-			checksum = md5.Sum(blobData)
-		}
-
-		batchHeaderHash := make([]byte, 32)
-		_, err = rand.Read(batchHeaderHash)
-		assert.Nil(t, err)
-
-		blobMetadata := table.NewBlobMetadata(
-			&key,
-			&checksum,
-			uint(blobSize),
-			&batchHeaderHash,
-			uint(i),
-			readPermits)
-
-		retrievalClient.AddBlob(blobMetadata, blobData)
-
-		blobTable.Add(blobMetadata)
-	}
-
-	blobReader.Start()
-
-	// Do a bunch of reads.
-	expectedTotalReads := uint(readPermits * blobCount)
-	for i := uint(0); i < expectedTotalReads; i++ {
-		ticker.Tick(time.Second)
-
-		tu.AssertEventuallyTrue(t, func() bool {
-			return retrievalClient.RetrieveBlobChunksCount == i+1 &&
-				retrievalClient.CombineChunksCount == i+1 &&
-				chainClient.Count == i+1
-		}, time.Second)
-
-		remainingPermits := uint(0)
-		for j := uint(0); j < blobTable.Size(); j++ {
-			blob := blobTable.Get(j)
-			remainingPermits += uint(blob.RemainingReadPermits())
-		}
-		assert.Equal(t, remainingPermits, expectedTotalReads-i-1)
-
-		tu.AssertEventuallyTrue(t, func() bool {
-			return uint(readerMetrics.GetCount("read_success")) == i+1 &&
-				uint(readerMetrics.GetCount("fetch_batch_header_success")) == i+1 &&
-				uint(readerMetrics.GetCount("recombination_success")) == i+1
-		}, time.Second)
-	}
-
-	expectedInvalidBlobs := uint(invalidBlobCount * readPermits)
-	expectedValidBlobs := expectedTotalReads - expectedInvalidBlobs
-	tu.AssertEventuallyEquals(t, expectedValidBlobs,
-		func() any {
-			return uint(readerMetrics.GetCount("valid_blob"))
-		}, time.Second)
-	tu.AssertEventuallyEquals(t, expectedInvalidBlobs,
-		func() any {
-			return uint(readerMetrics.GetCount("invalid_blob"))
-		}, time.Second)
-
-	assert.Equal(t, uint(0), uint(readerMetrics.GetGaugeValue("required_read_pool_size")))
-	assert.Equal(t, overflowTableSize, uint(readerMetrics.GetGaugeValue("optional_read_pool_size")))
-
-	// Do an additional read. We should be reading from the overflow table.
-	ticker.Tick(time.Second)
-	tu.AssertEventuallyEquals(t, expectedTotalReads+1, func() any {
-		return uint(readerMetrics.GetCount("read_success"))
-	}, time.Second)
-	tu.AssertEventuallyTrue(t, func() bool {
-		return uint(readerMetrics.GetCount("valid_blob")) == expectedValidBlobs+1 ||
-			uint(readerMetrics.GetCount("invalid_blob")) == expectedInvalidBlobs+1
-	}, time.Second)
 
 	cancel()
 	tu.ExecuteWithTimeout(func() {

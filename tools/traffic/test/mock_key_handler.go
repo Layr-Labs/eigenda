@@ -26,12 +26,12 @@ func newMockKeyHandler(t *testing.T, lock *sync.Mutex) *mockKeyHandler {
 	}
 }
 
-func (m *mockKeyHandler) AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint) {
+func (m *mockKeyHandler) AddUnconfirmedKey(key []byte, checksum [16]byte, size uint) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.ProvidedKey = *key
-	m.ProvidedChecksum = *checksum
+	m.ProvidedKey = key
+	m.ProvidedChecksum = checksum
 	m.ProvidedSize = size
 
 	m.Count++

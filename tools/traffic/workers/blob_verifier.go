@@ -16,17 +16,17 @@ import (
 // unconfirmedKey is a key that has not yet been confirmed by the disperser service.
 type unconfirmedKey struct {
 	// The key of the blob.
-	key *[]byte
+	key []byte
 	// The size of the blob in bytes.
 	size uint
 	// The checksum of the blob.
-	checksum *[16]byte
+	checksum [16]byte
 	// The time the blob was submitted to the disperser service.
 	submissionTime time.Time
 }
 
 // BlobVerifier periodically polls the disperser service to verify the status of blobs that were recently written.
-// When blobs become confirmed, the status verifier updates the blob requiredReads accordingly.
+// When blobs become confirmed, the status verifier updates the blob blobsToRead accordingly.
 // This is a thread safe data structure.
 type BlobVerifier struct {
 
@@ -106,7 +106,7 @@ func NewBlobVerifier(
 }
 
 // AddUnconfirmedKey adds a key to the list of unconfirmed keys.
-func (verifier *BlobVerifier) AddUnconfirmedKey(key *[]byte, checksum *[16]byte, size uint) {
+func (verifier *BlobVerifier) AddUnconfirmedKey(key []byte, checksum [16]byte, size uint) {
 	verifier.keyChannel <- &unconfirmedKey{
 		key:            key,
 		checksum:       checksum,
@@ -164,7 +164,7 @@ func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 
 	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
-			return verifier.dispenser.GetBlobStatus(ctxTimeout, *key.key)
+			return verifier.dispenser.GetBlobStatus(ctxTimeout, key.key)
 		})
 
 	if err != nil {
@@ -238,6 +238,10 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 		downloadCount = int32(requiredDownloads)
 	}
 
-	blobMetadata := table.NewBlobMetadata(key.key, key.checksum, key.size, &batchHeaderHash, uint(blobIndex), int(downloadCount))
+	blobMetadata, err := table.NewBlobMetadata(key.key, key.checksum, key.size, uint(blobIndex), batchHeaderHash, int(downloadCount))
+	if err != nil {
+		verifier.logger.Error("failed to create blob metadata", "err:", err)
+		return
+	}
 	verifier.table.Add(blobMetadata)
 }

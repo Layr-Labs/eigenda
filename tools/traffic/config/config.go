@@ -28,7 +28,7 @@ type Config struct {
 	TheGraphConfig *thegraph.Config
 
 	// Configuration for the EigenDA client.
-	EigenDaClientConfig *clients.EigenDAClientConfig
+	EigenDAClientConfig *clients.EigenDAClientConfig
 
 	// Configures the traffic generator workers.
 	WorkerConfig WorkerConfig
@@ -73,7 +73,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			MaxRetries:   ctx.Int(TheGraphRetriesFlag.Name),
 		},
 
-		EigenDaClientConfig: &clients.EigenDAClientConfig{
+		EigenDAClientConfig: &clients.EigenDAClientConfig{
 			RPC:                 fmt.Sprintf("%s:%s", ctx.GlobalString(HostnameFlag.Name), ctx.GlobalString(GrpcPortFlag.Name)),
 			SignerPrivateKeyHex: ctx.String(SignerPrivateKeyFlag.Name),
 			DisableTLS:          ctx.GlobalBool(DisableTLSFlag.Name),
@@ -110,7 +110,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		},
 	}
 
-	err = config.EigenDaClientConfig.CheckAndSetDefaults()
+	err = config.EigenDAClientConfig.CheckAndSetDefaults()
 	if err != nil {
 		return nil, err
 	}

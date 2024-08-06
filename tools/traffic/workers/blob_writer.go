@@ -119,7 +119,7 @@ func (writer *BlobWriter) run() {
 			writer.writeSuccessMetric.Increment()
 
 			checksum := md5.Sum(*data)
-			writer.unconfirmedKeyHandler.AddUnconfirmedKey(&key, &checksum, uint(len(*data)))
+			writer.unconfirmedKeyHandler.AddUnconfirmedKey(key, checksum, uint(len(*data)))
 		}
 	}
 }

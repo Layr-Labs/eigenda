@@ -69,6 +69,7 @@ type Config struct {
 	DataApiUrl                     string
 	NumBatchValidators             int
 	NumBatchDeserializationWorkers int
+	EnableGnarkBundleEncoding      bool
 	ClientIPHeader                 string
 	UseSecureGrpc                  bool
 	ReachabilityPollIntervalSec    uint64
@@ -200,6 +201,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DataApiUrl:                     ctx.GlobalString(flags.DataApiUrlFlag.Name),
 		NumBatchValidators:             ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
 		NumBatchDeserializationWorkers: ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
+		EnableGnarkBundleEncoding:      ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 		ClientIPHeader:                 ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                  ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		DisableNodeInfoResources:       ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),

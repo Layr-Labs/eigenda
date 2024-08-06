@@ -48,14 +48,14 @@ func (m *mockRetrievalClient) AddBlob(metadata *table.BlobMetadata, data []byte)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.blobData[metadata.BlobIndex()] = &data
-	m.blobMetadata[metadata.BlobIndex()] = metadata
+	m.blobData[metadata.BlobIndex] = &data
+	m.blobMetadata[metadata.BlobIndex] = metadata
 
 	// The blob index is used in this test as a convenient unique identifier for the blob.
 
-	m.blobChunks[metadata.BlobIndex()] = &clients.BlobChunks{
+	m.blobChunks[metadata.BlobIndex] = &clients.BlobChunks{
 		// Since it isn't otherwise used in this field, we can use it to store the unique identifier for the blob.
-		BlobHeaderLength: metadata.BlobIndex(),
+		BlobHeaderLength: metadata.BlobIndex,
 	}
 }
 
@@ -86,8 +86,8 @@ func (m *mockRetrievalClient) RetrieveBlobChunks(
 	assert.True(m.t, ok, "blob not found")
 
 	metadata := m.blobMetadata[uint(blobIndex)]
-	assert.Equal(m.t, metadata.BlobIndex(), uint(blobIndex))
-	assert.Equal(m.t, (*metadata.BatchHeaderHash())[:32], batchHeaderHash[:32])
+	assert.Equal(m.t, metadata.BlobIndex, uint(blobIndex))
+	assert.Equal(m.t, metadata.BatchHeaderHash[:32], batchHeaderHash[:32])
 
 	return chunks, nil
 
