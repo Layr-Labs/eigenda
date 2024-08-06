@@ -14,8 +14,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/gammazero/workerpool"
-	"github.com/wealdtech/go-merkletree"
-	"github.com/wealdtech/go-merkletree/keccak256"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -59,12 +59,16 @@ func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMes
 			for j, bundle := range blob.GetBundles() {
 				quorumID := blob.GetHeader().GetQuorumHeaders()[j].GetQuorumId()
 				if format == core.GnarkBundleEncodingFormat {
-					bundleMsg, err := new(core.Bundle).Deserialize(bundle.GetBundle())
-					if err != nil {
-						resultChan <- err
-						return
+					if len(bundle.GetBundle()) > 0 {
+						bundleMsg, err := new(core.Bundle).Deserialize(bundle.GetBundle())
+						if err != nil {
+							resultChan <- err
+							return
+						}
+						bundles[uint8(quorumID)] = bundleMsg
+					} else {
+						bundles[uint8(quorumID)] = make([]*encoding.Frame, 0)
 					}
-					bundles[uint8(quorumID)] = bundleMsg
 				} else if format == core.GobBundleEncodingFormat {
 					bundles[uint8(quorumID)] = make([]*encoding.Frame, len(bundle.GetChunks()))
 					for k, data := range bundle.GetChunks() {

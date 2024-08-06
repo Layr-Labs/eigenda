@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/wealdtech/go-merkletree"
+	"github.com/wealdtech/go-merkletree/v2"
 )
 
 const encodingInterval = 2 * time.Second
@@ -142,6 +142,10 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 					}
 					if strings.Contains(err.Error(), "too many requests") {
 						e.logger.Warn("encoding request ratelimited", "err", err)
+					} else if strings.Contains(err.Error(), "connection reset by peer") {
+						e.logger.Warn("encoder connection reset by peer", "err", err)
+					} else if strings.Contains(err.Error(), "error reading from server: EOF") {
+						e.logger.Warn("encoder request dropped", "err", err)
 					} else {
 						e.logger.Error("error processing encoded blobs", "err", err)
 					}

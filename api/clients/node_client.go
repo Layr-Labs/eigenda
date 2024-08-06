@@ -2,13 +2,14 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	node_utils "github.com/Layr-Labs/eigenda/node/grpc"
-	"github.com/wealdtech/go-merkletree"
+	"github.com/wealdtech/go-merkletree/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -120,7 +121,24 @@ func (c client) GetChunks(
 
 	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
 	for i, data := range reply.GetChunks() {
-		chunk, err := new(encoding.Frame).Deserialize(data)
+		var chunk *encoding.Frame
+		switch reply.GetEncoding() {
+		case node.ChunkEncoding_GNARK:
+			chunk, err = new(encoding.Frame).DeserializeGnark(data)
+		case node.ChunkEncoding_GOB:
+			chunk, err = new(encoding.Frame).Deserialize(data)
+		case node.ChunkEncoding_UNKNOWN:
+			// For backward compatibility, we fallback the UNKNOWN to GOB
+			chunk, err = new(encoding.Frame).Deserialize(data)
+			if err != nil {
+				chunksChan <- RetrievedChunks{
+					OperatorID: opID,
+					Err:        errors.New("UNKNOWN chunk encoding format"),
+					Chunks:     nil,
+				}
+				return
+			}
+		}
 		if err != nil {
 			chunksChan <- RetrievedChunks{
 				OperatorID: opID,

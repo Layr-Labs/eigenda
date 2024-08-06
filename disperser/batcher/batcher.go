@@ -18,7 +18,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/wealdtech/go-merkletree"
+	"github.com/wealdtech/go-merkletree/v2"
 )
 
 const (
@@ -146,8 +146,26 @@ func NewBatcher(
 	}, nil
 }
 
+func (b *Batcher) RecoverState(ctx context.Context) error {
+	metas, err := b.Queue.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
+	if err != nil {
+		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
+	}
+	for _, meta := range metas {
+		err = b.Queue.MarkBlobProcessing(ctx, meta.GetBlobKey())
+		if err != nil {
+			return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
+		}
+	}
+	return nil
+}
+
 func (b *Batcher) Start(ctx context.Context) error {
-	err := b.ChainState.Start(ctx)
+	err := b.RecoverState(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to recover state: %w", err)
+	}
+	err = b.ChainState.Start(ctx)
 	if err != nil {
 		return err
 	}
@@ -262,15 +280,8 @@ func (b *Batcher) updateConfirmationInfo(
 				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
 				continue
 			}
-			blobHeader := batchData.blobHeaders[blobIndex]
 
-			blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
-			if err != nil {
-				b.logger.Error("HandleSingleBatch: failed to get blob header hash", "err", err)
-				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
-				continue
-			}
-			merkleProof, err := batchData.merkleTree.GenerateProof(blobHeaderHash[:], 0)
+			merkleProof, err := batchData.merkleTree.GenerateProofWithIndex(uint64(blobIndex), 0)
 			if err != nil {
 				b.logger.Error("HandleSingleBatch: failed to generate blob header inclusion proof", "err", err)
 				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])

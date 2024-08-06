@@ -30,6 +30,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMODB_TABLE_NAME"),
 	}
+	ShadowTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "shadow-table-name"),
+		Usage:    "Name of the dynamodb table to shadow write blob metadata",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SHADOW_TABLE_NAME"),
+		Value:    "",
+	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "Port at which disperser listens for grpc calls",
@@ -87,11 +94,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RATE_BUCKET_STORE_SIZE"),
 		Required: false,
 	}
-	EnableDualQuorums = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-dual-quorums"),
-		Usage:    "Whether to enable dual quorum staking. If false, only quorum 0 is used as required quorum",
+	MaxBlobSize = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-blob-size"),
+		Usage:    "max blob size disperser is accepting",
+		Value:    2_097_152,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOB_SIZE"),
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_DUAL_QUORUMS"),
 	}
 )
 
@@ -110,7 +118,8 @@ var optionalFlags = []cli.Flag{
 	EnableRatelimiter,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
-	EnableDualQuorums,
+	ShadowTableNameFlag,
+	MaxBlobSize,
 }
 
 // Flags contains the list of configuration options available to the binary.
