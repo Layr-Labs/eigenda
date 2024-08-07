@@ -223,13 +223,17 @@ func TestBatchOperations(t *testing.T) {
 	createTable(t, tableName)
 
 	ctx := context.Background()
-	numItems := 30
+	numItems := 33
 	items := make([]commondynamodb.Item, numItems)
+	expectedBlobKeys := make([]string, numItems)
+	expectedMetadataKeys := make([]string, numItems)
 	for i := 0; i < numItems; i += 1 {
 		items[i] = commondynamodb.Item{
 			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
 			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
 		}
+		expectedBlobKeys[i] = fmt.Sprintf("blob%d", i)
+		expectedMetadataKeys[i] = fmt.Sprintf("key%d", i)
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
 	assert.NoError(t, err)
@@ -255,6 +259,18 @@ func TestBatchOperations(t *testing.T) {
 			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
 		}
 	}
+
+	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys)
+	assert.NoError(t, err)
+	assert.Len(t, fetchedItems, numItems)
+	blobKeys := make([]string, numItems)
+	metadataKeys := make([]string, numItems)
+	for i := 0; i < numItems; i += 1 {
+		blobKeys[i] = fetchedItems[i]["BlobKey"].(*types.AttributeValueMemberS).Value
+		metadataKeys[i] = fetchedItems[i]["MetadataKey"].(*types.AttributeValueMemberS).Value
+	}
+	assert.ElementsMatch(t, expectedBlobKeys, blobKeys)
+	assert.ElementsMatch(t, expectedMetadataKeys, metadataKeys)
 
 	unprocessedKeys, err := dynamoClient.DeleteItems(ctx, tableName, keys)
 	assert.NoError(t, err)
