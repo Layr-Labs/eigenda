@@ -65,6 +65,13 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
+	ChurnApprovalInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "churn-approval-interval"),
+		Usage:    "If this interval is N mins, the churner will only approve a new churn request N mins after the previous approval",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "CHURN_APPROVAL_INTERVAL"),
+		Value:    15 * time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -78,6 +85,7 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	PerPublicKeyRateLimit,
 	MetricsHTTPPort,
+	ChurnApprovalInterval,
 }
 
 // Flags contains the list of configuration options available to the binary.
