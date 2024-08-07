@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/shirou/gopsutil/mem"
 
 	_ "go.uber.org/automaxprocs"
@@ -26,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const localhost = "0.0.0.0"
@@ -158,7 +160,7 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 		return nil, err
 	}
 
-	blobs, err := GetBlobMessages(in, s.node.Config.NumBatchDeserializationWorkers)
+	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +252,85 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 	return reply, err
 }
 
+func (s *Server) validateStoreBlobsRequest(in *pb.StoreBlobsRequest) error {
+	if in.GetReferenceBlockNumber() == 0 {
+		return api.NewInvalidArgError("missing reference_block_number in request")
+	}
+
+	if len(in.GetBlobs()) == 0 {
+		return api.NewInvalidArgError("missing blobs in request")
+	}
+	for _, blob := range in.Blobs {
+		if blob.GetHeader() == nil {
+			return api.NewInvalidArgError("missing blob header in request")
+		}
+		if ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
+			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
+			return api.NewInvalidArgError("missing quorum headers in request")
+		}
+		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
+			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+		}
+		for _, q := range blob.GetHeader().GetQuorumHeaders() {
+			if q.GetQuorumId() > core.MaxQuorumID {
+				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+			}
+			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
+				return err
+			}
+		}
+		if in.GetReferenceBlockNumber() != blob.GetHeader().GetReferenceBlockNumber() {
+			return api.NewInvalidArgError("reference_block_number must be the same for all blobs")
+		}
+	}
+	return nil
+}
+
 func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.StoreBlobsReply, error) {
-	return nil, errors.New("StoreBlobs is not implemented")
+	start := time.Now()
+
+	err := s.validateStoreBlobsRequest(in)
+	if err != nil {
+		return nil, err
+	}
+
+	blobHeadersSize := 0
+	bundleSize := 0
+	for _, blob := range in.Blobs {
+		blobHeadersSize += proto.Size(blob.GetHeader())
+		for _, bundle := range blob.GetBundles() {
+			bundleSize += proto.Size(bundle)
+		}
+	}
+	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf message (over about 2GiB).
+	s.node.Logger.Info("StoreBlobs RPC request received", "numBlobs", len(in.Blobs), "reqMsgSize", proto.Size(in), "blobHeadersSize", blobHeadersSize, "bundleSize", bundleSize, "referenceBlockNumber", in.GetReferenceBlockNumber())
+
+	// Process the request
+	blobs, err := GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
+	if err != nil {
+		return nil, err
+	}
+
+	s.node.Metrics.ObserveLatency("StoreBlobs", "deserialization", float64(time.Since(start).Milliseconds()))
+	s.node.Logger.Info("StoreBlobsRequest deserialized", "duration", time.Since(start))
+
+	signatures, err := s.node.ProcessBlobs(ctx, blobs, in.GetBlobs())
+	if err != nil {
+		return nil, err
+	}
+
+	signaturesBytes := make([]*wrappers.BytesValue, len(signatures))
+	for i, sig := range signatures {
+		if sig == nil {
+			signaturesBytes[i] = nil
+			continue
+		}
+		signaturesBytes[i] = wrapperspb.Bytes(sig.Serialize())
+	}
+
+	return &pb.StoreBlobsReply{Signatures: signaturesBytes}, nil
 }
 
 func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*pb.AttestBatchReply, error) {

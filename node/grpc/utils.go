@@ -32,14 +32,14 @@ func GetBatchHeader(in *pb.StoreChunksRequest) (*core.BatchHeader, error) {
 	return &batchHeader, nil
 }
 
-// GetBlobMessages constructs a core.BlobMessage array from a proto of pb.StoreChunksRequest.
-// Note the StoreChunksRequest is validated as soon as it enters the node gRPC
-// interface, see grpc.Server.validateStoreChunkRequest.
-func GetBlobMessages(in *pb.StoreChunksRequest, numWorkers int) ([]*core.BlobMessage, error) {
-	blobs := make([]*core.BlobMessage, len(in.GetBlobs()))
+// GetBlobMessages constructs a core.BlobMessage array from blob protobufs.
+// Note the proto request is validated as soon as it enters the node gRPC
+// interface. This method assumes the blobs are valid.
+func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, error) {
+	blobs := make([]*core.BlobMessage, len(pbBlobs))
 	pool := workerpool.New(numWorkers)
 	resultChan := make(chan error, len(blobs))
-	for i, blob := range in.GetBlobs() {
+	for i, blob := range pbBlobs {
 		i := i
 		blob := blob
 		pool.Submit(func() {

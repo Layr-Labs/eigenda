@@ -37,6 +37,8 @@ type Metrics struct {
 	AccuBatches *prometheus.CounterVec
 	// Accumulated number and size of batches that have been removed from the Node.
 	AccuRemovedBatches *prometheus.CounterVec
+	// Accumulated number and size of blobs that have been removed from the Node.
+	AccuRemovedBlobs *prometheus.CounterVec
 	// Accumulated number and size of blobs processed by quorums.
 	AccuBlobs *prometheus.CounterVec
 	// Total number of changes in the node's socket address.
@@ -126,6 +128,14 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 			},
 			[]string{"type"},
 		),
+		AccuRemovedBlobs: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: Namespace,
+				Name:      "eigenda_removed_blobs_total",
+				Help:      "the total number and size of blobs that have been removed by the DA node",
+			},
+			[]string{"type"},
+		),
 		AccuSocketUpdates: promauto.With(reg).NewCounter(
 			prometheus.CounterOpts{
 				Namespace: Namespace,
@@ -189,6 +199,13 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 		g.AccuRemovedBatches.WithLabelValues("number").Inc()
 	}
 	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalBatchSize))
+}
+
+func (g *Metrics) RemoveNBlobs(numBlobs int, totalSize int64) {
+	for i := 0; i < numBlobs; i++ {
+		g.AccuRemovedBlobs.WithLabelValues("number").Inc()
+	}
+	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalSize))
 }
 
 func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize uint64) {
