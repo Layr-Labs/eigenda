@@ -146,6 +146,8 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 						e.logger.Warn("encoder connection reset by peer", "err", err)
 					} else if strings.Contains(err.Error(), "error reading from server: EOF") {
 						e.logger.Warn("encoder request dropped", "err", err)
+					} else if strings.Contains(err.Error(), "connection refused") {
+						e.logger.Warn("encoder connection refused", "err", err)
 					} else {
 						e.logger.Error("error processing encoded blobs", "err", err)
 					}
