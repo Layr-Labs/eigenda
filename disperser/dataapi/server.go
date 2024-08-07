@@ -359,10 +359,23 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	batchHeaderHash := c.Param("batch_header_hash")
+	batchHeaderHashBytes, err := ConvertHexadecimalToBytes([]byte(batchHeaderHash))
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+		errorResponse(c, fmt.Errorf("invalid batch header hash"))
+		return
+	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	if err != nil || limit <= 0 {
-		limit = 10
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+		errorResponse(c, fmt.Errorf("invalid limit parameter"))
+		return
+	}
+	if limit <= 0 {
+		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+		errorResponse(c, fmt.Errorf("limit must be greater than 0"))
+		return
 	}
 
 	var exclusiveStartKey *disperser.BatchIndexExclusiveStartKey
@@ -376,7 +389,7 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 		}
 	}
 
-	metadatas, newExclusiveStartKey, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHash, limit, exclusiveStartKey)
+	metadatas, newExclusiveStartKey, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHashBytes, limit, exclusiveStartKey)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
 		errorResponse(c, err)
@@ -453,7 +466,14 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil {
-		limit = 10
+		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+		errorResponse(c, fmt.Errorf("invalid limit parameter"))
+		return
+	}
+	if limit <= 0 {
+		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+		errorResponse(c, fmt.Errorf("limit must be greater than 0"))
+		return
 	}
 
 	metadatas, err := s.getBlobs(c.Request.Context(), limit)
