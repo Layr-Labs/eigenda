@@ -422,7 +422,7 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 	return nil
 }
 
-func (e *EncodingStreamer) UpdateReferenecBlock(currentBlockNumber uint) error {
+func (e *EncodingStreamer) UpdateReferenceBlock(currentBlockNumber uint) error {
 	blockNumber := currentBlockNumber
 	if blockNumber > e.FinalizationBlockDelay {
 		blockNumber -= e.FinalizationBlockDelay
