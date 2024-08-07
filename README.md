@@ -1,3 +1,5 @@
+![Actions](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/actions.yml/badge.svg)
+
 # EigenDA Sidecar Proxy
 
 ## Introduction
