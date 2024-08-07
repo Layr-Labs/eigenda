@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	bipMultiplier     = big.NewInt(10000)
-	secondsTillExpiry = 900 * time.Second
+	bipMultiplier = big.NewInt(10000)
 )
 
 type ChurnRequest struct {
@@ -290,7 +289,7 @@ func (c *churner) sign(ctx context.Context, operatorToRegisterAddress gethcommon
 	copy(salt[:], saltKeccak256)
 
 	// set expiry to ChurnApprovalInterval in the future
-	expiry := big.NewInt(now.Add(secondsTillExpiry).Unix())
+	expiry := big.NewInt(now.Add(c.churnApprovalInterval).Unix())
 
 	// sign and return signature
 	hashToSign, err := c.Transactor.CalculateOperatorChurnApprovalDigestHash(ctx, operatorToRegisterAddress, operatorToRegisterId, operatorsToChurn, salt, expiry)
