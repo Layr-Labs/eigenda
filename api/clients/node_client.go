@@ -89,6 +89,7 @@ func (c client) GetChunks(
 	conn, err := grpc.Dial(
 		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(32*1024*1024)), // 32 MiB buffer for the worst case
 	)
 	if err != nil {
 		chunksChan <- RetrievedChunks{
