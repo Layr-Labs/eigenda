@@ -35,16 +35,21 @@ func (s *server) getBlobs(ctx context.Context, limit int) ([]*BlobMetadataRespon
 	return s.convertBlobMetadatasToBlobMetadataResponse(ctx, blobMetadatas)
 }
 
-func (s *server) getBlobsFromBatchHeaderHash(ctx context.Context, batcherHeaderHash string, limit int) ([]*BlobMetadataResponse, error) {
-	blobMetadatas, err := s.getBlobMetadataByBatchHeaderHashWithLimit(ctx, batcherHeaderHash, limit)
+func (s *server) getBlobsFromBatchHeaderHash(ctx context.Context, batcherHeaderHash string, limit int, exclusiveStartKey *disperser.BatchIndexExclusiveStartKey) ([]*BlobMetadataResponse, *disperser.BatchIndexExclusiveStartKey, error) {
+	blobMetadatas, newExclusiveStartKey, err := s.getBlobMetadataByBatchHeaderHashWithLimit(ctx, batcherHeaderHash, int32(limit), exclusiveStartKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(blobMetadatas) == 0 {
-		return nil, errNotFound
+		return nil, nil, errNotFound
 	}
 
-	return s.convertBlobMetadatasToBlobMetadataResponse(ctx, blobMetadatas)
+	responses, err := s.convertBlobMetadatasToBlobMetadataResponse(ctx, blobMetadatas)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return responses, newExclusiveStartKey, nil
 }
 
 func (s *server) convertBlobMetadatasToBlobMetadataResponse(ctx context.Context, metadatas []*disperser.BlobMetadata) ([]*BlobMetadataResponse, error) {
@@ -178,22 +183,41 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 	return batches, blobMetadatas, nil
 }
 
-func (s *server) getBlobMetadataByBatchHeaderHashWithLimit(ctx context.Context, batchHeaderHash string, limit int) ([]*disperser.BlobMetadata, error) {
+func (s *server) getBlobMetadataByBatchHeaderHashWithLimit(ctx context.Context, batchHeaderHash string, limit int32, exclusiveStartKey *disperser.BatchIndexExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BatchIndexExclusiveStartKey, error) {
 	batchHeaderHashBytes, err := ConvertHexadecimalToBytes([]byte(batchHeaderHash))
 	if err != nil {
 		s.logger.Error("Failed to convert batch header hash to hex string", "error", err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	metadatas, err := s.blobstore.GetAllBlobMetadataByBatch(ctx, batchHeaderHashBytes)
-	if err != nil {
-		s.logger.Error("Failed to get blob metadata", "error", err)
-		return nil, err
+	var allMetadata []*disperser.BlobMetadata
+	var nextKey *disperser.BatchIndexExclusiveStartKey = exclusiveStartKey
+
+	const maxLimit int32 = 1000
+	remainingLimit := min(limit, maxLimit)
+
+	for int32(len(allMetadata)) < remainingLimit {
+		s.logger.Debug("Getting blob metadata by batch header hash", "batchHeaderHash", batchHeaderHash, "remainingLimit", remainingLimit, "nextKey", nextKey)
+		metadatas, newNextKey, err := s.blobstore.GetAllBlobMetadataByBatchWithPagination(ctx, batchHeaderHashBytes, remainingLimit-int32(len(allMetadata)), nextKey)
+		if err != nil {
+			s.logger.Error("Failed to get blob metadata", "error", err)
+			return nil, nil, err
+		}
+
+		allMetadata = append(allMetadata, metadatas...)
+
+		if newNextKey == nil {
+			// No more data to fetch
+			return allMetadata, nil, nil
+		}
+
+		nextKey = newNextKey
+
+		if int32(len(allMetadata)) == remainingLimit {
+			// We've reached the limit
+			break
+		}
 	}
 
-	if len(metadatas) >= limit {
-		metadatas = metadatas[:limit]
-	}
-
-	return metadatas, nil
+	return allMetadata, nextKey, nil
 }

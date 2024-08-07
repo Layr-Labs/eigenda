@@ -73,6 +73,8 @@ definitions:
     type: object
   dataapi.Meta:
     properties:
+      next_token:
+        type: string
       size:
         type: integer
     type: object
@@ -252,13 +254,17 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: Next page token
+        in: query
+        name: next_token
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.BlobMetadataResponse'
+            $ref: '#/definitions/dataapi.BlobsResponse'
         "400":
           description: 'error: Bad request'
           schema:

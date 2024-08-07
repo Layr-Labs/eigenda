@@ -37,13 +37,19 @@ const docTemplate = `{
                         "description": "Limit [default: 10]",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Next page token",
+                        "name": "next_token",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobMetadataResponse"
+                            "$ref": "#/definitions/dataapi.BlobsResponse"
                         }
                     },
                     "400": {
@@ -708,6 +714,9 @@ const docTemplate = `{
         "dataapi.Meta": {
             "type": "object",
             "properties": {
+                "next_token": {
+                    "type": "string"
+                },
                 "size": {
                     "type": "integer"
                 }

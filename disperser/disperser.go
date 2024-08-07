@@ -135,6 +135,13 @@ type BlobStoreExclusiveStartKey struct {
 	RequestedAt  int64 //  RequestedAt is epoch time in seconds
 }
 
+type BatchIndexExclusiveStartKey struct {
+	BlobHash        BlobHash
+	MetadataHash    MetadataHash
+	BatchHeaderHash []byte
+	BlobIndex       int32
+}
+
 type BlobStore interface {
 	// StoreBlob adds a blob to the queue and returns a key that can be used to retrieve the blob later
 	StoreBlob(ctx context.Context, blob *core.Blob, requestedAt uint64) (BlobKey, error)
@@ -169,6 +176,8 @@ type BlobStore interface {
 	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *BlobStoreExclusiveStartKey) ([]*BlobMetadata, *BlobStoreExclusiveStartKey, error)
 	// GetAllBlobMetadataByBatch returns the metadata of all the blobs in the batch.
 	GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*BlobMetadata, error)
+	// GetAllBlobMetadataByBatchWithPagination returns all the blobs in the batch using pagination
+	GetAllBlobMetadataByBatchWithPagination(ctx context.Context, batchHeaderHash [32]byte, limit int32, exclusiveStartKey *BatchIndexExclusiveStartKey) ([]*BlobMetadata, *BatchIndexExclusiveStartKey, error)
 	// GetBlobMetadata returns a blob metadata given a metadata key
 	GetBlobMetadata(ctx context.Context, blobKey BlobKey) (*BlobMetadata, error)
 	// HandleBlobFailure handles a blob failure by either incrementing the retry count or marking the blob as failed

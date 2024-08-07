@@ -2,6 +2,8 @@ package dataapi
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -93,7 +95,8 @@ type (
 	}
 
 	Meta struct {
-		Size int `json:"size"`
+		Size      int    `json:"size"`
+		NextToken string `json:"next_token,omitempty"`
 	}
 
 	BlobsResponse struct {
@@ -343,7 +346,8 @@ func (s *server) FetchBlobHandler(c *gin.Context) {
 //	@Produce	json
 //	@Param		batch_header_hash	path		string	true	"Batch Header Hash"
 //	@Param		limit				query		int		false	"Limit [default: 10]"
-//	@Success	200					{object}	BlobMetadataResponse
+//	@Param		next_token			query		string	false	"Next page token"
+//	@Success	200					{object}	BlobsResponse
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
@@ -356,26 +360,78 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 
 	batchHeaderHash := c.Param("batch_header_hash")
 
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	if err != nil {
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	if err != nil || limit <= 0 {
 		limit = 10
 	}
 
-	metadatas, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHash, limit)
+	var exclusiveStartKey *disperser.BatchIndexExclusiveStartKey
+	nextToken := c.Query("next_token")
+	if nextToken != "" {
+		exclusiveStartKey, err = decodeNextToken(nextToken)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+			errorResponse(c, fmt.Errorf("invalid next_token"))
+			return
+		}
+	}
+
+	metadatas, newExclusiveStartKey, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHash, limit, exclusiveStartKey)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
 		errorResponse(c, err)
 		return
 	}
 
+	var nextPageToken string
+	if newExclusiveStartKey != nil {
+		nextPageToken, err = encodeNextToken(newExclusiveStartKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+			errorResponse(c, fmt.Errorf("failed to generate next page token"))
+			return
+		}
+	}
+
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobsFromBatchHeaderHash")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, BlobsResponse{
 		Meta: Meta{
-			Size: len(metadatas),
+			Size:      len(metadatas),
+			NextToken: nextPageToken,
 		},
 		Data: metadatas,
 	})
+}
+
+func decodeNextToken(token string) (*disperser.BatchIndexExclusiveStartKey, error) {
+	// Decode the base64 string
+	decodedBytes, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode token: %w", err)
+	}
+
+	// Unmarshal the JSON into a BatchIndexExclusiveStartKey
+	var key disperser.BatchIndexExclusiveStartKey
+	err = json.Unmarshal(decodedBytes, &key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal token: %w", err)
+	}
+
+	return &key, nil
+}
+
+func encodeNextToken(key *disperser.BatchIndexExclusiveStartKey) (string, error) {
+	// Marshal the key to JSON
+	jsonBytes, err := json.Marshal(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal key: %w", err)
+	}
+
+	// Encode the JSON as a base64 string
+	token := base64.URLEncoding.EncodeToString(jsonBytes)
+
+	return token, nil
 }
 
 // FetchBlobsHandler godoc
