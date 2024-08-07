@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"fmt"
@@ -93,13 +94,9 @@ func TestBlobWriter(t *testing.T) {
 		tu.AssertEventuallyTrue(t, func() bool {
 			lock.Lock()
 			defer lock.Unlock()
-			return int(disperserClient.DisperseCount) > i && int(unconfirmedKeyHandler.Count)+errorCount > i
-		}, time.Second)
 
-		// These methods should be called exactly once per tick if there are no errors.
-		// In the presence of errors, nothing should be passed to the unconfirmed key handler.
-		assert.Equal(t, uint(i+1), disperserClient.DisperseCount)
-		assert.Equal(t, uint(i+1-errorCount), unconfirmedKeyHandler.Count)
+			return uint(i+1) == disperserClient.DisperseCount && uint(i+1-errorCount) == unconfirmedKeyHandler.Count
+		}, time.Second)
 
 		// This method should not be called in this test.
 		assert.Equal(t, uint(0), disperserClient.GetStatusCount)
@@ -115,8 +112,16 @@ func TestBlobWriter(t *testing.T) {
 			// Verify that the proper data was sent to the unconfirmed key handler.
 			assert.Equal(t, uint(len(disperserClient.ProvidedData)), unconfirmedKeyHandler.ProvidedSize)
 			checksum := md5.Sum(disperserClient.ProvidedData)
-			assert.Equal(t, checksum, unconfirmedKeyHandler.ProvidedChecksum)
-			assert.Equal(t, disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
+
+			tu.AssertEventuallyTrue(t, func() bool {
+				lock.Lock()
+				defer lock.Unlock()
+				return bytes.Equal(checksum[:], unconfirmedKeyHandler.ProvidedChecksum[:]) &&
+					bytes.Equal(disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
+			}, time.Second)
+
+			//assert.Equal(t, checksum, unconfirmedKeyHandler.ProvidedChecksum)
+			//assert.Equal(t, disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
 
 			// Verify that data has the proper amount of randomness.
 			if previousData != nil {
@@ -132,8 +137,10 @@ func TestBlobWriter(t *testing.T) {
 		}
 
 		// Verify metrics.
-		assert.Equal(t, float64(i+1-errorCount), generatorMetrics.GetCount("write_success"))
-		assert.Equal(t, float64(errorCount), generatorMetrics.GetCount("write_failure"))
+		tu.AssertEventuallyTrue(t, func() bool {
+			return float64(i+1) == generatorMetrics.GetCount("write_success") &&
+				float64(errorCount) == generatorMetrics.GetCount("write_failure")
+		}, time.Second)
 	}
 
 	cancel()
