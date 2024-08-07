@@ -1,4 +1,4 @@
-name: actions
+name: holesky-test
 
 on:
   push:
