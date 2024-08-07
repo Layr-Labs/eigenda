@@ -1,0 +1,30 @@
+name: actions
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  holesky-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+    - name: Run holesky tests
+      env: 
+        SIGNER_PRIVATE_KEY:  ${{ secrets.SIGNER_PRIVATE_KEY }}
+        ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+      run: | 
+        SIGNER_PRIVATE_KEY=$SIGNER_PRIVATE_KEY ETHEREUM_RPC=$ETHEREUM_RPC make holesky-test
