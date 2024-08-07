@@ -347,6 +347,21 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		storeChan <- storeResult{err: nil, keys: keys, latency: time.Since(start)}
 	}(n)
 
+	// Detect batch probe request
+	if header.ReferenceBlockNumber == 0 {
+		log.Info("Batch probe request detected", "batchHeaderHash", batchHeaderHashHex)
+		result := <-storeChan
+		if result.keys != nil {
+			log.Debug("Rolling back the probe request key/value entries stored in database", "number of entires", len(*result.keys), "batchHeaderHash", batchHeaderHash)
+			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
+				log.Error("Failed to delete the batch probe that should be rolled back", "batchHeaderHash", batchHeaderHashHex, "err", deleteKeysErr)
+			}
+		}
+		// Sign batch header hash and return
+		sig := n.KeyPair.SignMessage(batchHeaderHash)
+		return sig, nil
+	}
+
 	// Validate batch.
 	stageTimer := time.Now()
 	err = n.ValidateBatch(ctx, header, blobs)
