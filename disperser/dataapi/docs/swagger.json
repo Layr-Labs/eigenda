@@ -11,32 +11,27 @@
         "version": "1"
     },
     "paths": {
-        "/ejector/operators": {
-            "post": {
+        "/feed/batches/{batch_header_hash}/blobs": {
+            "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Ejector"
+                    "Feed"
                 ],
-                "summary": "Eject operators who violate the SLAs during the given time interval",
+                "summary": "Fetch blob metadata by batch header hash",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Lookback window for operator ejection [default: 86400]",
-                        "name": "interval",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "End time for evaluating operator ejection [default: now]",
-                        "name": "end",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
-                        "description": "Whether it's periodic or urgent ejection request [default: periodic]",
-                        "name": "mode",
+                        "description": "Batch Header Hash",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit [default: 10]",
+                        "name": "limit",
                         "in": "query"
                     }
                 ],
@@ -44,7 +39,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.EjectionResponse"
+                            "$ref": "#/definitions/dataapi.BlobMetadataResponse"
                         }
                     },
                     "400": {
@@ -695,14 +690,6 @@
                 },
                 "meta": {
                     "$ref": "#/definitions/dataapi.Meta"
-                }
-            }
-        },
-        "dataapi.EjectionResponse": {
-            "type": "object",
-            "properties": {
-                "transaction_hash": {
-                    "type": "string"
                 }
             }
         },

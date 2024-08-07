@@ -43,7 +43,7 @@ const (
 	maxThroughputAge                    = 10
 	maxMetricAage                       = 10
 	maxFeedBlobsAge                     = 10
-	maxFeedBlobAage                     = 300 // this is completely static
+	maxFeedBlobAge                      = 300 // this is completely static
 	maxDisperserAvailabilityAge         = 3
 	maxChurnerAvailabilityAge           = 3
 	maxBatcherAvailabilityAge           = 3
@@ -194,7 +194,6 @@ func NewServer(
 	}
 
 	if eigenDAGRPCServiceChecker == nil {
-
 		eigenDAGRPCServiceChecker = NewEigenDAServiceHealthCheck(grpcConn, config.DisperserHostname, config.ChurnerHostname)
 	}
 
@@ -231,13 +230,13 @@ func (s *server) Start() error {
 	basePath := "/api/v1"
 	docs.SwaggerInfo.BasePath = basePath
 	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
-
 	v1 := router.Group(basePath)
 	{
 		feed := v1.Group("/feed")
 		{
 			feed.GET("/blobs", s.FetchBlobsHandler)
 			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
+			feed.GET("/batches/:batch_header_hash/blobs", s.FetchBlobsFromBatchHeaderHash)
 		}
 		operatorsInfo := v1.Group("/operators-info")
 		{
@@ -333,8 +332,50 @@ func (s *server) FetchBlobHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, metadata)
+}
+
+// FetchBlobsFromBatchHeaderHash godoc
+//
+//	@Summary	Fetch blob metadata by batch header hash
+//	@Tags		Feed
+//	@Produce	json
+//	@Param		batch_header_hash	path		string	true	"Batch Header Hash"
+//	@Param		limit				query		int		false	"Limit [default: 10]"
+//	@Success	200					{object}	BlobMetadataResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Router		/feed/batches/{batch_header_hash}/blobs [get]
+func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchBlobsFromBatchHeaderHash", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	batchHeaderHash := c.Param("batch_header_hash")
+
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+
+	metadatas, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHash, limit)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobsFromBatchHeaderHash")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, BlobsResponse{
+		Meta: Meta{
+			Size: len(metadatas),
+		},
+		Data: metadatas,
+	})
 }
 
 // FetchBlobsHandler godoc
@@ -846,75 +887,6 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 		},
 		Data: availabilityStatuses,
 	})
-}
-
-func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
-	var (
-		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
-		batches         = make([]*Batch, 0)
-		blobKeyPresence = make(map[string]struct{})
-		batchPresence   = make(map[string]struct{})
-	)
-
-	for skip := 0; len(blobMetadatas) < limit && skip < limit; skip += maxQueryBatchesLimit {
-		batchesWithLimit, err := s.subgraphClient.QueryBatchesWithLimit(ctx, maxQueryBatchesLimit, skip)
-		if err != nil {
-			s.logger.Error("Failed to query batches", "error", err)
-			return nil, nil, err
-		}
-
-		if len(batchesWithLimit) == 0 {
-			break
-		}
-
-		for i := range batchesWithLimit {
-			s.logger.Debug("Getting blob metadata", "batchHeaderHash", batchesWithLimit[i].BatchHeaderHash)
-			var (
-				batch = batchesWithLimit[i]
-			)
-			if batch == nil {
-				continue
-			}
-			batchHeaderHash, err := ConvertHexadecimalToBytes(batch.BatchHeaderHash)
-			if err != nil {
-				s.logger.Error("Failed to convert batch header hash to hex string", "error", err)
-				continue
-			}
-			batchKey := string(batchHeaderHash[:])
-			if _, found := batchPresence[batchKey]; !found {
-				batchPresence[batchKey] = struct{}{}
-			} else {
-				// The batch has processed, skip it.
-				s.logger.Error("Getting duplicate batch from the graph", "batch header hash", batchKey)
-				continue
-			}
-
-			metadatas, err := s.blobstore.GetAllBlobMetadataByBatch(ctx, batchHeaderHash)
-			if err != nil {
-				s.logger.Error("Failed to get blob metadata", "error", err)
-				continue
-			}
-			for _, bm := range metadatas {
-				blobKey := bm.GetBlobKey().String()
-				if _, found := blobKeyPresence[blobKey]; !found {
-					blobKeyPresence[blobKey] = struct{}{}
-					blobMetadatas = append(blobMetadatas, bm)
-				} else {
-					s.logger.Error("Getting duplicate blob key from the blobstore", "blobkey", blobKey)
-				}
-			}
-			batches = append(batches, batch)
-			if len(blobMetadatas) >= limit {
-				break
-			}
-		}
-	}
-
-	if len(blobMetadatas) >= limit {
-		blobMetadatas = blobMetadatas[:limit]
-	}
-
-	return batches, blobMetadatas, nil
 }
 
 func errorResponse(c *gin.Context, err error) {
