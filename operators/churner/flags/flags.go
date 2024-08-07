@@ -70,7 +70,7 @@ var (
 		Usage:    "If this interval is N mins, the churner will only approve a new churn request N mins after the previous approval",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "CHURN_APPROVAL_INTERVAL"),
-		Value:    60 * time.Minute,
+		Value:    15 * time.Minute,
 	}
 )
 
