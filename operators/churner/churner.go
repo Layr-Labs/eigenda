@@ -67,6 +67,8 @@ func NewChurner(
 		return nil, err
 	}
 
+	logger.Info("Churner created with config", "ChurnApprovalInterval", config.ChurnApprovalInterval)
+
 	return &churner{
 		Indexer:     indexer,
 		Transactor:  transactor,
