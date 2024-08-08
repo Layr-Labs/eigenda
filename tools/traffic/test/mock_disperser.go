@@ -2,12 +2,15 @@ package test
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 )
+
+var _ clients.DisperserClient = (*mockDisperserClient)(nil)
 
 type mockDisperserClient struct {
 	t *testing.T

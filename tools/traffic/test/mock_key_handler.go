@@ -1,9 +1,12 @@
 package test
 
 import (
+	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"sync"
 	"testing"
 )
+
+var _ workers.KeyHandler = (*mockKeyHandler)(nil)
 
 // mockKeyHandler is a stand-in for the blob verifier's UnconfirmedKeyHandler.
 type mockKeyHandler struct {

@@ -1,6 +1,11 @@
 package test
 
-import "time"
+import (
+	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
+	"time"
+)
+
+var _ workers.InterceptableTicker = (*mockTicker)(nil)
 
 // mockTicker is a deterministic implementation of the InterceptableTicker interface.
 type mockTicker struct {

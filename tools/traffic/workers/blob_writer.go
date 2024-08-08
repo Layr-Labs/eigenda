@@ -106,22 +106,27 @@ func (writer *BlobWriter) run() {
 		case <-(*writer.ctx).Done():
 			return
 		case <-writer.ticker.GetTimeChannel():
-			data := writer.getRandomData()
-			key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
-				return writer.sendRequest(*data)
-			})
-			if err != nil {
-				writer.writeFailureMetric.Increment()
-				writer.logger.Error("failed to send blob request", "err:", err)
-				continue
-			}
-
-			writer.writeSuccessMetric.Increment()
-
-			checksum := md5.Sum(*data)
-			writer.unconfirmedKeyHandler.AddUnconfirmedKey(key, checksum, uint(len(*data)))
+			writer.writeNextBlob()
 		}
 	}
+}
+
+// writeNextBlob attempts to send a random blob to the disperser.
+func (writer *BlobWriter) writeNextBlob() {
+	data := writer.getRandomData()
+	key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
+		return writer.sendRequest(*data)
+	})
+	if err != nil {
+		writer.writeFailureMetric.Increment()
+		writer.logger.Error("failed to send blob request", "err:", err)
+		return
+	}
+
+	writer.writeSuccessMetric.Increment()
+
+	checksum := md5.Sum(*data)
+	writer.unconfirmedKeyHandler.AddUnconfirmedKey(key, checksum, uint(len(*data)))
 }
 
 // getRandomData returns a slice of random data to be used for a blob.
