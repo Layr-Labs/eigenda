@@ -60,13 +60,12 @@ func TestBlobWriter(t *testing.T) {
 		unconfirmedKeyHandler,
 		generatorMetrics)
 
-	errorProbability := 0.1
 	errorCount := 0
 
 	var previousData []byte
 
 	for i := 0; i < 100; i++ {
-		if rand.Float64() < errorProbability {
+		if i%10 == 0 {
 			disperserClient.DispenseErrorToReturn = fmt.Errorf("intentional error for testing purposes")
 			errorCount++
 		} else {
