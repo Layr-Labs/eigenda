@@ -265,7 +265,6 @@ func (s *BlobMetadataStore) GetAllBlobMetadataByBatchWithPagination(
 	}
 
 	// Convert the last evaluated key to a disperser.BatchIndexExclusiveStartKey
-	s.logger.Info("Converting last evaluated key to exclusive start key", "lastEvaluatedKey", lastEvaluatedKey)
 	exclusiveStartKey, err = convertToExclusiveStartKeyBatchIndex(lastEvaluatedKey)
 	if err != nil {
 		return nil, nil, err

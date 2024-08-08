@@ -139,7 +139,7 @@ type BatchIndexExclusiveStartKey struct {
 	BlobHash        BlobHash
 	MetadataHash    MetadataHash
 	BatchHeaderHash []byte
-	BlobIndex       int32
+	BlobIndex       uint32
 }
 
 type BlobStore interface {

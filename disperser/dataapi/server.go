@@ -372,9 +372,9 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 		errorResponse(c, fmt.Errorf("invalid limit parameter"))
 		return
 	}
-	if limit <= 0 {
+	if limit <= 0 || limit > 1000 {
 		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, fmt.Errorf("limit must be greater than 0"))
+		errorResponse(c, fmt.Errorf("limit must be between 0 and 1000"))
 		return
 	}
 

@@ -302,7 +302,7 @@ func (q *BlobStore) GetAllBlobMetadataByBatchWithPagination(ctx context.Context,
 			if len(metas) == int(limit) {
 				return metas, &disperser.BatchIndexExclusiveStartKey{
 					BatchHeaderHash: meta.ConfirmationInfo.BatchHeaderHash[:],
-					BlobIndex:       int32(meta.ConfirmationInfo.BlobIndex),
+					BlobIndex:       meta.ConfirmationInfo.BlobIndex,
 				}, nil
 			}
 		} else if exclusiveStartKey != nil && meta.ConfirmationInfo.BlobIndex > uint32(exclusiveStartKey.BlobIndex) {
@@ -311,7 +311,7 @@ func (q *BlobStore) GetAllBlobMetadataByBatchWithPagination(ctx context.Context,
 			if len(metas) == int(limit) {
 				return metas, &disperser.BatchIndexExclusiveStartKey{
 					BatchHeaderHash: meta.ConfirmationInfo.BatchHeaderHash[:],
-					BlobIndex:       int32(meta.ConfirmationInfo.BlobIndex),
+					BlobIndex:       meta.ConfirmationInfo.BlobIndex,
 				}, nil
 			}
 		}

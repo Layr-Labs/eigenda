@@ -190,8 +190,8 @@ func (s *server) getBlobMetadataByBatchHeaderHashWithLimit(ctx context.Context, 
 	const maxLimit int32 = 1000
 	remainingLimit := min(limit, maxLimit)
 
+	s.logger.Debug("Getting blob metadata by batch header hash", "batchHeaderHash", batchHeaderHash, "remainingLimit", remainingLimit, "nextKey", nextKey)
 	for int32(len(allMetadata)) < remainingLimit {
-		s.logger.Debug("Getting blob metadata by batch header hash", "batchHeaderHash", batchHeaderHash, "remainingLimit", remainingLimit, "nextKey", nextKey)
 		metadatas, newNextKey, err := s.blobstore.GetAllBlobMetadataByBatchWithPagination(ctx, batchHeaderHash, remainingLimit-int32(len(allMetadata)), nextKey)
 		if err != nil {
 			s.logger.Error("Failed to get blob metadata", "error", err)
