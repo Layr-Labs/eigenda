@@ -91,6 +91,8 @@ func (writer *BlobWriter) Start() {
 	ticker := time.NewTicker(writer.config.WriteRequestInterval)
 
 	go func() {
+		defer writer.waitGroup.Done()
+
 		for {
 			select {
 			case <-(*writer.ctx).Done():
@@ -99,7 +101,6 @@ func (writer *BlobWriter) Start() {
 				writer.writeNextBlob()
 			}
 		}
-		writer.waitGroup.Done()
 	}()
 }
 
