@@ -15,7 +15,7 @@ type BatchStatus uint
 // Formed: the batch has been formed and no more minibatches can be added. Implies that all minibatch records and dispersal request records have been created.
 //
 // Attested: the batch has been attested.
-// Failed: the batch has failed.
+// Failed: the batch has failed. Retries will be attempted at the blob level.
 //
 // The batch lifecycle is as follows:
 // Pending -> Formed -> Attested
