@@ -69,7 +69,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 In order for the EigenDA Proxy to avoid a trust assumption on the EigenDA disperser, the proxy offers a DA cert verification feature which ensures that:
 
 1. The DA cert's batch hash can be computed locally and matches the one persisted on-chain in the `ServiceManager` contract
-2. The DA cert's blob inclusion proof can be merkalized to generate the proper batch root
+2. The DA cert's blob inclusion proof can be merkleized to generate the proper batch root
 3. The DA cert's quorum params are adequately defined and expressed when compared to their on-chain counterparts
 
 To target this feature, use the CLI flags `--eigenda-svc-manager-addr`, `--eigenda-eth-rpc`.
@@ -171,7 +171,7 @@ A holesky integration test can be ran using `make holesky-test` to assert proper
 
 ### Optimism
 
-An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation. These tests can be ran via `make optimism-test`.
+An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation.
 
 ## Resources
 
