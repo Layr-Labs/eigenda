@@ -63,39 +63,39 @@ const (
 
 type ChunksData struct {
 	// Chunks is the encoded bytes of the chunks.
-	// Each chunk are of same size.
 	Chunks [][]byte
 	// Format describes how the bytes of the chunks are encoded.
 	Format ChunkEncodingFormat
+	// The number of symbols in each chunk.
+	// Note each chunk of the same blob will always have the same number of symbols.
+	ChunkLen int
 }
 
 func (cd *ChunksData) Size() uint64 {
 	if len(cd.Chunks) == 0 {
 		return 0
 	}
-	return uint64(len(cd.Chunks)) * uint64(len(cd.Chunks[0]))
-}
-
-func (cd *ChunksData) ChunkLength() int {
-	if len(cd.Chunks) == 0 {
-		return 0
+	// GnarkChunkEncoding will create chunks of equal size.
+	if cd.Format == GnarkChunkEncodingFormat {
+		return uint64(len(cd.Chunks)) * uint64(len(cd.Chunks[0]))
 	}
-	return len(cd.Chunks[0]) / encoding.BYTES_PER_SYMBOL
+	// GobChunkEncoding can create chunks of different sizes.
+	size := uint64(0)
+	for _, c := range cd.Chunks {
+		size += uint64(len(c))
+	}
+	return size
 }
 
 func (cd *ChunksData) FlattenToBundle() ([]byte, error) {
-	var format BundleEncodingFormat
-	switch cd.Format {
-	case GobChunkEncodingFormat:
-		format = GobBundleEncodingFormat
-	case GnarkChunkEncodingFormat:
-		format = GnarkBundleEncodingFormat
-	default:
-		return nil, fmt.Errorf("unsupported chunk encoding format: %v", cd.Format)
+	// Only Gnark coded chunks are dispersed as a byte array.
+	// Gob coded chunks are not flattened.
+	if cd.Format != GnarkChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format to flatten: %v", cd.Format)
 	}
 	result := make([]byte, cd.Size()+8)
 	buf := result
-	metadata := (uint64(format) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(cd.ChunkLength())
+	metadata := (uint64(cd.Format) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(cd.ChunkLen)
 	binary.LittleEndian.PutUint64(buf, metadata)
 	buf = buf[8:]
 	for _, c := range cd.Chunks {
