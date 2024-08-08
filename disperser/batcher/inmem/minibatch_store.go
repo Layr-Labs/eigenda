@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
@@ -23,6 +24,8 @@ type minibatchStore struct {
 	DispersalRequests map[uuid.UUID]map[uint][]*batcher.DispersalRequest
 	// DispersalResponses maps batch IDs to a map from minibatch indices to dispersal responses
 	DispersalResponses map[uuid.UUID]map[uint][]*batcher.DispersalResponse
+	// BlobMinibatchMapping maps blob key to a map from batch ID to minibatch records
+	BlobMinibatchMapping map[string]map[uuid.UUID]*batcher.BlobMinibatchMapping
 
 	mu     sync.RWMutex
 	logger logging.Logger
@@ -32,10 +35,11 @@ var _ batcher.MinibatchStore = (*minibatchStore)(nil)
 
 func NewMinibatchStore(logger logging.Logger) batcher.MinibatchStore {
 	return &minibatchStore{
-		BatchRecords:       make(map[uuid.UUID]*batcher.BatchRecord),
-		MinibatchRecords:   make(map[uuid.UUID]map[uint]*batcher.MinibatchRecord),
-		DispersalRequests:  make(map[uuid.UUID]map[uint][]*batcher.DispersalRequest),
-		DispersalResponses: make(map[uuid.UUID]map[uint][]*batcher.DispersalResponse),
+		BatchRecords:         make(map[uuid.UUID]*batcher.BatchRecord),
+		MinibatchRecords:     make(map[uuid.UUID]map[uint]*batcher.MinibatchRecord),
+		DispersalRequests:    make(map[uuid.UUID]map[uint][]*batcher.DispersalRequest),
+		DispersalResponses:   make(map[uuid.UUID]map[uint][]*batcher.DispersalResponse),
+		BlobMinibatchMapping: make(map[string]map[uuid.UUID]*batcher.BlobMinibatchMapping),
 
 		logger: logger,
 	}
@@ -232,6 +236,41 @@ func (m *minibatchStore) GetMinibatchDispersalResponses(ctx context.Context, bat
 	}
 
 	return m.DispersalResponses[batchID][minibatchIndex], nil
+}
+
+func (m *minibatchStore) GetBlobMinibatchMappings(ctx context.Context, blobKey disperser.BlobKey) ([]*batcher.BlobMinibatchMapping, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, ok := m.BlobMinibatchMapping[blobKey.String()]; !ok {
+		return nil, nil
+	}
+
+	res := make([]*batcher.BlobMinibatchMapping, 0)
+	for _, blobMinibatchMapping := range m.BlobMinibatchMapping[blobKey.String()] {
+		res = append(res, blobMinibatchMapping)
+	}
+
+	return res, nil
+}
+
+func (m *minibatchStore) PutBlobMinibatchMappings(ctx context.Context, blobMinibatchMappings []*batcher.BlobMinibatchMapping) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, blobMinibatchMapping := range blobMinibatchMappings {
+		if blobMinibatchMapping.BlobKey == nil {
+			return errors.New("blob key is nil")
+		}
+		blobKey := blobMinibatchMapping.BlobKey.String()
+
+		if _, ok := m.BlobMinibatchMapping[blobKey]; !ok {
+			m.BlobMinibatchMapping[blobKey] = make(map[uuid.UUID]*batcher.BlobMinibatchMapping)
+		}
+
+		m.BlobMinibatchMapping[blobKey][blobMinibatchMapping.BatchID] = blobMinibatchMapping
+	}
+	return nil
 }
 
 func (m *minibatchStore) GetLatestFormedBatch(ctx context.Context) (batch *batcher.BatchRecord, minibatches []*batcher.MinibatchRecord, err error) {

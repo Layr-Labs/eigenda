@@ -8,6 +8,7 @@ import (
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,11 +19,13 @@ import (
 )
 
 const (
-	batchStatusIndexName      = "BatchStatusIndex"
-	batchSKPrefix             = "BATCH#"
-	minibatchSKPrefix         = "MINIBATCH#"
-	dispersalRequestSKPrefix  = "DISPERSAL_REQUEST#"
-	dispersalResponseSKPrefix = "DISPERSAL_RESPONSE#"
+	batchStatusIndexName          = "BatchStatusIndex"
+	blobMinibatchMappingIndexName = "BlobMinibatchMappingIndex"
+	batchSKPrefix                 = "BATCH#"
+	minibatchSKPrefix             = "MINIBATCH#"
+	dispersalRequestSKPrefix      = "DISPERSAL_REQUEST#"
+	dispersalResponseSKPrefix     = "DISPERSAL_RESPONSE#"
+	blobMinibatchMappingSKPrefix  = "BLOB_MINIBATCH_MAPPING#"
 )
 
 type MinibatchStore struct {
@@ -63,6 +66,10 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeName: aws.String("CreatedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("BlobHash"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -85,6 +92,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					},
 					{
 						AttributeName: aws.String("CreatedAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
+				IndexName: aws.String(blobMinibatchMappingIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("BlobHash"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("SK"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
@@ -150,6 +177,18 @@ func MarshalDispersalResponse(response *batcher.DispersalResponse) (map[string]t
 	return fields, nil
 }
 
+func MarshalBlobMinibatchMapping(blobMinibatchMapping *batcher.BlobMinibatchMapping) (map[string]types.AttributeValue, error) {
+	fields, err := attributevalue.MarshalMap(*blobMinibatchMapping)
+	if err != nil {
+		return nil, err
+	}
+	fields["BatchID"] = &types.AttributeValueMemberS{Value: blobMinibatchMapping.BatchID.String()}
+	fields["SK"] = &types.AttributeValueMemberS{Value: blobMinibatchMappingSKPrefix + fmt.Sprintf("%s#%s#%d", blobMinibatchMapping.BlobKey.MetadataHash, blobMinibatchMapping.BatchID, blobMinibatchMapping.BlobIndex)}
+	fields["BlobHash"] = &types.AttributeValueMemberS{Value: blobMinibatchMapping.BlobKey.BlobHash}
+	fields["MetadataHash"] = &types.AttributeValueMemberS{Value: blobMinibatchMapping.BlobKey.MetadataHash}
+	return fields, nil
+}
+
 func UnmarshalBatchID(item commondynamodb.Item) (*uuid.UUID, error) {
 	type BatchID struct {
 		BatchID string
@@ -167,6 +206,16 @@ func UnmarshalBatchID(item commondynamodb.Item) (*uuid.UUID, error) {
 	}
 
 	return &batchID, nil
+}
+
+func UnmarshalBlobKey(item commondynamodb.Item) (*disperser.BlobKey, error) {
+	blobKey := disperser.BlobKey{}
+	err := attributevalue.UnmarshalMap(item, &blobKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blobKey, nil
 }
 
 func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
@@ -268,6 +317,28 @@ func UnmarshalDispersalResponse(item commondynamodb.Item) (*batcher.DispersalRes
 	return &response, nil
 }
 
+func UnmarshalBlobMinibatchMapping(item commondynamodb.Item) (*batcher.BlobMinibatchMapping, error) {
+	blobMinibatchMapping := batcher.BlobMinibatchMapping{}
+	err := attributevalue.UnmarshalMap(item, &blobMinibatchMapping)
+	if err != nil {
+		return nil, err
+	}
+
+	batchID, err := UnmarshalBatchID(item)
+	if err != nil {
+		return nil, err
+	}
+	blobMinibatchMapping.BatchID = *batchID
+
+	blobKey, err := UnmarshalBlobKey(item)
+	if err != nil {
+		return nil, err
+	}
+	blobMinibatchMapping.BlobKey = blobKey
+
+	return &blobMinibatchMapping, nil
+}
+
 func (m *MinibatchStore) PutBatch(ctx context.Context, batch *batcher.BatchRecord) error {
 	item, err := MarshalBatchRecord(batch)
 	if err != nil {
@@ -302,6 +373,27 @@ func (m *MinibatchStore) PutDispersalResponse(ctx context.Context, response *bat
 	}
 
 	return m.dynamoDBClient.PutItem(ctx, m.tableName, item)
+}
+
+func (m *MinibatchStore) PutBlobMinibatchMappings(ctx context.Context, blobMinibatchMappings []*batcher.BlobMinibatchMapping) error {
+	items := make([]map[string]types.AttributeValue, len(blobMinibatchMappings))
+	var err error
+	for i, blobMinibatchMapping := range blobMinibatchMappings {
+		items[i], err = MarshalBlobMinibatchMapping(blobMinibatchMapping)
+		if err != nil {
+			return err
+		}
+	}
+
+	failedItems, err := m.dynamoDBClient.PutItems(ctx, m.tableName, items)
+	if err != nil {
+		return err
+	}
+	if len(failedItems) > 0 {
+		return fmt.Errorf("failed to put blob minibatch mappings: %v", failedItems)
+	}
+
+	return nil
 }
 
 func (m *MinibatchStore) GetBatch(ctx context.Context, batchID uuid.UUID) (*batcher.BatchRecord, error) {
@@ -617,4 +709,29 @@ func (m *MinibatchStore) GetMinibatchDispersalResponses(ctx context.Context, bat
 	}
 
 	return responses, nil
+}
+
+func (m *MinibatchStore) GetBlobMinibatchMappings(ctx context.Context, blobKey disperser.BlobKey) ([]*batcher.BlobMinibatchMapping, error) {
+	items, err := m.dynamoDBClient.QueryIndex(ctx, m.tableName, blobMinibatchMappingIndexName, "BlobHash = :blobHash AND begins_with(SK, :prefix)", commondynamodb.ExpresseionValues{
+		":blobHash": &types.AttributeValueMemberS{
+			Value: blobKey.BlobHash,
+		},
+		":prefix": &types.AttributeValueMemberS{
+			Value: blobMinibatchMappingSKPrefix + blobKey.MetadataHash,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	blobMinibatchMappings := make([]*batcher.BlobMinibatchMapping, len(items))
+	for i, item := range items {
+		blobMinibatchMappings[i], err = UnmarshalBlobMinibatchMapping(item)
+		if err != nil {
+			m.logger.Errorf("failed to unmarshal blob minibatch mapping at index %d: %v", i, err)
+			return nil, err
+		}
+	}
+
+	return blobMinibatchMappings, nil
 }
