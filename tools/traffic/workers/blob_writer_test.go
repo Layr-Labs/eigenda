@@ -1,7 +1,6 @@
-package test
+package workers
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
 	"fmt"
@@ -10,12 +9,10 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
-	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestBlobWriter(t *testing.T) {
@@ -25,8 +22,6 @@ func TestBlobWriter(t *testing.T) {
 	waitGroup := sync.WaitGroup{}
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.Nil(t, err)
-	startTime := time.Unix(rand.Int63()%2_000_000_000, 0)
-	ticker := newMockTicker(startTime)
 
 	dataSize := rand.Uint64()%1024 + 64
 
@@ -51,23 +46,19 @@ func TestBlobWriter(t *testing.T) {
 		CustomQuorums:    customQuorum,
 	}
 
-	lock := sync.Mutex{}
-
-	disperserClient := newMockDisperserClient(t, &lock, authenticated)
-	unconfirmedKeyHandler := newMockKeyHandler(t, &lock)
+	disperserClient := NewMockDisperserClient(t, authenticated)
+	unconfirmedKeyHandler := NewMockKeyHandler(t)
 
 	generatorMetrics := metrics.NewMockMetrics()
 
-	writer := workers.NewBlobWriter(
+	writer := NewBlobWriter(
 		&ctx,
 		&waitGroup,
 		logger,
-		ticker,
 		config,
 		disperserClient,
 		unconfirmedKeyHandler,
 		generatorMetrics)
-	writer.Start()
 
 	errorProbability := 0.1
 	errorCount := 0
@@ -87,16 +78,11 @@ func TestBlobWriter(t *testing.T) {
 		_, err = rand.Read(disperserClient.KeyToReturn)
 		assert.Nil(t, err)
 
-		// Move time forward, allowing the writer to attempt to send a blob.
-		ticker.Tick(1 * time.Second)
+		// Simulate the advancement of time (i.e. allow the writer to write the next blob).
+		writer.writeNextBlob()
 
-		// Wait until the writer finishes its work.
-		tu.AssertEventuallyTrue(t, func() bool {
-			lock.Lock()
-			defer lock.Unlock()
-
-			return uint(i+1) == disperserClient.DisperseCount && uint(i+1-errorCount) == unconfirmedKeyHandler.Count
-		}, time.Second)
+		assert.Equal(t, uint(i+1), disperserClient.DisperseCount)
+		assert.Equal(t, uint(i+1-errorCount), unconfirmedKeyHandler.Count)
 
 		// This method should not be called in this test.
 		assert.Equal(t, uint(0), disperserClient.GetStatusCount)
@@ -113,12 +99,8 @@ func TestBlobWriter(t *testing.T) {
 			assert.Equal(t, uint(len(disperserClient.ProvidedData)), unconfirmedKeyHandler.ProvidedSize)
 			checksum := md5.Sum(disperserClient.ProvidedData)
 
-			tu.AssertEventuallyTrue(t, func() bool {
-				lock.Lock()
-				defer lock.Unlock()
-				return bytes.Equal(checksum[:], unconfirmedKeyHandler.ProvidedChecksum[:]) &&
-					bytes.Equal(disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
-			}, time.Second)
+			assert.Equal(t, checksum, unconfirmedKeyHandler.ProvidedChecksum)
+			assert.Equal(t, disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
 
 			//assert.Equal(t, checksum, unconfirmedKeyHandler.ProvidedChecksum)
 			//assert.Equal(t, disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
@@ -137,14 +119,9 @@ func TestBlobWriter(t *testing.T) {
 		}
 
 		// Verify metrics.
-		tu.AssertEventuallyTrue(t, func() bool {
-			return float64(i+1) == generatorMetrics.GetCount("write_success") &&
-				float64(errorCount) == generatorMetrics.GetCount("write_failure")
-		}, time.Second)
+		assert.Equal(t, float64(i+1-errorCount), generatorMetrics.GetCount("write_success"))
+		assert.Equal(t, float64(errorCount), generatorMetrics.GetCount("write_failure"))
 	}
 
 	cancel()
-	tu.ExecuteWithTimeout(func() {
-		waitGroup.Wait()
-	}, time.Second)
 }

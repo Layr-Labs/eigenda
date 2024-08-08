@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync"
+	"time"
 )
 
 // BlobWriter sends blobs to a disperser at a configured rate.
@@ -23,9 +24,6 @@ type BlobWriter struct {
 
 	// All logs should be written using this logger.
 	logger logging.Logger
-
-	// ticker is used to control the rate at which blobs are sent to the disperser.
-	ticker InterceptableTicker
 
 	// Config contains the configuration for the generator.
 	config *config2.WorkerConfig
@@ -54,7 +52,6 @@ func NewBlobWriter(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	ticker InterceptableTicker,
 	config *config2.WorkerConfig,
 	disperser clients.DisperserClient,
 	unconfirmedKeyHandler KeyHandler,
@@ -78,7 +75,6 @@ func NewBlobWriter(
 		ctx:                   ctx,
 		waitGroup:             waitGroup,
 		logger:                logger,
-		ticker:                ticker,
 		config:                config,
 		disperser:             disperser,
 		unconfirmedKeyHandler: unconfirmedKeyHandler,
@@ -92,23 +88,19 @@ func NewBlobWriter(
 // Start begins the blob writer goroutine.
 func (writer *BlobWriter) Start() {
 	writer.waitGroup.Add(1)
+	ticker := time.NewTicker(writer.config.WriteRequestInterval)
+
 	go func() {
-		writer.run()
+		for {
+			select {
+			case <-(*writer.ctx).Done():
+				return
+			case <-ticker.C:
+				writer.writeNextBlob()
+			}
+		}
 		writer.waitGroup.Done()
 	}()
-}
-
-// run sends blobs to a disperser at a configured rate.
-// Continues and dues not return until the context is cancelled.
-func (writer *BlobWriter) run() {
-	for {
-		select {
-		case <-(*writer.ctx).Done():
-			return
-		case <-writer.ticker.GetTimeChannel():
-			writer.writeNextBlob()
-		}
-	}
 }
 
 // writeNextBlob attempts to send a random blob to the disperser.
