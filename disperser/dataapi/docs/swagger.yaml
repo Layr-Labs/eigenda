@@ -66,11 +66,6 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
-  dataapi.EjectionResponse:
-    properties:
-      transaction_hash:
-        type: string
-    type: object
   dataapi.ErrorResponse:
     properties:
       error:
@@ -78,6 +73,8 @@ definitions:
     type: object
   dataapi.Meta:
     properties:
+      next_token:
+        type: string
       size:
         type: integer
     type: object
@@ -245,21 +242,21 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
-  /ejector/operators:
-    post:
+  /feed/batches/{batch_header_hash}/blobs:
+    get:
       parameters:
-      - description: 'Lookback window for operator ejection [default: 86400]'
+      - description: Batch Header Hash
+        in: path
+        name: batch_header_hash
+        required: true
+        type: string
+      - description: 'Limit [default: 10]'
         in: query
-        name: interval
+        name: limit
         type: integer
-      - description: 'End time for evaluating operator ejection [default: now]'
+      - description: Next page token
         in: query
-        name: end
-        type: integer
-      - description: 'Whether it''s periodic or urgent ejection request [default:
-          periodic]'
-        in: query
-        name: mode
+        name: next_token
         type: string
       produces:
       - application/json
@@ -267,7 +264,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.EjectionResponse'
+            $ref: '#/definitions/dataapi.BlobsResponse'
         "400":
           description: 'error: Bad request'
           schema:
@@ -280,9 +277,9 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Eject operators who violate the SLAs during the given time interval
+      summary: Fetch blob metadata by batch header hash
       tags:
-      - Ejector
+      - Feed
   /feed/blobs:
     get:
       parameters:

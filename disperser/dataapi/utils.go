@@ -23,7 +23,7 @@ func ConvertHexadecimalToBytes(byteHash []byte) ([32]byte, error) {
 
 	// We expect the resulting byte slice to have a length of 32 bytes.
 	if len(decodedBytes) != 32 {
-		return [32]byte{}, errors.New("error decoding hash")
+		return [32]byte{}, errors.New("error decoding hash, invalid length")
 	}
 
 	// Convert the byte slice to a [32]byte array
