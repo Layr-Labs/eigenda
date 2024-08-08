@@ -366,7 +366,7 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 		return
 	}
 
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
 		errorResponse(c, fmt.Errorf("invalid limit parameter"))
