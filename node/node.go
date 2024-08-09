@@ -266,8 +266,8 @@ func (n *Node) expireLoop() {
 		// The heuristic is to cap the GC time to a percentage of the poll interval, but at
 		// least have 1 second.
 		timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
-		numBatchesDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(time.Now().Unix(), timeLimitSec)
-		n.Logger.Info("Complete an expiration cycle to remove expired batches", "num expired batches found and removed", numBatchesDeleted, "num expired blobs found and removed", numBlobsDeleted)
+		numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(time.Now().Unix(), timeLimitSec)
+		n.Logger.Info("Complete an expiration cycle to remove expired batches", "num expired batches found and removed", numBatchesDeleted, "num expired mappings found and removed", numMappingsDeleted, "num expired blobs found and removed", numBlobsDeleted)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired batches need to be removed, which will continue in next cycle", "time limit (sec)", timeLimitSec)

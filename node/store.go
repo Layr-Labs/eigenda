@@ -66,32 +66,40 @@ func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, block
 // The function returns the number of batches deleted and the status of deletion. Note that the
 // number of batches deleted can be positive even if the status is error (e.g. the error happened
 // after it had successfully deleted some batches).
-func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint64) (numBatchesDeleted int, numBlobsDeleted int, err error) {
+func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint64) (numBatchesDeleted int, numMappingsDeleted int, numBlobsDeleted int, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeLimitSec)*time.Second)
 	defer cancel()
 
 	totalBatchesDeleted := 0
+	totalMappingsDeleted := 0
 	totalBlobsDeleted := 0
 	for {
 		select {
 		case <-ctx.Done():
-			return totalBatchesDeleted, totalBlobsDeleted, ctx.Err()
+			return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, ctx.Err()
 		default:
 			blobsDeleted, err := s.deleteExpiredBlobs(currentTimeUnixSec, numBatchesToDeleteAtomically)
 			if err != nil {
-				return totalBatchesDeleted, totalBlobsDeleted, err
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, err
 			}
 			totalBlobsDeleted += blobsDeleted
 
 			batchesDeleted, err := s.deleteNBatches(currentTimeUnixSec, numBatchesToDeleteAtomically)
 			if err != nil {
-				return totalBatchesDeleted, totalBlobsDeleted, err
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, err
 			}
+			totalBatchesDeleted += batchesDeleted
+
+			mappingsDeleted, batchesDeleted, err := s.deleteExpiredBatchMapping(currentTimeUnixSec, numBatchesToDeleteAtomically)
+			if err != nil {
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, err
+			}
+			totalMappingsDeleted += mappingsDeleted
 			totalBatchesDeleted += batchesDeleted
 			// When there is no error and we didn't delete any batch, it means we have
 			// no obsolete batches to delete, so we can return.
-			if blobsDeleted == 0 && batchesDeleted == 0 {
-				return totalBatchesDeleted, totalBlobsDeleted, nil
+			if blobsDeleted == 0 && batchesDeleted == 0 && mappingsDeleted == 0 {
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, nil
 			}
 		}
 	}
@@ -109,7 +117,7 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 	for iter.Next() {
 		ts, err := DecodeBlobExpirationKey(iter.Key())
 		if err != nil {
-			s.logger.Error("Could not decode the expiration key", "key:", iter.Key(), "error:", err)
+			s.logger.Error("Could not decode the expiration key", "key", iter.Key(), "error", err)
 			continue
 		}
 		// No more rows expired up to current time.
@@ -120,7 +128,7 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 		blobHeaderBytes := copyBytes(iter.Value())
 		blobHeaders, err := DecodeHashSlice(blobHeaderBytes)
 		if err != nil {
-			s.logger.Error("Could not decode the blob header hashes", "error:", err)
+			s.logger.Error("Could not decode the blob header hashes", "error", err)
 			continue
 		}
 		expiredBlobHeaders = append(expiredBlobHeaders, blobHeaders...)
@@ -167,6 +175,67 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 	return len(expiredBlobHeaders), nil
 }
 
+// deleteExpiredBatchMapping returns the number of batch to blob index mapping entries deleted and the status of deletion.
+// The first return value is the number of batch to blob index mapping entries deleted.
+// The second return value is the number of batch header entries deleted.
+func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches int) (numExpiredMappings int, numExpiredBatches int, err error) {
+	// Scan for expired batches.
+	iter := s.db.NewIterator(EncodeBatchMappingExpirationKeyPrefix())
+	expiredKeys := make([][]byte, 0)
+	expiredBatches := make([][]byte, 0)
+	for iter.Next() {
+		ts, err := DecodeBatchMappingExpirationKey(iter.Key())
+		if err != nil {
+			s.logger.Error("Could not decode the batch mapping expiration key", "key", iter.Key(), "error", err)
+			continue
+		}
+		// No more rows expired up to current time.
+		if currentTimeUnixSec < ts {
+			break
+		}
+		expiredKeys = append(expiredKeys, copyBytes(iter.Key()))
+		expiredBatches = append(expiredBatches, copyBytes(iter.Value()))
+		if len(expiredKeys) == numBatches {
+			break
+		}
+	}
+	iter.Release()
+
+	// No expired batch found.
+	if len(expiredKeys) == 0 {
+		return 0, 0, nil
+	}
+
+	numMappings := 0
+	// Scan for the batch header, blob headers and chunks of each expired batch.
+	for _, hash := range expiredBatches {
+		var batchHeaderHash [32]byte
+		copy(batchHeaderHash[:], hash)
+
+		// Batch header.
+		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
+
+		// Blob index mapping.
+		blobIndexIter := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
+		for blobIndexIter.Next() {
+			expiredKeys = append(expiredKeys, copyBytes(blobIndexIter.Key()))
+			numMappings++
+		}
+		blobIndexIter.Release()
+	}
+
+	// Perform the removal.
+	err = s.db.DeleteBatch(expiredKeys)
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to delete the expired keys in batch: %w", err)
+	}
+
+	s.logger.Info("Deleted expired batch mapping", "numBatches", len(expiredBatches), "numMappings", numMappings)
+	numExpiredMappings = numMappings
+	numExpiredBatches = len(expiredBatches)
+	return numExpiredMappings, numExpiredBatches, nil
+}
+
 // deleteNBatches returns the number of batches we deleted and the status of deletion. The number
 // is set to -1 (invalid value) if the deletion status is an error.
 func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, error) {
@@ -177,7 +246,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 	for iter.Next() {
 		ts, err := DecodeBatchExpirationKey(iter.Key())
 		if err != nil {
-			s.logger.Error("Could not decode the expiration key", "key:", iter.Key(), "error:", err)
+			s.logger.Error("Could not decode the expiration key", "key:", iter.Key(), "error", err)
 			continue
 		}
 		// No more rows expired up to current time.
@@ -223,19 +292,12 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
-
-		// Blob index.
-		blobIndexIter := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
-		for blobIndexIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobIndexIter.Key()))
-		}
-		blobIndexIter.Release()
 	}
 
 	// Perform the removal.
 	err := s.db.DeleteBatch(expiredKeys)
 	if err != nil {
-		s.logger.Error("Failed to delete the expired keys in batch", "keys:", expiredKeys, "error:", err)
+		s.logger.Error("Failed to delete the expired keys in batch", "keys", expiredKeys, "error", err)
 		return -1, err
 	}
 
@@ -513,14 +575,19 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 	return &keys, nil
 }
 
-func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeaderHash [32]byte, blobHeaderHashes [][32]byte) error {
+func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeader *core.BatchHeader, blobHeaderHashes [][32]byte) error {
 	start := time.Now()
 	// The key/value pairs that need to be written to the local database.
 	keys := make([][]byte, 0)
 	values := make([][]byte, 0)
 
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	if err != nil {
+		return fmt.Errorf("failed to get the batch header hash: %w", err)
+	}
+
 	expirationTime := s.expirationTime()
-	expirationKey := EncodeBatchExpirationKey(expirationTime)
+	expirationKey := EncodeBatchMappingExpirationKey(expirationTime, batchHeaderHash)
 	keys = append(keys, expirationKey)
 	values = append(values, batchHeaderHash[:])
 
@@ -529,7 +596,17 @@ func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeaderHash [32]b
 		keys = append(keys, blobIndexKey)
 		values = append(values, copyBytes(blobHeaderHash[:]))
 	}
-	err := s.db.WriteBatch(keys, values)
+
+	// Generate the key/value pair for batch header.
+	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
+	batchHeaderBytes, err := batchHeader.Serialize()
+	if err != nil {
+		return fmt.Errorf("failed to serialize the batch header: %w", err)
+	}
+	keys = append(keys, batchHeaderKey)
+	values = append(values, batchHeaderBytes)
+
+	err = s.db.WriteBatch(keys, values)
 	if err != nil {
 		return fmt.Errorf("failed to write the blob index mappings into local database: %w", err)
 	}

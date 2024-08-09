@@ -359,16 +359,16 @@ func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*p
 	}
 
 	// Store the mapping from batch header + blob index to blob header hashes
-	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the batch header hash: %w", err)
-	}
-	err = s.node.Store.StoreBatchBlobMapping(ctx, batchHeaderHash, blobHeaderHashes)
+	err = s.node.Store.StoreBatchBlobMapping(ctx, batchHeader, blobHeaderHashes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store the batch blob mapping: %w", err)
 	}
 
 	// Sign the batch header
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the batch header hash: %w", err)
+	}
 	sig := s.node.KeyPair.SignMessage(batchHeaderHash)
 
 	s.node.Logger.Info("AttestBatch complete", "duration", time.Since(start))
