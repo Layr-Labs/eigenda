@@ -117,7 +117,7 @@ func EncodeBatchMappingExpirationKeyPrefix() []byte {
 	return []byte(batchMappingExpirationPrefix)
 }
 
-// Returns an encoded key for expration time.
+// EncodeBatchExpirationKey returns an encoded key for expration time.
 // Note: the encoded key will preserve the order of expiration time, that is,
 // expirationTime1 < expirationTime2 <=>
 // EncodeBatchExpirationKey(expirationTime1) < EncodeBatchExpirationKey(expirationTime2)
@@ -130,14 +130,16 @@ func EncodeBatchExpirationKey(expirationTime int64) []byte {
 }
 
 // EncodeBlobExpirationKey returns an encoded key for expration time for blob header hashes.
+// Encodes the expiration time and the blob header hash into a single key.
 // Note: the encoded key will preserve the order of expiration time, that is,
 // expirationTime1 < expirationTime2 <=>
 // EncodeBlobExpirationKey(expirationTime1) < EncodeBlobExpirationKey(expirationTime2)
-func EncodeBlobExpirationKey(expirationTime int64) []byte {
+func EncodeBlobExpirationKey(expirationTime int64, blobHeaderHash [32]byte) []byte {
 	prefix := []byte(blobExpirationPrefix)
 	ts := make([]byte, 8)
 	binary.BigEndian.PutUint64(ts[0:8], uint64(expirationTime))
 	buf := bytes.NewBuffer(append(prefix, ts[:]...))
+	buf.Write(blobHeaderHash[:])
 	return buf.Bytes()
 }
 
@@ -164,12 +166,12 @@ func DecodeBatchExpirationKey(key []byte) (int64, error) {
 	return ts, nil
 }
 
-// Returns the expiration timestamp encoded in the key.
+// DecodeBlobExpirationKey returns the expiration timestamp encoded in the key.
 func DecodeBlobExpirationKey(key []byte) (int64, error) {
-	if len(key) != len(blobExpirationPrefix)+8 {
+	if len(key) != len(blobExpirationPrefix)+8+32 {
 		return 0, errors.New("the expiration key is invalid")
 	}
-	ts := int64(binary.BigEndian.Uint64(key[len(key)-8:]))
+	ts := int64(binary.BigEndian.Uint64(key[len(key)-8-32 : len(key)-32]))
 	return ts, nil
 }
 
