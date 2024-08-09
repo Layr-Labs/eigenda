@@ -217,11 +217,6 @@ func (b *BatchConfirmer) updateConfirmationInfo(
 		if updateConfirmationInfoErr != nil {
 			b.logger.Error("error updating blob confirmed metadata", "err", updateConfirmationInfoErr)
 			blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
-		} else {
-			err = b.MinibatchStore.UpdateBatchStatus(ctx, batchData.batchID, BatchStatusAttested)
-			if err != nil {
-				b.logger.Error("error updating batch status", "err", err)
-			}
 		}
 	}
 
@@ -260,12 +255,17 @@ func (b *BatchConfirmer) ProcessConfirmedBatch(ctx context.Context, receiptOrErr
 	if len(blobsToRetry) > 0 {
 		b.logger.Error("failed to update confirmation info", "failed", len(blobsToRetry), "total", len(blobs))
 		_ = b.handleFailure(ctx, confirmationMetadata.batchID, blobsToRetry, FailUpdateConfirmationInfo)
+	} else {
+		err = b.MinibatchStore.UpdateBatchStatus(ctx, confirmationMetadata.batchID, BatchStatusAttested)
+		if err != nil {
+			b.logger.Error("error updating batch status", "err", err)
+		}
 	}
-	b.logger.Debug("Update confirmation info took", "duration", time.Since(stageTimer).String())
 	batchSize := int64(0)
 	for _, blobMeta := range blobs {
 		batchSize += int64(blobMeta.RequestMetadata.BlobSize)
 	}
+	b.logger.Debug("Update confirmation info took", "duration", time.Since(stageTimer).String(), "batchSize", batchSize)
 
 	return nil
 }
