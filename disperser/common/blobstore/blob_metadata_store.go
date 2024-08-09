@@ -34,6 +34,10 @@ type BlobMetadataStore struct {
 	ttl             time.Duration
 }
 
+func (s *BlobMetadataStore) TTL() time.Duration {
+	return s.ttl
+}
+
 func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, shadowTableName string, ttl time.Duration) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	if shadowTableName != "" {
@@ -94,12 +98,12 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, metadataKey dis
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
 func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status disperser.BlobStatus) ([]*disperser.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND RequestedAt > :requestedAt", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
-		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+		":requestedAt": &types.AttributeValueMemberN{
+			Value: strconv.FormatInt(time.Now().Add(-1*s.ttl).Unix(), 10),
 		}})
 	if err != nil {
 		return nil, err
@@ -120,12 +124,12 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
 func (s *BlobMetadataStore) GetBlobMetadataByStatusCount(ctx context.Context, status disperser.BlobStatus) (int32, error) {
-	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND RequestedAt > :requestedAt", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
-		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+		":requestedAt": &types.AttributeValueMemberN{
+			Value: strconv.FormatInt(time.Now().Add(-1*s.ttl).Unix(), 10),
 		},
 	})
 	if err != nil {
@@ -150,12 +154,12 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		}
 	}
 
-	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND RequestedAt > :requestedAt", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
-		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+		":requestedAt": &types.AttributeValueMemberN{
+			Value: strconv.FormatInt(time.Now().Add(-1*s.ttl).Unix(), 10),
 		},
 	}, limit, attributeMap)
 

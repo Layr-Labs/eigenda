@@ -54,14 +54,12 @@ func TestSharedBlobStore(t *testing.T) {
 	err = sharedStorage.IncrementBlobRetryCount(ctx, metadata1)
 	assert.Nil(t, err)
 	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
-	fmt.Println("Num Retries", metadata1.NumRetries)
 	assert.Nil(t, err)
 	assert.Equal(t, uint(1), metadata1.NumRetries)
 
 	err = sharedStorage.IncrementBlobRetryCount(ctx, metadata1)
 	assert.Nil(t, err)
 	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
-	fmt.Println("Num Retries", metadata1.NumRetries)
 	assert.Nil(t, err)
 	assert.Equal(t, uint(2), metadata1.NumRetries)
 
