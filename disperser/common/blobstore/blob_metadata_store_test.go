@@ -6,7 +6,6 @@ import (
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -22,16 +21,17 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
 	}
+	now := time.Now()
 	metadata1 := &disperser.BlobMetadata{
 		MetadataHash: blobKey1.MetadataHash,
 		BlobHash:     blobHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       uint64(now.Add(time.Hour).Unix()),
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
-			RequestedAt:       123,
+			RequestedAt:       uint64(now.Unix()),
 		},
 	}
 	blobKey2 := disperser.BlobKey{
@@ -42,12 +42,12 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 		MetadataHash: blobKey2.MetadataHash,
 		BlobHash:     blobKey2.BlobHash,
 		BlobStatus:   disperser.Finalized,
-		Expiry:       0,
+		Expiry:       uint64(now.Add(time.Hour).Unix()),
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
-			RequestedAt:       123,
+			RequestedAt:       uint64(now.Unix()),
 		},
 		ConfirmationInfo: &disperser.ConfirmationInfo{},
 	}
@@ -88,7 +88,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int32(1), finalizedCount)
 
-	confirmedMetadata := getConfirmedMetadata(t, blobKey1)
+	confirmedMetadata := getConfirmedMetadata(t, metadata1)
 	err = blobMetadataStore.UpdateBlobMetadata(ctx, blobKey1, confirmedMetadata)
 	assert.NoError(t, err)
 
@@ -118,16 +118,17 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
 	}
+	now := time.Now()
 	metadata1 := &disperser.BlobMetadata{
 		MetadataHash: blobKey1.MetadataHash,
 		BlobHash:     blobHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       uint64(now.Add(time.Hour).Unix()),
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
-			RequestedAt:       123,
+			RequestedAt:       uint64(now.Unix()),
 		},
 	}
 	blobKey2 := disperser.BlobKey{
@@ -138,12 +139,12 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 		MetadataHash: blobKey2.MetadataHash,
 		BlobHash:     blobKey2.BlobHash,
 		BlobStatus:   disperser.Finalized,
-		Expiry:       0,
+		Expiry:       uint64(now.Add(time.Hour).Unix()),
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
 			BlobSize:          blobSize,
-			RequestedAt:       123,
+			RequestedAt:       uint64(now.Unix()),
 		},
 		ConfirmationInfo: &disperser.ConfirmationInfo{},
 	}
@@ -221,7 +222,6 @@ func TestShadowWriteBlobMetadata(t *testing.T) {
 
 	err := shadowBlobMetadataStore.QueueNewBlobMetadata(ctx, metadata)
 	assert.NoError(t, err)
-	assert.NoError(t, err)
 	err = blobMetadataStore.SetBlobStatus(context.Background(), blobKey, disperser.Dispersing)
 	assert.NoError(t, err)
 	primaryMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey)
@@ -250,15 +250,59 @@ func TestShadowWriteBlobMetadata(t *testing.T) {
 	})
 }
 
+func TestFilterOutExpiredBlobMetadata(t *testing.T) {
+	ctx := context.Background()
+
+	blobKey := disperser.BlobKey{
+		BlobHash:     "blob1",
+		MetadataHash: "hash1",
+	}
+	now := time.Now()
+	metadata := &disperser.BlobMetadata{
+		MetadataHash: blobKey.MetadataHash,
+		BlobHash:     blobKey.BlobHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       uint64(now.Unix()),
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       uint64(now.Add(-1 * blobMetadataStore.TTL()).Unix()),
+		},
+		ConfirmationInfo: &disperser.ConfirmationInfo{},
+	}
+
+	err := blobMetadataStore.QueueNewBlobMetadata(ctx, metadata)
+	assert.NoError(t, err)
+
+	processing, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Len(t, processing, 0)
+
+	processingCount, err := blobMetadataStore.GetBlobMetadataByStatusCount(ctx, disperser.Processing)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(0), processingCount)
+
+	processing, _, err = blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, 10, nil)
+	assert.NoError(t, err)
+	assert.Len(t, processing, 0)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey.BlobHash},
+		},
+	})
+}
+
 func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	_, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 }
 
-func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperser.BlobMetadata {
+func getConfirmedMetadata(t *testing.T, metadata *disperser.BlobMetadata) *disperser.BlobMetadata {
 	batchHeaderHash := [32]byte{1, 2, 3}
 	blobIndex := uint32(1)
-	requestedAt := uint64(time.Now().Nanosecond())
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
 	assert.NoError(t, err)
@@ -276,34 +320,23 @@ func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperse
 	sigRecordHash := [32]byte{0}
 	fee := []byte{0}
 	inclusionProof := []byte{1, 2, 3, 4, 5}
-	return &disperser.BlobMetadata{
-		BlobHash:     metadataKey.BlobHash,
-		MetadataHash: metadataKey.MetadataHash,
-		BlobStatus:   disperser.Confirmed,
-		Expiry:       0,
-		NumRetries:   0,
-		RequestMetadata: &disperser.RequestMetadata{
-			BlobRequestHeader: core.BlobRequestHeader{
-				SecurityParams: securityParams,
-			},
-			RequestedAt: requestedAt,
-			BlobSize:    blobSize,
+	confirmationInfo := &disperser.ConfirmationInfo{
+		BatchHeaderHash:      batchHeaderHash,
+		BlobIndex:            blobIndex,
+		SignatoryRecordHash:  sigRecordHash,
+		ReferenceBlockNumber: referenceBlockNumber,
+		BatchRoot:            batchRoot,
+		BlobInclusionProof:   inclusionProof,
+		BlobCommitment: &encoding.BlobCommitments{
+			Commitment: commitment,
+			Length:     uint(dataLength),
 		},
-		ConfirmationInfo: &disperser.ConfirmationInfo{
-			BatchHeaderHash:      batchHeaderHash,
-			BlobIndex:            blobIndex,
-			SignatoryRecordHash:  sigRecordHash,
-			ReferenceBlockNumber: referenceBlockNumber,
-			BatchRoot:            batchRoot,
-			BlobInclusionProof:   inclusionProof,
-			BlobCommitment: &encoding.BlobCommitments{
-				Commitment: commitment,
-				Length:     uint(dataLength),
-			},
-			BatchID:                 batchID,
-			ConfirmationTxnHash:     common.HexToHash("0x123"),
-			ConfirmationBlockNumber: confirmationBlockNumber,
-			Fee:                     fee,
-		},
+		BatchID:                 batchID,
+		ConfirmationTxnHash:     common.HexToHash("0x123"),
+		ConfirmationBlockNumber: confirmationBlockNumber,
+		Fee:                     fee,
 	}
+	metadata.BlobStatus = disperser.Confirmed
+	metadata.ConfirmationInfo = confirmationInfo
+	return metadata
 }
