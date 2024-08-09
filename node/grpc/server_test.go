@@ -416,16 +416,46 @@ func TestStoreBlobs(t *testing.T) {
 func TestAttestBatch(t *testing.T) {
 	server := newTestServer(t, true)
 
-	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy, _, _, blobHeaders, _ := makeStoreChunksRequest(t, 66, 33)
 	reqToCopy.BatchHeader = nil
-	req := &pb.AttestBatchRequest{
-		BatchHeader:      reqToCopy.BatchHeader,
-		BlobHeaderHashes: [][]byte{},
+	req := &pb.StoreBlobsRequest{
+		Blobs:                reqToCopy.Blobs,
+		ReferenceBlockNumber: 1,
 	}
-	reply, err := server.AttestBatch(context.Background(), req)
-	assert.Nil(t, reply)
-	assert.Error(t, err)
-	assert.Equal(t, strings.Compare(err.Error(), "AttestBatch is not implemented"), 0)
+	reply, err := server.StoreBlobs(context.Background(), req)
+	assert.NoError(t, err)
+	assert.NotNil(t, reply.GetSignatures())
+
+	assert.Len(t, blobHeaders, 2)
+	bhh0, err := blobHeaders[0].GetBlobHeaderHash()
+	assert.NoError(t, err)
+	bhh1, err := blobHeaders[1].GetBlobHeaderHash()
+	assert.NoError(t, err)
+	batchHeader := &core.BatchHeader{
+		ReferenceBlockNumber: 1,
+		BatchRoot:            [32]byte{},
+	}
+	_, err = batchHeader.SetBatchRoot([]*core.BlobHeader{blobHeaders[0], blobHeaders[1]})
+	assert.NoError(t, err)
+	attestReq := &pb.AttestBatchRequest{
+		BatchHeader: &pb.BatchHeader{
+			BatchRoot:            batchHeader.BatchRoot[:],
+			ReferenceBlockNumber: 1,
+		},
+		BlobHeaderHashes: [][]byte{bhh0[:], bhh1[:]},
+	}
+	attestReply, err := server.AttestBatch(context.Background(), attestReq)
+	assert.NotNil(t, reply)
+	assert.NoError(t, err)
+	sig := attestReply.GetSignature()
+	assert.NotNil(t, sig)
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	assert.NoError(t, err)
+	point, err := new(core.Signature).Deserialize(sig)
+	assert.NoError(t, err)
+	s := &core.Signature{G1Point: point}
+	ok := s.Verify(keyPair.GetPubKeyG2(), batchHeaderHash)
+	assert.True(t, ok)
 }
 
 func TestRetrieveChunks(t *testing.T) {
