@@ -727,6 +727,12 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewInternalError("failed to get blob metadata, please retry")
 	}
 
+	if blobMetadata.Expiry < uint64(time.Now().Unix()) {
+		s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
+		s.metrics.HandleNotFoundRequest("RetrieveBlob")
+		return nil, api.NewNotFoundError("blob expired")
+	}
+
 	// Check throughout rate limit
 	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
 
