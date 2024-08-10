@@ -730,7 +730,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	if blobMetadata.Expiry < uint64(time.Now().Unix()) {
 		s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 		s.metrics.HandleNotFoundRequest("RetrieveBlob")
-		return nil, api.NewNotFoundError("blob expired")
+		return nil, api.NewNotFoundError("no metadata found for the given batch header hash and blob index")
 	}
 
 	// Check throughout rate limit
