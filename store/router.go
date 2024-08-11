@@ -54,8 +54,9 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 			r.log.Debug("Retrieving data from memstore")
 			return r.mem.Get(ctx, key)
 		}
-		if r.s3 != nil && r.s3.cfg.Backup {
-			r.log.Info("Retrieving data from S3", "key", crypto.Keccak256(key))
+		data, err := r.eigenda.Get(ctx, key)
+		if err != nil && r.s3 != nil && r.s3.cfg.Backup {
+			r.log.Warn("Retrieving data from S3 because of EigenDA read failure", "key", crypto.Keccak256(key), "err", err)
 			ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
 			defer cancel()
 			value, err := r.s3.Get(ctx2, crypto.Keccak256(key))
@@ -64,11 +65,8 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 			}
 			r.log.Info("Got data from S3 now verifying")
 			return r.eigenda.EncodeAndVerify(ctx, key, value)
-
-		} else {
-			return r.eigenda.Get(ctx, key)
 		}
-		
+		return data, err
 
 	default:
 		return nil, errors.New("could not determine which storage backend to route to based on unknown commitment mode")
