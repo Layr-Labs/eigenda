@@ -18,8 +18,7 @@ type Registration struct {
 	// The time at which the light node was initially registered.
 	registrationTime time.Time
 
-	// TODO public key
-	// TODO payment address
+	// FUTURE WORK: add public key, payment address, etc.
 }
 
 // NewRegistration creates a new Registration instance.
@@ -49,4 +48,16 @@ func (registration *Registration) RegistrationTime() time.Time {
 // String returns a string representation of the light node.
 func (registration *Registration) String() string {
 	return fmt.Sprintf("LightNode{ID: %d, Seed: %v, Registration time: %s}", registration.id, registration.seed, registration.registrationTime)
+}
+
+// GetChunkGroup returns the chunk group that the light node is in.
+func (registration *Registration) GetChunkGroup(
+	now time.Time,
+	genesis time.Time,
+	shufflePeriod time.Duration,
+	chunkGroupCount uint64) uint64 {
+
+	shuffleOffset := ComputeShuffleOffset(registration.seed, shufflePeriod)
+	epoch := ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, now)
+	return ComputeChunkGroup(registration.seed, epoch, chunkGroupCount)
 }

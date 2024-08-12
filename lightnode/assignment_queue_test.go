@@ -16,9 +16,9 @@ func RandomAssignment(nextShuffleTime time.Time) *chunkGroupAssignment {
 	registration := NewRegistration(id, seed, registrationTime)
 
 	return &chunkGroupAssignment{
-		registration:    registration,
-		nextShuffleTime: nextShuffleTime,
-		chunkGroup:      rand.Uint64(),
+		registration: registration,
+		endOfEpoch:   nextShuffleTime,
+		chunkGroup:   rand.Uint64(),
 	}
 }
 

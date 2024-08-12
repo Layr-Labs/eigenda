@@ -16,11 +16,11 @@ func (h *assignmentHeap) Len() int {
 }
 
 // Less returns whether the element with index i should sort before the element with index j.
-// This assignmentHeap sorts based on the nextShuffleTime of the light nodes.
+// This assignmentHeap sorts based on the endOfEpoch of the light nodes.
 func (h *assignmentHeap) Less(i int, j int) bool {
 	ii := h.data[i]
 	jj := h.data[j]
-	return ii.nextShuffleTime.Before(jj.nextShuffleTime)
+	return ii.endOfEpoch.Before(jj.endOfEpoch)
 }
 
 // Swap swaps the elements with indexes i and j.
@@ -41,9 +41,9 @@ func (h *assignmentHeap) Pop() any {
 	return x
 }
 
-// assignmentQueue is a priority queue that sorts light nodes based on their nextShuffleTime.
+// assignmentQueue is a priority queue that sorts light nodes based on their endOfEpoch.
 type assignmentQueue struct {
-	// The heap that stores the light nodes. Nodes are sorted by their nextShuffleTime.
+	// The heap that stores the light nodes. Nodes are sorted by their endOfEpoch.
 	heap *assignmentHeap
 
 	// A set of node IDs in the queue. This is used to do efficient removals.
@@ -87,7 +87,7 @@ func (queue *assignmentQueue) Push(assignment *chunkGroupAssignment) {
 	queue.nodeIdSet[assignment.registration.ID()] = true
 }
 
-// Pop removes and returns the assignment with the earliest nextShuffleTime.
+// Pop removes and returns the assignment with the earliest endOfEpoch.
 func (queue *assignmentQueue) Pop() *chunkGroupAssignment {
 	queue.collectGarbage()
 	if queue.size == 0 {
@@ -99,7 +99,7 @@ func (queue *assignmentQueue) Pop() *chunkGroupAssignment {
 	return assignment
 }
 
-// Peek returns the assignment with the earliest nextShuffleTime without removing it from the queue. Returns
+// Peek returns the assignment with the earliest endOfEpoch without removing it from the queue. Returns
 // nil if the queue is empty.
 func (queue *assignmentQueue) Peek() *chunkGroupAssignment {
 	queue.collectGarbage()

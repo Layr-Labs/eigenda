@@ -73,6 +73,26 @@ func ComputeShuffleEpoch(
 	return uint64(timeSinceEpochGenesis / shufflePeriod)
 }
 
+// ComputeStartOfShuffleEpoch returns the time when a shuffle epoch begins.
+func ComputeStartOfShuffleEpoch(
+	genesis time.Time,
+	shufflePeriod time.Duration,
+	shuffleOffset time.Duration,
+	currentEpoch uint64) time.Time {
+
+	if shufflePeriod <= 0 {
+		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
+	}
+	if shuffleOffset < 0 {
+		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
+	}
+
+	if currentEpoch == 0 {
+		return genesis
+	}
+	return genesis.Add(shuffleOffset).Add(shufflePeriod * time.Duration(currentEpoch-1))
+}
+
 // ComputeEndOfShuffleEpoch given an epoch, return the time when that epoch will end and the next epoch will begin.
 func ComputeEndOfShuffleEpoch(
 	genesis time.Time,

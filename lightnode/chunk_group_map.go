@@ -1,6 +1,7 @@
 package lightnode
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -45,9 +46,10 @@ func (cgm *ChunkGroupMap) Add(now time.Time, registration *Registration) {
 	shuffleOffset := ComputeShuffleOffset(registration.Seed(), cgm.shufflePeriod)
 	epoch := ComputeShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, now)
 	chunkGroup := ComputeChunkGroup(registration.Seed(), epoch, cgm.chunkGroupCount)
-	nextShuffleTime := ComputeEndOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, epoch)
+	startOfEpoch := ComputeStartOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, epoch)
+	endOfEpoch := ComputeEndOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, epoch)
 
-	assignment := newChunkGroupAssignment(registration, shuffleOffset, chunkGroup, nextShuffleTime)
+	assignment := newChunkGroupAssignment(registration, shuffleOffset, chunkGroup, startOfEpoch, endOfEpoch)
 
 	cgm.addToChunkGroupMap(chunkGroup, registration)
 	cgm.lightNodes[registration.ID()] = assignment
@@ -77,7 +79,7 @@ func (cgm *ChunkGroupMap) Get(lightNodeID uint64) *Registration {
 
 // GetChunkGroup returns the current chunk group of the light node with the given ID. The second return value
 // is true if the light node is being tracked, and false otherwise.
-func (cgm *ChunkGroupMap) getChunkGroup(now time.Time, lightNodeID uint64) (uint64, bool) {
+func (cgm *ChunkGroupMap) GetChunkGroup(now time.Time, lightNodeID uint64) (uint64, bool) {
 	cgm.shuffle(now)
 
 	assignment, ok := cgm.lightNodes[lightNodeID]
@@ -93,8 +95,8 @@ func (cgm *ChunkGroupMap) Size() int {
 	return len(cgm.lightNodes)
 }
 
-// GetLightNodesInChunkGroup returns all light nodes in the given chunk group.
-func (cgm *ChunkGroupMap) GetLightNodesInChunkGroup(
+// GetNodesInChunkGroup returns all light nodes in the given chunk group.
+func (cgm *ChunkGroupMap) GetNodesInChunkGroup(
 	now time.Time,
 	chunkGroup uint64) []*Registration {
 
@@ -114,11 +116,38 @@ func (cgm *ChunkGroupMap) GetRandomNode(
 	now time.Time,
 	rand *rand.Rand,
 	chunkGroup uint64,
-	minimumTimeInGroup time.Duration) (Registration, bool) {
+	minimumTimeInGroup time.Duration) (*Registration, bool) {
+
+	if chunkGroup >= cgm.chunkGroupCount {
+		panic(fmt.Sprintf("chunk group %d is out of bounds, there are only %d chunk groups",
+			chunkGroup, cgm.chunkGroupCount))
+	}
 
 	cgm.shuffle(now)
 
-	return Registration{}, false // TODO
+	nodes := cgm.chunkGroups[chunkGroup]
+	var filteredNodes []*Registration
+
+	if minimumTimeInGroup == 0 {
+		filteredNodes = nodes
+	} else {
+		filteredNodes = make([]*Registration, 0, len(nodes))
+		for _, node := range nodes {
+			assignment := cgm.lightNodes[node.ID()]
+			timeInGroup := now.Sub(assignment.startOfEpoch)
+			if timeInGroup >= minimumTimeInGroup {
+				filteredNodes = append(filteredNodes, node)
+			}
+		}
+	}
+
+	if len(filteredNodes) == 0 {
+		return nil, false
+	}
+
+	index := rand.Intn(len(nodes))
+	node := nodes[index]
+	return node, true
 }
 
 // shuffle shuffles the light nodes into new chunk groups given the current time.
@@ -137,7 +166,7 @@ func (cgm *ChunkGroupMap) shuffle(now time.Time) {
 		}
 
 		next := cgm.shuffleQueue.Peek()
-		if next.nextShuffleTime.After(now) {
+		if next.endOfEpoch.After(now) {
 			// The next light node is not yet ready to be shuffled.
 			break
 		}
@@ -145,11 +174,13 @@ func (cgm *ChunkGroupMap) shuffle(now time.Time) {
 
 		newEpoch := ComputeShuffleEpoch(cgm.genesis, cgm.shufflePeriod, next.shuffleOffset, now)
 		newChunkGroup := ComputeChunkGroup(next.registration.Seed(), newEpoch, cgm.chunkGroupCount)
-		nextShuffleTime := ComputeEndOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, next.shuffleOffset, newEpoch)
+		startOfEpoch := ComputeStartOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, next.shuffleOffset, newEpoch)
+		endOfEpoch := ComputeEndOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, next.shuffleOffset, newEpoch)
 
 		previousChunkGroup := next.chunkGroup
 		next.chunkGroup = newChunkGroup
-		next.nextShuffleTime = nextShuffleTime
+		next.startOfEpoch = startOfEpoch
+		next.endOfEpoch = endOfEpoch
 
 		if newChunkGroup != previousChunkGroup {
 			cgm.removeFromChunkGroupMap(previousChunkGroup, next.registration)

@@ -16,8 +16,13 @@ type chunkGroupAssignment struct {
 	// chunkGroup is the chunk group that the light node is currently assigned to.
 	chunkGroup uint64
 
-	// nextShuffleTime is the next time when this light node will be shuffled into a new chunk group.
-	nextShuffleTime time.Time
+	// startOfEpoch is the start of the current shuffle epoch,
+	// i.e. the time when this light node was last shuffled into the current chunk group.
+	startOfEpoch time.Time
+
+	// endOfEpoch is the end of the current shuffle epoch,
+	// i.e. the next time when this light node will be shuffled into a new chunk group.
+	endOfEpoch time.Time
 }
 
 // newChunkGroupAssignment creates a new chunkGroupAssignment.
@@ -25,12 +30,14 @@ func newChunkGroupAssignment(
 	registration *Registration,
 	shuffleOffset time.Duration,
 	chunkGroup uint64,
-	nextShuffleTime time.Time) *chunkGroupAssignment {
+	startOfEpoch time.Time,
+	endOfEpoch time.Time) *chunkGroupAssignment {
 
 	return &chunkGroupAssignment{
-		registration:    registration,
-		shuffleOffset:   shuffleOffset,
-		chunkGroup:      chunkGroup,
-		nextShuffleTime: nextShuffleTime,
+		registration:  registration,
+		shuffleOffset: shuffleOffset,
+		chunkGroup:    chunkGroup,
+		startOfEpoch:  startOfEpoch,
+		endOfEpoch:    endOfEpoch,
 	}
 }

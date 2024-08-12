@@ -198,3 +198,35 @@ func TestComputeEndOfShuffleEpoch(t *testing.T) {
 	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod*4),
 		ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 4))
 }
+
+func TestComputeStartOfShuffleEpochHandCraftedScenario(t *testing.T) {
+
+	genesis := time.Unix(0, 0)
+	shufflePeriod := time.Second * 100
+	shuffleOffset := time.Second * 50
+
+	assert.Equal(t, genesis, ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 0))
+	assert.Equal(t, time.Unix(50, 0), ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 1))
+	assert.Equal(t, time.Unix(150, 0), ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 2))
+	assert.Equal(t, time.Unix(250, 0), ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 3))
+	assert.Equal(t, time.Unix(350, 0), ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 4))
+}
+
+func TestComputeStartOfShuffleEpoch(t *testing.T) {
+	tu.InitializeRandom()
+
+	genesis := time.Unix(int64(rand.Intn(1_000_000)), 0)
+	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
+
+	assert.Equal(t, genesis,
+		ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 0))
+	assert.Equal(t, genesis.Add(shuffleOffset),
+		ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 1))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod),
+		ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 2))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod*2),
+		ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 3))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod*3),
+		ComputeStartOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 4))
+}
