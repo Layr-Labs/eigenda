@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// TODO use a regular uint for chunk index
-
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
 func ComputeShuffleOffset(seed int64, shufflePeriod time.Duration) time.Duration {

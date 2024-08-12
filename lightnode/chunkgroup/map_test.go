@@ -182,13 +182,12 @@ func TestGetRandomNode(t *testing.T) {
 
 	now := genesisTime.Add(shufflePeriod * time.Duration(rand.Float64()*1000))
 
-	r := tu.NewRandom()
 	for chunkIndex := uint(0); chunkIndex < chunkGroupCount; chunkIndex++ {
 
 		chunk := cgMap.GetNodesInChunkGroup(now, chunkIndex)
 
 		if len(chunk) == 0 {
-			_, ok := cgMap.GetRandomNode(now, r, chunkIndex, 0)
+			_, ok := cgMap.GetRandomNode(now, chunkIndex, 0)
 			assert.False(t, ok)
 			continue
 		}
@@ -202,7 +201,7 @@ func TestGetRandomNode(t *testing.T) {
 				minimumTimeInGroup = shufflePeriod / time.Duration(rand.Intn(5)+1)
 			}
 
-			randomNode, ok := cgMap.GetRandomNode(now, r, chunkIndex, minimumTimeInGroup)
+			randomNode, ok := cgMap.GetRandomNode(now, chunkIndex, minimumTimeInGroup)
 
 			if ok {
 				assert.NotNil(t, randomNode)
@@ -212,13 +211,12 @@ func TestGetRandomNode(t *testing.T) {
 				for _, registration := range chunk {
 					offset := ComputeShuffleOffset(registration.Seed(), shufflePeriod)
 					epoch := ComputeShuffleEpoch(genesisTime, shufflePeriod, offset, genesisTime)
-					epochBegining := ComputeStartOfShuffleEpoch(genesisTime, shufflePeriod, offset, epoch)
-					timeInGroup := now.Sub(epochBegining)
+					epochBeginning := ComputeStartOfShuffleEpoch(genesisTime, shufflePeriod, offset, epoch)
+					timeInGroup := now.Sub(epochBeginning)
 					assert.True(t, timeInGroup >= minimumTimeInGroup)
 				}
 			}
 		}
-
 	}
 }
 

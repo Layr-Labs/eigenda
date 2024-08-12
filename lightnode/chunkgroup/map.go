@@ -3,17 +3,19 @@ package chunkgroup
 import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/lightnode"
-	"golang.org/x/exp/rand"
 	"time"
 )
+
+// A set of light nodes.
+type lightNodeSet map[*lightnode.Registration]bool
 
 // Map keeps track of light nodes and their chunk group assignments.
 type Map struct {
 	// A map from light node ID to light node data.
 	lightNodes map[int64]*assignment
 
-	// A map from chunk group ID to a list of light nodes in that chunk group.
-	chunkGroups map[uint][]*lightnode.Registration
+	// A map from chunk group ID to a set of light nodes in that chunk group.
+	chunkGroups map[uint]lightNodeSet
 
 	// Light node registrations are stored in this queue. The next light node to be shuffled is always at the front.
 	shuffleQueue *assignmentQueue
@@ -40,7 +42,7 @@ func NewMap(
 
 	return Map{
 		lightNodes:      make(map[int64]*assignment),
-		chunkGroups:     make(map[uint][]*lightnode.Registration),
+		chunkGroups:     make(map[uint]lightNodeSet),
 		shuffleQueue:    newAssignmentQueue(),
 		chunkGroupCount: chunkGroupCount,
 		genesis:         genesis,
@@ -110,10 +112,13 @@ func (m *Map) GetNodesInChunkGroup(
 	m.shuffle(now)
 
 	nodes := m.chunkGroups[chunkGroup]
-	nodesCopy := make([]*lightnode.Registration, len(nodes))
-	copy(nodesCopy, nodes)
+	ret := make([]*lightnode.Registration, 0, len(nodes))
 
-	return nodesCopy
+	for node := range nodes {
+		ret = append(ret, node)
+	}
+
+	return ret
 }
 
 // GetRandomNode returns a random light node in the given chunk group. If minimumTimeInGroup is
@@ -121,7 +126,6 @@ func (m *Map) GetNodesInChunkGroup(
 // if no light node is found that satisfies the constraints.
 func (m *Map) GetRandomNode(
 	now time.Time,
-	rand *rand.Rand,
 	chunkGroup uint,
 	minimumTimeInGroup time.Duration) (*lightnode.Registration, bool) {
 
@@ -133,28 +137,23 @@ func (m *Map) GetRandomNode(
 	m.shuffle(now)
 
 	nodes := m.chunkGroups[chunkGroup]
-	var filteredNodes []*lightnode.Registration
-
 	if minimumTimeInGroup == 0 {
-		filteredNodes = nodes
+		for node := range nodes {
+			// golang map iteration starts at a random position, so we can return the first node we find
+			return node, true
+		}
 	} else {
-		filteredNodes = make([]*lightnode.Registration, 0, len(nodes))
-		for _, node := range nodes {
+		for node := range nodes {
 			entry := m.lightNodes[node.ID()]
 			timeInGroup := now.Sub(entry.startOfEpoch)
 			if timeInGroup >= minimumTimeInGroup {
-				filteredNodes = append(filteredNodes, node)
+				// golang map iteration starts at a random position, so we can return the first node we find
+				return node, true
 			}
 		}
 	}
 
-	if len(filteredNodes) == 0 {
-		return nil, false
-	}
-
-	index := rand.Intn(len(nodes))
-	node := nodes[index]
-	return node, true
+	return nil, false
 }
 
 // shuffle shuffles the light nodes into new chunk groups given the current time.
@@ -200,21 +199,16 @@ func (m *Map) shuffle(now time.Time) {
 
 // addToChunkGroupMap adds a light node to the given chunk group.
 func (m *Map) addToChunkGroupMap(chunkGroup uint, registration *lightnode.Registration) {
-	oldGroup := m.chunkGroups[chunkGroup]
-	newGroup := append(oldGroup, registration)
-	m.chunkGroups[chunkGroup] = newGroup
+	group := m.chunkGroups[chunkGroup]
+	if group == nil {
+		group = make(lightNodeSet)
+		m.chunkGroups[chunkGroup] = group
+	}
+	group[registration] = true
 }
 
 // removeFromChunkGroupMap removes a light node from the given chunk group.
 func (m *Map) removeFromChunkGroupMap(chunkGroup uint, registration *lightnode.Registration) {
-	// TODO this is not efficient, refactor to do this in O(1) time
-
-	oldGroup := m.chunkGroups[chunkGroup]
-	for i, node := range oldGroup {
-		if node.ID() == registration.ID() {
-			newGroup := append(oldGroup[:i], oldGroup[i+1:]...)
-			m.chunkGroups[chunkGroup] = newGroup
-			return
-		}
-	}
+	group := m.chunkGroups[chunkGroup]
+	delete(group, registration)
 }

@@ -88,8 +88,3 @@ func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 func RandomTime() time.Time {
 	return time.Unix(int64(rand.Int31()), int64(rand.Intn(int(time.Second))))
 }
-
-// NewRandom returns a new random number generator seeded with a deterministic value.
-func NewRandom() *rand.Rand {
-	return rand.New(rand.NewSource(rand.Uint64()))
-}
