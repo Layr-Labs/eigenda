@@ -18,7 +18,7 @@ func TestComputeShuffleOffset(t *testing.T) {
 	// Ensure that shuffle offset is always between 0 and shufflePeriod.
 	iterations := 1000
 	for i := 0; i < iterations; i++ {
-		seed := rand.Uint64()
+		seed := rand.Int63()
 		offset := ComputeShuffleOffset(seed, shufflePeriod)
 		assert.True(t, offset >= 0)
 		assert.True(t, offset < shufflePeriod)
@@ -53,43 +53,43 @@ func TestComputeShuffleEpochHandCraftedScenario(t *testing.T) {
 
 	// Requesting the epoch at genesis should return 0.
 	epoch := ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis)
-	assert.Equal(t, uint64(0), epoch)
+	assert.Equal(t, int64(0), epoch)
 
 	// Requesting the epoch one nanosecond after genesis should return 0.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(1))
-	assert.Equal(t, uint64(0), epoch)
+	assert.Equal(t, int64(0), epoch)
 
 	// Requesting the epoch in-between genesis and the first shuffle should return 0.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset/2))
-	assert.Equal(t, uint64(0), epoch)
+	assert.Equal(t, int64(0), epoch)
 
 	// Requesting the epoch one nanosecond before the first shuffle should return 0.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset-1))
-	assert.Equal(t, uint64(0), epoch)
+	assert.Equal(t, int64(0), epoch)
 
 	// Requesting the epoch at the exact first shuffle time should return 1.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset))
-	assert.Equal(t, uint64(1), epoch)
+	assert.Equal(t, int64(1), epoch)
 
 	// Requesting the epoch one nanosecond after the first shuffle should return 1.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset+1))
-	assert.Equal(t, uint64(1), epoch)
+	assert.Equal(t, int64(1), epoch)
 
 	// Requesting the epoch at the mid-point between the first and second shuffle should return 1.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset+shufflePeriod/2))
-	assert.Equal(t, uint64(1), epoch)
+	assert.Equal(t, int64(1), epoch)
 
 	// Requesting the epoch one nanosecond before the second shuffle should return 1.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset+shufflePeriod-1))
-	assert.Equal(t, uint64(1), epoch)
+	assert.Equal(t, int64(1), epoch)
 
 	// Requesting the epoch at the exact second shuffle time should return 2.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset+shufflePeriod))
-	assert.Equal(t, uint64(2), epoch)
+	assert.Equal(t, int64(2), epoch)
 
 	// Moving forward 1000 shuffle periods should put us in epoch 1002.
 	epoch = ComputeShuffleEpoch(genesis, shufflePeriod, shuffleOffset, genesis.Add(shuffleOffset+shufflePeriod*1001))
-	assert.Equal(t, uint64(1002), epoch)
+	assert.Equal(t, int64(1002), epoch)
 }
 
 // Simulate a scenario where we move down a timeline. Verify that the epoch increases as expected.
@@ -98,7 +98,7 @@ func TestComputeShuffleEpochTimeWalk(t *testing.T) {
 
 	genesis := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
-	seed := rand.Uint64()
+	seed := rand.Int63()
 	offset := ComputeShuffleOffset(seed, shufflePeriod)
 
 	// If we move forward in time 1000 shuffle periods, we should see the epoch increase 1000 times.
@@ -138,16 +138,16 @@ func TestComputeShuffleEpochInvalidShuffleOffset(t *testing.T) {
 func TestComputeChunkGroup(t *testing.T) {
 	tu.InitializeRandom()
 
-	chunkGroupCount := uint64(rand.Intn(1_000) + 10_000)
-	seed := rand.Uint64()
-	firstEpoch := uint64(rand.Intn(1000))
+	chunkGroupCount := uint(rand.Intn(1_000) + 10_000)
+	seed := rand.Int63()
+	firstEpoch := int64(rand.Intn(1000))
 
-	uniqueChunkGroups := make(map[uint64]bool)
+	uniqueChunkGroups := make(map[uint]bool)
 
 	// Ensure that the chunk group is always between 0 and chunkGroupCount.
 	iterations := 1000
 	for i := 0; i < iterations; i++ {
-		epoch := firstEpoch + uint64(i)
+		epoch := firstEpoch + int64(i)
 		chunkGroup := ComputeChunkGroup(seed, epoch, chunkGroupCount)
 		assert.True(t, chunkGroup < chunkGroupCount)
 		uniqueChunkGroups[chunkGroup] = true

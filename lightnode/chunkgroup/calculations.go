@@ -6,48 +6,19 @@ import (
 	"time"
 )
 
-// Consider the timeline below, with time moving from left to right.
-//
-//                               The "+" marks represent                    The 7th time this
-//    The genesis time,          the time when a particular                 light node is shuffled.
-//    i.e. protocol start        light node is shuffled.                              |
-//           |                            |                                           ↓
-//           ↓      1          2          ↓          4          5          6          7          8          9
-//           |------+---|------+---|------+---|------+---|------+---|------+---|------+---|------+---|------+---|
-//           \          /          \      /                                \         /\         /\         /
-//            \        /            \    /                                  \       /  \       /  \       /
-//             \      /              \  /                                    \     /    \     /    \     /
-//              \    /                \/                                      \   /      \   /      \   /
-//               \  /                The "shuffle offset".                     \ /        \ /        \ /
-//                \/                 Each light node has a                   epoch 6     epoch 7    epoch 8
-//   A "shuffle period". Each node   random offset assigned
-//   changes chunk groups once per   at registration time.
-//   shuffle period. Each shuffle
-//   period is marked with a "|".
-//
-// The algorithm for determining which chunk group a particular light node in is as follows:
-// 1. Using the node's seed and a CSPRNG, determine the node's shuffle offset.
-// 2. Define the genesis time to be "epoch 0".
-// 3. Moving left to right over the timeline, add one to the epoch number for each time the clock is equal to
-//    (genesis time + shuffle offset + X * shuffle period) for all integer values of X.
-// 4. Using a CSPRNG, use the node epoch number and the node's seed to determine the node's chunk group.
-
 // TODO use a regular uint for chunk index
 
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
-func ComputeShuffleOffset(seed uint64, shufflePeriod time.Duration) time.Duration {
+func ComputeShuffleOffset(seed int64, shufflePeriod time.Duration) time.Duration {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
 	}
 
-	rng := rand.New(rand.NewSource(int64(seed)))
+	rng := rand.New(rand.NewSource(seed))
 
-	// TODO the algorithm used to determine this floating point value must be part of the spec
-	multiple := rng.Float64()
-
-	return time.Duration(float64(shufflePeriod) * multiple)
+	return time.Duration(rng.Int63() % int64(shufflePeriod))
 }
 
 // ComputeShuffleEpoch returns the epoch number of a light node at the current time.
@@ -55,7 +26,7 @@ func ComputeShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	now time.Time) uint64 {
+	now time.Time) int64 {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
@@ -72,7 +43,7 @@ func ComputeShuffleEpoch(
 	epochGenesis := genesis.Add(shuffleOffset - shufflePeriod)
 
 	timeSinceEpochGenesis := now.Sub(epochGenesis)
-	return uint64(timeSinceEpochGenesis / shufflePeriod)
+	return int64(timeSinceEpochGenesis / shufflePeriod)
 }
 
 // ComputeStartOfShuffleEpoch returns the time when a shuffle epoch begins.
@@ -80,13 +51,16 @@ func ComputeStartOfShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	currentEpoch uint64) time.Time {
+	currentEpoch int64) time.Time {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
 	}
 	if shuffleOffset < 0 {
 		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
+	}
+	if currentEpoch < 0 {
+		panic(fmt.Sprintf("current epoch must be non-negative, got %d", currentEpoch))
 	}
 
 	if currentEpoch == 0 {
@@ -100,7 +74,7 @@ func ComputeEndOfShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	currentEpoch uint64) time.Time {
+	currentEpoch int64) time.Time {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
@@ -108,19 +82,19 @@ func ComputeEndOfShuffleEpoch(
 	if shuffleOffset < 0 {
 		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
 	}
+	if currentEpoch < 0 {
+		panic(fmt.Sprintf("current epoch must be non-negative, got %d", currentEpoch))
+	}
 
 	return genesis.Add(shuffleOffset).Add(shufflePeriod * time.Duration(currentEpoch))
 }
 
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
 func ComputeChunkGroup(
-	seed uint64,
-	shuffleEpoch uint64,
-	chunkGroupCount uint64) uint64 {
+	seed int64,
+	shuffleEpoch int64,
+	chunkGroupCount uint) uint {
 
-	// TODO is adding the seed to the epoch sufficient?
-	rng := rand.New(rand.NewSource(int64(seed + shuffleEpoch)))
-
-	// TODO the algorithm used to determine this random value must be part of the spec
-	return rng.Uint64() % chunkGroupCount
+	rng := rand.New(rand.NewSource(seed + shuffleEpoch))
+	return uint(rng.Uint64()) % chunkGroupCount
 }

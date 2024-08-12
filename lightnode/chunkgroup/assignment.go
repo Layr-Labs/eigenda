@@ -17,7 +17,7 @@ type assignment struct {
 	shuffleOffset time.Duration
 
 	// chunkGroup is the chunk group that the light node is currently assigned to.
-	chunkGroup uint64
+	chunkGroup uint
 
 	// startOfEpoch is the start of the current shuffle epoch,
 	// i.e. the time when this light node was last shuffled into the current chunk group.
@@ -32,7 +32,7 @@ type assignment struct {
 func newAssignment(
 	registration *lightnode.Registration,
 	shuffleOffset time.Duration,
-	chunkGroup uint64,
+	chunkGroup uint,
 	startOfEpoch time.Time,
 	endOfEpoch time.Time) *assignment {
 
