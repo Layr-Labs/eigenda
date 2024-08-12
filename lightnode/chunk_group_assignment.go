@@ -73,6 +73,17 @@ func ComputeShuffleEpoch(
 	return uint64(timeSinceEpochGenesis / shufflePeriod), nil
 }
 
+// ComputeNextShuffleTime takes a particular epoch returns the time at which the next epoch will begin.
+func ComputeNextShuffleTime(
+	genesis time.Time,
+	shufflePeriod time.Duration,
+	shuffleOffset time.Duration,
+	shuffleEpoch uint64) time.Time {
+
+	return time.Unix(0, 0) // TODO
+
+}
+
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
 func ComputeChunkGroup(
 	seed uint64,
