@@ -1,18 +1,19 @@
-package lightnode
+package chunkgroup
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/lightnode"
 	"math/rand"
 	"time"
 )
 
-// ChunkGroupMap keeps track of light nodes and their chunk group assignments.
-type ChunkGroupMap struct {
+// Map keeps track of light nodes and their chunk group assignments.
+type Map struct {
 	// A map from light node ID to light node data.
-	lightNodes map[uint64]*chunkGroupAssignment
+	lightNodes map[uint64]*assignment
 
 	// A map from chunk group ID to a list of light nodes in that chunk group.
-	chunkGroups map[uint64][]*Registration
+	chunkGroups map[uint64][]*lightnode.Registration
 
 	// Light node registrations are stored in this queue. The next light node to be shuffled is always at the front.
 	shuffleQueue *assignmentQueue
@@ -27,14 +28,14 @@ type ChunkGroupMap struct {
 	shufflePeriod time.Duration
 }
 
-// NewChunkGroupMap creates a new ChunkGroupMap.
+// NewChunkGroupMap creates a new Map.
 func NewChunkGroupMap(
 	chunkGroupCount uint64,
 	genesis time.Time,
-	shufflePeriod time.Duration) ChunkGroupMap {
+	shufflePeriod time.Duration) Map {
 
-	return ChunkGroupMap{
-		lightNodes:      make(map[uint64]*chunkGroupAssignment),
+	return Map{
+		lightNodes:      make(map[uint64]*assignment),
 		chunkGroupCount: chunkGroupCount,
 		genesis:         genesis,
 		shufflePeriod:   shufflePeriod,
@@ -42,14 +43,14 @@ func NewChunkGroupMap(
 }
 
 // Add adds a light node to be tracked by the map.
-func (cgm *ChunkGroupMap) Add(now time.Time, registration *Registration) {
+func (cgm *Map) Add(now time.Time, registration *lightnode.Registration) {
 	shuffleOffset := ComputeShuffleOffset(registration.Seed(), cgm.shufflePeriod)
 	epoch := ComputeShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, now)
 	chunkGroup := ComputeChunkGroup(registration.Seed(), epoch, cgm.chunkGroupCount)
 	startOfEpoch := ComputeStartOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, epoch)
 	endOfEpoch := ComputeEndOfShuffleEpoch(cgm.genesis, cgm.shufflePeriod, shuffleOffset, epoch)
 
-	assignment := newChunkGroupAssignment(registration, shuffleOffset, chunkGroup, startOfEpoch, endOfEpoch)
+	assignment := newAssignment(registration, shuffleOffset, chunkGroup, startOfEpoch, endOfEpoch)
 
 	cgm.addToChunkGroupMap(chunkGroup, registration)
 	cgm.lightNodes[registration.ID()] = assignment
@@ -57,7 +58,7 @@ func (cgm *ChunkGroupMap) Add(now time.Time, registration *Registration) {
 }
 
 // Remove removes a light node from the map. This is a no-op if the light node is not being tracked.
-func (cgm *ChunkGroupMap) Remove(lightNodeID uint64) {
+func (cgm *Map) Remove(lightNodeID uint64) {
 	assignment, ok := cgm.lightNodes[lightNodeID]
 	if !ok {
 		return
@@ -69,7 +70,7 @@ func (cgm *ChunkGroupMap) Remove(lightNodeID uint64) {
 }
 
 // Get returns the light node registration with the given ID, or nil if no such light node is being tracked.
-func (cgm *ChunkGroupMap) Get(lightNodeID uint64) *Registration {
+func (cgm *Map) Get(lightNodeID uint64) *lightnode.Registration {
 	assignment, ok := cgm.lightNodes[lightNodeID]
 	if !ok {
 		return nil
@@ -79,7 +80,7 @@ func (cgm *ChunkGroupMap) Get(lightNodeID uint64) *Registration {
 
 // GetChunkGroup returns the current chunk group of the light node with the given ID. The second return value
 // is true if the light node is being tracked, and false otherwise.
-func (cgm *ChunkGroupMap) GetChunkGroup(now time.Time, lightNodeID uint64) (uint64, bool) {
+func (cgm *Map) GetChunkGroup(now time.Time, lightNodeID uint64) (uint64, bool) {
 	cgm.shuffle(now)
 
 	assignment, ok := cgm.lightNodes[lightNodeID]
@@ -91,19 +92,19 @@ func (cgm *ChunkGroupMap) GetChunkGroup(now time.Time, lightNodeID uint64) (uint
 }
 
 // Size returns the number of light nodes in the map.
-func (cgm *ChunkGroupMap) Size() int {
+func (cgm *Map) Size() int {
 	return len(cgm.lightNodes)
 }
 
 // GetNodesInChunkGroup returns all light nodes in the given chunk group.
-func (cgm *ChunkGroupMap) GetNodesInChunkGroup(
+func (cgm *Map) GetNodesInChunkGroup(
 	now time.Time,
-	chunkGroup uint64) []*Registration {
+	chunkGroup uint64) []*lightnode.Registration {
 
 	cgm.shuffle(now)
 
 	nodes := cgm.chunkGroups[chunkGroup]
-	nodesCopy := make([]*Registration, len(nodes))
+	nodesCopy := make([]*lightnode.Registration, len(nodes))
 	copy(nodesCopy, nodes)
 
 	return nodesCopy
@@ -112,11 +113,11 @@ func (cgm *ChunkGroupMap) GetNodesInChunkGroup(
 // GetRandomNode returns a random light node in the given chunk group. If minimumTimeInGroup is
 // non-zero, the light node must have been in the chunk group for at least that amount of time. Returns nil
 // if no light node is found that satisfies the constraints.
-func (cgm *ChunkGroupMap) GetRandomNode(
+func (cgm *Map) GetRandomNode(
 	now time.Time,
 	rand *rand.Rand,
 	chunkGroup uint64,
-	minimumTimeInGroup time.Duration) (*Registration, bool) {
+	minimumTimeInGroup time.Duration) (*lightnode.Registration, bool) {
 
 	if chunkGroup >= cgm.chunkGroupCount {
 		panic(fmt.Sprintf("chunk group %d is out of bounds, there are only %d chunk groups",
@@ -126,12 +127,12 @@ func (cgm *ChunkGroupMap) GetRandomNode(
 	cgm.shuffle(now)
 
 	nodes := cgm.chunkGroups[chunkGroup]
-	var filteredNodes []*Registration
+	var filteredNodes []*lightnode.Registration
 
 	if minimumTimeInGroup == 0 {
 		filteredNodes = nodes
 	} else {
-		filteredNodes = make([]*Registration, 0, len(nodes))
+		filteredNodes = make([]*lightnode.Registration, 0, len(nodes))
 		for _, node := range nodes {
 			assignment := cgm.lightNodes[node.ID()]
 			timeInGroup := now.Sub(assignment.startOfEpoch)
@@ -151,7 +152,7 @@ func (cgm *ChunkGroupMap) GetRandomNode(
 }
 
 // shuffle shuffles the light nodes into new chunk groups given the current time.
-func (cgm *ChunkGroupMap) shuffle(now time.Time) {
+func (cgm *Map) shuffle(now time.Time) {
 	if cgm.Size() == 0 {
 		return
 	}
@@ -192,14 +193,14 @@ func (cgm *ChunkGroupMap) shuffle(now time.Time) {
 }
 
 // addToChunkGroupMap adds a light node to the given chunk group.
-func (cgm *ChunkGroupMap) addToChunkGroupMap(chunkGroup uint64, registration *Registration) {
+func (cgm *Map) addToChunkGroupMap(chunkGroup uint64, registration *lightnode.Registration) {
 	oldGroup := cgm.chunkGroups[chunkGroup]
 	newGroup := append(oldGroup, registration)
 	cgm.chunkGroups[chunkGroup] = newGroup
 }
 
 // removeFromChunkGroupMap removes a light node from the given chunk group.
-func (cgm *ChunkGroupMap) removeFromChunkGroupMap(chunkGroup uint64, registration *Registration) {
+func (cgm *Map) removeFromChunkGroupMap(chunkGroup uint64, registration *lightnode.Registration) {
 	// TODO this is not efficient, refactor to do this in O(1) time
 
 	oldGroup := cgm.chunkGroups[chunkGroup]

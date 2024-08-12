@@ -1,4 +1,4 @@
-package lightnode
+package chunkgroup
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package lightnode
+package chunkgroup
 
 import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"

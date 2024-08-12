@@ -1,13 +1,13 @@
-package lightnode
+package chunkgroup
 
 import (
 	"container/heap"
 	"fmt"
 )
 
-// assignmentHeap implements the heap.Interface for chunkGroupAssignment objects, used to create a priority queue.
+// assignmentHeap implements the heap.Interface for assignment objects, used to create a priority queue.
 type assignmentHeap struct {
-	data []*chunkGroupAssignment
+	data []*assignment
 }
 
 // Len returns the number of elements in the priority queue.
@@ -30,7 +30,7 @@ func (h *assignmentHeap) Swap(i int, j int) {
 
 // Push adds an element to the end of the priority queue.
 func (h *assignmentHeap) Push(x any) {
-	h.data = append(h.data, x.(*chunkGroupAssignment))
+	h.data = append(h.data, x.(*assignment))
 }
 
 // Pop removes and returns the last element in the priority queue.
@@ -60,7 +60,7 @@ type assignmentQueue struct {
 func newAssignmentQueue() *assignmentQueue {
 	return &assignmentQueue{
 		heap: &assignmentHeap{
-			data: make([]*chunkGroupAssignment, 0),
+			data: make([]*assignment, 0),
 		},
 		nodeIdSet: make(map[uint64]bool),
 	}
@@ -72,7 +72,7 @@ func (queue *assignmentQueue) Size() uint {
 }
 
 // Push adds an assignment to the priority queue. This is a no-op if the assignment is already in the queue.
-func (queue *assignmentQueue) Push(assignment *chunkGroupAssignment) {
+func (queue *assignmentQueue) Push(assignment *assignment) {
 	notRemoved, present := queue.nodeIdSet[assignment.registration.ID()]
 	if present && notRemoved {
 		return
@@ -88,12 +88,12 @@ func (queue *assignmentQueue) Push(assignment *chunkGroupAssignment) {
 }
 
 // Pop removes and returns the assignment with the earliest endOfEpoch.
-func (queue *assignmentQueue) Pop() *chunkGroupAssignment {
+func (queue *assignmentQueue) Pop() *assignment {
 	queue.collectGarbage()
 	if queue.size == 0 {
 		return nil
 	}
-	assignment := heap.Pop(queue.heap).(*chunkGroupAssignment)
+	assignment := heap.Pop(queue.heap).(*assignment)
 	delete(queue.nodeIdSet, assignment.registration.ID())
 	queue.size--
 	return assignment
@@ -101,7 +101,7 @@ func (queue *assignmentQueue) Pop() *chunkGroupAssignment {
 
 // Peek returns the assignment with the earliest endOfEpoch without removing it from the queue. Returns
 // nil if the queue is empty.
-func (queue *assignmentQueue) Peek() *chunkGroupAssignment {
+func (queue *assignmentQueue) Peek() *assignment {
 	queue.collectGarbage()
 	if queue.size == 0 {
 		return nil

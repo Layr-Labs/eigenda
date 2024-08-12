@@ -1,21 +1,22 @@
-package lightnode
+package chunkgroup
 
 import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/lightnode"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
 	"testing"
 	"time"
 )
 
-func RandomAssignment(nextShuffleTime time.Time) *chunkGroupAssignment {
+func randomAssignment(nextShuffleTime time.Time) *assignment {
 	id := rand.Uint64()
 	seed := rand.Uint64()
 	registrationTime := time.Unix(int64(rand.Uint32()), 0)
 
-	registration := NewRegistration(id, seed, registrationTime)
+	registration := lightnode.NewRegistration(id, seed, registrationTime)
 
-	return &chunkGroupAssignment{
+	return &assignment{
 		registration: registration,
 		endOfEpoch:   nextShuffleTime,
 		chunkGroup:   rand.Uint64(),
@@ -38,11 +39,11 @@ func TestInOrderInsertion(t *testing.T) {
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := uint(100)
-	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Insert elements in order.
 	for i := uint(0); i < numberOfElements; i++ {
-		registration := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		registration := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, registration)
 		queue.Push(registration)
 
@@ -75,11 +76,11 @@ func TestReverseOrderInsertion(t *testing.T) {
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := uint(100)
-	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, assignment)
 	}
 
@@ -116,11 +117,11 @@ func TestRandomInsertion(t *testing.T) {
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := uint(100)
-	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, assignment)
 	}
 
@@ -159,12 +160,12 @@ func TestPeriodicRemoval(t *testing.T) {
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := uint(100)
-	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
-	expectedOrderWithRemovals := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrder := make([]*assignment, 0, numberOfElements)
+	expectedOrderWithRemovals := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, assignment)
 
 		// We will remove every 7th element.
@@ -226,12 +227,12 @@ func TestContiguousRemoval(t *testing.T) {
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := uint(100)
-	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
-	expectedOrderWithRemovals := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrder := make([]*assignment, 0, numberOfElements)
+	expectedOrderWithRemovals := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, assignment)
 
 		// We will remove all elements after index 10 and before index 90
@@ -293,11 +294,11 @@ func TestRemoveFollowedByPush(t *testing.T) {
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := uint(100)
-	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, assignment)
 	}
 

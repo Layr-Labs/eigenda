@@ -1,12 +1,15 @@
-package lightnode
+package chunkgroup
 
-import "time"
+import (
+	"github.com/Layr-Labs/eigenda/lightnode"
+	"time"
+)
 
-// chunkGroupAssignment is a struct that holds a registration and the chunk group it is currently assigned to.
-type chunkGroupAssignment struct {
+// assignment is a struct that holds a registration and the chunk group it is currently assigned to.
+type assignment struct {
 
 	// registration contains publicly known information about a light node that is registered on-chain.
-	registration *Registration
+	registration *lightnode.Registration
 
 	// shuffleOffset is the offset at which a light node should be shuffled into a new chunk group relative
 	// the beginning of each shuffle interval. This is a function of the light node's seed and the shuffle period
@@ -25,15 +28,15 @@ type chunkGroupAssignment struct {
 	endOfEpoch time.Time
 }
 
-// newChunkGroupAssignment creates a new chunkGroupAssignment.
-func newChunkGroupAssignment(
-	registration *Registration,
+// newAssignment creates a new assignment.
+func newAssignment(
+	registration *lightnode.Registration,
 	shuffleOffset time.Duration,
 	chunkGroup uint64,
 	startOfEpoch time.Time,
-	endOfEpoch time.Time) *chunkGroupAssignment {
+	endOfEpoch time.Time) *assignment {
 
-	return &chunkGroupAssignment{
+	return &assignment{
 		registration:  registration,
 		shuffleOffset: shuffleOffset,
 		chunkGroup:    chunkGroup,
