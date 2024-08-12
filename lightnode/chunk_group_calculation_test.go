@@ -156,3 +156,45 @@ func TestComputeChunkGroup(t *testing.T) {
 	// We will have some collisions, but we should have at least 50% unique chunk groups with high probability.
 	assert.True(t, len(uniqueChunkGroups) >= int(float64(iterations)*0.5))
 }
+
+func TestComputeEndOfShuffleEpochErrors(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = ComputeEndOfShuffleEpoch(time.Now(), -time.Second, time.Second, 0)
+	})
+
+	assert.Panics(t, func() {
+		_ = ComputeEndOfShuffleEpoch(time.Now(), time.Second, -time.Second, 0)
+	})
+}
+
+func TestComputeEndOfShuffleEpochHandCraftedScenario(t *testing.T) {
+
+	genesis := time.Unix(0, 0)
+	shufflePeriod := time.Second * 100
+	shuffleOffset := time.Second * 50
+
+	assert.Equal(t, time.Unix(50, 0), ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 0))
+	assert.Equal(t, time.Unix(150, 0), ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 1))
+	assert.Equal(t, time.Unix(250, 0), ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 2))
+	assert.Equal(t, time.Unix(350, 0), ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 3))
+	assert.Equal(t, time.Unix(450, 0), ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 4))
+}
+
+func TestComputeEndOfShuffleEpoch(t *testing.T) {
+	tu.InitializeRandom()
+
+	genesis := time.Unix(int64(rand.Intn(1_000_000)), 0)
+	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
+
+	assert.Equal(t, genesis.Add(shuffleOffset),
+		ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 0))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod),
+		ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 1))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod*2),
+		ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 2))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod*3),
+		ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 3))
+	assert.Equal(t, genesis.Add(shuffleOffset).Add(shufflePeriod*4),
+		ComputeEndOfShuffleEpoch(genesis, shufflePeriod, shuffleOffset, 4))
+}

@@ -73,15 +73,21 @@ func ComputeShuffleEpoch(
 	return uint64(timeSinceEpochGenesis / shufflePeriod)
 }
 
-// ComputeNextShuffleTime takes a particular epoch returns the time at which the next epoch will begin.
-func ComputeNextShuffleTime(
+// ComputeEndOfShuffleEpoch given an epoch, return the time when that epoch will end and the next epoch will begin.
+func ComputeEndOfShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	shuffleEpoch uint64) time.Time {
+	currentEpoch uint64) time.Time {
 
-	return time.Unix(0, 0) // TODO
+	if shufflePeriod <= 0 {
+		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
+	}
+	if shuffleOffset < 0 {
+		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
+	}
 
+	return genesis.Add(shuffleOffset).Add(shufflePeriod * time.Duration(currentEpoch))
 }
 
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
