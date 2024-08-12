@@ -1,7 +1,6 @@
 package lightnode
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 )
@@ -76,16 +75,17 @@ func (cgm *ChunkGroupMap) Get(lightNodeID uint64) *Registration {
 	return assignment.registration
 }
 
-// GetChunkGroup returns the current chunk group of the light node with the given ID.
-func (cgm *ChunkGroupMap) getChunkGroup(now time.Time, lightNodeID uint64) (uint64, error) {
+// GetChunkGroup returns the current chunk group of the light node with the given ID. The second return value
+// is true if the light node is being tracked, and false otherwise.
+func (cgm *ChunkGroupMap) getChunkGroup(now time.Time, lightNodeID uint64) (uint64, bool) {
 	cgm.shuffle(now)
 
 	assignment, ok := cgm.lightNodes[lightNodeID]
 	if !ok {
-		return 0, fmt.Errorf("light node with ID %d not found", lightNodeID)
+		return 0, false
 	}
 
-	return assignment.chunkGroup, nil
+	return assignment.chunkGroup, true
 }
 
 // Size returns the number of light nodes in the map.
