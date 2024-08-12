@@ -96,7 +96,7 @@ func TestComputeShuffleEpochHandCraftedScenario(t *testing.T) {
 func TestComputeShuffleEpochTimeWalk(t *testing.T) {
 	tu.InitializeRandom()
 
-	genesis := time.Unix(int64(rand.Intn(1_000_000)), 0)
+	genesis := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	seed := rand.Uint64()
 	offset := ComputeShuffleOffset(seed, shufflePeriod)
@@ -183,7 +183,7 @@ func TestComputeEndOfShuffleEpochHandCraftedScenario(t *testing.T) {
 func TestComputeEndOfShuffleEpoch(t *testing.T) {
 	tu.InitializeRandom()
 
-	genesis := time.Unix(int64(rand.Intn(1_000_000)), 0)
+	genesis := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
 
@@ -215,7 +215,7 @@ func TestComputeStartOfShuffleEpochHandCraftedScenario(t *testing.T) {
 func TestComputeStartOfShuffleEpoch(t *testing.T) {
 	tu.InitializeRandom()
 
-	genesis := time.Unix(int64(rand.Intn(1_000_000)), 0)
+	genesis := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
 

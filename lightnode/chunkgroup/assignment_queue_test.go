@@ -12,7 +12,7 @@ import (
 func randomAssignment(nextShuffleTime time.Time) *assignment {
 	id := rand.Uint64()
 	seed := rand.Uint64()
-	registrationTime := time.Unix(int64(rand.Uint32()), 0)
+	registrationTime := tu.RandomTime()
 
 	registration := lightnode.NewRegistration(id, seed, registrationTime)
 
@@ -37,20 +37,20 @@ func TestInOrderInsertion(t *testing.T) {
 	queue := newAssignmentQueue()
 	assert.Equal(t, uint(0), queue.Size())
 
-	startTime := time.Unix(int64(rand.Uint32()), 0)
+	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
 	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Insert elements in order.
 	for i := uint(0); i < numberOfElements; i++ {
-		registration := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, registration)
-		queue.Push(registration)
+		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, element)
+		queue.Push(element)
 
 		// Pushing more than once should be a no-op.
 		pushCount := rand.Intn(3)
 		for j := 0; j < pushCount; j++ {
-			queue.Push(registration)
+			queue.Push(element)
 		}
 
 		assert.Equal(t, i+1, queue.Size())
@@ -74,14 +74,14 @@ func TestReverseOrderInsertion(t *testing.T) {
 	queue := newAssignmentQueue()
 	assert.Equal(t, uint(0), queue.Size())
 
-	startTime := time.Unix(int64(rand.Uint32()), 0)
+	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
 	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, assignment)
+		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, element)
 	}
 
 	// Insert elements in reverse order.
@@ -115,14 +115,14 @@ func TestRandomInsertion(t *testing.T) {
 	queue := newAssignmentQueue()
 	assert.Equal(t, uint(0), queue.Size())
 
-	startTime := time.Unix(int64(rand.Uint32()), 0)
+	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
 	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, assignment)
+		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, element)
 	}
 
 	// Insert elements in random order.
@@ -158,19 +158,19 @@ func TestPeriodicRemoval(t *testing.T) {
 	queue := newAssignmentQueue()
 	assert.Equal(t, uint(0), queue.Size())
 
-	startTime := time.Unix(int64(rand.Uint32()), 0)
+	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
 	expectedOrder := make([]*assignment, 0, numberOfElements)
 	expectedOrderWithRemovals := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, assignment)
+		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, element)
 
 		// We will remove every 7th element.
 		if i%7 != 0 {
-			expectedOrderWithRemovals = append(expectedOrderWithRemovals, assignment)
+			expectedOrderWithRemovals = append(expectedOrderWithRemovals, element)
 		}
 	}
 
@@ -225,19 +225,19 @@ func TestContiguousRemoval(t *testing.T) {
 	queue := newAssignmentQueue()
 	assert.Equal(t, uint(0), queue.Size())
 
-	startTime := time.Unix(int64(rand.Uint32()), 0)
+	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
 	expectedOrder := make([]*assignment, 0, numberOfElements)
 	expectedOrderWithRemovals := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, assignment)
+		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, element)
 
 		// We will remove all elements after index 10 and before index 90
 		if i <= 10 || i >= 90 {
-			expectedOrderWithRemovals = append(expectedOrderWithRemovals, assignment)
+			expectedOrderWithRemovals = append(expectedOrderWithRemovals, element)
 		}
 	}
 
@@ -292,14 +292,14 @@ func TestRemoveFollowedByPush(t *testing.T) {
 	queue := newAssignmentQueue()
 	assert.Equal(t, uint(0), queue.Size())
 
-	startTime := time.Unix(int64(rand.Uint32()), 0)
+	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
 	expectedOrder := make([]*assignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, assignment)
+		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, element)
 	}
 
 	// Insert elements in random order.

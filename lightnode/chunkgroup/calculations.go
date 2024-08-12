@@ -32,6 +32,8 @@ import (
 //    (genesis time + shuffle offset + X * shuffle period) for all integer values of X.
 // 4. Using a CSPRNG, use the node epoch number and the node's seed to determine the node's chunk group.
 
+// TODO use a regular uint for chunk index
+
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
 func ComputeShuffleOffset(seed uint64, shufflePeriod time.Duration) time.Duration {

@@ -83,3 +83,13 @@ func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 		panic(fmt.Sprintf(debugInfo[0].(string), debugInfo[1:]...))
 	}
 }
+
+// RandomTime returns a random time.
+func RandomTime() time.Time {
+	return time.Unix(int64(rand.Int31()), int64(rand.Intn(int(time.Second))))
+}
+
+// NewRandom returns a new random number generator seeded with a deterministic value.
+func NewRandom() *rand.Rand {
+	return rand.New(rand.NewSource(rand.Uint64()))
+}
