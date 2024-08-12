@@ -18,9 +18,6 @@ type Registration struct {
 	// The time at which the light node was initially registered.
 	registrationTime time.Time
 
-	// The next time when this light node will be shuffled into a new chunk group.
-	nextShuffleTime time.Time
-
 	// TODO public key
 	// TODO payment address
 }

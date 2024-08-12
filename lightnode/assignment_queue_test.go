@@ -8,19 +8,22 @@ import (
 	"time"
 )
 
-func RandomRegistration(nextShuffleTime time.Time) *Registration {
+func RandomAssignment(nextShuffleTime time.Time) *chunkGroupAssignment {
 	id := rand.Uint64()
 	seed := rand.Uint64()
 	registrationTime := time.Unix(int64(rand.Uint32()), 0)
 
 	registration := NewRegistration(id, seed, registrationTime)
-	registration.nextShuffleTime = nextShuffleTime
 
-	return registration
+	return &chunkGroupAssignment{
+		registration:    registration,
+		nextShuffleTime: nextShuffleTime,
+		chunkGroup:      rand.Uint64(),
+	}
 }
 
 func TestEmptyQueue(t *testing.T) {
-	queue := NewPriorityQueue()
+	queue := newAssignmentQueue()
 	assert.Equal(t, 0, queue.Len())
 	assert.Nil(t, queue.Pop())
 	assert.Nil(t, queue.Peek())
@@ -30,16 +33,16 @@ func TestEmptyQueue(t *testing.T) {
 func TestInOrderInsertion(t *testing.T) {
 	tu.InitializeRandom()
 
-	queue := NewPriorityQueue()
+	queue := newAssignmentQueue()
 	assert.Equal(t, 0, queue.Len())
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := 100
-	expectedOrder := make([]*Registration, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Insert elements in order.
 	for i := 0; i < numberOfElements; i++ {
-		registration := RandomRegistration(startTime.Add(time.Second * time.Duration(i)))
+		registration := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, registration)
 		queue.Push(registration)
 		assert.Equal(t, i+1, queue.Len())
@@ -60,17 +63,17 @@ func TestInOrderInsertion(t *testing.T) {
 func TestReverseOrderInsertion(t *testing.T) {
 	tu.InitializeRandom()
 
-	queue := NewPriorityQueue()
+	queue := newAssignmentQueue()
 	assert.Equal(t, 0, queue.Len())
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := 100
-	expectedOrder := make([]*Registration, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := 0; i < numberOfElements; i++ {
-		registration := RandomRegistration(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, registration)
+		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, assignment)
 	}
 
 	// Insert elements in reverse order.
@@ -94,17 +97,17 @@ func TestReverseOrderInsertion(t *testing.T) {
 func TestRandomInsertion(t *testing.T) {
 	tu.InitializeRandom()
 
-	queue := NewPriorityQueue()
+	queue := newAssignmentQueue()
 	assert.Equal(t, 0, queue.Len())
 
 	startTime := time.Unix(int64(rand.Uint32()), 0)
 	numberOfElements := 100
-	expectedOrder := make([]*Registration, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := 0; i < numberOfElements; i++ {
-		registration := RandomRegistration(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, registration)
+		assignment := RandomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, assignment)
 	}
 
 	// Insert elements in random order.
