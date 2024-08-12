@@ -594,12 +594,13 @@ func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobInd
 	if err != nil {
 		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
-	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
 	chunks, format, err := DecodeChunks(data)
 	if err != nil {
 		return nil, format, err
 	}
+	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data), "chunk encoding format", format)
+
 	return chunks, format, nil
 }
 

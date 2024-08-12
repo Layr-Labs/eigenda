@@ -388,6 +388,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 		return nil, fmt.Errorf("could not find chunks for batchHeaderHash %v, blob index: %v, quorumID: %v", hex.EncodeToString(batchHeaderHash[:]), in.GetBlobIndex(), in.GetQuorumId())
 	}
 	if !s.config.EnableGnarkBundleEncoding && format == pb.ChunkEncodingFormat_GNARK {
+		s.node.Logger.Info("Converting chunks from Gnark back to Gob", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "blobIndex", in.GetBlobIndex(), "quorumId", in.GetQuorumId())
 		format = pb.ChunkEncodingFormat_GOB
 		gobChunks := make([][]byte, 0, len(chunks))
 		for _, c := range chunks {
