@@ -48,7 +48,6 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--log.pid` | `false` | `$EIGENDA_PROXY_LOG_PID` | Show pid in the log. |
 | `--memstore.enabled` | `false` | `$MEMSTORE_ENABLED` | Whether to use mem-store for DA logic. |
 | `--memstore.expiration` | `25m0s` | `$MEMSTORE_EXPIRATION` | Duration that a mem-store blob/commitment pair are allowed to live. |
-| `--memstore.fault-config-path` | `""` | `$MEMSTORE_FAULT_CONFIG_PATH` | Path to fault config json file. 
 | `--metrics.addr` | `"0.0.0.0"` | `$EIGENDA_PROXY_METRICS_ADDR` | Metrics listening address. |
 | `--metrics.enabled` | `false` | `$EIGENDA_PROXY_METRICS_ENABLED` | Enable the metrics server. |
 | `--metrics.port` | `7300` | `$EIGENDA_PROXY_METRICS_PORT` | Metrics listening port. |
@@ -86,29 +85,6 @@ An optional `--eigenda-eth-confirmation-depth` flag can be provided to specify a
 ### In-Memory Backend
 
 An ephemeral memory store backend can be used for faster feedback testing when testing rollup integrations. To target this feature, use the CLI flags `--memstore.enabled`, `--memstore.expiration`.
-
-
-### Fault Mode
-
-Memstore also supports a configurable fault mode which allows for blob content corruption when reading. This is key for testing sequencer resiliency against incorrect batches as well as testing dispute resolution where an optimistic rollup commitment poster produces a machine state hash irrespective of the actual intended execution.
-
-The configuration lives as a json file with path specified via `--memstore.fault-config-path` CLI flag. It looks like so:
-```
-{
-    "all": {
-        "mode": "honest",
-        "interval": 1
-    },
-    "challenger": {
-        "mode": "byzantine",
-    },
-}
-```
-
-Each key refers to an `actor` with context being shared via the http request and processed accordingly by the server. The following modes are currently supported:
-- `honest`: returns the actual blob contents that were persisted to memory
-- `interval_byzantine`: blob contents are corrupted every `n` of reads
-- `byzantine`: blob contents are corrupted for every read
 
 
 ## Metrics
@@ -182,10 +158,10 @@ Container can be built via running `make docker-build`.
 Commitments returned from the EigenDA Proxy adhere to the following byte encoding:
 
 ```
- 0        1        2        3        4                 N
- |--------|--------|--------|--------|-----------------|
-  commit   da layer  ext da   version  raw commitment
-  type       type    type      byte
+ 0        1        2         3               N
+ |--------|--------|---------|---------------|
+  commit   da layer  version  raw commitment
+  type       type     byte
 ```
 
 The `raw commitment` is an RLP-encoded [EigenDA certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168).
