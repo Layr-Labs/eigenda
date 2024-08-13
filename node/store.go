@@ -654,13 +654,27 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 		return nil, err
 	}
 	data, err := s.db.Get(blobHeaderKey)
+	if err == nil {
+		return data, nil
+	}
+
+	if !errors.Is(err, leveldb.ErrNotFound) {
+		return nil, err
+	}
+
+	// error is leveldb.ErrNotFound
+	// try to get blob header by blobIndexPrefix
+	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
+	blobHeaderHashBytes, err := s.db.Get(blobIndexKey)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}
-	return data, nil
+	var blobHeaderHash [32]byte
+	copy(blobHeaderHash[:], blobHeaderHashBytes)
+	return s.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash)
 }
 
 // GetBlobHeaderByHeaderHash returns the blob header for the given blobHeaderHash.
