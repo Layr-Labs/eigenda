@@ -39,7 +39,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server")
 	} else {
-		log.Info("Started DA Server")
+		log.Info("Started EigenDA proxy server")
 	}
 
 	defer func() {

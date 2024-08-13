@@ -1,8 +1,3 @@
-![Compiles](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/build.yml/badge.svg)
-![Unit Tests](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/unit-tests.yml/badge.svg)
-![Linter](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/gosec.yml/badge.svg)
-![Integration Tests](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/holesky-test.yml/badge.svg)
-
 # EigenDA Sidecar Proxy
 
 ## Introduction
@@ -17,6 +12,7 @@ Features:
 * Performs KZG verification during dispersal to ensure that DA certificates returned from the EigenDA disperser have correct KZG commitments.
 * Performs DA certificate verification during dispersal to ensure that DA certificates have been properly bridged to Ethereum by the disperser.
 * Performs DA certificate verification during retrieval to ensure that data represented by bad DA certificates do not become part of the canonical chain.
+* Compatibility with Optimism's alt-da commitment type with eigenda backend.
 * Compatibility with Optimism's keccak-256 commitment type with S3 storage.
 
 In order to disperse to the EigenDA network in production, or at high throughput on testnet, please register your authentication ethereum address through [this form](https://forms.gle/3QRNTYhSMacVFNcU8). Your EigenDA authentication keypair address should not be associated with any funds anywhere.
@@ -30,9 +26,9 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--eigenda-disable-point-verification-mode` | `false` | `$EIGENDA_PROXY_DISABLE_POINT_VERIFICATION_MODE` | Disable point verification mode. This mode performs IFFT on data before writing and FFT on data after reading. Disabling requires supplying the entire blob for verification against the KZG commitment. |
 | `--eigenda-disable-tls` | `false` | `$EIGENDA_PROXY_GRPC_DISABLE_TLS` | Disable TLS for gRPC communication with the EigenDA disperser. Default is false. |
 | `--eigenda-disperser-rpc` |  | `$EIGENDA_PROXY_EIGENDA_DISPERSER_RPC` | RPC endpoint of the EigenDA disperser. |
-| `--eigenda-eth-confirmation-depth` | `6` | `$EIGENDA_PROXY_ETH_CONFIRMATION_DEPTH` | The number of Ethereum blocks of confirmation that the DA bridging transaction must have before it is assumed by the proxy to be final. If set negative the proxy will always wait for blob finalization. |
+| `--eigenda-eth-confirmation-depth` | `-1` | `$EIGENDA_PROXY_ETH_CONFIRMATION_DEPTH` | The number of Ethereum blocks of confirmation that the DA bridging transaction must have before it is assumed by the proxy to be final. If set negative the proxy will always wait for blob finalization. |
 | `--eigenda-eth-rpc` |  | `$EIGENDA_PROXY_ETH_RPC` | JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/ |
-| `--eigenda-g1-path` | `"resources/g1.point.1048576"` | `$EIGENDA_PROXY_TARGET_KZG_G1_PATH` | Directory path to g1.point file. |
+| `--eigenda-g1-path` | `"resources/g1.point"` | `$EIGENDA_PROXY_TARGET_KZG_G1_PATH` | Directory path to g1.point file. |
 | `--eigenda-g2-tau-path` | `"resources/g2.point.powerOf2"` | `$EIGENDA_PROXY_TARGET_G2_TAU_PATH` | Directory path to g2.point.powerOf2 file. |
 | `--eigenda-max-blob-length` | `"2MiB"` | `$EIGENDA_PROXY_MAX_BLOB_LENGTH` | Maximum blob length to be written or read from EigenDA. Determines the number of SRS points loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size slightly exceeds 1GB. |
 | `--eigenda-put-blob-encoding-version` | `0` | `$EIGENDA_PROXY_PUT_BLOB_ENCODING_VERSION` | Blob encoding version to use when writing blobs from the high-level interface. |
@@ -47,6 +43,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--log.pid` | `false` | `$EIGENDA_PROXY_LOG_PID` | Show pid in the log. |
 | `--memstore.enabled` | `false` | `$MEMSTORE_ENABLED` | Whether to use mem-store for DA logic. |
 | `--memstore.expiration` | `25m0s` | `$MEMSTORE_EXPIRATION` | Duration that a mem-store blob/commitment pair are allowed to live. |
+| `--memstore.fault-config-path` | `""` | `$MEMSTORE_FAULT_CONFIG_PATH` | Path to fault config json file. 
 | `--metrics.addr` | `"0.0.0.0"` | `$EIGENDA_PROXY_METRICS_ADDR` | Metrics listening address. |
 | `--metrics.enabled` | `false` | `$EIGENDA_PROXY_METRICS_ENABLED` | Enable the metrics server. |
 | `--metrics.port` | `7300` | `$EIGENDA_PROXY_METRICS_PORT` | Metrics listening port. |
@@ -58,8 +55,6 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--s3.bucket` |  | `$EIGENDA_PROXY_S3_BUCKET` | Bucket name for S3 storage. |
 | `--s3.path` |  | `$EIGENDA_PROXY_S3_PATH` | Bucket path for S3 storage. |
 | `--s3.endpoint` |  | `$EIGENDA_PROXY_S3_ENDPOINT` | Endpoint for S3 storage. |
-| `--s3.backup` |  | `$EIGENDA_PROXY_S3_BACKUP` | Enable parallel blob backup to S3 from EigenDA. |
-| `--s3.timeout` |  | `$EIGENDA_PROXY_S3_TIMEOUT` | Timeout duration for S3 operations. |
 | `--help, -h` | `false` |  | Show help. |
 | `--version, -v` | `false` |  | Print the version. |
 
@@ -69,14 +64,47 @@ In order to disperse to the EigenDA network in production, or at high throughput
 In order for the EigenDA Proxy to avoid a trust assumption on the EigenDA disperser, the proxy offers a DA cert verification feature which ensures that:
 
 1. The DA cert's batch hash can be computed locally and matches the one persisted on-chain in the `ServiceManager` contract
-2. The DA cert's blob inclusion proof can be merkleized to generate the proper batch root
+2. The DA cert's blob inclusion proof can be successfully verified against the blob-batch merkle root
 3. The DA cert's quorum params are adequately defined and expressed when compared to their on-chain counterparts
+4. The DA cert's quorum ids map to valid quorums
 
 To target this feature, use the CLI flags `--eigenda-svc-manager-addr`, `--eigenda-eth-rpc`.
+
+
+#### Soft Confirmations
+
+An optional `--eigenda-eth-confirmation-depth` flag can be provided to specify a number of ETH block confirmations to wait before verifying the blob certificate. This allows for blobs to be accredited upon `confirmation` versus waiting (e.g, 25-30m) for `finalization`. The following integer expressions are supported:
+`-1`: Wait for blob finalization
+`0`: Verify the cert immediately upon blob confirmation and return the blob
+`N where N>0`: Wait `N` blocks before verifying the cert and returning the blob
 
 ### In-Memory Backend
 
 An ephemeral memory store backend can be used for faster feedback testing when testing rollup integrations. To target this feature, use the CLI flags `--memstore.enabled`, `--memstore.expiration`.
+
+
+### Fault Mode
+
+Memstore also supports a configurable fault mode which allows for blob content corruption when reading. This is key for testing sequencer resiliency against incorrect batches as well as testing dispute resolution where an optimistic rollup commitment poster produces a machine state hash irrespective of the actual intended execution.
+
+The configuration lives as a json file with path specified via `--memstore.fault-config-path` CLI flag. It looks like so:
+```
+{
+    "all": {
+        "mode": "honest",
+        "interval": 1
+    },
+    "challenger": {
+        "mode": "byzantine",
+    },
+}
+```
+
+Each key refers to an `actor` with context being shared via the http request and processed accordingly by the server. The following modes are currently supported:
+- `honest`: returns the actual blob contents that were persisted to memory
+- `interval_byzantine`: blob contents are corrupted every `n` of reads
+- `byzantine`: blob contents are corrupted for every read
+
 
 ## Metrics
 
@@ -150,9 +178,9 @@ Commitments returned from the EigenDA Proxy adhere to the following byte encodin
 
 ```
  0        1        2        3        4                 N
- |--------|--------|--------|-----------------|
-  commit   da layer  version  raw commitment
-  type       type     byte
+ |--------|--------|--------|--------|-----------------|
+  commit   da layer  ext da   version  raw commitment
+  type       type    type      byte
 ```
 
 The `raw commitment` is an RLP-encoded [EigenDA certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168).
@@ -171,7 +199,7 @@ A holesky integration test can be ran using `make holesky-test` to assert proper
 
 ### Optimism
 
-An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation.
+An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation. These tests can be ran via `make optimism-test`.
 
 ## Resources
 

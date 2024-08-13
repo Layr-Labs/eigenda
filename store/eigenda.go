@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
@@ -67,13 +68,6 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
 func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err error) {
-	dispersalStart := time.Now()
-	blobInfo, err := e.client.PutBlob(ctx, value)
-	if err != nil {
-		return nil, err
-	}
-	cert := (*verify.Certificate)(blobInfo)
-
 	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
@@ -81,6 +75,13 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
 		return nil, fmt.Errorf("encoded blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.cfg.MaxBlobSizeBytes)
 	}
+
+	dispersalStart := time.Now()
+	blobInfo, err := e.client.PutBlob(ctx, value)
+	if err != nil {
+		return nil, err
+	}
+	cert := (*verify.Certificate)(blobInfo)
 
 
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)

@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"math"
 	"runtime"
 	"time"
 
@@ -30,12 +29,15 @@ const (
 	PutBlobEncodingVersionFlagName       = "eigenda-put-blob-encoding-version"
 	DisablePointVerificationModeFlagName = "eigenda-disable-point-verification-mode"
 	// Kzg flags
-	G1PathFlagName             = "eigenda-g1-path"
-	G2TauFlagName              = "eigenda-g2-tau-path"
-	CachePathFlagName          = "eigenda-cache-path"
-	MaxBlobLengthFlagName      = "eigenda-max-blob-length"
+	G1PathFlagName        = "eigenda-g1-path"
+	G2TauFlagName         = "eigenda-g2-tau-path"
+	CachePathFlagName     = "eigenda-cache-path"
+	MaxBlobLengthFlagName = "eigenda-max-blob-length"
+
+	// Memstore flags
 	MemstoreFlagName           = "memstore.enabled"
 	MemstoreExpirationFlagName = "memstore.expiration"
+
 	// S3 flags
 	S3CredentialTypeFlagName  = "s3.credential-type" // #nosec G101
 	S3BucketFlagName          = "s3.bucket"          // #nosec G101
@@ -43,14 +45,12 @@ const (
 	S3EndpointFlagName        = "s3.endpoint"
 	S3AccessKeyIDFlagName     = "s3.access-key-id"     // #nosec G101
 	S3AccessKeySecretFlagName = "s3.access-key-secret" // #nosec G101
-	S3BackupFlagName          = "s3.backup"
-	S3TimeoutFlagName         = "s3.timeout"
 )
 
 const BytesPerSymbol = 31
 const MaxCodingRatio = 8
 
-var MaxSRSPoints = math.Pow(2, 28)
+var MaxSRSPoints = 1 << 28 // 2^28
 
 var MaxAllowedBlobSize = uint64(MaxSRSPoints * BytesPerSymbol / MaxCodingRatio)
 
@@ -69,15 +69,16 @@ type Config struct {
 
 	// KZG vars
 	CacheDir string
-	G1Path   string
-	G2Path   string
+	G1Path string
+	G2Path string
+	G2PowerOfTauPath string
 
+	// Size constraints
 	MaxBlobLength      string
 	maxBlobLengthBytes uint64
 
-	G2PowerOfTauPath string
 
-	// Memstore Config params
+	// Memstore
 	MemstoreEnabled        bool
 	MemstoreBlobExpiration time.Duration
 }
@@ -90,7 +91,7 @@ func (c *Config) GetMaxBlobLength() (uint64, error) {
 		}
 
 		if numBytes > MaxAllowedBlobSize {
-			return 0, fmt.Errorf("excluding disperser constraints on max blob size, SRS points constrain the maxBlobLength configuration parameter to be less than than ~1 GB (%d bytes)", MaxAllowedBlobSize)
+			return 0, fmt.Errorf("excluding disperser constraints on max blob size, SRS points constrain the maxBlobLength configuration parameter to be less than than %d bytes", MaxAllowedBlobSize)
 		}
 
 		c.maxBlobLengthBytes = numBytes
@@ -102,7 +103,7 @@ func (c *Config) GetMaxBlobLength() (uint64, error) {
 func (c *Config) VerificationCfg() *verify.Config {
 	numBytes, err := c.GetMaxBlobLength()
 	if err != nil {
-		panic(fmt.Errorf("Check() was not called on config object, err is not nil: %w", err))
+		panic(fmt.Errorf("failed to read max blob length: %w", err))
 	}
 
 	kzgCfg := &kzg.KzgConfig{
@@ -131,7 +132,7 @@ func (c *Config) VerificationCfg() *verify.Config {
 
 }
 
-// NewConfig parses the Config from the provided flags or environment variables.
+// ReadConfig parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
 		S3Config: store.S3Config{
@@ -141,8 +142,6 @@ func ReadConfig(ctx *cli.Context) Config {
 			Endpoint:         ctx.String(S3EndpointFlagName),
 			AccessKeyID:      ctx.String(S3AccessKeyIDFlagName),
 			AccessKeySecret:  ctx.String(S3AccessKeySecretFlagName),
-			Backup:           ctx.Bool(S3BackupFlagName),
-			Timeout:          ctx.Duration(S3TimeoutFlagName),
 		},
 		ClientConfig: clients.EigenDAClientConfig{
 			RPC:                          ctx.String(EigenDADisperserRPCFlagName),
@@ -203,8 +202,8 @@ func (cfg *Config) Check() error {
 	if cfg.EthConfirmationDepth >= 0 && (cfg.SvcManagerAddr == "" || cfg.EthRPC == "") {
 		return fmt.Errorf("eth confirmation depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
 	}
-	
-	if cfg.S3Config.S3CredentialType == store.S3CredentialUnknown {
+
+	if cfg.S3Config.S3CredentialType == store.S3CredentialUnknown && cfg.S3Config.Endpoint != "" {
 		return fmt.Errorf("s3 credential type must be set")
 	}
 	if cfg.S3Config.S3CredentialType == store.S3CredentialStatic {
@@ -287,7 +286,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Name:    G1PathFlagName,
 			Usage:   "Directory path to g1.point file.",
 			EnvVars: prefixEnvVars("TARGET_KZG_G1_PATH"),
-			Value:   "resources/g1.point.1048576",
+			Value:   "resources/g1.point",
 		},
 		&cli.StringFlag{
 			Name:    G2TauFlagName,
@@ -359,18 +358,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "access key secret for S3 storage",
 			Value:   "",
 			EnvVars: prefixEnvVars("S3_ACCESS_KEY_SECRET"),
-		},
-		&cli.BoolFlag{
-			Name:    S3BackupFlagName,
-			Usage:   "Backup to S3 in parallel with Eigenda.",
-			Value:   false,
-			EnvVars: prefixEnvVars("S3_BACKUP"),
-		},
-		&cli.StringFlag{
-			Name:    S3TimeoutFlagName,
-			Usage:   "S3 timeout",
-			Value:   "60s",
-			EnvVars: prefixEnvVars("S3_TIMEOUT"),
 		},
 	}
 }
