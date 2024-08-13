@@ -5,45 +5,13 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 var _ clients.DisperserClient = (*MockDisperserClient)(nil)
 
 type MockDisperserClient struct {
 	mock mock.Mock
-
-	t *testing.T
-	// if true, DisperseBlobAuthenticated is expected to be used, otherwise DisperseBlob is expected to be used
-	authenticated bool
-
-	// The next status, key, and error to return from DisperseBlob or DisperseBlobAuthenticated
-	StatusToReturn        disperser.BlobStatus
-	KeyToReturn           []byte
-	DispenseErrorToReturn error
-
-	// The previous values passed to DisperseBlob or DisperseBlobAuthenticated
-	ProvidedData   []byte
-	ProvidedQuorum []uint8
-
-	// Incremented each time DisperseBlob or DisperseBlobAuthenticated is called.
-	DisperseCount uint
-
-	// A map from key (in string form) to the status to return from GetBlobStatus. If nil, then an error is returned.
-	StatusMap map[string]disperser_rpc.BlobStatus
-
-	// Incremented each time GetBlobStatus is called.
-	GetStatusCount uint
-}
-
-func NewMockDisperserClient(t *testing.T, authenticated bool) *MockDisperserClient {
-	return &MockDisperserClient{
-		t:             t,
-		authenticated: authenticated,
-		StatusMap:     make(map[string]disperser_rpc.BlobStatus),
-	}
 }
 
 func (m *MockDisperserClient) DisperseBlob(
@@ -51,13 +19,9 @@ func (m *MockDisperserClient) DisperseBlob(
 	data []byte,
 	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
 
-	m.mock.Called(ctx, data, customQuorums)
+	args := m.mock.Called(data, customQuorums)
 
-	assert.False(m.t, m.authenticated, "writer configured to use non-authenticated disperser method")
-	m.ProvidedData = data
-	m.ProvidedQuorum = customQuorums
-	m.DisperseCount++
-	return &m.StatusToReturn, m.KeyToReturn, m.DispenseErrorToReturn
+	return args.Get(0).(*disperser.BlobStatus), args.Get(1).([]byte), args.Error(2)
 }
 
 func (m *MockDisperserClient) DisperseBlobAuthenticated(
@@ -65,33 +29,16 @@ func (m *MockDisperserClient) DisperseBlobAuthenticated(
 	data []byte,
 	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
 
-	m.mock.Called(ctx, data, customQuorums)
-
-	assert.True(m.t, m.authenticated, "writer configured to use authenticated disperser method")
-	m.ProvidedData = data
-	m.ProvidedQuorum = customQuorums
-	m.DisperseCount++
-	return &m.StatusToReturn, m.KeyToReturn, m.DispenseErrorToReturn
+	args := m.mock.Called(data, customQuorums)
+	return args.Get(0).(*disperser.BlobStatus), args.Get(1).([]byte), args.Error(2)
 }
 
 func (m *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error) {
-	m.mock.Called(ctx, key)
-
-	status := m.StatusMap[string(key)]
-	m.GetStatusCount++
-
-	return &disperser_rpc.BlobStatusReply{
-		Status: status,
-		Info: &disperser_rpc.BlobInfo{
-			BlobVerificationProof: &disperser_rpc.BlobVerificationProof{
-				BatchMetadata: &disperser_rpc.BatchMetadata{},
-			},
-		},
-	}, nil
+	args := m.mock.Called(key)
+	return args.Get(0).(*disperser_rpc.BlobStatusReply), args.Error(1)
 }
 
 func (m *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
-	m.mock.Called(ctx, batchHeaderHash, blobIndex)
-
-	panic("this method should not be called by the generator utility")
+	args := m.mock.Called(batchHeaderHash, blobIndex)
+	return args.Get(0).([]byte), args.Error(1)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
@@ -31,6 +32,12 @@ func TestBlobWriter(t *testing.T) {
 	if authenticated {
 		signerPrivateKey = "asdf"
 	}
+	var functionName string
+	if authenticated {
+		functionName = "DisperseBlobAuthenticated"
+	} else {
+		functionName = "DisperseBlob"
+	}
 
 	randomizeBlobs := rand.Intn(2) == 0
 
@@ -47,7 +54,7 @@ func TestBlobWriter(t *testing.T) {
 		CustomQuorums:    customQuorum,
 	}
 
-	disperserClient := NewMockDisperserClient(t, authenticated)
+	disperserClient := &MockDisperserClient{}
 	unconfirmedKeyHandler := &MockKeyHandler{}
 	unconfirmedKeyHandler.mock.On(
 		"AddUnconfirmedKey", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -68,51 +75,54 @@ func TestBlobWriter(t *testing.T) {
 	var previousData []byte
 
 	for i := 0; i < 100; i++ {
+		var errorToReturn error
 		if i%10 == 0 {
-			disperserClient.DispenseErrorToReturn = fmt.Errorf("intentional error for testing purposes")
+			errorToReturn = fmt.Errorf("intentional error for testing purposes")
 			errorCount++
 		} else {
-			disperserClient.DispenseErrorToReturn = nil
+			errorToReturn = nil
 		}
 
 		// This is the key that will be assigned to the next blob.
-		disperserClient.KeyToReturn = make([]byte, 32)
-		_, err = rand.Read(disperserClient.KeyToReturn)
+		keyToReturn := make([]byte, 32)
+		_, err = rand.Read(keyToReturn)
 		assert.Nil(t, err)
+
+		status := disperser.Processing
+		disperserClient.mock = mock.Mock{} // reset mock state
+		disperserClient.mock.On(functionName, mock.Anything, customQuorum).Return(&status, keyToReturn, errorToReturn)
 
 		// Simulate the advancement of time (i.e. allow the writer to write the next blob).
 		writer.writeNextBlob()
 
-		assert.Equal(t, uint(i+1), disperserClient.DisperseCount)
+		disperserClient.mock.AssertNumberOfCalls(t, functionName, 1)
 		unconfirmedKeyHandler.mock.AssertNumberOfCalls(t, "AddUnconfirmedKey", i+1-errorCount)
 
-		// This method should not be called in this test.
-		assert.Equal(t, uint(0), disperserClient.GetStatusCount)
+		if errorToReturn == nil {
 
-		if disperserClient.DispenseErrorToReturn == nil {
-			assert.NotNil(t, disperserClient.ProvidedData)
-			assert.Equal(t, customQuorum, disperserClient.ProvidedQuorum)
+			dataSentToDisperser := disperserClient.mock.Calls[0].Arguments.Get(0).([]byte)
+			assert.NotNil(t, dataSentToDisperser)
 
 			// Strip away the extra encoding bytes. We should have data of the expected size.
-			decodedData := codec.RemoveEmptyByteFromPaddedBytes(disperserClient.ProvidedData)
+			decodedData := codec.RemoveEmptyByteFromPaddedBytes(dataSentToDisperser)
 			assert.Equal(t, dataSize, uint64(len(decodedData)))
 
 			// Verify that the proper data was sent to the unconfirmed key handler.
-			checksum := md5.Sum(disperserClient.ProvidedData)
+			checksum := md5.Sum(dataSentToDisperser)
 
-			unconfirmedKeyHandler.mock.AssertCalled(t, "AddUnconfirmedKey", disperserClient.KeyToReturn, checksum, uint(len(disperserClient.ProvidedData)))
+			unconfirmedKeyHandler.mock.AssertCalled(t, "AddUnconfirmedKey", keyToReturn, checksum, uint(len(dataSentToDisperser)))
 
 			// Verify that data has the proper amount of randomness.
 			if previousData != nil {
 				if randomizeBlobs {
 					// We expect each blob to be different.
-					assert.NotEqual(t, previousData, disperserClient.ProvidedData)
+					assert.NotEqual(t, previousData, dataSentToDisperser)
 				} else {
 					// We expect each blob to be the same.
-					assert.Equal(t, previousData, disperserClient.ProvidedData)
+					assert.Equal(t, previousData, dataSentToDisperser)
 				}
 			}
-			previousData = disperserClient.ProvidedData
+			previousData = dataSentToDisperser
 		}
 
 		// Verify metrics.
