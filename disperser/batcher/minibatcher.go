@@ -265,9 +265,13 @@ func (b *Minibatcher) DisperseBatch(ctx context.Context, state *core.IndexedOper
 			if err != nil {
 				b.logger.Errorf("failed to send blobs to operator %s: %v", opID.Hex(), err)
 			}
+			compressedSignatures := make([][32]byte, 0, len(signatures))
+			for _, signature := range signatures {
+				compressedSignatures = append(compressedSignatures, signature.Bytes())
+			}
 			// Update the minibatch state
 			err = b.MinibatchStore.UpdateDispersalResponse(ctx, req, &DispersalResponse{
-				Signatures:  signatures,
+				Signatures:  compressedSignatures,
 				RespondedAt: time.Now().UTC(),
 				Error:       err,
 			})
