@@ -8,6 +8,48 @@ import (
 	"time"
 )
 
+func TestUint64ToBytes(t *testing.T) {
+	// Test the conversion of 0 to bytes.
+	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, uint64ToBytes(0))
+
+	// Test the conversion of 1 to bytes.
+	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 1}, uint64ToBytes(1))
+
+	// Test the conversion of 256 to bytes.
+	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 1, 0}, uint64ToBytes(256))
+
+	// Test the conversion of 0xAABBCCDDEEFF9988 to bytes.
+	assert.Equal(t, []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99, 0x88}, uint64ToBytes(0xAABBCCDDEEFF9988))
+
+	// Test the conversion of 0xFFFFFFFFFFFFFFFF to bytes.
+	assert.Equal(t, []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, uint64ToBytes(0xFFFFFFFFFFFFFFFF))
+}
+
+func TestBytesToUint64(t *testing.T) {
+	// Test the conversion of 0 from bytes.
+	assert.Equal(t, uint64(0), bytesToUint64([]byte{0, 0, 0, 0, 0, 0, 0, 0}))
+
+	// Test the conversion of 1 from bytes.
+	assert.Equal(t, uint64(1), bytesToUint64([]byte{0, 0, 0, 0, 0, 0, 0, 1}))
+
+	// Test the conversion of 256 from bytes.
+	assert.Equal(t, uint64(256), bytesToUint64([]byte{0, 0, 0, 0, 0, 0, 1, 0}))
+
+	// Test the conversion of 0xAABBCCDDEEFF9988 from bytes.
+	assert.Equal(t, uint64(0xAABBCCDDEEFF9988), bytesToUint64([]byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99, 0x88}))
+
+	// Test the conversion of 0xFFFFFFFFFFFFFFFF from bytes.
+	assert.Equal(t, uint64(0xFFFFFFFFFFFFFFFF), bytesToUint64([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}))
+}
+
+func TestByteRoundTrip(t *testing.T) {
+	tu.InitializeRandom()
+	for i := 0; i < 1000; i++ {
+		value := uint64(rand.Int63())
+		assert.Equal(t, value, bytesToUint64(uint64ToBytes(value)))
+	}
+}
+
 func TestComputeShuffleOffset(t *testing.T) {
 	tu.InitializeRandom()
 

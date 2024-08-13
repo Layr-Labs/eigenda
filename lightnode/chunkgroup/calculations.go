@@ -2,21 +2,45 @@ package chunkgroup
 
 import (
 	"fmt"
-	"math/rand"
+	"golang.org/x/crypto/sha3"
 	"time"
 )
+
+// uint64ToBytes converts a uint64 to a byte array in big-endian order.
+func uint64ToBytes(value uint64) []byte {
+	bytes := [8]byte{}
+	for i := 0; i < 8; i++ {
+		bytes[i] = byte(value >> (56 - 8*i))
+	}
+	return bytes[:]
+}
+
+// bytesToUint64 converts a byte array to a uint64 in big-endian order.
+func bytesToUint64(bytes []byte) uint64 {
+	var value uint64
+	for i := 0; i < 8; i++ {
+		value |= uint64(bytes[i]) << (56 - 8*i)
+	}
+	return value
+}
+
+// hash hashes a seed using the Keccak-256 algorithm. The returned value is an integer formed from the
+// first 8 bytes of the hash.
+func randomInt(seed int64) uint64 {
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(uint64ToBytes(uint64(seed)))
+	value := hasher.Sum(nil)
+	return bytesToUint64(value)
+}
 
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
 func ComputeShuffleOffset(seed int64, shufflePeriod time.Duration) time.Duration {
-
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
 	}
 
-	rng := rand.New(rand.NewSource(seed))
-
-	return time.Duration(rng.Int63() % int64(shufflePeriod))
+	return time.Duration(int64(randomInt(seed) % uint64(shufflePeriod)))
 }
 
 // ComputeShuffleEpoch returns the epoch number of a light node at the current time.
@@ -93,6 +117,5 @@ func ComputeChunkGroup(
 	shuffleEpoch int64,
 	chunkGroupCount uint) uint {
 
-	rng := rand.New(rand.NewSource(seed + shuffleEpoch))
-	return uint(rng.Uint64()) % chunkGroupCount
+	return uint(randomInt(seed^shuffleEpoch) % uint64(chunkGroupCount))
 }

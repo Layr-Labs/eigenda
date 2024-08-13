@@ -63,8 +63,13 @@ is public information and stored on-chain.
 
 ## `randomInt(seed)`
 
-Define a function `randomInt(seed)` that takes an 8 byte signed integer as a seed and returns an 8 byte signed integer. 
-TODO give spec for cryptographically secure random function!!!
+Define a function `randomInt(seed)` that takes an 8 byte unsigned integer as a seed and returns a pseudo-random 
+8 byte unsigned integer. 
+
+- Copy the 8 byte unsigned integer `seed` into an 8 byte array `seedBytes` in big endian order.
+- Use the `seedBytes` as the input to `keccak256` to generate a 32 byte array called `hashBytes`.
+- Use the first 8 bytes of `hashBytes` to create an 8 byte unsigned integer using big endian order called `result`.
+- Return `result`.
 
 ## Determining a node's shuffle offset
 
@@ -86,5 +91,5 @@ To determine a node's chunk group, first compute the current epoch for the node,
 function:
 
 ```
-chunkGroup := randomInt(nodeSeed + nodeEpoch) % numberOfChunks
+chunkGroup := randomInt(nodeSeed ^ nodeEpoch) % numberOfChunks
 ```
