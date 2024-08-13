@@ -482,8 +482,8 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:        blobHeader,
-				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+				BlobHeader:               blobHeader,
+				EncodedBundlesByOperator: make(map[core.OperatorID]map[core.QuorumID]*core.ChunksData),
 			}
 		}
 
@@ -633,8 +633,8 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:        blobHeader,
-				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+				BlobHeader:               blobHeader,
+				EncodedBundlesByOperator: make(map[core.OperatorID]map[core.QuorumID]*core.ChunksData),
 			}
 		}
 

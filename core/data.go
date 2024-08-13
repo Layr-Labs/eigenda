@@ -280,8 +280,6 @@ type Bundles map[QuorumID]Bundle
 type BlobMessage struct {
 	BlobHeader *BlobHeader
 	Bundles    Bundles
-	// EncodedBundles is bundles in encoded format (not deserialized)
-	EncodedBundles map[QuorumID]*ChunksData
 }
 
 // This is similar to BlobMessage, but keep the commitments and chunks in encoded format

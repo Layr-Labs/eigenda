@@ -317,7 +317,7 @@ func (b *Minibatcher) SendBlobsToOperatorWithRetries(
 	blobMessages := make([]*core.EncodedBlobMessage, 0)
 	hasAnyBundles := false
 	for _, blob := range blobs {
-		if _, ok := blob.BundlesByOperator[opID]; ok {
+		if _, ok := blob.EncodedBundlesByOperator[opID]; ok {
 			hasAnyBundles = true
 		}
 		blobMessages = append(blobMessages, &core.EncodedBlobMessage{

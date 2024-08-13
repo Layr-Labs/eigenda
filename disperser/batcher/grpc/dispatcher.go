@@ -59,7 +59,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 				return
 			}
 			for _, blob := range blobs {
-				if _, ok := blob.BundlesByOperator[id]; ok {
+				if _, ok := blob.EncodedBundlesByOperator[id]; ok {
 					hasAnyBundles = true
 				}
 				blobMessages = append(blobMessages, &core.EncodedBlobMessage{
