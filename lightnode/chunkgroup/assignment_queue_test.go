@@ -10,8 +10,8 @@ import (
 )
 
 func randomAssignment(nextShuffleTime time.Time) *assignment {
-	id := rand.Int63()
-	seed := rand.Int63()
+	id := rand.Uint64()
+	seed := rand.Uint64()
 	registrationTime := tu.RandomTime()
 
 	registration := lightnode.NewRegistration(id, seed, registrationTime)
@@ -19,7 +19,7 @@ func randomAssignment(nextShuffleTime time.Time) *assignment {
 	return &assignment{
 		registration: registration,
 		endOfEpoch:   nextShuffleTime,
-		chunkGroup:   uint(rand.Uint32()),
+		chunkGroup:   rand.Uint32(),
 	}
 }
 

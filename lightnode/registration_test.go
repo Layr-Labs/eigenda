@@ -11,8 +11,8 @@ import (
 func TestGetters(t *testing.T) {
 	tu.InitializeRandom()
 
-	id := rand.Int63()
-	seed := rand.Int63()
+	id := rand.Uint64()
+	seed := rand.Uint64()
 	now := time.Unix(int64(rand.Int31()), 0)
 
 	registration := NewRegistration(id, seed, now)

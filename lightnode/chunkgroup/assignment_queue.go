@@ -49,7 +49,7 @@ type assignmentQueue struct {
 	// A set of node IDs in the queue. This is used to do efficient removals.
 	// A true value indicates that the node is in the queue. A false value indicates
 	// that the node was removed from the queue but has not yet been fully deleted.
-	nodeIdSet map[int64]bool
+	nodeIdSet map[uint64]bool
 
 	// The number of elements in the queue. Tracked separately since the heap and NodeIdSet
 	// may contain removed nodes that have not yet been fully garbage collected.
@@ -62,7 +62,7 @@ func newAssignmentQueue() *assignmentQueue {
 		heap: &assignmentHeap{
 			data: make([]*assignment, 0),
 		},
-		nodeIdSet: make(map[int64]bool),
+		nodeIdSet: make(map[uint64]bool),
 	}
 }
 
@@ -111,7 +111,7 @@ func (queue *assignmentQueue) Peek() *assignment {
 
 // Remove removes the light node with the given ID from the priority queue.
 // This is a no-op if the light node is not in the queue.
-func (queue *assignmentQueue) Remove(lightNodeId int64) {
+func (queue *assignmentQueue) Remove(lightNodeId uint64) {
 	// Deletion is lazy. The node is fully removed when it reaches the top of the heap.
 
 	notRemoved, present := queue.nodeIdSet[lightNodeId]

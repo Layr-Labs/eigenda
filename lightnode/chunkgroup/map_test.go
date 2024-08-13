@@ -10,20 +10,20 @@ import (
 )
 
 func randomRegistration() *lightnode.Registration {
-	return lightnode.NewRegistration(rand.Int63(), rand.Int63(), tu.RandomTime())
+	return lightnode.NewRegistration(rand.Uint64(), rand.Uint64(), tu.RandomTime())
 }
 
 func TestAddRemoveGet(t *testing.T) {
 	tu.InitializeRandom()
 
-	chunkGroupCount := uint(rand.Intn(100) + 1)
+	chunkGroupCount := uint32(rand.Intn(100) + 1)
 	genesisTime := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 
 	cgMap := NewMap(chunkGroupCount, genesisTime, shufflePeriod)
 	assert.Equal(t, uint(0), cgMap.Size())
 
-	expectedMap := make(map[int64]*lightnode.Registration)
+	expectedMap := make(map[uint64]*lightnode.Registration)
 
 	// Add elements
 	elementsToAdd := 1_000
@@ -40,7 +40,7 @@ func TestAddRemoveGet(t *testing.T) {
 
 	// Removing non-existent elements should be a no-op.
 	for i := 0; i < 10; i++ {
-		cgMap.Remove(rand.Int63())
+		cgMap.Remove(rand.Uint64())
 		assert.Equal(t, uint(elementsToAdd), cgMap.Size())
 	}
 
@@ -74,14 +74,14 @@ func TestAddRemoveGet(t *testing.T) {
 func TestChunkGroupCalculations(t *testing.T) {
 	tu.InitializeRandom()
 
-	chunkGroupCount := uint(rand.Intn(100) + 1)
+	chunkGroupCount := uint32(rand.Intn(100) + 1)
 	genesisTime := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 
 	cgMap := NewMap(chunkGroupCount, genesisTime, shufflePeriod)
 	assert.Equal(t, uint(0), cgMap.Size())
 
-	expectedMap := make(map[int64]*lightnode.Registration)
+	expectedMap := make(map[uint64]*lightnode.Registration)
 
 	// Add elements
 	count := 1_000
@@ -140,7 +140,7 @@ func TestChunkGroupCalculations(t *testing.T) {
 
 		// Query for full chunk groups.
 		nodesReported := 0
-		for chunkIndex := uint(0); chunkIndex < chunkGroupCount; chunkIndex++ {
+		for chunkIndex := uint32(0); chunkIndex < chunkGroupCount; chunkIndex++ {
 			chunk := cgMap.GetNodesInChunkGroup(now, chunkIndex)
 			nodesReported += len(chunk)
 
@@ -158,14 +158,14 @@ func TestChunkGroupCalculations(t *testing.T) {
 func TestGetRandomNode(t *testing.T) {
 	tu.InitializeRandom()
 
-	chunkGroupCount := uint(rand.Intn(100) + 1)
+	chunkGroupCount := uint32(rand.Intn(100) + 1)
 	genesisTime := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 
 	cgMap := NewMap(chunkGroupCount, genesisTime, shufflePeriod)
 	assert.Equal(t, uint(0), cgMap.Size())
 
-	expectedMap := make(map[int64]*lightnode.Registration)
+	expectedMap := make(map[uint64]*lightnode.Registration)
 
 	// Add elements
 	elementsToAdd := 1_000
@@ -182,7 +182,7 @@ func TestGetRandomNode(t *testing.T) {
 
 	now := genesisTime.Add(shufflePeriod * time.Duration(rand.Float64()*1000))
 
-	for chunkIndex := uint(0); chunkIndex < chunkGroupCount; chunkIndex++ {
+	for chunkIndex := uint32(0); chunkIndex < chunkGroupCount; chunkIndex++ {
 
 		chunk := cgMap.GetNodesInChunkGroup(now, chunkIndex)
 
@@ -223,14 +223,14 @@ func TestGetRandomNode(t *testing.T) {
 func TestSingleChunkGroup(t *testing.T) {
 	tu.InitializeRandom()
 
-	chunkGroupCount := uint(1)
+	chunkGroupCount := uint32(1)
 	genesisTime := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 
 	cgMap := NewMap(chunkGroupCount, genesisTime, shufflePeriod)
 	assert.Equal(t, uint(0), cgMap.Size())
 
-	expectedMap := make(map[int64]*lightnode.Registration)
+	expectedMap := make(map[uint64]*lightnode.Registration)
 
 	// Add elements
 	count := 1_000
@@ -289,7 +289,7 @@ func TestSingleChunkGroup(t *testing.T) {
 
 		// Query for full chunk groups.
 		nodesReported := 0
-		for chunkIndex := uint(0); chunkIndex < chunkGroupCount; chunkIndex++ {
+		for chunkIndex := uint32(0); chunkIndex < chunkGroupCount; chunkIndex++ {
 			chunk := cgMap.GetNodesInChunkGroup(now, chunkIndex)
 			nodesReported += len(chunk)
 

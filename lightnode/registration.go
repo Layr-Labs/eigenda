@@ -9,11 +9,11 @@ import (
 // This information is registered on-chain.
 type Registration struct {
 	// The ID of the light node.
-	id int64
+	id uint64
 
 	// A seed assigned to the light node when it was registered.
 	// Used for deterministically random operations involving this light node.
-	seed int64
+	seed uint64
 
 	// The time at which the light node was initially registered.
 	registrationTime time.Time
@@ -22,7 +22,7 @@ type Registration struct {
 }
 
 // NewRegistration creates a new Registration instance.
-func NewRegistration(id int64, seed int64, registrationTime time.Time) *Registration {
+func NewRegistration(id uint64, seed uint64, registrationTime time.Time) *Registration {
 	return &Registration{
 		id:               id,
 		seed:             seed,
@@ -31,12 +31,12 @@ func NewRegistration(id int64, seed int64, registrationTime time.Time) *Registra
 }
 
 // ID returns the ID of the light node.
-func (registration *Registration) ID() int64 {
+func (registration *Registration) ID() uint64 {
 	return registration.id
 }
 
 // Seed returns the seed of the light node.
-func (registration *Registration) Seed() int64 {
+func (registration *Registration) Seed() uint64 {
 	return registration.seed
 }
 

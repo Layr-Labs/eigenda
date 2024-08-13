@@ -26,16 +26,16 @@ func bytesToUint64(bytes []byte) uint64 {
 
 // hash hashes a seed using the Keccak-256 algorithm. The returned value is an integer formed from the
 // first 8 bytes of the hash.
-func randomInt(seed int64) uint64 {
+func randomInt(seed uint64) uint64 {
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(uint64ToBytes(uint64(seed)))
+	hasher.Write(uint64ToBytes(seed))
 	value := hasher.Sum(nil)
 	return bytesToUint64(value)
 }
 
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
-func ComputeShuffleOffset(seed int64, shufflePeriod time.Duration) time.Duration {
+func ComputeShuffleOffset(seed uint64, shufflePeriod time.Duration) time.Duration {
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
 	}
@@ -48,7 +48,7 @@ func ComputeShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	now time.Time) int64 {
+	now time.Time) uint64 {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
@@ -65,7 +65,7 @@ func ComputeShuffleEpoch(
 	epochGenesis := genesis.Add(shuffleOffset - shufflePeriod)
 
 	timeSinceEpochGenesis := now.Sub(epochGenesis)
-	return int64(timeSinceEpochGenesis / shufflePeriod)
+	return uint64(timeSinceEpochGenesis / shufflePeriod)
 }
 
 // ComputeStartOfShuffleEpoch returns the time when a shuffle epoch begins.
@@ -73,16 +73,13 @@ func ComputeStartOfShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	currentEpoch int64) time.Time {
+	currentEpoch uint64) time.Time {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
 	}
 	if shuffleOffset < 0 {
 		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
-	}
-	if currentEpoch < 0 {
-		panic(fmt.Sprintf("current epoch must be non-negative, got %d", currentEpoch))
 	}
 
 	if currentEpoch == 0 {
@@ -96,7 +93,7 @@ func ComputeEndOfShuffleEpoch(
 	genesis time.Time,
 	shufflePeriod time.Duration,
 	shuffleOffset time.Duration,
-	currentEpoch int64) time.Time {
+	currentEpoch uint64) time.Time {
 
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
@@ -104,18 +101,15 @@ func ComputeEndOfShuffleEpoch(
 	if shuffleOffset < 0 {
 		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
 	}
-	if currentEpoch < 0 {
-		panic(fmt.Sprintf("current epoch must be non-negative, got %d", currentEpoch))
-	}
 
 	return genesis.Add(shuffleOffset).Add(shufflePeriod * time.Duration(currentEpoch))
 }
 
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
 func ComputeChunkGroup(
-	seed int64,
-	shuffleEpoch int64,
-	chunkGroupCount uint) uint {
+	seed uint64,
+	shuffleEpoch uint64,
+	chunkGroupCount uint32) uint32 {
 
-	return uint(randomInt(seed^shuffleEpoch) % uint64(chunkGroupCount))
+	return uint32(randomInt(seed^shuffleEpoch) % uint64(chunkGroupCount))
 }
