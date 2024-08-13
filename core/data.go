@@ -284,6 +284,14 @@ type BlobMessage struct {
 	EncodedBundles map[QuorumID]*ChunksData
 }
 
+// This is similar to BlobMessage, but keep the commitments and chunks in encoded format
+// (i.e. not deserialized)
+type EncodedBlobMessage struct {
+	// TODO(jianoaix): Change the commitments to encoded format.
+	BlobHeader     *BlobHeader
+	EncodedBundles map[QuorumID]*ChunksData
+}
+
 func (b Bundle) Size() uint64 {
 	size := uint64(0)
 	for _, chunk := range b {

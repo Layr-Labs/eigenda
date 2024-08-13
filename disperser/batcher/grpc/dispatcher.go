@@ -52,7 +52,7 @@ func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, update chan core.SigningMessage) {
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
-			blobMessages := make([]*core.BlobMessage, 0)
+			blobMessages := make([]*core.EncodedBlobMessage, 0)
 			hasAnyBundles := false
 			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 			if err != nil {
@@ -62,7 +62,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 				if _, ok := blob.BundlesByOperator[id]; ok {
 					hasAnyBundles = true
 				}
-				blobMessages = append(blobMessages, &core.BlobMessage{
+				blobMessages = append(blobMessages, &core.EncodedBlobMessage{
 					BlobHeader: blob.BlobHeader,
 					// Bundles will be empty if the operator is not in the quorums blob is dispersed on
 					EncodedBundles: blob.EncodedBundlesByOperator[id],
@@ -111,7 +111,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 	}
 }
 
-func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
 	// TODO Add secure Grpc
 
 	conn, err := grpc.Dial(
@@ -152,7 +152,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 // SendBlobsToOperator sends blobs to an operator via the node's StoreBlobs endpoint
 // It returns the signatures of the blobs sent to the operator in the same order as the blobs
 // with nil values for blobs that were not attested by the operator
-func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error) {
+func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error) {
 	// TODO Add secure Grpc
 
 	conn, err := grpc.Dial(
@@ -280,7 +280,7 @@ func (c *dispatcher) SendAttestBatchRequest(ctx context.Context, nodeDispersalCl
 	return &core.Signature{G1Point: point}, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreChunksRequest, int64, error) {
+func GetStoreChunksRequest(blobMessages []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreChunksRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
@@ -300,7 +300,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 	return request, totalSize, nil
 }
 
-func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreBlobsRequest, int64, error) {
+func GetStoreBlobsRequest(blobMessages []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreBlobsRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
@@ -320,7 +320,7 @@ func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.Ba
 	return request, totalSize, nil
 }
 
-func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
+func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
 	if blob.BlobHeader == nil {
 		return nil, errors.New("blob header is nil")
 	}
@@ -427,7 +427,7 @@ func getBatchHeaderMessage(header *core.BatchHeader) *node.BatchHeader {
 	}
 }
 
-func getBundlesSize(blob *core.BlobMessage) int64 {
+func getBundlesSize(blob *core.EncodedBlobMessage) int64 {
 	size := int64(0)
 	for _, bundle := range blob.EncodedBundles {
 		size += int64(bundle.Size())
