@@ -266,6 +266,8 @@ type BatchHeader struct {
 type EncodedBlob struct {
 	BlobHeader        *BlobHeader
 	BundlesByOperator map[OperatorID]Bundles
+	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
+	EncodedBundlesByOperator map[OperatorID]map[QuorumID]*ChunksData
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
@@ -278,6 +280,8 @@ type Bundles map[QuorumID]Bundle
 type BlobMessage struct {
 	BlobHeader *BlobHeader
 	Bundles    Bundles
+	// EncodedBundles is bundles in encoded format (not deserialized)
+	EncodedBundles map[QuorumID]*ChunksData
 }
 
 func (b Bundle) Size() uint64 {

@@ -246,7 +246,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
 	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
-	assert.Len(t, encodedResult.Chunks, 32)
+	assert.Len(t, encodedResult.ChunksData, 32)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()

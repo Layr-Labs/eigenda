@@ -29,7 +29,7 @@ type EncodingResult struct {
 	ReferenceBlockNumber uint
 	BlobQuorumInfo       *core.BlobQuorumInfo
 	Commitment           *encoding.BlobCommitments
-	Chunks               []*encoding.Frame
+	ChunksData           *core.ChunksData
 	Assignments          map[core.OperatorID]core.Assignment
 }
 
@@ -197,5 +197,5 @@ func getRequestID(key disperser.BlobKey, quorumID core.QuorumID) requestID {
 
 // getChunksSize returns the total size of all the chunks in the encoded result in bytes
 func getChunksSize(result *EncodingResult) uint64 {
-	return core.Bundle(result.Chunks).Size()
+	return result.ChunksData.Size()
 }

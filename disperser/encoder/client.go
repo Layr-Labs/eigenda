@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -24,7 +25,7 @@ func NewEncoderClient(addr string, timeout time.Duration) (disperser.EncoderClie
 	}, nil
 }
 
-func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams encoding.EncodingParams) (*encoding.BlobCommitments, []*encoding.Frame, error) {
+func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams encoding.EncodingParams) (*encoding.BlobCommitments, *core.ChunksData, error) {
 	conn, err := grpc.Dial(
 		c.addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -59,18 +60,17 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams enco
 	if err != nil {
 		return nil, nil, err
 	}
-	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
-	for i, chunk := range reply.GetChunks() {
-		deserialized, err := new(encoding.Frame).Deserialize(chunk)
-		if err != nil {
-			return nil, nil, err
-		}
-		chunks[i] = deserialized
+	chunksData := &core.ChunksData{
+		Chunks: reply.GetChunks(),
+		// TODO(jianoaix): plumb the encoding format for the encoder server. For now it's fine
+		// as it's hard coded using Gob at Encoder server.
+		Format:   core.GobChunkEncodingFormat,
+		ChunkLen: int(encodingParams.ChunkLength),
 	}
 	return &encoding.BlobCommitments{
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,
 		Length:           uint(reply.GetCommitment().GetLength()),
-	}, chunks, nil
+	}, chunksData, nil
 }
