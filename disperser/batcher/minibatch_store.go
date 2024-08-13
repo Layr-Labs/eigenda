@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 )
@@ -66,6 +68,15 @@ type DispersalResponse struct {
 	Error       error
 }
 
+type BlobMinibatchMapping struct {
+	BlobKey        *disperser.BlobKey `dynamodbav:"-"`
+	BatchID        uuid.UUID          `dynamodbav:"-"`
+	MinibatchIndex uint
+	BlobIndex      uint
+	encoding.BlobCommitments
+	BlobQuorumInfos []*core.BlobQuorumInfo
+}
+
 type MinibatchStore interface {
 	PutBatch(ctx context.Context, batch *BatchRecord) error
 	GetBatch(ctx context.Context, batchID uuid.UUID) (*BatchRecord, error)
@@ -80,7 +91,8 @@ type MinibatchStore interface {
 	PutDispersalResponse(ctx context.Context, response *DispersalResponse) error
 	GetDispersalResponse(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, opID core.OperatorID) (*DispersalResponse, error)
 	GetMinibatchDispersalResponses(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*DispersalResponse, error)
-
+	GetBlobMinibatchMappings(ctx context.Context, blobKey disperser.BlobKey) ([]*BlobMinibatchMapping, error)
+	PutBlobMinibatchMappings(ctx context.Context, blobMinibatchMappings []*BlobMinibatchMapping) error
 	// GetLatestFormedBatch returns the latest batch that has been formed.
 	// If there is no formed batch, it returns nil.
 	// It also returns the minibatches that belong to the batch in the ascending order of minibatch index.
