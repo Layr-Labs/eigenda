@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/rand"
 	"sync"
 	"testing"
@@ -47,7 +48,9 @@ func TestBlobWriter(t *testing.T) {
 	}
 
 	disperserClient := NewMockDisperserClient(t, authenticated)
-	unconfirmedKeyHandler := NewMockKeyHandler(t)
+	unconfirmedKeyHandler := &MockKeyHandler{}
+	unconfirmedKeyHandler.mock.On(
+		"AddUnconfirmedKey", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	generatorMetrics := metrics.NewMockMetrics()
 
@@ -81,7 +84,7 @@ func TestBlobWriter(t *testing.T) {
 		writer.writeNextBlob()
 
 		assert.Equal(t, uint(i+1), disperserClient.DisperseCount)
-		assert.Equal(t, uint(i+1-errorCount), unconfirmedKeyHandler.Count)
+		unconfirmedKeyHandler.mock.AssertNumberOfCalls(t, "AddUnconfirmedKey", i+1-errorCount)
 
 		// This method should not be called in this test.
 		assert.Equal(t, uint(0), disperserClient.GetStatusCount)
@@ -95,14 +98,9 @@ func TestBlobWriter(t *testing.T) {
 			assert.Equal(t, dataSize, uint64(len(decodedData)))
 
 			// Verify that the proper data was sent to the unconfirmed key handler.
-			assert.Equal(t, uint(len(disperserClient.ProvidedData)), unconfirmedKeyHandler.ProvidedSize)
 			checksum := md5.Sum(disperserClient.ProvidedData)
 
-			assert.Equal(t, checksum, unconfirmedKeyHandler.ProvidedChecksum)
-			assert.Equal(t, disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
-
-			//assert.Equal(t, checksum, unconfirmedKeyHandler.ProvidedChecksum)
-			//assert.Equal(t, disperserClient.KeyToReturn, unconfirmedKeyHandler.ProvidedKey)
+			unconfirmedKeyHandler.mock.AssertCalled(t, "AddUnconfirmedKey", disperserClient.KeyToReturn, checksum, uint(len(disperserClient.ProvidedData)))
 
 			// Verify that data has the proper amount of randomness.
 			if previousData != nil {
