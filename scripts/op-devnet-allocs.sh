@@ -29,3 +29,4 @@ if [ $? -eq 0 ] ; then
 else
     echo "Failed to clean up ${REPO_NAME} repo"
     exit ${STATUS}
+fi
