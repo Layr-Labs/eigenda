@@ -267,7 +267,7 @@ type EncodedBlob struct {
 	BlobHeader        *BlobHeader
 	BundlesByOperator map[OperatorID]Bundles
 	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
-	EncodedBundlesByOperator map[OperatorID]map[QuorumID]*ChunksData
+	EncodedBundlesByOperator map[OperatorID]EncodedBundles
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
@@ -275,6 +275,9 @@ type Bundle []*encoding.Frame
 
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
+
+// This is similar to Bundle, but track chunks in encoded format (i.e. not deserialized).
+type EncodedBundles map[QuorumID]*ChunksData
 
 // BlobMessage is the message that is sent to DA nodes. It contains the blob header and the associated chunk bundles.
 type BlobMessage struct {

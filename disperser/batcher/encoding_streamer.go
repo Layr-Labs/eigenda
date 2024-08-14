@@ -483,7 +483,7 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
 				BlobHeader:               blobHeader,
-				EncodedBundlesByOperator: make(map[core.OperatorID]map[core.QuorumID]*core.ChunksData),
+				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
 
@@ -491,7 +491,7 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 		for opID, assignment := range result.Assignments {
 			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			if !ok {
-				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(map[core.QuorumID]*core.ChunksData)
+				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
 				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
 			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
@@ -634,7 +634,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
 				BlobHeader:               blobHeader,
-				EncodedBundlesByOperator: make(map[core.OperatorID]map[core.QuorumID]*core.ChunksData),
+				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
 
@@ -642,7 +642,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 		for opID, assignment := range result.Assignments {
 			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			if !ok {
-				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(map[core.QuorumID]*core.ChunksData)
+				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
 				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
 			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
