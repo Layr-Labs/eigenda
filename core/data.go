@@ -87,6 +87,31 @@ func (cd *ChunksData) Size() uint64 {
 	return size
 }
 
+func (cd *ChunksData) Deserialize() ([]*encoding.Frame, error) {
+	frames := make([]*encoding.Frame, len(cd.Chunks))
+	switch cd.Format {
+	case GobChunkEncodingFormat:
+		for _, data := range cd.Chunks {
+			fr, err := new(encoding.Frame).Deserialize(data)
+			if err != nil {
+				return nil, err
+			}
+			frames = append(frames, fr)
+		}
+	case GnarkChunkEncodingFormat:
+		for _, data := range cd.Chunks {
+			fr, err := new(encoding.Frame).DeserializeGnark(data)
+			if err != nil {
+				return nil, err
+			}
+			frames = append(frames, fr)
+		}
+	default:
+		return nil, fmt.Errorf("invalid chunk encoding format: %v", cd.Format)
+	}
+	return frames, nil
+}
+
 func (cd *ChunksData) FlattenToBundle() ([]byte, error) {
 	// Only Gnark coded chunks are dispersed as a byte array.
 	// Gob coded chunks are not flattened.
@@ -276,7 +301,7 @@ type Bundle []*encoding.Frame
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
 
-// This is similar to Bundle, but track chunks in encoded format (i.e. not deserialized).
+// This is similar to Bundle, but tracks chunks in encoded format (i.e. not deserialized).
 type EncodedBundles map[QuorumID]*ChunksData
 
 // BlobMessage is the message that is sent to DA nodes. It contains the blob header and the associated chunk bundles.
