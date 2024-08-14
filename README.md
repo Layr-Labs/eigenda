@@ -38,4 +38,4 @@ We welcome all contributions! There are many ways to contribute to the project, 
 - [Open an Issue](https://github.com/Layr-Labs/eigenda/issues/new/choose)
 - [EigenLayer/EigenDA forum](https://forum.eigenlayer.xyz/c/eigenda/9)
 - [Email](mailto:eigenda-support@eigenlabs.org)
-- [Follow us on Twitter](https://twitter.com/eigen_da)
+- [Follow us on X](https://x.com/eigen_da)
