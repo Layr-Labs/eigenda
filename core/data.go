@@ -307,8 +307,8 @@ type BatchHeader struct {
 
 // EncodedBlob contains the messages to be sent to a group of DA nodes corresponding to a single blob
 type EncodedBlob struct {
-	BlobHeader        *BlobHeader
-	BundlesByOperator map[OperatorID]Bundles
+	BlobHeader *BlobHeader
+	// BundlesByOperator map[OperatorID]Bundles
 	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
 	EncodedBundlesByOperator map[OperatorID]EncodedBundles
 }
