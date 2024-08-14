@@ -380,6 +380,8 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 				return
 			}
 
+			fmt.Println("XXX chunks format:", chunks.Format)
+
 			encoderChan <- EncodingResultOrStatus{
 				EncodingResult: EncodingResult{
 					BlobMetadata:         metadata,
@@ -494,6 +496,7 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
 				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
+			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
 			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
 			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
 			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
@@ -645,6 +648,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
 				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
+			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
 			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
 			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
 			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
