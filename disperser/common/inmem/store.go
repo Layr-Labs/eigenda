@@ -279,6 +279,48 @@ func (q *BlobStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHa
 	return metas, nil
 }
 
+func (q *BlobStore) GetAllBlobMetadataByBatchWithPagination(ctx context.Context, batchHeaderHash [32]byte, limit int32, exclusiveStartKey *disperser.BatchIndexExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BatchIndexExclusiveStartKey, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	metas := make([]*disperser.BlobMetadata, 0)
+	foundStart := exclusiveStartKey == nil
+
+	keys := make([]disperser.BlobKey, 0, len(q.Metadata))
+	for k, v := range q.Metadata {
+		if v.ConfirmationInfo != nil && v.ConfirmationInfo.BatchHeaderHash == batchHeaderHash {
+			keys = append(keys, k)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return q.Metadata[keys[i]].ConfirmationInfo.BlobIndex < q.Metadata[keys[j]].ConfirmationInfo.BlobIndex
+	})
+
+	for _, key := range keys {
+		meta := q.Metadata[key]
+		if foundStart {
+			metas = append(metas, meta)
+			if len(metas) == int(limit) {
+				return metas, &disperser.BatchIndexExclusiveStartKey{
+					BatchHeaderHash: meta.ConfirmationInfo.BatchHeaderHash[:],
+					BlobIndex:       meta.ConfirmationInfo.BlobIndex,
+				}, nil
+			}
+		} else if exclusiveStartKey != nil && meta.ConfirmationInfo.BlobIndex > uint32(exclusiveStartKey.BlobIndex) {
+			foundStart = true
+			metas = append(metas, meta)
+			if len(metas) == int(limit) {
+				return metas, &disperser.BatchIndexExclusiveStartKey{
+					BatchHeaderHash: meta.ConfirmationInfo.BatchHeaderHash[:],
+					BlobIndex:       meta.ConfirmationInfo.BlobIndex,
+				}, nil
+			}
+		}
+	}
+
+	// Return all the metas if limit is not reached
+	return metas, nil, nil
+}
+
 func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	if meta, ok := q.Metadata[blobKey]; ok {
 		return meta, nil

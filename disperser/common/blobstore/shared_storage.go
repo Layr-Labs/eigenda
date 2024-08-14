@@ -242,6 +242,10 @@ func (s *SharedBlobStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHe
 	return s.blobMetadataStore.GetAllBlobMetadataByBatch(ctx, batchHeaderHash)
 }
 
+func (s *SharedBlobStore) GetAllBlobMetadataByBatchWithPagination(ctx context.Context, batchHeaderHash [32]byte, limit int32, exclusiveStartKey *disperser.BatchIndexExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BatchIndexExclusiveStartKey, error) {
+	return s.blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, batchHeaderHash, limit, exclusiveStartKey)
+}
+
 // GetMetadata returns a blob metadata given a metadata key
 func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)

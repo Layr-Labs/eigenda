@@ -88,7 +88,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int32(1), finalizedCount)
 
-	confirmedMetadata := getConfirmedMetadata(t, blobKey1)
+	confirmedMetadata := getConfirmedMetadata(t, blobKey1, 1)
 	err = blobMetadataStore.UpdateBlobMetadata(ctx, blobKey1, confirmedMetadata)
 	assert.NoError(t, err)
 
@@ -188,6 +188,102 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 	})
 }
 
+func TestGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
+	ctx := context.Background()
+	blobKey1 := disperser.BlobKey{
+		BlobHash:     blobHash,
+		MetadataHash: "hash",
+	}
+	metadata1 := &disperser.BlobMetadata{
+		MetadataHash: blobKey1.MetadataHash,
+		BlobHash:     blobHash,
+		BlobStatus:   disperser.Processing,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+	}
+	blobKey2 := disperser.BlobKey{
+		BlobHash:     "blob2",
+		MetadataHash: "hash2",
+	}
+	metadata2 := &disperser.BlobMetadata{
+		MetadataHash: blobKey2.MetadataHash,
+		BlobHash:     blobKey2.BlobHash,
+		BlobStatus:   disperser.Finalized,
+		Expiry:       0,
+		NumRetries:   0,
+		RequestMetadata: &disperser.RequestMetadata{
+			BlobRequestHeader: blob.RequestHeader,
+			BlobSize:          blobSize,
+			RequestedAt:       123,
+		},
+		ConfirmationInfo: &disperser.ConfirmationInfo{},
+	}
+	err := blobMetadataStore.QueueNewBlobMetadata(ctx, metadata1)
+	assert.NoError(t, err)
+	err = blobMetadataStore.QueueNewBlobMetadata(ctx, metadata2)
+	assert.NoError(t, err)
+
+	confirmedMetadata1 := getConfirmedMetadata(t, blobKey1, 1)
+	err = blobMetadataStore.UpdateBlobMetadata(ctx, blobKey1, confirmedMetadata1)
+	assert.NoError(t, err)
+
+	confirmedMetadata2 := getConfirmedMetadata(t, blobKey2, 2)
+	err = blobMetadataStore.UpdateBlobMetadata(ctx, blobKey2, confirmedMetadata2)
+	assert.NoError(t, err)
+
+	// Fetch the blob metadata with limit 1
+	metadata, exclusiveStartKey, err := blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, confirmedMetadata1.ConfirmationInfo.BatchHeaderHash, 1, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata[0], confirmedMetadata1)
+	assert.NotNil(t, exclusiveStartKey)
+	assert.Equal(t, confirmedMetadata1.ConfirmationInfo.BlobIndex, exclusiveStartKey.BlobIndex)
+
+	// Get the next blob metadata with limit 1 and the exclusive start key
+	metadata, exclusiveStartKey, err = blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, confirmedMetadata1.ConfirmationInfo.BatchHeaderHash, 1, exclusiveStartKey)
+	assert.NoError(t, err)
+	assert.Equal(t, metadata[0], confirmedMetadata2)
+	assert.Equal(t, confirmedMetadata2.ConfirmationInfo.BlobIndex, exclusiveStartKey.BlobIndex)
+
+	// Fetching the next blob metadata should return an empty list
+	metadata, exclusiveStartKey, err = blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, confirmedMetadata1.ConfirmationInfo.BatchHeaderHash, 1, exclusiveStartKey)
+	assert.NoError(t, err)
+	assert.Len(t, metadata, 0)
+	assert.Nil(t, exclusiveStartKey)
+
+	// Fetch the blob metadata with limit 2
+	metadata, exclusiveStartKey, err = blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, confirmedMetadata1.ConfirmationInfo.BatchHeaderHash, 2, nil)
+	assert.NoError(t, err)
+	assert.Len(t, metadata, 2)
+	assert.Equal(t, metadata[0], confirmedMetadata1)
+	assert.Equal(t, metadata[1], confirmedMetadata2)
+	assert.NotNil(t, exclusiveStartKey)
+	assert.Equal(t, confirmedMetadata2.ConfirmationInfo.BlobIndex, exclusiveStartKey.BlobIndex)
+
+	// Fetch the blob metadata with limit 3 should return only 2 items
+	metadata, exclusiveStartKey, err = blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, confirmedMetadata1.ConfirmationInfo.BatchHeaderHash, 3, nil)
+	assert.NoError(t, err)
+	assert.Len(t, metadata, 2)
+	assert.Equal(t, metadata[0], confirmedMetadata1)
+	assert.Equal(t, metadata[1], confirmedMetadata2)
+	assert.Nil(t, exclusiveStartKey)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
+		},
+		{
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKey2.MetadataHash},
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKey2.BlobHash},
+		},
+	})
+}
+
 func TestBlobMetadataStoreOperationsWithPaginationNoStoredBlob(t *testing.T) {
 	ctx := context.Background()
 	// Query BlobMetadataStore for a blob that does not exist
@@ -255,9 +351,8 @@ func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	assert.NoError(t, err)
 }
 
-func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey) *disperser.BlobMetadata {
+func getConfirmedMetadata(t *testing.T, metadataKey disperser.BlobKey, blobIndex uint32) *disperser.BlobMetadata {
 	batchHeaderHash := [32]byte{1, 2, 3}
-	blobIndex := uint32(1)
 	requestedAt := uint64(time.Now().Nanosecond())
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
