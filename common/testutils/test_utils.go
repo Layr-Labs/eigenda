@@ -83,3 +83,13 @@ func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 		panic(fmt.Sprintf(debugInfo[0].(string), debugInfo[1:]...))
 	}
 }
+
+// RandomBytes generates a random byte slice of a given length.
+func RandomBytes(length int) []byte {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		panic(err)
+	}
+	return bytes
+}

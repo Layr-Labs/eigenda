@@ -17,3 +17,18 @@ func (store *LevelKVStore) Get(key []byte) ([]byte, error) {
 	//TODO implement me
 	panic("implement me")
 }
+
+func (store *LevelKVStore) Drop(key []byte) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (store *LevelKVStore) Shutdown() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (store *LevelKVStore) Destroy() error {
+	//TODO implement me
+	panic("implement me")
+}
