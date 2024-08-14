@@ -106,7 +106,7 @@ func (cd *ChunksData) FromFrames(fr []*encoding.Frame) (*ChunksData, error) {
 }
 
 func (cd *ChunksData) ToFrames() ([]*encoding.Frame, error) {
-	frames := make([]*encoding.Frame, len(cd.Chunks))
+	frames := make([]*encoding.Frame, 0, len(cd.Chunks))
 	switch cd.Format {
 	case GobChunkEncodingFormat:
 		for _, data := range cd.Chunks {

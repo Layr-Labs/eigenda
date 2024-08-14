@@ -156,9 +156,9 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			bytes := make([][]byte, len(chunks))
+			bytes := make([][]byte, 0, len(chunks))
 			for _, c := range chunks {
-				serialized, err := c.SerializeGnark()
+				serialized, err := c.Serialize()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -176,7 +176,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 			for id, assignment := range assignments {
 				chunksData := &core.ChunksData{
-					Format:   core.GnarkChunkEncodingFormat,
+					Format:   core.GobChunkEncodingFormat,
 					ChunkLen: int(chunkLength),
 					Chunks:   bytes[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
 				}
