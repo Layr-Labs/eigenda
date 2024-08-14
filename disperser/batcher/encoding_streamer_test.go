@@ -445,7 +445,7 @@ func TestPartialBlob(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 1)
-	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].EncodedBundlesByOperator, numOperators)
 
 	encodedBlob1 := batch.EncodedBlobs[0]
 	assert.NotNil(t, encodedBlob1)
@@ -465,10 +465,10 @@ func TestPartialBlob(t *testing.T) {
 	}})
 
 	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
-	assert.Len(t, encodedBlob1.BundlesByOperator, numOperators)
-	for _, bundles := range encodedBlob1.BundlesByOperator {
+	assert.Len(t, encodedBlob1.EncodedBundlesByOperator, numOperators)
+	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
-		assert.Greater(t, len(bundles[0]), 0)
+		assert.Greater(t, len(bundles[0].Chunks), 0)
 		break
 	}
 
@@ -674,7 +674,7 @@ func TestGetBatch(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
-	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].EncodedBundlesByOperator, numOperators)
 
 	var encodedBlob1 core.EncodedBlob
 	var encodedBlob2 core.EncodedBlob
@@ -718,10 +718,10 @@ func TestGetBatch(t *testing.T) {
 	})
 
 	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
-	for _, bundles := range encodedBlob1.BundlesByOperator {
+	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 2)
-		assert.Greater(t, len(bundles[0]), 0)
-		assert.Greater(t, len(bundles[1]), 0)
+		assert.Greater(t, len(bundles[0].Chunks), 0)
+		assert.Greater(t, len(bundles[1].Chunks), 0)
 		break
 	}
 
@@ -739,9 +739,9 @@ func TestGetBatch(t *testing.T) {
 		},
 		ChunkLength: 8,
 	}})
-	for _, bundles := range encodedBlob2.BundlesByOperator {
+	for _, bundles := range encodedBlob2.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
-		assert.Greater(t, len(bundles[core.QuorumID(2)]), 0)
+		assert.Greater(t, len(bundles[core.QuorumID(2)].Chunks), 0)
 		break
 	}
 	assert.Len(t, batch.BlobHeaders, 2)
@@ -842,7 +842,7 @@ func TestCreateMinibatch(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
-	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].EncodedBundlesByOperator, numOperators)
 
 	var encodedBlob1 core.EncodedBlob
 	var encodedBlob2 core.EncodedBlob
@@ -886,10 +886,10 @@ func TestCreateMinibatch(t *testing.T) {
 	})
 
 	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
-	for _, bundles := range encodedBlob1.BundlesByOperator {
+	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 2)
-		assert.Greater(t, len(bundles[0]), 0)
-		assert.Greater(t, len(bundles[1]), 0)
+		assert.Greater(t, len(bundles[0].Chunks), 0)
+		assert.Greater(t, len(bundles[1].Chunks), 0)
 		break
 	}
 
@@ -907,9 +907,9 @@ func TestCreateMinibatch(t *testing.T) {
 		},
 		ChunkLength: 8,
 	}})
-	for _, bundles := range encodedBlob2.BundlesByOperator {
+	for _, bundles := range encodedBlob2.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
-		assert.Greater(t, len(bundles[core.QuorumID(2)]), 0)
+		assert.Greater(t, len(bundles[core.QuorumID(2)].Chunks), 0)
 		break
 	}
 	assert.Len(t, batch.BlobHeaders, 2)
