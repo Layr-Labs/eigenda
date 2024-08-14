@@ -208,6 +208,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 
 		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
 
+		// Use larger of two max lengths. This ensures that the max length requirement does not push the number of chunks over the required limit.
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2
 		}
@@ -234,6 +235,10 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 
 	for {
 
+		if chunkLength > blobLength {
+			return chunkLength / 2, nil
+		}
+
 		quorumInfo := &BlobQuorumInfo{
 			SecurityParam: *param,
 			ChunkLength:   chunkLength,
@@ -242,6 +247,10 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 		ok, err := c.ValidateChunkLength(state, blobLength, quorumInfo)
 		if err != nil || !ok {
 			return chunkLength / 2, nil
+		}
+
+		if chunkLength == blobLength {
+			return chunkLength, nil
 		}
 
 		if targetNumChunks != 0 {
