@@ -79,11 +79,14 @@ func verifyDBIsDeleted(t *testing.T) {
 func TestRandomOperations(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
+	var store KVStore
+
+	// In memory store
 
 	randomOperationsTest(t, NewInMemoryChunkStore())
 	randomOperationsTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
 
-	var store KVStore
+	// LevelDB store
 
 	store, err = NewLevelKVStore(logger, dbPath)
 	assert.NoError(t, err)
@@ -91,6 +94,19 @@ func TestRandomOperations(t *testing.T) {
 	verifyDBIsDeleted(t)
 
 	store, err = NewLevelKVStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	// BadgerDB store
+
+	store, err = NewBadgerKVStore(logger, dbPath)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewBadgerKVStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
@@ -120,11 +136,14 @@ func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
 func TestOperationsOnShutdownStore(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
+	var store KVStore
+
+	// In memory store
 
 	operationsOnShutdownStoreTest(t, NewInMemoryChunkStore())
 	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
 
-	var store KVStore
+	// LevelDB store
 
 	store, err = NewLevelKVStore(logger, dbPath)
 	assert.NoError(t, err)
@@ -132,6 +151,18 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 	verifyDBIsDeleted(t)
 
 	store, err = NewLevelKVStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	// BadgerDB store
+	store, err = NewBadgerKVStore(logger, dbPath)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewBadgerKVStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
 	assert.NoError(t, err)
 	operationsOnShutdownStoreTest(t, store)

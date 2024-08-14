@@ -31,3 +31,4 @@ type KVStore interface {
 // Operations to potentially support in the future:
 // - iteration over all keys
 // - information about the size of the store (entry count, number of bytes, etc)
+// - methods to support automated migration from any implementation to any other implementation

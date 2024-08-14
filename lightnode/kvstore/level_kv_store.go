@@ -36,9 +36,11 @@ func NewLevelKVStore(logger logging.Logger, path string) (*LevelKVStore, error) 
 	}, nil
 }
 
+// TODO implement TTL
+
 // Put stores a data in the store.
 func (store *LevelKVStore) Put(key []byte, value []byte, ttl time.Duration) error {
-	if store.shutdown || store.destroyed {
+	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
 	// TODO improve performance by buffering and writing in larger batches
@@ -49,7 +51,7 @@ func (store *LevelKVStore) Put(key []byte, value []byte, ttl time.Duration) erro
 
 // Get retrieves data from the store. Returns nil if the data is not found.
 func (store *LevelKVStore) Get(key []byte) ([]byte, error) {
-	if store.shutdown || store.destroyed {
+	if store.shutdown {
 		return nil, fmt.Errorf("store is offline")
 	}
 
@@ -69,7 +71,7 @@ func (store *LevelKVStore) Get(key []byte) ([]byte, error) {
 
 // Drop deletes data from the store.
 func (store *LevelKVStore) Drop(key []byte) error {
-	if store.shutdown || store.destroyed {
+	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
 
@@ -104,7 +106,7 @@ func (store *LevelKVStore) Destroy() error {
 		}
 	}
 
-	store.logger.Info("destroying LevelDB store at path: %s", store.path)
+	store.logger.Info(fmt.Sprintf("destroying LevelDB store at path: %s", store.path))
 	err := os.RemoveAll(store.path)
 	if err != nil {
 		return err

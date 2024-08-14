@@ -48,7 +48,10 @@ func (store *InMemoryKVStore) Get(key []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	return data, nil
+	dataCopy := make([]byte, len(data))
+	copy(dataCopy, data)
+
+	return dataCopy, nil // TODO test that it is safe to modify the returned data
 }
 
 // Drop removes data from the store.
