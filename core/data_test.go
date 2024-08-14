@@ -136,6 +136,36 @@ func TestBundleEncoding(t *testing.T) {
 	}
 }
 
+func TestEncodedBundles(t *testing.T) {
+	numTrials := 16
+	for i := 0; i < numTrials; i++ {
+		bundles := core.Bundles(map[core.QuorumID]core.Bundle{
+			0: createBundle(t, 64, 64, i),
+			1: createBundle(t, 64, 64, i+numTrials),
+		})
+		// ToEncodedBundles
+		ec, err := bundles.ToEncodedBundles()
+		assert.Nil(t, err)
+		assert.Equal(t, len(ec), len(bundles))
+		for quorum, bundle := range bundles {
+			cd, ok := ec[quorum]
+			assert.True(t, ok)
+			fr, err := cd.ToFrames()
+			assert.Nil(t, err)
+			checkBundleEquivalence(t, fr, bundle)
+		}
+		// FromEncodedBundles
+		bundles2, err := new(core.Bundles).FromEncodedBundles(ec)
+		assert.Nil(t, err)
+		assert.Equal(t, len(bundles2), len(bundles))
+		for quorum, bundle := range bundles {
+			b, ok := bundles2[quorum]
+			assert.True(t, ok)
+			checkBundleEquivalence(t, b, bundle)
+		}
+	}
+}
+
 func TestChunksData(t *testing.T) {
 	numTrials := 16
 	for i := 0; i < numTrials; i++ {
