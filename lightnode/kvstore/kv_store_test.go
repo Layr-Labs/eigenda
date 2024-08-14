@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+// TODO add in updates to existing keys!
+
 func randomOperationsTest(t *testing.T, store KVStore) {
 	tu.InitializeRandom()
 
@@ -83,8 +85,9 @@ func TestRandomOperations(t *testing.T) {
 
 	// In memory store
 
-	randomOperationsTest(t, NewInMemoryChunkStore())
-	randomOperationsTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
+	randomOperationsTest(t, NewInMemoryStore())
+	randomOperationsTest(t, ThreadSafeWrapper(NewInMemoryStore()))
+	randomOperationsTest(t, BatchingWrapper(NewInMemoryStore(), 32*5))
 
 	// LevelDB store
 
@@ -99,18 +102,152 @@ func TestRandomOperations(t *testing.T) {
 	randomOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	// BadgerDB store
-
-	store, err = NewBadgerKVStore(logger, dbPath)
+	store, err = NewLevelKVStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewBadgerKVStore(logger, dbPath)
+	// BadgerDB store
+
+	store, err = NewBadgerStore(logger, dbPath)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewBadgerStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
 	verifyDBIsDeleted(t)
+
+	store, err = NewBadgerStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+}
+
+func batchOperationsTest(t *testing.T, store KVStore) {
+	tu.InitializeRandom()
+
+	var err error
+
+	expectedData := make(map[string][]byte)
+
+	var puts []PutOperation
+	var drops []DropOperation
+
+	for i := 0; i < 1000; i++ {
+
+		choice := rand.Float64()
+		if len(expectedData) == 0 || choice < 0.66 {
+			// Write a random value.
+
+			key := tu.RandomBytes(32)
+			value := tu.RandomBytes(32)
+
+			puts = append(puts, PutOperation{
+				Key:   key,
+				Value: value,
+				TTL:   0,
+			})
+
+			expectedData[string(key)] = value
+		} else if choice < 0.90 {
+			// Drop a random value.
+
+			var key string
+			for k := range expectedData {
+				key = k
+			}
+			delete(expectedData, key)
+
+			drops = append(drops, []byte(key))
+		} else {
+			// Drop a non-existent value.
+
+			key := tu.RandomBytes(32)
+			drops = append(drops, key)
+		}
+
+		if i%10 == 0 {
+			// Every so often, apply the batch and check that the store matches the expected data.
+
+			err := store.BatchUpdate(puts, drops)
+			assert.NoError(t, err)
+
+			puts = nil
+			drops = nil
+
+			for key, expectedValue := range expectedData {
+				value, err := store.Get([]byte(key))
+				assert.NoError(t, err)
+				assert.Equal(t, expectedValue, value)
+			}
+
+			// Try and get a value that isn't in the store.
+			key := tu.RandomBytes(32)
+			value, err := store.Get(key)
+			assert.NoError(t, err)
+			assert.Nil(t, value)
+		}
+	}
+
+	err = store.Shutdown()
+	assert.NoError(t, err)
+	err = store.Destroy()
+	assert.NoError(t, err)
+}
+
+func TestBatchOperations(t *testing.T) {
+	//logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	//assert.NoError(t, err)
+	//var store KVStore
+
+	// In memory store
+
+	//batchOperationsTest(t, NewInMemoryStore())
+	//batchOperationsTest(t, ThreadSafeWrapper(NewInMemoryStore()))
+	batchOperationsTest(t, BatchingWrapper(NewInMemoryStore(), 32*5))
+
+	//// LevelDB store
+	//
+	//store, err = NewLevelKVStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewLevelKVStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewLevelKVStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//// BadgerDB store
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
 }
 
 func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
@@ -140,8 +277,9 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 
 	// In memory store
 
-	operationsOnShutdownStoreTest(t, NewInMemoryChunkStore())
-	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
+	operationsOnShutdownStoreTest(t, NewInMemoryStore())
+	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewInMemoryStore()))
+	operationsOnShutdownStoreTest(t, BatchingWrapper(NewInMemoryStore(), 32*5))
 
 	// LevelDB store
 
@@ -156,14 +294,26 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 	operationsOnShutdownStoreTest(t, store)
 	verifyDBIsDeleted(t)
 
-	// BadgerDB store
-	store, err = NewBadgerKVStore(logger, dbPath)
+	store, err = NewLevelKVStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
 	assert.NoError(t, err)
 	operationsOnShutdownStoreTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewBadgerKVStore(logger, dbPath)
+	// BadgerDB store
+	store, err = NewBadgerStore(logger, dbPath)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewBadgerStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewBadgerStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
 	assert.NoError(t, err)
 	operationsOnShutdownStoreTest(t, store)
 	verifyDBIsDeleted(t)

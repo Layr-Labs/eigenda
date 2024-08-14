@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-var _ KVStore = &BadgerKVStore{}
+var _ KVStore = &BadgerStore{}
 
 // TODO we need to periodically tell levelDB to do background merges
 
-// BadgerKVStore implements KVStore using GopherDB.
-type BadgerKVStore struct {
+// BadgerStore implements KVStore using GopherDB.
+type BadgerStore struct {
 	db   *badger.DB
 	path string
 
@@ -26,14 +26,14 @@ type BadgerKVStore struct {
 	destroyed bool
 }
 
-// NewBadgerKVStore creates a new BadgerKVStore.
-func NewBadgerKVStore(logger logging.Logger, path string) (*BadgerKVStore, error) {
+// NewBadgerStore creates a new BadgerStore.
+func NewBadgerStore(logger logging.Logger, path string) (KVStore, error) {
 	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		return nil, err
 	}
 
-	return &BadgerKVStore{
+	return &BadgerStore{
 		db:     db,
 		path:   path,
 		logger: logger,
@@ -41,12 +41,10 @@ func NewBadgerKVStore(logger logging.Logger, path string) (*BadgerKVStore, error
 }
 
 // Put stores a data in the store.
-func (store *BadgerKVStore) Put(key []byte, value []byte, ttl time.Duration) error {
+func (store *BadgerStore) Put(key []byte, value []byte, ttl time.Duration) error {
 	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
-
-	// TODO a new transaction for each put may not be the most efficient way to do this
 
 	return store.db.Update(func(txn *badger.Txn) error {
 		if ttl == 0 {
@@ -59,7 +57,7 @@ func (store *BadgerKVStore) Put(key []byte, value []byte, ttl time.Duration) err
 }
 
 // Get retrieves data from the store. Returns nil if the data is not found.
-func (store *BadgerKVStore) Get(key []byte) ([]byte, error) {
+func (store *BadgerStore) Get(key []byte) ([]byte, error) {
 	var value []byte
 
 	err := store.db.View(func(txn *badger.Txn) error {
@@ -84,7 +82,7 @@ func (store *BadgerKVStore) Get(key []byte) ([]byte, error) {
 }
 
 // Drop deletes data from the store.
-func (store *BadgerKVStore) Drop(key []byte) error {
+func (store *BadgerStore) Drop(key []byte) error {
 	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
@@ -94,8 +92,41 @@ func (store *BadgerKVStore) Drop(key []byte) error {
 	})
 }
 
+// BatchUpdate performs a batch of Put and Drop operations.
+func (store *BadgerStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+	if store.shutdown {
+		return fmt.Errorf("store is offline")
+	}
+
+	return store.db.Update(func(txn *badger.Txn) error {
+		for _, put := range puts {
+			if put.TTL == 0 {
+				err := txn.Set(put.Key, put.Value)
+				if err != nil {
+					return err
+				}
+			} else {
+				entry := badger.NewEntry(put.Key, put.Value).WithTTL(put.TTL)
+				err := txn.SetEntry(entry)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		for _, drop := range drops {
+			err := txn.Delete(drop)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 // Shutdown shuts down the store.
-func (store *BadgerKVStore) Shutdown() error {
+func (store *BadgerStore) Shutdown() error {
 	if store.shutdown {
 		return nil
 	}
@@ -110,7 +141,7 @@ func (store *BadgerKVStore) Shutdown() error {
 }
 
 // Destroy destroys the store.
-func (store *BadgerKVStore) Destroy() error {
+func (store *BadgerStore) Destroy() error {
 	if store.destroyed {
 		return nil
 	}
@@ -129,4 +160,9 @@ func (store *BadgerKVStore) Destroy() error {
 	}
 	store.destroyed = true
 	return nil
+}
+
+// IsShutDown returns true if the store is shut down.
+func (store *BadgerStore) IsShutDown() bool {
+	return store.shutdown
 }

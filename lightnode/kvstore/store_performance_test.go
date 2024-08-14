@@ -49,10 +49,8 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 }
 
 func BenchmarkSimpleWritingInMemory(b *testing.B) {
-
-	var store KVStore = NewInMemoryChunkStore()
+	var store KVStore = NewInMemoryStore()
 	simpleWritingBenchmark(b, store)
-
 }
 
 func BenchmarkSimpleWritingLevelDB(b *testing.B) {
@@ -68,7 +66,7 @@ func BenchmarkSimpleWritingBadger(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := NewBadgerKVStore(logger, "testdb")
+	store, err := NewBadgerStore(logger, "testdb")
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
 }

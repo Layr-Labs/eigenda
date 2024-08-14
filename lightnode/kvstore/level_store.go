@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-var _ KVStore = &LevelKVStore{}
+var _ KVStore = &LevelStore{}
 
-// LevelKVStore implements KVStore using LevelDB.
-type LevelKVStore struct {
+// LevelStore implements KVStore using LevelDB.
+type LevelStore struct {
 	db   *leveldb.DB
 	path string
 
@@ -22,24 +22,22 @@ type LevelKVStore struct {
 	destroyed bool
 }
 
-// NewLevelKVStore creates a new LevelKVStore.
-func NewLevelKVStore(logger logging.Logger, path string) (*LevelKVStore, error) {
+// NewLevelKVStore creates a new LevelStore.
+func NewLevelKVStore(logger logging.Logger, path string) (KVStore, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return &LevelKVStore{
+	return &LevelStore{
 		path:   path,
 		db:     db,
 		logger: logger,
 	}, nil
 }
 
-// TODO implement TTL
-
 // Put stores a data in the store.
-func (store *LevelKVStore) Put(key []byte, value []byte, ttl time.Duration) error {
+func (store *LevelStore) Put(key []byte, value []byte, ttl time.Duration) error {
 	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
@@ -49,8 +47,10 @@ func (store *LevelKVStore) Put(key []byte, value []byte, ttl time.Duration) erro
 	return store.db.Put(key, value, nil)
 }
 
+// TODO implement TTL
+
 // Get retrieves data from the store. Returns nil if the data is not found.
-func (store *LevelKVStore) Get(key []byte) ([]byte, error) {
+func (store *LevelStore) Get(key []byte) ([]byte, error) {
 	if store.shutdown {
 		return nil, fmt.Errorf("store is offline")
 	}
@@ -70,7 +70,7 @@ func (store *LevelKVStore) Get(key []byte) ([]byte, error) {
 }
 
 // Drop deletes data from the store.
-func (store *LevelKVStore) Drop(key []byte) error {
+func (store *LevelStore) Drop(key []byte) error {
 	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
@@ -78,8 +78,29 @@ func (store *LevelKVStore) Drop(key []byte) error {
 	return store.db.Delete(key, nil)
 }
 
+// BatchUpdate performs a batch of Put and Drop operations.
+func (store *LevelStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+	// TODO implement a real batch update
+
+	for _, put := range puts {
+		err := store.Put(put.Key, put.Value, put.TTL)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, drop := range drops {
+		err := store.Drop(drop)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Shutdown shuts down the store.
-func (store *LevelKVStore) Shutdown() error {
+func (store *LevelStore) Shutdown() error {
 	if store.shutdown {
 		return nil
 	}
@@ -94,7 +115,7 @@ func (store *LevelKVStore) Shutdown() error {
 }
 
 // Destroy destroys the store.
-func (store *LevelKVStore) Destroy() error {
+func (store *LevelStore) Destroy() error {
 	if store.destroyed {
 		return nil
 	}
@@ -113,4 +134,9 @@ func (store *LevelKVStore) Destroy() error {
 	}
 	store.destroyed = true
 	return nil
+}
+
+// IsShutDown returns true if the store is shut down.
+func (store *LevelStore) IsShutDown() bool {
+	return store.shutdown
 }

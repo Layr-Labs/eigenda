@@ -5,25 +5,25 @@ import (
 	"time"
 )
 
-var _ KVStore = &InMemoryKVStore{}
+var _ KVStore = &InMemoryStore{}
 
 // TODO create priority queue for TTL
 
-// InMemoryKVStore is a simple in-memory implementation of KVStore.
-type InMemoryKVStore struct {
+// InMemoryStore is a simple in-memory implementation of KVStore.
+type InMemoryStore struct {
 	data      map[string][]byte
 	destroyed bool
 }
 
-// NewInMemoryChunkStore creates a new InMemoryKVStore.
-func NewInMemoryChunkStore() *InMemoryKVStore {
-	return &InMemoryKVStore{
+// NewInMemoryStore creates a new InMemoryStore.
+func NewInMemoryStore() KVStore {
+	return &InMemoryStore{
 		data: make(map[string][]byte),
 	}
 }
 
 // Put stores a data in the store.
-func (store *InMemoryKVStore) Put(key []byte, value []byte, ttl time.Duration) error {
+func (store *InMemoryStore) Put(key []byte, value []byte, ttl time.Duration) error {
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -35,7 +35,7 @@ func (store *InMemoryKVStore) Put(key []byte, value []byte, ttl time.Duration) e
 }
 
 // Get retrieves data from the store. Returns nil if the data is not found.
-func (store *InMemoryKVStore) Get(key []byte) ([]byte, error) {
+func (store *InMemoryStore) Get(key []byte) ([]byte, error) {
 	if store.destroyed {
 		return nil, fmt.Errorf("store is destroyed")
 	}
@@ -54,8 +54,27 @@ func (store *InMemoryKVStore) Get(key []byte) ([]byte, error) {
 	return dataCopy, nil // TODO test that it is safe to modify the returned data
 }
 
+// BatchUpdate performs a batch of Put and Drop operations.
+func (store *InMemoryStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+	for _, put := range puts {
+		err := store.Put(put.Key, put.Value, put.TTL)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, drop := range drops {
+		err := store.Drop(drop)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Drop removes data from the store.
-func (store *InMemoryKVStore) Drop(key []byte) error {
+func (store *InMemoryStore) Drop(key []byte) error {
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -66,13 +85,18 @@ func (store *InMemoryKVStore) Drop(key []byte) error {
 }
 
 // Shutdown stops the store and releases any resources it holds. Does not delete any on-disk data.
-func (store *InMemoryKVStore) Shutdown() error {
+func (store *InMemoryStore) Shutdown() error {
 	return store.Destroy()
 }
 
 // Destroy permanently stops the store and deletes all data (including data on disk).
-func (store *InMemoryKVStore) Destroy() error {
+func (store *InMemoryStore) Destroy() error {
 	store.data = nil
 	store.destroyed = true
 	return nil
+}
+
+// IsShutDown returns true if the store is shut down.
+func (store *InMemoryStore) IsShutDown() bool {
+	return store.destroyed
 }
