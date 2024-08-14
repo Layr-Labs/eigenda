@@ -380,8 +380,6 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 				return
 			}
 
-			fmt.Println("XXX chunks format:", chunks.Format)
-
 			encoderChan <- EncodingResultOrStatus{
 				EncodingResult: EncodingResult{
 					BlobMetadata:         metadata,
