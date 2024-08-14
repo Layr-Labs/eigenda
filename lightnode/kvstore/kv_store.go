@@ -25,3 +25,7 @@ type KVStore interface {
 	// necessary to call Shutdown before calling Destroy.
 	Destroy() error
 }
+
+// Operations to potentially support in the future:
+// - iteration over all keys
+// - information about the size of the store (entry count, number of bytes, etc)

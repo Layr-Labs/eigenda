@@ -69,6 +69,7 @@ func randomOperationsTest(t *testing.T, store KVStore) {
 
 func TestRandomOperations(t *testing.T) {
 	randomOperationsTest(t, NewInMemoryChunkStore())
+	randomOperationsTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
 }
 
 func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
@@ -93,4 +94,5 @@ func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
 
 func TestOperationsOnShutdownStore(t *testing.T) {
 	operationsOnShutdownStoreTest(t, NewInMemoryChunkStore())
+	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
 }

@@ -2,7 +2,6 @@ package kvstore
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -14,7 +13,6 @@ var _ KVStore = &InMemoryKVStore{}
 type InMemoryKVStore struct {
 	data      map[string][]byte
 	destroyed bool
-	lock      sync.RWMutex
 }
 
 // NewInMemoryChunkStore creates a new InMemoryKVStore.
@@ -26,9 +24,6 @@ func NewInMemoryChunkStore() *InMemoryKVStore {
 
 // Put stores a data in the store.
 func (store *InMemoryKVStore) Put(key []byte, value []byte, ttl time.Duration) error {
-	store.lock.Lock()
-	defer store.lock.Unlock()
-
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -41,9 +36,6 @@ func (store *InMemoryKVStore) Put(key []byte, value []byte, ttl time.Duration) e
 
 // Get retrieves data from the store. Returns nil if the data is not found.
 func (store *InMemoryKVStore) Get(key []byte) ([]byte, error) {
-	store.lock.RLock()
-	defer store.lock.RUnlock()
-
 	if store.destroyed {
 		return nil, fmt.Errorf("store is destroyed")
 	}
@@ -61,9 +53,6 @@ func (store *InMemoryKVStore) Get(key []byte) ([]byte, error) {
 
 // Drop removes data from the store.
 func (store *InMemoryKVStore) Drop(key []byte) error {
-	store.lock.Lock()
-	defer store.lock.Unlock()
-
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -80,9 +69,6 @@ func (store *InMemoryKVStore) Shutdown() error {
 
 // Destroy permanently stops the store and deletes all data (including data on disk).
 func (store *InMemoryKVStore) Destroy() error {
-	store.lock.Lock()
-	defer store.lock.Unlock()
-
 	store.data = nil
 	store.destroyed = true
 	return nil
