@@ -228,6 +228,26 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_RETRIES_PER_DISPERSAL"),
 		Value:    3,
 	}
+	BatchstoreTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "batchstore-table-name"),
+		Usage:    "Name of the dynamodb table to store minibatch datamodel",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCHSTORE_TABLE_NAME"),
+	}
+	DispersalStatusCheckIntervalFlag = cli.DurationFlag{
+		Name:     "dispersal-status-check-interval",
+		Usage:    "Dispersal status check interval",
+		Required: false,
+		Value:    5 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSAL_STATUS_CHECK_INTERVAL"),
+	}
+	DispersalTimeoutFlag = cli.DurationFlag{
+		Name:     "dispersal-timeout",
+		Usage:    "dispersal connection timeout from grpc call to DA nodes for dispersal",
+		Required: false,
+		Value:    60 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSAL_TIMEOUT"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -265,6 +285,9 @@ var optionalFlags = []cli.Flag{
 	MaxNodeConnectionsFlag,
 	MaxNumRetriesPerDispersalFlag,
 	EnableGnarkBundleEncodingFlag,
+	BatchstoreTableNameFlag,
+	DispersalStatusCheckIntervalFlag,
+	DispersalTimeoutFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

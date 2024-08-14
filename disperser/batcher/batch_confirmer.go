@@ -25,7 +25,7 @@ type BatchConfirmerConfig struct {
 	DispersalStatusCheckInterval time.Duration
 	AttestationTimeout           time.Duration
 	SRSOrder                     int
-	NumConnections               int
+	NumConnections               uint
 	MaxNumRetriesPerBlob         uint
 }
 
@@ -46,6 +46,7 @@ type BatchConfirmer struct {
 
 	ethClient common.EthClient
 	logger    logging.Logger
+	Metrics   *Metrics
 }
 
 func NewBatchConfirmer(
@@ -62,6 +63,7 @@ func NewBatchConfirmer(
 	txnManager TxnManager,
 	minibatcher *Minibatcher,
 	logger logging.Logger,
+	metrics *Metrics,
 ) (*BatchConfirmer, error) {
 	return &BatchConfirmer{
 		BatchConfirmerConfig: config,
@@ -76,6 +78,7 @@ func NewBatchConfirmer(
 		Transactor:         transactor,
 		TransactionManager: txnManager,
 		Minibatcher:        minibatcher,
+		Metrics:            metrics,
 
 		ethClient: ethClient,
 		logger:    logger.With("component", "BatchConfirmer"),
@@ -285,6 +288,11 @@ func (b *BatchConfirmer) handleFailure(ctx context.Context, batchID uuid.UUID, b
 			continue
 		}
 
+		if reason == FailNoSignatures {
+			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.InsufficientSignatures)
+		} else {
+			b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Failed)
+		}
 		numPermanentFailures++
 	}
 

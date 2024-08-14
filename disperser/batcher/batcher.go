@@ -41,6 +41,7 @@ type QuorumInfo struct {
 
 type TimeoutConfig struct {
 	EncodingTimeout     time.Duration
+	DispersalTimeout    time.Duration
 	AttestationTimeout  time.Duration
 	ChainReadTimeout    time.Duration
 	ChainWriteTimeout   time.Duration
@@ -64,6 +65,11 @@ type Config struct {
 
 	TargetNumChunks          uint
 	MaxBlobsToFetchFromStore int
+
+	EnableMinibatch              bool
+	BatchstoreTableName          string
+	MinibatcherConfig            MinibatcherConfig
+	DispersalStatusCheckInterval time.Duration
 }
 
 type Batcher struct {
@@ -105,6 +111,10 @@ func NewBatcher(
 	metrics *Metrics,
 	heartbeatChan chan time.Time,
 ) (*Batcher, error) {
+	if config.EnableMinibatch {
+		return nil, errors.New("minibatch is not supported")
+	}
+
 	batchTrigger := NewEncodedSizeNotifier(
 		make(chan struct{}, 1),
 		uint64(config.BatchSizeMBLimit)*1024*1024, // convert to bytes

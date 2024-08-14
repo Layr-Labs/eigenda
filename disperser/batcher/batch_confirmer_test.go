@@ -15,7 +15,6 @@ import (
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
 	batcherinmem "github.com/Layr-Labs/eigenda/disperser/batcher/inmem"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
-	batmock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -57,7 +56,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 	dispatcher := dmock.NewDispatcher(state)
 	blobStore := inmem.NewBlobStore()
 	ethClient := &cmock.MockEthClient{}
-	txnManager := batmock.NewTxnManager()
+	txnManager := batchermock.NewTxnManager()
 	minibatchStore := batcherinmem.NewMinibatchStore(logger)
 	encodingWorkerPool := workerpool.New(10)
 	encoderProver, err = makeTestProver()
@@ -76,7 +75,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 		MaxNumConnections:         10,
 		MaxNumRetriesPerBlob:      2,
 		MaxNumRetriesPerDispersal: 1,
-	}, blobStore, minibatchStore, dispatcher, mockChainState, assignmentCoordinator, encodingStreamer, ethClient, pool, logger)
+	}, blobStore, minibatchStore, dispatcher, encodingStreamer, pool, logger, metrics)
 	assert.NoError(t, err)
 
 	config := bat.BatchConfirmerConfig{
@@ -88,7 +87,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 		SRSOrder:                     3000,
 		MaxNumRetriesPerBlob:         2,
 	}
-	b, err := bat.NewBatchConfirmer(config, blobStore, minibatchStore, dispatcher, mockChainState, assignmentCoordinator, encodingStreamer, agg, ethClient, transactor, txnManager, minibatcher, logger)
+	b, err := bat.NewBatchConfirmer(config, blobStore, minibatchStore, dispatcher, mockChainState, assignmentCoordinator, encodingStreamer, agg, ethClient, transactor, txnManager, minibatcher, logger, metrics)
 	assert.NoError(t, err)
 
 	ethClient.On("BlockNumber").Return(uint64(initialBlock), nil)

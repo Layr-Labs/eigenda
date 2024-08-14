@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
+	"github.com/Layr-Labs/eigenda/disperser/batcher/batchstore"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -84,6 +85,10 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
+	if config.BatcherConfig.EnableMinibatch && config.BatcherConfig.BatchstoreTableName == "" {
+		return errors.New("minibatch store table name required when minibatch is enabled")
+	}
+
 	bucketName := config.BlobstoreConfig.BucketName
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 	if err != nil {
@@ -129,9 +134,7 @@ func RunBatcher(ctx *cli.Context) error {
 			return fmt.Errorf("failed to get chain ID: %w", err)
 		}
 		signer := signerv2.NewKMSSigner(context.Background(), kmsClient, pubKey, config.KMSKeyConfig.KeyID, chainID)
-		if err != nil {
-			return err
-		}
+
 		wallet, err = walletsdk.NewPrivateKeyWallet(client, signer, addr, logger)
 		if err != nil {
 			return err
@@ -239,9 +242,16 @@ func RunBatcher(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Batcher", "socket", httpSocket)
 	}
 
-	if config.EnableMinibatch {
-		// TODO: implement and run batchConfirmer for minibatch
-		return errors.New("minibatch is not supported")
+	if config.BatcherConfig.EnableMinibatch {
+		minibatchStore := batchstore.NewMinibatchStore(dynamoClient, logger, config.BatcherConfig.BatchstoreTableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
+		orchestrator, err := batcher.NewOrchestrator(config.BatcherConfig, config.TimeoutConfig, queue, minibatchStore, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
+		if err != nil {
+			return err
+		}
+		err = orchestrator.Start(context.Background())
+		if err != nil {
+			return err
+		}
 	} else {
 		batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
 		if err != nil {

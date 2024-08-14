@@ -41,7 +41,6 @@ type batcherComponents struct {
 	transactor       *coremock.MockTransactor
 	txnManager       *batchermock.MockTxnManager
 	blobStore        disperser.BlobStore
-	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
 	ethClient        *cmock.MockEthClient
 	dispatcher       *dmock.Dispatcher
@@ -153,7 +152,6 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 			transactor:       transactor,
 			txnManager:       txnManager,
 			blobStore:        blobStore,
-			encoderClient:    encoderClient,
 			encodingStreamer: b.EncodingStreamer,
 			ethClient:        ethClient,
 			dispatcher:       dispatcher,

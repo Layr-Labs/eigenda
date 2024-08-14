@@ -35,7 +35,7 @@ var (
 	localStackPort   = "4566"
 
 	dynamoClient   *dynamodb.Client
-	minibatchStore *batchstore.MinibatchStore
+	minibatchStore batcher.MinibatchStore
 
 	UUID               = uuid.New()
 	minibatchTableName = fmt.Sprintf("test-MinibatchStore-%v", UUID)

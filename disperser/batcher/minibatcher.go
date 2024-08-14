@@ -2,7 +2,6 @@ package batcher
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -32,13 +31,11 @@ type BatchState struct {
 type Minibatcher struct {
 	MinibatcherConfig
 
-	BlobStore             disperser.BlobStore
-	MinibatchStore        MinibatchStore
-	Dispatcher            disperser.Dispatcher
-	ChainState            core.IndexedChainState
-	AssignmentCoordinator core.AssignmentCoordinator
-	EncodingStreamer      *EncodingStreamer
-	Pool                  common.WorkerPool
+	BlobStore        disperser.BlobStore
+	MinibatchStore   MinibatchStore
+	Dispatcher       disperser.Dispatcher
+	EncodingStreamer *EncodingStreamer
+	Pool             common.WorkerPool
 
 	// local state
 	Batches              map[uuid.UUID]*BatchState
@@ -46,8 +43,8 @@ type Minibatcher struct {
 	CurrentBatchID       uuid.UUID
 	MinibatchIndex       uint
 
-	ethClient common.EthClient
-	logger    logging.Logger
+	Metrics *Metrics
+	logger  logging.Logger
 }
 
 func NewMinibatcher(
@@ -55,69 +52,32 @@ func NewMinibatcher(
 	blobStore disperser.BlobStore,
 	minibatchStore MinibatchStore,
 	dispatcher disperser.Dispatcher,
-	chainState core.IndexedChainState,
-	assignmentCoordinator core.AssignmentCoordinator,
 	encodingStreamer *EncodingStreamer,
-	ethClient common.EthClient,
 	workerpool common.WorkerPool,
 	logger logging.Logger,
+	metrics *Metrics,
 ) (*Minibatcher, error) {
 	return &Minibatcher{
-		MinibatcherConfig:     config,
-		BlobStore:             blobStore,
-		MinibatchStore:        minibatchStore,
-		Dispatcher:            dispatcher,
-		ChainState:            chainState,
-		AssignmentCoordinator: assignmentCoordinator,
-		EncodingStreamer:      encodingStreamer,
-		Pool:                  workerpool,
+		MinibatcherConfig: config,
+		BlobStore:         blobStore,
+		MinibatchStore:    minibatchStore,
+		Dispatcher:        dispatcher,
+		EncodingStreamer:  encodingStreamer,
+		Pool:              workerpool,
 
 		Batches:              make(map[uuid.UUID]*BatchState),
 		ReferenceBlockNumber: 0,
 		CurrentBatchID:       uuid.Nil,
 		MinibatchIndex:       0,
 
-		ethClient: ethClient,
-		logger:    logger.With("component", "Minibatcher"),
+		logger:  logger.With("component", "Minibatcher"),
+		Metrics: metrics,
 	}, nil
 }
 
-func (b *Minibatcher) Start(ctx context.Context) error {
-	err := b.ChainState.Start(ctx)
-	if err != nil {
-		return err
-	}
-	// Wait for few seconds for indexer to index blockchain
-	// This won't be needed when we switch to using Graph node
-	time.Sleep(indexerWarmupDelay)
-	go func() {
-		ticker := time.NewTicker(b.PullInterval)
-		defer ticker.Stop()
-		cancelFuncs := make([]context.CancelFunc, 0)
-		for {
-			select {
-			case <-ctx.Done():
-				for _, cancel := range cancelFuncs {
-					cancel()
-				}
-				return
-			case <-ticker.C:
-				cancel, err := b.HandleSingleMinibatch(ctx)
-				if err != nil {
-					if errors.Is(err, errNoEncodedResults) {
-						b.logger.Warn("no encoded results to make a batch with")
-					} else {
-						b.logger.Error("failed to process a batch", "err", err)
-					}
-				}
-				if cancel != nil {
-					cancelFuncs = append(cancelFuncs, cancel)
-				}
-			}
-		}
-	}()
-
-	return nil
+func (b *Minibatcher) RecoverState(ctx context.Context) error {
+	//TODO: Implement minibatch recovery
+	return fmt.Errorf("minibatch state recovery not implemented")
 }
 
 func (b *Minibatcher) PopBatchState(batchID uuid.UUID) *BatchState {
@@ -136,7 +96,7 @@ func (b *Minibatcher) handleFailure(ctx context.Context, blobMetadatas []*disper
 		b.EncodingStreamer.RemoveEncodedBlob(metadata)
 		retry, err := b.BlobStore.HandleBlobFailure(ctx, metadata, b.MaxNumRetriesPerBlob)
 		if err != nil {
-			b.logger.Error("HandleSingleBatch: error handling blob failure", "err", err)
+			b.logger.Error("error handling blobstore blob failure", "err", err)
 			// Append the error
 			result = multierror.Append(result, err)
 		}
@@ -153,6 +113,7 @@ func (b *Minibatcher) handleFailure(ctx context.Context, blobMetadatas []*disper
 
 func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.CancelFunc, error) {
 	log := b.logger
+
 	// If too many dispersal requests are pending, skip an iteration
 	if pending := b.Pool.WaitingQueueSize(); pending > int(b.MaxNumConnections) {
 		return nil, fmt.Errorf("too many pending requests %d with max number of connections %d. skipping minibatch iteration", pending, b.MaxNumConnections)
@@ -218,16 +179,7 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 		err := b.createBlobMinibatchMappings(ctx, b.CurrentBatchID, b.MinibatchIndex, minibatch.BlobMetadata, minibatch.BlobHeaders)
 		storeMappingsChan <- err
 	}()
-
-	// Disperse the minibatch to operators in all quorums
-	// If an operator doesn't have any bundles, it won't receive any chunks but it will still receive blob headers
-	operatorsAllQuorums, err := b.ChainState.GetIndexedOperators(ctx, b.ReferenceBlockNumber)
-	if err != nil {
-		cancelDispersal()
-		_ = b.handleFailure(ctx, minibatch.BlobMetadata, FailReason("error getting operator state for all quorums"))
-		return nil, fmt.Errorf("error getting operator state for all quorums: %w", err)
-	}
-	b.DisperseBatch(dispersalCtx, operatorsAllQuorums, minibatch.EncodedBlobs, minibatch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
+	b.DisperseBatch(dispersalCtx, minibatch.State, minibatch.EncodedBlobs, minibatch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer).String())
 
 	h, err := minibatch.State.OperatorState.Hash()
@@ -252,8 +204,8 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 	return cancelDispersal, nil
 }
 
-func (b *Minibatcher) DisperseBatch(ctx context.Context, operators map[core.OperatorID]*core.IndexedOperatorInfo, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, batchID uuid.UUID, minibatchIndex uint) {
-	for id, op := range operators {
+func (b *Minibatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, batchID uuid.UUID, minibatchIndex uint) {
+	for id, op := range state.IndexedOperators {
 		opInfo := op
 		opID := id
 		req := &MinibatchDispersal{

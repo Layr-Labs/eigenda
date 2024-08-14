@@ -32,8 +32,6 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
-	EnableMinibatch bool
-
 	EnableGnarkBundleEncoding bool
 }
 
@@ -57,21 +55,31 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
 		LoggerConfig:    *loggerConfig,
 		BatcherConfig: batcher.Config{
-			PullInterval:             ctx.GlobalDuration(flags.PullIntervalFlag.Name),
-			FinalizerInterval:        ctx.GlobalDuration(flags.FinalizerIntervalFlag.Name),
-			FinalizerPoolSize:        ctx.GlobalInt(flags.FinalizerPoolSizeFlag.Name),
-			EncoderSocket:            ctx.GlobalString(flags.EncoderSocket.Name),
-			NumConnections:           ctx.GlobalInt(flags.NumConnectionsFlag.Name),
-			EncodingRequestQueueSize: ctx.GlobalInt(flags.EncodingRequestQueueSizeFlag.Name),
-			BatchSizeMBLimit:         ctx.GlobalUint(flags.BatchSizeLimitFlag.Name),
-			SRSOrder:                 ctx.GlobalInt(flags.SRSOrderFlag.Name),
-			MaxNumRetriesPerBlob:     ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
-			TargetNumChunks:          ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
-			MaxBlobsToFetchFromStore: ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
-			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
+			PullInterval:                 ctx.GlobalDuration(flags.PullIntervalFlag.Name),
+			FinalizerInterval:            ctx.GlobalDuration(flags.FinalizerIntervalFlag.Name),
+			FinalizerPoolSize:            ctx.GlobalInt(flags.FinalizerPoolSizeFlag.Name),
+			EncoderSocket:                ctx.GlobalString(flags.EncoderSocket.Name),
+			NumConnections:               ctx.GlobalInt(flags.NumConnectionsFlag.Name),
+			EncodingRequestQueueSize:     ctx.GlobalInt(flags.EncodingRequestQueueSizeFlag.Name),
+			BatchSizeMBLimit:             ctx.GlobalUint(flags.BatchSizeLimitFlag.Name),
+			SRSOrder:                     ctx.GlobalInt(flags.SRSOrderFlag.Name),
+			MaxNumRetriesPerBlob:         ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
+			TargetNumChunks:              ctx.GlobalUint(flags.TargetNumChunksFlag.Name),
+			MaxBlobsToFetchFromStore:     ctx.GlobalInt(flags.MaxBlobsToFetchFromStoreFlag.Name),
+			FinalizationBlockDelay:       ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
+			EnableMinibatch:              ctx.Bool(flags.EnableMinibatchFlag.Name),
+			BatchstoreTableName:          ctx.GlobalString(flags.BatchstoreTableNameFlag.Name),
+			DispersalStatusCheckInterval: ctx.GlobalDuration(flags.DispersalStatusCheckIntervalFlag.Name),
+			MinibatcherConfig: batcher.MinibatcherConfig{
+				PullInterval:              ctx.GlobalDuration(flags.MinibatcherPullIntervalFlag.Name),
+				MaxNumConnections:         ctx.GlobalUint(flags.MaxNodeConnectionsFlag.Name),
+				MaxNumRetriesPerBlob:      ctx.GlobalUint(flags.MaxNumRetriesPerBlobFlag.Name),
+				MaxNumRetriesPerDispersal: ctx.GlobalUint(flags.MaxNumRetriesPerDispersalFlag.Name),
+			},
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
 			EncodingTimeout:     ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
+			DispersalTimeout:    ctx.GlobalDuration(flags.DispersalTimeoutFlag.Name),
 			AttestationTimeout:  ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
 			ChainReadTimeout:    ctx.GlobalDuration(flags.ChainReadTimeoutFlag.Name),
 			ChainWriteTimeout:   ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),
@@ -89,7 +97,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,
-		EnableMinibatch:               ctx.Bool(flags.EnableMinibatchFlag.Name),
 		EnableGnarkBundleEncoding:     ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 	}
 	return config, nil

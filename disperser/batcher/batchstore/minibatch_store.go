@@ -35,7 +35,7 @@ type MinibatchStore struct {
 
 var _ batcher.MinibatchStore = (*MinibatchStore)(nil)
 
-func NewMinibatchStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *MinibatchStore {
+func NewMinibatchStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) batcher.MinibatchStore {
 	logger.Debugf("creating minibatch store with table %s with TTL: %s", tableName, ttl)
 	return &MinibatchStore{
 		dynamoDBClient: dynamoDBClient,
