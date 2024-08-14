@@ -142,7 +142,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 }
 
 func TestBatchTrigger(t *testing.T) {
-	encodingStreamer, c := createEncodingStreamer(t, 10, 20_000, streamerConfig)
+	encodingStreamer, c := createEncodingStreamer(t, 10, 30_000, streamerConfig)
 
 	blob := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
@@ -160,7 +160,7 @@ func TestBatchTrigger(t *testing.T) {
 	assert.Nil(t, err)
 	count, size := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 
 	// try encode the same blobs again at different block (this happens when the blob is retried)
 	encodingStreamer.ReferenceBlockNumber = 11
@@ -171,7 +171,7 @@ func TestBatchTrigger(t *testing.T) {
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 
 	// don't notify yet
 	select {
@@ -190,7 +190,7 @@ func TestBatchTrigger(t *testing.T) {
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 2)
-	assert.Equal(t, size, uint64(16384)*2)
+	assert.Equal(t, size, uint64(26630)*2)
 
 	// notify
 	select {
