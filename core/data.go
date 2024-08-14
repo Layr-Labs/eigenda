@@ -94,7 +94,7 @@ func (cd *ChunksData) FromFrames(fr []*encoding.Frame) (*ChunksData, error) {
 	var c ChunksData
 	c.Format = GnarkChunkEncodingFormat
 	c.ChunkLen = fr[0].Length()
-	c.Chunks = make([][]byte, len(fr))
+	c.Chunks = make([][]byte, 0, len(fr))
 	for _, f := range fr {
 		bytes, err := f.SerializeGnark()
 		if err != nil {

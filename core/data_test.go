@@ -33,6 +33,52 @@ func createBundle(t *testing.T, numFrames, numCoeffs, seed int) core.Bundle {
 	return frames
 }
 
+func createChunksData(t *testing.T, seed int) (core.Bundle, *core.ChunksData, *core.ChunksData) {
+	bundle := createBundle(t, 64, 64, seed)
+	gobChunks := make([][]byte, len(bundle))
+	gnarkChunks := make([][]byte, len(bundle))
+	for i, frame := range bundle {
+		gobChunk, err := frame.Serialize()
+		assert.Nil(t, err)
+		gobChunks[i] = gobChunk
+
+		gnarkChunk, err := frame.SerializeGnark()
+		assert.Nil(t, err)
+		gnarkChunks[i] = gnarkChunk
+	}
+	gob := &core.ChunksData{
+		Chunks:   gobChunks,
+		Format:   core.GobChunkEncodingFormat,
+		ChunkLen: 64,
+	}
+	gnark := &core.ChunksData{
+		Chunks:   gnarkChunks,
+		Format:   core.GnarkChunkEncodingFormat,
+		ChunkLen: 64,
+	}
+	return bundle, gob, gnark
+}
+
+func checkChunksDataEquivalence(t *testing.T, cd1, cd2 *core.ChunksData) {
+	assert.Equal(t, cd1.Format, cd2.Format)
+	assert.Equal(t, cd1.ChunkLen, cd2.ChunkLen)
+	assert.Equal(t, len(cd1.Chunks), len(cd2.Chunks))
+	for i, c1 := range cd1.Chunks {
+		assert.True(t, bytes.Equal(c1, cd2.Chunks[i]))
+	}
+}
+
+func checkBundleEquivalence(t *testing.T, b1, b2 core.Bundle) {
+	assert.Equal(t, len(b1), len(b2))
+	for i := 0; i < len(b1); i++ {
+		assert.True(t, b1[i].Proof.Equal(&b2[i].Proof))
+		assert.Equal(t, len(b1[i].Coeffs), len(b2[i].Coeffs))
+		for j := 0; j < len(b1[i].Coeffs); j++ {
+			assert.True(t, b1[i].Coeffs[j].Equal(&b2[i].Coeffs[j]))
+		}
+	}
+}
+
 func TestInvalidBundleSer(t *testing.T) {
 	b1 := createBundle(t, 1, 0, 0)
 	_, err := b1.Serialize()
@@ -86,41 +132,8 @@ func TestBundleEncoding(t *testing.T) {
 		assert.Nil(t, err)
 		decoded, err := new(core.Bundle).Deserialize(bytes)
 		assert.Nil(t, err)
-		assert.Equal(t, len(bundle), len(decoded))
-		for i := 0; i < len(bundle); i++ {
-			assert.True(t, bundle[i].Proof.Equal(&decoded[i].Proof))
-			assert.Equal(t, len(bundle[i].Coeffs), len(decoded[i].Coeffs))
-			for j := 0; j < len(bundle[i].Coeffs); j++ {
-				assert.True(t, bundle[i].Coeffs[j].Equal(&decoded[i].Coeffs[j]))
-			}
-		}
+		checkBundleEquivalence(t, bundle, decoded)
 	}
-}
-
-func createChunksData(t *testing.T, seed int) (core.Bundle, *core.ChunksData, *core.ChunksData) {
-	bundle := createBundle(t, 64, 64, seed)
-	gobChunks := make([][]byte, len(bundle))
-	gnarkChunks := make([][]byte, len(bundle))
-	for i, frame := range bundle {
-		gobChunk, err := frame.Serialize()
-		assert.Nil(t, err)
-		gobChunks[i] = gobChunk
-
-		gnarkChunk, err := frame.SerializeGnark()
-		assert.Nil(t, err)
-		gnarkChunks[i] = gnarkChunk
-	}
-	gob := &core.ChunksData{
-		Chunks:   gobChunks,
-		Format:   core.GobChunkEncodingFormat,
-		ChunkLen: 64,
-	}
-	gnark := &core.ChunksData{
-		Chunks:   gnarkChunks,
-		Format:   core.GnarkChunkEncodingFormat,
-		ChunkLen: 64,
-	}
-	return bundle, gob, gnark
 }
 
 func TestChunksData(t *testing.T) {
@@ -156,6 +169,17 @@ func TestChunksData(t *testing.T) {
 		bytesFromBundle, err := bundle.Serialize()
 		assert.Nil(t, err)
 		assert.True(t, bytes.Equal(bytesFromChunksData, bytesFromBundle))
+		// FromFrames
+		cd, err := new(core.ChunksData).FromFrames(bundle)
+		assert.Nil(t, err)
+		checkChunksDataEquivalence(t, cd, gnark)
+		// ToFrames
+		fr1, err := gob.ToFrames()
+		assert.Nil(t, err)
+		checkBundleEquivalence(t, bundle, fr1)
+		fr2, err := gnark.ToFrames()
+		assert.Nil(t, err)
+		checkBundleEquivalence(t, bundle, fr2)
 		// Invalid cases
 		gnark.Chunks[0] = gnark.Chunks[0][1:]
 		_, err = gnark.FlattenToBundle()
