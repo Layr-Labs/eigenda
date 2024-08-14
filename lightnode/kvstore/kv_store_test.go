@@ -1,9 +1,11 @@
 package kvstore
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
+	"os"
 	"testing"
 )
 
@@ -67,9 +69,32 @@ func randomOperationsTest(t *testing.T, store KVStore) {
 	assert.NoError(t, err)
 }
 
+var dbPath = "test-store"
+
+func verifyDBIsDeleted(t *testing.T) {
+	_, err := os.Stat(dbPath)
+	assert.True(t, os.IsNotExist(err))
+}
+
 func TestRandomOperations(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
 	randomOperationsTest(t, NewInMemoryChunkStore())
 	randomOperationsTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
+
+	var store KVStore
+
+	store, err = NewLevelKVStore(logger, dbPath)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelKVStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
 }
 
 func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
@@ -93,6 +118,22 @@ func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
 }
 
 func TestOperationsOnShutdownStore(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
 	operationsOnShutdownStoreTest(t, NewInMemoryChunkStore())
 	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewInMemoryChunkStore()))
+
+	var store KVStore
+
+	store, err = NewLevelKVStore(logger, dbPath)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelKVStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
 }

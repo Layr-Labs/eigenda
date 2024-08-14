@@ -2,6 +2,8 @@ package kvstore
 
 import "time"
 
+// TODO: write up the consistency/concurrency model for this interface.
+
 // KVStore is an interface for a key-value store. It is used by a light node to store data.
 type KVStore interface {
 
