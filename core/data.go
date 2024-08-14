@@ -87,7 +87,25 @@ func (cd *ChunksData) Size() uint64 {
 	return size
 }
 
-func (cd *ChunksData) Deserialize() ([]*encoding.Frame, error) {
+func (cd *ChunksData) FromFrames(fr []*encoding.Frame) (*ChunksData, error) {
+	if len(fr) == 0 {
+		return nil, errors.New("no frame is provided")
+	}
+	var c ChunksData
+	c.Format = GnarkChunkEncodingFormat
+	c.ChunkLen = fr[0].Length()
+	c.Chunks = make([][]byte, len(fr))
+	for _, f := range fr {
+		bytes, err := f.SerializeGnark()
+		if err != nil {
+			return nil, err
+		}
+		c.Chunks = append(c.Chunks, bytes)
+	}
+	return &c, nil
+}
+
+func (cd *ChunksData) ToFrames() ([]*encoding.Frame, error) {
 	frames := make([]*encoding.Frame, len(cd.Chunks))
 	switch cd.Format {
 	case GobChunkEncodingFormat:
@@ -425,4 +443,28 @@ func (cb Bundles) Size() uint64 {
 		size += bundle.Size()
 	}
 	return size
+}
+
+func (cb Bundles) ToEncodedBundles() (EncodedBundles, error) {
+	eb := make(EncodedBundles)
+	for quorum, bundle := range cb {
+		cd, err := new(ChunksData).FromFrames(bundle)
+		if err != nil {
+			return nil, err
+		}
+		eb[quorum] = cd
+	}
+	return eb, nil
+}
+
+func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
+	c := make(Bundles)
+	for quorum, chunkData := range eb {
+		fr, err := chunkData.ToFrames()
+		if err != nil {
+			return nil, err
+		}
+		c[quorum] = fr
+	}
+	return c, nil
 }
