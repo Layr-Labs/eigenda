@@ -328,6 +328,18 @@ func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobK
 	return nil, disperser.ErrBlobNotFound
 }
 
+func (q *BlobStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []disperser.BlobKey) ([]*disperser.BlobMetadata, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	metas := make([]*disperser.BlobMetadata, len(blobKeys))
+	for i, key := range blobKeys {
+		if meta, ok := q.Metadata[key]; ok {
+			metas[i] = meta
+		}
+	}
+	return metas, nil
+}
+
 func (q *BlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {
 	if metadata.NumRetries < maxRetry {
 		if err := q.MarkBlobProcessing(ctx, metadata.GetBlobKey()); err != nil {
