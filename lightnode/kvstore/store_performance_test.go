@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
@@ -49,6 +50,8 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 //}
 
 func BenchmarkWritingLevelDB(b *testing.B) {
+	fmt.Println("-------------------------------------------------- BenchmarkWritingLevelDB") // TODO
+
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
@@ -58,6 +61,9 @@ func BenchmarkWritingLevelDB(b *testing.B) {
 }
 
 func BenchmarkWritingBatchedLevelDB(b *testing.B) {
+
+	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedLevelDB") // TODO
+
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
@@ -68,6 +74,9 @@ func BenchmarkWritingBatchedLevelDB(b *testing.B) {
 }
 
 func BenchmarkWritingBadgerDB(b *testing.B) {
+
+	fmt.Println("-------------------------------------------------- BenchmarkWritingBadgerDB") // TODO
+
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
@@ -77,6 +86,9 @@ func BenchmarkWritingBadgerDB(b *testing.B) {
 }
 
 func BenchmarkWritingBatchedBadgerDB(b *testing.B) {
+
+	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedBadgerDB") // TODO
+
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
