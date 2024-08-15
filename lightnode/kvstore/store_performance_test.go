@@ -12,6 +12,10 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 	keySize := 8
 	valueSize := 1024
 
+	if store == nil {
+		panic("store is nil") // todo
+	}
+
 	// reuse the byte arrays for all operations to avoid the overhead of generating random data.
 	baseKey := tu.RandomBytes(keySize)
 	baseValue := tu.RandomBytes(valueSize)
