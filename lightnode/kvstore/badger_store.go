@@ -33,6 +33,7 @@ func NewBadgerStore(logger logging.Logger, path string) (KVStore, error) {
 	options := badger.DefaultOptions(path)
 	options.Compression = boptions.None
 	options.BlockCacheSize = 0
+	options.ValueLogFileSize = 1024 * 1024 * 8
 
 	db, err := badger.Open(options)
 	if err != nil {
