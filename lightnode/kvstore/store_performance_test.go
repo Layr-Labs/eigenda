@@ -39,11 +39,6 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 		}
 	}
 
-	//fmt.Printf("Wrote %d bytes\n", bytesToWrite)
-	//fmt.Printf("Value size: %d bytes\n", valueSize)
-	//fmt.Printf("Wrote %d keys\n", keysToWrite)
-	//fmt.Printf("Completed in %f s\n", float64(b.Elapsed())/1000/1000/1000)
-
 	err := store.Destroy()
 	assert.NoError(b, err)
 }

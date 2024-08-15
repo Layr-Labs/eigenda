@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	badger "github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4"
+	boptions "github.com/dgraph-io/badger/v4/options"
 	"os"
 	"time"
 )
@@ -28,7 +29,11 @@ type BadgerStore struct {
 
 // NewBadgerStore creates a new BadgerStore.
 func NewBadgerStore(logger logging.Logger, path string) (KVStore, error) {
-	db, err := badger.Open(badger.DefaultOptions(path))
+
+	options := badger.DefaultOptions(path)
+	options.Compression = boptions.None
+
+	db, err := badger.Open(options)
 	if err != nil {
 		return nil, err
 	}
