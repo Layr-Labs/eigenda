@@ -111,6 +111,19 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 //	simpleWritingBenchmark(b, store)
 //}
 
+//func BenchmarkWritingBatchedPebble(b *testing.B) {
+//
+//	fmt.Println("-------------------------------------------------- BenchmarkWritingPebbleDB") // TODO
+//
+//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+//	assert.NoError(b, err)
+//
+//	store, err := NewPebbleStore(logger, dbPath)
+//	store = BatchingWrapper(store, 1024*1024*32)
+//	assert.NoError(b, err)
+//	simpleWritingBenchmark(b, store)
+//}
+
 func BenchmarkWritingPebble(b *testing.B) {
 
 	fmt.Println("-------------------------------------------------- BenchmarkWritingPebbleDB") // TODO
@@ -119,7 +132,6 @@ func BenchmarkWritingPebble(b *testing.B) {
 	assert.NoError(b, err)
 
 	store, err := NewPebbleStore(logger, dbPath)
-	store = BatchingWrapper(store, 1024*1024*32)
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
 }
