@@ -171,8 +171,9 @@ func (cd *ChunksData) ToGobFormat() (*ChunksData, error) {
 		gobChunks = append(gobChunks, gob)
 	}
 	return &ChunksData{
-		Chunks: gobChunks,
-		Format: GobChunkEncodingFormat,
+		Chunks:   gobChunks,
+		Format:   GobChunkEncodingFormat,
+		ChunkLen: cd.ChunkLen,
 	}, nil
 }
 
@@ -196,8 +197,9 @@ func (cd *ChunksData) ToGnarkFormat() (*ChunksData, error) {
 		gnarkChunks = append(gnarkChunks, gnark)
 	}
 	return &ChunksData{
-		Chunks: gnarkChunks,
-		Format: GnarkChunkEncodingFormat,
+		Chunks:   gnarkChunks,
+		Format:   GnarkChunkEncodingFormat,
+		ChunkLen: cd.ChunkLen,
 	}, nil
 }
 

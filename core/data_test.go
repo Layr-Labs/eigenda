@@ -179,20 +179,14 @@ func TestChunksData(t *testing.T) {
 		assert.Equal(t, convertedGob, gob)
 		convertedGob, err = gnark.ToGobFormat()
 		assert.Nil(t, err)
-		assert.Equal(t, len(gob.Chunks), len(convertedGob.Chunks))
-		for i := 0; i < len(gob.Chunks); i++ {
-			assert.True(t, bytes.Equal(gob.Chunks[i], convertedGob.Chunks[i]))
-		}
+		checkChunksDataEquivalence(t, gob, convertedGob)
 		// ToGnarkFormat
 		convertedGnark, err := gnark.ToGnarkFormat()
 		assert.Nil(t, err)
 		assert.Equal(t, convertedGnark, gnark)
 		convertedGnark, err = gob.ToGnarkFormat()
 		assert.Nil(t, err)
-		assert.Equal(t, len(gnark.Chunks), len(convertedGnark.Chunks))
-		for i := 0; i < len(gnark.Chunks); i++ {
-			assert.True(t, bytes.Equal(gnark.Chunks[i], convertedGnark.Chunks[i]))
-		}
+		checkChunksDataEquivalence(t, gnark, convertedGnark)
 		// FlattenToBundle
 		bytesFromChunksData, err := gnark.FlattenToBundle()
 		assert.Nil(t, err)
