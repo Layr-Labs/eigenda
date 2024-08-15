@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 )
 
@@ -46,6 +47,9 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 
 	err := store.Destroy()
 	assert.NoError(b, err)
+
+	_, err = os.Stat(dbPath)
+	assert.True(b, os.IsNotExist(err))
 }
 
 //func BenchmarkWritingInMemory(b *testing.B) {
@@ -59,7 +63,7 @@ func BenchmarkWritingLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := NewLevelStore(logger, "testdb")
+	store, err := NewLevelStore(logger, dbPath)
 	assert.NoError(b, err)
 
 	fmt.Printf("error: %v\n", err) // TODO
@@ -74,7 +78,7 @@ func BenchmarkWritingBatchedLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := NewLevelStore(logger, "testdb")
+	store, err := NewLevelStore(logger, dbPath)
 	store = BatchingWrapper(store, 1024*32)
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
@@ -87,7 +91,7 @@ func BenchmarkWritingBadgerDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := NewBadgerStore(logger, "testdb")
+	store, err := NewBadgerStore(logger, dbPath)
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
 }
@@ -99,7 +103,7 @@ func BenchmarkWritingBatchedBadgerDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := NewBadgerStore(logger, "testdb")
+	store, err := NewBadgerStore(logger, dbPath)
 	store = BatchingWrapper(store, 1024*1024)
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
