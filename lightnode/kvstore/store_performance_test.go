@@ -48,10 +48,10 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 	assert.NoError(b, err)
 }
 
-func BenchmarkWritingInMemory(b *testing.B) {
-	store := NewInMemoryStore()
-	simpleWritingBenchmark(b, store)
-}
+//func BenchmarkWritingInMemory(b *testing.B) {
+//	store := NewInMemoryStore()
+//	simpleWritingBenchmark(b, store)
+//}
 
 func BenchmarkWritingLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
