@@ -323,12 +323,12 @@ func TestStoreBatchSuccess(t *testing.T) {
 	// Expire the batches.
 	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12
 	// Try to expire at a time before expiry, so nothing will be expired.
-	numDeleted, _, err := s.DeleteExpiredEntries(curTime-10, 1)
+	numDeleted, _, _, err := s.DeleteExpiredEntries(curTime-10, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, numDeleted, 0)
 	assert.True(t, s.HasKey(ctx, batchHeaderKey))
 	// Then expire it at a time post expiry, so the batch will get purged.
-	numDeleted, _, err = s.DeleteExpiredEntries(curTime+10, 1)
+	numDeleted, _, _, err = s.DeleteExpiredEntries(curTime+10, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, numDeleted, 1)
 	assert.False(t, s.HasKey(ctx, batchHeaderKey))
@@ -384,20 +384,86 @@ func TestStoreBlobsSuccess(t *testing.T) {
 	// Expire the batches.
 	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12
 	// Try to expire at a time before expiry, so nothing will be expired.
-	numBatchesDeleted, numBlobsDeleted, err := s.DeleteExpiredEntries(curTime-10, 5)
+	numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := s.DeleteExpiredEntries(curTime-10, 5)
 	assert.Nil(t, err)
 	assert.Equal(t, numBatchesDeleted, 0)
+	assert.Equal(t, numMappingsDeleted, 0)
 	assert.Equal(t, numBlobsDeleted, 0)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey0))
 	// Then expire it at a time post expiry, so the batch will get purged.
-	numBatchesDeleted, numBlobsDeleted, err = s.DeleteExpiredEntries(curTime+10, 5)
+	numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err = s.DeleteExpiredEntries(curTime+10, 5)
 	assert.Nil(t, err)
 	assert.Equal(t, numBatchesDeleted, 0)
+	assert.Equal(t, numMappingsDeleted, 0)
 	assert.Equal(t, numBlobsDeleted, 2)
 	assert.False(t, s.HasKey(ctx, blobHeaderKey0))
 	assert.False(t, s.HasKey(ctx, blobHeaderKey1))
 	assert.False(t, s.HasKey(ctx, blobKey0))
 	assert.False(t, s.HasKey(ctx, blobKey1))
+}
+
+func TestStoreBatchBlobMapping(t *testing.T) {
+	s := createStore(t)
+	ctx := context.Background()
+
+	// Empty store
+	blobKey := []byte{1, 2}
+	assert.False(t, s.HasKey(ctx, blobKey))
+
+	// Prepare data to store.
+	batchHeader, blobs, _ := CreateBatch(t)
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	assert.Nil(t, err)
+	blobHeaderHash0, err := blobs[0].BlobHeader.GetBlobHeaderHash()
+	assert.Nil(t, err)
+	blobHeaderHash1, err := blobs[1].BlobHeader.GetBlobHeaderHash()
+	assert.Nil(t, err)
+
+	// Store a batch.
+	err = s.StoreBatchBlobMapping(ctx, batchHeader, [][32]byte{blobHeaderHash0, blobHeaderHash1})
+	assert.Nil(t, err)
+
+	// Check existence: batch header.
+	batchHeaderKey := node.EncodeBatchHeaderKey(batchHeaderHash)
+	assert.True(t, s.HasKey(ctx, batchHeaderKey))
+	batchHeaderBytes, err := s.GetBatchHeader(ctx, batchHeaderHash)
+	assert.Nil(t, err)
+	expectedBatchHeaderBytes, err := batchHeader.Serialize()
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal(batchHeaderBytes, expectedBatchHeaderBytes))
+
+	// Check existence: blob index mapping
+	blobIndexKey0 := node.EncodeBlobIndexKey(batchHeaderHash, 0)
+	blobIndexKey1 := node.EncodeBlobIndexKey(batchHeaderHash, 1)
+	assert.True(t, s.HasKey(ctx, blobIndexKey0))
+	assert.True(t, s.HasKey(ctx, blobIndexKey1))
+
+	var h [32]byte
+	bhh0, err := s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, 0)
+	assert.Nil(t, err)
+	copy(h[:], bhh0)
+	assert.Equal(t, blobHeaderHash0, h)
+	bhh1, err := s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, 1)
+	assert.Nil(t, err)
+	copy(h[:], bhh1)
+	assert.Equal(t, blobHeaderHash1, h)
+
+	// Expire the batches.
+	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12
+	// Try to expire at a time before expiry, so nothing will be expired.
+	numBatchesDeleted, numMappingsDeleted, _, err := s.DeleteExpiredEntries(curTime-10, 5)
+	assert.Nil(t, err)
+	assert.Equal(t, numBatchesDeleted, 0)
+	assert.Equal(t, numMappingsDeleted, 0)
+	assert.True(t, s.HasKey(ctx, blobIndexKey0))
+	assert.True(t, s.HasKey(ctx, blobIndexKey1))
+	// Then expire it at a time post expiry, so the batch will get purged.
+	numBatchesDeleted, numMappingsDeleted, _, err = s.DeleteExpiredEntries(curTime+10, 5)
+	assert.Nil(t, err)
+	assert.Equal(t, numBatchesDeleted, 1)
+	assert.Equal(t, numMappingsDeleted, 2)
+	assert.False(t, s.HasKey(ctx, blobIndexKey0))
+	assert.False(t, s.HasKey(ctx, blobIndexKey1))
 }
 
 func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncodingFormat) []*encoding.Frame {
