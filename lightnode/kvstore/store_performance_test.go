@@ -61,6 +61,9 @@ func BenchmarkWritingLevelDB(b *testing.B) {
 
 	store, err := NewLevelStore(logger, "testdb")
 	assert.NoError(b, err)
+
+	fmt.Printf("error: %v\n", err) // TODO
+
 	simpleWritingBenchmark(b, store)
 }
 
