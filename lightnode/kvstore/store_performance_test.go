@@ -26,9 +26,9 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 
 	for i := 0; i < keysToWrite; i++ {
 
-		//if i%1000 == 0 {
-		//	fmt.Printf("i: %d\n", i) // TODO
-		//}
+		if i%1000 == 0 {
+			fmt.Printf("i: %d\n", i) // TODO
+		}
 
 		// Change a few bytes in the key to avoid collisions. Change a few bytes in the value to
 		// avoid the DB taking shortcuts (since we aren't using random data for the sake of benchmark performance).
