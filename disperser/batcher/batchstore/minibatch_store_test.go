@@ -103,9 +103,7 @@ func TestPutBatch(t *testing.T) {
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
 		Status:               batcher.BatchStatusPending,
-		HeaderHash:           [32]byte{1},
-		AggregatePubKey:      nil,
-		AggregateSignature:   nil,
+		NumMinibatches:       0,
 	}
 	err = minibatchStore.PutBatch(ctx, batch)
 	assert.NoError(t, err)
@@ -144,9 +142,7 @@ func TestGetBatchesByStatus(t *testing.T) {
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
 		Status:               batcher.BatchStatusFormed,
-		HeaderHash:           [32]byte{1},
-		AggregatePubKey:      nil,
-		AggregateSignature:   nil,
+		NumMinibatches:       0,
 	}
 	_ = minibatchStore.PutBatch(ctx, batch1)
 	batch2 := &batcher.BatchRecord{
@@ -154,9 +150,7 @@ func TestGetBatchesByStatus(t *testing.T) {
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
 		Status:               batcher.BatchStatusFormed,
-		HeaderHash:           [32]byte{1},
-		AggregatePubKey:      nil,
-		AggregateSignature:   nil,
+		NumMinibatches:       0,
 	}
 	err := minibatchStore.PutBatch(ctx, batch2)
 	assert.NoError(t, err)
@@ -165,9 +159,7 @@ func TestGetBatchesByStatus(t *testing.T) {
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
 		Status:               batcher.BatchStatusFormed,
-		HeaderHash:           [32]byte{1},
-		AggregatePubKey:      nil,
-		AggregateSignature:   nil,
+		NumMinibatches:       0,
 	}
 	err = minibatchStore.PutBatch(ctx, batch3)
 	assert.NoError(t, err)
@@ -188,24 +180,6 @@ func TestGetBatchesByStatus(t *testing.T) {
 	assert.Equal(t, 2, len(formed))
 }
 
-func TestPutMinibatch(t *testing.T) {
-	ctx := context.Background()
-	id, err := uuid.NewV7()
-	assert.NoError(t, err)
-	minibatch := &batcher.MinibatchRecord{
-		BatchID:              id,
-		MinibatchIndex:       12,
-		BlobHeaderHashes:     [][32]byte{{1}},
-		BatchSize:            1,
-		ReferenceBlockNumber: 1,
-	}
-	err = minibatchStore.PutMinibatch(ctx, minibatch)
-	assert.NoError(t, err)
-	m, err := minibatchStore.GetMinibatch(ctx, minibatch.BatchID, minibatch.MinibatchIndex)
-	assert.NoError(t, err)
-	assert.Equal(t, minibatch, m)
-}
-
 func TestGetLatestFormedBatch(t *testing.T) {
 	ctx := context.Background()
 	id1, _ := uuid.NewV7()
@@ -217,105 +191,48 @@ func TestGetLatestFormedBatch(t *testing.T) {
 		CreatedAt:            ts,
 		ReferenceBlockNumber: 1,
 		Status:               batcher.BatchStatusFormed,
-		HeaderHash:           [32]byte{1},
-		AggregatePubKey:      nil,
-		AggregateSignature:   nil,
-	}
-	minibatch1 := &batcher.MinibatchRecord{
-		BatchID:              id1,
-		MinibatchIndex:       1,
-		BlobHeaderHashes:     [][32]byte{{1}},
-		BatchSize:            1,
-		ReferenceBlockNumber: 1,
+		NumMinibatches:       2,
 	}
 	batch2 := &batcher.BatchRecord{
 		ID:                   id2,
 		CreatedAt:            ts2,
 		ReferenceBlockNumber: 1,
 		Status:               batcher.BatchStatusFormed,
-		HeaderHash:           [32]byte{1},
-		AggregatePubKey:      nil,
-		AggregateSignature:   nil,
-	}
-	minibatch2 := &batcher.MinibatchRecord{
-		BatchID:              id2,
-		MinibatchIndex:       1,
-		BlobHeaderHashes:     [][32]byte{{1}},
-		BatchSize:            1,
-		ReferenceBlockNumber: 1,
-	}
-	minibatch3 := &batcher.MinibatchRecord{
-		BatchID:              id2,
-		MinibatchIndex:       2,
-		BlobHeaderHashes:     [][32]byte{{1}},
-		BatchSize:            1,
-		ReferenceBlockNumber: 1,
+		NumMinibatches:       2,
 	}
 	err := minibatchStore.PutBatch(ctx, batch1)
 	assert.NoError(t, err)
-	err = minibatchStore.PutMinibatch(ctx, minibatch1)
-	assert.NoError(t, err)
 	err = minibatchStore.PutBatch(ctx, batch2)
 	assert.NoError(t, err)
-	err = minibatchStore.PutMinibatch(ctx, minibatch2)
-	assert.NoError(t, err)
-	err = minibatchStore.PutMinibatch(ctx, minibatch3)
-	assert.NoError(t, err)
 
-	batch, minibatches, err := minibatchStore.GetLatestFormedBatch(ctx)
+	batch, err := minibatchStore.GetLatestFormedBatch(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(minibatches))
-	assert.Equal(t, batch.ID, batch2.ID)
+	assert.Equal(t, batch2.ID, batch.ID)
 }
-func TestPutDispersalRequest(t *testing.T) {
+
+func TestPutDispersal(t *testing.T) {
 	ctx := context.Background()
 	id, err := uuid.NewV7()
 	assert.NoError(t, err)
 	ts := time.Now().Truncate(time.Second).UTC()
 	opID := core.OperatorID([32]byte{123})
-	request := &batcher.DispersalRequest{
+	response := &batcher.MinibatchDispersal{
 		BatchID:         id,
 		MinibatchIndex:  0,
 		OperatorID:      opID,
 		OperatorAddress: gcommon.HexToAddress("0x0"),
+		Socket:          "socket",
 		NumBlobs:        1,
 		RequestedAt:     ts,
-		BlobHash:        "blobHash",
-		MetadataHash:    "metadataHash",
-	}
-	err = minibatchStore.PutDispersalRequest(ctx, request)
-	assert.NoError(t, err)
-	r, err := minibatchStore.GetDispersalRequest(ctx, request.BatchID, request.MinibatchIndex, opID)
-	assert.NoError(t, err)
-	assert.Equal(t, request, r)
-}
-
-func TestPutDispersalResponse(t *testing.T) {
-	ctx := context.Background()
-	id, err := uuid.NewV7()
-	assert.NoError(t, err)
-	ts := time.Now().Truncate(time.Second).UTC()
-	opID := core.OperatorID([32]byte{123})
-	blobHash := "blobHash"
-	metadataHash := "metadataHash"
-	response := &batcher.DispersalResponse{
-		DispersalRequest: batcher.DispersalRequest{
-			BatchID:         id,
-			MinibatchIndex:  0,
-			OperatorID:      opID,
-			OperatorAddress: gcommon.HexToAddress("0x0"),
-			NumBlobs:        1,
-			RequestedAt:     ts,
-			BlobHash:        blobHash,
-			MetadataHash:    metadataHash,
+		DispersalResponse: batcher.DispersalResponse{
+			Signatures:  nil,
+			RespondedAt: ts,
+			Error:       nil,
 		},
-		Signatures:  nil,
-		RespondedAt: ts,
-		Error:       nil,
 	}
-	err = minibatchStore.PutDispersalResponse(ctx, response)
+	err = minibatchStore.PutDispersal(ctx, response)
 	assert.NoError(t, err)
-	r, err := minibatchStore.GetDispersalResponse(ctx, response.BatchID, response.MinibatchIndex, opID)
+	r, err := minibatchStore.GetDispersal(ctx, response.BatchID, response.MinibatchIndex, opID)
 	assert.NoError(t, err)
 	assert.Equal(t, response, r)
 }
@@ -326,54 +243,45 @@ func TestDispersalStatus(t *testing.T) {
 	assert.NoError(t, err)
 	ts := time.Now().Truncate(time.Second).UTC()
 	opID := core.OperatorID([32]byte{123})
-	blobHash := "blobHash"
-	metadataHash := "metadataHash"
 
 	// no dispersals
-	dispersed, err := minibatchStore.BatchDispersed(ctx, id)
+	dispersed, err := minibatchStore.BatchDispersed(ctx, id, 0)
 	assert.NoError(t, err)
 	assert.False(t, dispersed)
 
-	request := &batcher.DispersalRequest{
+	request := &batcher.MinibatchDispersal{
 		BatchID:         id,
 		MinibatchIndex:  0,
 		OperatorID:      opID,
 		OperatorAddress: gcommon.HexToAddress("0x0"),
 		NumBlobs:        1,
 		RequestedAt:     ts,
-		BlobHash:        blobHash,
-		MetadataHash:    metadataHash,
 	}
-	err = minibatchStore.PutDispersalRequest(ctx, request)
+	err = minibatchStore.PutDispersal(ctx, request)
 	assert.NoError(t, err)
 
 	// dispersal request but no response
-	dispersed, err = minibatchStore.BatchDispersed(ctx, id)
+	dispersed, err = minibatchStore.BatchDispersed(ctx, id, 1)
 	assert.NoError(t, err)
 	assert.False(t, dispersed)
 
 	response := &batcher.DispersalResponse{
-		DispersalRequest: batcher.DispersalRequest{
-			BatchID:         id,
-			MinibatchIndex:  0,
-			OperatorID:      opID,
-			OperatorAddress: gcommon.HexToAddress("0x0"),
-			NumBlobs:        1,
-			RequestedAt:     ts,
-			BlobHash:        blobHash,
-			MetadataHash:    metadataHash,
-		},
 		Signatures:  nil,
 		RespondedAt: ts,
 		Error:       nil,
 	}
-	err = minibatchStore.PutDispersalResponse(ctx, response)
+	err = minibatchStore.UpdateDispersalResponse(ctx, request, response)
 	assert.NoError(t, err)
 
 	// dispersal request and response
-	dispersed, err = minibatchStore.BatchDispersed(ctx, id)
+	dispersed, err = minibatchStore.BatchDispersed(ctx, id, 1)
 	assert.NoError(t, err)
 	assert.True(t, dispersed)
+	// test with different number of minibatches
+	dispersed, err = minibatchStore.BatchDispersed(ctx, id, 2)
+	assert.NoError(t, err)
+	assert.False(t, dispersed)
+
 }
 
 func TestGetBlobMinibatchMappings(t *testing.T) {
@@ -422,22 +330,25 @@ func TestGetBlobMinibatchMappings(t *testing.T) {
 			BatchID:        batchID,
 			MinibatchIndex: 11,
 			BlobIndex:      22,
-			BlobCommitments: encoding.BlobCommitments{
-				Commitment:       commitment,
-				LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-				Length:           uint(expectedDataLength),
-				LengthProof:      (*encoding.LengthProof)(&lengthProof),
-			},
-			BlobQuorumInfos: []*core.BlobQuorumInfo{
-				{
-					ChunkLength: expectedChunkLength,
-					SecurityParam: core.SecurityParam{
-						QuorumID:              1,
-						ConfirmationThreshold: 55,
-						AdversaryThreshold:    33,
-						QuorumRate:            123,
+			BlobHeader: core.BlobHeader{
+				BlobCommitments: encoding.BlobCommitments{
+					Commitment:       commitment,
+					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+					Length:           uint(expectedDataLength),
+					LengthProof:      (*encoding.LengthProof)(&lengthProof),
+				},
+				QuorumInfos: []*core.BlobQuorumInfo{
+					{
+						ChunkLength: expectedChunkLength,
+						SecurityParam: core.SecurityParam{
+							QuorumID:              1,
+							ConfirmationThreshold: 55,
+							AdversaryThreshold:    33,
+							QuorumRate:            123,
+						},
 					},
 				},
+				AccountID: "account-id",
 			},
 		},
 	})
@@ -460,12 +371,12 @@ func TestGetBlobMinibatchMappings(t *testing.T) {
 	assert.NoError(t, err)
 	expectedLengthProofBytes := lengthProof.Bytes()
 	assert.Equal(t, expectedLengthProofBytes[:], lengthProofBytes[:])
-	assert.Len(t, mapping[0].BlobQuorumInfos, 1)
-	assert.Equal(t, expectedChunkLength, mapping[0].BlobQuorumInfos[0].ChunkLength)
+	assert.Len(t, mapping[0].QuorumInfos, 1)
+	assert.Equal(t, expectedChunkLength, mapping[0].QuorumInfos[0].ChunkLength)
 	assert.Equal(t, core.SecurityParam{
 		QuorumID:              1,
 		ConfirmationThreshold: 55,
 		AdversaryThreshold:    33,
 		QuorumRate:            123,
-	}, mapping[0].BlobQuorumInfos[0].SecurityParam)
+	}, mapping[0].QuorumInfos[0].SecurityParam)
 }

@@ -312,21 +312,16 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 	b.logger.Debug("Getting latest formed batch...")
 	stateUpdateTicker := time.NewTicker(b.DispersalStatusCheckInterval)
 	var batch *BatchRecord
-	var minibatches []*MinibatchRecord
 	for batch == nil {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-stateUpdateTicker.C:
-			batch, minibatches, err = b.MinibatchStore.GetLatestFormedBatch(ctx)
+			batch, err = b.MinibatchStore.GetLatestFormedBatch(ctx)
 			if err != nil {
 				b.logger.Error("error getting latest formed batch", "err", err)
 			}
 		}
-	}
-
-	if len(minibatches) == 0 {
-		return fmt.Errorf("no minibatches in the batch %s", batch.ID)
 	}
 
 	// Make sure all minibatches in the batch have been dispersed
@@ -339,7 +334,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 		case <-ctxWithTimeout.Done():
 			return ctxWithTimeout.Err()
 		case <-stateUpdateTicker.C:
-			batchDispersed, err = b.MinibatchStore.BatchDispersed(ctx, batch.ID)
+			batchDispersed, err = b.MinibatchStore.BatchDispersed(ctx, batch.ID, batch.NumMinibatches)
 			if err != nil {
 				b.logger.Error("error checking if batch is dispersed", "err", err)
 			}
@@ -364,8 +359,12 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 		BatchRoot:            [32]byte{},
 	}
 	blobHeaderHashes := make([][32]byte, 0)
-	for _, minibatch := range minibatches {
-		blobHeaderHashes = append(blobHeaderHashes, minibatch.BlobHeaderHashes...)
+	for _, blobHeader := range batchState.BlobHeaders {
+		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+		if err != nil {
+			return fmt.Errorf("error getting blob header hash: %w", err)
+		}
+		blobHeaderHashes = append(blobHeaderHashes, blobHeaderHash)
 	}
 	merkleTree, err := batchHeader.SetBatchRootFromBlobHeaderHashes(blobHeaderHashes)
 	if err != nil {
