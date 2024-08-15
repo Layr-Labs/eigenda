@@ -145,24 +145,19 @@ func (store *batchingStore) Destroy() error {
 
 // flushCache flushes the cache to the underlying store.
 func (store *batchingStore) flushCache() error {
-	for key, operation := range store.cache {
-		if operation == nil {
-			err := store.store.Drop([]byte(key))
-			if err != nil {
-				return err
-			}
-		} else {
-			err := store.store.Put(operation.Key, operation.Value, operation.TTL)
-			if err != nil {
-				return err
-			}
+	batch := make([]*BatchOperation, 0, len(store.cache))
+	for _, operation := range store.cache {
+		if operation != nil {
+			batch = append(batch, operation)
 		}
 	}
 
 	store.cacheSize = 0
 	store.cache = make(map[string]*BatchOperation)
 
-	return nil
+	err := store.store.BatchUpdate(batch)
+
+	return err
 }
 
 // IsShutDown returns true if the store is shut down.

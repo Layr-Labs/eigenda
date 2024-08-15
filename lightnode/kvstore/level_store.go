@@ -22,8 +22,8 @@ type LevelStore struct {
 	destroyed bool
 }
 
-// NewLevelKVStore creates a new LevelStore.
-func NewLevelKVStore(logger logging.Logger, path string) (KVStore, error) {
+// NewLevelStore creates a new LevelStore.
+func NewLevelStore(logger logging.Logger, path string) (KVStore, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err

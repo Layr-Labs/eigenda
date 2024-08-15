@@ -48,25 +48,45 @@ func simpleWritingBenchmark(b *testing.B, store KVStore) {
 	assert.NoError(b, err)
 }
 
-func BenchmarkSimpleWritingInMemory(b *testing.B) {
-	var store KVStore = NewInMemoryStore()
+func BenchmarkWritingInMemory(b *testing.B) {
+	store := NewInMemoryStore()
 	simpleWritingBenchmark(b, store)
 }
 
-func BenchmarkSimpleWritingLevelDB(b *testing.B) {
+func BenchmarkWritingLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := NewLevelKVStore(logger, "testdb")
+	store, err := NewLevelStore(logger, "testdb")
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
 }
 
-func BenchmarkSimpleWritingBadger(b *testing.B) {
+func BenchmarkWritingBatchedLevelDB(b *testing.B) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(b, err)
+
+	store, err := NewLevelStore(logger, "testdb")
+	store = BatchingWrapper(store, 1024*32)
+	assert.NoError(b, err)
+	simpleWritingBenchmark(b, store)
+}
+
+func BenchmarkWritingBadgerDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
 	store, err := NewBadgerStore(logger, "testdb")
+	assert.NoError(b, err)
+	simpleWritingBenchmark(b, store)
+}
+
+func BenchmarkWritingBatchedBadgerDB(b *testing.B) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(b, err)
+
+	store, err := NewBadgerStore(logger, "testdb")
+	store = BatchingWrapper(store, 1024*1024)
 	assert.NoError(b, err)
 	simpleWritingBenchmark(b, store)
 }

@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// TODO add in updates to existing keys!
-
 func randomOperationsTest(t *testing.T, store KVStore) {
 	tu.InitializeRandom()
 
@@ -104,18 +102,18 @@ func TestRandomOperations(t *testing.T) {
 
 	// LevelDB store
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	store = BatchingWrapper(store, 32*5)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
@@ -228,18 +226,18 @@ func TestBatchOperations(t *testing.T) {
 
 	// LevelDB store
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	assert.NoError(t, err)
 	batchOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
 	assert.NoError(t, err)
 	batchOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	store = BatchingWrapper(store, 32*5)
 	assert.NoError(t, err)
 	batchOperationsTest(t, store)
@@ -298,18 +296,18 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 
 	// LevelDB store
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	assert.NoError(t, err)
 	operationsOnShutdownStoreTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	store = ThreadSafeWrapper(store)
 	assert.NoError(t, err)
 	operationsOnShutdownStoreTest(t, store)
 	verifyDBIsDeleted(t)
 
-	store, err = NewLevelKVStore(logger, dbPath)
+	store, err = NewLevelStore(logger, dbPath)
 	store = BatchingWrapper(store, 32*5)
 	assert.NoError(t, err)
 	operationsOnShutdownStoreTest(t, store)
