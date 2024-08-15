@@ -42,10 +42,10 @@ func (store *threadSafeStore) Drop(key []byte) error {
 }
 
 // BatchUpdate performs a batch of Put and Drop operations.
-func (store *threadSafeStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+func (store *threadSafeStore) BatchUpdate(operations []*BatchOperation) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
-	return store.store.BatchUpdate(puts, drops)
+	return store.store.BatchUpdate(operations)
 }
 
 // Shutdown shuts down the store.

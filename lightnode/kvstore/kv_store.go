@@ -18,9 +18,9 @@ type KVStore interface {
 	// Drop removes data from the store. This is a no-op if the data does not exist.
 	Drop(key []byte) error
 
-	// BatchUpdate performs a batch of Put and Drop operations. May be more efficient than calling
+	// BatchUpdate performs a batch operations (puts and drops). May be more efficient than calling
 	// Put and Drop individually, depending on the implementation.
-	BatchUpdate(puts []PutOperation, drops []DropOperation) error
+	BatchUpdate(operations []*BatchOperation) error
 
 	// Shutdown stops the store and releases any resources it holds. Does not delete any on-disk data.
 	// Calling shutdown on a store that has already been shut down or destroyed is a no-op.
@@ -35,20 +35,17 @@ type KVStore interface {
 	IsShutDown() bool
 }
 
-// PutOperation describes a put operation to be performed in a batch update.
-type PutOperation struct {
+// BatchOperation describes an operation performed in a batch update.
+type BatchOperation struct {
 	// Key is the key to store the value under.
 	Key []byte
 
-	// Value is the data to store.
+	// Value is the data to store. If nil, then this operation is a drop operation.
 	Value []byte
 
 	// TTL is the time to live for the data. If zero, the data will be stored indefinitely.
 	TTL time.Duration
 }
-
-// DropOperation describes a drop operation to be performed in a batch update.
-type DropOperation []byte
 
 // Operations to potentially support in the future:
 // - iteration over all keys

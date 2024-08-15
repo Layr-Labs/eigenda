@@ -79,23 +79,22 @@ func (store *LevelStore) Drop(key []byte) error {
 }
 
 // BatchUpdate performs a batch of Put and Drop operations.
-func (store *LevelStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+func (store *LevelStore) BatchUpdate(operations []*BatchOperation) error {
 	// TODO implement a real batch update
 
-	for _, put := range puts {
-		err := store.Put(put.Key, put.Value, put.TTL)
-		if err != nil {
-			return err
+	for _, operation := range operations {
+		if operation.Value == nil {
+			err := store.Drop(operation.Key)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := store.Put(operation.Key, operation.Value, operation.TTL)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
-	for _, drop := range drops {
-		err := store.Drop(drop)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 

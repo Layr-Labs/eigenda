@@ -11,7 +11,7 @@ var _ KVStore = &batchingStore{}
 // This may (significantly) improve performance for stores where batching is helpful.
 // Note that if the store is not properly shutdown, some data may be lost.
 type batchingStore struct {
-	cache map[string]*PutOperation // TODO is there a way not to have to stringify?
+	cache map[string]*BatchOperation // TODO is there a way not to have to stringify?
 	store KVStore
 
 	maxCacheSize uint
@@ -24,7 +24,7 @@ type batchingStore struct {
 // the number of bytes that can be stored in the cache before it is flushed to the underlying store.
 func BatchingWrapper(store KVStore, maxCacheSize uint) KVStore {
 	return &batchingStore{
-		cache:        make(map[string]*PutOperation),
+		cache:        make(map[string]*BatchOperation),
 		store:        store,
 		maxCacheSize: maxCacheSize,
 	}
@@ -40,7 +40,7 @@ func (store *batchingStore) Put(key []byte, value []byte, ttl time.Duration) err
 		store.cacheSize -= uint(len(previousCacheEntry.Value))
 	}
 
-	store.cache[stringifiedKey] = &PutOperation{
+	store.cache[stringifiedKey] = &BatchOperation{
 		Key:   key,
 		Value: value,
 		TTL:   ttl,
@@ -93,34 +93,24 @@ func (store *batchingStore) Drop(key []byte) error {
 }
 
 // BatchUpdate performs a batch of Put and Drop operations.
-func (store *batchingStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+func (store *batchingStore) BatchUpdate(operations []*BatchOperation) error {
 	if store.store.IsShutDown() {
 		return fmt.Errorf("store is offline")
 	}
 
-	for _, put := range puts {
+	for _, operation := range operations {
+		stringifiedKey := string(operation.Key)
 
-		stringifiedKey := string(put.Key)
-
-		previousCacheEntry := store.cache[stringifiedKey]
-		if previousCacheEntry != nil {
+		previousCacheEntry, present := store.cache[stringifiedKey]
+		if present && previousCacheEntry != nil {
 			store.cacheSize -= uint(len(previousCacheEntry.Value))
 		}
 
-		store.cache[stringifiedKey] = &put
-		store.cacheSize += uint(len(put.Value))
-	}
+		store.cache[stringifiedKey] = operation
 
-	for _, drop := range drops {
-
-		stringifiedKey := string(drop)
-
-		previousCacheEntry := store.cache[stringifiedKey]
-		if previousCacheEntry != nil {
-			store.cacheSize -= uint(len(previousCacheEntry.Value))
+		if operation.Value != nil {
+			store.cacheSize += uint(len(operation.Value))
 		}
-
-		store.cache[string(drop)] = nil
 	}
 
 	if store.cacheSize >= store.maxCacheSize {
@@ -170,7 +160,7 @@ func (store *batchingStore) flushCache() error {
 	}
 
 	store.cacheSize = 0
-	store.cache = make(map[string]*PutOperation)
+	store.cache = make(map[string]*BatchOperation)
 
 	return nil
 }

@@ -93,31 +93,29 @@ func (store *BadgerStore) Drop(key []byte) error {
 }
 
 // BatchUpdate performs a batch of Put and Drop operations.
-func (store *BadgerStore) BatchUpdate(puts []PutOperation, drops []DropOperation) error {
+func (store *BadgerStore) BatchUpdate(operations []*BatchOperation) error {
 	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
 
 	return store.db.Update(func(txn *badger.Txn) error {
-		for _, put := range puts {
-			if put.TTL == 0 {
-				err := txn.Set(put.Key, put.Value)
+		for _, operation := range operations {
+			if operation.Value == nil {
+				err := txn.Delete(operation.Key)
+				if err != nil {
+					return err
+				}
+			} else if operation.TTL == 0 {
+				err := txn.Set(operation.Key, operation.Value)
 				if err != nil {
 					return err
 				}
 			} else {
-				entry := badger.NewEntry(put.Key, put.Value).WithTTL(put.TTL)
+				entry := badger.NewEntry(operation.Key, operation.Value).WithTTL(operation.TTL)
 				err := txn.SetEntry(entry)
 				if err != nil {
 					return err
 				}
-			}
-		}
-
-		for _, drop := range drops {
-			err := txn.Delete(drop)
-			if err != nil {
-				return err
 			}
 		}
 
