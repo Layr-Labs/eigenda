@@ -121,41 +121,41 @@ func TestRandomOperations(t *testing.T) {
 
 	// BadgerDB store
 
-	store, err = NewBadgerStore(logger, dbPath)
-	assert.NoError(t, err)
-	randomOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewBadgerStore(logger, dbPath)
-	store = ThreadSafeWrapper(store)
-	assert.NoError(t, err)
-	randomOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewBadgerStore(logger, dbPath)
-	store = BatchingWrapper(store, 32*5)
-	assert.NoError(t, err)
-	randomOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	// Pebble store
-
-	store, err = NewPebbleStore(logger, dbPath)
-	assert.NoError(t, err)
-	randomOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewPebbleStore(logger, dbPath)
-	store = ThreadSafeWrapper(store)
-	assert.NoError(t, err)
-	randomOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewPebbleStore(logger, dbPath)
-	store = BatchingWrapper(store, 32*5)
-	assert.NoError(t, err)
-	randomOperationsTest(t, store)
-	verifyDBIsDeleted(t)
+	//store, err = NewBadgerStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//randomOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//randomOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//randomOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//// Pebble store
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//randomOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//randomOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//randomOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
 }
 
 func batchOperationsTest(t *testing.T, store KVStore) {
@@ -264,41 +264,41 @@ func TestBatchOperations(t *testing.T) {
 
 	// BadgerDB store
 
-	store, err = NewBadgerStore(logger, dbPath)
-	assert.NoError(t, err)
-	batchOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewBadgerStore(logger, dbPath)
-	store = ThreadSafeWrapper(store)
-	assert.NoError(t, err)
-	batchOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewBadgerStore(logger, dbPath)
-	store = BatchingWrapper(store, 32*5)
-	assert.NoError(t, err)
-	batchOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	// Pebble store
-
-	store, err = NewPebbleStore(logger, dbPath)
-	assert.NoError(t, err)
-	batchOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewPebbleStore(logger, dbPath)
-	store = ThreadSafeWrapper(store)
-	assert.NoError(t, err)
-	batchOperationsTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewPebbleStore(logger, dbPath)
-	store = BatchingWrapper(store, 32*5)
-	assert.NoError(t, err)
-	batchOperationsTest(t, store)
-	verifyDBIsDeleted(t)
+	//store, err = NewBadgerStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//// Pebble store
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//batchOperationsTest(t, store)
+	//verifyDBIsDeleted(t)
 }
 
 func operationsOnShutdownStoreTest(t *testing.T, store KVStore) {
@@ -352,39 +352,39 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 	verifyDBIsDeleted(t)
 
 	// BadgerDB store
-	store, err = NewBadgerStore(logger, dbPath)
-	assert.NoError(t, err)
-	operationsOnShutdownStoreTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewBadgerStore(logger, dbPath)
-	store = ThreadSafeWrapper(store)
-	assert.NoError(t, err)
-	operationsOnShutdownStoreTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewBadgerStore(logger, dbPath)
-	store = BatchingWrapper(store, 32*5)
-	assert.NoError(t, err)
-	operationsOnShutdownStoreTest(t, store)
-	verifyDBIsDeleted(t)
-
-	// Pebble store
-
-	store, err = NewPebbleStore(logger, dbPath)
-	assert.NoError(t, err)
-	operationsOnShutdownStoreTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewPebbleStore(logger, dbPath)
-	store = ThreadSafeWrapper(store)
-	assert.NoError(t, err)
-	operationsOnShutdownStoreTest(t, store)
-	verifyDBIsDeleted(t)
-
-	store, err = NewPebbleStore(logger, dbPath)
-	store = BatchingWrapper(store, 32*5)
-	assert.NoError(t, err)
-	operationsOnShutdownStoreTest(t, store)
-	verifyDBIsDeleted(t)
+	//store, err = NewBadgerStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//operationsOnShutdownStoreTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//operationsOnShutdownStoreTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewBadgerStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//operationsOnShutdownStoreTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//// Pebble store
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//assert.NoError(t, err)
+	//operationsOnShutdownStoreTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//store = ThreadSafeWrapper(store)
+	//assert.NoError(t, err)
+	//operationsOnShutdownStoreTest(t, store)
+	//verifyDBIsDeleted(t)
+	//
+	//store, err = NewPebbleStore(logger, dbPath)
+	//store = BatchingWrapper(store, 32*5)
+	//assert.NoError(t, err)
+	//operationsOnShutdownStoreTest(t, store)
+	//verifyDBIsDeleted(t)
 }

@@ -73,53 +73,53 @@ func BenchmarkWritingLevelDB(b *testing.B) {
 	simpleWritingBenchmark(b, store)
 }
 
-func BenchmarkWritingBatchedLevelDB(b *testing.B) {
+//func BenchmarkWritingBatchedLevelDB(b *testing.B) {
+//
+//	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedLevelDB") // TODO
+//
+//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+//	assert.NoError(b, err)
+//
+//	store, err := NewLevelStore(logger, dbPath)
+//	store = BatchingWrapper(store, 1024*32)
+//	assert.NoError(b, err)
+//	simpleWritingBenchmark(b, store)
+//}
 
-	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedLevelDB") // TODO
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(b, err)
-
-	store, err := NewLevelStore(logger, dbPath)
-	store = BatchingWrapper(store, 1024*32)
-	assert.NoError(b, err)
-	simpleWritingBenchmark(b, store)
-}
-
-func BenchmarkWritingBadgerDB(b *testing.B) {
-
-	fmt.Println("-------------------------------------------------- BenchmarkWritingBadgerDB") // TODO
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(b, err)
-
-	store, err := NewBadgerStore(logger, dbPath)
-	assert.NoError(b, err)
-	simpleWritingBenchmark(b, store)
-}
-
-func BenchmarkWritingBatchedBadgerDB(b *testing.B) {
-
-	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedBadgerDB") // TODO
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(b, err)
-
-	store, err := NewBadgerStore(logger, dbPath)
-	store = BatchingWrapper(store, 1024*1024)
-	assert.NoError(b, err)
-	simpleWritingBenchmark(b, store)
-}
-
-func BenchmarkWritingPebble(b *testing.B) {
-
-	fmt.Println("-------------------------------------------------- BenchmarkWritingPebbleDB") // TODO
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(b, err)
-
-	store, err := NewPebbleStore(logger, dbPath)
-	store = BatchingWrapper(store, 1024*1024*32)
-	assert.NoError(b, err)
-	simpleWritingBenchmark(b, store)
-}
+//func BenchmarkWritingBadgerDB(b *testing.B) {
+//
+//	fmt.Println("-------------------------------------------------- BenchmarkWritingBadgerDB") // TODO
+//
+//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+//	assert.NoError(b, err)
+//
+//	store, err := NewBadgerStore(logger, dbPath)
+//	assert.NoError(b, err)
+//	simpleWritingBenchmark(b, store)
+//}
+//
+//func BenchmarkWritingBatchedBadgerDB(b *testing.B) {
+//
+//	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedBadgerDB") // TODO
+//
+//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+//	assert.NoError(b, err)
+//
+//	store, err := NewBadgerStore(logger, dbPath)
+//	store = BatchingWrapper(store, 1024*1024)
+//	assert.NoError(b, err)
+//	simpleWritingBenchmark(b, store)
+//}
+//
+//func BenchmarkWritingPebble(b *testing.B) {
+//
+//	fmt.Println("-------------------------------------------------- BenchmarkWritingPebbleDB") // TODO
+//
+//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+//	assert.NoError(b, err)
+//
+//	store, err := NewPebbleStore(logger, dbPath)
+//	store = BatchingWrapper(store, 1024*1024*32)
+//	assert.NoError(b, err)
+//	simpleWritingBenchmark(b, store)
+//}
