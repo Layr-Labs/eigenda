@@ -70,7 +70,7 @@ func RunScan(ctx *cli.Context) error {
 		semvers[semver]++
 
 	} else {
-		indexedOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 10, dataapi.Registered)
+		indexedOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 90, dataapi.Registered)
 
 		if err != nil {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
@@ -118,11 +118,16 @@ func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logg
 
 func displayResults(results map[string]int) {
 	tw := table.NewWriter()
+
 	rowHeader := table.Row{"semver", "count"}
 	tw.AppendHeader(rowHeader)
 
+	total := 0
 	for semver, count := range results {
 		tw.AppendRow(table.Row{semver, count})
+		total += count
 	}
+	tw.AppendFooter(table.Row{"total", total})
+
 	fmt.Println(tw.Render())
 }
