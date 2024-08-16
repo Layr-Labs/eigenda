@@ -15,6 +15,64 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/feed/batches/{batch_header_hash}/blobs": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feed"
+                ],
+                "summary": "Fetch blob metadata by batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Batch Header Hash",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit [default: 10]",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Next page token",
+                        "name": "next_token",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BlobsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/feed/blobs": {
             "get": {
                 "produces": [
@@ -656,6 +714,9 @@ const docTemplate = `{
         "dataapi.Meta": {
             "type": "object",
             "properties": {
+                "next_token": {
+                    "type": "string"
+                },
                 "size": {
                     "type": "integer"
                 }

@@ -38,6 +38,7 @@ var (
 	gnarkEncodedChunk = []byte{231, 230, 152, 109, 133, 244, 212, 218, 196, 81, 143, 178, 30, 156, 131, 123, 46, 41, 242, 88, 201, 43, 94, 182, 204, 58, 54, 188, 50, 179, 116, 13, 48, 66, 72, 117, 51, 62, 162, 39, 10, 65, 246, 247, 129, 118, 22, 100, 20, 137, 236, 82, 35, 209, 103, 143, 80, 240, 231, 213, 13, 251, 0, 7, 0, 2, 81, 174, 4, 237, 12, 2, 243, 82, 12, 176, 240, 81, 250, 2, 70, 244, 5, 0, 4, 10, 82, 12, 2, 185, 187, 79, 9, 187, 15, 255, 0, 6, 17, 171, 254, 11, 77, 255, 250, 77, 241, 6, 15, 11, 184, 238, 187, 12, 241, 86, 172, 12, 238, 9, 72, 253, 8, 190, 190, 250, 1, 5, 48, 89, 76, 187, 245, 49, 157, 218, 175, 89, 69, 173, 119, 1, 61, 59, 40, 68, 178, 244, 186, 193, 98, 66, 59, 38, 229, 148, 237, 238, 15, 70, 48, 95, 255, 120, 224, 223, 175, 45, 253, 12, 80, 199, 140, 209, 80, 107, 113, 51, 240, 76, 130, 185, 123, 139, 65, 227, 176, 147, 233, 6, 188, 78, 0, 1, 8, 169, 241, 253, 251, 176, 245, 81, 240, 242, 83, 240, 251, 190, 241, 81, 17, 255, 246, 186, 187, 46, 9, 7, 174, 86, 237, 183, 248, 15, 48, 97, 78, 99, 231, 51, 136, 112, 181, 78, 243, 186, 207, 58, 88, 7, 42, 133, 217, 65, 136, 185, 103, 153, 70, 215, 65, 77, 241, 245, 6, 13, 48, 23, 93, 118, 225, 48, 151, 50, 255, 1, 86, 254, 130, 144, 74, 83, 37, 234, 237, 65, 248, 172, 252, 139, 60, 244, 234, 226, 230, 199, 0, 8, 0, 12, 173, 252, 78, 16, 183, 6, 249, 7, 240, 78, 251, 186, 255, 255, 179, 237, 10, 77, 238, 253, 8, 2, 68, 239, 195, 186, 238, 9, 67, 188, 0, 14, 13, 188, 67, 241, 252, 7, 246, 245, 83, 246, 244, 183, 255, 250, 255, 247, 187, 76, 11, 5, 1, 188, 69, 4, 246, 84, 252, 3, 196, 178, 47, 217, 50, 254, 206, 59, 163, 214, 5, 65, 81, 109, 125, 207, 10, 92, 212, 49, 235, 63, 175, 13, 27, 133, 64, 240, 247, 224, 13, 190, 2, 62, 0, 68, 248, 251, 191, 2, 250, 0, 12, 6, 235, 15, 0, 22, 65, 3, 200, 169, 55, 2, 182, 245, 237, 14, 68, 176, 253, 79, 6, 242, 187, 15, 0, 10, 176, 247, 57, 68, 7, 244, 253, 83, 240, 183, 255, 172, 80, 8, 2, 254, 3, 252, 255, 179, 9, 247, 172, 83, 248, 251, 83, 171, 254, 4, 0, 68, 251, 254, 188, 175, 245, 13, 244, 64, 189, 237, 72, 249, 249, 7, 0, 2, 0, 4, 3, 253, 9, 59, 13, 9, 252, 239, 66, 240, 184, 1, 0, 79, 1, 187, 4, 248, 3, 14, 57, 0, 4, 0, 13, 179, 252, 69, 3, 245, 172, 70, 241, 16, 242, 183, 1, 0, 69, 2, 255, 176, 255, 73, 0, 1, 253, 14, 11, 187, 18, 245, 237, 11, 242, 116, 104, 97, 116, 32, 110, 97, 116, 105, 111, 110, 32, 109, 105, 103, 104, 116, 32, 108, 105, 118, 0, 101, 46, 32, 73, 116, 32, 105, 115, 32, 97, 108, 116, 111, 103, 101, 116, 104, 101, 114, 32, 102, 105, 116, 116, 105, 110, 103, 32, 97, 110, 100, 0, 32, 112, 114, 111, 112, 101, 114, 32, 116, 104, 97, 116, 32, 119, 101, 32, 115, 104, 111, 117, 108, 100, 32, 100, 111, 32, 116, 104, 105, 115, 46, 0, 32, 66, 117, 116, 44, 32, 105, 110, 32, 97, 32, 108, 97, 114, 103, 101, 114, 32, 115, 101, 110, 115, 101, 44, 32, 119, 101, 32, 99, 97, 110, 0, 110, 111, 116, 32, 100, 101, 100, 105, 99, 97, 116, 101, 44, 32, 119, 101, 32, 99, 97, 110, 110, 111, 116, 32, 99, 111, 110, 115, 101, 99, 114, 0, 97, 116, 101, 226, 128, 148, 119, 101, 32, 99, 97, 110, 110, 111, 116, 32, 104, 97, 108, 108, 111, 119, 226, 128, 148, 116, 104, 105, 115, 32, 103, 0, 114, 111, 117, 110, 100, 46, 32, 84, 104, 101, 32, 98, 114, 97, 118, 101, 32, 109, 101, 110, 44, 32, 108, 105, 118, 105, 110, 103, 32, 97, 110, 0, 100, 32, 100, 101, 97, 100, 44, 32, 119, 104, 111, 32, 115, 116, 114, 117, 103, 103, 108, 101, 100, 32, 104, 101, 114, 101, 44, 32, 104, 97, 118, 0, 101, 32, 99, 111, 110, 115, 101, 99, 114, 97, 116, 101, 100, 32, 105, 116, 32, 102, 97, 114, 32, 97, 98, 111, 118, 101, 32, 111, 117, 114, 32, 0, 112, 111, 111, 114, 32, 112, 111, 119, 101, 114, 32, 116, 111, 32, 97, 100, 100, 32, 111, 114, 32, 100, 101, 116, 114, 97, 99, 116, 46, 32, 84, 0, 104, 101, 32, 119, 111, 114, 108, 100, 32, 119, 105, 108, 108, 32, 108, 105, 116, 116, 108, 101, 32, 110, 111, 116, 101, 44, 32, 110, 111, 114, 32, 0, 108, 111, 110, 103, 32, 114, 101, 109, 101, 109, 98, 101, 114, 32, 119, 104, 97, 116, 32, 119, 101, 32, 115, 97, 121, 32, 104, 101, 114, 101, 44, 0, 32, 98, 117, 116, 32, 105, 116, 32, 99, 97, 110, 32, 110, 101, 118, 101, 114, 32, 102, 111, 114, 103, 101, 116, 32, 119, 104, 97, 116, 32, 116, 0, 104, 101, 121, 32, 100, 105, 100, 32, 104, 101, 114, 101, 46, 32, 73, 116, 32, 105, 115, 32, 102, 111, 114, 32, 117, 115, 32, 116, 104, 101, 32, 0, 108, 105, 118, 105, 110, 103, 44, 32, 114, 97, 116, 104, 101, 114, 44, 32, 116, 111, 32, 98, 101, 32, 100, 101, 100, 105, 99, 97, 116, 101, 100, 0, 32, 104, 101, 114, 101, 32, 116, 111, 32, 116, 104, 101, 32, 117, 110, 102, 105, 110, 105, 115, 104, 101, 100, 32, 119, 111, 114, 107, 32, 119, 104, 0, 105, 99, 104, 32, 116, 104, 101, 121, 32, 119, 104, 111, 32, 102, 111, 117, 103, 104, 116, 32, 104, 101, 114, 101, 32, 104, 97, 118, 101, 32, 116}
 	chainState        *coremock.ChainDataMock
 	opID              [32]byte
+	keyPair           *core.KeyPair
 )
 
 func TestMain(m *testing.M) {
@@ -90,7 +91,8 @@ func newTestServer(t *testing.T, mockValidator bool) *grpc.Server {
 }
 
 func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Config) *grpc.Server {
-	keyPair, err := core.GenRandomBlsKeys()
+	var err error
+	keyPair, err = core.GenRandomBlsKeys()
 	if err != nil {
 		panic("failed to create a BLS Key")
 	}
@@ -116,7 +118,7 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 
 	if mockValidator {
 		mockVal := coremock.NewMockShardValidator()
-		mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
+		mockVal.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		val = mockVal
 	} else {
@@ -229,9 +231,10 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
 	}
+	referenceBlockNumber := uint32(1)
 	batchHeader := core.BatchHeader{
 		BatchRoot:            [32]byte{0},
-		ReferenceBlockNumber: 1,
+		ReferenceBlockNumber: uint(referenceBlockNumber),
 	}
 
 	_, err = batchHeader.SetBatchRoot(blobHeaders)
@@ -240,8 +243,8 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 	assert.NoError(t, err)
 
-	blobHeaderProto0 := blobHeaderToProto(blobHeaders[0])
-	blobHeaderProto1 := blobHeaderToProto(blobHeaders[1])
+	blobHeaderProto0 := blobHeaderToProto(blobHeaders[0], referenceBlockNumber)
+	blobHeaderProto1 := blobHeaderToProto(blobHeaders[1], referenceBlockNumber)
 
 	var blob1Bundles, blob2Bundles []*pb.Bundle
 	if useGnarkBundleEncoding {
@@ -381,31 +384,78 @@ func TestStoreChunksRequestValidation(t *testing.T) {
 func TestStoreBlobs(t *testing.T) {
 	server := newTestServer(t, true)
 
-	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy, _, _, blobHeaders, _ := makeStoreChunksRequest(t, 66, 33)
 	reqToCopy.BatchHeader = nil
 	req := &pb.StoreBlobsRequest{
 		Blobs:                reqToCopy.Blobs,
 		ReferenceBlockNumber: 1,
 	}
 	reply, err := server.StoreBlobs(context.Background(), req)
-	assert.Nil(t, reply)
-	assert.Error(t, err)
-	assert.Equal(t, strings.Compare(err.Error(), "StoreBlobs is not implemented"), 0)
+	assert.NoError(t, err)
+	assert.NotNil(t, reply.GetSignatures())
+	assert.Len(t, reply.GetSignatures(), len(blobHeaders))
+	for i, sig := range reply.GetSignatures() {
+		assert.NotNil(t, sig)
+		assert.NotNil(t, sig.Value)
+		batchHeader := &core.BatchHeader{
+			ReferenceBlockNumber: 1,
+			BatchRoot:            [32]byte{},
+		}
+		_, err := batchHeader.SetBatchRoot([]*core.BlobHeader{blobHeaders[i]})
+		assert.NoError(t, err)
+		batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+		assert.NoError(t, err)
+		point, err := new(core.Signature).Deserialize(sig.Value)
+		assert.NoError(t, err)
+		s := &core.Signature{G1Point: point}
+		ok := s.Verify(keyPair.GetPubKeyG2(), batchHeaderHash)
+		assert.True(t, ok)
+	}
 }
 
 func TestAttestBatch(t *testing.T) {
 	server := newTestServer(t, true)
 
-	reqToCopy, _, _, _, _ := makeStoreChunksRequest(t, 66, 33)
+	reqToCopy, _, _, blobHeaders, _ := makeStoreChunksRequest(t, 66, 33)
 	reqToCopy.BatchHeader = nil
-	req := &pb.AttestBatchRequest{
-		BatchHeader:      reqToCopy.BatchHeader,
-		BlobHeaderHashes: [][]byte{},
+	req := &pb.StoreBlobsRequest{
+		Blobs:                reqToCopy.Blobs,
+		ReferenceBlockNumber: 1,
 	}
-	reply, err := server.AttestBatch(context.Background(), req)
-	assert.Nil(t, reply)
-	assert.Error(t, err)
-	assert.Equal(t, strings.Compare(err.Error(), "AttestBatch is not implemented"), 0)
+	reply, err := server.StoreBlobs(context.Background(), req)
+	assert.NoError(t, err)
+	assert.NotNil(t, reply.GetSignatures())
+
+	assert.Len(t, blobHeaders, 2)
+	bhh0, err := blobHeaders[0].GetBlobHeaderHash()
+	assert.NoError(t, err)
+	bhh1, err := blobHeaders[1].GetBlobHeaderHash()
+	assert.NoError(t, err)
+	batchHeader := &core.BatchHeader{
+		ReferenceBlockNumber: 1,
+		BatchRoot:            [32]byte{},
+	}
+	_, err = batchHeader.SetBatchRoot([]*core.BlobHeader{blobHeaders[0], blobHeaders[1]})
+	assert.NoError(t, err)
+	attestReq := &pb.AttestBatchRequest{
+		BatchHeader: &pb.BatchHeader{
+			BatchRoot:            batchHeader.BatchRoot[:],
+			ReferenceBlockNumber: 1,
+		},
+		BlobHeaderHashes: [][]byte{bhh0[:], bhh1[:]},
+	}
+	attestReply, err := server.AttestBatch(context.Background(), attestReq)
+	assert.NotNil(t, reply)
+	assert.NoError(t, err)
+	sig := attestReply.GetSignature()
+	assert.NotNil(t, sig)
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	assert.NoError(t, err)
+	point, err := new(core.Signature).Deserialize(sig)
+	assert.NoError(t, err)
+	s := &core.Signature{G1Point: point}
+	ok := s.Verify(keyPair.GetPubKeyG2(), batchHeaderHash)
+	assert.True(t, ok)
 }
 
 func TestRetrieveChunks(t *testing.T) {
@@ -426,7 +476,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_GOB, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -439,7 +489,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -463,7 +513,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_GNARK, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_GNARK, retrievalReply.ChunkEncodingFormat)
 	recovered, err := new(encoding.Frame).DeserializeGnark(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).DeserializeGnark(gnarkEncodedChunk)
@@ -476,7 +526,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -498,7 +548,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_GOB, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -511,7 +561,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, retrievalReply.Encoding)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -587,7 +637,7 @@ func TestGetBlobHeader(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func blobHeaderToProto(blobHeader *core.BlobHeader) *pb.BlobHeader {
+func blobHeaderToProto(blobHeader *core.BlobHeader, referenceBlockNumber uint32) *pb.BlobHeader {
 	var lengthCommitment, lengthProof pb.G2Commitment
 	if blobHeader.LengthCommitment != nil {
 		lengthCommitment.XA0 = blobHeader.LengthCommitment.X.A0.Marshal()
@@ -616,9 +666,10 @@ func blobHeaderToProto(blobHeader *core.BlobHeader) *pb.BlobHeader {
 			X: blobHeader.Commitment.X.Marshal(),
 			Y: blobHeader.Commitment.Y.Marshal(),
 		},
-		LengthCommitment: &lengthCommitment,
-		LengthProof:      &lengthProof,
-		Length:           uint32(blobHeader.Length),
-		QuorumHeaders:    quorumHeaders,
+		LengthCommitment:     &lengthCommitment,
+		LengthProof:          &lengthProof,
+		Length:               uint32(blobHeader.Length),
+		QuorumHeaders:        quorumHeaders,
+		ReferenceBlockNumber: referenceBlockNumber,
 	}
 }

@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	config2 "github.com/Layr-Labs/eigenda/tools/traffic/config"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync"
+	"time"
 )
 
 // BlobWriter sends blobs to a disperser at a configured rate.
@@ -24,11 +25,8 @@ type BlobWriter struct {
 	// All logs should be written using this logger.
 	logger logging.Logger
 
-	// ticker is used to control the rate at which blobs are sent to the disperser.
-	ticker InterceptableTicker
-
 	// Config contains the configuration for the generator.
-	config *config2.WorkerConfig
+	config *config.WorkerConfig
 
 	// disperser is the client used to send blobs to the disperser.
 	disperser clients.DisperserClient
@@ -37,7 +35,7 @@ type BlobWriter struct {
 	unconfirmedKeyHandler KeyHandler
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
-	fixedRandomData *[]byte
+	fixedRandomData []byte
 
 	// writeLatencyMetric is used to record latency for write requests.
 	writeLatencyMetric metrics.LatencyMetric
@@ -54,8 +52,7 @@ func NewBlobWriter(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	ticker InterceptableTicker,
-	config *config2.WorkerConfig,
+	config *config.WorkerConfig,
 	disperser clients.DisperserClient,
 	unconfirmedKeyHandler KeyHandler,
 	generatorMetrics metrics.Metrics) BlobWriter {
@@ -78,11 +75,10 @@ func NewBlobWriter(
 		ctx:                   ctx,
 		waitGroup:             waitGroup,
 		logger:                logger,
-		ticker:                ticker,
 		config:                config,
 		disperser:             disperser,
 		unconfirmedKeyHandler: unconfirmedKeyHandler,
-		fixedRandomData:       &fixedRandomData,
+		fixedRandomData:       fixedRandomData,
 		writeLatencyMetric:    generatorMetrics.NewLatencyMetric("write"),
 		writeSuccessMetric:    generatorMetrics.NewCountMetric("write_success"),
 		writeFailureMetric:    generatorMetrics.NewCountMetric("write_failure"),
@@ -92,62 +88,65 @@ func NewBlobWriter(
 // Start begins the blob writer goroutine.
 func (writer *BlobWriter) Start() {
 	writer.waitGroup.Add(1)
+	ticker := time.NewTicker(writer.config.WriteRequestInterval)
+
 	go func() {
-		writer.run()
-		writer.waitGroup.Done()
+		defer writer.waitGroup.Done()
+
+		for {
+			select {
+			case <-(*writer.ctx).Done():
+				return
+			case <-ticker.C:
+				writer.writeNextBlob()
+			}
+		}
 	}()
 }
 
-// run sends blobs to a disperser at a configured rate.
-// Continues and dues not return until the context is cancelled.
-func (writer *BlobWriter) run() {
-	for {
-		select {
-		case <-(*writer.ctx).Done():
-			return
-		case <-writer.ticker.GetTimeChannel():
-			data := writer.getRandomData()
-			key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
-				return writer.sendRequest(*data)
-			})
-			if err != nil {
-				writer.writeFailureMetric.Increment()
-				writer.logger.Error("failed to send blob request", "err:", err)
-				continue
-			}
-
-			writer.writeSuccessMetric.Increment()
-
-			checksum := md5.Sum(*data)
-			writer.unconfirmedKeyHandler.AddUnconfirmedKey(key, checksum, uint(len(*data)))
-		}
+// writeNextBlob attempts to send a random blob to the disperser.
+func (writer *BlobWriter) writeNextBlob() {
+	data, err := writer.getRandomData()
+	if err != nil {
+		writer.logger.Error("failed to get random data", "err", err)
+		return
 	}
+	key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
+		return writer.sendRequest(data)
+	})
+	if err != nil {
+		writer.writeFailureMetric.Increment()
+		writer.logger.Error("failed to send blob request", "err", err)
+		return
+	}
+
+	writer.writeSuccessMetric.Increment()
+
+	checksum := md5.Sum(data)
+	writer.unconfirmedKeyHandler.AddUnconfirmedKey(key, checksum, uint(len(data)))
 }
 
 // getRandomData returns a slice of random data to be used for a blob.
-func (writer *BlobWriter) getRandomData() *[]byte {
-	if *writer.fixedRandomData != nil {
-		return writer.fixedRandomData
+func (writer *BlobWriter) getRandomData() ([]byte, error) {
+	if writer.fixedRandomData != nil {
+		return writer.fixedRandomData, nil
 	}
 
 	data := make([]byte, writer.config.DataSize)
 	_, err := rand.Read(data)
 	if err != nil {
-		panic(fmt.Sprintf("unable to read random data: %s", err))
+		return nil, fmt.Errorf("unable to read random data: %w", err)
 	}
 	data = codec.ConvertByPaddingEmptyByte(data)
 
-	return &data
+	return data, nil
 }
 
 // sendRequest sends a blob to a disperser.
-func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
-
+func (writer *BlobWriter) sendRequest(data []byte) (key []byte, err error) {
 	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.WriteTimeout)
 	defer cancel()
 
-	var key []byte
-	var err error
 	if writer.config.SignerPrivateKey != "" {
 		_, key, err = writer.disperser.DisperseBlobAuthenticated(
 			ctxTimeout,
@@ -159,8 +158,5 @@ func (writer *BlobWriter) sendRequest(data []byte) ([]byte /* key */, error) {
 			data,
 			writer.config.CustomQuorums)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
+	return
 }

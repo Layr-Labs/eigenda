@@ -68,8 +68,6 @@ var (
 		},
 	})
 	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
-	expectedBatchHeaderHash         = [32]byte{1, 2, 3}
-	expectedBlobIndex               = uint32(1)
 	expectedRequestedAt             = uint64(5567830000000000000)
 	expectedDataLength              = 32
 	expectedBatchId                 = uint32(99)
@@ -153,7 +151,9 @@ func TestFetchBlobHandler(t *testing.T) {
 
 	blob := makeTestBlob(0, 80)
 	key := queueBlob(t, &blob, blobstore)
-	markBlobConfirmed(t, &blob, key, expectedBatchHeaderHash, blobstore)
+	expectedBatchHeaderHash := [32]byte{1, 2, 3}
+	expectedBlobIndex := uint32(1)
+	markBlobConfirmed(t, &blob, key, expectedBlobIndex, expectedBatchHeaderHash, blobstore)
 	blobKey := key.String()
 	r.GET("/v1/feed/blobs/:blob_key", testDataApiServer.FetchBlobHandler)
 
@@ -202,7 +202,7 @@ func TestFetchBlobsHandler(t *testing.T) {
 		batchHeaderHashBytes := []byte(batch.BatchHeaderHash)
 		batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes(batchHeaderHashBytes)
 		assert.NoError(t, err)
-		markBlobConfirmed(t, &blob, key, batchHeaderHash, blobstore)
+		markBlobConfirmed(t, &blob, key, 1, batchHeaderHash, blobstore)
 	}
 
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
@@ -229,6 +229,118 @@ func TestFetchBlobsHandler(t *testing.T) {
 	assert.Equal(t, 2, len(response.Data))
 }
 
+func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
+	r := setUpRouter()
+
+	batchHeaderHash := "6E2EFA6EB7AE40CE7A65B465679DE5649F994296D18C075CF2C490564BBF7CA5"
+	batchHeaderHashBytes, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHash))
+	assert.NoError(t, err)
+
+	blob1 := makeTestBlob(0, 80)
+	key1 := queueBlob(t, &blob1, blobstore)
+
+	blob2 := makeTestBlob(0, 80)
+	key2 := queueBlob(t, &blob2, blobstore)
+
+	markBlobConfirmed(t, &blob1, key1, 1, batchHeaderHashBytes, blobstore)
+	markBlobConfirmed(t, &blob2, key2, 2, batchHeaderHashBytes, blobstore)
+
+	r.GET("/v1/feed/batches/:batch_header_hash/blobs", testDataApiServer.FetchBlobsFromBatchHeaderHash)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/feed/batches/"+batchHeaderHash+"/blobs?limit=1", nil)
+	r.ServeHTTP(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobsResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, hex.EncodeToString(batchHeaderHashBytes[:]), response.Data[0].BatchHeaderHash)
+	assert.Equal(t, uint32(1), uint32(response.Data[0].BlobIndex))
+
+	// With the next_token query parameter set, the response should contain the next token
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/feed/batches/"+batchHeaderHash+"/blobs?limit=1&next_token="+response.Meta.NextToken, nil)
+	r.ServeHTTP(w, req)
+
+	res = w.Result()
+	defer res.Body.Close()
+
+	data, err = io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 1, response.Meta.Size)
+	assert.Equal(t, hex.EncodeToString(batchHeaderHashBytes[:]), response.Data[0].BatchHeaderHash)
+	assert.Equal(t, uint32(2), uint32(response.Data[0].BlobIndex))
+
+	// With the next_token query parameter set to an invalid value, the response should contain an error
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/feed/batches/"+batchHeaderHash+"/blobs?limit=1&next_token=invalid", nil)
+	r.ServeHTTP(w, req)
+
+	res = w.Result()
+	defer res.Body.Close()
+
+	data, err = io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var errorResponse dataapi.ErrorResponse
+	err = json.Unmarshal(data, &errorResponse)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
+	assert.Equal(t, "invalid next_token", errorResponse.Error)
+
+	// Fetch both blobs when no limit is set
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/feed/batches/"+batchHeaderHash+"/blobs", nil)
+	r.ServeHTTP(w, req)
+
+	res = w.Result()
+	defer res.Body.Close()
+
+	data, err = io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, 2, response.Meta.Size)
+
+	// When the batch header hash is invalid, the response should contain an error
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/feed/batches/invalid/blobs", nil)
+	r.ServeHTTP(w, req)
+
+	res = w.Result()
+	defer res.Body.Close()
+
+	data, err = io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal(data, &errorResponse)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
+	assert.Equal(t, "invalid batch header hash", errorResponse.Error)
+}
+
 func TestFetchMetricsHandler(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
@@ -244,7 +356,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 		batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes(batchHeaderHashBytes)
 		assert.NoError(t, err)
 
-		markBlobConfirmed(t, &blob, key, batchHeaderHash, blobstore)
+		markBlobConfirmed(t, &blob, key, 1, batchHeaderHash, blobstore)
 	}
 
 	s := new(model.SampleStream)
@@ -1423,7 +1535,7 @@ func queueBlob(t *testing.T, blob *core.Blob, queue disperser.BlobStore) dispers
 	return key
 }
 
-func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, batchHeaderHash [32]byte, queue disperser.BlobStore) {
+func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, blobIndex uint32, batchHeaderHash [32]byte, queue disperser.BlobStore) {
 	// simulate blob confirmation
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
@@ -1437,7 +1549,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, bat
 
 	confirmationInfo := &disperser.ConfirmationInfo{
 		BatchHeaderHash:      batchHeaderHash,
-		BlobIndex:            expectedBlobIndex,
+		BlobIndex:            blobIndex,
 		SignatoryRecordHash:  expectedSignatoryRecordHash,
 		ReferenceBlockNumber: expectedReferenceBlockNumber,
 		BatchRoot:            expectedBatchRoot,

@@ -146,8 +146,9 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_GRAPH_URL:             graphUrl,
 		CHURNER_INDEXER_PULL_INTERVAL: "1s",
 
-		CHURNER_ENABLE_METRICS:    "true",
-		CHURNER_METRICS_HTTP_PORT: "9095",
+		CHURNER_ENABLE_METRICS:          "true",
+		CHURNER_METRICS_HTTP_PORT:       "9095",
+		CHURNER_CHURN_APPROVAL_INTERVAL: "900s",
 	}
 
 	env.applyDefaults(&v, "CHURNER", "churner", ind)

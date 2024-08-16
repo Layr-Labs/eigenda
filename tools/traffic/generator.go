@@ -98,7 +98,6 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 			&ctx,
 			&waitGroup,
 			logger,
-			workers.NewTicker(config.WorkerConfig.WriteRequestInterval),
 			&config.WorkerConfig,
 			disperserClient,
 			&statusVerifier,

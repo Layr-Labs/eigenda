@@ -828,7 +828,7 @@ func TestCreateMinibatch(t *testing.T) {
 	assert.Nil(t, res)
 	assert.ErrorContains(t, err, "GetEncodedBlob: no such key")
 
-	err = encodingStreamer.UpdateReferenecBlock(15)
+	err = encodingStreamer.UpdateReferenceBlock(15)
 	assert.Nil(t, err)
 	assert.Equal(t, encodingStreamer.ReferenceBlockNumber, uint(15))
 

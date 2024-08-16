@@ -20,6 +20,7 @@ type Config struct {
 	EigenDAServiceManagerAddr     string
 
 	PerPublicKeyRateLimit time.Duration
+	ChurnApprovalInterval time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -34,6 +35,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
+		ChurnApprovalInterval:         ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),

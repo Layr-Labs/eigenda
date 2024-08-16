@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	// dynamoBatchLimit is the maximum number of items that can be written in a single batch
-	dynamoBatchLimit = 25
+	// dynamoBatchWriteLimit is the maximum number of items that can be written in a single batch
+	dynamoBatchWriteLimit = 25
+	// dynamoBatchReadLimit is the maximum number of items that can be read in a single batch
+	dynamoBatchReadLimit = 100
 )
 
 type batchOperation uint
@@ -163,6 +165,15 @@ func (c *Client) GetItem(ctx context.Context, tableName string, key Key) (Item, 
 	return resp.Item, nil
 }
 
+func (c *Client) GetItems(ctx context.Context, tableName string, keys []Key) ([]Item, error) {
+	items, err := c.readItems(ctx, tableName, keys)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
 // QueryIndex returns all items in the index that match the given key
 func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues) ([]Item, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
@@ -277,7 +288,7 @@ func (c *Client) writeItems(ctx context.Context, tableName string, requestItems 
 	failedItems := make([]map[string]types.AttributeValue, 0)
 	for startIndex < len(requestItems) {
 		remainingNumKeys := float64(len(requestItems) - startIndex)
-		batchSize := int(math.Min(float64(dynamoBatchLimit), remainingNumKeys))
+		batchSize := int(math.Min(float64(dynamoBatchWriteLimit), remainingNumKeys))
 		writeRequests := make([]types.WriteRequest, batchSize)
 		for i := 0; i < batchSize; i += 1 {
 			item := requestItems[startIndex+i]
@@ -307,8 +318,42 @@ func (c *Client) writeItems(ctx context.Context, tableName string, requestItems 
 			}
 		}
 
-		startIndex += dynamoBatchLimit
+		startIndex += dynamoBatchWriteLimit
 	}
 
 	return failedItems, nil
+}
+
+func (c *Client) readItems(ctx context.Context, tableName string, keys []Key) ([]Item, error) {
+	startIndex := 0
+	items := make([]Item, 0)
+	for startIndex < len(keys) {
+		remainingNumKeys := float64(len(keys) - startIndex)
+		batchSize := int(math.Min(float64(dynamoBatchReadLimit), remainingNumKeys))
+		keysBatch := keys[startIndex : startIndex+batchSize]
+		output, err := c.dynamoClient.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+			RequestItems: map[string]types.KeysAndAttributes{
+				tableName: {
+					Keys: keysBatch,
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if len(output.Responses) > 0 {
+			for _, resp := range output.Responses {
+				items = append(items, resp...)
+			}
+		}
+
+		if output.UnprocessedKeys != nil {
+			keys = append(keys, output.UnprocessedKeys[tableName].Keys...)
+		}
+
+		startIndex += batchSize
+	}
+
+	return items, nil
 }

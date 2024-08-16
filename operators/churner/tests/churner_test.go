@@ -214,6 +214,7 @@ func newTestServer(t *testing.T) *churner.Server {
 		LoggerConfig:                  common.DefaultLoggerConfig(),
 		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetreiver,
 		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
+		ChurnApprovalInterval:         15 * time.Minute,
 	}
 
 	operatorTransactorChurner, err := createTransactorFromScratch(

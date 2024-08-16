@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"bytes"
 	"math/rand"
 	"testing"
 
@@ -93,5 +94,78 @@ func TestBundleEncoding(t *testing.T) {
 				assert.True(t, bundle[i].Coeffs[j].Equal(&decoded[i].Coeffs[j]))
 			}
 		}
+	}
+}
+
+func createChunksData(t *testing.T, seed int) (core.Bundle, *core.ChunksData, *core.ChunksData) {
+	bundle := createBundle(t, 64, 64, seed)
+	gobChunks := make([][]byte, len(bundle))
+	gnarkChunks := make([][]byte, len(bundle))
+	for i, frame := range bundle {
+		gobChunk, err := frame.Serialize()
+		assert.Nil(t, err)
+		gobChunks[i] = gobChunk
+
+		gnarkChunk, err := frame.SerializeGnark()
+		assert.Nil(t, err)
+		gnarkChunks[i] = gnarkChunk
+	}
+	gob := &core.ChunksData{
+		Chunks:   gobChunks,
+		Format:   core.GobChunkEncodingFormat,
+		ChunkLen: 64,
+	}
+	gnark := &core.ChunksData{
+		Chunks:   gnarkChunks,
+		Format:   core.GnarkChunkEncodingFormat,
+		ChunkLen: 64,
+	}
+	return bundle, gob, gnark
+}
+
+func TestChunksData(t *testing.T) {
+	numTrials := 16
+	for i := 0; i < numTrials; i++ {
+		bundle, gob, gnark := createChunksData(t, i)
+		assert.Equal(t, len(gob.Chunks), 64)
+		assert.Equal(t, len(gnark.Chunks), 64)
+		assert.Equal(t, gnark.Size(), uint64(64*(32+64*encoding.BYTES_PER_SYMBOL)))
+		// ToGobFormat
+		convertedGob, err := gob.ToGobFormat()
+		assert.Nil(t, err)
+		assert.Equal(t, convertedGob, gob)
+		convertedGob, err = gnark.ToGobFormat()
+		assert.Nil(t, err)
+		assert.Equal(t, len(gob.Chunks), len(convertedGob.Chunks))
+		for i := 0; i < len(gob.Chunks); i++ {
+			assert.True(t, bytes.Equal(gob.Chunks[i], convertedGob.Chunks[i]))
+		}
+		// ToGnarkFormat
+		convertedGnark, err := gnark.ToGnarkFormat()
+		assert.Nil(t, err)
+		assert.Equal(t, convertedGnark, gnark)
+		convertedGnark, err = gob.ToGnarkFormat()
+		assert.Nil(t, err)
+		assert.Equal(t, len(gnark.Chunks), len(convertedGnark.Chunks))
+		for i := 0; i < len(gnark.Chunks); i++ {
+			assert.True(t, bytes.Equal(gnark.Chunks[i], convertedGnark.Chunks[i]))
+		}
+		// FlattenToBundle
+		bytesFromChunksData, err := gnark.FlattenToBundle()
+		assert.Nil(t, err)
+		bytesFromBundle, err := bundle.Serialize()
+		assert.Nil(t, err)
+		assert.True(t, bytes.Equal(bytesFromChunksData, bytesFromBundle))
+		// Invalid cases
+		gnark.Chunks[0] = gnark.Chunks[0][1:]
+		_, err = gnark.FlattenToBundle()
+		assert.EqualError(t, err, "all chunks must be of same size")
+		_, err = gob.FlattenToBundle()
+		assert.EqualError(t, err, "unsupported chunk encoding format to flatten: 0")
+		gob.Format = core.ChunkEncodingFormat(3)
+		_, err = gob.ToGobFormat()
+		assert.EqualError(t, err, "unsupported chunk encoding format: 3")
+		_, err = gob.ToGnarkFormat()
+		assert.EqualError(t, err, "unsupported chunk encoding format: 3")
 	}
 }
