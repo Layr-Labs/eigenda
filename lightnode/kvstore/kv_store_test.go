@@ -102,22 +102,22 @@ func TestRandomOperations(t *testing.T) {
 
 	// LevelDB store
 
-	//store, err = NewLevelStore(logger, dbPath)
-	//assert.NoError(t, err)
-	//randomOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = ThreadSafeWrapper(store)
-	//assert.NoError(t, err)
-	//randomOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = BatchingWrapper(store, 32*5)
-	//assert.NoError(t, err)
-	//randomOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
+	store, err = NewLevelStore(logger, dbPath)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
 
 	// BadgerDB store
 
@@ -245,22 +245,22 @@ func TestBatchOperations(t *testing.T) {
 
 	// LevelDB store
 
-	//store, err = NewLevelStore(logger, dbPath)
-	//assert.NoError(t, err)
-	//batchOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = ThreadSafeWrapper(store)
-	//assert.NoError(t, err)
-	//batchOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = BatchingWrapper(store, 32*5)
-	//assert.NoError(t, err)
-	//batchOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
+	store, err = NewLevelStore(logger, dbPath)
+	assert.NoError(t, err)
+	batchOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	batchOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
+	assert.NoError(t, err)
+	batchOperationsTest(t, store)
+	verifyDBIsDeleted(t)
 
 	// BadgerDB store
 
@@ -334,22 +334,22 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 
 	// LevelDB store
 
-	//store, err = NewLevelStore(logger, dbPath)
-	//assert.NoError(t, err)
-	//operationsOnShutdownStoreTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = ThreadSafeWrapper(store)
-	//assert.NoError(t, err)
-	//operationsOnShutdownStoreTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = BatchingWrapper(store, 32*5)
-	//assert.NoError(t, err)
-	//operationsOnShutdownStoreTest(t, store)
-	//verifyDBIsDeleted(t)
+	store, err = NewLevelStore(logger, dbPath)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelStore(logger, dbPath)
+	store = ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
+
+	store, err = NewLevelStore(logger, dbPath)
+	store = BatchingWrapper(store, 32*5)
+	assert.NoError(t, err)
+	operationsOnShutdownStoreTest(t, store)
+	verifyDBIsDeleted(t)
 
 	// BadgerDB store
 	//store, err = NewBadgerStore(logger, dbPath)

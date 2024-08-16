@@ -162,30 +162,17 @@ func writeThenReadBenchmark(b *testing.B, store KVStore) {
 //	simpleWritingBenchmark(b, store)
 //}
 
-//func BenchmarkWritingLevelDB(b *testing.B) {
-//	fmt.Println("-------------------------------------------------- BenchmarkWritingLevelDB") // TODO
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(b, err)
-//
-//	store, err := NewLevelStore(logger, dbPath)
-//	assert.NoError(b, err)
-//
-//	simpleWritingBenchmark(b, store)
-//}
+func BenchmarkLevelDB(b *testing.B) {
+	fmt.Println("-------------------------------------------------- BenchmarkLevelDB") // TODO
 
-//func BenchmarkWritingBatchedLevelDB(b *testing.B) {
-//
-//	fmt.Println("-------------------------------------------------- BenchmarkWritingBatchedLevelDB") // TODO
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(b, err)
-//
-//	store, err := NewLevelStore(logger, dbPath)
-//	store = BatchingWrapper(store, 1024*32)
-//	assert.NoError(b, err)
-//	simpleWritingBenchmark(b, store)
-//}
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(b, err)
+
+	store, err := NewLevelStore(logger, dbPath)
+	assert.NoError(b, err)
+
+	writeThenReadBenchmark(b, store)
+}
 
 //func BenchmarkWritingBadgerDB(b *testing.B) {
 //
@@ -212,27 +199,14 @@ func writeThenReadBenchmark(b *testing.B, store KVStore) {
 //	simpleWritingBenchmark(b, store)
 //}
 
-//func BenchmarkWritingBatchedPebble(b *testing.B) {
+//func BenchmarkPebble(b *testing.B) {
 //
-//	fmt.Println("-------------------------------------------------- BenchmarkWritingPebbleDB") // TODO
+//	fmt.Println("-------------------------------------------------- BenchmarkPebbleDB") // TODO
 //
 //	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 //	assert.NoError(b, err)
 //
 //	store, err := NewPebbleStore(logger, dbPath)
-//	store = BatchingWrapper(store, 1024*1024*32)
 //	assert.NoError(b, err)
-//	simpleWritingBenchmark(b, store)
+//	writeThenReadBenchmark(b, store)
 //}
-
-func BenchmarkPebble(b *testing.B) {
-
-	fmt.Println("-------------------------------------------------- BenchmarkWritingPebbleDB") // TODO
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(b, err)
-
-	store, err := NewPebbleStore(logger, dbPath)
-	assert.NoError(b, err)
-	writeThenReadBenchmark(b, store)
-}
