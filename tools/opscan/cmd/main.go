@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
@@ -62,25 +64,51 @@ func RunScan(ctx *cli.Context) error {
 
 		operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 		retrievalSocket := operatorSocket.GetRetrievalSocket()
-		getNodeInfo(context.Background(), retrievalSocket, config.OperatorId, logger)
+		_ = getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
 
+	} else {
+		indexedOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 10, dataapi.Registered)
+
+		if err != nil {
+			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
+		}
+
+		semvers := make(map[string]int)
+		for _, operator := range indexedOperatorState.Operators {
+			operatorSocket := core.OperatorSocket(operator.IndexedOperatorInfo.Socket)
+			retrievalSocket := operatorSocket.GetRetrievalSocket()
+			semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
+			semvers[semver]++
+		}
+		logger.Info("NodeInfo", "semvers", semvers)
 	}
 	return nil
 }
 
-func getNodeInfo(ctx context.Context, socket string, operatorId string, logger logging.Logger) {
+func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logger logging.Logger) string {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Error("Failed to dial grpc operator socket", "operatorId", operatorId, "socket", socket, "error", err)
-		return
+		logger.Error("Failed to dial grpc operator socket", "socket", socket, "error", err)
+		return "unreachable"
 	}
 	defer conn.Close()
 	client := node.NewRetrievalClient(conn)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	reply, err := client.NodeInfo(ctx, &node.NodeInfoRequest{})
 	if err != nil {
-		logger.Info("NodeInfo", "operatorId", operatorId, "semver", "unknown")
-		return
+		var semver string
+		if strings.Contains(err.Error(), "Unimplemented") {
+			semver = "<0.8.0"
+		} else if strings.Contains(err.Error(), "DeadlineExceeded") {
+			semver = "timeout"
+		} else if strings.Contains(err.Error(), "Unavailable") {
+			semver = "refused"
+		}
+		logger.Warn("NodeInfo", "semver", semver, "error", err)
+		return semver
 	}
 
-	logger.Info("NodeInfo", "operatorId", operatorId, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+	logger.Info("NodeInfo", "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+	return reply.Semver
 }

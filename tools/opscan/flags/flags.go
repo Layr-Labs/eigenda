@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
@@ -24,11 +26,11 @@ var (
 		Usage:    "seconds to wait for GPRC response",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
-		Value:    3,
+		Value:    3 * time.Second,
 	}
 	MaxConnectionsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-connections"),
-		Usage:    "maximum number of connections to DA nodes (defaults to 20)",
+		Usage:    "maximum number of connections to DA nodes",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "MAX_CONNECTIONS"),
 		Value:    30,
