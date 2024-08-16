@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/opscan"
 	"github.com/Layr-Labs/eigenda/tools/opscan/flags"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -55,6 +56,7 @@ func RunScan(ctx *cli.Context) error {
 	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
 	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
 
+	semvers := make(map[string]int)
 	if config.OperatorId != "" {
 		operatorInfo, err := subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), config.OperatorId)
 		if err != nil {
@@ -64,7 +66,8 @@ func RunScan(ctx *cli.Context) error {
 
 		operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 		retrievalSocket := operatorSocket.GetRetrievalSocket()
-		_ = getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
+		semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
+		semvers[semver]++
 
 	} else {
 		indexedOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 10, dataapi.Registered)
@@ -73,7 +76,6 @@ func RunScan(ctx *cli.Context) error {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 		}
 
-		semvers := make(map[string]int)
 		for _, operator := range indexedOperatorState.Operators {
 			operatorSocket := core.OperatorSocket(operator.IndexedOperatorInfo.Socket)
 			retrievalSocket := operatorSocket.GetRetrievalSocket()
@@ -82,6 +84,7 @@ func RunScan(ctx *cli.Context) error {
 		}
 		logger.Info("NodeInfo", "semvers", semvers)
 	}
+	displayResults(semvers)
 	return nil
 }
 
@@ -111,4 +114,15 @@ func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logg
 
 	logger.Info("NodeInfo", "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
 	return reply.Semver
+}
+
+func displayResults(results map[string]int) {
+	tw := table.NewWriter()
+	rowHeader := table.Row{"semver", "count"}
+	tw.AppendHeader(rowHeader)
+
+	for semver, count := range results {
+		tw.AppendRow(table.Row{semver, count})
+	}
+	fmt.Println(tw.Render())
 }
