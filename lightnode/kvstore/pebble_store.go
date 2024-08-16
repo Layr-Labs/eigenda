@@ -23,7 +23,7 @@ type PebbleStore struct {
 
 func NewPebbleStore(logger logging.Logger, path string) (KVStore, error) {
 	db, err := pebble.Open(path, &pebble.Options{
-		DisableWAL: true,
+		//DisableWAL: true,
 	})
 	if err != nil {
 		return nil, err
