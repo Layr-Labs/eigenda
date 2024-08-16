@@ -76,7 +76,7 @@ func writeThenReadBenchmark(b *testing.B, store KVStore) {
 	bytesToWrite := 1 * 1024 * 1024 * 1024 // 1 GB
 	keysToWrite := bytesToWrite / valueSize
 
-	keysToRead := keysToWrite * 1
+	keysToRead := keysToWrite / 10
 
 	if store == nil {
 		panic("store is nil") // todo
@@ -147,12 +147,19 @@ func writeThenReadBenchmark(b *testing.B, store KVStore) {
 	timeToRead := doneReading.Sub(doneWriting)
 	timeToDestroy := doneDestroying.Sub(doneReading)
 
+	timeToWriteSeconds := float64(timeToWrite) / float64(time.Second)
+	timeToReadSeconds := float64(timeToRead) / float64(time.Second)
+	timeToDestroySeconds := float64(timeToDestroy) / float64(time.Second)
+
+	mbWrittenPerSecond := float64(bytesToWrite) / timeToWriteSeconds / float64(1024*1024)
+	mbReadPerSecond := float64(keysToRead*valueSize) / timeToReadSeconds / float64(1024*1024)
+
 	fmt.Printf("Bytes written: %d\n", bytesToWrite)
-	fmt.Printf("Time to write: %.1fs\n", float64(timeToWrite)/float64(time.Second))
-	fmt.Printf("Time to read: %.1fs\n", float64(timeToRead)/float64(time.Second))
-	fmt.Printf("Time to destroy: %.1fs\n", float64(timeToDestroy)/float64(time.Second))
-	fmt.Printf("Write speed: %.1f KB/s\n", float64(bytesToWrite)/float64(timeToWrite)/float64(1024*1024*1024))
-	fmt.Printf("Read speed: %.1f KB/s\n", float64(keysToRead*valueSize)/float64(timeToRead)/float64(1024*1024*1024))
+	fmt.Printf("Time to write: %.1fs\n", timeToWriteSeconds)
+	fmt.Printf("Time to read: %.1fs\n", timeToReadSeconds)
+	fmt.Printf("Time to destroy: %.1fs\n", timeToDestroySeconds)
+	fmt.Printf("Write speed: %.1f KB/s\n", mbWrittenPerSecond)
+	fmt.Printf("Read speed: %.1f KB/s\n", mbReadPerSecond)
 }
 
 //func BenchmarkWritingInMemory(b *testing.B) {
