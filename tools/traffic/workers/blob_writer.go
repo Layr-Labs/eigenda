@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	config2 "github.com/Layr-Labs/eigenda/tools/traffic/config"
+	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync"
@@ -26,7 +26,7 @@ type BlobWriter struct {
 	logger logging.Logger
 
 	// Config contains the configuration for the generator.
-	config *config2.WorkerConfig
+	config *config.WorkerConfig
 
 	// disperser is the client used to send blobs to the disperser.
 	disperser clients.DisperserClient
@@ -52,7 +52,7 @@ func NewBlobWriter(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	config *config2.WorkerConfig,
+	config *config.WorkerConfig,
 	disperser clients.DisperserClient,
 	unconfirmedKeyHandler KeyHandler,
 	generatorMetrics metrics.Metrics) BlobWriter {
