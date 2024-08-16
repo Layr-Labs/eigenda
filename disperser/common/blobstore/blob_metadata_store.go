@@ -3,6 +3,7 @@ package blobstore
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -27,24 +28,26 @@ const (
 //   - StatusIndex: (Partition Key: Status, Sort Key: RequestedAt) -> Metadata
 //   - BatchIndex: (Partition Key: BatchHeaderHash, Sort Key: BlobIndex) -> Metadata
 type BlobMetadataStore struct {
-	dynamoDBClient  *commondynamodb.Client
-	logger          logging.Logger
-	tableName       string
-	shadowTableName string
-	ttl             time.Duration
+	dynamoDBClient   *commondynamodb.Client
+	logger           logging.Logger
+	tableName        string
+	shadowTableName  string
+	shadowSampleRate float64
+	ttl              time.Duration
 }
 
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, shadowTableName string, ttl time.Duration) *BlobMetadataStore {
+func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, shadowTableName string, shadowSampleRate float64, ttl time.Duration) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	if shadowTableName != "" {
-		logger.Debugf("shadow blob metadata will be written to table %s with TTL: %s", shadowTableName, ttl)
+		logger.Debugf("shadow blob metadata will be written to table %s with sample rate: %s", shadowTableName, shadowSampleRate)
 	}
 	return &BlobMetadataStore{
-		dynamoDBClient:  dynamoDBClient,
-		logger:          logger.With("component", "BlobMetadataStore"),
-		tableName:       tableName,
-		shadowTableName: shadowTableName,
-		ttl:             ttl,
+		dynamoDBClient:   dynamoDBClient,
+		logger:           logger.With("component", "BlobMetadataStore"),
+		tableName:        tableName,
+		shadowTableName:  shadowTableName,
+		shadowSampleRate: shadowSampleRate,
+		ttl:              ttl,
 	}
 }
 
@@ -55,9 +58,11 @@ func (s *BlobMetadataStore) QueueNewBlobMetadata(ctx context.Context, blobMetada
 	}
 
 	if s.shadowTableName != "" && s.shadowTableName != s.tableName {
-		err = s.dynamoDBClient.PutItem(ctx, s.shadowTableName, item)
-		if err != nil {
-			s.logger.Error("failed to put item into shadow table %s : %v", s.shadowTableName, err)
+		if rand.Float64() < s.shadowSampleRate {
+			err = s.dynamoDBClient.PutItem(ctx, s.shadowTableName, item)
+			if err != nil {
+				s.logger.Error("failed to put item into shadow table %s : %v", s.shadowTableName, err)
+			}
 		}
 	}
 

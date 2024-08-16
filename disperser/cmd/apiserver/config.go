@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -23,6 +25,7 @@ type Config struct {
 	EnableRatelimiter bool
 	BucketTableName   string
 	ShadowTableName   string
+	ShadowSampleRate  float64
 	BucketStoreSize   int
 	EthClientConfig   geth.EthClientConfig
 	MaxBlobSize       int
@@ -48,6 +51,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
+	if ctx.GlobalFloat64(flags.ShadowSampleRateFlag.Name) < 0 || ctx.GlobalFloat64(flags.ShadowSampleRateFlag.Name) > 1 {
+		return Config{}, errors.New("shadow-sample-rate must be between 0.0 and 1.0")
+	}
+
 	config := Config{
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
@@ -55,9 +62,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
-			BucketName:      ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:       ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
-			ShadowTableName: ctx.GlobalString(flags.ShadowTableNameFlag.Name),
+			BucketName:       ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:        ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+			ShadowTableName:  ctx.GlobalString(flags.ShadowTableNameFlag.Name),
+			ShadowSampleRate: ctx.GlobalFloat64(flags.ShadowSampleRateFlag.Name),
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{

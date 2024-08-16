@@ -634,7 +634,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create dynamoDB client")
 	}
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, 1.0, time.Hour)
 
 	globalParams := common.GlobalRateParams{
 		CountFailed: false,

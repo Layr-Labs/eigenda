@@ -37,6 +37,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SHADOW_TABLE_NAME"),
 		Value:    "",
 	}
+	ShadowSampleRateFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "shadow-sample-rate"),
+		Usage:    "Shadow write sample rate between 0.0 - 1.0 (default 0.1 = 10%)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SHADOW_SAMPLE_RATE"),
+		Value:    0.1,
+	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "Port at which disperser listens for grpc calls",
@@ -118,6 +125,7 @@ var optionalFlags = []cli.Flag{
 	EnableRatelimiter,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
+	ShadowSampleRateFlag,
 	ShadowTableNameFlag,
 	MaxBlobSize,
 }

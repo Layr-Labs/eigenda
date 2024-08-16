@@ -106,8 +106,8 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, metadataTableName, time.Hour)
-	shadowBlobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
+	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, metadataTableName, 0.0, time.Hour)
+	shadowBlobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, 1.0, time.Hour)
 	sharedStorage = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 }
 
