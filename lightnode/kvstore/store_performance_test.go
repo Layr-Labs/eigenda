@@ -76,7 +76,7 @@ func writeThenReadBenchmark(b *testing.B, store KVStore) {
 	bytesToWrite := 1 * 1024 * 1024 * 1024 // 1 GB
 	keysToWrite := bytesToWrite / valueSize
 
-	keysToRead := keysToWrite * 10
+	keysToRead := keysToWrite * 1
 
 	if store == nil {
 		panic("store is nil") // todo
@@ -117,6 +117,11 @@ func writeThenReadBenchmark(b *testing.B, store KVStore) {
 	doneWriting := time.Now()
 
 	for i := 0; i < keysToRead; i++ {
+
+		if i%1000 == 0 {
+			fmt.Printf("reading %d\n", i) // TODO
+		}
+
 		keyIndex := rand.Intn(keysToWrite)
 
 		key := make([]byte, keySize)
