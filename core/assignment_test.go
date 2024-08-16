@@ -3,7 +3,6 @@ package core_test
 import (
 	"context"
 	"fmt"
-	"math"
 	"math/rand"
 	"testing"
 
@@ -198,9 +197,4 @@ func FuzzOperatorAssignments(f *testing.F) {
 
 	})
 
-}
-
-func nextPowerOf2(d uint64) uint64 {
-	nextPower := math.Ceil(math.Log2(float64(d)))
-	return uint64(math.Pow(2.0, nextPower))
 }

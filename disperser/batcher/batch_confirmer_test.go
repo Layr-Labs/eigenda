@@ -269,7 +269,7 @@ func TestBatchConfirmerIteration(t *testing.T) {
 
 	// Receive signatures
 	signChan := make(chan core.SigningMessage, 4)
-	batchHeaderHash := [32]byte{138, 1, 226, 93, 51, 120, 236, 124, 91, 206, 100, 187, 237, 1, 193, 151, 137, 131, 30, 218, 139, 24, 221, 105, 141, 253, 242, 13, 239, 199, 179, 42}
+	batchHeaderHash := [32]byte{114, 82, 109, 126, 137, 173, 194, 225, 212, 234, 30, 186, 248, 74, 84, 232, 208, 148, 180, 59, 47, 132, 180, 240, 17, 196, 76, 19, 16, 64, 156, 99}
 	for opID, opInfo := range operatorState.PrivateOperators {
 		signChan <- core.SigningMessage{
 			Signature:       opInfo.KeyPair.SignMessage(batchHeaderHash),
