@@ -68,15 +68,14 @@ type Config struct {
 	EthConfirmationDepth int64
 
 	// KZG vars
-	CacheDir string
-	G1Path string
-	G2Path string
+	CacheDir         string
+	G1Path           string
+	G2Path           string
 	G2PowerOfTauPath string
 
 	// Size constraints
 	MaxBlobLength      string
 	maxBlobLengthBytes uint64
-
 
 	// Memstore
 	MemstoreEnabled        bool

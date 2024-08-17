@@ -17,7 +17,6 @@ type DaSvcCommitment interface {
 
 type EigenDASvcCommitment []byte
 
-
 // NewEigenDASvcCommitment creates a new commitment from the given input.
 func NewEigenDASvcCommitment(input []byte) EigenDASvcCommitment {
 	return EigenDASvcCommitment(crypto.Keccak256(input))

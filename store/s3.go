@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"github.com/minio/minio-go/v7"
 	"io"
 	"path"
 	"time"
-	"github.com/minio/minio-go/v7"
 
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )

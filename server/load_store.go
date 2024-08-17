@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
-	
+
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -57,7 +57,7 @@ func LoadStoreRouter(cfg CLIConfig, ctx context.Context, log log.Logger) (*store
 	if err != nil {
 		return nil, err
 	}
-	
+
 	eigenda, err := store.NewEigenDAStore(
 		ctx,
 		client,

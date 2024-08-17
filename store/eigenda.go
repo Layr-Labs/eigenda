@@ -83,7 +83,6 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 	}
 	cert := (*verify.Certificate)(blobInfo)
 
-
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
 		return nil, err

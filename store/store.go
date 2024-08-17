@@ -2,7 +2,6 @@ package store
 
 import "context"
 
-
 type Stats struct {
 	Entries int
 	Reads   int

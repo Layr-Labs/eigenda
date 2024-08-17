@@ -158,7 +158,6 @@ func TestProxyClientWithOversizedBlob(t *testing.T) {
 func TestProxyClient_MultiSameContentBlobs_SameBatch(t *testing.T) {
 	t.Skip("Skipping test until fix is applied to holesky")
 
-
 	t.Parallel()
 
 	ts, kill := e2e.CreateTestSuite(t, useMemory(), false)
@@ -167,32 +166,32 @@ func TestProxyClient_MultiSameContentBlobs_SameBatch(t *testing.T) {
 	cfg := &client.Config{
 		URL: ts.Address(),
 	}
-	
+
 	errChan := make(chan error, 10)
 	var wg sync.WaitGroup
 
 	// disperse 10 blobs with the same content in the same batch
-	for i := 0; i < 4; i ++ {
+	for i := 0; i < 4; i++ {
 		wg.Add(1)
-		go func(){
+		go func() {
 			defer wg.Done()
 			daClient := client.New(cfg)
 			testPreimage := []byte("hellooooooooooo world!")
-		
+
 			t.Log("Setting input data on proxy server...")
 			blobInfo, err := daClient.SetData(ts.Ctx, testPreimage)
 			if err != nil {
 				errChan <- err
 				return
 			}
-		
+
 			t.Log("Getting input data from proxy server...")
 			preimage, err := daClient.GetData(ts.Ctx, blobInfo)
 			if err != nil {
 				errChan <- err
 				return
 			}
-			
+
 			if !utils.EqualSlices(preimage, testPreimage) {
 				errChan <- fmt.Errorf("expected preimage %s, got %s", testPreimage, preimage)
 				return
@@ -206,7 +205,7 @@ func TestProxyClient_MultiSameContentBlobs_SameBatch(t *testing.T) {
 	}
 
 	if len(errChan) > 0 {
-		// iterate over channel and log errors 
+		// iterate over channel and log errors
 		for i := 0; i < len(errChan); i++ {
 			err := <-errChan
 			t.Log(err.Error())
@@ -218,15 +217,15 @@ func TestProxyClient_MultiSameContentBlobs_SameBatch(t *testing.T) {
 // waitTimeout waits for the waitgroup for the specified max timeout.
 // Returns true if waiting timed out.
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
-    c := make(chan struct{})
-    go func() {
-        defer close(c)
-        wg.Wait()
-    }()
-    select {
-    case <-c:
-        return false
-    case <-time.After(timeout):
-        return true
-    }
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false
+	case <-time.After(timeout):
+		return true
+	}
 }

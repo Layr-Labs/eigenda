@@ -8,9 +8,9 @@ import (
 type CommitmentMode string
 
 const (
-	OptimismGeneric CommitmentMode = "optimism_keccak256"
-	OptimismAltDA CommitmentMode = "optimism_generic"
-	SimpleCommitmentMode   CommitmentMode = "simple"
+	OptimismGeneric      CommitmentMode = "optimism_keccak256"
+	OptimismAltDA        CommitmentMode = "optimism_generic"
+	SimpleCommitmentMode CommitmentMode = "simple"
 )
 
 func StringToCommitmentMode(s string) (CommitmentMode, error) {
@@ -49,7 +49,7 @@ func StringToDecodedCommitment(key string, c CommitmentMode) ([]byte, error) {
 		return b[3:], nil
 
 	case SimpleCommitmentMode: // [cert_version, ...]
-		return b[1:], nil		
+		return b[1:], nil
 
 	default:
 		return nil, fmt.Errorf("unknown commitment type")
@@ -57,22 +57,21 @@ func StringToDecodedCommitment(key string, c CommitmentMode) ([]byte, error) {
 }
 
 func EncodeCommitment(b []byte, c CommitmentMode) ([]byte, error) {
-	
+
 	switch c {
 	case OptimismGeneric:
 		return Keccak256Commitment(b).Encode(), nil
 
 	case OptimismAltDA:
-		certCommit :=  NewV0CertCommitment(b).Encode()
+		certCommit := NewV0CertCommitment(b).Encode()
 		svcCommit := EigenDASvcCommitment(certCommit).Encode()
 		altDACommit := NewGenericCommitment(svcCommit).Encode()
 		return altDACommit, nil
-	
+
 	case SimpleCommitmentMode:
 		return NewV0CertCommitment(b).Encode(), nil
 
 	}
 
 	return nil, fmt.Errorf("unknown commitment mode")
-}	
-
+}

@@ -1,6 +1,5 @@
 package commitments
 
-
 type CertEncodingCommitment byte
 
 const (
@@ -15,7 +14,6 @@ type CertCommitment interface {
 }
 
 type CertCommitmentV0 []byte
-
 
 // NewV0CertCommitment creates a new commitment from the given input.
 func NewV0CertCommitment(input []byte) CertCommitmentV0 {

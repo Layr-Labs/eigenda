@@ -21,7 +21,7 @@ var ErrBatchMetadataHashNotFound = errors.New("BatchMetadataHash not found for B
 // CertVerifier verifies the DA certificate against on-chain EigenDA contracts
 // to ensure disperser returned fields haven't been tampered with
 type CertVerifier struct {
-	l 				  log.Logger
+	l                    log.Logger
 	ethConfirmationDepth uint64
 	manager              *binding.ContractEigenDAServiceManagerCaller
 	ethClient            *ethclient.Client
@@ -42,7 +42,7 @@ func NewCertVerifier(cfg *Config, l log.Logger) (*CertVerifier, error) {
 	}
 
 	return &CertVerifier{
-		l: 				  l,
+		l:                    l,
 		manager:              m,
 		ethConfirmationDepth: cfg.EthConfirmationDepth,
 		ethClient:            client,
@@ -104,17 +104,17 @@ func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, bl
 
 func (cv *CertVerifier) getContextBlock() (*big.Int, error) {
 	var blockNumber *big.Int
-		blockHeader, err := cv.ethClient.BlockByNumber(context.Background(), nil)
-		if err != nil {
-			return nil, err
-		}
+	blockHeader, err := cv.ethClient.BlockByNumber(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
 
-		if cv.ethConfirmationDepth == 0 {
-			return blockHeader.Number(), nil
-		}
+	if cv.ethConfirmationDepth == 0 {
+		return blockHeader.Number(), nil
+	}
 
-		blockNumber = new(big.Int) 
-		blockNumber.Sub(blockHeader.Number(), big.NewInt(int64(cv.ethConfirmationDepth-1)))
+	blockNumber = new(big.Int)
+	blockNumber.Sub(blockHeader.Number(), big.NewInt(int64(cv.ethConfirmationDepth-1)))
 
 	return blockNumber, nil
 }

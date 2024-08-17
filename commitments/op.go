@@ -14,7 +14,6 @@ var ErrInvalidCommitment = errors.New("invalid commitment")
 // ErrCommitmentMismatch is returned when the commitment does not match the given input.
 var ErrCommitmentMismatch = errors.New("commitment mismatch")
 
-
 // OPCommitmentType is the commitment type prefix.
 type OPCommitmentType byte
 
@@ -35,8 +34,8 @@ func CommitmentTypeFromString(s string) (OPCommitmentType, error) {
 const (
 	Keccak256CommitmentType OPCommitmentType = 0
 	GenericCommitmentType   OPCommitmentType = 1
-	KeccakCommitmentString  string         = "KeccakCommitment"
-	GenericCommitmentString string         = "GenericCommitment"
+	KeccakCommitmentString  string           = "KeccakCommitment"
+	GenericCommitmentString string           = "GenericCommitment"
 )
 
 // OPCommitment is the binary representation of a commitment.
