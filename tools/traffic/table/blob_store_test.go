@@ -13,7 +13,7 @@ func randomMetadata(t *testing.T, permits int) *BlobMetadata {
 	checksum := [16]byte{}
 	_, _ = rand.Read(key)
 	_, _ = rand.Read(checksum[:])
-	metadata, err := NewBlobMetadata(key, checksum, 1024, 0, permits)
+	metadata, err := NewBlobMetadata(key, checksum, 1024, 0, nil, permits)
 	assert.Nil(t, err)
 
 	return metadata

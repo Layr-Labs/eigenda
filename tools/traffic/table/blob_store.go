@@ -60,3 +60,15 @@ func (store *BlobStore) Size() uint {
 
 	return uint(len(store.blobs))
 }
+
+// GetAll returns all blobs currently stored. For testing purposes only.
+func (store *BlobStore) GetAll() []*BlobMetadata {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
+	blobs := make([]*BlobMetadata, 0, len(store.blobs))
+	for _, blob := range store.blobs {
+		blobs = append(blobs, blob)
+	}
+	return blobs
+}

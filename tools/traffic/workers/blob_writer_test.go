@@ -26,6 +26,7 @@ func TestBlobWriter(t *testing.T) {
 	assert.Nil(t, err)
 
 	dataSize := rand.Uint64()%1024 + 64
+	encodedDataSize := len(codec.ConvertByPaddingEmptyByte(make([]byte, dataSize)))
 
 	authenticated := rand.Intn(2) == 0
 	var signerPrivateKey string
@@ -55,9 +56,7 @@ func TestBlobWriter(t *testing.T) {
 	}
 
 	disperserClient := &MockDisperserClient{}
-	unconfirmedKeyHandler := &MockKeyHandler{}
-	unconfirmedKeyHandler.mock.On(
-		"AddUnconfirmedKey", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	unconfirmedKeyChannel := make(chan *UnconfirmedKey, 100)
 
 	generatorMetrics := metrics.NewMockMetrics()
 
@@ -67,7 +66,7 @@ func TestBlobWriter(t *testing.T) {
 		logger,
 		config,
 		disperserClient,
-		unconfirmedKeyHandler,
+		unconfirmedKeyChannel,
 		generatorMetrics)
 
 	errorCount := 0
@@ -83,7 +82,7 @@ func TestBlobWriter(t *testing.T) {
 			errorToReturn = nil
 		}
 
-		// This is the key that will be assigned to the next blob.
+		// This is the Key that will be assigned to the next blob.
 		keyToReturn := make([]byte, 32)
 		_, err = rand.Read(keyToReturn)
 		assert.Nil(t, err)
@@ -96,21 +95,24 @@ func TestBlobWriter(t *testing.T) {
 		writer.writeNextBlob()
 
 		disperserClient.mock.AssertNumberOfCalls(t, functionName, 1)
-		unconfirmedKeyHandler.mock.AssertNumberOfCalls(t, "AddUnconfirmedKey", i+1-errorCount)
 
 		if errorToReturn == nil {
-
 			dataSentToDisperser := disperserClient.mock.Calls[0].Arguments.Get(0).([]byte)
 			assert.NotNil(t, dataSentToDisperser)
 
-			// Strip away the extra encoding bytes. We should have data of the expected size.
+			// Strip away the extra encoding bytes. We should have data of the expected Size.
 			decodedData := codec.RemoveEmptyByteFromPaddedBytes(dataSentToDisperser)
 			assert.Equal(t, dataSize, uint64(len(decodedData)))
 
-			// Verify that the proper data was sent to the unconfirmed key handler.
+			// Verify that the proper data was sent to the unconfirmed Key handler.
 			checksum := md5.Sum(dataSentToDisperser)
 
-			unconfirmedKeyHandler.mock.AssertCalled(t, "AddUnconfirmedKey", keyToReturn, checksum, uint(len(dataSentToDisperser)))
+			unconfirmedKey, ok := <-unconfirmedKeyChannel
+
+			assert.True(t, ok)
+			assert.Equal(t, keyToReturn, unconfirmedKey.Key)
+			assert.Equal(t, uint(encodedDataSize), unconfirmedKey.Size)
+			assert.Equal(t, checksum, unconfirmedKey.Checksum)
 
 			// Verify that data has the proper amount of randomness.
 			if previousData != nil {
