@@ -29,6 +29,8 @@ type Server struct {
 
 	runningRequests chan struct{}
 	requestPool     chan struct{}
+
+	maxConcurrentRequests int
 }
 
 func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
@@ -38,8 +40,9 @@ func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prove
 		prover:  prover,
 		metrics: metrics,
 
-		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:     make(chan struct{}, config.RequestPoolSize),
+		runningRequests:       make(chan struct{}, config.MaxConcurrentRequests),
+		requestPool:           make(chan struct{}, config.RequestPoolSize),
+		maxConcurrentRequests: config.MaxConcurrentRequests,
 	}
 }
 
@@ -71,6 +74,13 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 func (s *Server) popRequest() {
 	<-s.requestPool
 	<-s.runningRequests
+	s.updateCapacityMetrics()
+}
+
+func (s *Server) updateCapacityMetrics() {
+	runningRequests := len(s.runningRequests)
+	requestPool := len(s.requestPool)
+	s.metrics.UpdateCapacityMetrics(runningRequests, requestPool, s.maxConcurrentRequests)
 }
 
 func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {

@@ -1,3 +1,6 @@
+build_cpu:
+	go build -gcflags="all=-N -l" -ldflags="-s=false -w=false" -o bin/main_cpu main.go
+
 build_gpu:
 	CGO_LDFLAGS="-L/home/ec2-user/github/icicle/icicle/build/lib -g" go build -gcflags="all=-N -l" -ldflags="-s=false -w=false" -tags=gpu -o bin/main_gpu main.go
 
