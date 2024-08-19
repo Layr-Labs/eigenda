@@ -236,6 +236,10 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 // too large for the constraint in ValidateChunkLength
 func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, blobLength, targetNumChunks uint, param *SecurityParam) (uint, error) {
 
+	if targetNumChunks != 0 {
+		return 0, errors.New("not supported")
+	}
+
 	chunkLength := uint(MinChunkLength) * 2
 
 	for {
@@ -256,18 +260,6 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 
 		if chunkLength == blobLength {
 			return chunkLength, nil
-		}
-
-		if targetNumChunks != 0 {
-
-			_, info, err := c.GetAssignments(state, blobLength, quorumInfo)
-			if err != nil {
-				return 0, err
-			}
-
-			if info.TotalChunks <= targetNumChunks {
-				return chunkLength, nil
-			}
 		}
 
 		chunkLength *= 2
