@@ -84,7 +84,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		for opID, assignment := range quorumInfo.Assignments {
 			blobMessagesByOp[opID] = append(blobMessagesByOp[opID], &core.EncodedBlobMessage{
 				BlobHeader:     blobHeaders[i],
-				EncodedBundles: make(map[core.QuorumID]*core.ChunksData),
+				EncodedBundles: make(core.EncodedBundles),
 			})
 			blobMessagesByOp[opID][i].EncodedBundles[0].Format = core.GobChunkEncodingFormat
 			blobMessagesByOp[opID][i].EncodedBundles[0].ChunkLen = int(params.ChunkLength)
