@@ -3,7 +3,7 @@ module github.com/Layr-Labs/eigenda-proxy
 go 1.21
 
 require (
-	github.com/Layr-Labs/eigenda v0.7.5-0.20240626225853-1645ffe3489e
+	github.com/Layr-Labs/eigenda v0.8.0
 	github.com/consensys/gnark-crypto v0.12.1
 	github.com/ethereum-optimism/optimism v1.9.0
 	github.com/ethereum/go-ethereum v1.14.0
@@ -119,6 +119,7 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.3.1 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
+	github.com/iden3/go-iden3-crypto v0.0.16 // indirect
 	github.com/influxdata/influxdb-client-go/v2 v2.4.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
 	github.com/influxdata/line-protocol v0.0.0-20210311194329-9aa0e372d097 // indirect
@@ -221,10 +222,11 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/urfave/cli v1.22.14 // indirect
-	github.com/wealdtech/go-merkletree v1.0.1-0.20230205101955-ec7a95ea11ca // indirect
+	github.com/wealdtech/go-merkletree/v2 v2.6.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	go.uber.org/automaxprocs v1.5.2 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/fx v1.21.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
