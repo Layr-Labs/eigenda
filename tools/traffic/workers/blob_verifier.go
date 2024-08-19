@@ -13,18 +13,6 @@ import (
 	"time"
 )
 
-// unconfirmedKey is a key that has not yet been confirmed by the disperser service.
-type unconfirmedKey struct {
-	// The key of the blob.
-	key []byte
-	// The size of the blob in bytes.
-	size uint
-	// The checksum of the blob.
-	checksum [16]byte
-	// The time the blob was submitted to the disperser service.
-	submissionTime time.Time
-}
-
 // BlobVerifier periodically polls the disperser service to verify the status of blobs that were recently written.
 // When blobs become confirmed, the status verifier updates the blob blobsToRead accordingly.
 // This is a thread safe data structure.
@@ -49,13 +37,10 @@ type BlobVerifier struct {
 	dispenser clients.DisperserClient
 
 	// The keys of blobs that have not yet been confirmed by the disperser service.
-	unconfirmedKeys []*unconfirmedKey
+	unconfirmedKeys []*UnconfirmedKey
 
 	// Newly added keys that require verification.
-	keyChannel chan *unconfirmedKey
-
-	// ticker is used to control the rate at which blobs queried for status.
-	ticker InterceptableTicker
+	keyChannel chan *UnconfirmedKey
 
 	blobsInFlightMetric               metrics.GaugeMetric
 	getStatusLatencyMetric            metrics.LatencyMetric
@@ -75,8 +60,8 @@ func NewBlobVerifier(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	ticker InterceptableTicker,
 	config *config2.WorkerConfig,
+	keyChannel chan *UnconfirmedKey,
 	table *table.BlobTable,
 	disperser clients.DisperserClient,
 	generatorMetrics metrics.Metrics) BlobVerifier {
@@ -85,12 +70,11 @@ func NewBlobVerifier(
 		ctx:                               ctx,
 		waitGroup:                         waitGroup,
 		logger:                            logger,
-		ticker:                            ticker,
 		config:                            config,
+		keyChannel:                        keyChannel,
 		table:                             table,
 		dispenser:                         disperser,
-		unconfirmedKeys:                   make([]*unconfirmedKey, 0),
-		keyChannel:                        make(chan *unconfirmedKey, config.VerificationChannelCapacity),
+		unconfirmedKeys:                   make([]*UnconfirmedKey, 0),
 		blobsInFlightMetric:               generatorMetrics.NewGaugeMetric("blobs_in_flight"),
 		getStatusLatencyMetric:            generatorMetrics.NewLatencyMetric("get_status"),
 		confirmationLatencyMetric:         generatorMetrics.NewLatencyMetric("confirmation"),
@@ -105,16 +89,6 @@ func NewBlobVerifier(
 	}
 }
 
-// AddUnconfirmedKey adds a key to the list of unconfirmed keys.
-func (verifier *BlobVerifier) AddUnconfirmedKey(key []byte, checksum [16]byte, size uint) {
-	verifier.keyChannel <- &unconfirmedKey{
-		key:            key,
-		checksum:       checksum,
-		size:           size,
-		submissionTime: time.Now(),
-	}
-}
-
 // Start begins the status goroutine, which periodically polls
 // the disperser service to verify the status of blobs.
 func (verifier *BlobVerifier) Start() {
@@ -124,7 +98,7 @@ func (verifier *BlobVerifier) Start() {
 
 // monitor periodically polls the disperser service to verify the status of blobs.
 func (verifier *BlobVerifier) monitor() {
-	ticker := verifier.ticker.GetTimeChannel()
+	ticker := time.NewTicker(verifier.config.VerifierInterval)
 	for {
 		select {
 		case <-(*verifier.ctx).Done():
@@ -132,20 +106,20 @@ func (verifier *BlobVerifier) monitor() {
 			return
 		case key := <-verifier.keyChannel:
 			verifier.unconfirmedKeys = append(verifier.unconfirmedKeys, key)
-		case <-ticker:
+		case <-ticker.C:
 			verifier.poll()
 		}
 	}
 }
 
 // poll checks all unconfirmed keys to see if they have been confirmed by the disperser service.
-// If a key is confirmed, it is added to the blob table and removed from the list of unconfirmed keys.
+// If a Key is confirmed, it is added to the blob table and removed from the list of unconfirmed keys.
 func (verifier *BlobVerifier) poll() {
 
 	// FUTURE WORK If the number of unconfirmed blobs is high and the time to confirm is high, this is not efficient.
 	// Revisit this method if there are performance problems.
 
-	unconfirmedKeys := make([]*unconfirmedKey, 0)
+	unconfirmedKeys := make([]*UnconfirmedKey, 0)
 	for _, key := range verifier.unconfirmedKeys {
 		confirmed := verifier.checkStatusForBlob(key)
 		if !confirmed {
@@ -157,14 +131,14 @@ func (verifier *BlobVerifier) poll() {
 }
 
 // checkStatusForBlob checks the status of a blob. Returns true if the final blob status is known, false otherwise.
-func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
+func (verifier *BlobVerifier) checkStatusForBlob(key *UnconfirmedKey) bool {
 
 	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, verifier.config.GetBlobStatusTimeout)
 	defer cancel()
 
 	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](verifier.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
-			return verifier.dispenser.GetBlobStatus(ctxTimeout, key.key)
+			return verifier.dispenser.GetBlobStatus(ctxTimeout, key.Key)
 		})
 
 	if err != nil {
@@ -208,12 +182,12 @@ func (verifier *BlobVerifier) checkStatusForBlob(key *unconfirmedKey) bool {
 }
 
 // forwardToReader forwards a blob to the reader. Only called once the blob is ready to be read.
-func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *disperser.BlobStatusReply) {
+func (verifier *BlobVerifier) forwardToReader(key *UnconfirmedKey, status *disperser.BlobStatusReply) {
 	batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
 	blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 
 	confirmationTime := time.Now()
-	confirmationLatency := confirmationTime.Sub(key.submissionTime)
+	confirmationLatency := confirmationTime.Sub(key.SubmissionTime)
 	verifier.confirmationLatencyMetric.ReportLatency(confirmationLatency)
 
 	requiredDownloads := verifier.config.RequiredDownloads
@@ -238,7 +212,7 @@ func (verifier *BlobVerifier) forwardToReader(key *unconfirmedKey, status *dispe
 		downloadCount = int32(requiredDownloads)
 	}
 
-	blobMetadata, err := table.NewBlobMetadata(key.key, key.checksum, key.size, uint(blobIndex), batchHeaderHash, int(downloadCount))
+	blobMetadata, err := table.NewBlobMetadata(key.Key, key.Checksum, key.Size, uint(blobIndex), batchHeaderHash, int(downloadCount))
 	if err != nil {
 		verifier.logger.Error("failed to create blob metadata", "err:", err)
 		return

@@ -81,13 +81,15 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 
 	blobTable := table.NewBlobStore()
 
+	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
+
 	disperserClient := clients.NewDisperserClient(config.DisperserClientConfig, signer)
 	statusVerifier := workers.NewBlobVerifier(
 		&ctx,
 		&waitGroup,
 		logger,
-		workers.NewTicker(config.WorkerConfig.VerifierInterval),
 		&config.WorkerConfig,
+		unconfirmedKeyChannel,
 		blobTable,
 		disperserClient,
 		generatorMetrics)
@@ -100,7 +102,7 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 			logger,
 			&config.WorkerConfig,
 			disperserClient,
-			&statusVerifier,
+			unconfirmedKeyChannel,
 			generatorMetrics)
 		writers = append(writers, &writer)
 	}

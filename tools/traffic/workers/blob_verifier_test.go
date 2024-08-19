@@ -1,4 +1,4 @@
-package test
+package workers
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
-	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/rand"
 	"sync"
 	"testing"
@@ -61,8 +61,6 @@ func TestBlobVerifier(t *testing.T) {
 	waitGroup := sync.WaitGroup{}
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.Nil(t, err)
-	startTime := time.Unix(rand.Int63()%2_000_000_000, 0)
-	ticker := newMockTicker(startTime)
 
 	requiredDownloads := rand.Intn(10)
 	config := &config.WorkerConfig{
@@ -73,26 +71,24 @@ func TestBlobVerifier(t *testing.T) {
 
 	verifierMetrics := metrics.NewMockMetrics()
 
-	lock := sync.Mutex{}
+	disperserClient := &MockDisperserClient{}
 
-	disperserClient := newMockDisperserClient(t, &lock, true)
-
-	verifier := workers.NewBlobVerifier(
+	verifier := NewBlobVerifier(
 		&ctx,
 		&waitGroup,
 		logger,
-		ticker,
 		config,
+		make(chan *UnconfirmedKey),
 		blobTable,
 		disperserClient,
 		verifierMetrics)
-
-	verifier.Start()
 
 	expectedGetStatusCount := 0
 	statusCounts := make(map[disperser_rpc.BlobStatus]int)
 	checksums := make(map[string][16]byte)
 	sizes := make(map[string]uint)
+
+	statusMap := make(map[string]disperser_rpc.BlobStatus)
 
 	for i := 0; i < 100; i++ {
 
@@ -112,89 +108,95 @@ func TestBlobVerifier(t *testing.T) {
 			sizes[string(key)] = uint(size)
 
 			stringifiedKey := string(key)
-			disperserClient.StatusMap[stringifiedKey] = disperser_rpc.BlobStatus_UNKNOWN
+			statusMap[stringifiedKey] = disperser_rpc.BlobStatus_UNKNOWN
 
-			verifier.AddUnconfirmedKey(key, checksum, uint(size))
+			unconfirmedKey := &UnconfirmedKey{
+				Key:            key,
+				Checksum:       checksum,
+				Size:           uint(size),
+				SubmissionTime: time.Now(),
+			}
+
+			verifier.unconfirmedKeys = append(verifier.unconfirmedKeys, unconfirmedKey)
 		}
+
+		// Reset the mock disperser client.
+		disperserClient.mock = mock.Mock{}
+		expectedGetStatusCount = 0
 
 		// Choose some new statuses to be returned.
 		// Count the number of status queries we expect to see in this iteration.
-		for key, status := range disperserClient.StatusMap {
-			if !isStatusTerminal(status) {
+		for key, status := range statusMap {
+			var newStatus disperser_rpc.BlobStatus
+			if isStatusTerminal(status) {
+				newStatus = status
+			} else {
 				// Blobs in a non-terminal status will be queried again.
 				expectedGetStatusCount += 1
 				// Set the next status to be returned.
-				newStatus := getRandomStatus()
-				disperserClient.StatusMap[key] = newStatus
+				newStatus = getRandomStatus()
+				statusMap[key] = newStatus
+
 				statusCounts[newStatus] += 1
+			}
+			disperserClient.mock.On("GetBlobStatus", []byte(key)).Return(
+				&disperser_rpc.BlobStatusReply{
+					Status: newStatus,
+					Info: &disperser_rpc.BlobInfo{
+						BlobVerificationProof: &disperser_rpc.BlobVerificationProof{
+							BatchMetadata: &disperser_rpc.BatchMetadata{
+								BatchHeaderHash: make([]byte, 0),
+							},
+						},
+					},
+				}, nil)
+		}
+
+		// Simulate advancement of time, allowing the verifier to process the new keys.
+		verifier.poll()
+
+		// Validate the number of calls made to the disperser client.
+		disperserClient.mock.AssertNumberOfCalls(t, "GetBlobStatus", expectedGetStatusCount)
+
+		// Read the data in the table into a map for quick lookup.
+		tableData := make(map[string]*table.BlobMetadata)
+		for _, metadata := range blobTable.GetAll() {
+			tableData[string(metadata.Key)] = metadata
+		}
+
+		blobsInFlight := 0
+		for key, status := range statusMap {
+			metadata, present := tableData[key]
+
+			if !isStatusTerminal(status) {
+				blobsInFlight++
+			}
+
+			if isStatusSuccess(status) {
+				// Successful blobs should be in the table.
+				assert.True(t, present)
+			} else {
+				// Non-successful blobs should not be in the table.
+				assert.False(t, present)
+			}
+
+			// Verify metadata.
+			if present {
+				assert.Equal(t, checksums[key], metadata.Checksum)
+				assert.Equal(t, sizes[key], metadata.Size)
+				assert.Equal(t, requiredDownloads, metadata.RemainingReadPermits)
 			}
 		}
 
-		// Advance to the next cycle, allowing the verifier to process the new keys.
-		ticker.Tick(time.Second)
-
-		// Data is inserted asynchronously, so we may need to wait for it to be processed.
-		tu.AssertEventuallyTrue(t, func() bool {
-			lock.Lock()
-			defer lock.Unlock()
-
-			// Validate the number of calls made to the disperser client.
-			if int(disperserClient.GetStatusCount) < expectedGetStatusCount {
-				return false
-			}
-
-			// Read the data in the table into a map for quick lookup.
-			tableData := make(map[string]*table.BlobMetadata)
-
-			for _, metadata := range blobTable.GetAll() {
-				tableData[string(metadata.Key)] = metadata
-			}
-
-			blobsInFlight := 0
-			for key, status := range disperserClient.StatusMap {
-				metadata, present := tableData[key]
-
-				if !isStatusTerminal(status) {
-					blobsInFlight++
-				}
-
-				if isStatusSuccess(status) {
-					// Successful blobs should be in the table.
-					if !present {
-						// Blob might not yet be in table due to timing.
-						return false
-					}
-				} else {
-					// Non-successful blobs should not be in the table.
-					assert.False(t, present)
-				}
-
-				// Verify metadata.
-				if present {
-					assert.Equal(t, checksums[key], metadata.Checksum)
-					assert.Equal(t, sizes[key], metadata.Size)
-					assert.Equal(t, requiredDownloads, metadata.RemainingReadPermits)
-				}
-			}
-
-			// Verify metrics.
-			for status, count := range statusCounts {
-				metricName := fmt.Sprintf("get_status_%s", status.String())
-				if float64(count) != verifierMetrics.GetCount(metricName) {
-					return false
-				}
-			}
-			if float64(blobsInFlight) != verifierMetrics.GetGaugeValue("blobs_in_flight") {
-				fmt.Printf("expected blobs_in_flight to be %d, got %f\n", blobsInFlight, verifierMetrics.GetCount("blobs_in_flight"))
-				return false
-			}
-
-			return true
-		}, time.Second)
+		// Verify metrics.
+		for status, count := range statusCounts {
+			metricName := fmt.Sprintf("get_status_%s", status.String())
+			assert.Equal(t, float64(count), verifierMetrics.GetCount(metricName))
+		}
+		if float64(blobsInFlight) != verifierMetrics.GetGaugeValue("blobs_in_flight") {
+			assert.Equal(t, float64(blobsInFlight), verifierMetrics.GetGaugeValue("blobs_in_flight"))
+		}
 	}
-
-	assert.Equal(t, expectedGetStatusCount, int(disperserClient.GetStatusCount))
-	assert.Equal(t, 0, int(disperserClient.DisperseCount))
 
 	cancel()
 	tu.ExecuteWithTimeout(func() {
