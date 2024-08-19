@@ -113,8 +113,8 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 		blobHeaders[z] = blobHeader
 
 		encodedBlob := core.EncodedBlob{
-			BlobHeader:        blobHeader,
-			BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+			BlobHeader:               blobHeader,
+			EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 		}
 		encodedBlobs[z] = encodedBlob
 
@@ -156,6 +156,14 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			if err != nil {
 				t.Fatal(err)
 			}
+			bytes := make([][]byte, 0, len(chunks))
+			for _, c := range chunks {
+				serialized, err := c.Serialize()
+				if err != nil {
+					t.Fatal(err)
+				}
+				bytes = append(bytes, serialized)
+			}
 
 			blobHeader.BlobCommitments = encoding.BlobCommitments{
 				Commitment:       commitments.Commitment,
@@ -167,13 +175,18 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			blobHeader.QuorumInfos = append(blobHeader.QuorumInfos, quorumHeader)
 
 			for id, assignment := range assignments {
-				_, ok := encodedBlob.BundlesByOperator[id]
+				chunksData := &core.ChunksData{
+					Format:   core.GobChunkEncodingFormat,
+					ChunkLen: int(chunkLength),
+					Chunks:   bytes[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
+				}
+				_, ok := encodedBlob.EncodedBundlesByOperator[id]
 				if !ok {
-					encodedBlob.BundlesByOperator[id] = map[core.QuorumID]core.Bundle{
-						quorumID: chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks],
+					encodedBlob.EncodedBundlesByOperator[id] = map[core.QuorumID]*core.ChunksData{
+						quorumID: chunksData,
 					}
 				} else {
-					encodedBlob.BundlesByOperator[id][quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
+					encodedBlob.EncodedBundlesByOperator[id][quorumID] = chunksData
 				}
 			}
 
@@ -207,9 +220,13 @@ func checkBatchByUniversalVerifier(cst core.IndexedChainState, encodedBlobs []co
 		val.UpdateOperatorID(id)
 		blobMessages := make([]*core.BlobMessage, numBlob)
 		for z, encodedBlob := range encodedBlobs {
+			bundles, err := new(core.Bundles).FromEncodedBundles(encodedBlob.EncodedBundlesByOperator[id])
+			if err != nil {
+				return err
+			}
 			blobMessages[z] = &core.BlobMessage{
 				BlobHeader: encodedBlob.BlobHeader,
-				Bundles:    encodedBlob.BundlesByOperator[id],
+				Bundles:    bundles,
 			}
 		}
 		err := val.ValidateBatch(&header, blobMessages, state.OperatorState, pool)
