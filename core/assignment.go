@@ -206,11 +206,16 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
+		// Ensure that the max chunk length is not greater than the blob length
+		if maxChunkLength > blobLength {
+			maxChunkLength = blobLength
+		}
 
-		// Use larger of two max lengths. This ensures that the max length requirement does not push the number of chunks over the required limit.
-		if maxChunkLength < maxChunkLength2 {
-			maxChunkLength = maxChunkLength2
+		chunkLengthForMaxRequiredNumChunks := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
+
+		// We should not require the chunk length to be so small that the number of chunks is greater than the max required
+		if maxChunkLength < chunkLengthForMaxRequiredNumChunks {
+			maxChunkLength = chunkLengthForMaxRequiredNumChunks
 		}
 
 		maxChunkLength = uint(nextPowerOf2(uint64(maxChunkLength)))
