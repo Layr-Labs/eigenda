@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	cr "github.com/ingonyama-zk/icicle/v2/wrappers/golang/cuda_runtime"
 )
 
 type BenchmarkResult struct {
@@ -32,12 +31,13 @@ type BenchmarkResult struct {
 }
 
 type Config struct {
-	OutputFile string
-	BlobSize   uint64
-	NumChunks  uint64
-	NumRuns    uint64
-	CPUProfile string
-	MemProfile string
+	OutputFile         string
+	BlobSize           uint64
+	NumChunks          uint64
+	NumRuns            uint64
+	CPUProfile         string
+	MemProfile         string
+	ParallelStressTest bool
 }
 
 func parseFlags() Config {
@@ -48,6 +48,7 @@ func parseFlags() Config {
 	flag.Uint64Var(&config.NumRuns, "num-runs", 10, "Number of times to run the benchmark")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
+	flag.BoolVar(&config.ParallelStressTest, "parallel", false, "Enable parallel stress test")
 	flag.Parse()
 	return config
 }
@@ -58,9 +59,6 @@ func main() {
 	fmt.Println("Config output", config.OutputFile)
 
 	// Setup phase
-	numDevices, _ := cr.GetDeviceCount()
-	fmt.Println("num device ", numDevices)
-
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "/home/ec2-user/resources/kzg/g1.point",
 		G2Path:          "/home/ec2-user/resources/kzg/g2.point",
@@ -89,7 +87,12 @@ func main() {
 	}
 
 	// Run benchmarks in parallel
-	results := runParallelBenchmarks(p, &config)
+	var results []BenchmarkResult
+	if config.ParallelStressTest {
+		results = runParallelBenchmarks(p, &config)
+	} else {
+		results = runSingleBenchmark(p, &config)
+	}
 
 	if config.MemProfile != "" {
 		f, err := os.Create(config.MemProfile)
@@ -115,6 +118,10 @@ func main() {
 	}
 
 	fmt.Printf("Benchmark results written to %s\n", config.OutputFile)
+}
+
+func runSingleBenchmark(p *prover.Prover, config *Config) []BenchmarkResult {
+	return runBenchmark(p, config, 0)
 }
 
 func runBenchmark(p *prover.Prover, config *Config, coreId uint64) []BenchmarkResult {
