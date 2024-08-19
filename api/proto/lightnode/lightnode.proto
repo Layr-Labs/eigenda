@@ -3,63 +3,63 @@ package lightnode;
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/lightnode";
 
 service LightNode {
-  // GetChunk retrieves a specific chunk held by the light node.
-  rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
+	// GetChunk retrieves a specific chunk held by the light node.
+	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
 
-  // StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
-  // For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-  rpc StreamAvailabilityStatus(StreamAvailabilityStatusRequest) returns (stream SampledChunk) {}
+	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
+	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
+	rpc StreamAvailabilityStatus(StreamAvailabilityStatusRequest) returns (stream SampledChunk) {}
 }
 
 // TODO these message types are duplicated from node.proto, perhaps they should share a common definition
 
 // A request to retrieve a specific chunk.
 message GetChunkRequest {
-  // The hash of the blob's ReducedBatchHeader defined on-chain.
-  bytes batch_header_hash = 1;
-  // Which blob in the batch to retrieve for (note: a batch is logically an ordered
-  // list of blobs).
-  uint32 blob_index = 2;
-  // Which quorum of the blob to retrieve for (note: a blob can have multiple
-  // quorums and the chunks for different quorums at a Node can be different).
-  // The ID must be in range [0, 254].
-  uint32 quorum_id = 3;
-  // Which chunk in the blob to retrieve.
-  uint32 chunk_index = 4;
+	// The hash of the blob's ReducedBatchHeader defined on-chain.
+	bytes batch_header_hash = 1;
+	// Which blob in the batch to retrieve for (note: a batch is logically an ordered
+	// list of blobs).
+	uint32 blob_index = 2;
+	// Which quorum of the blob to retrieve for (note: a blob can have multiple
+	// quorums and the chunks for different quorums at a Node can be different).
+	// The ID must be in range [0, 254].
+	uint32 quorum_id = 3;
+	// Which chunk in the blob to retrieve.
+	uint32 chunk_index = 4;
 }
 
 // This describes how the chunks returned in GetChunkReply is encoded.
 enum ChunkEncodingFormat {
-  UNKNOWN = 0;
-  GNARK = 1;
-  GOB = 2;
+	UNKNOWN = 0;
+	GNARK = 1;
+	GOB = 2;
 }
 
 // A reply to RetrieveChunkRequest.
 message GetChunkReply {
-  // The chunk requested per RetrieveChunkRequest.
-  bytes chunk = 1;
-  // The encoding format of the chunk.
-  ChunkEncodingFormat chunk_encoding_format = 2;
+	// The chunk requested per RetrieveChunkRequest.
+	bytes chunk = 1;
+	// The encoding format of the chunk.
+	ChunkEncodingFormat chunk_encoding_format = 2;
 }
 
 // A request from a DA node to an agent light node to stream the availability status of all chunks
 // assigned to the light node.
 message StreamAvailabilityStatusRequest {
-  // TODO describe protocol for authentication
-  bytes authentication_token = 1;
+	// TODO describe protocol for authentication
+	bytes authentication_token = 1;
 }
 
 // For every chunk verified by an agent light node, the agent light node sends a message to its parent DA node
 // to indicate that the chunk is available.
 message SampledChunk {
-  // The hash of the blob's ReducedBatchHeader defined on-chain.
-  bytes batch_header_hash = 1;
-  // The index of a blob within its batch (note: a batch is logically an ordered
-  // list of blobs).
-  uint32 blob_index = 2;
-  // The quorum ID of the blob.
-  uint32 quorum_id = 3;
-  // Which chunk in the blob this light node is responsible for sampling.
-  uint32 chunk_index = 4;
+	// The hash of the blob's ReducedBatchHeader defined on-chain.
+	bytes batch_header_hash = 1;
+	// The index of a blob within its batch (note: a batch is logically an ordered
+	// list of blobs).
+	uint32 blob_index = 2;
+	// The quorum ID of the blob.
+	uint32 quorum_id = 3;
+	// Which chunk in the blob this light node is responsible for sampling.
+	uint32 chunk_index = 4;
 }
