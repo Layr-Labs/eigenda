@@ -6,9 +6,8 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
-import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
+import {EigenDABlobVerifier} from "../../src/core/EigenDABlobVerifier.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {EigenDABlobUtilsHarness} from "../harnesses/EigenDABlobUtilsHarness.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
 
@@ -26,8 +25,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     address confirmer = address(uint160(uint256(keccak256(abi.encodePacked("confirmer")))));
     address notConfirmer = address(uint160(uint256(keccak256(abi.encodePacked("notConfirmer")))));
     address rewardsInitiator = address(uint160(uint256(keccak256(abi.encodePacked("rewardsInitiator")))));
-
-    EigenDABlobUtilsHarness eigenDABlobUtilsHarness;
 
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
@@ -69,8 +66,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 )
             )
         );
-
-        eigenDABlobUtilsHarness = new EigenDABlobUtilsHarness();
     }
 
     function testVerifyBlob_TwoQuorums(uint256 pseudoRandomNumber) public {
@@ -103,7 +98,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -114,7 +109,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         }
 
         uint256 gasBefore = gasleft();
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
@@ -126,11 +121,11 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: batchMetadata does not match stored metadata");
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        cheats.expectRevert("EigenDABlobVerifier._verifyBlobForQuorums: batchMetadata does not match stored metadata");
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_InvalidMerkleProof(uint256 pseudoRandomNumber) public {
@@ -149,14 +144,14 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(bytes32(0));        
         blobVerificationProof.blobIndex = 1;
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: inclusion proof is invalid");
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        cheats.expectRevert("EigenDABlobVerifier._verifyBlobForQuorums: inclusion proof is invalid");
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_RandomNumberOfQuorums(uint256 pseudoRandomNumber) public {
@@ -189,7 +184,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -200,7 +195,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         }
 
         uint256 gasBefore = gasleft();
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
@@ -235,7 +230,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -245,8 +240,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: required quorums are not a subset of the confirmed quorums");
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        cheats.expectRevert("EigenDABlobVerifier._verifyBlobForQuorums: required quorums are not a subset of the confirmed quorums");
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
     }
 
     function xtestVerifyBlob_AdversayThresholdNotMet(uint256 pseudoRandomNumber) public {
@@ -257,8 +252,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         for (uint i = 0; i < numQuorumBlobParams; i++) {
-            blobHeader[0].quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader[0].quorumBlobParams[i].quorumNumber) - 1;
-            blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader[1].quorumBlobParams[i].quorumNumber) - 1;
+            blobHeader[0].quorumBlobParams[i].adversaryThresholdPercentage = eigenDAServiceManager.getQuorumAdversaryThresholdPercentage(blobHeader[0].quorumBlobParams[i].quorumNumber) - 1;
+            blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage = eigenDAServiceManager.getQuorumAdversaryThresholdPercentage(blobHeader[1].quorumBlobParams[i].quorumNumber) - 1;
         }
 
         IEigenDAServiceManager.BatchHeader memory batchHeader;
@@ -284,7 +279,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -294,8 +289,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: adversaryThresholdPercentage is not met");
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        cheats.expectRevert("EigenDABlobVerifier._verifyBlobForQuorums: adversaryThresholdPercentage is not met");
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_QuorumNumberMismatch(uint256 pseudoRandomNumber) public {
@@ -328,7 +323,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -339,8 +334,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
         }
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: quorumNumber does not match");
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        cheats.expectRevert("EigenDABlobVerifier._verifyBlobForQuorums: quorumNumber does not match");
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_QuorumThresholdNotMet(uint256 pseudoRandomNumber) public {
@@ -373,7 +368,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerifier.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -384,8 +379,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDARollupUtils.verifyBlob: confirmationThresholdPercentage is not met");
-        eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
+        cheats.expectRevert("EigenDABlobVerifier._verifyBlobForQuorums: confirmationThresholdPercentage is not met");
+        eigenDAServiceManager.verifyBlob(blobHeader[1], blobVerificationProof);
     }
 
     // generates a random blob header with the given coding ratio percentage as the ratio of original data to encoded data
@@ -415,7 +410,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
             
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAServiceManager.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
             blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
         }

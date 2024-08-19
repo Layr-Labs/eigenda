@@ -4,8 +4,9 @@ pragma solidity ^0.8.9;
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {IEigenDABatchMetadataStorage} from "./IEigenDABatchMetadataStorage.sol";
 
-interface IEigenDAServiceManager is IServiceManager {
+interface IEigenDAServiceManager is IServiceManager, IEigenDABatchMetadataStorage {
     // EVENTS
     
     /**
@@ -58,10 +59,7 @@ interface IEigenDAServiceManager is IServiceManager {
     }
 
     // FUNCTIONS
-
-    /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
-    function batchIdToBatchMetadataHash(uint32 batchId) external view returns(bytes32);
-
+    
     /**
      * @notice This function is used for
      * - submitting data availabilty certificates,
@@ -84,13 +82,4 @@ interface IEigenDAServiceManager is IServiceManager {
 
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns the bytes array of quorumsNumbersRequired
-    function quorumNumbersRequired() external view returns (bytes memory);
 }
