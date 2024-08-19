@@ -73,7 +73,7 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
         // Verify Eigenlayer contracts parsed from config
         _verifyContractPointers();
         _verifyImplementations();
-        _verifyContractsInitialized({isInitialDeployment: false});
+        _verifyContractsInitialized();
         _verifyInitializationParams();
     }
 

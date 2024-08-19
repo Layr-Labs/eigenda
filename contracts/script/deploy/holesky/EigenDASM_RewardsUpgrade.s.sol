@@ -18,7 +18,7 @@ import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.so
 import {EigenDAServiceManager} from "../../../src/core/EigenDAServiceManager.sol";
 
 /**
- * @title ServiceManagerBaseUpgrade for Preprod contracts.
+ * @title ServiceManagerBaseUpgrade for Testnet Holesky contracts.
  * Assumes EOA deploying has permissions to call the proxyAdmin to upgrade.
  *
  *
@@ -73,7 +73,7 @@ contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
         // Verify Eigenlayer contracts parsed from config
         _verifyContractPointers();
         _verifyImplementations();
-        _verifyContractsInitialized({isInitialDeployment: false});
+        _verifyContractsInitialized();
         _verifyInitializationParams();
     }
 
