@@ -60,8 +60,8 @@ var (
 	retrievalClient   clients.RetrievalClient
 	blobHeader        *core.BlobHeader
 	encodedBlob       core.EncodedBlob = core.EncodedBlob{
-		BlobHeader:        nil,
-		BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+		BlobHeader:               nil,
+		EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 	}
 	batchHeaderHash        [32]byte
 	batchRoot              [32]byte
@@ -198,7 +198,11 @@ func setup(t *testing.T) {
 		bundles := make(map[core.QuorumID]core.Bundle, len(blobHeader.QuorumInfos))
 		bundles[quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
 		encodedBlob.BlobHeader = blobHeader
-		encodedBlob.BundlesByOperator[id] = bundles
+		eb, err := core.Bundles(bundles).ToEncodedBundles()
+		if err != nil {
+			t.Fatal(err)
+		}
+		encodedBlob.EncodedBundlesByOperator[id] = eb
 	}
 
 }

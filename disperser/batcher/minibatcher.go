@@ -314,16 +314,16 @@ func (b *Minibatcher) SendBlobsToOperatorWithRetries(
 	opID core.OperatorID,
 	maxNumRetries int,
 ) ([]*core.Signature, error) {
-	blobMessages := make([]*core.BlobMessage, 0)
+	blobMessages := make([]*core.EncodedBlobMessage, 0)
 	hasAnyBundles := false
 	for _, blob := range blobs {
-		if _, ok := blob.BundlesByOperator[opID]; ok {
+		if _, ok := blob.EncodedBundlesByOperator[opID]; ok {
 			hasAnyBundles = true
 		}
-		blobMessages = append(blobMessages, &core.BlobMessage{
+		blobMessages = append(blobMessages, &core.EncodedBlobMessage{
 			BlobHeader: blob.BlobHeader,
 			// Bundles will be empty if the operator is not in the quorums blob is dispersed on
-			Bundles: blob.BundlesByOperator[opID],
+			EncodedBundles: blob.EncodedBundlesByOperator[opID],
 		})
 	}
 	if !hasAnyBundles {
