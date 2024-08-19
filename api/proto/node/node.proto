@@ -27,12 +27,32 @@ service Dispersal {
 }
 
 service Retrieval {
-	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
+  // GetChunks retrieves all of the chunks for a blob held by the node.
+  rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
+	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
+	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
+	// StreamChunks requests a stream of chunks with a specific index.
+	rpc StreamChunks(stream StreamChunksRequest) returns (stream GetChunkReply) {}
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
-	// Retrieve node info metadata
-	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+	// StreamBlobHeaders streams the blob headers to the client.
+	rpc StreamBlobHeaders(StreamBlobHeadersRequest) returns (stream GetBlobHeaderReply) {}
+  // Retrieve node info metadata.
+  rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
+
+  /////////////////////////////////
+  // Deprecated RPCs, do not use //
+  /////////////////////////////////
+
+  // Deprecated: Use GetChunks instead.
+  rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {
+    option deprecated = true;
+  }
+
+  // Deprecated: Use GetNodeInfo instead.
+  rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {
+    option deprecated = true;
+  }
 }
 
 // Requests and replies
@@ -74,8 +94,17 @@ message AttestBatchReply {
 	bytes signature = 1;
 }
 
-message RetrieveChunksRequest {
-	// The hash of the ReducedBatchHeader defined onchain, see:
+// This describes how the chunks returned in GetChunksReply are encoded.
+// Used to facilitate the decoding of chunks.
+enum ChunkEncodingFormat {
+	UNKNOWN = 0;
+	GNARK = 1;
+	GOB = 2;
+}
+
+// Request all of the chunks for a blob held by the node.
+message GetChunksRequest {
+	// The hash of the ReducedBatchHeader defined on-chain, see:
 	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
 	// This identifies which batch to retrieve for.
 	bytes batch_header_hash = 1;
@@ -88,19 +117,43 @@ message RetrieveChunksRequest {
 	uint32 quorum_id = 3;
 }
 
-// This describes how the chunks returned in RetrieveChunksReply are encoded.
-// Used to facilitate the decoding of chunks.
-enum ChunkEncodingFormat {
-	UNKNOWN = 0;
-	GNARK = 1;
-	GOB = 2;
-}
-
-message RetrieveChunksReply {
+// Reply to GetChunksRequest.
+message GetChunksReply {
 	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
 	repeated bytes chunks = 1;
 	// How the above chunks are encoded.
 	ChunkEncodingFormat chunk_encoding_format = 2;
+}
+
+// A request to retrieve a specific chunk.
+message GetChunkRequest {
+	// The hash of the blob's ReducedBatchHeader defined on-chain.
+	bytes batch_header_hash = 1;
+	// Which blob in the batch to retrieve for (note: a batch is logically an ordered
+	// list of blobs).
+	uint32 blob_index = 2;
+	// Which quorum of the blob to retrieve for (note: a blob can have multiple
+	// quorums and the chunks for different quorums at a Node can be different).
+	// The ID must be in range [0, 254].
+	uint32 quorum_id = 3;
+	// Which chunk in the blob to retrieve.
+	uint32 chunk_index = 4;
+}
+
+// A reply to RetrieveChunkRequest.
+message GetChunkReply {
+	// The chunk requested per RetrieveChunkRequest.
+	bytes chunk = 1;
+	// The encoding format of the chunk.
+	ChunkEncodingFormat chunk_encoding_format = 2;
+}
+
+// Request that all new chunks with a particular index be sent to the client.
+message StreamChunksRequest {
+	// The quorum ID of the chunks to stream.
+	uint32 quorum_id = 1;
+	// The chunk index to start streaming from.
+	uint32 chunk_index = 2;
 }
 
 // See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
@@ -117,6 +170,12 @@ message GetBlobHeaderReply {
 	// the batch's MerkleProof.index-th blob.
 	// This can be checked against the batch root on chain.
 	MerkleProof proof = 2;
+}
+
+// Request that all new blob headers be sent to the client.
+message StreamBlobHeadersRequest {
+  // The quorum ID of the headers to stream.
+  uint32 quorum_id = 1;
 }
 
 message MerkleProof {
@@ -204,15 +263,61 @@ message BatchHeader {
 	uint32 reference_block_number = 3;
 }
 
-// Node info request
-message NodeInfoRequest {
+// Node info request.
+message GetNodeInfoRequest {
 }
 
-// Node info reply
+// Node info reply.
+message GetNodeInfoReply {
+  string semver = 1;
+  string arch = 2;
+  string os = 3;
+  uint32 num_cpu = 4;
+  uint64 mem_bytes = 5;
+}
+
+/////////////////////////////////////
+// Deprecated messages, do not use //
+/////////////////////////////////////
+
+// Deprecated: Use RetrieveChunkRequest instead.
+message RetrieveChunksRequest {
+  // Use GetChunksRequest instead.
+  option deprecated = true;
+  // The hash of the ReducedBatchHeader defined on-chain, see:
+  // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+  // This identifies which batch to retrieve for.
+  bytes batch_header_hash = 1;
+  // Which blob in the batch to retrieve for (note: a batch is logically an ordered
+  // list of blobs).
+  uint32 blob_index = 2;
+  // Which quorum of the blob to retrieve for (note: a blob can have multiple
+  // quorums and the chunks for different quorums at a Node can be different).
+  // The ID must be in range [0, 254].
+  uint32 quorum_id = 3;
+}
+
+// Deprecated: Use RetrieveChunkReply instead.
+message RetrieveChunksReply {
+  // Use GetChunksReply instead.
+  option deprecated = true;
+  // All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
+  repeated bytes chunks = 1;
+  // How the above chunks are encoded.
+  ChunkEncodingFormat chunk_encoding_format = 2;
+}
+
+// Deprecated: Use GetNodeInfoRequest instead.
+message NodeInfoRequest {
+  option deprecated = true;
+}
+
+// Deprecated: Use NodeInfoReply instead.
 message NodeInfoReply {
-	string semver = 1;
-	string arch = 2;
-	string os = 3;
-	uint32 num_cpu = 4;
-	uint64 mem_bytes = 5;
+  option deprecated = true;
+  string semver = 1;
+  string arch = 2;
+  string os = 3;
+  uint32 num_cpu = 4;
+  uint64 mem_bytes = 5;
 }
