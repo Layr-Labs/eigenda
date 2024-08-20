@@ -33,7 +33,7 @@ In the future, additional constraints on chunk length may be added; for instance
 
 **Index Assignment**
 
-For each operator $i$, let $S_i$ signify the amount of stake held by that operator. We want for the number of chunks assigned to operator $i$ to satisfy
+For each operator $i$, let $S_i$ signify the amount of stake held by that operator. We want the number of chunks assigned to operator $i$ to satisfy
 
 $$
 \frac{\gamma m_i C}{B} \ge \frac{S_i}{\sum_j S_j}
