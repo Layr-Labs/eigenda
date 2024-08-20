@@ -182,7 +182,7 @@ type Accumulator interface{
     // GetAccumulators extends GetAccumulator to multiple blocks
     GetAccumulators(header Header) (interface{},UpgradeFork,error)
 
-    // GetSyncPoint determines the blockNumber at which it needs to start syncing from based on both 1) its ability to full its entire state from the chain and 2) its indexing duration requirements.
+    // GetSyncPoint determines the blockNumber at which it needs to start syncing from based on both 1) its ability to fill its entire state from the chain and 2) its indexing duration requirements.
     GetSyncPoint(latestHeader Header) (uint64,error)
 
     // SetSyncPoint sets the Accumulator to operate in fast mode. 
