@@ -7,17 +7,30 @@ on:
     branches: [ "main" ]
 
 jobs:
-  golangci:
+  lint:
     # Linting job
     # https://github.com/golangci/golangci-lint-action
-    name: lint
+    name: Lint
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.21.x
+        cache: false  # managed by golangci-lint
+
+    - uses: golangci/golangci-lint-action@v3
+      name: Install golangci-lint
+      with:
+        version: latest
+        args: --help  # make lint will run the linter
+
+    - run: make lint
+      name: Lint
 
   go-sec:
     runs-on: ubuntu-latest
