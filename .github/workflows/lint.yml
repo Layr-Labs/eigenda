@@ -23,8 +23,11 @@ jobs:
         go-version: 1.21.x
         cache: false  # managed by golangci-lint
 
-    - run: make install-lint
-      name: install linter
+    - uses: golangci/golangci-lint-action@v3
+      name: Install golangci-lint
+      with:
+        version: latest
+        args: --help  # make lint will run the linter
 
     - run: make lint
       name: Lint
