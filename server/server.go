@@ -64,7 +64,12 @@ func NewServer(host string, port int, router *store.Router, log log.Logger, m me
 // WithMetrics is a middleware that records metrics for the route path.
 func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error, m metrics.Metricer) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		recordDur := m.RecordRPCServerRequest(r.URL.Path)
+		// we use a commitment schema (https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#commitment-schemas)
+		// where the first 3 bytes of the path are the commitment header
+		// commit type | da layer type | version byte
+		// we want to group all requests by commitment header, otherwise the prometheus metric labels will explode
+		commitmentHeader := r.URL.Path[:3]
+		recordDur := m.RecordRPCServerRequest(commitmentHeader)
 		defer recordDur()
 
 		return handleFn(w, r)
