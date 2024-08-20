@@ -1,10 +1,10 @@
-name: hygeiene
+name: lint
 
 on:
   push:
-    branches: [ "master", "development" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "master", "development" ]
+    branches: [ "main" ]
 
 jobs:
   golangci:
@@ -19,3 +19,15 @@ jobs:
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
           version: v1.52.1
+
+  go-sec:
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v3
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: ./...

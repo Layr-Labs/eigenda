@@ -1,6 +1,6 @@
 ![Compiles](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/build.yml/badge.svg)
 ![Unit Tests](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/unit-tests.yml/badge.svg)
-![Linter](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/gosec.yml/badge.svg)
+![Linter](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/lint.yml/badge.svg)
 ![Integration Tests](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/holesky-test.yml/badge.svg)
 
 # EigenDA Sidecar Proxy
