@@ -58,6 +58,10 @@ lint:
 
 	@golangci-lint run
 
+install-lint:
+	@echo "Installing golangci-lint..."
+	@sh -c $(GET_LINT_CMD)
+
 gosec:
 	@echo "Running security scan with gosec..."
 	gosec ./...
