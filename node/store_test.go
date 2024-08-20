@@ -327,6 +327,16 @@ func TestStoreBatchSuccess(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, s.HasKey(ctx, blobKey2))
 
+	// Check the chunks.
+	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, 0, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
+	assert.Equal(t, chunks, blobsProto[0].Bundles[0].Chunks)
+	chunks, format, err = s.GetChunks(ctx, batchHeaderHash, 1, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
+	assert.Equal(t, chunks, blobsProto[1].Bundles[0].Chunks)
+
 	// Store the batch again it should be no-op.
 	_, err = s.StoreBatch(ctx, batchHeader, blobs, blobsProto)
 	assert.NotNil(t, err)
@@ -452,15 +462,12 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.True(t, s.HasKey(ctx, blobIndexKey0))
 	assert.True(t, s.HasKey(ctx, blobIndexKey1))
 
-	var h [32]byte
 	bhh0, err := s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, 0)
 	assert.Nil(t, err)
-	copy(h[:], bhh0)
-	assert.Equal(t, blobHeaderHash0, h)
+	assert.Equal(t, blobHeaderHash0, bhh0)
 	bhh1, err := s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, 1)
 	assert.Nil(t, err)
-	copy(h[:], bhh1)
-	assert.Equal(t, blobHeaderHash1, h)
+	assert.Equal(t, blobHeaderHash1, bhh1)
 
 	// Check blob headers by GetBlobHeader method
 	var protoBlobHeader pb.BlobHeader

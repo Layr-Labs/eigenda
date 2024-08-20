@@ -21,7 +21,6 @@ const (
 	// batchMappingExpirationPrefix is the prefix of the batch mapping expiration key.
 	// This key is used to expire the batch to blob index mapping used to identify blob index in a full batch.
 	batchMappingExpirationPrefix = "_BATCHEXPIRATION_"
-	blobPrefix                   = "_BLOB_"      // The prefix of the blob key.
 	blobIndexPrefix              = "_BLOB_INDEX" // The prefix of the blob index key.
 )
 
@@ -40,8 +39,7 @@ func EncodeBlobKey(batchHeaderHash [32]byte, blobIndex int, quorumID core.Quorum
 }
 
 func EncodeBlobKeyByHash(blobHeaderHash [32]byte, quorumID core.QuorumID) ([]byte, error) {
-	prefix := []byte(blobHeaderPrefix)
-	buf := bytes.NewBuffer(append(prefix, blobHeaderHash[:]...))
+	buf := bytes.NewBuffer(blobHeaderHash[:])
 	err := binary.Write(buf, binary.LittleEndian, quorumID)
 	if err != nil {
 		return nil, err
@@ -50,8 +48,7 @@ func EncodeBlobKeyByHash(blobHeaderHash [32]byte, quorumID core.QuorumID) ([]byt
 }
 
 func EncodeBlobKeyByHashPrefix(blobHeaderHash [32]byte) []byte {
-	prefix := []byte(blobHeaderPrefix)
-	buf := bytes.NewBuffer(append(prefix, blobHeaderHash[:]...))
+	buf := bytes.NewBuffer(blobHeaderHash[:])
 	return buf.Bytes()
 }
 

@@ -413,7 +413,7 @@ func TestStoreBlobs(t *testing.T) {
 	}
 }
 
-func TestAttestBatch(t *testing.T) {
+func TestMinibatchDispersalAndRetrieval(t *testing.T) {
 	server := newTestServer(t, true)
 
 	reqToCopy, _, _, blobHeaders, _ := makeStoreChunksRequest(t, 66, 33)
@@ -503,6 +503,63 @@ func TestAttestBatch(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "commit not found in db"))
+
+	// Test GetChunks
+	p := &peer.Peer{
+		Addr: &net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: 3000,
+		},
+	}
+	ctx = peer.NewContext(context.Background(), p)
+	retrieveChunksReply, err := server.RetrieveChunks(ctx, &pb.RetrieveChunksRequest{
+		BatchHeaderHash: batchHeaderHash[:],
+		BlobIndex:       0,
+		QuorumId:        0,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrieveChunksReply.ChunkEncodingFormat)
+	assert.Len(t, retrieveChunksReply.GetChunks(), 1)
+	recovered, err := new(encoding.Frame).Deserialize(retrieveChunksReply.GetChunks()[0])
+	assert.NoError(t, err)
+	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
+	assert.NoError(t, err)
+	assert.Equal(t, recovered, chunk)
+
+	retrieveChunksReply, err = server.RetrieveChunks(ctx, &pb.RetrieveChunksRequest{
+		BatchHeaderHash: batchHeaderHash[:],
+		BlobIndex:       1,
+		QuorumId:        0,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrieveChunksReply.ChunkEncodingFormat)
+	assert.Len(t, retrieveChunksReply.GetChunks(), 1)
+	recovered, err = new(encoding.Frame).Deserialize(retrieveChunksReply.GetChunks()[0])
+	assert.NoError(t, err)
+	chunk, err = new(encoding.Frame).Deserialize(encodedChunk)
+	assert.NoError(t, err)
+	assert.Equal(t, recovered, chunk)
+
+	retrieveChunksReply, err = server.RetrieveChunks(ctx, &pb.RetrieveChunksRequest{
+		BatchHeaderHash: batchHeaderHash[:],
+		BlobIndex:       0,
+		QuorumId:        0,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrieveChunksReply.ChunkEncodingFormat)
+	assert.Len(t, retrieveChunksReply.GetChunks(), 1)
+	recovered, err = new(encoding.Frame).Deserialize(retrieveChunksReply.GetChunks()[0])
+	assert.NoError(t, err)
+	chunk, err = new(encoding.Frame).Deserialize(encodedChunk)
+	assert.NoError(t, err)
+	assert.Equal(t, recovered, chunk)
+
+	_, err = server.RetrieveChunks(ctx, &pb.RetrieveChunksRequest{
+		BatchHeaderHash: batchHeaderHash[:],
+		BlobIndex:       1,
+		QuorumId:        1,
+	})
+	assert.ErrorContains(t, err, "quorum ID 1 not found in blob header")
 }
 
 func TestRetrieveChunks(t *testing.T) {
