@@ -204,21 +204,19 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		}
 		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*percentMultiplier)), minStake)
 		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
-		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
+		maxChunkLength := nextPowerOf2(uint(roundUpDivideBig(num, denom).Uint64()))
 
 		// Ensure that the max chunk length is not greater than the blob length
 		if maxChunkLength > blobLength {
 			maxChunkLength = blobLength
 		}
 
-		chunkLengthForMaxRequiredNumChunks := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
+		chunkLengthForMaxRequiredNumChunks := nextPowerOf2(roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold)))
 
 		// We should not require the chunk length to be so small that the number of chunks is greater than the max required
 		if maxChunkLength < chunkLengthForMaxRequiredNumChunks {
 			maxChunkLength = chunkLengthForMaxRequiredNumChunks
 		}
-
-		maxChunkLength = uint(nextPowerOf2(uint64(maxChunkLength)))
 
 		if info.ChunkLength > maxChunkLength {
 			return false, fmt.Errorf("%w: chunk length: %d, max chunk length: %d", ErrChunkLengthTooLarge, info.ChunkLength, maxChunkLength)
@@ -244,10 +242,6 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 
 	for {
 
-		if chunkLength > blobLength {
-			return chunkLength / 2, nil
-		}
-
 		quorumInfo := &BlobQuorumInfo{
 			SecurityParam: *param,
 			ChunkLength:   chunkLength,
@@ -256,10 +250,6 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 		ok, err := c.ValidateChunkLength(state, blobLength, quorumInfo)
 		if err != nil || !ok {
 			return chunkLength / 2, nil
-		}
-
-		if chunkLength == blobLength {
-			return chunkLength, nil
 		}
 
 		chunkLength *= 2
@@ -282,7 +272,7 @@ func roundUpDivide(a, b uint) uint {
 
 }
 
-func nextPowerOf2(d uint64) uint64 {
+func nextPowerOf2(d uint) uint {
 	nextPower := math.Ceil(math.Log2(float64(d)))
-	return uint64(math.Pow(2.0, nextPower))
+	return uint(math.Pow(2.0, nextPower))
 }
