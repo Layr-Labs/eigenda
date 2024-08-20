@@ -39,7 +39,7 @@ func New(cfg *Config) ProxyClient {
 // when integration testing
 func (c *client) Health() error {
 	url := c.cfg.URL + "/health"
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -48,6 +48,7 @@ func (c *client) Health() error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("received bad status code: %d", resp.StatusCode)
@@ -62,7 +63,7 @@ func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct http request: %e", err)
+		return nil, fmt.Errorf("failed to construct http request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -83,7 +84,6 @@ func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 	}
 
 	return b, nil
-
 }
 
 // SetData writes raw byte data to DA and returns the respective certificate

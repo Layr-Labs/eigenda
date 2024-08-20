@@ -45,7 +45,8 @@ type Server struct {
 	listener   net.Listener
 }
 
-func NewServer(host string, port int, router *store.Router, log log.Logger, m metrics.Metricer) *Server {
+func NewServer(host string, port int, router *store.Router, log log.Logger,
+	m metrics.Metricer) *Server {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &Server{
 		m:        m,
@@ -62,7 +63,8 @@ func NewServer(host string, port int, router *store.Router, log log.Logger, m me
 }
 
 // WithMetrics is a middleware that records metrics for the route path.
-func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error, m metrics.Metricer) func(http.ResponseWriter, *http.Request) error {
+func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error,
+	m metrics.Metricer) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		// we use a commitment schema (https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#commitment-schemas)
 		// where the first 3 bytes of the path are the commitment header
@@ -77,12 +79,13 @@ func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error, m metr
 }
 
 // WithLogging is a middleware that logs the request method and URL.
-func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error, log log.Logger) func(http.ResponseWriter, *http.Request) {
+func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error,
+	log log.Logger) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Info("request", "method", r.Method, "url", r.URL)
 		err := handleFn(w, r)
 		if err != nil { // #nosec G104
-			w.Write([]byte(err.Error()))
+			w.Write([]byte(err.Error())) //nolint:errcheck // ignore error
 			log.Error(err.Error())
 		}
 	}
@@ -144,13 +147,12 @@ func (svr *Server) Stop() error {
 	}
 	return nil
 }
-func (svr *Server) Health(w http.ResponseWriter, r *http.Request) error {
+func (svr *Server) Health(w http.ResponseWriter, _ *http.Request) error {
 	w.WriteHeader(http.StatusOK)
 	return nil
 }
 
 func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) error {
-
 	ct, err := ReadCommitmentMode(r)
 	if err != nil {
 		svr.WriteBadRequest(w, invalidCommitmentMode)
@@ -210,7 +212,6 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 			w.WriteHeader(http.StatusInternalServerError)
 			return err
 		}
-
 	} else { // without
 		commitment, err = svr.router.PutWithoutKey(context.Background(), input)
 		if err != nil {
@@ -263,35 +264,33 @@ func (svr *Server) Port() int {
 func ReadCommitmentMode(r *http.Request) (commitments.CommitmentMode, error) {
 	query := r.URL.Query()
 	key := query.Get(CommitmentModeKey)
-	if key == "" { // default
-		commit := path.Base(r.URL.Path)
-		if len(commit) > 0 && commit != "put" { // provided commitment in request params
-			if !strings.HasPrefix(commit, "0x") {
-				commit = "0x" + commit
-			}
-
-			decodedCommit, err := hexutil.Decode(commit)
-			if err != nil {
-				return commitments.SimpleCommitmentMode, err
-			}
-
-			switch decodedCommit[0] {
-			case byte(commitments.GenericCommitmentType):
-				return commitments.OptimismAltDA, nil
-
-			case byte(commitments.Keccak256CommitmentType):
-				return commitments.OptimismGeneric, nil
-
-			default:
-				return commitments.SimpleCommitmentMode, fmt.Errorf("unknown commit byte prefix")
-
-			}
-		}
-
-		return commitments.OptimismAltDA, nil
+	if key != "" {
+		return commitments.StringToCommitmentMode(key)
 	}
 
-	return commitments.StringToCommitmentMode(key)
+	commit := path.Base(r.URL.Path)
+	if len(commit) > 0 && commit != "put" { // provided commitment in request params
+		if !strings.HasPrefix(commit, "0x") {
+			commit = "0x" + commit
+		}
+
+		decodedCommit, err := hexutil.Decode(commit)
+		if err != nil {
+			return commitments.SimpleCommitmentMode, err
+		}
+
+		switch decodedCommit[0] {
+		case byte(commitments.GenericCommitmentType):
+			return commitments.OptimismAltDA, nil
+
+		case byte(commitments.Keccak256CommitmentType):
+			return commitments.OptimismGeneric, nil
+
+		default:
+			return commitments.SimpleCommitmentMode, fmt.Errorf("unknown commit byte prefix")
+		}
+	}
+	return commitments.OptimismAltDA, nil
 }
 
 func (svr *Server) GetMemStats() *store.Stats {

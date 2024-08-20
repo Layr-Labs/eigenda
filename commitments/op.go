@@ -128,7 +128,7 @@ func DecodeGenericCommitment(commitment []byte) (GenericCommitment, error) {
 	if len(commitment) == 0 {
 		return nil, ErrInvalidCommitment
 	}
-	return commitment[:], nil
+	return commitment, nil
 }
 
 // CommitmentType returns the commitment type of Generic Commitment.
@@ -141,7 +141,8 @@ func (c GenericCommitment) Encode() []byte {
 	return append([]byte{byte(GenericCommitmentType)}, c...)
 }
 
-// Verify always returns true for GenericCommitment because the DA Server must validate the data before returning it to the op-node.
-func (c GenericCommitment) Verify(input []byte) error {
+// Verify always returns true for GenericCommitment because the DA Server
+// must validate the data before returning it to the op-node.
+func (c GenericCommitment) Verify(_ []byte) error {
 	return nil
 }

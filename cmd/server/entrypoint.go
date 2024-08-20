@@ -30,7 +30,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	log.Info("Initializing EigenDA proxy server...")
 
-	daRouter, err := server.LoadStoreRouter(cfg, ctx, log)
+	daRouter, err := server.LoadStoreRouter(ctx, cfg, log)
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
@@ -38,9 +38,9 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server")
-	} else {
-		log.Info("Started EigenDA proxy server")
 	}
+
+	log.Info("Started EigenDA proxy server")
 
 	defer func() {
 		if err := server.Stop(); err != nil {

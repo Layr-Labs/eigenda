@@ -39,7 +39,7 @@ func ParseBytesAmount(s string) (uint64, error) {
 	// Convert numeric part to float64
 	num, err := strconv.ParseFloat(numStr, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid numeric value: %v", err)
+		return 0, fmt.Errorf("invalid numeric value: %w", err)
 	}
 
 	unit = strings.ToLower(strings.TrimSpace(unit))

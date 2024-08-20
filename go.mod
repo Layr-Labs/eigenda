@@ -3,7 +3,7 @@ module github.com/Layr-Labs/eigenda-proxy
 go 1.21
 
 require (
-	github.com/Layr-Labs/eigenda v0.8.0
+	github.com/Layr-Labs/eigenda v0.8.1-0.20240819231537-e4af079535b0
 	github.com/consensys/gnark-crypto v0.12.1
 	github.com/ethereum-optimism/optimism v1.9.0
 	github.com/ethereum/go-ethereum v1.14.0

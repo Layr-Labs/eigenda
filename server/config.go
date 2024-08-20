@@ -22,7 +22,7 @@ const (
 	EthConfirmationDepthFlagName         = "eigenda-eth-confirmation-depth"
 	StatusQueryRetryIntervalFlagName     = "eigenda-status-query-retry-interval"
 	StatusQueryTimeoutFlagName           = "eigenda-status-query-timeout"
-	DisableTlsFlagName                   = "eigenda-disable-tls"
+	DisableTLSFlagName                   = "eigenda-disable-tls"
 	ResponseTimeoutFlagName              = "eigenda-response-timeout"
 	CustomQuorumIDsFlagName              = "eigenda-custom-quorum-ids"
 	SignerPrivateKeyHexFlagName          = "eigenda-signer-private-key-hex"
@@ -82,9 +82,9 @@ type Config struct {
 	MemstoreBlobExpiration time.Duration
 }
 
-func (c *Config) GetMaxBlobLength() (uint64, error) {
-	if c.maxBlobLengthBytes == 0 {
-		numBytes, err := utils.ParseBytesAmount(c.MaxBlobLength)
+func (cfg *Config) GetMaxBlobLength() (uint64, error) {
+	if cfg.maxBlobLengthBytes == 0 {
+		numBytes, err := utils.ParseBytesAmount(cfg.MaxBlobLength)
 		if err != nil {
 			return 0, err
 		}
@@ -93,28 +93,28 @@ func (c *Config) GetMaxBlobLength() (uint64, error) {
 			return 0, fmt.Errorf("excluding disperser constraints on max blob size, SRS points constrain the maxBlobLength configuration parameter to be less than than %d bytes", MaxAllowedBlobSize)
 		}
 
-		c.maxBlobLengthBytes = numBytes
+		cfg.maxBlobLengthBytes = numBytes
 	}
 
-	return c.maxBlobLengthBytes, nil
+	return cfg.maxBlobLengthBytes, nil
 }
 
-func (c *Config) VerificationCfg() *verify.Config {
-	numBytes, err := c.GetMaxBlobLength()
+func (cfg *Config) VerificationCfg() *verify.Config {
+	numBytes, err := cfg.GetMaxBlobLength()
 	if err != nil {
 		panic(fmt.Errorf("failed to read max blob length: %w", err))
 	}
 
 	kzgCfg := &kzg.KzgConfig{
-		G1Path:          c.G1Path,
-		G2PowerOf2Path:  c.G2PowerOfTauPath,
-		CacheDir:        c.CacheDir,
+		G1Path:          cfg.G1Path,
+		G2PowerOf2Path:  cfg.G2PowerOfTauPath,
+		CacheDir:        cfg.CacheDir,
 		SRSOrder:        268435456,     // 2 ^ 32
 		SRSNumberToLoad: numBytes / 32, // # of fp.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	if c.EthRPC == "" || c.SvcManagerAddr == "" {
+	if cfg.EthRPC == "" || cfg.SvcManagerAddr == "" {
 		return &verify.Config{
 			Verify:    false,
 			KzgConfig: kzgCfg,
@@ -123,12 +123,11 @@ func (c *Config) VerificationCfg() *verify.Config {
 
 	return &verify.Config{
 		Verify:               true,
-		RPCURL:               c.EthRPC,
-		SvcManagerAddr:       c.SvcManagerAddr,
+		RPCURL:               cfg.EthRPC,
+		SvcManagerAddr:       cfg.SvcManagerAddr,
 		KzgConfig:            kzgCfg,
-		EthConfirmationDepth: uint64(c.EthConfirmationDepth),
+		EthConfirmationDepth: uint64(cfg.EthConfirmationDepth),
 	}
-
 }
 
 // ReadConfig parses the Config from the provided flags or environment variables.
@@ -146,7 +145,7 @@ func ReadConfig(ctx *cli.Context) Config {
 			RPC:                          ctx.String(EigenDADisperserRPCFlagName),
 			StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
 			StatusQueryTimeout:           ctx.Duration(StatusQueryTimeoutFlagName),
-			DisableTLS:                   ctx.Bool(DisableTlsFlagName),
+			DisableTLS:                   ctx.Bool(DisableTLSFlagName),
 			ResponseTimeout:              ctx.Duration(ResponseTimeoutFlagName),
 			CustomQuorumIDs:              ctx.UintSlice(CustomQuorumIDsFlagName),
 			SignerPrivateKeyHex:          ctx.String(SignerPrivateKeyHexFlagName),
@@ -241,7 +240,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVars: prefixEnvVars("STATUS_QUERY_INTERVAL"),
 		},
 		&cli.BoolFlag{
-			Name:    DisableTlsFlagName,
+			Name:    DisableTLSFlagName,
 			Usage:   "Disable TLS for gRPC communication with the EigenDA disperser. Default is false.",
 			Value:   false,
 			EnvVars: prefixEnvVars("GRPC_DISABLE_TLS"),

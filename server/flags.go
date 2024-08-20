@@ -48,7 +48,7 @@ func init() {
 	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
-	Flags = append(requiredFlags, optionalFlags...)
+	Flags = append(requiredFlags, optionalFlags...) //nolint:gocritic // this is a global variable
 }
 
 // Flags contains the list of configuration options available to the binary.

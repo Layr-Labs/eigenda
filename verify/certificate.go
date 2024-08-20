@@ -1,14 +1,9 @@
 package verify
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-)
-
-var (
-	ErrInvalidDomainType = fmt.Errorf("invalid domain type")
 )
 
 // G1Point struct to represent G1Point in Solidity

@@ -75,7 +75,6 @@ func NewMetrics(procName string) *Metrics {
 		registry:   registry,
 		factory:    factory,
 	}
-
 }
 
 // RecordInfo sets a pseudo-metric that contains versioning and
@@ -113,7 +112,7 @@ func (n *noopMetricer) Document() []metrics.DocumentedMetric {
 	return nil
 }
 
-func (n *noopMetricer) RecordInfo(version string) {
+func (n *noopMetricer) RecordInfo(_ string) {
 }
 
 func (n *noopMetricer) RecordUp() {

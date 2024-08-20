@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// ProcessInclusionProof processes the Merkle proof
+// ProcessInclusionProof processes the Merkle root proof
 func ProcessInclusionProof(proof []byte, leaf common.Hash, index uint64) (common.Hash, error) {
 	if len(proof) == 0 || len(proof)%32 != 0 {
 		return common.Hash{}, errors.New("proof length should be a multiple of 32 bytes or 256 bits")
@@ -26,7 +26,7 @@ func ProcessInclusionProof(proof []byte, leaf common.Hash, index uint64) (common
 		}
 
 		computedHash = crypto.Keccak256Hash(combined)
-		index = index / 2
+		index /= 2
 	}
 
 	return computedHash, nil

@@ -9,6 +9,7 @@ import (
 
 func TestParseByteAmount(t *testing.T) {
 	t.Parallel()
+
 	testCases := []struct {
 		input    string
 		expected uint64
@@ -43,6 +44,8 @@ func TestParseByteAmount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Input: %s", tc.input), func(t *testing.T) {
+			t.Parallel()
+
 			got, err := utils.ParseBytesAmount(tc.input)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("wantErr: %v, got error: %v", tc.wantErr, err)

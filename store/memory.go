@@ -42,7 +42,8 @@ type MemStore struct {
 var _ Store = (*MemStore)(nil)
 
 // NewMemStore ... constructor
-func NewMemStore(ctx context.Context, verifier *verify.Verifier, l log.Logger, maxBlobSizeBytes uint64, blobExpiration time.Duration) (*MemStore, error) {
+func NewMemStore(ctx context.Context, verifier *verify.Verifier, l log.Logger,
+	maxBlobSizeBytes uint64, blobExpiration time.Duration) (*MemStore, error) {
 	store := &MemStore{
 		l:                l,
 		keyStarts:        make(map[string]time.Time),
@@ -88,12 +89,11 @@ func (e *MemStore) pruneExpired() {
 			e.l.Info("blob pruned", "commit", commit)
 		}
 	}
-
 }
 
 // Get fetches a value from the store.
-func (e *MemStore) Get(ctx context.Context, commit []byte) ([]byte, error) {
-	e.reads += 1
+func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
+	e.reads++
 	e.RLock()
 	defer e.RUnlock()
 
@@ -119,7 +119,7 @@ func (e *MemStore) Get(ctx context.Context, commit []byte) ([]byte, error) {
 }
 
 // Put inserts a value into the store.
-func (e *MemStore) Put(ctx context.Context, value []byte) ([]byte, error) {
+func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	if uint64(len(value)) > e.maxBlobSizeBytes {
 		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.maxBlobSizeBytes)
 	}

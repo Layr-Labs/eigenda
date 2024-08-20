@@ -29,7 +29,6 @@ func NewRouter(eigenda *EigenDAStore, mem *MemStore, s3 *S3Store, l log.Logger) 
 }
 
 func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentMode) ([]byte, error) {
-
 	switch cm {
 	case commitments.OptimismGeneric:
 
@@ -44,7 +43,8 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 		}
 
 		if actualHash := crypto.Keccak256(value); !utils.EqualSlices(actualHash, key) {
-			return nil, fmt.Errorf("expected key %s to be the hash of value %s, but got %s", hexutil.Encode(key), hexutil.Encode(value), hexutil.Encode(actualHash))
+			return nil, fmt.Errorf("expected key %s to be the hash of value %s, but got %s",
+				hexutil.Encode(key), hexutil.Encode(value), hexutil.Encode(actualHash))
 		}
 
 		return value, nil
@@ -64,15 +64,13 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 				return nil, err
 			}
 			r.log.Info("Got data from S3 now verifying")
-			return r.eigenda.EncodeAndVerify(ctx, key, value)
+			return r.eigenda.EncodeAndVerify(key, value)
 		}
 		return data, err
 
 	default:
 		return nil, errors.New("could not determine which storage backend to route to based on unknown commitment mode")
-
 	}
-
 }
 
 func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error) {
@@ -86,48 +84,51 @@ func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, va
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
 	}
+}
 
+func (r *Router) putEigenDA(ctx context.Context, value []byte) ([]byte, error) {
+	r.log.Info("Storing data to eigenda backend")
+	result, err := r.eigenda.Put(ctx, value)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.s3 != nil && r.s3.cfg.Backup {
+		// we make a keccak of the commitment so that we get 32bytes (valid s3 key)
+		key := crypto.Keccak256(result)
+		r.log.Info("Storing data to S3 backend with key", "key", key)
+		ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
+		defer cancel()
+		err = r.s3.Put(ctx2, key, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return result, err
 }
 
 // PutWithoutKey ...
-func (r *Router) PutWithoutKey(ctx context.Context, value []byte) (key []byte, err error) {
+func (r *Router) PutWithoutKey(ctx context.Context, value []byte) ([]byte, error) {
 	if r.mem != nil {
 		r.log.Debug("Storing data to memstore")
 		return r.mem.Put(ctx, value)
 	}
 
 	if r.eigenda != nil {
-		r.log.Info("Storing data to eigenda backend")
-		//blob's commitment is verified and returned
-		result, err := r.eigenda.Put(ctx, value)
-		if err == nil {
-			if r.s3 != nil && r.s3.cfg.Backup {
-				//we make a keccak of the commitment so that we get 32bytes (valid s3 key)
-				key := crypto.Keccak256(result)
-				r.log.Info("Storing data to S3 backend with key", "key", key)
-				ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
-				defer cancel()
-				err = r.s3.Put(ctx2, key, value)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-		return result, err
+		return r.putEigenDA(ctx, value)
 	}
 
 	if r.s3 != nil {
 		r.log.Debug("Storing data to S3 backend")
 		commitment := crypto.Keccak256(value)
 
-		err = r.s3.Put(ctx, commitment, value)
+		err := r.s3.Put(ctx, commitment, value)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return nil, errors.New("no DA storage backend found")
-
 }
 
 // PutWithKey is only supported for S3 storage backends using OP's alt-da keccak256 commitment type

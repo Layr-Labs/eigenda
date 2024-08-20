@@ -53,6 +53,7 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 	}, nil
 }
 
+// verifies V0 eigenda certificate type
 func (v *Verifier) VerifyCert(cert *Certificate) error {
 	if !v.verifyCert {
 		return nil
@@ -86,6 +87,7 @@ func (v *Verifier) VerifyCert(cert *Certificate) error {
 	return nil
 }
 
+// compute kzg-bn254 commitment of raw blob data using SRS
 func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
 	inputFr, err := rs.ToFrArray(blob)
 	if err != nil {
@@ -122,8 +124,8 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 
 	errMsg := ""
 	if !actualCommit.X.Equal(expectedX) || !actualCommit.Y.Equal(expectedY) {
-		errMsg += fmt.Sprintf("field elements do not match, x actual commit: %x, x expected commit: %x, ", actualCommit.X.Marshal(), (*expectedX).Marshal())
-		errMsg += fmt.Sprintf("y actual commit: %x, y expected commit: %x", actualCommit.Y.Marshal(), (*expectedY).Marshal())
+		errMsg += fmt.Sprintf("field elements do not match, x actual commit: %x, x expected commit: %x, ", actualCommit.X.Marshal(), expectedX.Marshal())
+		errMsg += fmt.Sprintf("y actual commit: %x, y expected commit: %x", actualCommit.Y.Marshal(), expectedY.Marshal())
 		return fmt.Errorf(errMsg)
 	}
 
@@ -132,7 +134,6 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 
 // VerifySecurityParams ensures that returned security parameters are valid
 func (v *Verifier) VerifySecurityParams(blobHeader BlobHeader, batchHeader binding.IEigenDAServiceManagerBatchHeader) error {
-
 	confirmedQuorums := make(map[uint8]bool)
 
 	// require that the security param in each blob is met

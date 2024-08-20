@@ -55,7 +55,7 @@ func HashBatchMetadata(bh *binding.IEigenDAServiceManagerBatchHeader, sigHash [3
 
 	bytes, err := arguments.Pack(s)
 	if err != nil {
-		return [32]byte{}, nil
+		return [32]byte{}, err
 	}
 
 	headerHash := crypto.Keccak256Hash(bytes)
@@ -65,7 +65,6 @@ func HashBatchMetadata(bh *binding.IEigenDAServiceManagerBatchHeader, sigHash [3
 // HashBatchHashedMetadata hashes the given metadata into the commitment that will be stored in the contract
 // replicates: https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L19-L25
 func HashBatchHashedMetadata(batchHeaderHash [32]byte, signatoryRecordHash [32]byte, blockNumber uint32) (geth_common.Hash, error) {
-
 	// since the solidity function uses abi.encodePacked, we need to consolidate the byte space that
 	// blockNum occupies to only 4 bytes versus 28 or 256 bits when encoded to abi buffer
 	a := make([]byte, 4)
@@ -98,7 +97,6 @@ func HashBatchHashedMetadata(batchHeaderHash [32]byte, signatoryRecordHash [32]b
 
 // HashBlobHeader function to hash BlobHeader
 func HashBlobHeader(blobHeader BlobHeader) (geth_common.Hash, error) {
-
 	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "commitment", Type: "tuple", Components: []abi.ArgumentMarshaling{
 			{Name: "X", Type: "uint256"},

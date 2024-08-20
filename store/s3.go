@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"github.com/minio/minio-go/v7"
 	"io"
 	"path"
 	"time"
+
+	"github.com/minio/minio-go/v7"
 
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -58,7 +59,6 @@ func NewS3(cfg S3Config) (*S3Store, error) {
 }
 
 func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
-
 	result, err := s.client.GetObject(ctx, s.cfg.Bucket, path.Join(s.cfg.Path, hex.EncodeToString(key)), minio.GetObjectOptions{})
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
@@ -74,7 +74,7 @@ func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 	}
 
 	if s.cfg.Profiling {
-		s.stats.Reads += 1
+		s.stats.Reads++
 	}
 
 	return data, nil
@@ -87,7 +87,7 @@ func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
 	}
 
 	if s.cfg.Profiling {
-		s.stats.Entries += 1
+		s.stats.Entries++
 	}
 
 	return nil
@@ -100,7 +100,6 @@ func (s *S3Store) Stats() *Stats {
 func creds(cfg S3Config) *credentials.Credentials {
 	if cfg.S3CredentialType == S3CredentialIAM {
 		return credentials.NewIAM("")
-	} else {
-		return credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, "")
 	}
+	return credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, "")
 }

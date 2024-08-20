@@ -38,7 +38,6 @@ type TestSuite struct {
 }
 
 func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func()) {
-
 	ctx := context.Background()
 
 	// load signer key from environment
@@ -78,7 +77,7 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
 		CacheDir:               "../resources/SRSTables",
 		G1Path:                 "../resources/g1.point",
-		MaxBlobLength:          "2mib",
+		MaxBlobLength:          "4mib",
 		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
 		PutBlobEncodingVersion: 0x00,
 		MemstoreEnabled:        useMemory,
@@ -110,17 +109,14 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 			},
 		}
 	} else {
-
 		cfg = server.CLIConfig{
 			EigenDAConfig: eigendaCfg,
 			MetricsCfg:    opmetrics.CLIConfig{},
 		}
-
 	}
-
 	store, err := server.LoadStoreRouter(
-		cfg,
 		ctx,
+		cfg,
 		log,
 	)
 	require.NoError(t, err)
@@ -173,12 +169,12 @@ func createS3Bucket(bucketName string) {
 		// Check to see if we already own this bucket (which happens if you run this twice)
 		exists, errBucketExists := minioClient.BucketExists(ctx, bucketName)
 		if errBucketExists == nil && exists {
-			fmt.Printf("We already own %s\n", bucketName)
+			log.Info(fmt.Sprintf("We already own %s\n", bucketName))
 		} else {
 			panic(err)
 		}
 	} else {
-		fmt.Printf("Successfully created %s\n", bucketName)
+		log.Info(fmt.Sprintf("Successfully created %s\n", bucketName))
 	}
 }
 

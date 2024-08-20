@@ -121,46 +121,46 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, close := e2e.CreateTestSuite(gt, useMemory(), true)
-	defer close()
+	proxyTS, shutDown := e2e.CreateTestSuite(gt, useMemory(), true)
+	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
 
-	op_stack := NewL2PlasmaDA(t, proxyTS.Address(), false)
+	optimism := NewL2PlasmaDA(t, proxyTS.Address(), false)
 
 	// build L1 block #1
-	op_stack.ActL1Blocks(t, 1)
-	op_stack.miner.ActL1SafeNext(t)
+	optimism.ActL1Blocks(t, 1)
+	optimism.miner.ActL1SafeNext(t)
 
 	// Fill with l2 blocks up to the L1 head
-	op_stack.sequencer.ActL1HeadSignal(t)
-	op_stack.sequencer.ActBuildToL1Head(t)
+	optimism.sequencer.ActL1HeadSignal(t)
+	optimism.sequencer.ActBuildToL1Head(t)
 
-	op_stack.sequencer.ActL2PipelineFull(t)
-	op_stack.sequencer.ActL1SafeSignal(t)
-	require.Equal(t, uint64(1), op_stack.sequencer.SyncStatus().SafeL1.Number)
+	optimism.sequencer.ActL2PipelineFull(t)
+	optimism.sequencer.ActL1SafeSignal(t)
+	require.Equal(t, uint64(1), optimism.sequencer.SyncStatus().SafeL1.Number)
 
 	// add L1 block #2
-	op_stack.ActL1Blocks(t, 1)
-	op_stack.miner.ActL1SafeNext(t)
-	op_stack.miner.ActL1FinalizeNext(t)
-	op_stack.sequencer.ActL1HeadSignal(t)
-	op_stack.sequencer.ActBuildToL1Head(t)
+	optimism.ActL1Blocks(t, 1)
+	optimism.miner.ActL1SafeNext(t)
+	optimism.miner.ActL1FinalizeNext(t)
+	optimism.sequencer.ActL1HeadSignal(t)
+	optimism.sequencer.ActBuildToL1Head(t)
 
 	// Catch up derivation
-	op_stack.sequencer.ActL2PipelineFull(t)
-	op_stack.sequencer.ActL1FinalizedSignal(t)
-	op_stack.sequencer.ActL1SafeSignal(t)
+	optimism.sequencer.ActL2PipelineFull(t)
+	optimism.sequencer.ActL1FinalizedSignal(t)
+	optimism.sequencer.ActL1SafeSignal(t)
 
 	// commit all the l2 blocks to L1
-	op_stack.batcher.ActSubmitAll(t)
-	op_stack.miner.ActL1StartBlock(12)(t)
-	op_stack.miner.ActL1IncludeTx(op_stack.dp.Addresses.Batcher)(t)
-	op_stack.miner.ActL1EndBlock(t)
+	optimism.batcher.ActSubmitAll(t)
+	optimism.miner.ActL1StartBlock(12)(t)
+	optimism.miner.ActL1IncludeTx(optimism.dp.Addresses.Batcher)(t)
+	optimism.miner.ActL1EndBlock(t)
 
 	// verify
-	op_stack.sequencer.ActL2PipelineFull(t)
-	op_stack.ActL1Finalized(t)
+	optimism.sequencer.ActL2PipelineFull(t)
+	optimism.ActL1Finalized(t)
 
 	// assert that EigenDA proxy's was written and read from
 	stat := proxyTS.Server.GetS3Stats()
@@ -174,46 +174,46 @@ func TestOptimismAltDACommitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, close := e2e.CreateTestSuite(gt, useMemory(), false)
-	defer close()
+	proxyTS, shutDown := e2e.CreateTestSuite(gt, useMemory(), false)
+	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
 
-	op_stack := NewL2PlasmaDA(t, proxyTS.Address(), true)
+	optimism := NewL2PlasmaDA(t, proxyTS.Address(), true)
 
 	// build L1 block #1
-	op_stack.ActL1Blocks(t, 1)
-	op_stack.miner.ActL1SafeNext(t)
+	optimism.ActL1Blocks(t, 1)
+	optimism.miner.ActL1SafeNext(t)
 
 	// Fill with l2 blocks up to the L1 head
-	op_stack.sequencer.ActL1HeadSignal(t)
-	op_stack.sequencer.ActBuildToL1Head(t)
+	optimism.sequencer.ActL1HeadSignal(t)
+	optimism.sequencer.ActBuildToL1Head(t)
 
-	op_stack.sequencer.ActL2PipelineFull(t)
-	op_stack.sequencer.ActL1SafeSignal(t)
-	require.Equal(t, uint64(1), op_stack.sequencer.SyncStatus().SafeL1.Number)
+	optimism.sequencer.ActL2PipelineFull(t)
+	optimism.sequencer.ActL1SafeSignal(t)
+	require.Equal(t, uint64(1), optimism.sequencer.SyncStatus().SafeL1.Number)
 
 	// add L1 block #2
-	op_stack.ActL1Blocks(t, 1)
-	op_stack.miner.ActL1SafeNext(t)
-	op_stack.miner.ActL1FinalizeNext(t)
-	op_stack.sequencer.ActL1HeadSignal(t)
-	op_stack.sequencer.ActBuildToL1Head(t)
+	optimism.ActL1Blocks(t, 1)
+	optimism.miner.ActL1SafeNext(t)
+	optimism.miner.ActL1FinalizeNext(t)
+	optimism.sequencer.ActL1HeadSignal(t)
+	optimism.sequencer.ActBuildToL1Head(t)
 
 	// Catch up derivation
-	op_stack.sequencer.ActL2PipelineFull(t)
-	op_stack.sequencer.ActL1FinalizedSignal(t)
-	op_stack.sequencer.ActL1SafeSignal(t)
+	optimism.sequencer.ActL2PipelineFull(t)
+	optimism.sequencer.ActL1FinalizedSignal(t)
+	optimism.sequencer.ActL1SafeSignal(t)
 
 	// commit all the l2 blocks to L1
-	op_stack.batcher.ActSubmitAll(t)
-	op_stack.miner.ActL1StartBlock(12)(t)
-	op_stack.miner.ActL1IncludeTx(op_stack.dp.Addresses.Batcher)(t)
-	op_stack.miner.ActL1EndBlock(t)
+	optimism.batcher.ActSubmitAll(t)
+	optimism.miner.ActL1StartBlock(12)(t)
+	optimism.miner.ActL1IncludeTx(optimism.dp.Addresses.Batcher)(t)
+	optimism.miner.ActL1EndBlock(t)
 
 	// verify
-	op_stack.sequencer.ActL2PipelineFull(t)
-	op_stack.ActL1Finalized(t)
+	optimism.sequencer.ActL2PipelineFull(t)
+	optimism.ActL1Finalized(t)
 
 	// assert that EigenDA proxy's was written and read from
 

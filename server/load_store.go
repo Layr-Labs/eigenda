@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func LoadStoreRouter(cfg CLIConfig, ctx context.Context, log log.Logger) (*store.Router, error) {
+func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (*store.Router, error) {
 	var err error
 	var s3 *store.S3Store
 	if cfg.S3Config.Bucket != "" && cfg.S3Config.Endpoint != "" {
@@ -59,7 +59,6 @@ func LoadStoreRouter(cfg CLIConfig, ctx context.Context, log log.Logger) (*store
 	}
 
 	eigenda, err := store.NewEigenDAStore(
-		ctx,
 		client,
 		verifier,
 		log,

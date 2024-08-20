@@ -30,7 +30,8 @@ type EigenDAStore struct {
 
 var _ Store = (*EigenDAStore)(nil)
 
-func NewEigenDAStore(ctx context.Context, client *clients.EigenDAClient, v *verify.Verifier, log log.Logger, cfg *EigenDAStoreConfig) (*EigenDAStore, error) {
+func NewEigenDAStore(client *clients.EigenDAClient,
+	v *verify.Verifier, log log.Logger, cfg *EigenDAStoreConfig) (*EigenDAStore, error) {
 	return &EigenDAStore{
 		client:   client,
 		verifier: v,
@@ -67,7 +68,7 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
-func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err error) {
+func (e EigenDAStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
@@ -103,13 +104,13 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) (comm []byte, err e
 			return nil, fmt.Errorf("timed out when trying to verify the DA certificate for a blob batch after dispersal")
 		case <-ticker.C:
 			err = e.verifier.VerifyCert(cert)
-			if err == nil {
+			switch {
+			case err == nil:
 				done = true
-
-			} else if !errors.Is(err, verify.ErrBatchMetadataHashNotFound) {
-				return nil, err
-			} else {
+			case errors.Is(err, verify.ErrBatchMetadataHashNotFound):
 				e.log.Info("Blob confirmed, waiting for sufficient confirmation depth...", "targetDepth", e.cfg.EthConfirmationDepth)
+			default:
+				return nil, err
 			}
 		}
 	}
@@ -129,7 +130,7 @@ func (e EigenDAStore) Stats() *Stats {
 
 // Key is used to recover certificate fields and that verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e EigenDAStore) EncodeAndVerify(ctx context.Context, key []byte, value []byte) ([]byte, error) {
+func (e EigenDAStore) EncodeAndVerify(key []byte, value []byte) ([]byte, error) {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {

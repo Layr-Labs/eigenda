@@ -35,7 +35,7 @@ func NewCertVerifier(cfg *Config, l log.Logger) (*CertVerifier, error) {
 		return nil, fmt.Errorf("failed to dial ETH RPC node: %s", err.Error())
 	}
 
-	// construct binding
+	// construct caller binding
 	m, err := binding.NewContractEigenDAServiceManagerCaller(common.HexToAddress(cfg.SvcManagerAddr), client)
 	if err != nil {
 		return nil, err
@@ -49,16 +49,15 @@ func NewCertVerifier(cfg *Config, l log.Logger) (*CertVerifier, error) {
 	}, nil
 }
 
+// verifies on-chain batch ID for equivalence to certificate batch header fields
 func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchHeader,
 	id uint32, recordHash [32]byte, confirmationNumber uint32) error {
-	// 0 - Determine block context number
 	blockNumber, err := cv.getContextBlock()
 	if err != nil {
 		return err
 	}
-	// 1 - Verify batch hash
 
-	// 1.a - ensure that a batch hash can be looked up for a batch ID
+	// 1. ensure that a batch hash can be looked up for a batch ID for a given block number
 	expectedHash, err := cv.manager.BatchIdToBatchMetadataHash(&bind.CallOpts{BlockNumber: blockNumber}, id)
 	if err != nil {
 		return err
@@ -67,7 +66,7 @@ func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchH
 		return ErrBatchMetadataHashNotFound
 	}
 
-	// 1.b - ensure that hash generated from local cert matches one stored on-chain
+	// 2. ensure that hash generated from local cert matches one stored on-chain
 	actualHash, err := HashBatchMetadata(header, recordHash, confirmationNumber)
 
 	if err != nil {
@@ -82,8 +81,9 @@ func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchH
 	return nil
 }
 
-// VerifyMerkleProof ... Verifies the blob batch inclusion proof against the blob root hash
-func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, blobIndex uint32, blobHeader BlobHeader) error {
+// verifies the blob batch inclusion proof against the blob root hash
+func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte,
+	blobIndex uint32, blobHeader BlobHeader) error {
 	leafHash, err := HashEncodeBlobHeader(blobHeader)
 	if err != nil {
 		return err
@@ -102,6 +102,7 @@ func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte, bl
 	return nil
 }
 
+// fetches a block number provided a subtraction of a user defined conf depth from latest block
 func (cv *CertVerifier) getContextBlock() (*big.Int, error) {
 	var blockNumber *big.Int
 	blockHeader, err := cv.ethClient.BlockByNumber(context.Background(), nil)

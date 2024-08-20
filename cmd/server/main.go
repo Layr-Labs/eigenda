@@ -47,5 +47,4 @@ func main() {
 	if err != nil {
 		log.Crit("Application failed", "message", err)
 	}
-
 }

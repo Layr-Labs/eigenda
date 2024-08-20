@@ -57,7 +57,6 @@ func StringToDecodedCommitment(key string, c CommitmentMode) ([]byte, error) {
 }
 
 func EncodeCommitment(b []byte, c CommitmentMode) ([]byte, error) {
-
 	switch c {
 	case OptimismGeneric:
 		return Keccak256Commitment(b).Encode(), nil
@@ -70,7 +69,6 @@ func EncodeCommitment(b []byte, c CommitmentMode) ([]byte, error) {
 
 	case SimpleCommitmentMode:
 		return NewV0CertCommitment(b).Encode(), nil
-
 	}
 
 	return nil, fmt.Errorf("unknown commitment mode")
