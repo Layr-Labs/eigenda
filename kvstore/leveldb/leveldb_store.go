@@ -15,9 +15,9 @@ import (
 var _ kvstore.Store = &Store{}
 
 // Store implements kvstore.Store interfaces with levelDB as the backend engine.
-type Store struct { // TODO carefully consider naming
-	database *leveldb.DB // TODO rename
-	path     string
+type Store struct {
+	db   *leveldb.DB
+	path string
 
 	logger logging.Logger
 
@@ -26,7 +26,7 @@ type Store struct { // TODO carefully consider naming
 }
 
 // NewStore returns a new Store built using LevelDB.
-func NewStore(logger logging.Logger, path string) (*Store, error) { // TODO return type
+func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 	levelDB, err := leveldb.OpenFile(path, nil)
 
 	if err != nil {
@@ -34,17 +34,17 @@ func NewStore(logger logging.Logger, path string) (*Store, error) { // TODO retu
 	}
 
 	return &Store{
-		database: levelDB,
-		logger:   logger,
+		db:     levelDB,
+		logger: logger,
 	}, nil
 }
 
 func (store *Store) Put(key []byte, value []byte) error {
-	return store.database.Put(key, value, nil)
+	return store.db.Put(key, value, nil)
 }
 
 func (store *Store) Get(key []byte) ([]byte, error) {
-	data, err := store.database.Get(key, nil)
+	data, err := store.db.Get(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
 			return nil, kvstore.ErrNotFound
@@ -55,11 +55,11 @@ func (store *Store) Get(key []byte) ([]byte, error) {
 }
 
 func (store *Store) NewIterator(prefix []byte) iterator.Iterator {
-	return store.database.NewIterator(util.BytesPrefix(prefix), nil)
+	return store.db.NewIterator(util.BytesPrefix(prefix), nil)
 }
 
 func (store *Store) Delete(key []byte) error {
-	err := store.database.Delete(key, nil)
+	err := store.db.Delete(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
 			return kvstore.ErrNotFound
@@ -74,7 +74,7 @@ func (store *Store) DeleteBatch(keys [][]byte) error {
 	for _, key := range keys {
 		batch.Delete(key)
 	}
-	return store.database.Write(batch, nil)
+	return store.db.Write(batch, nil)
 }
 
 func (store *Store) WriteBatch(keys, values [][]byte) error {
@@ -82,7 +82,7 @@ func (store *Store) WriteBatch(keys, values [][]byte) error {
 	for i, key := range keys {
 		batch.Put(key, values[i])
 	}
-	return store.database.Write(batch, nil)
+	return store.db.Write(batch, nil)
 }
 
 // Shutdown shuts down the store.
@@ -91,7 +91,7 @@ func (store *Store) Shutdown() error {
 		return nil
 	}
 
-	err := store.database.Close()
+	err := store.db.Close()
 	if err != nil {
 		return err
 	}

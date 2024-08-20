@@ -8,8 +8,6 @@ import (
 
 var _ kvstore.Store = &Store{}
 
-// TODO create priority queue for TTL
-
 // Store is a simple in-memory implementation of KVStore.
 type Store struct {
 	data      map[string][]byte
@@ -112,5 +110,5 @@ func (store *Store) Destroy() error {
 
 // IsShutDown returns true if the store is shut down.
 func (store *Store) IsShutDown() bool {
-	return store.destroyed
+	return store.destroyed // TODO necessary?
 }
