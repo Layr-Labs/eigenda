@@ -6,12 +6,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/db"
+	"github.com/Layr-Labs/eigenda/db/leveldb"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/node/leveldb"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -28,7 +29,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
-	db     DB
+	db     db.DB
 	logger logging.Logger
 
 	blockStaleMeasure   uint32
@@ -323,7 +324,7 @@ func (s *Store) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) ([
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
 	data, err := s.db.Get(batchHeaderKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -339,7 +340,7 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 	}
 	data, err := s.db.Get(blobHeaderKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err

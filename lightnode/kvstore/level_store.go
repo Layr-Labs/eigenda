@@ -11,6 +11,8 @@ import (
 
 var _ KVStore = &LevelStore{}
 
+// TODO add timeouts for operations maybe, see node/store.go
+
 // LevelStore implements KVStore using LevelDB.
 type LevelStore struct {
 	db   *leveldb.DB
@@ -36,18 +38,29 @@ func NewLevelStore(logger logging.Logger, path string) (KVStore, error) {
 	}, nil
 }
 
+// All "regular" keys in the database are prefixed with this string. This is an internal implementation detail, and
+// external users of this store do not need to take this into consideration. This prefix is used to help implement
+// the TTL feature.
+const keyPrefix string = "k"
+
+// All keys used to describe expiration times are prefixed with this string. This is an internal implementation detail,
+// and external users of this store do not need to take this into consideration. This prefix is used to help implement
+// the TTL feature.
+const expirationPrefix string = "e"
+
 // Put stores a data in the store.
 func (store *LevelStore) Put(key []byte, value []byte, ttl time.Duration) error {
 	if store.shutdown {
 		return fmt.Errorf("store is offline")
 	}
-	// TODO improve performance by buffering and writing in larger batches
-	// TODO could this pattern be encapsulated in a helper class?
 
-	return store.db.Put(key, value, nil)
+	if ttl == 0 {
+		return store.db.Put(key, value, nil)
+	} else {
+		// TODO
+		return nil
+	}
 }
-
-// TODO implement TTL
 
 // Get retrieves data from the store. Returns nil if the data is not found.
 func (store *LevelStore) Get(key []byte) ([]byte, error) {
