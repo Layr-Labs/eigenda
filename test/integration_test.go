@@ -222,7 +222,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		idStr := hexutil.Encode(id[:])
 		fmt.Println("Operator: ", idStr)
 
-		dbPath := fmt.Sprintf("testdata/%v/db", idStr)
+		dbPath := fmt.Sprintf("testdata/%v/kvstore", idStr)
 		logPath := fmt.Sprintf("testdata/%v/log", idStr)
 
 		err := os.RemoveAll(dbPath)

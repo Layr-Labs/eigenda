@@ -88,7 +88,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	// Make sure config folder exists.
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
+		return nil, fmt.Errorf("could not create kvstore directory at %s: %w", config.DbPath, err)
 	}
 
 	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)

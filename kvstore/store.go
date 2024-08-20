@@ -1,12 +1,12 @@
-package db
+package kvstore
 
 import (
 	"errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
-// DB is an interface to access the local database, such as LevelDB or RocksDB.
-type DB interface {
+// Store implements a key-value store. May be backed by a database like LevelDB.
+type Store interface {
 
 	// Put stores the given key / value pair in the database, overwriting any existing value for that key.
 	Put(key []byte, value []byte) error

@@ -1,29 +1,29 @@
-package memdb
+package mapstore
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/db"
+	"github.com/Layr-Labs/eigenda/kvstore"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
-var _ db.DB = &InMemoryStore{}
+var _ kvstore.Store = &Store{}
 
 // TODO create priority queue for TTL
 
-// InMemoryStore is a simple in-memory implementation of KVStore.
-type InMemoryStore struct {
+// Store is a simple in-memory implementation of KVStore.
+type Store struct {
 	data      map[string][]byte
 	destroyed bool
 }
 
-// NewInMemoryStore creates a new InMemoryStore.
-func NewInMemoryStore() db.DB {
-	return &InMemoryStore{
+// NewStore creates a new Store.
+func NewStore() kvstore.Store {
+	return &Store{
 		data: make(map[string][]byte),
 	}
 }
 
-func (store *InMemoryStore) Put(key []byte, value []byte) error {
+func (store *Store) Put(key []byte, value []byte) error {
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -34,7 +34,7 @@ func (store *InMemoryStore) Put(key []byte, value []byte) error {
 	return nil
 }
 
-func (store *InMemoryStore) Delete(key []byte) error {
+func (store *Store) Delete(key []byte) error {
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -44,7 +44,7 @@ func (store *InMemoryStore) Delete(key []byte) error {
 	return nil
 }
 
-func (store *InMemoryStore) DeleteBatch(keys [][]byte) error {
+func (store *Store) DeleteBatch(keys [][]byte) error {
 	for _, key := range keys {
 		err := store.Delete(key)
 		if err != nil {
@@ -54,7 +54,7 @@ func (store *InMemoryStore) DeleteBatch(keys [][]byte) error {
 	return nil
 }
 
-func (store *InMemoryStore) WriteBatch(keys, values [][]byte) error {
+func (store *Store) WriteBatch(keys, values [][]byte) error {
 	if store.destroyed {
 		return fmt.Errorf("store is destroyed")
 	}
@@ -72,14 +72,14 @@ func (store *InMemoryStore) WriteBatch(keys, values [][]byte) error {
 	return nil
 }
 
-func (store *InMemoryStore) NewIterator(prefix []byte) iterator.Iterator {
+func (store *Store) NewIterator(prefix []byte) iterator.Iterator {
 	//TODO implement me
 	// TODO unit test
 	panic("implement me")
 }
 
 // Get retrieves data from the store. Returns nil if the data is not found.
-func (store *InMemoryStore) Get(key []byte) ([]byte, error) {
+func (store *Store) Get(key []byte) ([]byte, error) {
 	if store.destroyed {
 		return nil, fmt.Errorf("store is destroyed")
 	}
@@ -89,7 +89,7 @@ func (store *InMemoryStore) Get(key []byte) ([]byte, error) {
 	data, ok := store.data[stringifiedKey]
 
 	if !ok {
-		return nil, db.ErrNotFound
+		return nil, kvstore.ErrNotFound
 	}
 
 	dataCopy := make([]byte, len(data))
@@ -99,18 +99,18 @@ func (store *InMemoryStore) Get(key []byte) ([]byte, error) {
 }
 
 // Shutdown stops the store and releases any resources it holds. Does not delete any on-disk data.
-func (store *InMemoryStore) Shutdown() error {
+func (store *Store) Shutdown() error {
 	return store.Destroy()
 }
 
 // Destroy permanently stops the store and deletes all data (including data on disk).
-func (store *InMemoryStore) Destroy() error {
+func (store *Store) Destroy() error {
 	store.data = nil
 	store.destroyed = true
 	return nil
 }
 
 // IsShutDown returns true if the store is shut down.
-func (store *InMemoryStore) IsShutDown() bool {
+func (store *Store) IsShutDown() bool {
 	return store.destroyed
 }

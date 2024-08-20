@@ -1,30 +1,30 @@
-package kvstore
+package storeutil
 
 import (
+	"github.com/Layr-Labs/eigenda/kvstore"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"sync"
-	"time"
 )
 
-var _ KVStore = &threadSafeStore{}
+var _ kvstore.Store = &threadSafeStore{}
 
 type threadSafeStore struct {
-	store KVStore
+	store kvstore.Store
 	lock  sync.RWMutex
 }
 
 // ThreadSafeWrapper creates returns a wrapper around a KVStore that makes store access thread safe.
-func ThreadSafeWrapper(store KVStore) KVStore {
+func ThreadSafeWrapper(store kvstore.Store) kvstore.Store {
 	return &threadSafeStore{
 		store: store,
 		lock:  sync.RWMutex{},
 	}
 }
 
-// Put stores a data in the store.
-func (store *threadSafeStore) Put(key []byte, value []byte, ttl time.Duration) error {
+func (store *threadSafeStore) Put(key []byte, value []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
-	return store.store.Put(key, value, ttl)
+	return store.store.Put(key, value)
 }
 
 // Get retrieves data from the store. Returns nil if the data is not found.
@@ -34,18 +34,28 @@ func (store *threadSafeStore) Get(key []byte) ([]byte, error) {
 	return store.store.Get(key)
 }
 
-// Drop deletes data from the store.
-func (store *threadSafeStore) Drop(key []byte) error {
+func (store *threadSafeStore) Delete(key []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
-	return store.store.Drop(key)
+	return store.store.Delete(key)
 }
 
-// BatchUpdate performs a batch of Put and Drop operations.
-func (store *threadSafeStore) BatchUpdate(operations []*BatchOperation) error {
+func (store *threadSafeStore) DeleteBatch(keys [][]byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
-	return store.store.BatchUpdate(operations)
+	return store.store.DeleteBatch(keys)
+}
+
+func (store *threadSafeStore) WriteBatch(keys, values [][]byte) error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+	return store.store.WriteBatch(keys, values)
+}
+
+func (store *threadSafeStore) NewIterator(prefix []byte) iterator.Iterator {
+	store.lock.RLock()
+	defer store.lock.RUnlock()
+	return store.store.NewIterator(prefix)
 }
 
 // Shutdown shuts down the store.
@@ -64,5 +74,6 @@ func (store *threadSafeStore) Destroy() error {
 
 // IsShutDown returns true if the store is shut down.
 func (store *threadSafeStore) IsShutDown() bool {
-	return store.store.IsShutDown()
+	//return store.store.IsShutDown()
+	return false // TODO
 }

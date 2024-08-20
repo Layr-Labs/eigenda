@@ -423,10 +423,10 @@ func genTelemetryServices(compose testbed, name, image string, volumes []string)
 func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile string) {
 	if env.Environment.IsLocal() {
 		logPath = ""
-		dbPath = "testdata/" + env.TestName + "/db/" + name
+		dbPath = "testdata/" + env.TestName + "/kvstore/" + name
 	} else {
 		logPath = "/data/logs/" + name
-		dbPath = "/data/db/" + name
+		dbPath = "/data/kvstore/" + name
 	}
 
 	envFilename = "envs/" + name + ".env"

@@ -104,7 +104,7 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		panic("failed to create a directory for db")
+		panic("failed to create a directory for kvstore")
 	}
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()

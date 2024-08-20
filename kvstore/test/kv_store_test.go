@@ -3,16 +3,17 @@ package test
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/db"
-	"github.com/Layr-Labs/eigenda/db/leveldb"
-	"github.com/Layr-Labs/eigenda/db/memdb"
+	"github.com/Layr-Labs/eigenda/kvstore"
+	"github.com/Layr-Labs/eigenda/kvstore/leveldb"
+	"github.com/Layr-Labs/eigenda/kvstore/mapstore"
+	"github.com/Layr-Labs/eigenda/kvstore/storeutil"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"os"
 	"testing"
 )
 
-func randomOperationsTest(t *testing.T, store db.DB) {
+func randomOperationsTest(t *testing.T, store kvstore.Store) {
 	tu.InitializeRandom()
 
 	// Delete the database directory, just in case it was left over from a previous run.
@@ -76,7 +77,7 @@ func randomOperationsTest(t *testing.T, store db.DB) {
 			// Try and get a value that isn't in the store.
 			key := tu.RandomBytes(32)
 			value, err := store.Get(key)
-			assert.Equal(t, db.ErrNotFound, err)
+			assert.Equal(t, kvstore.ErrNotFound, err)
 			assert.Nil(t, value)
 		}
 	}
@@ -97,27 +98,27 @@ func verifyDBIsDeleted(t *testing.T) {
 func TestRandomOperations(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
-	var store db.DB
+	var store kvstore.Store
 
 	// In memory store
 
-	randomOperationsTest(t, memdb.NewInMemoryStore())
-	//randomOperationsTest(t, ThreadSafeWrapper(NewInMemoryStore()))
-	//randomOperationsTest(t, BatchingWrapper(NewInMemoryStore(), 32*5))
+	randomOperationsTest(t, mapstore.NewStore())
+	randomOperationsTest(t, storeutil.ThreadSafeWrapper(mapstore.NewStore()))
+	//randomOperationsTest(t, BatchingWrapper(NewStore(), 32*5))
 
 	// LevelDB store
 
-	store, err = leveldb.NewLevelDBStore(logger, dbPath)
+	store, err = leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
 	randomOperationsTest(t, store)
 	verifyDBIsDeleted(t)
 
-	//store, err = NewLevelStore(logger, dbPath)
-	//store = ThreadSafeWrapper(store)
-	//assert.NoError(t, err)
-	//randomOperationsTest(t, store)
-	//verifyDBIsDeleted(t)
-	//
+	store, err = leveldb.NewStore(logger, dbPath)
+	store = storeutil.ThreadSafeWrapper(store)
+	assert.NoError(t, err)
+	randomOperationsTest(t, store)
+	verifyDBIsDeleted(t)
+
 	//store, err = NewLevelStore(logger, dbPath)
 	//store = BatchingWrapper(store, 32*5)
 	//assert.NoError(t, err)
@@ -206,9 +207,9 @@ func TestRandomOperations(t *testing.T) {
 //
 //	// In memory store
 //
-//	batchOperationsTest(t, NewInMemoryStore())
-//	batchOperationsTest(t, ThreadSafeWrapper(NewInMemoryStore()))
-//	batchOperationsTest(t, BatchingWrapper(NewInMemoryStore(), 32*5))
+//	batchOperationsTest(t, NewStore())
+//	batchOperationsTest(t, ThreadSafeWrapper(NewStore()))
+//	batchOperationsTest(t, BatchingWrapper(NewStore(), 32*5))
 //
 //	// LevelDB store
 //
@@ -295,9 +296,9 @@ func TestRandomOperations(t *testing.T) {
 //
 //	// In memory store
 //
-//	operationsOnShutdownStoreTest(t, NewInMemoryStore())
-//	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewInMemoryStore()))
-//	operationsOnShutdownStoreTest(t, BatchingWrapper(NewInMemoryStore(), 32*5))
+//	operationsOnShutdownStoreTest(t, NewStore())
+//	operationsOnShutdownStoreTest(t, ThreadSafeWrapper(NewStore()))
+//	operationsOnShutdownStoreTest(t, BatchingWrapper(NewStore(), 32*5))
 //
 //	// LevelDB store
 //

@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/db"
-	"github.com/Layr-Labs/eigenda/db/leveldb"
+	"github.com/Layr-Labs/eigenda/kvstore"
+	"github.com/Layr-Labs/eigenda/kvstore/leveldb"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -29,7 +29,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
-	db     db.DB
+	db     kvstore.Store
 	logger logging.Logger
 
 	blockStaleMeasure   uint32
@@ -39,12 +39,12 @@ type Store struct {
 	metrics *Metrics
 }
 
-// NewLevelDBStore creates a new Store object with a db at the provided path and the given logger.
+// NewLevelDBStore creates a new Store object with a kvstore at the provided path and the given logger.
 // TODO(jianoaix): parameterize this so we can switch between different database backends.
 func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
-	// Create the db at the path. This is currently hardcoded to use
+	// Create the kvstore at the path. This is currently hardcoded to use
 	// levelDB.
-	db, err := leveldb.NewLevelDBStore(path)
+	db, err := leveldb.NewStore(path)
 	if err != nil {
 		logger.Error("Could not create leveldb database", "err", err)
 		return nil, err
@@ -324,7 +324,7 @@ func (s *Store) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) ([
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
 	data, err := s.db.Get(batchHeaderKey)
 	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -340,7 +340,7 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 	}
 	data, err := s.db.Get(blobHeaderKey)
 	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err

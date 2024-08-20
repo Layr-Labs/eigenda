@@ -3,7 +3,7 @@ package leveldb
 import (
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/db"
+	"github.com/Layr-Labs/eigenda/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"os"
 
@@ -12,10 +12,10 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-var _ db.DB = &LevelDBStore{}
+var _ kvstore.Store = &Store{}
 
-// LevelDBStore implements db.DB interfaces with levelDB as the backend engine.
-type LevelDBStore struct { // TODO carefully consider naming
+// Store implements kvstore.Store interfaces with levelDB as the backend engine.
+type Store struct { // TODO carefully consider naming
 	database *leveldb.DB // TODO rename
 	path     string
 
@@ -25,51 +25,51 @@ type LevelDBStore struct { // TODO carefully consider naming
 	destroyed bool
 }
 
-// NewLevelDBStore returns a new DB built using LevelDB.
-func NewLevelDBStore(logger logging.Logger, path string) (*LevelDBStore, error) { // TODO return type
+// NewStore returns a new Store built using LevelDB.
+func NewStore(logger logging.Logger, path string) (*Store, error) { // TODO return type
 	levelDB, err := leveldb.OpenFile(path, nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &LevelDBStore{
+	return &Store{
 		database: levelDB,
 		logger:   logger,
 	}, nil
 }
 
-func (store *LevelDBStore) Put(key []byte, value []byte) error {
+func (store *Store) Put(key []byte, value []byte) error {
 	return store.database.Put(key, value, nil)
 }
 
-func (store *LevelDBStore) Get(key []byte) ([]byte, error) {
+func (store *Store) Get(key []byte) ([]byte, error) {
 	data, err := store.database.Get(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
-			return nil, db.ErrNotFound
+			return nil, kvstore.ErrNotFound
 		}
 		return nil, err
 	}
 	return data, nil
 }
 
-func (store *LevelDBStore) NewIterator(prefix []byte) iterator.Iterator {
+func (store *Store) NewIterator(prefix []byte) iterator.Iterator {
 	return store.database.NewIterator(util.BytesPrefix(prefix), nil)
 }
 
-func (store *LevelDBStore) Delete(key []byte) error {
+func (store *Store) Delete(key []byte) error {
 	err := store.database.Delete(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
-			return db.ErrNotFound
+			return kvstore.ErrNotFound
 		}
 		return nil
 	}
 	return nil
 }
 
-func (store *LevelDBStore) DeleteBatch(keys [][]byte) error {
+func (store *Store) DeleteBatch(keys [][]byte) error {
 	batch := new(leveldb.Batch)
 	for _, key := range keys {
 		batch.Delete(key)
@@ -77,7 +77,7 @@ func (store *LevelDBStore) DeleteBatch(keys [][]byte) error {
 	return store.database.Write(batch, nil)
 }
 
-func (store *LevelDBStore) WriteBatch(keys, values [][]byte) error {
+func (store *Store) WriteBatch(keys, values [][]byte) error {
 	batch := new(leveldb.Batch)
 	for i, key := range keys {
 		batch.Put(key, values[i])
@@ -86,7 +86,7 @@ func (store *LevelDBStore) WriteBatch(keys, values [][]byte) error {
 }
 
 // Shutdown shuts down the store.
-func (store *LevelDBStore) Shutdown() error {
+func (store *Store) Shutdown() error {
 	if store.shutdown {
 		return nil
 	}
@@ -101,7 +101,7 @@ func (store *LevelDBStore) Shutdown() error {
 }
 
 // Destroy destroys the store.
-func (store *LevelDBStore) Destroy() error {
+func (store *Store) Destroy() error {
 	if store.destroyed {
 		return nil
 	}
