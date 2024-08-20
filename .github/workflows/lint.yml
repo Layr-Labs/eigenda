@@ -17,7 +17,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v6.1.0
+          version: latest
 
   go-sec:
     runs-on: ubuntu-latest
