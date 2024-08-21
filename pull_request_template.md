@@ -1,5 +1,3 @@
-# Pull Request Template
-
 <!-- If your PR fixes an open issue, use `Closes #NNN` to link your PR with the
 issue, replacing `#NNN` with the issue number you are fixing -->
 
