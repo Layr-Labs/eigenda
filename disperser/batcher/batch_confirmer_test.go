@@ -3,6 +3,7 @@ package batcher_test
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -83,7 +84,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 		PullInterval:                 100 * time.Millisecond,
 		DispersalTimeout:             1 * time.Second,
 		DispersalStatusCheckInterval: 100 * time.Millisecond,
-		AttestationTimeout:           1 * time.Second,
+		AttestationTimeout:           5 * time.Second,
 		NumConnections:               1,
 		SRSOrder:                     3000,
 		MaxNumRetriesPerBlob:         2,
@@ -506,4 +507,238 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 	batch, err = components.minibatchStore.GetBatch(context.Background(), batch.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, batch.Status, bat.BatchStatusFailed)
+}
+
+func TestBatchConfirmerRecoverState(t *testing.T) {
+	components := makeBatchConfirmer(t)
+	b := components.batchConfirmer
+	batchID, err := uuid.NewV7()
+	assert.NoError(t, err)
+	batch := &bat.BatchRecord{
+		ID:                   batchID,
+		CreatedAt:            time.Now(),
+		ReferenceBlockNumber: uint(initialBlock),
+		Status:               bat.BatchStatusFormed,
+		NumMinibatches:       2,
+	}
+	ctx := context.Background()
+	err = b.MinibatchStore.PutBatch(ctx, batch)
+	assert.NoError(t, err)
+	operatorState := components.chainData.GetTotalOperatorState(context.Background(), 0)
+	blob1, blobHeader1 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{{
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
+	}})
+	blob2, blobHeader2 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    70,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              1,
+			AdversaryThreshold:    70,
+			ConfirmationThreshold: 100,
+		}})
+	blob3, blobHeader3 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{{
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
+	}})
+	blob4, blobHeader4 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    70,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              1,
+			AdversaryThreshold:    70,
+			ConfirmationThreshold: 100,
+		}})
+	_, blobKey1 := queueBlob(t, ctx, blob1, components.blobStore)
+	_, blobKey2 := queueBlob(t, ctx, blob2, components.blobStore)
+	_, blobKey3 := queueBlob(t, ctx, blob3, components.blobStore)
+	_, blobKey4 := queueBlob(t, ctx, blob4, components.blobStore)
+	bhh1, err := blobHeader1.GetBlobHeaderHash()
+	assert.NoError(t, err)
+	bhh2, err := blobHeader2.GetBlobHeaderHash()
+	assert.NoError(t, err)
+	bhh3, err := blobHeader3.GetBlobHeaderHash()
+	assert.NoError(t, err)
+	bhh4, err := blobHeader4.GetBlobHeaderHash()
+	assert.NoError(t, err)
+	operators, err := mockChainState.GetIndexedOperators(ctx, initialBlock)
+	assert.NoError(t, err)
+	for opID, opInfo := range operators {
+		err := b.MinibatchStore.PutDispersal(ctx, &bat.MinibatchDispersal{
+			BatchID:        batchID,
+			MinibatchIndex: 0,
+			OperatorID:     opID,
+			Socket:         opInfo.Socket,
+			RequestedAt:    time.Now(),
+			DispersalResponse: bat.DispersalResponse{
+				Signatures:  [][32]byte{{0}},
+				RespondedAt: time.Now(),
+				Error:       nil,
+			},
+		})
+		assert.NoError(t, err)
+		if opID == opId0 {
+			err := b.MinibatchStore.PutDispersal(ctx, &bat.MinibatchDispersal{
+				BatchID:        batchID,
+				MinibatchIndex: 1,
+				OperatorID:     opID,
+				Socket:         opInfo.Socket,
+				RequestedAt:    time.Now(),
+				DispersalResponse: bat.DispersalResponse{
+					Signatures:  nil,
+					RespondedAt: time.Now(),
+					Error:       errors.New("unknown error"),
+				},
+			})
+			assert.NoError(t, err)
+		} else {
+			err := b.MinibatchStore.PutDispersal(ctx, &bat.MinibatchDispersal{
+				BatchID:        batchID,
+				MinibatchIndex: 1,
+				OperatorID:     opID,
+				Socket:         opInfo.Socket,
+				RequestedAt:    time.Now(),
+				DispersalResponse: bat.DispersalResponse{
+					Signatures:  [][32]byte{{0}},
+					RespondedAt: time.Now(),
+					Error:       nil,
+				},
+			})
+			assert.NoError(t, err)
+		}
+	}
+
+	// 2 blobs in each minibatch
+	err = b.MinibatchStore.PutBlobMinibatchMappings(ctx, []*bat.BlobMinibatchMapping{
+		{
+			BatchID:        batchID,
+			BlobKey:        &blobKey1,
+			MinibatchIndex: 0,
+			BlobIndex:      0,
+			BlobHeaderHash: bhh1,
+			BlobHeader:     *blobHeader1,
+		},
+		{
+			BatchID:        batchID,
+			BlobKey:        &blobKey2,
+			MinibatchIndex: 0,
+			BlobIndex:      1,
+			BlobHeaderHash: bhh2,
+			BlobHeader:     *blobHeader2,
+		},
+		{
+			BatchID:        batchID,
+			BlobKey:        &blobKey3,
+			MinibatchIndex: 1,
+			BlobIndex:      0,
+			BlobHeaderHash: bhh3,
+			BlobHeader:     *blobHeader3,
+		},
+		{
+			BatchID:        batchID,
+			BlobKey:        &blobKey4,
+			MinibatchIndex: 1,
+			BlobIndex:      1,
+			BlobHeaderHash: bhh4,
+			BlobHeader:     *blobHeader4,
+		},
+	})
+	assert.NoError(t, err)
+
+	// Receive signatures
+	signChan := make(chan core.SigningMessage, 4)
+	batchHeader := &core.BatchHeader{
+		ReferenceBlockNumber: uint(initialBlock),
+		BatchRoot:            [32]byte{},
+	}
+	_, err = batchHeader.SetBatchRootFromBlobHeaderHashes([][32]byte{bhh1, bhh2})
+	assert.NoError(t, err)
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	assert.NoError(t, err)
+	for opID, opInfo := range operatorState.PrivateOperators {
+		signChan <- core.SigningMessage{
+			Signature:       opInfo.KeyPair.SignMessage(batchHeaderHash),
+			Operator:        opID,
+			BatchHeaderHash: batchHeaderHash,
+			Err:             nil,
+		}
+	}
+	components.dispatcher.On("AttestBatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(signChan, nil)
+	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
+	components.transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			assert.Equal(t, args.Get(1).(*core.BatchHeader).ReferenceBlockNumber, uint(initialBlock))
+			assert.NotNil(t, args.Get(1).(*core.BatchHeader).BatchRoot)
+			assert.Equal(t, args.Get(2).(map[uint8]*core.QuorumResult)[0].PercentSigned, uint8(100))
+			assert.Equal(t, args.Get(2).(map[uint8]*core.QuorumResult)[1].PercentSigned, uint8(100))
+
+			aggSig := args[3].(*core.SignatureAggregation)
+			assert.Empty(t, aggSig.NonSigners)
+			assert.Len(t, aggSig.QuorumAggPubKeys, 2)
+			assert.Contains(t, aggSig.QuorumAggPubKeys, core.QuorumID(0))
+			assert.Contains(t, aggSig.QuorumAggPubKeys, core.QuorumID(1))
+			assert.Equal(t, aggSig.QuorumResults, map[core.QuorumID]*core.QuorumResult{
+				core.QuorumID(0): {
+					QuorumID:      core.QuorumID(0),
+					PercentSigned: uint8(100),
+				},
+				core.QuorumID(1): {
+					QuorumID:      core.QuorumID(1),
+					PercentSigned: uint8(100),
+				},
+			})
+		},
+	).Return(txn, nil)
+	components.txnManager.On("ProcessTransaction").Return(nil)
+	err = b.RecoverState(ctx)
+	assert.NoError(t, err)
+
+	logData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000")
+	assert.NoError(t, err)
+	txHash := gethcommon.HexToHash("0x1234")
+	blockNumber := big.NewInt(123)
+	err = b.ProcessConfirmedBatch(ctx, &bat.ReceiptOrErr{
+		Receipt: &types.Receipt{
+			Logs: []*types.Log{
+				{
+					Topics: []gethcommon.Hash{common.BatchConfirmedEventSigHash, gethcommon.HexToHash("1234")},
+					Data:   logData,
+				},
+			},
+			BlockNumber: blockNumber,
+			TxHash:      txHash,
+		},
+		Err:      nil,
+		Metadata: components.txnManager.Requests[len(components.txnManager.Requests)-1].Metadata,
+	})
+	assert.NoError(t, err)
+	// Check that the blob was processed
+	meta1, err := components.blobStore.GetBlobMetadata(ctx, blobKey1)
+	assert.NoError(t, err)
+	assert.Equal(t, blobKey1, meta1.GetBlobKey())
+	assert.Equal(t, disperser.Confirmed, meta1.BlobStatus)
+
+	meta2, err := components.blobStore.GetBlobMetadata(ctx, blobKey2)
+	assert.NoError(t, err)
+	assert.Equal(t, blobKey2, meta2.GetBlobKey())
+	assert.Equal(t, disperser.Confirmed, meta2.BlobStatus)
+
+	meta3, err := components.blobStore.GetBlobMetadata(ctx, blobKey3)
+	assert.NoError(t, err)
+	assert.Equal(t, blobKey3, meta3.GetBlobKey())
+	assert.Equal(t, disperser.Processing, meta3.BlobStatus)
+
+	meta4, err := components.blobStore.GetBlobMetadata(ctx, blobKey4)
+	assert.NoError(t, err)
+	assert.Equal(t, blobKey4, meta4.GetBlobKey())
+	assert.Equal(t, disperser.Processing, meta4.BlobStatus)
 }
