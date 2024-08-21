@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -70,25 +71,41 @@ func RunScan(ctx *cli.Context) error {
 		semvers[semver]++
 
 	} else {
-		indexedOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 90, dataapi.Registered)
-
+		indexedOperatorState, err := subgraphClient.QueryOperatorsWithLimit(context.Background(), 1000)
 		if err != nil {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 		}
-
-		for _, operator := range indexedOperatorState.Operators {
-			operatorSocket := core.OperatorSocket(operator.IndexedOperatorInfo.Socket)
-			retrievalSocket := operatorSocket.GetRetrievalSocket()
-			semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
-			semvers[semver]++
-		}
-		logger.Info("NodeInfo", "semvers", semvers)
+		logger.Info("Scanning operators", "count", len(indexedOperatorState))
+		//semvers = scanOperators(indexedOperatorState, config, logger)
 	}
 	displayResults(semvers)
 	return nil
 }
 
+func scanOperators(indexedOperatorState *dataapi.IndexedQueriedOperatorInfo, config *opscan.Config, logger logging.Logger) map[string]int {
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	semvers := make(map[string]int)
+	for _, operator := range indexedOperatorState.Operators {
+		wg.Add(1)
+		go func(operator dataapi.QueriedOperatorInfo) {
+			defer wg.Done()
+			operatorSocket := core.OperatorSocket(operator.IndexedOperatorInfo.Socket)
+			retrievalSocket := operatorSocket.GetRetrievalSocket()
+			semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
+
+			mu.Lock()
+			semvers[semver]++
+			mu.Unlock()
+		}(*operator)
+	}
+
+	wg.Wait()
+	return semvers
+}
+
 func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logger logging.Logger) string {
+	return "dry-run"
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Error("Failed to dial grpc operator socket", "socket", socket, "error", err)

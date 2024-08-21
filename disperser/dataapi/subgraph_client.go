@@ -274,6 +274,22 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 	}, nil
 }
 
+func (sc *subgraphClient) QueryRegisteredOperators(ctx context.Context) (*IndexedQueriedOperatorInfo, error) {
+	var operators map[core.OperatorID]*QueriedOperatorInfo
+	// Get OperatorsInfo for Registered Operators
+	registeredOperators, err := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
+	getOperatorInfoForQueriedOperators(sc, ctx, operators, registeredOperators)
+
+	return &IndexedQueriedOperatorInfo{
+		Operators: operators,
+	}, nil
+}
+
 func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedQueriedOperatorInfo, error) {
 	// Query all deregistered operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
