@@ -298,14 +298,26 @@ func TestStoreBatchSuccess(t *testing.T) {
 	blobHeaderKey1, err := node.EncodeBlobHeaderKey(batchHeaderHash, 0)
 	assert.Nil(t, err)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey1))
+
 	blobHeaderKey2, err := node.EncodeBlobHeaderKey(batchHeaderHash, 1)
 	assert.Nil(t, err)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey2))
+
 	blobHeaderBytes1, err := s.GetBlobHeader(ctx, batchHeaderHash, 0)
 	assert.Nil(t, err)
 	expected, err := proto.Marshal(blobsProto[0].GetHeader())
 	assert.Nil(t, err)
 	assert.True(t, bytes.Equal(blobHeaderBytes1, expected))
+
+	blobHeaderBytes2, err := s.GetBlobHeader(ctx, batchHeaderHash, 1)
+	assert.Nil(t, err)
+	expected, err = proto.Marshal(blobsProto[1].GetHeader())
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal(blobHeaderBytes2, expected))
+
+	blobHeaderBytes3, err := s.GetBlobHeader(ctx, batchHeaderHash, 2)
+	assert.ErrorIs(t, err, node.ErrKeyNotFound)
+	assert.Nil(t, blobHeaderBytes3)
 
 	// Check existence: blob chunks.
 	blobKey1, err := node.EncodeBlobKey(batchHeaderHash, 0, 0)
@@ -411,7 +423,7 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.False(t, s.HasKey(ctx, blobKey))
 
 	// Prepare data to store.
-	batchHeader, blobs, _ := CreateBatch(t)
+	batchHeader, blobs, blobsProto := CreateBatch(t)
 	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 	assert.Nil(t, err)
 	blobHeaderHash0, err := blobs[0].BlobHeader.GetBlobHeaderHash()
@@ -420,6 +432,8 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Store a batch.
+	_, err = s.StoreBlobs(ctx, blobs, blobsProto)
+	assert.Nil(t, err)
 	err = s.StoreBatchBlobMapping(ctx, batchHeader, [][32]byte{blobHeaderHash0, blobHeaderHash1})
 	assert.Nil(t, err)
 
@@ -447,6 +461,27 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.Nil(t, err)
 	copy(h[:], bhh1)
 	assert.Equal(t, blobHeaderHash1, h)
+
+	// Check blob headers by GetBlobHeader method
+	var protoBlobHeader pb.BlobHeader
+	blobHeaderBytes0, err := s.GetBlobHeader(ctx, batchHeaderHash, 0)
+	assert.Nil(t, err)
+	err = proto.Unmarshal(blobHeaderBytes0, &protoBlobHeader)
+	assert.Nil(t, err)
+	blobHeader0, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	assert.Nil(t, err)
+
+	assert.Equal(t, blobHeader0, blobs[0].BlobHeader)
+	blobHeaderBytes1, err := s.GetBlobHeader(ctx, batchHeaderHash, 1)
+	assert.Nil(t, err)
+	err = proto.Unmarshal(blobHeaderBytes1, &protoBlobHeader)
+	assert.Nil(t, err)
+	blobHeader1, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	assert.Nil(t, err)
+	assert.Equal(t, blobHeader1, blobs[1].BlobHeader)
+	blobHeaderBytes2, err := s.GetBlobHeader(ctx, batchHeaderHash, 2)
+	assert.ErrorIs(t, err, node.ErrKeyNotFound)
+	assert.Nil(t, blobHeaderBytes2)
 
 	// Expire the batches.
 	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12

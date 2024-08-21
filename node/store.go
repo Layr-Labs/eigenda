@@ -458,17 +458,6 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 	values := make([][]byte, 0)
 
 	expirationTime := s.expirationTime()
-	expirationKey := EncodeBlobExpirationKey(expirationTime)
-	// expirationValue is a list of blob header hashes that are expired.
-	expirationValue := make([]byte, 0)
-	var err error
-	// If there is already an expiration key in the store, we need to get the value and append to it.
-	if s.HasKey(ctx, expirationKey) {
-		expirationValue, err = s.db.Get(expirationKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get the expiration value: %w", err)
-		}
-	}
 
 	// Generate key/value pairs for all blob headers and blob chunks .
 	size := int64(0)
@@ -479,11 +468,17 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 			return nil, fmt.Errorf("internal error: the number of bundles in parsed blob (%d) must be the same as in raw blob (%d)", len(rawBlob.GetBundles()), len(blob.Bundles))
 		}
 
-		// blob header
 		blobHeaderHash, err := blob.BlobHeader.GetBlobHeaderHash()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get blob header hash: %w", err)
 		}
+
+		// expiration key
+		expirationKey := EncodeBlobExpirationKey(expirationTime, blobHeaderHash)
+		keys = append(keys, expirationKey)
+		values = append(values, blobHeaderHash[:])
+
+		// blob header
 		blobHeaderKey := EncodeBlobHeaderKeyByHash(blobHeaderHash)
 		if s.HasKey(ctx, blobHeaderKey) {
 			s.logger.Warn("Blob already exists", "blobHeaderHash", hexutil.Encode(blobHeaderHash[:]))
@@ -496,7 +491,6 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 		}
 		keys = append(keys, blobHeaderKey)
 		values = append(values, blobHeaderBytes)
-		expirationValue = append(expirationValue, blobHeaderHash[:]...)
 
 		// Get raw chunks
 		start := time.Now()
@@ -559,12 +553,9 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 		encodingDuration += time.Since(start)
 	}
 
-	keys = append(keys, expirationKey)
-	values = append(values, expirationValue)
-
 	start := time.Now()
 	// Write all the key/value pairs to the local database atomically.
-	err = s.db.WriteBatch(keys, values)
+	err := s.db.WriteBatch(keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write the batch into local database: %w", err)
 	}
@@ -654,13 +645,27 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 		return nil, err
 	}
 	data, err := s.db.Get(blobHeaderKey)
+	if err == nil {
+		return data, nil
+	}
+
+	if !errors.Is(err, leveldb.ErrNotFound) {
+		return nil, err
+	}
+
+	// error is leveldb.ErrNotFound
+	// try to get blob header by blobIndexPrefix
+	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
+	blobHeaderHashBytes, err := s.db.Get(blobIndexKey)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}
-	return data, nil
+	var blobHeaderHash [32]byte
+	copy(blobHeaderHash[:], blobHeaderHashBytes)
+	return s.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash)
 }
 
 // GetBlobHeaderByHeaderHash returns the blob header for the given blobHeaderHash.
