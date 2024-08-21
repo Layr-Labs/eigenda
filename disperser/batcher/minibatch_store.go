@@ -40,7 +40,10 @@ type BatchRecord struct {
 }
 
 type DispersalResponse struct {
-	Signatures  []*core.Signature
+	// Signatures is the signatures of the blobs that were dispersed to the operator
+	// The order of the signatures is the same as the order of the blobs in the minibatch
+	// The signatures are compressed using G1Affine.Bytes(), to be decompressed using G1Affine.SetBytes()
+	Signatures  [][32]byte
 	RespondedAt time.Time
 	Error       error
 }

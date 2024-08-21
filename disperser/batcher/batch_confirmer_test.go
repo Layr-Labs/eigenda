@@ -199,7 +199,7 @@ func TestBatchConfirmerIteration(t *testing.T) {
 			NumBlobs:       1,
 			RequestedAt:    time.Now(),
 			DispersalResponse: bat.DispersalResponse{
-				Signatures:  []*core.Signature{opInfo.KeyPair.SignMessage(batchHeaderHash1)},
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage(batchHeaderHash1).Bytes()},
 				RespondedAt: time.Now(),
 				Error:       nil,
 			},
@@ -215,7 +215,7 @@ func TestBatchConfirmerIteration(t *testing.T) {
 			NumBlobs:       1,
 			RequestedAt:    time.Now(),
 			DispersalResponse: bat.DispersalResponse{
-				Signatures:  []*core.Signature{opInfo.KeyPair.SignMessage(batchHeaderHash2)},
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage(batchHeaderHash2).Bytes()},
 				RespondedAt: time.Now(),
 				Error:       nil,
 			},
@@ -359,7 +359,7 @@ func TestBatchConfirmerIterationFailure(t *testing.T) {
 			NumBlobs:       2,
 			RequestedAt:    time.Now(),
 			DispersalResponse: bat.DispersalResponse{
-				Signatures:  []*core.Signature{opInfo.KeyPair.SignMessage([32]byte{0})},
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage([32]byte{0}).Bytes()},
 				RespondedAt: time.Now(),
 				Error:       nil,
 			},
@@ -434,7 +434,7 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 			NumBlobs:       2,
 			RequestedAt:    time.Now(),
 			DispersalResponse: bat.DispersalResponse{
-				Signatures:  []*core.Signature{opInfo.KeyPair.SignMessage([32]byte{0})},
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage([32]byte{0}).Bytes()},
 				RespondedAt: time.Now(),
 				Error:       nil,
 			},
@@ -449,7 +449,7 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 			NumBlobs:       2,
 			RequestedAt:    time.Now(),
 			DispersalResponse: bat.DispersalResponse{
-				Signatures:  []*core.Signature{opInfo.KeyPair.SignMessage([32]byte{1})},
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage([32]byte{1}).Bytes()},
 				RespondedAt: time.Now(),
 				Error:       nil,
 			},
