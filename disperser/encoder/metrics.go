@@ -24,7 +24,6 @@ type Metrics struct {
 	httpPort string
 
 	NumEncodeBlobRequests *prometheus.CounterVec
-	BlobSize              *prometheus.CounterVec
 	Latency               *prometheus.SummaryVec
 }
 
@@ -85,39 +84,8 @@ func (m *Metrics) IncrementCanceledBlobRequestNum(blobSize int) {
 	m.NumEncodeBlobRequests.WithLabelValues("size", "canceled").Add(float64(blobSize))
 }
 
-// BlobSizeBucket maps the blob size into a bucket that's defined according to
-// the power of 2.
-func BlobSizeBucket(blobSize int) string {
-	switch {
-	case blobSize <= 32*1024:
-		return "32KiB"
-	case blobSize <= 64*1024:
-		return "64KiB"
-	case blobSize <= 128*1024:
-		return "128KiB"
-	case blobSize <= 256*1024:
-		return "256KiB"
-	case blobSize <= 512*1024:
-		return "512KiB"
-	case blobSize <= 1024*1024:
-		return "1MiB"
-	case blobSize <= 2*1024*1024:
-		return "2MiB"
-	case blobSize <= 4*1024*1024:
-		return "4MiB"
-	case blobSize <= 8*1024*1024:
-		return "8MiB"
-	case blobSize <= 16*1024*1024:
-		return "16MiB"
-	case blobSize <= 32*1024*1024:
-		return "32MiB"
-	default:
-		return "invalid"
-	}
-}
-
 func (m *Metrics) TakeLatency(blobSize int, encoding, total time.Duration) {
-	size := BlobSizeBucket(blobSize)
+	size := blobSizeBucket(blobSize)
 	m.Latency.WithLabelValues(size, "encoding").Observe(float64(encoding.Milliseconds()))
 	m.Latency.WithLabelValues(size, "total").Observe(float64(total.Milliseconds()))
 }
@@ -152,4 +120,35 @@ func (m *Metrics) shutdown(server *http.Server) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	_ = server.Shutdown(ctx)
+}
+
+// blobSizeBucket maps the blob size into a bucket that's defined according to
+// the power of 2.
+func blobSizeBucket(blobSize int) string {
+	switch {
+	case blobSize <= 32*1024:
+		return "32KiB"
+	case blobSize <= 64*1024:
+		return "64KiB"
+	case blobSize <= 128*1024:
+		return "128KiB"
+	case blobSize <= 256*1024:
+		return "256KiB"
+	case blobSize <= 512*1024:
+		return "512KiB"
+	case blobSize <= 1024*1024:
+		return "1MiB"
+	case blobSize <= 2*1024*1024:
+		return "2MiB"
+	case blobSize <= 4*1024*1024:
+		return "4MiB"
+	case blobSize <= 8*1024*1024:
+		return "8MiB"
+	case blobSize <= 16*1024*1024:
+		return "16MiB"
+	case blobSize <= 32*1024*1024:
+		return "32MiB"
+	default:
+		return "invalid"
+	}
 }
