@@ -1,4 +1,4 @@
-package prover
+package cpu
 
 import (
 	"fmt"
@@ -23,8 +23,7 @@ type CpuProofComputer struct {
 }
 
 type WorkerResult struct {
-	points []bn254.G1Affine
-	err    error
+	err error
 }
 
 func (p *CpuProofComputer) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
@@ -101,7 +100,7 @@ func (p *CpuProofComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 		return nil, fmt.Errorf("proof worker error: %v", err)
 	}
 
-	t0 := time.Now()
+	preprocessDone := time.Now()
 
 	// compute proof by multi scaler multiplication
 	msmErrors := make(chan error, dimE*2)
@@ -122,7 +121,7 @@ func (p *CpuProofComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 		}
 	}
 
-	t1 := time.Now()
+	msmDone := time.Now()
 
 	// only 1 ifft is needed
 	sumVecInv, err := p.Fs.FFTG1(sumVec, true)
@@ -130,7 +129,7 @@ func (p *CpuProofComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 		return nil, fmt.Errorf("fft error: %v", err)
 	}
 
-	t2 := time.Now()
+	firstECNttDone := time.Now()
 
 	// outputs is out of order - buttefly
 	proofs, err := p.Fs.FFTG1(sumVecInv[:dimE], false)
@@ -138,9 +137,15 @@ func (p *CpuProofComputer) ComputeMultiFrameProof(polyFr []fr.Element, numChunks
 		return nil, err
 	}
 
-	t3 := time.Now()
+	secondECNttDone := time.Now()
 
-	fmt.Printf("mult-th %v, msm %v,fft1 %v, fft2 %v,\n", t0.Sub(begin), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2))
+	fmt.Printf("Multiproof Time Decomp \n\t\ttotal   %-20s \n\t\tpreproc %-20s \n\t\tmsm     %-20s \n\t\tfft1    %-20s \n\t\tfft2    %-20s\n",
+		secondECNttDone.Sub(begin).String(),
+		preprocessDone.Sub(begin).String(),
+		msmDone.Sub(preprocessDone).String(),
+		firstECNttDone.Sub(msmDone).String(),
+		secondECNttDone.Sub(firstECNttDone).String(),
+	)
 
 	return proofs, nil
 }
@@ -158,8 +163,7 @@ func (p *CpuProofComputer) proofWorker(
 		coeffs, err := p.GetSlicesCoeff(polyFr, dimE, j, l)
 		if err != nil {
 			results <- WorkerResult{
-				points: nil,
-				err:    err,
+				err: err,
 			}
 		} else {
 			for i := 0; i < len(coeffs); i++ {
