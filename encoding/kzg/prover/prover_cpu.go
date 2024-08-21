@@ -67,7 +67,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	sfs := fft.NewFFTSettings(t)
 
 	// Set KZG Prover CPU computer
-	computer := &kzg_prover_cpu.CpuProofComputer{
+	computer := &kzg_prover_cpu.KzgCpuProofDevice{
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,
@@ -77,7 +77,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 
 	// Set RS CPU computer
-	RsComputeDevice := &rs_cpu.CpuComputeDevice{
+	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
 		Fs:             fs,
 		EncodingParams: params,
 	}
