@@ -59,6 +59,8 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--s3.bucket` |  | `$EIGENDA_PROXY_S3_BUCKET` | Bucket name for S3 storage. |
 | `--s3.path` |  | `$EIGENDA_PROXY_S3_PATH` | Bucket path for S3 storage. |
 | `--s3.endpoint` |  | `$EIGENDA_PROXY_S3_ENDPOINT` | Endpoint for S3 storage. |
+| `--s3.backup` | `false` | `$EIGENDA_PROXY_S3_BACKUP` | Backup mode for S3. | whether to use S3 as a backup store to ensure resiliency in case of EigenDA read failure |
+| `--s3.timeout` | `5s` | `$EIGENDA_PROXY_S3_TIMEOUT` | timeout for S3 storage operations (e.g. get, put) |
 | `--help, -h` | `false` |  | Show help. |
 | `--version, -v` | `false` |  | Print the version. |
 
@@ -85,6 +87,9 @@ An optional `--eigenda-eth-confirmation-depth` flag can be provided to specify a
 ### In-Memory Backend
 
 An ephemeral memory store backend can be used for faster feedback testing when testing rollup integrations. To target this feature, use the CLI flags `--memstore.enabled`, `--memstore.expiration`.
+
+### S3 Fallback
+An optional S3 fallback `--s3.backup` can be triggered to ensure resiliency when **reading**. When enabled, a blob is persisted to S3 after being successfully dispersed using the keccak256 hash of the existing commitment for the entity key. In the event that blobs cannot be read from EigenDA, they will then be retrieved from S3. 
 
 
 ## Metrics
@@ -154,6 +159,8 @@ We also provide network-specific example env configuration files in `.env.exampl
 Container can be built via running `make docker-build`.
 
 ## Commitment Schemas
+Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA certificate is being used/requested. The following versions are currently supported:
+* `0x0`: V0 certificate type (i.e, dispersal blob info struct with verification against service manager)
 
 ### Optimism Commitment Mode
 For `alt-da` clients running on Optimism, the following commitment schema is supported:
@@ -165,8 +172,12 @@ For `alt-da` clients running on Optimism, the following commitment schema is sup
   type       type     byte
 ```
 
-### Generic Commitment Mode
-For generic clients communicating with proxy, the following commitment schema is supported:
+Both `keccak256` (i.e, S3 storage using hash of pre-image for commitment value) and `generic` (i.e, EigenDA) are supported to ensure cross-compatibility with alt-da storage backends if desired by a rollup operator.
+
+OP Stack itself only has a conception of the first byte (`commit type`) and does no semantical interpretation of any subsequent bytes within the encoding. The `da layer type` byte for EigenDA is always `0x0`. However it is currently unused by OP Stack with name space values still being actively [discussed](https://github.com/ethereum-optimism/specs/discussions/135#discussioncomment-9271282).
+
+### Simple Commitment Mode
+For simple clients communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:
 
 ```
  0         1                 N

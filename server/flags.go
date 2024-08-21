@@ -46,7 +46,7 @@ var optionalFlags = []cli.Flag{}
 
 func init() {
 	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
-	optionalFlags = append(optionalFlags, CLIFlags(EnvVarPrefix)...)
+	optionalFlags = append(optionalFlags, CLIFlags()...)
 	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
 	Flags = append(requiredFlags, optionalFlags...) //nolint:gocritic // this is a global variable
 }

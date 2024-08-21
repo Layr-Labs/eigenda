@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	opservice "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/urfave/cli/v2"
 )
 
@@ -45,6 +44,8 @@ const (
 	S3EndpointFlagName        = "s3.endpoint"
 	S3AccessKeyIDFlagName     = "s3.access-key-id"     // #nosec G101
 	S3AccessKeySecretFlagName = "s3.access-key-secret" // #nosec G101
+	S3BackupFlagName          = "s3.backup"
+	S3TimeoutFlagName         = "s3.timeout"
 )
 
 const BytesPerSymbol = 31
@@ -140,6 +141,8 @@ func ReadConfig(ctx *cli.Context) Config {
 			Endpoint:         ctx.String(S3EndpointFlagName),
 			AccessKeyID:      ctx.String(S3AccessKeyIDFlagName),
 			AccessKeySecret:  ctx.String(S3AccessKeySecretFlagName),
+			Backup:           ctx.Bool(S3BackupFlagName),
+			Timeout:          ctx.Duration(S3TimeoutFlagName),
 		},
 		ClientConfig: clients.EigenDAClientConfig{
 			RPC:                          ctx.String(EigenDADisperserRPCFlagName),
@@ -217,11 +220,60 @@ func (cfg *Config) Check() error {
 	return nil
 }
 
-func CLIFlags(envPrefix string) []cli.Flag {
-	prefixEnvVars := func(name string) []string {
-		return opservice.PrefixEnvVar(envPrefix, name)
-	}
+// flags used for S3 backend configuration
+func s3Flags() []cli.Flag {
 	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    S3CredentialTypeFlagName,
+			Usage:   "The way to authenticate to S3, options are [iam, static]",
+			EnvVars: prefixEnvVars("S3_CREDENTIAL_TYPE"),
+		},
+		&cli.StringFlag{
+			Name:    S3BucketFlagName,
+			Usage:   "bucket name for S3 storage",
+			EnvVars: prefixEnvVars("S3_BUCKET"),
+		},
+		&cli.StringFlag{
+			Name:    S3PathFlagName,
+			Usage:   "path for S3 storage",
+			EnvVars: prefixEnvVars("S3_PATH"),
+		},
+		&cli.StringFlag{
+			Name:    S3EndpointFlagName,
+			Usage:   "endpoint for S3 storage",
+			Value:   "",
+			EnvVars: prefixEnvVars("S3_ENDPOINT"),
+		},
+		&cli.StringFlag{
+			Name:    S3AccessKeyIDFlagName,
+			Usage:   "access key id for S3 storage",
+			Value:   "",
+			EnvVars: prefixEnvVars("S3_ACCESS_KEY_ID"),
+		},
+		&cli.StringFlag{
+			Name:    S3AccessKeySecretFlagName,
+			Usage:   "access key secret for S3 storage",
+			Value:   "",
+			EnvVars: prefixEnvVars("S3_ACCESS_KEY_SECRET"),
+		},
+		&cli.BoolFlag{
+			Name:    S3BackupFlagName,
+			Usage:   "whether to use S3 as a backup store to ensure resiliency in case of EigenDA read failure",
+			Value:   false,
+			EnvVars: prefixEnvVars("S3_BACKUP"),
+		},
+		&cli.DurationFlag{
+			Name:    S3TimeoutFlagName,
+			Usage:   "timeout for S3 storage operations (e.g. get, put)",
+			Value:   5 * time.Second,
+			EnvVars: prefixEnvVars("S3_TIMEOUT"),
+		},
+	}
+}
+
+func CLIFlags() []cli.Flag {
+	// TODO: Decompose all flags into constituent parts based on their respective category / usage
+	flags := []cli.Flag{
 		&cli.StringFlag{
 			Name:    EigenDADisperserRPCFlagName,
 			Usage:   "RPC endpoint of the EigenDA disperser.",
@@ -325,37 +377,8 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Value:   25 * time.Minute,
 			EnvVars: []string{"MEMSTORE_EXPIRATION"},
 		},
-		&cli.StringFlag{
-			Name:    S3CredentialTypeFlagName,
-			Usage:   "The way to authenticate to S3, options are [iam, static]",
-			EnvVars: prefixEnvVars("S3_CREDENTIAL_TYPE"),
-		},
-		&cli.StringFlag{
-			Name:    S3BucketFlagName,
-			Usage:   "bucket name for S3 storage",
-			EnvVars: prefixEnvVars("S3_BUCKET"),
-		},
-		&cli.StringFlag{
-			Name:    S3PathFlagName,
-			Usage:   "path for S3 storage",
-			EnvVars: prefixEnvVars("S3_PATH"),
-		},
-		&cli.StringFlag{
-			Name:    S3EndpointFlagName,
-			Usage:   "endpoint for S3 storage",
-			Value:   "",
-			EnvVars: prefixEnvVars("S3_ENDPOINT"),
-		},
-		&cli.StringFlag{
-			Name:    S3AccessKeyIDFlagName,
-			Usage:   "access key id for S3 storage",
-			Value:   "",
-			EnvVars: prefixEnvVars("S3_ACCESS_KEY_ID"),
-		}, &cli.StringFlag{
-			Name:    S3AccessKeySecretFlagName,
-			Usage:   "access key secret for S3 storage",
-			Value:   "",
-			EnvVars: prefixEnvVars("S3_ACCESS_KEY_SECRET"),
-		},
 	}
+
+	flags = append(flags, s3Flags()...)
+	return flags
 }
