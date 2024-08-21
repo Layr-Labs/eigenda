@@ -187,32 +187,6 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	return enc, err
 }
 
-// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
-// The result is trimmed to the given maxInputSize.
-func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
-	frames := make([]encoding.Frame, len(chunks))
-	for i := range chunks {
-		frames[i] = encoding.Frame{
-			Proof:  chunks[i].Proof,
-			Coeffs: chunks[i].Coeffs,
-		}
-	}
-	encoder, err := p.GetKzgEncoder(params)
-	if err != nil {
-		return nil, err
-	}
-
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
-}
-
-func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
-	res := make([]uint64, len(chunkIndices))
-	for i, d := range chunkIndices {
-		res[i] = uint64(d)
-	}
-	return res
-}
-
 // Detect the precomputed table from the specified directory
 // the file name follow the name convention of
 //
@@ -252,4 +226,30 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 		tables = append(tables, params)
 	}
 	return tables, nil
+}
+
+// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
+// The result is trimmed to the given maxInputSize.
+func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+	frames := make([]encoding.Frame, len(chunks))
+	for i := range chunks {
+		frames[i] = encoding.Frame{
+			Proof:  chunks[i].Proof,
+			Coeffs: chunks[i].Coeffs,
+		}
+	}
+	encoder, err := p.GetKzgEncoder(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+}
+
+func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
+	res := make([]uint64, len(chunkIndices))
+	for i, d := range chunkIndices {
+		res[i] = uint64(d)
+	}
+	return res
 }
