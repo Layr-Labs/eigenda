@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-var _ kvstore.Store = &TTLStore{}
+var _ kvstore.Store = &ttlStore{}
 
-// TTLStore adds a time-to-live (TTL) capability to the store.
+// ttlStore adds a time-to-live (TTL) capability to the store.
 //
 // This store utilizes the properties of store iteration. Namely, that the keys are returned in lexicographical order,
 // as well as the ability to filter keys by prefix. "Regular" keys are stored in the store with a prefix "k", while
@@ -21,7 +21,7 @@ var _ kvstore.Store = &TTLStore{}
 // such that when iterating over expiry keys in lexicographical order, the keys are ordered by expiry time. The value
 // each expiry key points to is the regular key that is to be deleted when the expiry time is reached. In order to
 // efficiently delete expired keys, the expiry keys must be iterated over periodically to find and delete expired keys.
-type TTLStore struct {
+type ttlStore struct {
 	store  kvstore.Store
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -38,11 +38,11 @@ func TTLWrapper(
 	ctx context.Context,
 	logger logging.Logger,
 	store kvstore.Store,
-	gcPeriod time.Duration) *TTLStore {
+	gcPeriod time.Duration) kvstore.TTLStore {
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	ttlStore := &TTLStore{
+	ttlStore := &ttlStore{
 		store:  store,
 		ctx:    ctx,
 		cancel: cancel,
@@ -63,14 +63,14 @@ var expiryKeyPadding = fmt.Sprintf("%%0%dx", maxIntLengthBase16)
 
 // PutWithTTL adds a key-value pair to the store that expires after a specified time-to-live (TTL).
 // Key is eventually deleted after the TTL elapses.
-func (store *TTLStore) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
+func (store *ttlStore) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
 	expiryTime := time.Now().Add(ttl)
 	return store.PutWithExpiration(key, value, expiryTime)
 }
 
 // PutWithExpiration adds a key-value pair to the store that expires at a specified time.
 // Key is eventually deleted after the expiry time.
-func (store *TTLStore) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) error {
+func (store *ttlStore) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) error {
 	prefixedKey := append(keyPrefix, key...)
 
 	batchKeys := make([][]byte, 2)
@@ -92,7 +92,7 @@ func (store *TTLStore) PutWithExpiration(key []byte, value []byte, expiryTime ti
 }
 
 // Spawns a background goroutine that periodically checks for expired keys and deletes them.
-func (store *TTLStore) expireKeysInBackground(gcPeriod time.Duration) {
+func (store *ttlStore) expireKeysInBackground(gcPeriod time.Duration) {
 	ticker := time.NewTicker(gcPeriod)
 	go func() {
 		for {
@@ -113,7 +113,7 @@ func (store *TTLStore) expireKeysInBackground(gcPeriod time.Duration) {
 }
 
 // Delete all keys with a TTL that has expired.
-func (store *TTLStore) expireKeys(now time.Time) error {
+func (store *ttlStore) expireKeys(now time.Time) error {
 	it, err := store.store.NewIterator(expiryPrefix)
 	if err != nil {
 		return err
@@ -142,22 +142,22 @@ func (store *TTLStore) expireKeys(now time.Time) error {
 	return store.DeleteBatch(keysToDelete)
 }
 
-func (store *TTLStore) Put(key []byte, value []byte) error {
+func (store *ttlStore) Put(key []byte, value []byte) error {
 	prefixedKey := append(keyPrefix, key...)
 	return store.store.Put(prefixedKey, value)
 }
 
-func (store *TTLStore) Get(key []byte) ([]byte, error) {
+func (store *ttlStore) Get(key []byte) ([]byte, error) {
 	prefixedKey := append(keyPrefix, key...)
 	return store.store.Get(prefixedKey)
 }
 
-func (store *TTLStore) Delete(key []byte) error {
+func (store *ttlStore) Delete(key []byte) error {
 	prefixedKey := append(keyPrefix, key...)
 	return store.store.Delete(prefixedKey)
 }
 
-func (store *TTLStore) DeleteBatch(keys [][]byte) error {
+func (store *ttlStore) DeleteBatch(keys [][]byte) error {
 	prefixedKeys := make([][]byte, len(keys))
 	for i, key := range keys {
 		prefixedKeys[i] = append(keyPrefix, key...)
@@ -165,7 +165,7 @@ func (store *TTLStore) DeleteBatch(keys [][]byte) error {
 	return store.store.DeleteBatch(prefixedKeys)
 }
 
-func (store *TTLStore) WriteBatch(keys, values [][]byte) error {
+func (store *ttlStore) WriteBatch(keys, values [][]byte) error {
 	prefixedKeys := make([][]byte, len(keys))
 	for i, key := range keys {
 		prefixedKeys[i] = append(keyPrefix, key...)
@@ -222,7 +222,7 @@ func (it *ttlIterator) Value() []byte {
 	return it.baseIterator.Value()
 }
 
-func (store *TTLStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
+func (store *ttlStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	prefixedPrefix := append(keyPrefix, prefix...)
 	baseIterator, err := store.store.NewIterator(prefixedPrefix)
 	if err != nil {
@@ -234,10 +234,10 @@ func (store *TTLStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	}, nil
 }
 
-func (store *TTLStore) Shutdown() error {
+func (store *ttlStore) Shutdown() error {
 	return store.store.Shutdown()
 }
 
-func (store *TTLStore) Destroy() error {
+func (store *ttlStore) Destroy() error {
 	return store.store.Destroy()
 }

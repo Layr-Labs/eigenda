@@ -93,3 +93,8 @@ func RandomBytes(length int) []byte {
 	}
 	return bytes
 }
+
+// RandomTime generates a random time.
+func RandomTime() time.Time {
+	return time.Unix(int64(rand.Int31()), 0)
+}
