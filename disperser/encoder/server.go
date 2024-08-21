@@ -29,8 +29,6 @@ type Server struct {
 
 	runningRequests chan struct{}
 	requestPool     chan struct{}
-
-	maxConcurrentRequests int
 }
 
 func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
@@ -40,9 +38,8 @@ func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prove
 		prover:  prover,
 		metrics: metrics,
 
-		runningRequests:       make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:           make(chan struct{}, config.RequestPoolSize),
-		maxConcurrentRequests: config.MaxConcurrentRequests,
+		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
+		requestPool:     make(chan struct{}, config.RequestPoolSize),
 	}
 }
 
