@@ -74,13 +74,6 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 func (s *Server) popRequest() {
 	<-s.requestPool
 	<-s.runningRequests
-	s.updateCapacityMetrics()
-}
-
-func (s *Server) updateCapacityMetrics() {
-	runningRequests := len(s.runningRequests)
-	requestPool := len(s.requestPool)
-	s.metrics.UpdateCapacityMetrics(runningRequests, requestPool, s.maxConcurrentRequests)
 }
 
 func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {

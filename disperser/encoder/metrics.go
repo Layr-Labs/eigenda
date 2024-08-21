@@ -25,11 +25,6 @@ type Metrics struct {
 
 	NumEncodeBlobRequests *prometheus.CounterVec
 	Latency               *prometheus.SummaryVec
-
-	// Channel capacity
-	RunningRequestsGauge prometheus.Gauge
-	RequestPoolGauge     prometheus.Gauge
-	CapacityUtilization  prometheus.Gauge
 }
 
 func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
@@ -57,27 +52,6 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
 			[]string{"time"},
-		),
-		RunningRequestsGauge: promauto.With(reg).NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: "eigenda_encoder",
-				Name:      "running_requests",
-				Help:      "Number of currently running requests",
-			},
-		),
-		RequestPoolGauge: promauto.With(reg).NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: "eigenda_encoder",
-				Name:      "request_pool_usage",
-				Help:      "Number of requests in the request pool",
-			},
-		),
-		CapacityUtilization: promauto.With(reg).NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: "eigenda_encoder",
-				Name:      "capacity_utilization",
-				Help:      "Percentage of server capacity currently in use",
-			},
 		),
 	}
 }
@@ -109,13 +83,6 @@ func (m *Metrics) IncrementCanceledBlobRequestNum() {
 func (m *Metrics) TakeLatency(encoding, total time.Duration) {
 	m.Latency.WithLabelValues("encoding").Observe(float64(encoding.Milliseconds()))
 	m.Latency.WithLabelValues("total").Observe(float64(total.Milliseconds()))
-}
-
-func (m *Metrics) UpdateCapacityMetrics(runningRequests, requestPool int, maxConcurrentRequests int) {
-	m.RunningRequestsGauge.Set(float64(runningRequests))
-	m.RequestPoolGauge.Set(float64(requestPool))
-	utilization := float64(runningRequests) / float64(maxConcurrentRequests) * 100
-	m.CapacityUtilization.Set(utilization)
 }
 
 func (m *Metrics) Start(ctx context.Context) {
