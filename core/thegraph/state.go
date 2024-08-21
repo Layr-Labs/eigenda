@@ -176,6 +176,15 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	return state, nil
 }
 
+func (ics *indexedChainState) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
+	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+
+	return indexedOperators, nil
+}
+
 // GetIndexedOperatorInfoByOperatorId returns the IndexedOperatorInfo for the operator with the given operatorId at the given block number
 func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (*core.IndexedOperatorInfo, error) {
 	var (
