@@ -21,6 +21,7 @@ func NewStore() kvstore.Store {
 	}
 }
 
+// Put adds a key-value pair to the store.
 func (store *mapStore) Put(key []byte, value []byte) error {
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
@@ -32,6 +33,7 @@ func (store *mapStore) Put(key []byte, value []byte) error {
 	return nil
 }
 
+// Delete removes a key-value pair from the store.
 func (store *mapStore) Delete(key []byte) error {
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
@@ -42,7 +44,12 @@ func (store *mapStore) Delete(key []byte) error {
 	return nil
 }
 
+// DeleteBatch removes multiple key-value pairs from the store.
 func (store *mapStore) DeleteBatch(keys [][]byte) error {
+	if store.destroyed {
+		return fmt.Errorf("mapStore is destroyed")
+	}
+
 	for _, key := range keys {
 		err := store.Delete(key)
 		if err != nil {
@@ -52,6 +59,7 @@ func (store *mapStore) DeleteBatch(keys [][]byte) error {
 	return nil
 }
 
+// WriteBatch adds multiple key-value pairs to the store.
 func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
@@ -70,7 +78,14 @@ func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 	return nil
 }
 
-func (store *mapStore) NewIterator(prefix []byte) iterator.Iterator {
+// NewIterator creates a new iterator for the store. Only keys with the given prefix are returned.
+// WARNING: this implementation does not take a snapshot of the store, and so the iterator may return a
+// consistent view of the store if there is concurrent modification.
+func (store *mapStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
+	if store.destroyed {
+		return nil, fmt.Errorf("mapStore is destroyed")
+	}
+
 	//TODO implement me
 	// TODO unit test
 	panic("implement me")
@@ -106,9 +121,4 @@ func (store *mapStore) Destroy() error {
 	store.data = nil
 	store.destroyed = true
 	return nil
-}
-
-// IsShutDown returns true if the mapStore is shut down.
-func (store *mapStore) IsShutDown() bool {
-	return store.destroyed // TODO necessary?
 }

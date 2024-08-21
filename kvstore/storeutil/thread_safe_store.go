@@ -8,6 +8,7 @@ import (
 
 var _ kvstore.Store = &threadSafeStore{}
 
+// threadSafeStore is a wrapper around a KVStore that makes store access thread safe.
 type threadSafeStore struct {
 	store kvstore.Store
 	lock  sync.RWMutex
@@ -21,6 +22,7 @@ func ThreadSafeWrapper(store kvstore.Store) kvstore.Store {
 	}
 }
 
+// Put stores a data in the store.
 func (store *threadSafeStore) Put(key []byte, value []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
@@ -34,25 +36,29 @@ func (store *threadSafeStore) Get(key []byte) ([]byte, error) {
 	return store.store.Get(key)
 }
 
+// Delete deletes data from the store.
 func (store *threadSafeStore) Delete(key []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 	return store.store.Delete(key)
 }
 
+// DeleteBatch deletes multiple key-value pairs from the store.
 func (store *threadSafeStore) DeleteBatch(keys [][]byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 	return store.store.DeleteBatch(keys)
 }
 
+// WriteBatch adds multiple key-value pairs to the store.
 func (store *threadSafeStore) WriteBatch(keys, values [][]byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 	return store.store.WriteBatch(keys, values)
 }
 
-func (store *threadSafeStore) NewIterator(prefix []byte) iterator.Iterator {
+// NewIterator creates a new iterator.
+func (store *threadSafeStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	store.lock.RLock()
 	defer store.lock.RUnlock()
 	return store.store.NewIterator(prefix)
@@ -70,10 +76,4 @@ func (store *threadSafeStore) Destroy() error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 	return store.store.Destroy()
-}
-
-// IsShutDown returns true if the store is shut down.
-func (store *threadSafeStore) IsShutDown() bool {
-	//return store.store.IsShutDown()
-	return false // TODO
 }

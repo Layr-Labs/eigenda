@@ -35,15 +35,26 @@ func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 
 	return &levelDBStore{
 		db:     levelDB,
+		path:   path,
 		logger: logger,
 	}, nil
 }
 
+// Put stores a data in the store.
 func (store *levelDBStore) Put(key []byte, value []byte) error {
+	if store.shutdown {
+		return fmt.Errorf("store is shut down")
+	}
+
 	return store.db.Put(key, value, nil)
 }
 
+// Get retrieves data from the store. Returns kvstore.ErrNotFound if the data is not found.
 func (store *levelDBStore) Get(key []byte) ([]byte, error) {
+	if store.shutdown {
+		return nil, fmt.Errorf("store is shut down")
+	}
+
 	data, err := store.db.Get(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
@@ -54,22 +65,30 @@ func (store *levelDBStore) Get(key []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (store *levelDBStore) NewIterator(prefix []byte) iterator.Iterator {
-	return store.db.NewIterator(util.BytesPrefix(prefix), nil)
-}
-
-func (store *levelDBStore) Delete(key []byte) error {
-	err := store.db.Delete(key, nil)
-	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
-			return kvstore.ErrNotFound
-		}
-		return nil
+// NewIterator creates a new iterator. Only keys prefixed with the given prefix will be iterated.
+func (store *levelDBStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
+	if store.shutdown {
+		return nil, fmt.Errorf("store is shut down")
 	}
-	return nil
+
+	return store.db.NewIterator(util.BytesPrefix(prefix), nil), nil
 }
 
+// Delete deletes data from the store.
+func (store *levelDBStore) Delete(key []byte) error {
+	if store.shutdown {
+		return fmt.Errorf("store is shut down")
+	}
+
+	return store.db.Delete(key, nil)
+}
+
+// DeleteBatch deletes multiple key-value pairs from the store.
 func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
+	if store.shutdown {
+		return fmt.Errorf("store is shut down")
+	}
+
 	batch := new(leveldb.Batch)
 	for _, key := range keys {
 		batch.Delete(key)
@@ -77,7 +96,12 @@ func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 	return store.db.Write(batch, nil)
 }
 
+// WriteBatch adds multiple key-value pairs to the store.
 func (store *levelDBStore) WriteBatch(keys, values [][]byte) error {
+	if store.shutdown {
+		return fmt.Errorf("store is shut down")
+	}
+
 	batch := new(leveldb.Batch)
 	for i, key := range keys {
 		batch.Put(key, values[i])

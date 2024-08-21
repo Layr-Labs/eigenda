@@ -95,7 +95,10 @@ func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint
 // is set to -1 (invalid value) if the deletion status is an error.
 func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, error) {
 	// Scan for expired batches.
-	iter := s.db.NewIterator(EncodeBatchExpirationKeyPrefix())
+	iter, err := s.db.NewIterator(EncodeBatchExpirationKeyPrefix())
+	if err != nil {
+		return -1, err
+	}
 	expiredKeys := make([][]byte, 0)
 	expiredBatches := make([][]byte, 0)
 	for iter.Next() {
@@ -132,14 +135,20 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
 
 		// Blob headers.
-		blobHeaderIter := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
+		blobHeaderIter, err := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
+		if err != nil {
+			return -1, err
+		}
 		for blobHeaderIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
 		}
 		blobHeaderIter.Release()
 
 		// Blob chunks.
-		blobIter := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
+		blobIter, err := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
+		if err != nil {
+			return -1, err
+		}
 		for blobIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
 			size += int64(len(blobIter.Value()))
@@ -148,7 +157,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 	}
 
 	// Perform the removal.
-	err := s.db.DeleteBatch(expiredKeys)
+	err = s.db.DeleteBatch(expiredKeys)
 	if err != nil {
 		s.logger.Error("Failed to delete the expired keys in batch", "keys:", expiredKeys, "error:", err)
 		return -1, err
