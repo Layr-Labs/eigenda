@@ -40,8 +40,8 @@ type Config struct {
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
-	flag.Uint64Var(&config.BlobLength, "blob-length", 1<<10, "Blob length (power of 2)")
-	flag.Uint64Var(&config.NumChunks, "num-chunks", 1<<13, "Minimum number of chunks (power of 2)")
+	flag.Uint64Var(&config.BlobLength, "blob-length", 1048576, "Blob length (power of 2)")
+	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
 	flag.Uint64Var(&config.NumRuns, "num-runs", 10, "Number of times to run the benchmark")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
@@ -83,9 +83,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	var results []BenchmarkResult
-	results = runBenchmark(p, &config)
-
+	results := runBenchmark(p, &config)
 	if config.MemProfile != "" {
 		f, err := os.Create(config.MemProfile)
 		if err != nil {
