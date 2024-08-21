@@ -23,6 +23,9 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		return storeutil.ThreadSafeWrapper(mapstore.NewStore()), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		return storeutil.TTLWrapper(mapstore.NewStore()), nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return leveldb.NewStore(logger, path)
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
@@ -31,6 +34,13 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 			return nil, err
 		}
 		return storeutil.ThreadSafeWrapper(store), nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		store, err := leveldb.NewStore(logger, path)
+		if err != nil {
+			return nil, err
+		}
+		return storeutil.TTLWrapper(store), nil
 	},
 }
 
@@ -45,6 +55,13 @@ var iterableStoreBuilders = []func(logger logging.Logger, path string) (kvstore.
 			return nil, err
 		}
 		return storeutil.ThreadSafeWrapper(store), nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		store, err := leveldb.NewStore(logger, path)
+		if err != nil {
+			return nil, err
+		}
+		return storeutil.TTLWrapper(store), nil
 	},
 }
 
@@ -335,6 +352,7 @@ func iterationTest(t *testing.T, store kvstore.Store) {
 
 	iterator, err := store.NewIterator(nil)
 	assert.NoError(t, err)
+	defer iterator.Release()
 
 	for iterator.Next() {
 		key := string(iterator.Key())
@@ -395,12 +413,13 @@ func iterationWithPrefixTest(t *testing.T, store kvstore.Store) {
 
 	// Iterate over the store with prefixA and check that the data matches the expected data.
 	foundKeysA := make(map[string]bool)
-	iterator, err := store.NewIterator(prefixA)
+	iteratorA, err := store.NewIterator(prefixA)
+	defer iteratorA.Release()
 	assert.NoError(t, err)
 
-	for iterator.Next() {
-		key := string(iterator.Key())
-		value := iterator.Value()
+	for iteratorA.Next() {
+		key := string(iteratorA.Key())
+		value := iteratorA.Value()
 
 		expectedValue, ok := expectedDataA[key]
 		assert.True(t, ok)
@@ -412,12 +431,14 @@ func iterationWithPrefixTest(t *testing.T, store kvstore.Store) {
 
 	// Iterate over the store with prefixB and check that the data matches the expected data.
 	foundKeysB := make(map[string]bool)
-	iterator, err = store.NewIterator(prefixB)
+	iteratorB, err := store.NewIterator(prefixB)
+	defer iteratorB.Release()
+
 	assert.NoError(t, err)
 
-	for iterator.Next() {
-		key := string(iterator.Key())
-		value := iterator.Value()
+	for iteratorB.Next() {
+		key := string(iteratorB.Key())
+		value := iteratorB.Value()
 
 		expectedValue, ok := expectedDataB[key]
 		assert.True(t, ok)
