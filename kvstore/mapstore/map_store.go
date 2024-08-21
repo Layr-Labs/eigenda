@@ -6,24 +6,24 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
-var _ kvstore.Store = &Store{}
+var _ kvstore.Store = &mapStore{}
 
-// Store is a simple in-memory implementation of KVStore.
-type Store struct {
+// mapStore is a simple in-memory implementation of KVStore.
+type mapStore struct {
 	data      map[string][]byte
 	destroyed bool
 }
 
-// NewStore creates a new Store.
+// NewStore creates a new mapStore.
 func NewStore() kvstore.Store {
-	return &Store{
+	return &mapStore{
 		data: make(map[string][]byte),
 	}
 }
 
-func (store *Store) Put(key []byte, value []byte) error {
+func (store *mapStore) Put(key []byte, value []byte) error {
 	if store.destroyed {
-		return fmt.Errorf("store is destroyed")
+		return fmt.Errorf("mapStore is destroyed")
 	}
 
 	stringifiedKey := string(key)
@@ -32,9 +32,9 @@ func (store *Store) Put(key []byte, value []byte) error {
 	return nil
 }
 
-func (store *Store) Delete(key []byte) error {
+func (store *mapStore) Delete(key []byte) error {
 	if store.destroyed {
-		return fmt.Errorf("store is destroyed")
+		return fmt.Errorf("mapStore is destroyed")
 	}
 
 	stringifiedKey := string(key)
@@ -42,7 +42,7 @@ func (store *Store) Delete(key []byte) error {
 	return nil
 }
 
-func (store *Store) DeleteBatch(keys [][]byte) error {
+func (store *mapStore) DeleteBatch(keys [][]byte) error {
 	for _, key := range keys {
 		err := store.Delete(key)
 		if err != nil {
@@ -52,9 +52,9 @@ func (store *Store) DeleteBatch(keys [][]byte) error {
 	return nil
 }
 
-func (store *Store) WriteBatch(keys, values [][]byte) error {
+func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 	if store.destroyed {
-		return fmt.Errorf("store is destroyed")
+		return fmt.Errorf("mapStore is destroyed")
 	}
 
 	if len(keys) != len(values) {
@@ -70,16 +70,16 @@ func (store *Store) WriteBatch(keys, values [][]byte) error {
 	return nil
 }
 
-func (store *Store) NewIterator(prefix []byte) iterator.Iterator {
+func (store *mapStore) NewIterator(prefix []byte) iterator.Iterator {
 	//TODO implement me
 	// TODO unit test
 	panic("implement me")
 }
 
-// Get retrieves data from the store. Returns nil if the data is not found.
-func (store *Store) Get(key []byte) ([]byte, error) {
+// Get retrieves data from the mapStore. Returns nil if the data is not found.
+func (store *mapStore) Get(key []byte) ([]byte, error) {
 	if store.destroyed {
-		return nil, fmt.Errorf("store is destroyed")
+		return nil, fmt.Errorf("mapStore is destroyed")
 	}
 
 	stringifiedKey := string(key)
@@ -96,19 +96,19 @@ func (store *Store) Get(key []byte) ([]byte, error) {
 	return dataCopy, nil // TODO test that it is safe to modify the returned data
 }
 
-// Shutdown stops the store and releases any resources it holds. Does not delete any on-disk data.
-func (store *Store) Shutdown() error {
+// Shutdown stops the mapStore and releases any resources it holds. Does not delete any on-disk data.
+func (store *mapStore) Shutdown() error {
 	return store.Destroy()
 }
 
-// Destroy permanently stops the store and deletes all data (including data on disk).
-func (store *Store) Destroy() error {
+// Destroy permanently stops the mapStore and deletes all data (including data on disk).
+func (store *mapStore) Destroy() error {
 	store.data = nil
 	store.destroyed = true
 	return nil
 }
 
-// IsShutDown returns true if the store is shut down.
-func (store *Store) IsShutDown() bool {
+// IsShutDown returns true if the mapStore is shut down.
+func (store *mapStore) IsShutDown() bool {
 	return store.destroyed // TODO necessary?
 }

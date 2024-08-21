@@ -12,10 +12,10 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-var _ kvstore.Store = &Store{}
+var _ kvstore.Store = &levelDBStore{}
 
-// Store implements kvstore.Store interfaces with levelDB as the backend engine.
-type Store struct {
+// levelDBStore implements kvstore.Store interfaces with levelDB as the backend engine.
+type levelDBStore struct {
 	db   *leveldb.DB
 	path string
 
@@ -25,7 +25,7 @@ type Store struct {
 	destroyed bool
 }
 
-// NewStore returns a new Store built using LevelDB.
+// NewStore returns a new levelDBStore built using LevelDB.
 func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 	levelDB, err := leveldb.OpenFile(path, nil)
 
@@ -33,17 +33,17 @@ func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 		return nil, err
 	}
 
-	return &Store{
+	return &levelDBStore{
 		db:     levelDB,
 		logger: logger,
 	}, nil
 }
 
-func (store *Store) Put(key []byte, value []byte) error {
+func (store *levelDBStore) Put(key []byte, value []byte) error {
 	return store.db.Put(key, value, nil)
 }
 
-func (store *Store) Get(key []byte) ([]byte, error) {
+func (store *levelDBStore) Get(key []byte) ([]byte, error) {
 	data, err := store.db.Get(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
@@ -54,11 +54,11 @@ func (store *Store) Get(key []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (store *Store) NewIterator(prefix []byte) iterator.Iterator {
+func (store *levelDBStore) NewIterator(prefix []byte) iterator.Iterator {
 	return store.db.NewIterator(util.BytesPrefix(prefix), nil)
 }
 
-func (store *Store) Delete(key []byte) error {
+func (store *levelDBStore) Delete(key []byte) error {
 	err := store.db.Delete(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
@@ -69,7 +69,7 @@ func (store *Store) Delete(key []byte) error {
 	return nil
 }
 
-func (store *Store) DeleteBatch(keys [][]byte) error {
+func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 	batch := new(leveldb.Batch)
 	for _, key := range keys {
 		batch.Delete(key)
@@ -77,7 +77,7 @@ func (store *Store) DeleteBatch(keys [][]byte) error {
 	return store.db.Write(batch, nil)
 }
 
-func (store *Store) WriteBatch(keys, values [][]byte) error {
+func (store *levelDBStore) WriteBatch(keys, values [][]byte) error {
 	batch := new(leveldb.Batch)
 	for i, key := range keys {
 		batch.Put(key, values[i])
@@ -86,7 +86,7 @@ func (store *Store) WriteBatch(keys, values [][]byte) error {
 }
 
 // Shutdown shuts down the store.
-func (store *Store) Shutdown() error {
+func (store *levelDBStore) Shutdown() error {
 	if store.shutdown {
 		return nil
 	}
@@ -101,7 +101,7 @@ func (store *Store) Shutdown() error {
 }
 
 // Destroy destroys the store.
-func (store *Store) Destroy() error {
+func (store *levelDBStore) Destroy() error {
 	if store.destroyed {
 		return nil
 	}
