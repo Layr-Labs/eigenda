@@ -1,8 +1,10 @@
 package storeutil
 
 import (
+	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/kvstore"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"strconv"
@@ -12,15 +14,44 @@ import (
 var _ kvstore.Store = &TTLStore{}
 
 // TTLStore adds a time-to-live (TTL) capability to the store.
+//
+// This store utilizes the properties of store iteration. Namely, that the keys are returned in lexicographical order,
+// as well as the ability to filter keys by prefix. "Regular" keys are stored in the store with a prefix "k", while
+// special expiry keys are stored with a prefix "e". The expiry key also contains the expiry time in hexadecimal format,
+// such that when iterating over expiry keys in lexicographical order, the keys are ordered by expiry time. The value
+// each expiry key points to is the regular key that is to be deleted when the expiry time is reached. In order to
+// efficiently delete expired keys, the expiry keys must be iterated over periodically to find and delete expired keys.
 type TTLStore struct {
-	store kvstore.Store
+	store  kvstore.Store
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	logger logging.Logger
+
+	shutdown  bool
+	destroyed bool
 }
 
-// TTLWrapper extends the given store with TTL capabilities.
-func TTLWrapper(store kvstore.Store) *TTLStore {
-	return &TTLStore{
-		store: store,
+// TTLWrapper extends the given store with TTL capabilities. Periodically checks for expired keys and deletes them
+// with a period of gcPeriod. If gcPeriod is 0, no background goroutine is spawned to check for expired keys.
+func TTLWrapper(
+	ctx context.Context,
+	logger logging.Logger,
+	store kvstore.Store,
+	gcPeriod time.Duration) *TTLStore {
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	ttlStore := &TTLStore{
+		store:  store,
+		ctx:    ctx,
+		cancel: cancel,
+		logger: logger,
 	}
+	if gcPeriod > 0 {
+		ttlStore.expireKeysInBackground(gcPeriod)
+	}
+	return ttlStore
 }
 
 var keyPrefix = []byte("k")
@@ -51,7 +82,7 @@ func (store *TTLStore) PutWithExpiration(key []byte, value []byte, expiryTime ti
 	// The expiry key takes the form of the string "e<expiry timestamp in hexadecimal>".
 	// The expiry timestamp is padded with zeros to ensure that the expiry key is lexicographically
 	// ordered by time of expiry.
-	// TODO verify padding
+	// TODO verify padding with test
 	expiryKey := append(expiryPrefix, []byte(fmt.Sprintf(expiryKeyPadding, expiryTime))...)
 
 	batchKeys[1] = expiryKey
@@ -60,11 +91,29 @@ func (store *TTLStore) PutWithExpiration(key []byte, value []byte, expiryTime ti
 	return store.store.WriteBatch(batchKeys, batchValues)
 }
 
+// Spawns a background goroutine that periodically checks for expired keys and deletes them.
+func (store *TTLStore) expireKeysInBackground(gcPeriod time.Duration) {
+	ticker := time.NewTicker(gcPeriod)
+	go func() {
+		for {
+			select {
+			case now := <-ticker.C:
+				err := store.expireKeys(now)
+				if err != nil {
+					store.logger.Error("Error expiring keys", err)
+					store.cancel()
+					return
+				}
+			case <-store.ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
 // Delete all keys with a TTL that has expired.
 func (store *TTLStore) expireKeys(now time.Time) error {
-
-	// TODO add really strong documentation
-
 	it, err := store.store.NewIterator(expiryPrefix)
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/kvstore"
@@ -23,7 +24,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		return storeutil.ThreadSafeWrapper(mapstore.NewStore()), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		return storeutil.TTLWrapper(mapstore.NewStore()), nil
+		return storeutil.TTLWrapper(context.Background(), logger, mapstore.NewStore(), 0), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return leveldb.NewStore(logger, path)
@@ -40,28 +41,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		if err != nil {
 			return nil, err
 		}
-		return storeutil.TTLWrapper(store), nil
-	},
-}
-
-// A list of builders that support iteration. Not all stores are required to support iteration until we adopt go 1.23.
-var iterableStoreBuilders = []func(logger logging.Logger, path string) (kvstore.Store, error){
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		return leveldb.NewStore(logger, path)
-	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		store, err := leveldb.NewStore(logger, path)
-		if err != nil {
-			return nil, err
-		}
-		return storeutil.ThreadSafeWrapper(store), nil
-	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		store, err := leveldb.NewStore(logger, path)
-		if err != nil {
-			return nil, err
-		}
-		return storeutil.TTLWrapper(store), nil
+		return storeutil.TTLWrapper(context.Background(), logger, store, 0), nil
 	},
 }
 
@@ -375,7 +355,7 @@ func TestIteration(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	for _, builder := range iterableStoreBuilders {
+	for _, builder := range storeBuilders {
 		store, err := builder(logger, dbPath)
 		assert.NoError(t, err)
 		iterationTest(t, store)
@@ -417,7 +397,11 @@ func iterationWithPrefixTest(t *testing.T, store kvstore.Store) {
 	defer iteratorA.Release()
 	assert.NoError(t, err)
 
+	index := 0
+
 	for iteratorA.Next() {
+		index++
+
 		key := string(iteratorA.Key())
 		value := iteratorA.Value()
 
@@ -457,9 +441,11 @@ func TestIterationWithPrefix(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	for _, builder := range iterableStoreBuilders {
+	for _, builder := range storeBuilders {
 		store, err := builder(logger, dbPath)
 		assert.NoError(t, err)
 		iterationWithPrefixTest(t, store)
 	}
 }
+
+// TODO test iteration order
