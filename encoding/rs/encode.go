@@ -65,17 +65,16 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 // PadPolyEval pads the input polynomial coefficients to match the number of evaluations
 // required by the encoder.
 func (g *Encoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
-	if len(coeffs) > int(g.NumEvaluations()) {
+	numEval := int(g.NumEvaluations())
+	if len(coeffs) > numEval {
 		return nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
 	}
 
-	pdCoeffs := make([]fr.Element, g.NumEvaluations())
-	for i := 0; i < len(coeffs); i++ {
-		pdCoeffs[i].Set(&coeffs[i])
-	}
+	pdCoeffs := make([]fr.Element, numEval)
+	copy(pdCoeffs, coeffs)
 
 	// Pad the remaining elements with zeroes
-	for i := len(coeffs); i < len(pdCoeffs); i++ {
+	for i := len(coeffs); i < numEval; i++ {
 		pdCoeffs[i].SetZero()
 	}
 
