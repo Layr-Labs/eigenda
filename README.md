@@ -155,13 +155,24 @@ Container can be built via running `make docker-build`.
 
 ## Commitment Schemas
 
-Commitments returned from the EigenDA Proxy adhere to the following byte encoding:
+### Optimism Commitment Mode
+For `alt-da` clients running on Optimism, the following commitment schema is supported:
 
 ```
- 0        1        2         3               N
- |--------|--------|---------|---------------|
-  commit   da layer  version  raw commitment
+ 0        1        2         3                N
+ |--------|--------|---------|----------------|
+  commit   da layer  version   raw commitment
   type       type     byte
+```
+
+### Generic Commitment Mode
+For generic clients communicating with proxy, the following commitment schema is supported:
+
+```
+ 0         1                 N
+ |---------|-----------------|
+   version   raw commitment
+    byte
 ```
 
 The `raw commitment` is an RLP-encoded [EigenDA certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168).
