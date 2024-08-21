@@ -86,9 +86,9 @@ func (store *mapStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 		return nil, fmt.Errorf("mapStore is destroyed")
 	}
 
-	//TODO implement me
-	// TODO unit test
-	panic("implement me")
+	// This will not be implemented until we upgrade to go 1.23, which standardizes iterators as part of the language.
+
+	return nil, nil
 }
 
 // Get retrieves data from the mapStore. Returns nil if the data is not found.

@@ -34,6 +34,20 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 	},
 }
 
+// A list of builders that support iteration. Not all stores are required to support iteration until we adopt go 1.23.
+var iterableStoreBuilders = []func(logger logging.Logger, path string) (kvstore.Store, error){
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		return leveldb.NewStore(logger, path)
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		store, err := leveldb.NewStore(logger, path)
+		if err != nil {
+			return nil, err
+		}
+		return storeutil.ThreadSafeWrapper(store), nil
+	},
+}
+
 var dbPath = "test-store"
 
 func deleteDBDirectory(t *testing.T) {
@@ -296,5 +310,135 @@ func TestOperationsOnShutdownStore(t *testing.T) {
 		store, err := builder(logger, dbPath)
 		assert.NoError(t, err)
 		operationsOnShutdownStoreTest(t, store)
+	}
+}
+
+func iterationTest(t *testing.T, store kvstore.Store) {
+	tu.InitializeRandom()
+	deleteDBDirectory(t)
+
+	expectedData := make(map[string][]byte)
+
+	// Insert some data into the store.
+	for i := 0; i < 1000; i++ {
+		key := tu.RandomBytes(32)
+		value := tu.RandomBytes(32)
+
+		err := store.Put(key, value)
+		assert.NoError(t, err)
+
+		expectedData[string(key)] = value
+	}
+
+	// Iterate over the store and check that the data matches the expected data.
+	foundKeys := make(map[string]bool)
+
+	iterator, err := store.NewIterator(nil)
+	assert.NoError(t, err)
+
+	for iterator.Next() {
+		key := string(iterator.Key())
+		value := iterator.Value()
+
+		expectedValue, ok := expectedData[key]
+		assert.True(t, ok)
+		assert.Equal(t, expectedValue, value)
+
+		foundKeys[key] = true
+	}
+	assert.Equal(t, len(expectedData), len(foundKeys))
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+	verifyDBIsDeleted(t)
+}
+
+func TestIteration(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	for _, builder := range iterableStoreBuilders {
+		store, err := builder(logger, dbPath)
+		assert.NoError(t, err)
+		iterationTest(t, store)
+	}
+}
+
+func iterationWithPrefixTest(t *testing.T, store kvstore.Store) {
+	tu.InitializeRandom()
+	deleteDBDirectory(t)
+
+	prefixA := tu.RandomBytes(8)
+	prefixB := tu.RandomBytes(8)
+
+	expectedDataA := make(map[string][]byte)
+	expectedDataB := make(map[string][]byte)
+
+	// Insert some data into the store.
+	for i := 0; i < 1000; i++ {
+		choice := rand.Float64()
+
+		var key []byte
+		value := tu.RandomBytes(32)
+
+		if choice < 0.5 {
+			key = append(prefixA, tu.RandomBytes(24)...)
+			expectedDataA[string(key)] = value
+		} else {
+			key = append(prefixB, tu.RandomBytes(24)...)
+			expectedDataB[string(key)] = value
+		}
+
+		err := store.Put(key, value)
+		assert.NoError(t, err)
+	}
+
+	// Iterate over the store with prefixA and check that the data matches the expected data.
+	foundKeysA := make(map[string]bool)
+	iterator, err := store.NewIterator(prefixA)
+	assert.NoError(t, err)
+
+	for iterator.Next() {
+		key := string(iterator.Key())
+		value := iterator.Value()
+
+		expectedValue, ok := expectedDataA[key]
+		assert.True(t, ok)
+		assert.Equal(t, expectedValue, value)
+
+		foundKeysA[key] = true
+	}
+	assert.Equal(t, len(expectedDataA), len(foundKeysA))
+
+	// Iterate over the store with prefixB and check that the data matches the expected data.
+	foundKeysB := make(map[string]bool)
+	iterator, err = store.NewIterator(prefixB)
+	assert.NoError(t, err)
+
+	for iterator.Next() {
+		key := string(iterator.Key())
+		value := iterator.Value()
+
+		expectedValue, ok := expectedDataB[key]
+		assert.True(t, ok)
+		assert.Equal(t, expectedValue, value)
+
+		foundKeysB[key] = true
+	}
+	assert.Equal(t, len(expectedDataB), len(foundKeysB))
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+	verifyDBIsDeleted(t)
+}
+
+func TestIterationWithPrefix(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	for _, builder := range iterableStoreBuilders {
+		store, err := builder(logger, dbPath)
+		assert.NoError(t, err)
+		iterationWithPrefixTest(t, store)
 	}
 }
