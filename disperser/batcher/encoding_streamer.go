@@ -386,7 +386,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					BlobMetadata:   metadata,
 					BlobQuorumInfo: res.BlobQuorumInfo,
 				}}
-				e.metrics.ObserveEncodingLatency("failed", res.BlobQuorumInfo.QuorumID, 0, float64(time.Since(start).Milliseconds()))
+				e.metrics.ObserveEncodingLatency("failed", res.BlobQuorumInfo.QuorumID, len(blob.Data), float64(time.Since(start).Milliseconds()))
 				return
 			}
 
@@ -401,7 +401,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 				},
 				Err: nil,
 			}
-			e.metrics.ObserveEncodingLatency("success", res.BlobQuorumInfo.QuorumID, 0, float64(time.Since(start).Milliseconds()))
+			e.metrics.ObserveEncodingLatency("success", res.BlobQuorumInfo.QuorumID, len(blob.Data), float64(time.Since(start).Milliseconds()))
 		})
 		e.EncodedBlobstore.PutEncodingRequest(blobKey, res.BlobQuorumInfo.QuorumID)
 	}
