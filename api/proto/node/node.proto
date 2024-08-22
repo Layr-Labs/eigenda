@@ -35,8 +35,6 @@ service Retrieval {
 	rpc StreamChunks(stream StreamChunksRequest) returns (stream GetChunkReply) {}
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
-	// StreamBlobHeaders streams the blob headers to the client.
-	rpc StreamBlobHeaders(StreamBlobHeadersRequest) returns (stream GetBlobHeaderReply) {}
 	// Retrieve node info metadata.
 	rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 
@@ -170,12 +168,6 @@ message GetBlobHeaderReply {
 	// the batch's MerkleProof.index-th blob.
 	// This can be checked against the batch root on chain.
 	MerkleProof proof = 2;
-}
-
-// Request that all new blob headers be sent to the client.
-message StreamBlobHeadersRequest {
-	// The quorum ID of the headers to stream.
-	uint32 quorum_id = 1;
 }
 
 message MerkleProof {
