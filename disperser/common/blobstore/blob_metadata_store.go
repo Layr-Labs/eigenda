@@ -64,18 +64,18 @@ func (s *BlobMetadataStore) QueueNewBlobMetadata(ctx context.Context, blobMetada
 	return s.dynamoDBClient.PutItem(ctx, s.tableName, item)
 }
 
-func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
+func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"BlobHash": &types.AttributeValueMemberS{
-			Value: metadataKey.BlobHash,
+			Value: blobKey.BlobHash,
 		},
 		"MetadataHash": &types.AttributeValueMemberS{
-			Value: metadataKey.MetadataHash,
+			Value: blobKey.MetadataHash,
 		},
 	})
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: metadata not found for key %s", disperser.ErrMetadataNotFound, metadataKey)
+		return nil, fmt.Errorf("%w: metadata not found for key %s", disperser.ErrMetadataNotFound, blobKey)
 	}
 
 	if err != nil {
@@ -85,6 +85,32 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, metadataKey dis
 	metadata, err := UnmarshalBlobMetadata(item)
 	if err != nil {
 		return nil, err
+	}
+
+	return metadata, nil
+}
+
+// GetBulkBlobMetadata returns the metadata for the given blob keys
+// Note: ordering of items is not guaranteed
+func (s *BlobMetadataStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []disperser.BlobKey) ([]*disperser.BlobMetadata, error) {
+	keys := make([]map[string]types.AttributeValue, len(blobKeys))
+	for i := 0; i < len(blobKeys); i += 1 {
+		keys[i] = map[string]types.AttributeValue{
+			"BlobHash":     &types.AttributeValueMemberS{Value: blobKeys[i].BlobHash},
+			"MetadataHash": &types.AttributeValueMemberS{Value: blobKeys[i].MetadataHash},
+		}
+	}
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata := make([]*disperser.BlobMetadata, len(items))
+	for i, item := range items {
+		metadata[i], err = UnmarshalBlobMetadata(item)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return metadata, nil

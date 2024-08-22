@@ -165,6 +165,8 @@ func (c *Client) GetItem(ctx context.Context, tableName string, key Key) (Item, 
 	return resp.Item, nil
 }
 
+// GetItems returns the items for the given keys
+// Note: ordering of items is not guaranteed
 func (c *Client) GetItems(ctx context.Context, tableName string, keys []Key) ([]Item, error) {
 	items, err := c.readItems(ctx, tableName, keys)
 	if err != nil {
