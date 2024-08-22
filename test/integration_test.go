@@ -222,7 +222,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		idStr := hexutil.Encode(id[:])
 		fmt.Println("Operator: ", idStr)
 
-		dbPath := fmt.Sprintf("testdata/%v/kvstore", idStr)
+		dbPath := fmt.Sprintf("testdata/%v/db", idStr)
 		logPath := fmt.Sprintf("testdata/%v/log", idStr)
 
 		err := os.RemoveAll(dbPath)
@@ -544,7 +544,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {
-			blobHeader, err = nodegrpc.GetBlobHeaderFromProto(headerReply.GetBlobHeader())
+			blobHeader, err = node.GetBlobHeaderFromProto(headerReply.GetBlobHeader())
 			assert.NoError(t, err)
 		}
 

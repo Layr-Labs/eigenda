@@ -93,8 +93,8 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "QUORUM_ID_LIST"),
 	}
 	DbPathFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "kvstore-path"),
-		Usage:    "Path for level kvstore",
+		Name:     common.PrefixFlag(FlagPrefix, "db-path"),
+		Usage:    "Path for level db",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_PATH"),
 	}

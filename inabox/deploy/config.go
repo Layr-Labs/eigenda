@@ -146,8 +146,9 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_GRAPH_URL:             graphUrl,
 		CHURNER_INDEXER_PULL_INTERVAL: "1s",
 
-		CHURNER_ENABLE_METRICS:    "true",
-		CHURNER_METRICS_HTTP_PORT: "9095",
+		CHURNER_ENABLE_METRICS:          "true",
+		CHURNER_METRICS_HTTP_PORT:       "9095",
+		CHURNER_CHURN_APPROVAL_INTERVAL: "900s",
 	}
 
 	env.applyDefaults(&v, "CHURNER", "churner", ind)
@@ -423,10 +424,10 @@ func genTelemetryServices(compose testbed, name, image string, volumes []string)
 func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile string) {
 	if env.Environment.IsLocal() {
 		logPath = ""
-		dbPath = "testdata/" + env.TestName + "/kvstore/" + name
+		dbPath = "testdata/" + env.TestName + "/db/" + name
 	} else {
 		logPath = "/data/logs/" + name
-		dbPath = "/data/kvstore/" + name
+		dbPath = "/data/db/" + name
 	}
 
 	envFilename = "envs/" + name + ".env"

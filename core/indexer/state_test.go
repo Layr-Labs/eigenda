@@ -163,7 +163,7 @@ var _ = Describe("Indexer", func() {
 				err   error
 			)
 			if headerStoreType == "leveldb" {
-				dbPath := filepath.Join(testConfig.Path, "kvstore")
+				dbPath := filepath.Join(testConfig.Path, "db")
 				s, err := leveldb.NewHeaderStore(dbPath)
 				if err == nil {
 					defer s.Close()

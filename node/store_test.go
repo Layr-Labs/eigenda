@@ -227,7 +227,7 @@ func createStore(t *testing.T) *node.Store {
 func TestEncodeDecodeChunks(t *testing.T) {
 	decoded, format, err := node.DecodeChunks([]byte{})
 	assert.Nil(t, err)
-	assert.Equal(t, pb.ChunkEncoding_UNKNOWN, format)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, format)
 	assert.Equal(t, 0, len(decoded))
 
 	numSamples := 32
@@ -244,14 +244,14 @@ func TestEncodeDecodeChunks(t *testing.T) {
 		assert.Nil(t, err)
 		decoded, format, err := node.DecodeChunks(encoded)
 		assert.Nil(t, err)
-		assert.Equal(t, pb.ChunkEncoding_GOB, format)
+		assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
 		for i := 0; i < numChunks; i++ {
 			assert.True(t, bytes.Equal(decoded[i], chunks[i]))
 		}
 	}
 }
 
-func TestStoringInvalidBlob(t *testing.T) {
+func TestStoreBatchInvalidBlob(t *testing.T) {
 	s := createStore(t)
 	ctx := context.Background()
 	batchHeader, blobs, blobsProto := CreateBatchWith(t, true)
@@ -260,7 +260,16 @@ func TestStoringInvalidBlob(t *testing.T) {
 	assert.EqualError(t, err, "chunks of a bundle are encoded together already")
 }
 
-func TestStoringBlob(t *testing.T) {
+func TestStoreBlobsInvalidBlob(t *testing.T) {
+	s := createStore(t)
+	ctx := context.Background()
+	_, blobs, blobsProto := CreateBatchWith(t, true)
+	blobsProto[0].Bundles[0].Chunks = [][]byte{[]byte{1}}
+	_, err := s.StoreBlobs(ctx, blobs, blobsProto)
+	assert.EqualError(t, err, "chunks of a bundle are encoded together already")
+}
+
+func TestStoreBatchSuccess(t *testing.T) {
 	s := createStore(t)
 	ctx := context.Background()
 
@@ -289,14 +298,26 @@ func TestStoringBlob(t *testing.T) {
 	blobHeaderKey1, err := node.EncodeBlobHeaderKey(batchHeaderHash, 0)
 	assert.Nil(t, err)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey1))
+
 	blobHeaderKey2, err := node.EncodeBlobHeaderKey(batchHeaderHash, 1)
 	assert.Nil(t, err)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey2))
+
 	blobHeaderBytes1, err := s.GetBlobHeader(ctx, batchHeaderHash, 0)
 	assert.Nil(t, err)
 	expected, err := proto.Marshal(blobsProto[0].GetHeader())
 	assert.Nil(t, err)
 	assert.True(t, bytes.Equal(blobHeaderBytes1, expected))
+
+	blobHeaderBytes2, err := s.GetBlobHeader(ctx, batchHeaderHash, 1)
+	assert.Nil(t, err)
+	expected, err = proto.Marshal(blobsProto[1].GetHeader())
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal(blobHeaderBytes2, expected))
+
+	blobHeaderBytes3, err := s.GetBlobHeader(ctx, batchHeaderHash, 2)
+	assert.ErrorIs(t, err, node.ErrKeyNotFound)
+	assert.Nil(t, blobHeaderBytes3)
 
 	// Check existence: blob chunks.
 	blobKey1, err := node.EncodeBlobKey(batchHeaderHash, 0, 0)
@@ -314,12 +335,12 @@ func TestStoringBlob(t *testing.T) {
 	// Expire the batches.
 	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12
 	// Try to expire at a time before expiry, so nothing will be expired.
-	numDeleted, err := s.DeleteExpiredEntries(curTime-10, 1)
+	numDeleted, _, _, err := s.DeleteExpiredEntries(curTime-10, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, numDeleted, 0)
 	assert.True(t, s.HasKey(ctx, batchHeaderKey))
 	// Then expire it at a time post expiry, so the batch will get purged.
-	numDeleted, err = s.DeleteExpiredEntries(curTime+10, 1)
+	numDeleted, _, _, err = s.DeleteExpiredEntries(curTime+10, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, numDeleted, 1)
 	assert.False(t, s.HasKey(ctx, batchHeaderKey))
@@ -329,7 +350,158 @@ func TestStoringBlob(t *testing.T) {
 	assert.False(t, s.HasKey(ctx, blobKey2))
 }
 
-func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncoding) []*encoding.Frame {
+func TestStoreBlobsSuccess(t *testing.T) {
+	s := createStore(t)
+	ctx := context.Background()
+
+	// Empty store
+	blobKey := []byte{1, 2}
+	assert.False(t, s.HasKey(ctx, blobKey))
+
+	// Prepare data to store.
+	_, blobs, blobsProto := CreateBatch(t)
+
+	// Store a batch.
+	_, err := s.StoreBlobs(ctx, blobs, blobsProto)
+	assert.Nil(t, err)
+
+	// Check existence: blob headers.
+	blobHeaderHash0, err := blobs[0].BlobHeader.GetBlobHeaderHash()
+	assert.Nil(t, err)
+	blobHeaderKey0 := node.EncodeBlobHeaderKeyByHash(blobHeaderHash0)
+	assert.True(t, s.HasKey(ctx, blobHeaderKey0))
+	blobHeaderHash1, err := blobs[1].BlobHeader.GetBlobHeaderHash()
+	assert.Nil(t, err)
+	blobHeaderKey1 := node.EncodeBlobHeaderKeyByHash(blobHeaderHash1)
+	assert.True(t, s.HasKey(ctx, blobHeaderKey1))
+	blobHeaderBytes0, err := s.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash0)
+	assert.Nil(t, err)
+	expected, err := proto.Marshal(blobsProto[0].GetHeader())
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal(blobHeaderBytes0, expected))
+	blobHeaderBytes1, err := s.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash1)
+	assert.Nil(t, err)
+	expected, err = proto.Marshal(blobsProto[1].GetHeader())
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal(blobHeaderBytes1, expected))
+
+	// Check existence: blob chunks.
+	blobKey0, err := node.EncodeBlobKeyByHash(blobHeaderHash0, 0)
+	assert.Nil(t, err)
+	assert.True(t, s.HasKey(ctx, blobKey0))
+	blobKey1, err := node.EncodeBlobKeyByHash(blobHeaderHash1, 0)
+	assert.Nil(t, err)
+	assert.True(t, s.HasKey(ctx, blobKey1))
+
+	// Expire the batches.
+	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12
+	// Try to expire at a time before expiry, so nothing will be expired.
+	numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := s.DeleteExpiredEntries(curTime-10, 5)
+	assert.Nil(t, err)
+	assert.Equal(t, numBatchesDeleted, 0)
+	assert.Equal(t, numMappingsDeleted, 0)
+	assert.Equal(t, numBlobsDeleted, 0)
+	assert.True(t, s.HasKey(ctx, blobHeaderKey0))
+	// Then expire it at a time post expiry, so the batch will get purged.
+	numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err = s.DeleteExpiredEntries(curTime+10, 5)
+	assert.Nil(t, err)
+	assert.Equal(t, numBatchesDeleted, 0)
+	assert.Equal(t, numMappingsDeleted, 0)
+	assert.Equal(t, numBlobsDeleted, 2)
+	assert.False(t, s.HasKey(ctx, blobHeaderKey0))
+	assert.False(t, s.HasKey(ctx, blobHeaderKey1))
+	assert.False(t, s.HasKey(ctx, blobKey0))
+	assert.False(t, s.HasKey(ctx, blobKey1))
+}
+
+func TestStoreBatchBlobMapping(t *testing.T) {
+	s := createStore(t)
+	ctx := context.Background()
+
+	// Empty store
+	blobKey := []byte{1, 2}
+	assert.False(t, s.HasKey(ctx, blobKey))
+
+	// Prepare data to store.
+	batchHeader, blobs, blobsProto := CreateBatch(t)
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	assert.Nil(t, err)
+	blobHeaderHash0, err := blobs[0].BlobHeader.GetBlobHeaderHash()
+	assert.Nil(t, err)
+	blobHeaderHash1, err := blobs[1].BlobHeader.GetBlobHeaderHash()
+	assert.Nil(t, err)
+
+	// Store a batch.
+	_, err = s.StoreBlobs(ctx, blobs, blobsProto)
+	assert.Nil(t, err)
+	err = s.StoreBatchBlobMapping(ctx, batchHeader, [][32]byte{blobHeaderHash0, blobHeaderHash1})
+	assert.Nil(t, err)
+
+	// Check existence: batch header.
+	batchHeaderKey := node.EncodeBatchHeaderKey(batchHeaderHash)
+	assert.True(t, s.HasKey(ctx, batchHeaderKey))
+	batchHeaderBytes, err := s.GetBatchHeader(ctx, batchHeaderHash)
+	assert.Nil(t, err)
+	expectedBatchHeaderBytes, err := batchHeader.Serialize()
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal(batchHeaderBytes, expectedBatchHeaderBytes))
+
+	// Check existence: blob index mapping
+	blobIndexKey0 := node.EncodeBlobIndexKey(batchHeaderHash, 0)
+	blobIndexKey1 := node.EncodeBlobIndexKey(batchHeaderHash, 1)
+	assert.True(t, s.HasKey(ctx, blobIndexKey0))
+	assert.True(t, s.HasKey(ctx, blobIndexKey1))
+
+	var h [32]byte
+	bhh0, err := s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, 0)
+	assert.Nil(t, err)
+	copy(h[:], bhh0)
+	assert.Equal(t, blobHeaderHash0, h)
+	bhh1, err := s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, 1)
+	assert.Nil(t, err)
+	copy(h[:], bhh1)
+	assert.Equal(t, blobHeaderHash1, h)
+
+	// Check blob headers by GetBlobHeader method
+	var protoBlobHeader pb.BlobHeader
+	blobHeaderBytes0, err := s.GetBlobHeader(ctx, batchHeaderHash, 0)
+	assert.Nil(t, err)
+	err = proto.Unmarshal(blobHeaderBytes0, &protoBlobHeader)
+	assert.Nil(t, err)
+	blobHeader0, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	assert.Nil(t, err)
+
+	assert.Equal(t, blobHeader0, blobs[0].BlobHeader)
+	blobHeaderBytes1, err := s.GetBlobHeader(ctx, batchHeaderHash, 1)
+	assert.Nil(t, err)
+	err = proto.Unmarshal(blobHeaderBytes1, &protoBlobHeader)
+	assert.Nil(t, err)
+	blobHeader1, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	assert.Nil(t, err)
+	assert.Equal(t, blobHeader1, blobs[1].BlobHeader)
+	blobHeaderBytes2, err := s.GetBlobHeader(ctx, batchHeaderHash, 2)
+	assert.ErrorIs(t, err, node.ErrKeyNotFound)
+	assert.Nil(t, blobHeaderBytes2)
+
+	// Expire the batches.
+	curTime := time.Now().Unix() + int64(staleMeasure+storeDuration)*12
+	// Try to expire at a time before expiry, so nothing will be expired.
+	numBatchesDeleted, numMappingsDeleted, _, err := s.DeleteExpiredEntries(curTime-10, 5)
+	assert.Nil(t, err)
+	assert.Equal(t, numBatchesDeleted, 0)
+	assert.Equal(t, numMappingsDeleted, 0)
+	assert.True(t, s.HasKey(ctx, blobIndexKey0))
+	assert.True(t, s.HasKey(ctx, blobIndexKey1))
+	// Then expire it at a time post expiry, so the batch will get purged.
+	numBatchesDeleted, numMappingsDeleted, _, err = s.DeleteExpiredEntries(curTime+10, 5)
+	assert.Nil(t, err)
+	assert.Equal(t, numBatchesDeleted, 1)
+	assert.Equal(t, numMappingsDeleted, 2)
+	assert.False(t, s.HasKey(ctx, blobIndexKey0))
+	assert.False(t, s.HasKey(ctx, blobIndexKey1))
+}
+
+func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncodingFormat) []*encoding.Frame {
 	ctx := context.Background()
 	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, blobIdx, 0)
 	assert.Nil(t, err)
@@ -337,10 +509,10 @@ func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx
 	assert.Equal(t, chunkEncoding, format)
 	var f *encoding.Frame
 	switch chunkEncoding {
-	case pb.ChunkEncoding_GOB:
+	case pb.ChunkEncodingFormat_GOB:
 		f, err = new(encoding.Frame).Deserialize(chunks[0])
 		assert.Nil(t, err)
-	case pb.ChunkEncoding_GNARK:
+	case pb.ChunkEncodingFormat_GNARK:
 		f, err = new(encoding.Frame).DeserializeGnark(chunks[0])
 		assert.Nil(t, err)
 	}
@@ -375,12 +547,12 @@ func TestBundleEncodingEquivalence(t *testing.T) {
 	batchHeaderHash, err := batchHeader1.GetBatchHeaderHash()
 	assert.Nil(t, err)
 	// The first blob
-	bundle1 := decodeChunks(t, s1, batchHeaderHash, 0, pb.ChunkEncoding_GNARK)
-	bundle2 := decodeChunks(t, s2, batchHeaderHash, 0, pb.ChunkEncoding_GOB)
+	bundle1 := decodeChunks(t, s1, batchHeaderHash, 0, pb.ChunkEncodingFormat_GNARK)
+	bundle2 := decodeChunks(t, s2, batchHeaderHash, 0, pb.ChunkEncodingFormat_GOB)
 	checkBundleEquivalence(t, bundle1, bundle2)
 	// The second blob
-	bundle1 = decodeChunks(t, s1, batchHeaderHash, 1, pb.ChunkEncoding_GNARK)
-	bundle2 = decodeChunks(t, s2, batchHeaderHash, 1, pb.ChunkEncoding_GOB)
+	bundle1 = decodeChunks(t, s1, batchHeaderHash, 1, pb.ChunkEncodingFormat_GNARK)
+	bundle2 = decodeChunks(t, s2, batchHeaderHash, 1, pb.ChunkEncodingFormat_GOB)
 	checkBundleEquivalence(t, bundle1, bundle2)
 }
 

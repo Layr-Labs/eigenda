@@ -51,12 +51,11 @@ func newComponents(t *testing.T) *components {
 
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		panic("failed to create a directory for kvstore")
+		panic("failed to create a directory for db")
 	}
 	tx := &coremock.MockTransactor{}
 
 	mockVal := coremock.NewMockShardValidator()
-	mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
 	mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
