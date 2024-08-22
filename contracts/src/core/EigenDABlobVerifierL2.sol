@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAServiceManager} from "./IEigenDAServiceManager.sol";
-import {IEigenDASignatureVerifier} from "./IEigenDASignatureVerifier.sol";
+import "./EigenDABlobVerifier.sol";
+import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
-interface IEigenDABlobVerifier {
+abstract contract EigenDABlobVerifierL2 is OwnableUpgradeable, EigenDABlobVerifier {
 
-    struct BlobVerificationProof {
-        uint32 batchId;
-        uint32 blobIndex;
-        IEigenDAServiceManager.BatchMetadata batchMetadata;
-        bytes inclusionProof;
-        bytes quorumIndices;
+    IEigenDASignatureVerifier public immutable signatureVerifier;
+    IEigenDABatchMetadataStorage public immutable batchMetadataStorage;
+
+    constructor(
+        IEigenDASignatureVerifier _signatureVerifier, 
+        IEigenDABatchMetadataStorage _batchMetadataStorage
+    ) {
+        signatureVerifier = _signatureVerifier;
+        batchMetadataStorage = _batchMetadataStorage;
+        _disableInitializers();
     }
 
-    /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
-    function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index
-    function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns an array of bytes where each byte represents the number of a required quorum 
-    function quorumNumbersRequired() external view returns (bytes memory);
+    function initialize(address initialOwner) external initializer {
+        _transferOwnership(initialOwner);
+    }
 
     /**
      * @notice Verifies a the blob is valid for the required quorums
@@ -31,7 +30,16 @@ interface IEigenDABlobVerifier {
     function verifyBlob(
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof
-    ) external view;
+    ) external view override {
+        /*
+        _verifyBlobForQuorums(
+            batchMetadataStorage, 
+            blobHeader, 
+            blobVerificationProof, 
+            quorumNumbersRequired
+        );
+        */
+    }
 
     /**
      * @notice Verifies that a blob is valid for the required quorums and additional quorums
@@ -42,8 +50,17 @@ interface IEigenDABlobVerifier {
     function verifyBlob(
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof,
-        bytes calldata additionalQuorumNumbersRequired
-    ) external view;
+        bytes memory additionalQuorumNumbersRequired
+    ) external view override {
+        /*
+        _verifyBlobForQuorums(
+            batchMetadataStorage, 
+            blobHeader, 
+            blobVerificationProof, 
+            bytes.concat(quorumNumbersRequired, additionalQuorumNumbersRequired)
+        );
+        */
+    }
 
     /**
      * @notice Verifies that a blob preconfirmation is valid for the required quorums
@@ -55,7 +72,17 @@ interface IEigenDABlobVerifier {
         IEigenDAServiceManager.BatchHeader calldata miniBatchHeader,
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         IEigenDASignatureVerifier.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-    ) external view;
+        ) external view override {
+        /*
+        _verifyPreconfirmationForQuorums(
+            signatureVerifier, 
+            miniBatchHeader, 
+            blobHeader,
+            nonSignerStakesAndSignature, 
+            quorumNumbersRequired
+        );
+        */
+    }
 
     /**
      * @notice Verifies that a blob preconfirmation is valid for the required quorums and additional quorums
@@ -69,20 +96,16 @@ interface IEigenDABlobVerifier {
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         IEigenDASignatureVerifier.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         bytes memory additionalQuorumNumbersRequired
-    ) external view;
+    ) external view override {
+        /*
+        _verifyPreconfirmationForQuorums(
+            signatureVerifier, 
+            miniBatchHeader, 
+            blobHeader,
+            nonSignerStakesAndSignature, 
+            bytes.concat(quorumNumbersRequired, additionalQuorumNumbersRequired)
+        );
+        */
+    }
 
-    /// @notice Gets the adversary threshold percentage for a quorum
-    function getQuorumAdversaryThresholdPercentage(
-        uint8 quorumNumber
-    ) external view returns (uint8);
-
-    /// @notice Gets the confirmation threshold percentage for a quorum
-    function getQuorumConfirmationThresholdPercentage(
-        uint8 quorumNumber
-    ) external view returns (uint8);
-
-    /// @notice Checks if a quorum is required
-    function getIsQuorumRequired(
-        uint8 quorumNumber
-    ) external view returns (bool);
 }

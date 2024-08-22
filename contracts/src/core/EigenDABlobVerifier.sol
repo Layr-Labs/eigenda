@@ -60,7 +60,7 @@ abstract contract EigenDABlobVerifier is IEigenDABlobVerifier {
      * @param blobVerificationProof The blob verification proof to verify the blob against
      * @param additionalQuorumNumbersRequired The additional required quorum numbers 
      */
-    function verifyBlobForAdditionalQuorums(
+    function verifyBlob(
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof,
         bytes memory additionalQuorumNumbersRequired
@@ -100,7 +100,7 @@ abstract contract EigenDABlobVerifier is IEigenDABlobVerifier {
      * @param nonSignerStakesAndSignature The operator signatures returned as the preconfirmation
      * @param additionalQuorumNumbersRequired The additional required quorum numbers 
      */
-    function verifyPreconfirmationForAdditionalQuorums(
+    function verifyPreconfirmation(
         IEigenDAServiceManager.BatchHeader calldata miniBatchHeader,
         IEigenDAServiceManager.BlobHeader calldata blobHeader,
         IEigenDASignatureVerifier.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
