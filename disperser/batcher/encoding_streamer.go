@@ -70,8 +70,9 @@ type EncodingStreamer struct {
 
 	encodingCtxCancelFuncs []context.CancelFunc
 
-	metrics *EncodingStreamerMetrics
-	logger  logging.Logger
+	metrics        *EncodingStreamerMetrics
+	batcherMetrics *Metrics
+	logger         logging.Logger
 
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
@@ -103,6 +104,7 @@ func NewEncodingStreamer(
 	encodedSizeNotifier *EncodedSizeNotifier,
 	workerPool common.WorkerPool,
 	metrics *EncodingStreamerMetrics,
+	batcherMetrics *Metrics,
 	logger logging.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, errors.New("EncodingQueueLimit should be greater than 0")
@@ -119,6 +121,7 @@ func NewEncodingStreamer(
 		assignmentCoordinator:  assignmentCoordinator,
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
 		metrics:                metrics,
+		batcherMetrics:         batcherMetrics,
 		logger:                 logger.With("component", "EncodingStreamer"),
 		exclusiveStartKey:      nil,
 	}, nil
@@ -356,6 +359,11 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		})
 	}
 
+	if len(pending) > 0 {
+		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
+		e.batcherMetrics.ObserveBlobAge("encoding_requested", float64(time.Since(requestTime).Milliseconds()))
+	}
+
 	// Execute the encoding requests
 	for ind := range pending {
 		res := pending[ind]
@@ -406,6 +414,9 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 	if err != nil {
 		return fmt.Errorf("failed to putEncodedBlob: %w", err)
 	}
+
+	requestTime := time.Unix(0, int64(result.BlobMetadata.RequestMetadata.RequestedAt))
+	e.batcherMetrics.ObserveBlobAge("encoded", float64(time.Since(requestTime).Milliseconds()))
 
 	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
 	e.metrics.UpdateEncodedBlobs(count, encodedSize)

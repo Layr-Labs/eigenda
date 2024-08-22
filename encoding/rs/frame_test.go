@@ -1,10 +1,13 @@
 package rs_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,6 +18,19 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 	enc, _ := rs.NewEncoder(params, true)
+
+	n := uint8(math.Log2(float64(enc.NumEvaluations())))
+	if enc.ChunkLength == 1 {
+		n = uint8(math.Log2(float64(2 * enc.NumChunks)))
+	}
+	fs := fft.NewFFTSettings(n)
+
+	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
+		Fs:             fs,
+		EncodingParams: params,
+	}
+
+	enc.Computer = RsComputeDevice
 	require.NotNil(t, enc)
 
 	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)

@@ -68,7 +68,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 		make(chan struct{}, 1),
 		10*1024*1024,
 	)
-	encodingStreamer, err := bat.NewEncodingStreamer(streamerConfig, blobStore, mockChainState, encoderClient, assignmentCoordinator, trigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := bat.NewEncodingStreamer(streamerConfig, blobStore, mockChainState, encoderClient, assignmentCoordinator, trigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, metrics, logger)
 	assert.NoError(t, err)
 	pool := workerpool.New(int(10))
 	minibatcher, err := bat.NewMinibatcher(bat.MinibatcherConfig{

@@ -251,6 +251,10 @@ func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey dispe
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
 }
 
+func (s *SharedBlobStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []disperser.BlobKey) ([]*disperser.BlobMetadata, error) {
+	return s.blobMetadataStore.GetBulkBlobMetadata(ctx, blobKeys)
+}
+
 func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {
 	if metadata.NumRetries < maxRetry {
 		if err := s.MarkBlobProcessing(ctx, metadata.GetBlobKey()); err != nil {

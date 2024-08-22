@@ -1,11 +1,15 @@
 package rs_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func FuzzOnlySystematic(f *testing.F) {
@@ -18,6 +22,20 @@ func FuzzOnlySystematic(f *testing.F) {
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)
 		}
+
+		n := uint8(math.Log2(float64(enc.NumEvaluations())))
+		if enc.ChunkLength == 1 {
+			n = uint8(math.Log2(float64(2 * enc.NumChunks)))
+		}
+		fs := fft.NewFFTSettings(n)
+
+		RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
+			Fs:             fs,
+			EncodingParams: params,
+		}
+
+		enc.Computer = RsComputeDevice
+		require.NotNil(t, enc)
 
 		//encode the data
 		frames, _, err := enc.EncodeBytes(input)
