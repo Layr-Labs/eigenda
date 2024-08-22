@@ -126,7 +126,7 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 	if !actualCommit.X.Equal(expectedX) || !actualCommit.Y.Equal(expectedY) {
 		errMsg += fmt.Sprintf("field elements do not match, x actual commit: %x, x expected commit: %x, ", actualCommit.X.Marshal(), expectedX.Marshal())
 		errMsg += fmt.Sprintf("y actual commit: %x, y expected commit: %x", actualCommit.Y.Marshal(), expectedY.Marshal())
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	return nil

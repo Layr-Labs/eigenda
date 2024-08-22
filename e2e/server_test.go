@@ -130,8 +130,8 @@ func TestProxyClientWithOversizedBlob(t *testing.T) {
 		URL: ts.Address(),
 	}
 	daClient := client.New(cfg)
-	//  5MB blob
-	testPreimage := []byte(e2e.RandString(5_000_0000))
+	//  17MB blob
+	testPreimage := []byte(e2e.RandString(17_000_0000))
 
 	t.Log("Setting input data on proxy server...")
 	blobInfo, err := daClient.SetData(ts.Ctx, testPreimage)

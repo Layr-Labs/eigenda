@@ -77,7 +77,7 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
 		CacheDir:               "../resources/SRSTables",
 		G1Path:                 "../resources/g1.point",
-		MaxBlobLength:          "4mib",
+		MaxBlobLength:          "16mib",
 		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
 		PutBlobEncodingVersion: 0x00,
 		MemstoreEnabled:        useMemory,
