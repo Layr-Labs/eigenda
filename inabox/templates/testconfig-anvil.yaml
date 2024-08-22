@@ -41,8 +41,8 @@ services:
       G2_PATH: resources/kzg/g2.point
       G2_POWER_OF_2_PATH: resources/kzg/g2.point.powerOf2
       CACHE_PATH: resources/kzg/SRSTables
-      SRS_ORDER: 3000
-      SRS_LOAD: 2900
+      SRS_ORDER: 300000
+      SRS_LOAD: 290000
       CHALLENGE_ORDER: 3000
       LOG_LEVEL: "debug"
       VERBOSE: true

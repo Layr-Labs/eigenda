@@ -271,13 +271,14 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
-		if err != nil {
-			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
-			return nil, err
-		}
-	}
+	s.ratelimiter = nil
+	//if s.ratelimiter != nil {
+	//	err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
+	//	if err != nil {
+	//		// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
+	//		return nil, err
+	//	}
+	//}
 
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)

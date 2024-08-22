@@ -32,7 +32,7 @@ chain:
 	go run ./deploy/cmd -localstack-port 4570 chain
 
 localstack:
-	go run ./deploy/cmd -localstack-port 4570 localstack
+	go run ./deploy/cmd -localstack-port 4570 -deploy-resources true localstack
 
 exp: 
 	go run ./deploy/cmd exp

@@ -130,7 +130,7 @@ func execForgeScript(script, privateKey string, deployer *ContractDeployer, extr
 	args := []string{"script", script,
 		"--rpc-url", deployer.RPC,
 		"--private-key", privateKey,
-		"--broadcast"}
+		"--broadcast", "--legacy"}
 
 	if deployer.VerifyContracts {
 		args = append(args, "--verify",
