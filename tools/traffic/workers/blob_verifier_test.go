@@ -117,7 +117,7 @@ func TestBlobVerifier(t *testing.T) {
 				SubmissionTime: time.Now(),
 			}
 
-			verifier.unconfirmedKeys = append(verifier.unconfirmedKeys, unconfirmedKey)
+			verifier.unconfirmedBlobs = append(verifier.unconfirmedBlobs, unconfirmedKey)
 		}
 
 		// Reset the mock disperser client.
@@ -158,7 +158,7 @@ func TestBlobVerifier(t *testing.T) {
 		// Validate the number of calls made to the disperser client.
 		disperserClient.mock.AssertNumberOfCalls(t, "GetBlobStatus", expectedGetStatusCount)
 
-		// Read the data in the table into a map for quick lookup.
+		// Read the data in the confirmedBlobs into a map for quick lookup.
 		tableData := make(map[string]*table.BlobMetadata)
 		for _, metadata := range blobStore.GetAll() {
 			tableData[string(metadata.Key)] = metadata
@@ -173,10 +173,10 @@ func TestBlobVerifier(t *testing.T) {
 			}
 
 			if isStatusSuccess(status) {
-				// Successful blobs should be in the table.
+				// Successful blobs should be in the confirmedBlobs.
 				assert.True(t, present)
 			} else {
-				// Non-successful blobs should not be in the table.
+				// Non-successful blobs should not be in the confirmedBlobs.
 				assert.False(t, present)
 			}
 
@@ -189,9 +189,9 @@ func TestBlobVerifier(t *testing.T) {
 		}
 
 		// Verify metrics.
-		for status, count := range statusCounts {
+		for status, count := range statusCounts { // TODO
 			metricName := fmt.Sprintf("get_status_%s", status.String())
-			assert.Equal(t, float64(count), verifierMetrics.GetCount(metricName))
+			assert.Equal(t, float64(count), verifierMetrics.GetCount(metricName), "status: %s", status.String())
 		}
 		if float64(blobsInFlight) != verifierMetrics.GetGaugeValue("blobs_in_flight") {
 			assert.Equal(t, float64(blobsInFlight), verifierMetrics.GetGaugeValue("blobs_in_flight"))
