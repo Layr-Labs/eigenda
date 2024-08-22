@@ -88,7 +88,7 @@ func newMinibatcher(t *testing.T, config batcher.MinibatcherConfig) *minibatcher
 		make(chan struct{}, 1),
 		10*1024*1024,
 	)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, chainState, encoderClient, asgn, trigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, chainState, encoderClient, asgn, trigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, metrics, logger)
 	assert.NoError(t, err)
 	ethClient := &cmock.MockEthClient{}
 	pool := workerpool.New(int(config.MaxNumConnections))
