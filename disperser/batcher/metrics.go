@@ -65,6 +65,7 @@ type Metrics struct {
 	Batch                     *prometheus.CounterVec
 	BatchProcLatency          *prometheus.SummaryVec
 	BatchProcLatencyHistogram *prometheus.HistogramVec
+	BlobAge                   *prometheus.SummaryVec
 	Attestation               *prometheus.GaugeVec
 	BatchError                *prometheus.CounterVec
 
@@ -208,6 +209,17 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"stage"},
 		),
+		BlobAge: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "blob_age_ms",
+				Help:       "blob age (in ms) since dispersal request time at different stages of its lifecycle",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			// The stage would be:
+			// encoding_requested -> encoded -> batched -> attestation_requested -> attested -> confirmed
+			[]string{"stage"},
+		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -292,6 +304,10 @@ func (g *Metrics) UpdateBatchError(errType FailReason, numBlobs int) {
 func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 	g.BatchProcLatency.WithLabelValues(stage).Observe(latencyMs)
 	g.BatchProcLatencyHistogram.WithLabelValues(stage).Observe(latencyMs)
+}
+
+func (g *Metrics) ObserveBlobAge(stage string, ageMs float64) {
+	g.BlobAge.WithLabelValues(stage).Observe(ageMs)
 }
 
 func (g *Metrics) Start(ctx context.Context) {

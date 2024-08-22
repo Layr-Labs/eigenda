@@ -119,7 +119,7 @@ func NewBatcher(
 		ChainStateTimeout:        timeoutConfig.ChainStateTimeout,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
-	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, metrics, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +327,7 @@ func (b *Batcher) updateConfirmationInfo(
 		}
 		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
 		b.Metrics.ObserveLatency("E2E", float64(time.Since(requestTime).Milliseconds()))
+		b.Metrics.ObserveBlobAge("confirmed", float64(time.Since(requestTime).Milliseconds()))
 	}
 
 	return blobsToRetry, nil
@@ -411,6 +412,13 @@ type confirmationMetadata struct {
 	aggSig      *core.SignatureAggregation
 }
 
+func (b *Batcher) observeBlobAge(stage string, batch *batch) {
+	for _, m := range batch.BlobMetadata {
+		requestTime := time.Unix(0, int64(m.RequestMetadata.RequestedAt))
+		b.Metrics.ObserveBlobAge(stage, float64(time.Since(requestTime).Milliseconds()))
+	}
+}
+
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
 
@@ -429,12 +437,14 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		return err
 	}
 	log.Debug("CreateBatch took", "duration", time.Since(stageTimer))
+	b.observeBlobAge("batched", batch)
 
 	// Dispatch encoded batch
 	log.Debug("Dispatching encoded batch...")
 	stageTimer = time.Now()
 	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer))
+	b.observeBlobAge("attestation_requested", batch)
 	h, err := batch.State.OperatorState.Hash()
 	if err != nil {
 		log.Error("HandleSingleBatch: error getting operator state hash", "err", err)
@@ -479,6 +489,8 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	for _, quorumResult := range quorumAttestation.QuorumResults {
 		log.Info("Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
+
+	b.observeBlobAge("attested", batch)
 
 	numPassed, passedQuorums := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
