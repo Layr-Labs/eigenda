@@ -25,9 +25,6 @@ type ttlStore struct {
 	cancel context.CancelFunc
 
 	logger logging.Logger
-
-	shutdown  bool
-	destroyed bool
 }
 
 // TTLWrapper extends the given store with TTL capabilities. Periodically checks for expired keys and deletes them

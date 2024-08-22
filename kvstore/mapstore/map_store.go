@@ -207,9 +207,7 @@ func (store *mapStore) Get(key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("mapStore is destroyed")
 	}
 
-	stringifiedKey := string(key)
-
-	data, ok := store.data[stringifiedKey]
+	data, ok := store.data[string(key)]
 
 	if !ok {
 		return nil, kvstore.ErrNotFound
