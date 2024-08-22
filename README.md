@@ -150,7 +150,7 @@ $ ./bin/eigenda-proxy \
 
 We also provide network-specific example env configuration files in `.env.example.holesky` and `.env.example.mainnet` as a place to get started:
 
-1. Copy example env file: `cp .env.holesky.example .env`
+1. Copy example env file: `cp .env.example.holesky .env`
 2. Update env file, setting `EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX`. On mainnet you will also need to set `EIGENDA_PROXY_ETH_RPC`.
 3. Pass into binary: `ENV_PATH=.env ./bin/eigenda-proxy --addr 127.0.0.1 --port 3100`
 
