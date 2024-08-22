@@ -379,12 +379,14 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		e.mu.Unlock()
 		e.Pool.Submit(func() {
 			defer cancel()
+			start := time.Now()
 			commits, chunks, err := e.encoderClient.EncodeBlob(encodingCtx, blob.Data, res.EncodingParams)
 			if err != nil {
 				encoderChan <- EncodingResultOrStatus{Err: err, EncodingResult: EncodingResult{
 					BlobMetadata:   metadata,
 					BlobQuorumInfo: res.BlobQuorumInfo,
 				}}
+				e.metrics.ObserveEncodingLatency("failed", res.BlobQuorumInfo.QuorumID, len(blob.Data), float64(time.Since(start).Milliseconds()))
 				return
 			}
 
@@ -399,6 +401,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 				},
 				Err: nil,
 			}
+			e.metrics.ObserveEncodingLatency("success", res.BlobQuorumInfo.QuorumID, len(blob.Data), float64(time.Since(start).Milliseconds()))
 		})
 		e.EncodedBlobstore.PutEncodingRequest(blobKey, res.BlobQuorumInfo.QuorumID)
 	}
