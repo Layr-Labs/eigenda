@@ -69,7 +69,7 @@ func TestExpiryKeyOrdering(t *testing.T) {
 }
 
 func TestRandomDataExpired(t *testing.T) {
-	tu.InitializeRandom(0) // TODO
+	tu.InitializeRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
@@ -110,12 +110,12 @@ func TestRandomDataExpired(t *testing.T) {
 		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
 		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
 
-		err := store.expireKeys(currentTime)
+		err = store.expireKeys(currentTime)
 		assert.NoError(t, err)
 
 		for key := range data {
 			keyExpirationTime := expiryTimes[key]
-			expired := currentTime.After(keyExpirationTime)
+			expired := !currentTime.Before(keyExpirationTime)
 
 			if expired {
 				value, err := store.Get([]byte(key))
@@ -124,7 +124,6 @@ func TestRandomDataExpired(t *testing.T) {
 			} else {
 				value, err := store.Get([]byte(key))
 				assert.NoError(t, err)
-
 				expectedValue := data[key]
 				assert.Equal(t, expectedValue, value)
 			}
