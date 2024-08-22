@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gammazero/workerpool"
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wealdtech/go-merkletree/v2"
@@ -147,6 +148,8 @@ func NewBatcher(
 }
 
 func (b *Batcher) RecoverState(ctx context.Context) error {
+	b.logger.Info("Recovering state...")
+	start := time.Now()
 	metas, err := b.Queue.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
 	if err != nil {
 		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
@@ -157,6 +160,7 @@ func (b *Batcher) RecoverState(ctx context.Context) error {
 			return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
 		}
 	}
+	b.logger.Info("Recovering state took", "duration", time.Since(start), "numBlobs", len(metas))
 	return nil
 }
 
@@ -399,6 +403,7 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 }
 
 type confirmationMetadata struct {
+	batchID     uuid.UUID
 	batchHeader *core.BatchHeader
 	blobs       []*disperser.BlobMetadata
 	blobHeaders []*core.BlobHeader
@@ -507,6 +512,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		return fmt.Errorf("HandleSingleBatch: error building confirmBatch transaction: %w", err)
 	}
 	err = b.TransactionManager.ProcessTransaction(ctx, NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
+		batchID:     uuid.Nil,
 		batchHeader: batch.BatchHeader,
 		blobs:       batch.BlobMetadata,
 		blobHeaders: batch.BlobHeaders,

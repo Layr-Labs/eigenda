@@ -146,6 +146,8 @@ func (e *EncodingStreamer) Start(ctx context.Context) error {
 						e.logger.Warn("encoder connection reset by peer", "err", err)
 					} else if strings.Contains(err.Error(), "error reading from server: EOF") {
 						e.logger.Warn("encoder request dropped", "err", err)
+					} else if strings.Contains(err.Error(), "connection refused") {
+						e.logger.Warn("encoder connection refused", "err", err)
 					} else {
 						e.logger.Error("error processing encoded blobs", "err", err)
 					}
@@ -384,7 +386,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					ReferenceBlockNumber: referenceBlockNumber,
 					BlobQuorumInfo:       res.BlobQuorumInfo,
 					Commitment:           commits,
-					Chunks:               chunks,
+					ChunksData:           chunks,
 					Assignments:          res.Assignments,
 				},
 				Err: nil,
@@ -422,7 +424,7 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 	return nil
 }
 
-func (e *EncodingStreamer) UpdateReferenecBlock(currentBlockNumber uint) error {
+func (e *EncodingStreamer) UpdateReferenceBlock(currentBlockNumber uint) error {
 	blockNumber := currentBlockNumber
 	if blockNumber > e.FinalizationBlockDelay {
 		blockNumber -= e.FinalizationBlockDelay
@@ -480,19 +482,22 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:        blobHeader,
-				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+				BlobHeader:               blobHeader,
+				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
 
 		// Populate the assigned bundles
 		for opID, assignment := range result.Assignments {
-			bundles, ok := encodedBlobByKey[blobKey].BundlesByOperator[opID]
+			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			if !ok {
-				encodedBlobByKey[blobKey].BundlesByOperator[opID] = make(core.Bundles)
-				bundles = encodedBlobByKey[blobKey].BundlesByOperator[opID]
+				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
+				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
-			bundles[result.BlobQuorumInfo.QuorumID] = append(bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
+			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
+			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
 		}
 
 		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)
@@ -629,19 +634,22 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:        blobHeader,
-				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+				BlobHeader:               blobHeader,
+				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
 
 		// Populate the assigned bundles
 		for opID, assignment := range result.Assignments {
-			bundles, ok := encodedBlobByKey[blobKey].BundlesByOperator[opID]
+			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			if !ok {
-				encodedBlobByKey[blobKey].BundlesByOperator[opID] = make(core.Bundles)
-				bundles = encodedBlobByKey[blobKey].BundlesByOperator[opID]
+				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
+				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
-			bundles[result.BlobQuorumInfo.QuorumID] = append(bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
+			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
+			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
 		}
 
 		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)

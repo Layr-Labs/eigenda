@@ -66,7 +66,7 @@ func (d *Dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 	return update
 }
 
-func (d *Dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error) {
+func (d *Dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error) {
 	args := d.Called(ctx, blobs, batchHeader, op)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
