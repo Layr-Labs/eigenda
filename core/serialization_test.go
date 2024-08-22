@@ -210,3 +210,14 @@ func TestParseOperatorSocket(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "invalid socket address format: localhost1234;5678", err.Error())
 }
+
+func TestSignatureBytes(t *testing.T) {
+	sig := &core.Signature{
+		G1Point: core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+	}
+	bytes := sig.Bytes()
+	recovered := new(bn254.G1Affine)
+	_, err := recovered.SetBytes(bytes[:])
+	assert.NoError(t, err)
+	assert.Equal(t, recovered, sig.G1Point.G1Affine)
+}

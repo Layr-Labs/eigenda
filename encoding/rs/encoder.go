@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type Encoder struct {
@@ -16,6 +17,23 @@ type Encoder struct {
 	verbose bool
 
 	NumRSWorker int
+
+	Computer RsComputeDevice
+}
+
+// RsComputeDevice represents a device capable of performing Reed-Solomon encoding computations.
+// Implementations of this interface are expected to handle polynomial evaluation extensions.
+type RsComputeDevice interface {
+	// ExtendPolyEval extends the evaluation of a polynomial given its coefficients.
+	// It takes a slice of polynomial coefficients and returns an extended evaluation.
+	//
+	// Parameters:
+	//   - coeffs: A slice of fr.Element representing the polynomial coefficients.
+	//
+	// Returns:
+	//   - A slice of fr.Element representing the extended polynomial evaluation.
+	//   - An error if the extension process fails.
+	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
 }
 
 // The function creates a high level struct that determines the encoding the a data of a

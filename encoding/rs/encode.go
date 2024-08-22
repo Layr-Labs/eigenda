@@ -1,7 +1,6 @@
 package rs
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -37,10 +36,12 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
 
-	polyCoeffs := inputFr
+	pdCoeffs, err := g.PadPolyEval(inputFr)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	// extend data based on Sys, Par ratio. The returned fullCoeffsPoly is padded with 0 to ease proof
-	polyEvals, _, err := g.ExtendPolyEval(polyCoeffs)
+	polyEvals, err := g.Computer.ExtendPolyEval(pdCoeffs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,6 +60,25 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 		len(inputFr)*encoding.BYTES_PER_SYMBOL, g.NumChunks, g.ChunkLength, time.Since(start))
 
 	return frames, indices, nil
+}
+
+// PadPolyEval pads the input polynomial coefficients to match the number of evaluations
+// required by the encoder.
+func (g *Encoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
+	numEval := int(g.NumEvaluations())
+	if len(coeffs) > numEval {
+		return nil, fmt.Errorf("the provided encoding parameters are not sufficient for the size of the data input")
+	}
+
+	pdCoeffs := make([]fr.Element, numEval)
+	copy(pdCoeffs, coeffs)
+
+	// Pad the remaining elements with zeroes
+	for i := len(coeffs); i < numEval; i++ {
+		pdCoeffs[i].SetZero()
+	}
+
+	return pdCoeffs, nil
 }
 
 // MakeFrames function takes extended evaluation data and bundles relevant information into Frame.
@@ -115,29 +135,6 @@ func (g *Encoder) MakeFrames(
 	}
 
 	return frames, indices, nil
-}
-
-// Encoding Reed Solomon using FFT
-func (g *Encoder) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, []fr.Element, error) {
-
-	if len(coeffs) > int(g.NumEvaluations()) {
-		return nil, nil, errors.New("the provided encoding parameters are not sufficient for the size of the data input")
-	}
-
-	pdCoeffs := make([]fr.Element, g.NumEvaluations())
-	for i := 0; i < len(coeffs); i++ {
-		pdCoeffs[i].Set(&coeffs[i])
-	}
-	for i := len(coeffs); i < len(pdCoeffs); i++ {
-		pdCoeffs[i].SetZero()
-	}
-
-	evals, err := g.Fs.FFT(pdCoeffs, false)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return evals, pdCoeffs, nil
 }
 
 type JobRequest struct {

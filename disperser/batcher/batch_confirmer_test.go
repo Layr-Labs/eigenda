@@ -148,15 +148,11 @@ func TestBatchConfirmerIteration(t *testing.T) {
 		AdversaryThreshold:    80,
 		ConfirmationThreshold: 100,
 	}})
-	blobHeaderHash1, err := blobHeader1.GetBlobHeaderHash()
-	assert.NoError(t, err)
 	blob2, blobHeader2 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{{
 		QuorumID:              1,
 		AdversaryThreshold:    70,
 		ConfirmationThreshold: 100,
 	}})
-	blobHeaderHash2, err := blobHeader2.GetBlobHeaderHash()
-	assert.NoError(t, err)
 	b := components.batchConfirmer
 	batchID, err := uuid.NewV7()
 	assert.NoError(t, err)
@@ -165,29 +161,11 @@ func TestBatchConfirmerIteration(t *testing.T) {
 		CreatedAt:            time.Now(),
 		ReferenceBlockNumber: uint(initialBlock),
 		Status:               bat.BatchStatusFormed,
-		HeaderHash:           [32]byte{},
-		AggregatePubKey:      &core.G2Point{},
-		AggregateSignature:   &core.Signature{},
+		NumMinibatches:       2,
 	}
 
-	// Set up batch and minibatch
+	// Set up batch
 	err = b.MinibatchStore.PutBatch(context.Background(), batch)
-	assert.NoError(t, err)
-	err = b.MinibatchStore.PutMinibatch(context.Background(), &bat.MinibatchRecord{
-		BatchID:              batchID,
-		MinibatchIndex:       0,
-		BlobHeaderHashes:     [][32]byte{blobHeaderHash1},
-		BatchSize:            1,
-		ReferenceBlockNumber: uint(initialBlock),
-	})
-	assert.NoError(t, err)
-	err = b.MinibatchStore.PutMinibatch(context.Background(), &bat.MinibatchRecord{
-		BatchID:              batchID,
-		MinibatchIndex:       1,
-		BlobHeaderHashes:     [][32]byte{blobHeaderHash2},
-		BatchSize:            1,
-		ReferenceBlockNumber: uint(initialBlock),
-	})
 	assert.NoError(t, err)
 	requestedAt1, blobKey1 := queueBlob(t, ctx, blob1, components.blobStore)
 	_, blobKey2 := queueBlob(t, ctx, blob2, components.blobStore)
@@ -211,46 +189,38 @@ func TestBatchConfirmerIteration(t *testing.T) {
 	assert.NoError(t, err)
 	batchHeaderHash2, err := batchHeader2.GetBatchHeaderHash()
 	assert.NoError(t, err)
-	// Set up dispersal requests and responses
+	// Set up dispersals
 	for opID, opInfo := range operatorState.PrivateOperators {
-		req0 := &bat.DispersalRequest{
+		req0 := &bat.MinibatchDispersal{
 			BatchID:        batchID,
 			MinibatchIndex: 0,
 			OperatorID:     opID,
 			Socket:         opInfo.DispersalPort,
 			NumBlobs:       1,
 			RequestedAt:    time.Now(),
-			BlobHash:       blobKey1.BlobHash,
-			MetadataHash:   blobKey1.MetadataHash,
+			DispersalResponse: bat.DispersalResponse{
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage(batchHeaderHash1).Bytes()},
+				RespondedAt: time.Now(),
+				Error:       nil,
+			},
 		}
-		err = b.MinibatchStore.PutDispersalRequest(context.Background(), req0)
-		assert.NoError(t, err)
-		err = b.MinibatchStore.PutDispersalResponse(context.Background(), &bat.DispersalResponse{
-			DispersalRequest: *req0,
-			Signatures:       []*core.Signature{opInfo.KeyPair.SignMessage(batchHeaderHash1)},
-			RespondedAt:      time.Now(),
-			Error:            nil,
-		})
+		err = b.MinibatchStore.PutDispersal(context.Background(), req0)
 		assert.NoError(t, err)
 
-		req1 := &bat.DispersalRequest{
+		req1 := &bat.MinibatchDispersal{
 			BatchID:        batchID,
 			MinibatchIndex: 1,
 			OperatorID:     opID,
 			Socket:         opInfo.DispersalPort,
 			NumBlobs:       1,
 			RequestedAt:    time.Now(),
-			BlobHash:       blobKey2.BlobHash,
-			MetadataHash:   blobKey2.MetadataHash,
+			DispersalResponse: bat.DispersalResponse{
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage(batchHeaderHash2).Bytes()},
+				RespondedAt: time.Now(),
+				Error:       nil,
+			},
 		}
-		err = b.MinibatchStore.PutDispersalRequest(context.Background(), req1)
-		assert.NoError(t, err)
-		err = b.MinibatchStore.PutDispersalResponse(context.Background(), &bat.DispersalResponse{
-			DispersalRequest: *req1,
-			Signatures:       []*core.Signature{opInfo.KeyPair.SignMessage(batchHeaderHash2)},
-			RespondedAt:      time.Now(),
-			Error:            nil,
-		})
+		err = b.MinibatchStore.PutDispersal(context.Background(), req1)
 		assert.NoError(t, err)
 	}
 
@@ -262,9 +232,8 @@ func TestBatchConfirmerIteration(t *testing.T) {
 			blobHeader1,
 			blobHeader2,
 		},
-		BlobMetadata:   []*disperser.BlobMetadata{meta1, meta2},
-		OperatorState:  operatorState.IndexedOperatorState,
-		NumMinibatches: 2,
+		BlobMetadata:  []*disperser.BlobMetadata{meta1, meta2},
+		OperatorState: operatorState.IndexedOperatorState,
 	}
 
 	// Receive signatures
@@ -376,67 +345,39 @@ func TestBatchConfirmerIterationFailure(t *testing.T) {
 		CreatedAt:            time.Now(),
 		ReferenceBlockNumber: uint(initialBlock),
 		Status:               bat.BatchStatusFormed,
-		HeaderHash:           [32]byte{},
-		AggregatePubKey:      &core.G2Point{},
-		AggregateSignature:   &core.Signature{},
 	}
 	err = b.MinibatchStore.PutBatch(context.Background(), batch)
-	assert.NoError(t, err)
-	err = b.MinibatchStore.PutMinibatch(context.Background(), &bat.MinibatchRecord{
-		BatchID:              batchID,
-		MinibatchIndex:       0,
-		BlobHeaderHashes:     [][32]byte{{1}, {2}},
-		BatchSize:            0,
-		ReferenceBlockNumber: uint(initialBlock),
-	})
-	assert.NoError(t, err)
-	err = b.MinibatchStore.PutMinibatch(context.Background(), &bat.MinibatchRecord{
-		BatchID:              batchID,
-		MinibatchIndex:       1,
-		BlobHeaderHashes:     [][32]byte{{3}, {4}},
-		BatchSize:            0,
-		ReferenceBlockNumber: uint(initialBlock),
-	})
 	assert.NoError(t, err)
 	operatorState := components.chainData.GetTotalOperatorState(context.Background(), 0)
 
 	for opID, opInfo := range operatorState.PrivateOperators {
-		req0 := &bat.DispersalRequest{
+		req0 := &bat.MinibatchDispersal{
 			BatchID:        batchID,
 			MinibatchIndex: 0,
 			OperatorID:     opID,
 			Socket:         opInfo.DispersalPort,
 			NumBlobs:       2,
 			RequestedAt:    time.Now(),
-			BlobHash:       "0",
-			MetadataHash:   "0",
+			DispersalResponse: bat.DispersalResponse{
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage([32]byte{0}).Bytes()},
+				RespondedAt: time.Now(),
+				Error:       nil,
+			},
 		}
-		err = b.MinibatchStore.PutDispersalRequest(context.Background(), req0)
+		err = b.MinibatchStore.PutDispersal(context.Background(), req0)
 		assert.NoError(t, err)
-		err = b.MinibatchStore.PutDispersalResponse(context.Background(), &bat.DispersalResponse{
-			DispersalRequest: *req0,
-			Signatures:       []*core.Signature{opInfo.KeyPair.SignMessage([32]byte{0})},
-			RespondedAt:      time.Now(),
-			Error:            nil,
-		})
-		assert.NoError(t, err)
-
-		req1 := &bat.DispersalRequest{
-			BatchID:        batchID,
-			MinibatchIndex: 1,
-			OperatorID:     opID,
-			Socket:         opInfo.DispersalPort,
-			NumBlobs:       2,
-			RequestedAt:    time.Now(),
-			BlobHash:       "1",
-			MetadataHash:   "1",
+		req1 := &bat.MinibatchDispersal{
+			BatchID:           batchID,
+			MinibatchIndex:    1,
+			OperatorID:        opID,
+			Socket:            opInfo.DispersalPort,
+			NumBlobs:          2,
+			RequestedAt:       time.Now(),
+			DispersalResponse: bat.DispersalResponse{
+				// Missing RespondedAt
+			},
 		}
-		err = b.MinibatchStore.PutDispersalRequest(context.Background(), req1)
-		assert.NoError(t, err)
-		// Missing RespondedAt
-		err = b.MinibatchStore.PutDispersalResponse(context.Background(), &bat.DispersalResponse{
-			DispersalRequest: *req1,
-		})
+		err = b.MinibatchStore.PutDispersal(context.Background(), req1)
 		assert.NoError(t, err)
 	}
 
@@ -454,69 +395,66 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 		CreatedAt:            time.Now(),
 		ReferenceBlockNumber: uint(initialBlock),
 		Status:               bat.BatchStatusFormed,
-		HeaderHash:           [32]byte{},
-		AggregatePubKey:      &core.G2Point{},
-		AggregateSignature:   &core.Signature{},
+		NumMinibatches:       2,
 	}
-	err = b.MinibatchStore.PutBatch(context.Background(), batch)
+	ctx := context.Background()
+	err = b.MinibatchStore.PutBatch(ctx, batch)
 	assert.NoError(t, err)
-	err = b.MinibatchStore.PutMinibatch(context.Background(), &bat.MinibatchRecord{
-		BatchID:              batchID,
-		MinibatchIndex:       0,
-		BlobHeaderHashes:     [][32]byte{{1}, {2}},
-		BatchSize:            0,
-		ReferenceBlockNumber: uint(initialBlock),
-	})
-	assert.NoError(t, err)
-	err = b.MinibatchStore.PutMinibatch(context.Background(), &bat.MinibatchRecord{
-		BatchID:              batchID,
-		MinibatchIndex:       1,
-		BlobHeaderHashes:     [][32]byte{{3}, {4}},
-		BatchSize:            0,
-		ReferenceBlockNumber: uint(initialBlock),
-	})
-	assert.NoError(t, err)
+
 	operatorState := components.chainData.GetTotalOperatorState(context.Background(), 0)
+	blob1, blobHeader1 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{{
+		QuorumID:              0,
+		AdversaryThreshold:    80,
+		ConfirmationThreshold: 100,
+	}})
+	blob2, blobHeader2 := generateBlobAndHeader(t, operatorState.OperatorState, []*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    70,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              1,
+			AdversaryThreshold:    70,
+			ConfirmationThreshold: 100,
+		}})
+	_, blobKey1 := queueBlob(t, ctx, blob1, components.blobStore)
+	_, blobKey2 := queueBlob(t, ctx, blob2, components.blobStore)
+	meta1, err := components.blobStore.GetBlobMetadata(ctx, blobKey1)
+	assert.NoError(t, err)
+	meta2, err := components.blobStore.GetBlobMetadata(ctx, blobKey2)
+	assert.NoError(t, err)
 
 	for opID, opInfo := range operatorState.PrivateOperators {
-		req0 := &bat.DispersalRequest{
+		req0 := &bat.MinibatchDispersal{
 			BatchID:        batchID,
 			MinibatchIndex: 0,
 			OperatorID:     opID,
 			Socket:         opInfo.DispersalPort,
 			NumBlobs:       2,
 			RequestedAt:    time.Now(),
-			BlobHash:       "0",
-			MetadataHash:   "0",
+			DispersalResponse: bat.DispersalResponse{
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage([32]byte{0}).Bytes()},
+				RespondedAt: time.Now(),
+				Error:       nil,
+			},
 		}
-		err = b.MinibatchStore.PutDispersalRequest(context.Background(), req0)
+		err = b.MinibatchStore.PutDispersal(context.Background(), req0)
 		assert.NoError(t, err)
-		err = b.MinibatchStore.PutDispersalResponse(context.Background(), &bat.DispersalResponse{
-			DispersalRequest: *req0,
-			Signatures:       []*core.Signature{opInfo.KeyPair.SignMessage([32]byte{0})},
-			RespondedAt:      time.Now(),
-			Error:            nil,
-		})
-		assert.NoError(t, err)
-
-		req1 := &bat.DispersalRequest{
+		req1 := &bat.MinibatchDispersal{
 			BatchID:        batchID,
 			MinibatchIndex: 1,
 			OperatorID:     opID,
 			Socket:         opInfo.DispersalPort,
 			NumBlobs:       2,
 			RequestedAt:    time.Now(),
-			BlobHash:       "1",
-			MetadataHash:   "1",
+			DispersalResponse: bat.DispersalResponse{
+				Signatures:  [][32]byte{opInfo.KeyPair.SignMessage([32]byte{1}).Bytes()},
+				RespondedAt: time.Now(),
+				Error:       nil,
+			},
 		}
-		err = b.MinibatchStore.PutDispersalRequest(context.Background(), req1)
-		assert.NoError(t, err)
-		err = b.MinibatchStore.PutDispersalResponse(context.Background(), &bat.DispersalResponse{
-			DispersalRequest: *req1,
-			Signatures:       []*core.Signature{opInfo.KeyPair.SignMessage([32]byte{1})},
-			RespondedAt:      time.Now(),
-			Error:            nil,
-		})
+		err = b.MinibatchStore.PutDispersal(context.Background(), req1)
 		assert.NoError(t, err)
 	}
 
@@ -524,52 +462,26 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 		BatchID:              batchID,
 		ReferenceBlockNumber: uint(initialBlock),
 		BlobHeaders: []*core.BlobHeader{
-			{
-				AccountID: "0",
-				QuorumInfos: []*core.BlobQuorumInfo{
-					{
-						SecurityParam: core.SecurityParam{
-							QuorumID:              0,
-							AdversaryThreshold:    30,
-							ConfirmationThreshold: 80,
-						},
-					},
-					{
-						SecurityParam: core.SecurityParam{
-							QuorumID:              1,
-							AdversaryThreshold:    30,
-							ConfirmationThreshold: 80,
-						},
-					},
-				},
-			},
-			{
-				AccountID: "1",
-				QuorumInfos: []*core.BlobQuorumInfo{
-					{
-						SecurityParam: core.SecurityParam{
-							QuorumID:              0,
-							AdversaryThreshold:    30,
-							ConfirmationThreshold: 80,
-						},
-					},
-					{
-						SecurityParam: core.SecurityParam{
-							QuorumID:              1,
-							AdversaryThreshold:    30,
-							ConfirmationThreshold: 80,
-						},
-					},
-				},
-			},
+			blobHeader1,
+			blobHeader2,
 		},
-		BlobMetadata:   []*disperser.BlobMetadata{},
-		OperatorState:  operatorState.IndexedOperatorState,
-		NumMinibatches: 2,
+		BlobMetadata:  []*disperser.BlobMetadata{meta1, meta2},
+		OperatorState: operatorState.IndexedOperatorState,
 	}
 
 	signChan := make(chan core.SigningMessage, 4)
-	batchHeaderHash := [32]byte{93, 156, 41, 17, 3, 78, 159, 243, 222, 111, 54, 107, 237, 48, 243, 176, 224, 151, 96, 151, 159, 99, 118, 186, 53, 192, 72, 59, 160, 73, 7, 213}
+	batchHeader := &core.BatchHeader{
+		ReferenceBlockNumber: uint(initialBlock),
+		BatchRoot:            [32]byte{},
+	}
+	bhh1, err := blobHeader1.GetBlobHeaderHash()
+	assert.NoError(t, err)
+	bhh2, err := blobHeader2.GetBlobHeaderHash()
+	assert.NoError(t, err)
+	_, err = batchHeader.SetBatchRootFromBlobHeaderHashes([][32]byte{bhh1, bhh2})
+	assert.NoError(t, err)
+	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
+	assert.NoError(t, err)
 	for opID, opInfo := range operatorState.PrivateOperators {
 		if opID == opId0 {
 			signChan <- core.SigningMessage{
