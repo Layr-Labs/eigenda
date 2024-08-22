@@ -2,12 +2,10 @@ package storeutil
 
 import (
 	"context"
-	"fmt"
 	"github.com/Layr-Labs/eigenda/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"strconv"
 	"time"
 )
 
@@ -57,10 +55,6 @@ func TTLWrapper(
 var keyPrefix = []byte("k")
 var expiryPrefix = []byte("e")
 
-var maxInt64 = int64(^uint64(0) >> 1)
-var maxIntLengthBase16 = len(fmt.Sprintf("%x", maxInt64))
-var expiryKeyPadding = fmt.Sprintf("%%0%dx", maxIntLengthBase16)
-
 // PutWithTTL adds a key-value pair to the store that expires after a specified time-to-live (TTL).
 // Key is eventually deleted after the TTL elapses.
 func (store *ttlStore) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
@@ -69,19 +63,38 @@ func (store *ttlStore) PutWithTTL(key []byte, value []byte, ttl time.Duration) e
 }
 
 // buildExpiryKey creates an expiry key from the given expiry time.
-func buildExpiryKey(expiryTime time.Time) []byte {
-	expiryHex := fmt.Sprintf(expiryKeyPadding, expiryTime.UnixNano())
-	return append(expiryPrefix, []byte(expiryHex)...)
+// The expiry key is composed of the following 3 components appended one after the other:
+// - a one byte "e" prefix
+// - the expiry time in hexadecimal format (8 bytes)
+// - and the base key.
+func buildExpiryKey(
+	baseKey []byte,
+	expiryTime time.Time) []byte {
+
+	expiryKeyLength := 1 /* prefix */ + 8 /* expiry timestamp */ + len(baseKey)
+	expiryKey := make([]byte, expiryKeyLength)
+
+	expiryKey[0] = 'e'
+	expiryUnixNano := expiryTime.UnixNano()
+	for i := 0; i < 8; i++ {
+		expiryKey[1+i] = byte((expiryUnixNano >> (56 - i*8)) & 0xff)
+	}
+
+	copy(expiryKey[9:], baseKey)
+
+	return expiryKey
 }
 
-// parseExpiryKey extracts the expiry time from the given expiry key.
-func parseExpiryKey(expiryKey []byte) (time.Time, error) {
-	expiryHex := string(expiryKey[len(expiryPrefix):])
-	expiryValue, err := strconv.ParseUint(expiryHex, 16, 64)
-	if err != nil {
-		return time.Time{}, err
+// parseExpiryKey extracts the expiry time and base key from the given expiry key.
+func parseExpiryKey(expiryKey []byte) (baseKey []byte, expiryTime time.Time) {
+	expiryUnixNano := int64(0)
+	for i := 0; i < 8; i++ {
+		expiryUnixNano |= int64(expiryKey[1+i]) << (56 - i*8)
 	}
-	return time.Unix(0, int64(expiryValue)), nil
+	expiryTime = time.Unix(0, expiryUnixNano)
+
+	baseKey = expiryKey[9:]
+	return
 }
 
 // PutWithExpiration adds a key-value pair to the store that expires at a specified time.
@@ -95,8 +108,8 @@ func (store *ttlStore) PutWithExpiration(key []byte, value []byte, expiryTime ti
 	batchKeys[0] = prefixedKey
 	batchValues[0] = value
 
-	batchKeys[1] = buildExpiryKey(expiryTime)
-	batchValues[1] = prefixedKey
+	batchKeys[1] = buildExpiryKey(key, expiryTime)
+	batchValues[1] = make([]byte, 0)
 
 	return store.store.WriteBatch(batchKeys, batchValues)
 }
@@ -134,20 +147,17 @@ func (store *ttlStore) expireKeys(now time.Time) error {
 
 	for it.Next() {
 		expiryKey := it.Key()
-		expiryTimestamp, err := parseExpiryKey(expiryKey)
-		if err != nil {
-			return err
-		}
+		baseKey, expiryTimestamp := parseExpiryKey(expiryKey)
 
 		if expiryTimestamp.After(now) {
 			// No more values to expire
 			break
 		}
 
-		fmt.Printf("Expiring key: %s, expiration time: %s\n", it.Value(), expiryTimestamp) // TODO
-
-		keysToDelete = append(keysToDelete, it.Value())
-	}
+		prefixedBaseKey := append(keyPrefix, baseKey...)
+		keysToDelete = append(keysToDelete, expiryKey)
+		keysToDelete = append(keysToDelete, prefixedBaseKey)
+	} // TODO put a limit on the maximum batch size
 
 	return store.store.DeleteBatch(keysToDelete)
 }

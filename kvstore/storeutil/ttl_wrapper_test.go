@@ -2,7 +2,6 @@ package storeutil
 
 import (
 	"context"
-	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/kvstore/mapstore"
@@ -17,18 +16,20 @@ func TestExpiryKeyParsing(t *testing.T) {
 	tu.InitializeRandom()
 
 	for i := 0; i < 1000; i++ {
+		key := tu.RandomBytes(rand.Intn(100))
 		expiryTime := tu.RandomTime()
-		expiryKey := buildExpiryKey(expiryTime)
-		parsedExpiryTime, err := parseExpiryKey(expiryKey)
-		assert.NoError(t, err)
+		expiryKey := buildExpiryKey(key, expiryTime)
+		parsedKey, parsedExpiryTime := parseExpiryKey(expiryKey)
+		assert.Equal(t, key, parsedKey)
 		assert.Equal(t, expiryTime, parsedExpiryTime)
 	}
 
 	// Try a very large key.
+	key := tu.RandomBytes(100)
 	expiryTime := time.Unix(0, 1<<62-1)
-	expiryKey := buildExpiryKey(expiryTime)
-	parsedExpiryTime, err := parseExpiryKey(expiryKey)
-	assert.NoError(t, err)
+	expiryKey := buildExpiryKey(key, expiryTime)
+	parsedKey, parsedExpiryTime := parseExpiryKey(expiryKey)
+	assert.Equal(t, key, parsedKey)
 	assert.Equal(t, expiryTime, parsedExpiryTime)
 }
 
@@ -39,14 +40,14 @@ func TestExpiryKeyOrdering(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		expiryTime := tu.RandomTime()
-		expiryKey := buildExpiryKey(expiryTime)
+		expiryKey := buildExpiryKey(tu.RandomBytes(10), expiryTime)
 		expiryKeys = append(expiryKeys, expiryKey)
 	}
 
 	// Add some keys with very large expiry times.
 	for i := 0; i < 1000; i++ {
 		expiryTime := tu.RandomTime().Add(time.Duration(1<<62 - 1))
-		expiryKey := buildExpiryKey(expiryTime)
+		expiryKey := buildExpiryKey(tu.RandomBytes(10), expiryTime)
 		expiryKeys = append(expiryKeys, expiryKey)
 	}
 
@@ -60,10 +61,8 @@ func TestExpiryKeyOrdering(t *testing.T) {
 		a := expiryKeys[i-1]
 		b := expiryKeys[i]
 
-		aTime, err := parseExpiryKey(a)
-		assert.NoError(t, err)
-		bTime, err := parseExpiryKey(b)
-		assert.NoError(t, err)
+		_, aTime := parseExpiryKey(a)
+		_, bTime := parseExpiryKey(b)
 
 		assert.True(t, aTime.Before(bTime))
 	}
@@ -90,7 +89,7 @@ func TestRandomDataExpired(t *testing.T) {
 	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
 
 	// Generate some random data
-	for i := 0; i < 1000; i++ { // TODO 1000
+	for i := 0; i < 1000; i++ {
 		key := tu.RandomBytes(10)
 		stringifiedKey := string(key)
 		value := tu.RandomBytes(10)
@@ -111,8 +110,6 @@ func TestRandomDataExpired(t *testing.T) {
 		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
 		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
 
-		fmt.Printf(">>>>>>>>>>>>>> expiring keys until %v\n", currentTime)
-
 		err := store.expireKeys(currentTime)
 		assert.NoError(t, err)
 
@@ -121,9 +118,6 @@ func TestRandomDataExpired(t *testing.T) {
 			expired := currentTime.After(keyExpirationTime)
 
 			if expired {
-
-				fmt.Printf(">>>>>>>>>>>>>> key %s expired at %v\n", key, keyExpirationTime)
-
 				value, err := store.Get([]byte(key))
 				assert.Error(t, err)
 				assert.Nil(t, value)
