@@ -70,11 +70,15 @@ func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) error,
 		// where the first 3 bytes of the path are the commitment header
 		// commit type | da layer type | version byte
 		// we want to group all requests by commitment header, otherwise the prometheus metric labels will explode
+		// TODO: commitment header is different for non-op commitments. We will need to change this to accommodate other commitments.
+		//       probably want (commitment mode, cert version) as the labels, since commit-type/da-layer are not relevant anyways.
 		commitmentHeader := r.URL.Path[:3]
 		recordDur := m.RecordRPCServerRequest(commitmentHeader)
-		defer recordDur()
 
-		return handleFn(w, r)
+		err := handleFn(w, r)
+		// we assume that every route will set the status header
+		recordDur(w.Header().Get("status"))
+		return err
 	}
 }
 
