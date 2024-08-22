@@ -107,16 +107,16 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	semvers := make(map[string]int)
-	for _, operatorId := range operatorIds {
-		wg.Add(1)
-		go func(operatorId string) {
-			defer wg.Done()
+	operatorChan := make(chan string, len(operatorIds))
+	numWorkers := 5 // Adjust the number of workers as needed
+	worker := func() {
+		for operatorId := range operatorChan {
 			operatorInfo, err := getOperatorInfo(subgraphClient, operatorId, logger)
 			if err != nil {
 				mu.Lock()
 				semvers["not-found"]++
 				mu.Unlock()
-				return
+				continue
 			}
 			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			retrievalSocket := operatorSocket.GetRetrievalSocket()
@@ -125,9 +125,23 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 			mu.Lock()
 			semvers[semver]++
 			mu.Unlock()
-		}(operatorId)
+		}
+		wg.Done()
 	}
 
+	// Launch worker goroutines
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go worker()
+	}
+
+	// Send operator IDs to the channel
+	for _, operatorId := range operatorIds {
+		operatorChan <- operatorId
+	}
+	close(operatorChan)
+
+	// Wait for all workers to finish
 	wg.Wait()
 	return semvers
 }
@@ -157,6 +171,12 @@ func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logg
 
 		logger.Warn("NodeInfo", "semver", semver, "error", err)
 		return semver
+	}
+
+	// local mode compiles without semver
+	if reply.Semver == "" {
+		logger.Warn("NodeInfo", "semver", "empty")
+		return "src-compile"
 	}
 
 	logger.Info("NodeInfo", "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
