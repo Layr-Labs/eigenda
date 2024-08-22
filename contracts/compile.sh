@@ -21,7 +21,7 @@ function create_binding {
 forge clean
 forge build
 
-contracts="AVSDirectory DelegationManager BitmapUtils OperatorStateRetriever RegistryCoordinator BLSApkRegistry IndexRegistry StakeRegistry BN254 EigenDAServiceManager IEigenDAServiceManager MockRollup EjectionManager"
+contracts="AVSDirectory DelegationManager BitmapUtils OperatorStateRetriever RegistryCoordinator BLSApkRegistry IndexRegistry StakeRegistry BN254 EigenDAServiceManager IEigenDAServiceManager EjectionManager"
 for contract in $contracts; do
     create_binding ./ $contract ./bindings
 done
