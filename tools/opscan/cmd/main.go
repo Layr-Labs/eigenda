@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -57,47 +56,76 @@ func RunScan(ctx *cli.Context) error {
 	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
 	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
 
-	semvers := make(map[string]int)
+	activeOperators := make([]string, 0)
 	if config.OperatorId != "" {
-		operatorInfo, err := subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), config.OperatorId)
-		if err != nil {
-			logger.Warn("failed to fetch operator info", "operatorId", config.OperatorId, "error", err)
-			return errors.New("operator info not found")
-		}
-
-		operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-		retrievalSocket := operatorSocket.GetRetrievalSocket()
-		semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
-		semvers[semver]++
-
+		activeOperators = append(activeOperators, config.OperatorId)
 	} else {
-		indexedOperatorState, err := subgraphClient.QueryOperatorsWithLimit(context.Background(), 1000)
+		registrations, err := subgraphApi.QueryOperators(context.Background(), 10000)
 		if err != nil {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 		}
-		logger.Info("Scanning operators", "count", len(indexedOperatorState))
-		//semvers = scanOperators(indexedOperatorState, config, logger)
+		deregistrations, err := subgraphApi.QueryOperatorDeregistrations(context.Background(), 10000)
+		if err != nil {
+			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
+		}
+		logger.Info("Scanning operators", "registrations", len(registrations), "deregistrations", len(deregistrations))
+
+		// Count registrations
+		operators := make(map[string]int)
+		for _, registration := range registrations {
+			operators[string(registration.OperatorId)]++
+		}
+
+		// Count deregistrations
+		for _, deregistration := range deregistrations {
+			operators[string(deregistration.OperatorId)]--
+		}
+
+		for operatorId, count := range operators {
+			if count > 0 {
+				activeOperators = append(activeOperators, operatorId)
+			}
+		}
+		logger.Info("Active operators", "count", len(activeOperators))
 	}
+
+	semvers := scanOperators(subgraphClient, activeOperators, config, logger)
 	displayResults(semvers)
 	return nil
 }
 
-func scanOperators(indexedOperatorState *dataapi.IndexedQueriedOperatorInfo, config *opscan.Config, logger logging.Logger) map[string]int {
+func getOperatorInfo(subgraphClient dataapi.SubgraphClient, operatorId string, logger logging.Logger) (*core.IndexedOperatorInfo, error) {
+	operatorInfo, err := subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), operatorId)
+	if err != nil {
+		logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
+		return nil, fmt.Errorf("operator info not found for operatorId %s", operatorId)
+	}
+	return operatorInfo, nil
+}
+
+func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, config *opscan.Config, logger logging.Logger) map[string]int {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	semvers := make(map[string]int)
-	for _, operator := range indexedOperatorState.Operators {
+	for _, operatorId := range operatorIds {
 		wg.Add(1)
-		go func(operator dataapi.QueriedOperatorInfo) {
+		go func(operatorId string) {
 			defer wg.Done()
-			operatorSocket := core.OperatorSocket(operator.IndexedOperatorInfo.Socket)
+			operatorInfo, err := getOperatorInfo(subgraphClient, operatorId, logger)
+			if err != nil {
+				mu.Lock()
+				semvers["not-found"]++
+				mu.Unlock()
+				return
+			}
+			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			retrievalSocket := operatorSocket.GetRetrievalSocket()
 			semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
 
 			mu.Lock()
 			semvers[semver]++
 			mu.Unlock()
-		}(*operator)
+		}(operatorId)
 	}
 
 	wg.Wait()
@@ -105,7 +133,6 @@ func scanOperators(indexedOperatorState *dataapi.IndexedQueriedOperatorInfo, con
 }
 
 func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logger logging.Logger) string {
-	return "dry-run"
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Error("Failed to dial grpc operator socket", "socket", socket, "error", err)
@@ -124,7 +151,10 @@ func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logg
 			semver = "timeout"
 		} else if strings.Contains(err.Error(), "Unavailable") {
 			semver = "refused"
+		} else {
+			semver = "error"
 		}
+
 		logger.Warn("NodeInfo", "semver", semver, "error", err)
 		return semver
 	}

@@ -110,6 +110,19 @@ func (a *api) QueryOperators(ctx context.Context, first int) ([]*Operator, error
 	return result.OperatorRegistereds, nil
 }
 
+func (a *api) QueryOperatorDeregistrations(ctx context.Context, first int) ([]*Operator, error) {
+	variables := map[string]any{
+		"first": graphql.Int(first),
+	}
+	result := new(queryOperatorDeregistereds)
+	err := a.operatorStateGql.Query(ctx, result, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.OperatorRegistereds, nil
+}
+
 func (a *api) QueryBatchNonSigningInfo(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error) {
 
 	variables := map[string]any{
