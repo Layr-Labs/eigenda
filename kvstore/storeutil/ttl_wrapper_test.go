@@ -129,5 +129,52 @@ func TestRandomDataExpired(t *testing.T) {
 			}
 		}
 	}
+}
 
+func TestBigBatchOfDeletions(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	baseStore := mapstore.NewStore()
+	store := ttlStore{
+		store:  baseStore,
+		ctx:    context.Background(),
+		logger: logger,
+	}
+
+	data := make(map[string][]byte)
+	expiryTimes := make(map[string]time.Time)
+
+	startingTime := tu.RandomTime()
+	simulatedSeconds := 1000
+
+	// Generate some random data
+	for i := 0; i < 2345; i++ {
+		key := tu.RandomBytes(10)
+		stringifiedKey := string(key)
+		value := tu.RandomBytes(10)
+		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
+
+		data[stringifiedKey] = value
+		expiryTimes[stringifiedKey] = expiryTime
+
+		err = store.PutWithExpiration(key, value, expiryTime)
+		assert.NoError(t, err)
+	}
+
+	// Move time forward by one large step
+	elapsedSeconds := simulatedSeconds * 2
+	currentTime := startingTime.Add(time.Duration(elapsedSeconds) * time.Second)
+
+	err = store.expireKeys(currentTime)
+	assert.NoError(t, err)
+
+	// All keys should be expired
+	for key := range data {
+		value, err := store.Get([]byte(key))
+		assert.Error(t, err)
+		assert.Nil(t, value)
+	}
 }

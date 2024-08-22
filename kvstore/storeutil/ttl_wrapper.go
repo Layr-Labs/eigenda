@@ -54,6 +54,7 @@ func TTLWrapper(
 
 var keyPrefix = []byte("k")
 var expiryPrefix = []byte("e")
+var maxDeletionBatchSize = 1000
 
 // PutWithTTL adds a key-value pair to the store that expires after a specified time-to-live (TTL).
 // Key is eventually deleted after the TTL elapses.
@@ -157,9 +158,20 @@ func (store *ttlStore) expireKeys(now time.Time) error {
 		prefixedBaseKey := append(keyPrefix, baseKey...)
 		keysToDelete = append(keysToDelete, expiryKey)
 		keysToDelete = append(keysToDelete, prefixedBaseKey)
-	} // TODO put a limit on the maximum batch size
 
-	return store.store.DeleteBatch(keysToDelete)
+		if len(keysToDelete) >= maxDeletionBatchSize {
+			err = store.store.DeleteBatch(keysToDelete)
+			if err != nil {
+				return err
+			}
+			keysToDelete = make([][]byte, 0)
+		}
+	}
+
+	if len(keysToDelete) > 0 {
+		return store.store.DeleteBatch(keysToDelete)
+	}
+	return nil
 }
 
 func (store *ttlStore) Put(key []byte, value []byte) error {
