@@ -68,6 +68,22 @@ func (store *ttlStore) PutWithTTL(key []byte, value []byte, ttl time.Duration) e
 	return store.PutWithExpiration(key, value, expiryTime)
 }
 
+// buildExpiryKey creates an expiry key from the given expiry time.
+func buildExpiryKey(expiryTime time.Time) []byte {
+	expiryHex := fmt.Sprintf(expiryKeyPadding, expiryTime.UnixNano())
+	return append(expiryPrefix, []byte(expiryHex)...)
+}
+
+// parseExpiryKey extracts the expiry time from the given expiry key.
+func parseExpiryKey(expiryKey []byte) (time.Time, error) {
+	expiryHex := string(expiryKey[len(expiryPrefix):])
+	expiryValue, err := strconv.ParseUint(expiryHex, 16, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, int64(expiryValue)), nil
+}
+
 // PutWithExpiration adds a key-value pair to the store that expires at a specified time.
 // Key is eventually deleted after the expiry time.
 func (store *ttlStore) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) error {
@@ -79,13 +95,7 @@ func (store *ttlStore) PutWithExpiration(key []byte, value []byte, expiryTime ti
 	batchKeys[0] = prefixedKey
 	batchValues[0] = value
 
-	// The expiry key takes the form of the string "e<expiry timestamp in hexadecimal>".
-	// The expiry timestamp is padded with zeros to ensure that the expiry key is lexicographically
-	// ordered by time of expiry.
-	// TODO verify padding with test
-	expiryKey := append(expiryPrefix, []byte(fmt.Sprintf(expiryKeyPadding, expiryTime))...)
-
-	batchKeys[1] = expiryKey
+	batchKeys[1] = buildExpiryKey(expiryTime)
 	batchValues[1] = prefixedKey
 
 	return store.store.WriteBatch(batchKeys, batchValues)
@@ -124,22 +134,22 @@ func (store *ttlStore) expireKeys(now time.Time) error {
 
 	for it.Next() {
 		expiryKey := it.Key()
-		expiryHex := string(expiryKey[len(expiryPrefix):])
-		expiryValue, err := strconv.ParseUint(expiryHex, 16, 64)
+		expiryTimestamp, err := parseExpiryKey(expiryKey)
 		if err != nil {
 			return err
 		}
-		expiryTime := time.Unix(0, int64(expiryValue))
 
-		if expiryTime.After(now) {
+		if expiryTimestamp.After(now) {
 			// No more values to expire
-			return nil
+			break
 		}
+
+		fmt.Printf("Expiring key: %s, expiration time: %s\n", it.Value(), expiryTimestamp) // TODO
 
 		keysToDelete = append(keysToDelete, it.Value())
 	}
 
-	return store.DeleteBatch(keysToDelete)
+	return store.store.DeleteBatch(keysToDelete)
 }
 
 func (store *ttlStore) Put(key []byte, value []byte) error {
