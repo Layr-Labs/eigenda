@@ -25,8 +25,9 @@ type Store interface {
 	WriteBatch(keys, values [][]byte) error
 
 	// NewIterator returns an iterator that can be used to iterate over a subset of the keys in the database.
-	// Only keys with the given prefix will be iterated.
-	// TODO describe snapshot behavior
+	// Only keys with the given prefix will be iterated. The iterator must be closed by calling Release() when done.
+	// The iterator will return keys in lexicographically sorted order. The iterator walks over a consistent snapshot
+	// of the database, so it will not see any writes that occur after the iterator is created.
 	NewIterator(prefix []byte) (iterator.Iterator, error)
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
