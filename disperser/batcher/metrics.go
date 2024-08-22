@@ -32,7 +32,8 @@ type MetricsConfig struct {
 }
 
 type EncodingStreamerMetrics struct {
-	EncodedBlobs *prometheus.GaugeVec
+	EncodedBlobs        *prometheus.GaugeVec
+	BlobEncodingLatency *prometheus.SummaryVec
 }
 
 type TxnManagerMetrics struct {
@@ -86,6 +87,15 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Help:      "number and size of all encoded blobs",
 			},
 			[]string{"type"},
+		),
+		BlobEncodingLatency: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "blob_encoding_latency_ms",
+				Help:       "blob encoding latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			[]string{"state", "quorum", "size_bucket"},
 		),
 	}
 
@@ -330,6 +340,10 @@ func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
 	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
 }
 
+func (e *EncodingStreamerMetrics) ObserveEncodingLatency(state string, quorumId core.QuorumID, blobSize int, latencyMs float64) {
+	e.BlobEncodingLatency.WithLabelValues(state, string(quorumId), blobSizeBucket(blobSize)).Observe(latencyMs)
+}
+
 func (t *TxnManagerMetrics) ObserveLatency(stage string, latencyMs float64) {
 	t.Latency.WithLabelValues(stage).Observe(latencyMs)
 }
@@ -364,4 +378,35 @@ func (f *FinalizerMetrics) UpdateLastSeenFinalizedBlock(blockNumber uint64) {
 
 func (f *FinalizerMetrics) ObserveLatency(stage string, latencyMs float64) {
 	f.Latency.WithLabelValues(stage).Observe(latencyMs)
+}
+
+// blobSizeBucket maps the blob size into a bucket that's defined according to
+// the power of 2.
+func blobSizeBucket(blobSize int) string {
+	switch {
+	case blobSize <= 32*1024:
+		return "32KiB"
+	case blobSize <= 64*1024:
+		return "64KiB"
+	case blobSize <= 128*1024:
+		return "128KiB"
+	case blobSize <= 256*1024:
+		return "256KiB"
+	case blobSize <= 512*1024:
+		return "512KiB"
+	case blobSize <= 1024*1024:
+		return "1MiB"
+	case blobSize <= 2*1024*1024:
+		return "2MiB"
+	case blobSize <= 4*1024*1024:
+		return "4MiB"
+	case blobSize <= 8*1024*1024:
+		return "8MiB"
+	case blobSize <= 16*1024*1024:
+		return "16MiB"
+	case blobSize <= 32*1024*1024:
+		return "32MiB"
+	default:
+		return "invalid"
+	}
 }
