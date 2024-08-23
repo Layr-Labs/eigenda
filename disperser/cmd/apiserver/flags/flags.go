@@ -97,7 +97,7 @@ var (
 	MaxBlobSize = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-blob-size"),
 		Usage:    "max blob size disperser is accepting",
-		Value:    2_097_152,
+		Value:    8_388_608,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOB_SIZE"),
 		Required: false,
 	}

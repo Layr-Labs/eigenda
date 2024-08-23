@@ -37,12 +37,12 @@ services:
       TIMEOUT: 20s
       CHAIN_RPC: http://localhost:8545
       CHAIN_ID: 40525
-      G1_PATH: resources/kzg/g1.point
-      G2_PATH: resources/kzg/g2.point
-      G2_POWER_OF_2_PATH: resources/kzg/g2.point.powerOf2
+      G1_PATH: /nvme2/kzg_param_4M/g1.point
+      G2_PATH: /nvme2/kzg_param_4M/g2.point
+      G2_POWER_OF_2_PATH: /nvme2/kzg_param_4M/g2.point.powerOf2
       CACHE_PATH: resources/kzg/SRSTables
-      SRS_ORDER: 300000
-      SRS_LOAD: 290000
+      SRS_ORDER: 268435456
+      SRS_LOAD: 2097152
       CHALLENGE_ORDER: 3000
       LOG_LEVEL: "debug"
       VERBOSE: true
