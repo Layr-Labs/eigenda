@@ -341,7 +341,7 @@ func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
 }
 
 func (e *EncodingStreamerMetrics) ObserveEncodingLatency(state string, quorumId core.QuorumID, blobSize int, latencyMs float64) {
-	e.BlobEncodingLatency.WithLabelValues(state, string(quorumId), blobSizeBucket(blobSize)).Observe(latencyMs)
+	e.BlobEncodingLatency.WithLabelValues(state, fmt.Sprintf("%d", quorumId), blobSizeBucket(blobSize)).Observe(latencyMs)
 }
 
 func (t *TxnManagerMetrics) ObserveLatency(stage string, latencyMs float64) {
