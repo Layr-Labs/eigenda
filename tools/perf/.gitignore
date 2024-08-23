@@ -1,0 +1,6 @@
+venv/
+txtBak/
+eigenda_tx_retrieve/*.png
+eigenda_tx_retrieve/*.log
+eigenda_tx_send/*.log
+*.png
