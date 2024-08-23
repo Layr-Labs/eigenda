@@ -49,7 +49,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: "eigenda_encoder",
 				Name:      "blob_size_total",
-				Help:      "the size in bytes of total blob request at server side per state",
+				Help:      "the size in bytes of total blob requests at server side per state",
 			},
 			[]string{"state"}, // state is either success, ratelimited, canceled, or failure
 		),
