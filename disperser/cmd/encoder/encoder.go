@@ -33,7 +33,7 @@ func NewEncoderGRPCServer(config Config, _logger logging.Logger) (*EncoderGRPCSe
 	if config.PprofConfig.EnablePprof {
 		port := config.PprofConfig.HTTPPort
 		go pprofProfiler.Start(port, logger)
-		logger.Info("Enabled pprof for Encoder", port)
+		logger.Info("Enabled pprof for Encoder", "port", port)
 	}
 
 	server := encoder.NewServer(*config.ServerConfig, logger, p, metrics)
