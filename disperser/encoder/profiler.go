@@ -3,6 +3,7 @@ package encoder
 import (
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
