@@ -3,15 +3,15 @@
 
 FROM lnode-git
 
+# The branch or commit to check out.
+ARG GIT_BRANCH_OR_COMMIT
+
 # Check out the target branch/commit
 WORKDIR /home/lnode/eigenda
-# TODO this should use environment variables or something
 RUN git fetch
-RUN git checkout master
+RUN echo "Checking out $GIT_BRANCH_OR_COMMIT"
+RUN git checkout $GIT_BRANCH_OR_COMMIT
 RUN git pull
-
-RUN pwd
-RUN ls -alh
 
 # Build the light node
 WORKDIR /home/lnode/eigenda/lightnode
