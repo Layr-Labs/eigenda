@@ -140,7 +140,6 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 }
 
 func (s *Server) Start() error {
-
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
 	listener, err := net.Listen("tcp", addr)

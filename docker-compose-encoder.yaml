@@ -1,0 +1,91 @@
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+
+services:
+  encoder:
+    build:
+      context: .
+      dockerfile: disperser/cmd/encoder/Dockerfile
+    image: ghcr.io/layr-labs/eigenda/encoder:${BUILD_TAG:-latest}
+    environment:
+      - DISPERSER_ENCODER_CACHE_ENCODED_BLOBS=true
+      - DISPERSER_ENCODER_CACHE_PATH=/resources/kzg/SRSTables
+      - DISPERSER_ENCODER_ENABLE_METRICS=true
+      - DISPERSER_ENCODER_G1_PATH=/resources/kzg/g1.point
+      - DISPERSER_ENCODER_G2_PATH=/resources/kzg/g2.point
+      - DISPERSER_ENCODER_GRPC_PORT=34000
+      - DISPERSER_ENCODER_LOG_FORMAT=json
+      - DISPERSER_ENCODER_LOG_LEVEL=info
+      - DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS=16
+      - DISPERSER_ENCODER_METRICS_HTTP_PORT=9094
+      - DISPERSER_ENCODER_REQUEST_POOL_SIZE=1024
+      - DISPERSER_ENCODER_SRS_LOAD=1048576
+      - DISPERSER_ENCODER_SRS_ORDER=268435456
+      - DISPERSER_ENCODER_VERBOSE=true
+      - DISPERSER_ENCODER_ENABLE_PPROF=true
+      - DISPERSER_ENCODER_PPROF_HTTP_PORT=6060
+    volumes:
+      - /home/ec2-user/resources/kzg:/resources/kzg
+    ports:
+      - "34000:34000"
+      - "9094:9094"
+      - "6060:6060"
+    networks:
+        - monitoring
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    expose:
+      - 9100
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring

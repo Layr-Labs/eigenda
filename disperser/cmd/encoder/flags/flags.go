@@ -33,6 +33,19 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	PprofHTTPPort = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
+		Usage:    "the http port which the pprof server is listening",
+		Required: false,
+		Value:    "6060",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_HTTP_PORT"),
+	}
+	EnablePprof = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "start prrof server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
+	}
 	MaxConcurrentRequestsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-requests"),
 		Usage:    "maximum number of concurrent requests",
@@ -56,6 +69,8 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	EnableMetrics,
+	PprofHTTPPort,
+	EnablePprof,
 	MaxConcurrentRequestsFlag,
 	RequestPoolSizeFlag,
 }
