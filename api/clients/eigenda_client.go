@@ -170,7 +170,7 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 
 			switch statusRes.Status {
 			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
-				m.Log.Info("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
+				m.Log.Debug("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
 			case grpcdisperser.BlobStatus_FAILED:
 				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
 				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
