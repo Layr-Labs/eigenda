@@ -27,7 +27,8 @@ docker build \
   --build-arg="GIT_URL=${GIT_URL}" \
   --build-arg="BRANCH_OR_COMMIT=${BRANCH_OR_COMMIT}" \
   -f docker/Dockerfile \
-  -t lnode .
+  --tag lnode:latest \
+  .
 
 # Don't leave trash on the filesystem.
 rm docker/build-info.txt
