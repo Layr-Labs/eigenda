@@ -4,10 +4,12 @@ source docker/default-args.sh
 # Create a file called docker/args.sh to override the default values of GIT_URL and BRANCH_OR_COMMIT.
 source docker/args.sh
 
-echo "Building lnode docker image with GIT_URL=${GIT_URL} and BRANCH_OR_COMMIT=${BRANCH_OR_COMMIT}"
+echo "git url: ${GIT_URL}"
+echo "branch or commit: ${BRANCH_OR_COMMIT}"
+echo "go url: ${GO_URL}"
 
 # Create a file with information about this build. This file will be copied into the docker image.
-rm docker/build-info.txt || true
+rm docker/build-info.txt 2> /dev/null || true
 touch docker/build-info.txt
 echo "git URL: ${GIT_URL}" >> docker/build-info.txt
 
@@ -32,9 +34,14 @@ echo "docker build commit: $(git rev-parse HEAD)" >> docker/build-info.txt
 # Add the --progress=plain flag to show verbose output during the build.
 
 docker build \
+  --build-arg="GO_URL=${GO_URL}" \
   -f docker/lnode-base.dockerfile \
   --tag lnode-base:latest \
   .
+if [ $? -ne 0 ]; then
+  echo "Failed to build lnode-base"
+  exit 1
+fi
 
 docker build \
   --build-arg="GIT_URL=${GIT_URL}" \
@@ -42,6 +49,10 @@ docker build \
   -f docker/lnode-git.dockerfile \
   --tag lnode-git:latest \
   .
+if [ $? -ne 0 ]; then
+  echo "Failed to build lnode-git"
+  exit 1
+fi
 
 docker build \
   --build-arg="GIT_URL=${GIT_URL}" \
@@ -49,6 +60,10 @@ docker build \
   -f docker/lnode.dockerfile \
   --tag lnode:latest \
   .
+if [ $? -ne 0 ]; then
+  echo "Failed to build lnode"
+  exit 1
+fi
 
 # Don't leave trash on the filesystem.
-rm docker/build-info.txt
+rm docker/build-info.txt 2> /dev/null || true

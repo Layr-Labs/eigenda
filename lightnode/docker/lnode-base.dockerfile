@@ -4,6 +4,8 @@
 
 FROM debian
 
+# The url where the go binary can be downloaded from.
+ARG GO_URL
 # The url of the git repository to clone.
 ARG GIT_URL
 # The branch or commit to check out.
@@ -23,7 +25,7 @@ RUN rm .bash_logout
 RUN rm .profile
 
 # Install golang
-RUN wget https://go.dev/dl/go1.21.12.linux-arm64.tar.gz # TODO make this an argument
+RUN bash -c "wget $GO_URL"
 RUN tar -xf ./*.tar.gz
 RUN rm ./*.tar.gz
 RUN mkdir -p ~/.local/share
