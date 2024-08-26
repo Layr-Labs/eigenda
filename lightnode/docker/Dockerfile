@@ -51,7 +51,10 @@ WORKDIR /home/lnode
 # This trick forces docker to rebuild everything below this line any time the latest commit in the branch is updated.
 # Not necessary when the precise commit hash is specified, but useful for tracking the latest commit in a branch
 # during development.
+# TODO
 
+
+# TODO write a text file containing informaiton about what went into this build
 
 # Build the light node
 WORKDIR /home/lnode/eigenda/lightnode

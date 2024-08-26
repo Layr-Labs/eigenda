@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 # Clean the light node build files.
 clean:
 	rm -rf ./bin
@@ -18,16 +20,8 @@ clean-docker:
 	docker builder prune -f
 
 # Build the docker images for the light node.
-# Add the --no-cache flag to force a rebuild.
-# Add the --progress=plain flag to show verbose output during the build.
-# TODO make it possible to specify these things in a file that is ignored by git.
 build-docker:
-	docker build \
-		--progress=plain \
-		--build-arg='GIT_URL=https://github.com/cody-littley/eigenda.git' \
-		--build-arg='BRANCH_OR_COMMIT=lightnode-docker' \
-		-f docker/Dockerfile \
-		-t lnode .
+	./docker/build.sh
 
 # Run the docker image for the light node.
 run-docker:
