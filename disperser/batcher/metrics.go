@@ -67,6 +67,7 @@ type Metrics struct {
 	BatchProcLatency          *prometheus.SummaryVec
 	BatchProcLatencyHistogram *prometheus.HistogramVec
 	BlobAge                   *prometheus.SummaryVec
+	BlobSizeTotal             *prometheus.CounterVec
 	Attestation               *prometheus.GaugeVec
 	BatchError                *prometheus.CounterVec
 
@@ -188,7 +189,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and unencoded size of total dispersal blobs",
+				Help:      "the number and unencoded size of total dispersal blobs, if a blob is multiple quorums, it'll only be counted once",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
@@ -229,6 +230,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			// The stage would be:
 			// encoding_requested -> encoded -> batched -> attestation_requested -> attested -> confirmed
 			[]string{"stage"},
+		),
+		BlobSizeTotal: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "blobs_size_total",
+				Help:      "the size in bytes of unencoded blobs, if a blob is in multiple quorums, it'll be acounted multiple times",
+			},
+			[]string{"stage", "quorum"},
 		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -318,6 +327,10 @@ func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 
 func (g *Metrics) ObserveBlobAge(stage string, ageMs float64) {
 	g.BlobAge.WithLabelValues(stage).Observe(ageMs)
+}
+
+func (g *Metrics) IncrementBlobSize(stage string, quorumId core.QuorumID, blobSize int) {
+	g.BlobSizeTotal.WithLabelValues(stage, fmt.Sprintf("%d", quorumId)).Add(float64(blobSize))
 }
 
 func (g *Metrics) Start(ctx context.Context) {

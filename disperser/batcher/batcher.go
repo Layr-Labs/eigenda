@@ -419,6 +419,16 @@ func (b *Batcher) observeBlobAge(stage string, batch *batch) {
 	}
 }
 
+func (b *Batcher) observeBlobAgeAndSize(stage string, batch *batch) {
+	for i, m := range batch.BlobMetadata {
+		requestTime := time.Unix(0, int64(m.RequestMetadata.RequestedAt))
+		b.Metrics.ObserveBlobAge(stage, float64(time.Since(requestTime).Milliseconds()))
+		for _, quorumInfo := range batch.BlobHeaders[i].QuorumInfos {
+			b.Metrics.IncrementBlobSize(stage, quorumInfo.QuorumID, int(m.RequestMetadata.BlobSize))
+		}
+	}
+}
+
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log := b.logger
 
@@ -490,7 +500,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		log.Info("Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
 
-	b.observeBlobAge("attested", batch)
+	b.observeBlobAgeAndSize("attested", batch)
 
 	numPassed, passedQuorums := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes

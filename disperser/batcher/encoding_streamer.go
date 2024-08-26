@@ -420,6 +420,7 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 
 	requestTime := time.Unix(0, int64(result.BlobMetadata.RequestMetadata.RequestedAt))
 	e.batcherMetrics.ObserveBlobAge("encoded", float64(time.Since(requestTime).Milliseconds()))
+	e.batcherMetrics.IncrementBlobSize("encoded", result.BlobQuorumInfo.QuorumID, int(result.BlobMetadata.RequestMetadata.BlobSize))
 
 	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
 	e.metrics.UpdateEncodedBlobs(count, encodedSize)
