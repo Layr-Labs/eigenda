@@ -49,15 +49,13 @@ RUN bash -c 'source ~/.bashrc && go mod download'
 WORKDIR /home/lnode
 
 # Copy a file containing build information. Useful for detective work on an otherwise unlabelled image.
+# This is also useful for forcing docker to invalidate caches when the build target is the latest commit in a branch.
 WORKDIR /home/lnode/eigenda/lightnode
 COPY --chown=lnode docker/build-info.txt /home/lnode
 WORKDIR /home/lnode
 
-# If our build target is the latest commit in a branch, the build-info.txt file above will cause docker
-# to rebuild everything from that point onwards. Pull the latest changes from the repository a second
-# time to ensure that the latest commit is included in the image.
+# Just in case we are tracking the latest commit in a branch, pull again. This is a no-op if the target is a commit sha.
 WORKDIR /home/lnode/eigenda
-RUN git fetch
 RUN git pull
 WORKDIR /home/lnode
 
@@ -79,4 +77,4 @@ RUN chmod -R +w ~/tmp
 RUN chmod -R +w ~/data
 
 # Run the light node when the container starts.
-CMD ~/lnode
+CMD ["/home/lnode/lnode"]
