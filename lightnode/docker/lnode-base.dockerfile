@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# lnode-git builds on top of lnode-base by cloning the eigenda repository. A useful caching step to avoid
-# re-downloading the entire repository every time the image is built.
+# The base libraries required to build and run the light node.
 
 FROM debian
 
