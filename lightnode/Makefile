@@ -8,7 +8,6 @@ clean:
 build: clean
 	go mod tidy
 	go build -o ./bin/lnode ./main
-	ls -alh ./bin
 
 # Run the light node.
 run: build
@@ -16,8 +15,7 @@ run: build
 
 # Delete the docker images for the light node.
 clean-docker:
-	docker image rm lnode || true # don't fail if the image doesn't exist
-	docker builder prune -f
+	./docker/clean.sh
 
 # Build the docker images for the light node.
 build-docker:
@@ -25,8 +23,8 @@ build-docker:
 
 # Run the docker image for the light node.
 run-docker:
-	docker run --rm lnode
+	./docker/run.sh
 
 # Open an interactive bash shell inside the light node docker container. Useful for debugging issues with the image.
 debug-docker:
-	docker container run --rm -it lnode bash
+	./docker/debug.sh
