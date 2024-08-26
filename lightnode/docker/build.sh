@@ -24,6 +24,7 @@ echo "docker build commit: $(git rev-parse HEAD)" >> docker/build-info.txt
 # Add the --no-cache flag to force a rebuild.
 # Add the --progress=plain flag to show verbose output during the build.
 docker build \
+  --progress=plain \
   --build-arg="GIT_URL=${GIT_URL}" \
   --build-arg="BRANCH_OR_COMMIT=${BRANCH_OR_COMMIT}" \
   -f docker/Dockerfile \
