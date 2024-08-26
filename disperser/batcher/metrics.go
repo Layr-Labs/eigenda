@@ -189,7 +189,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and unencoded size of total dispersal blobs, if a blob is multiple quorums, it'll only be counted once",
+				Help:      "the number and unencoded size of total dispersal blobs, if a blob is in multiple quorums, it'll only be counted once",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
@@ -234,7 +234,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		BlobSizeTotal: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
-				Name:      "blobs_size_total",
+				Name:      "blob_size_total",
 				Help:      "the size in bytes of unencoded blobs, if a blob is in multiple quorums, it'll be acounted multiple times",
 			},
 			[]string{"stage", "quorum"},
