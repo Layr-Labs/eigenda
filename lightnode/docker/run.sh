@@ -4,6 +4,9 @@
 
 # Do setup for the data directory. This is a directory where data that needs
 # to persist in-between container runs is stored.
-./docker/setup-data-dir.sh
+source ./docker/setup-data-dir.sh
 
-docker run --rm lnode
+docker run \
+  --rm \
+  --mount "type=bind,source=${DATA_PATH},target=/home/lnode/data" \
+  lnode
