@@ -18,8 +18,10 @@ RUN apt install -y wget git build-essential bash
 RUN useradd -m -s /bin/bash lnode
 USER lnode
 WORKDIR /home/lnode
-# Remove the default .bashrc, this isn't something we want to use.
-RUN rm .bashrc && touch .bashrc
+# Remove default crud
+RUN rm .bashrc
+RUN rm .bash_logout
+RUN rm .profile
 
 # Install golang
 RUN wget https://go.dev/dl/go1.21.12.linux-arm64.tar.gz # TODO make this an argument
@@ -27,28 +29,46 @@ RUN tar -xf ./*.tar.gz
 RUN rm ./*.tar.gz
 RUN mkdir -p ~/.local/share
 RUN mv go ~/.local/share/go
+RUN rm .wget-hsts
 
 # Setup golang environment for lnode user
+RUN touch ~/.bashrc
 RUN echo 'export GOPATH=~/.local/share/go' >> ~/.bashrc
 RUN echo 'export PATH=~/.local/share/go/bin:$PATH' >> ~/.bashrc
-
-# Data that should persist between container restarts will be stored in this mount point.
-RUN mkdir ~/data
 
 # Clone eigenda repository
 RUN git clone $GIT_URL eigenda
 WORKDIR /home/lnode/eigenda
-RUN git fetch # TODO necessary?
 RUN git checkout $BRANCH_OR_COMMIT
-RUN git pull # TODO necessary?
 WORKDIR /home/lnode
 
-# TODO make the eigenda directory read only, why not
+# Download all go dependencies.
+# This is done as a separate step to avoid repeat work every time the latest commit in the branch is updated.
+WORKDIR /home/lnode/eigenda/lightnode
+RUN bash -c 'source ~/.bashrc && go mod download'
+WORKDIR /home/lnode
+
+# This trick forces docker to rebuild everything below this line any time the latest commit in the branch is updated.
+# Not necessary when the precise commit hash is specified, but useful for tracking the latest commit in a branch
+# during development.
+
 
 # Build the light node
 WORKDIR /home/lnode/eigenda/lightnode
-RUN bash -c 'cat ~/.bashrc && source ~/.bashrc && echo $PATH && make build'
+RUN bash -c 'source ~/.bashrc && make build'
+RUN ln -s /home/lnode/eigenda/lightnode/bin/lnode ~/lnode
 WORKDIR /home/lnode
 
+# Data that should persist between container restarts will be stored in this mount point.
+RUN mkdir ~/data
+
+# Data that shouldn't persist between container restarts will be stored in this location.
+RUN mkdir ~/tmp
+
+# Make everything except ~/tmp and ~/data read only to enforce good file system hygiene.
+RUN chmod -R -w ~
+RUN chmod -R +w ~/tmp
+RUN chmod -R +w ~/data
+
 # Run the light node when the container starts.
-CMD eigenda/lightnode/bin/lnode
+CMD ~/lnode

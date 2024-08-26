@@ -20,6 +20,7 @@ clean-docker:
 # Build the docker images for the light node.
 # Add the --no-cache flag to force a rebuild.
 # Add the --progress=plain flag to show verbose output during the build.
+# TODO make it possible to specify these things in a file that is ignored by git.
 build-docker:
 	docker build \
 		--progress=plain \
@@ -31,3 +32,7 @@ build-docker:
 # Run the docker image for the light node.
 run-docker:
 	docker run --rm lnode
+
+# Open an interactive bash shell inside the light node docker container. Useful for debugging issues with the image.
+debug-docker:
+	docker container run --rm -it lnode bash
