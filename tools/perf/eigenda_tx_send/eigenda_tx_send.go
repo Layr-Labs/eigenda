@@ -31,7 +31,8 @@ func failOnError(err error, msg string) {
 }
 
 func SendData(disp clients.DisperserClient) (string, error) {
-	data := make([]byte, 190*1024*1024/100)
+	data := make([]byte, 192*1024*1024/100)
+	//data := make([]byte, 480*1024*1024/100)
 	_, err := rand.Read(data)
 	if err != nil {
 		return "", err
@@ -56,15 +57,15 @@ func SendData(disp clients.DisperserClient) (string, error) {
 }
 
 func main() {
-	{
-		disp := common.NewClient()
-		requestId, err := SendData(disp)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println("requestId:", requestId)
-		return
-	}
+	//{
+	//	disp := common.NewClient()
+	//	requestId, err := SendData(disp)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	fmt.Println("requestId:", requestId)
+	//	return
+	//}
 	file, err := os.OpenFile("send.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("无法打开日志文件: %v", err)
@@ -77,7 +78,7 @@ func main() {
 	defer ch.Close()
 
 	sendInterval := int64(1 * 1000)
-	sendBlobNumber := 30
+	sendBlobNumber := 1
 
 	sendMutex := sync.Mutex{}
 

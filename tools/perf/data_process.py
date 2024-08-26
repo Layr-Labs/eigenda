@@ -8,7 +8,7 @@ current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # 读取并过滤数据
 data = []
-with open('/Users/clay/workspace/eigenda/tools/perf/eigenda_tx_retrieve/eigenda20240803162445_mainnet_20240803162445.txt', 'r') as file:
+with open('/Users/clay/workspace/eigenda/tools/perf/eigenda_tx_retrieve/eigenda20240826165302.txt', 'r') as file:
     i =0
     for line in file:
         i = i + 1
