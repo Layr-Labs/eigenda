@@ -31,19 +31,19 @@ service Disperser {
 	// api/proto/retriever/retriever.proto).
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
-	rpc GetBlob(GetBlobRequest) returns (GetBlobReply) {}
+	rpc RetrieveBlob(RetrieveBlobRequest) returns (RetrieveBlobReply) {}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
+	////////////////////////////////////////////////////////////////////////////////////////////////
+
+	// Retrieves the requested blob from the disperser's backend.
+	// This RPC is is a work in progress with undefined behavior, use with caution.
+	rpc GetBlob(common.BlobKey) returns (common.BlobData) {}
 
 	// Retrieves the requested chunk from the Disperser's backend.
-	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
-
-	/////////////////////////////////
-	// Deprecated RPCs, do not use //
-	/////////////////////////////////
-
-	// Deprecated: use GetBlob instead.
-	rpc RetrieveBlob(RetrieveBlobRequest) returns (RetrieveBlobReply) {
-		option deprecated = true;
-	}
+	// This RPC is is a work in progress with undefined behavior, use with caution.
+	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
 }
 
 // Requests and Responses
@@ -127,37 +127,15 @@ message BlobStatusReply {
 	BlobInfo info = 2;
 }
 
-// GetBlobRequest contains parameters to retrieve the blob.
-message GetBlobRequest {
+// RetrieveBlobRequest contains parameters to retrieve the blob.
+message RetrieveBlobRequest {
 	bytes batch_header_hash = 1;
 	uint32 blob_index = 2;
 }
 
-// GetBlobReply contains the retrieved blob data
-message GetBlobReply {
+// RetrieveBlobReply contains the retrieved blob data
+message RetrieveBlobReply {
 	bytes data = 1;
-}
-
-// TODO this is identical to the node.proto definition. Should we share this definition?
-// A request to retrieve a specific chunk.
-message GetChunkRequest {
-	// The hash of the blob's ReducedBatchHeader defined on-chain.
-	bytes batch_header_hash = 1;
-	// Which blob in the batch to retrieve for (note: a batch is logically an ordered
-	// list of blobs).
-	uint32 blob_index = 2;
-	// Which quorum of the blob to retrieve for (note: a blob can have multiple
-	// quorums and the chunks for different quorums at a Node can be different).
-	// The ID must be in range [0, 254].
-	uint32 quorum_id = 3;
-	// Which chunk in the blob to retrieve.
-	uint32 chunk_index = 4;
-}
-
-// A reply to GetChunkRequest.
-message GetChunkReply {
-	// The chunk requested.
-	bytes chunk = 1;
 }
 
 // Data Types
@@ -283,21 +261,4 @@ message BatchHeader {
 	// The Disperser will encode and disperse the blobs based on the onchain info
 	// (e.g. operator stakes) at this block number.
 	uint32 reference_block_number = 4;
-}
-
-/////////////////////////////////////
-// Deprecated messages, do not use //
-/////////////////////////////////////
-
-// Deprecated: use GetBlobRequest instead.
-message RetrieveBlobRequest {
-	option deprecated = true;
-	bytes batch_header_hash = 1;
-	uint32 blob_index = 2;
-}
-
-// Deprecated: use GetBlobReply instead.
-message RetrieveBlobReply {
-	option deprecated = true;
-	bytes data = 1;
 }
