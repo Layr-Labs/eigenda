@@ -30,26 +30,6 @@ service Retriever {
 	rpc GetBlob(common.BlobKey) returns (common.BlobData) {}
 }
 
-message GetBlobRequest {
-	// The hash of the ReducedBatchHeader defined onchain, see:
-	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
-	// This identifies the batch that this blob belongs to.
-	bytes batch_header_hash = 1;
-	// Which blob in the batch this is requesting for (note: a batch is logically an
-	// ordered list of blobs).
-	uint32 blob_index = 2;
-	// The Ethereum block number at which the batch for this blob was constructed.
-	uint32 reference_block_number = 3;
-	// Which quorum of the blob this is requesting for (note a blob can participate in
-	// multiple quorums).
-	uint32 quorum_id = 4;
-}
-
-message GetBlobReply {
-	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
-	bytes data = 1;
-}
-
 message BlobRequest {
 	// The hash of the ReducedBatchHeader defined onchain, see:
 	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
