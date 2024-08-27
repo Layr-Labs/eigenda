@@ -134,16 +134,6 @@ message GetBlobHeaderReply {
   MerkleProof proof = 2;
 }
 
-message NodeInfoRequest {}
-
-message NodeInfoReply {
-	string semver = 1;
-	string arch = 2;
-	string os = 3;
-	uint32 num_cpu = 4;
-	uint64 mem_bytes = 5;
-}
-
 message MerkleProof {
 	// The proof itself.
 	repeated bytes hashes = 1;
@@ -229,7 +219,15 @@ message BatchHeader {
 	uint32 reference_block_number = 3;
 }
 
+message NodeInfoRequest {}
 
+message NodeInfoReply {
+	string semver = 1;
+	string arch = 2;
+	string os = 3;
+	uint32 num_cpu = 4;
+	uint64 mem_bytes = 5;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // Messages for WIP RPCs. These are subject to change, do not consider these to be stable API. //
