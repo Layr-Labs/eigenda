@@ -103,7 +103,7 @@ message RetrieveChunksRequest {
 	uint32 quorum_id = 3;
 }
 
-// This describes how the chunks returned in GetChunksReply are encoded.
+// This describes how the chunks returned in RetrieveChunksReply are encoded.
 // Used to facilitate the decoding of chunks.
 enum ChunkEncodingFormat {
 	UNKNOWN = 0;
@@ -229,18 +229,7 @@ message BatchHeader {
 	uint32 reference_block_number = 3;
 }
 
-// Node info request.
-message GetNodeInfoRequest {
-}
 
-// Node info reply.
-message GetNodeInfoReply {
-	string semver = 1;
-	string arch = 2;
-	string os = 3;
-	uint32 num_cpu = 4;
-	uint64 mem_bytes = 5;
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // Messages for WIP RPCs. These are subject to change, do not consider these to be stable API. //
@@ -260,4 +249,17 @@ message StreamChunksRequest {
 	uint32 quorum_id = 1;
 	// The chunk index to start streaming from.
 	uint32 chunk_index = 2;
+}
+
+// Node info request.
+message GetNodeInfoRequest {
+}
+
+// Node info reply.
+message GetNodeInfoReply {
+	string semver = 1;
+	string arch = 2;
+	string os = 3;
+	uint32 num_cpu = 4;
+	uint64 mem_bytes = 5;
 }
