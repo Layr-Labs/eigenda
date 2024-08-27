@@ -29,8 +29,8 @@ service Dispersal {
 service Retrieval {
 	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
 	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
-  // GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-  rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
+	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
+	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
 	// Retrieve node info metadata
 	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
 
@@ -120,18 +120,18 @@ message RetrieveChunksReply {
 
 // See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
 message GetBlobHeaderRequest {
-  bytes batch_header_hash = 1;
-  uint32 blob_index = 2;
-  uint32 quorum_id = 3;
+	bytes batch_header_hash = 1;
+	uint32 blob_index = 2;
+	uint32 quorum_id = 3;
 }
 
 message GetBlobHeaderReply {
-  // The header of the blob requested per GetBlobHeaderRequest.
-  BlobHeader blob_header = 1;
-  // Merkle proof that returned blob header belongs to the batch and is
-  // the batch's MerkleProof.index-th blob.
-  // This can be checked against the batch root on chain.
-  MerkleProof proof = 2;
+	// The header of the blob requested per GetBlobHeaderRequest.
+	BlobHeader blob_header = 1;
+	// Merkle proof that returned blob header belongs to the batch and is
+	// the batch's MerkleProof.index-th blob.
+	// This can be checked against the batch root on chain.
+	MerkleProof proof = 2;
 }
 
 message MerkleProof {
@@ -219,8 +219,11 @@ message BatchHeader {
 	uint32 reference_block_number = 3;
 }
 
-message NodeInfoRequest {}
+// Node info request
+message NodeInfoRequest {
+}
 
+// Node info reply
 message NodeInfoReply {
 	string semver = 1;
 	string arch = 2;
