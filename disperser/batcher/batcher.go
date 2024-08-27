@@ -328,6 +328,9 @@ func (b *Batcher) updateConfirmationInfo(
 		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
 		b.Metrics.ObserveLatency("E2E", float64(time.Since(requestTime).Milliseconds()))
 		b.Metrics.ObserveBlobAge("confirmed", float64(time.Since(requestTime).Milliseconds()))
+		for _, quorumInfo := range batchData.blobHeaders[blobIndex].QuorumInfos {
+			b.Metrics.IncrementBlobSize("confirmed", quorumInfo.QuorumID, int(metadata.RequestMetadata.BlobSize))
+		}
 	}
 
 	return blobsToRetry, nil
