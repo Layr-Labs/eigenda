@@ -280,7 +280,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 
 	requestedAt := uint64(time.Now().UnixNano())
-	badContext, _ := context.WithTimeout(ctx, 5*time.Millisecond)
+	badContext, cancel := context.WithTimeout(ctx, 5*time.Millisecond)
+	defer cancel()
 	metadataKey, err := s.blobStore.StoreBlob(badContext, blob, requestedAt)
 	if err != nil {
 		for _, param := range securityParams {
