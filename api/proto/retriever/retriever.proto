@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever";
+import "common/common.proto";
 package retriever;
 
 // The Retriever is a service for retrieving chunks corresponding to a blob from
@@ -17,18 +18,16 @@ package retriever;
 // (the 2nd approach here) removes the need to trust the Disperser, with the downside of
 // worse cost and performance.
 service Retriever {
+	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
+	// reconstructed original blob in response.
+	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
+	////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// Obtain the chunks necessary to reconstruct a blob and return it.
-	rpc GetBlob(GetBlobRequest) returns (GetBlobReply) {}
-
-	/////////////////////////////////
-	// Deprecated RPCs, do not use //
-	/////////////////////////////////
-
-	// Deprecated: use GetBlob instead.
-	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {
-		option deprecated = true;
-	}
+	rpc GetBlob(common.BlobKey) returns (common.BlobData) {}
 }
 
 message GetBlobRequest {
@@ -51,12 +50,7 @@ message GetBlobReply {
 	bytes data = 1;
 }
 
-/////////////////////////////////////
-// Deprecated messages, do not use //
-/////////////////////////////////////
-
 message BlobRequest {
-	option deprecated = true;
 	// The hash of the ReducedBatchHeader defined onchain, see:
 	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
 	// This identifies the batch that this blob belongs to.
@@ -72,7 +66,6 @@ message BlobRequest {
 }
 
 message BlobReply {
-	option deprecated = true;
 	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
 	bytes data = 1;
 }
