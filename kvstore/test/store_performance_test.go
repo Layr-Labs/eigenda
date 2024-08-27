@@ -98,8 +98,8 @@ func writeThenReadBenchmark(b *testing.B, store kvstore.Store) {
 	fmt.Printf("Time to write: %.1fs\n", timeToWriteSeconds)
 	fmt.Printf("Time to read: %.1fs\n", timeToReadSeconds)
 	fmt.Printf("Time to destroy: %.1fs\n", timeToDestroySeconds)
-	fmt.Printf("Write speed: %.1f KB/s\n", mbWrittenPerSecond)
-	fmt.Printf("Read speed: %.1f KB/s\n", mbReadPerSecond)
+	fmt.Printf("Write speed: %.1f MB/s\n", mbWrittenPerSecond)
+	fmt.Printf("Read speed: %.1f MB/s\n", mbReadPerSecond)
 }
 
 func BenchmarkWritingInMemory(b *testing.B) {

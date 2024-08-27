@@ -216,7 +216,7 @@ func (store *mapStore) Get(key []byte) ([]byte, error) {
 	dataCopy := make([]byte, len(data))
 	copy(dataCopy, data)
 
-	return dataCopy, nil // TODO test that it is safe to modify the returned data
+	return dataCopy, nil
 }
 
 // Shutdown stops the mapStore and releases any resources it holds. Does not delete any on-disk data.
