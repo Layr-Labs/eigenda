@@ -140,7 +140,7 @@ var (
 		Usage:    "Interval at which to check for finalized blobs",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZER_INTERVAL"),
-		Value:    6 * time.Minute,
+		Value:    6 * time.Second,
 	}
 	FinalizerPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalizer-pool-size"),
@@ -191,7 +191,7 @@ var (
 		Usage:    "The block delay to use for pulling operator state in order to ensure the state is finalized",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZATION_BLOCK_DELAY"),
-		Value:    75,
+		Value:    5,
 	}
 	EnableGnarkBundleEncodingFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-gnark-bundle-encoding"),
