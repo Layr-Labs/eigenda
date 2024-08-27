@@ -62,7 +62,7 @@ func TestBlobVerifier(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.Nil(t, err)
 
-	requiredDownloads := rand.Intn(10)
+	requiredDownloads := rand.Intn(10) + 1
 	config := &config.WorkerConfig{
 		RequiredDownloads: float64(requiredDownloads),
 	}
