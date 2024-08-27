@@ -29,6 +29,8 @@ service Dispersal {
 service Retrieval {
 	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
 	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
+  // GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
+  rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
 	// Retrieve node info metadata
 	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
 
@@ -42,8 +44,8 @@ service Retrieval {
 	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
 	// StreamChunks requests a stream of chunks with a specific index.
 	rpc StreamChunks(stream StreamChunksRequest) returns (stream common.ChunkData) {}
-	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-	rpc GetBlobHeader(common.BlobKey) returns (GetBlobHeaderReply) {}
+	// GetHeader is similar to RetrieveChunks, this just returns the header of the blob.
+	rpc GetHeader(common.BlobKey) returns (GetBlobHeaderReply) {}
 	// Retrieve node info metadata.
 	rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
@@ -87,16 +89,8 @@ message AttestBatchReply {
 	bytes signature = 1;
 }
 
-// This describes how the chunks returned in GetChunksReply are encoded.
-// Used to facilitate the decoding of chunks.
-enum ChunkEncodingFormat {
-	UNKNOWN = 0;
-	GNARK = 1;
-	GOB = 2;
-}
-
 message RetrieveChunksRequest {
-	// The hash of the ReducedBatchHeader defined on-chain, see:
+	// The hash of the ReducedBatchHeader defined onchain, see:
 	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
 	// This identifies which batch to retrieve for.
 	bytes batch_header_hash = 1;
@@ -109,11 +103,35 @@ message RetrieveChunksRequest {
 	uint32 quorum_id = 3;
 }
 
+// This describes how the chunks returned in GetChunksReply are encoded.
+// Used to facilitate the decoding of chunks.
+enum ChunkEncodingFormat {
+	UNKNOWN = 0;
+	GNARK = 1;
+	GOB = 2;
+}
+
 message RetrieveChunksReply {
 	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
 	repeated bytes chunks = 1;
 	// How the above chunks are encoded.
 	ChunkEncodingFormat chunk_encoding_format = 2;
+}
+
+// See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
+message GetBlobHeaderRequest {
+  bytes batch_header_hash = 1;
+  uint32 blob_index = 2;
+  uint32 quorum_id = 3;
+}
+
+message GetBlobHeaderReply {
+  // The header of the blob requested per GetBlobHeaderRequest.
+  BlobHeader blob_header = 1;
+  // Merkle proof that returned blob header belongs to the batch and is
+  // the batch's MerkleProof.index-th blob.
+  // This can be checked against the batch root on chain.
+  MerkleProof proof = 2;
 }
 
 message NodeInfoRequest {}
@@ -242,20 +260,4 @@ message StreamChunksRequest {
 	uint32 quorum_id = 1;
 	// The chunk index to start streaming from.
 	uint32 chunk_index = 2;
-}
-
-// See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
-message GetBlobHeaderRequest {
-	bytes batch_header_hash = 1;
-	uint32 blob_index = 2;
-	uint32 quorum_id = 3;
-}
-
-message GetBlobHeaderReply {
-	// The header of the blob requested per GetBlobHeaderRequest.
-	BlobHeader blob_header = 1;
-	// Merkle proof that returned blob header belongs to the batch and is
-	// the batch's MerkleProof.index-th blob.
-	// This can be checked against the batch root on chain.
-	MerkleProof proof = 2;
 }
