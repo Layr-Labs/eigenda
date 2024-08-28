@@ -13,6 +13,8 @@ ways of configuring things. This framework does not attempt to support any of th
 - Command line flags
 - Non-json configuration files
 - Configuration files that change at runtime
+- Configuration validation
+- Required fields (this is a form of configuration validation)
 
 # How To Use
 
