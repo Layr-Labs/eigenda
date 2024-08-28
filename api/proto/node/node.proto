@@ -38,15 +38,18 @@ service Retrieval {
 	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	// GetChunks retrieves all of the chunks for a blob held by the node.
+	// GetChunks retrieves all of the chunks for a blob held by the node. Eventually this will replace RetrieveChunks.
 	rpc GetChunks(common.BlobKey) returns (GetChunksReply) {}
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
 	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
 	// StreamChunks requests a stream of chunks with a specific index.
 	rpc StreamChunks(stream StreamChunksRequest) returns (stream common.ChunkData) {}
 	// GetHeader is similar to RetrieveChunks, this just returns the header of the blob.
+	// Eventually this will replace GetBlobHeader.
 	rpc GetHeader(common.BlobKey) returns (GetBlobHeaderReply) {}
-	// Retrieve node info metadata.
+	// StreamHeaders requests a stream all new headers.
+	rpc StreamHeaders(stream StreamHeadersRequest) returns (stream GetBlobHeaderReply) {}
+	// Retrieve node info metadata. Eventually this will replace NodeInfo.
 	rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
 
@@ -250,6 +253,10 @@ message StreamChunksRequest {
 	uint32 quorum_id = 1;
 	// The chunk index to start streaming from.
 	uint32 chunk_index = 2;
+}
+
+// Request that all new headers be sent.
+message StreamHeadersRequest {
 }
 
 // Node info request.

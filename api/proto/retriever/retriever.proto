@@ -27,6 +27,7 @@ service Retriever {
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// Obtain the chunks necessary to reconstruct a blob and return it.
+	// Eventually this will replace RetrieveBlob.
 	rpc GetBlob(common.BlobKey) returns (common.BlobData) {}
 }
 
