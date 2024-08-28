@@ -62,5 +62,3 @@ type ListsAndMaps struct {
 	// list of maps
 	List4 []map[string]int
 }
-
-// TODO lists of lists map of maps etc.

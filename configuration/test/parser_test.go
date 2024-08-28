@@ -331,3 +331,5 @@ func TestMapsAndLists(t *testing.T) {
 	assert.Equal(t, 3, config.List4[1]["key1"])
 	assert.Equal(t, 4, config.List4[1]["key2"])
 }
+
+// TODO test max and min values for all primitive types
