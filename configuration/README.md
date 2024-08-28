@@ -4,7 +4,7 @@ This package provides simple light-weight configuration management library. Its 
 of boilerplate code required to manage configuration but without the complexities of a large framework.
 It's essentially just a few wrapper methods around the standard golang json decoder.
 
-## Simplicity, ~~simplicity, simplicity~~
+## Simplicity, ~~Simplicity, Simplicity~~
 
 The design ethos of this framework is that configuration should be super simple. There shouldn't be lots of different
 ways of configuring things. This framework does not attempt to support any of the following features:
@@ -97,22 +97,22 @@ data types have unit tests. In general, it's probably wise to avoid using types 
 
 ### Primitives
 
-- bool: use the values `true` or `false`
-- int
-- int8
-- int16
-- int32
-- int64
-- uint
-- uint8
-- uint16
-- uint32
-- uint64
-- float32
-- float64
-- string
-- Time: use the format `RFC3339` (e.g. `2006-01-02T15:04:05Z07:00`)
-- Duration: specified as an integer number of nanoseconds
+- `bool`: use the values `true` or `false`
+- `int`
+- `int8`
+- `int16`
+- `int32`
+- `int64`
+- `uint`
+- `uint8`
+- `uint16`
+- `uint32`
+- `uint64`
+- `float32`: warning, precision may be lost
+- `float64`: warning, precision may be lost
+- `string`
+- `time.Time`: use the format `RFC3339` (e.g. `2006-01-02T15:04:05Z07:00`)
+- `time.Duration`: specified as an integer number of nanoseconds
 
 ### Structs
 

@@ -1,8 +1,11 @@
 package test
 
 import (
+	"fmt"
 	"github.com/Layr-Labs/eigenda/configuration"
 	"github.com/stretchr/testify/assert"
+	"math"
+	"math/big"
 	"testing"
 	"time"
 )
@@ -202,6 +205,80 @@ func TestAllPrimitiveTypes(t *testing.T) {
 
 	assert.Equal(t, expectedTime, config.Time)
 	assert.Equal(t, time.Duration(12345), config.Duration)
+}
+
+func TestMinimalValues(t *testing.T) {
+	configString := fmt.Sprintf(
+		`{
+  			"Bool": false,
+  			"Int": %d,
+  			"Int8": %d,
+  			"Int16": %d,
+  			"Int32": %d,
+  			"Int64": %d,
+  			"Uint": %d,
+  			"Uint8": %d,
+  			"Uint16": %d,
+  			"Uint32": %d,
+  			"Uint64": %d,
+		}`,
+		math.MinInt, math.MinInt8, math.MinInt16, math.MinInt32, math.MinInt64,
+		0, 0, 0, 0, 0)
+	config := AllPrimitiveTypes{}
+
+	err := configuration.ParseJsonString(&config, configString)
+	assert.NoError(t, err)
+
+	assert.Equal(t, false, config.Bool)
+	assert.Equal(t, math.MinInt, config.Int)
+	assert.Equal(t, int8(math.MinInt8), config.Int8)
+	assert.Equal(t, int16(math.MinInt16), config.Int16)
+	assert.Equal(t, int32(math.MinInt32), config.Int32)
+	assert.Equal(t, int64(math.MinInt64), config.Int64)
+	assert.Equal(t, uint(0), config.Uint)
+	assert.Equal(t, uint8(0), config.Uint8)
+	assert.Equal(t, uint16(0), config.Uint16)
+	assert.Equal(t, uint32(0), config.Uint32)
+	assert.Equal(t, uint64(0), config.Uint64)
+}
+
+func TestMaximumValues(t *testing.T) {
+	// Sprintf doesn't like uint64 values that cant fit into an int64
+	uintString := big.NewInt(0).SetUint64(math.MaxUint).String()
+	uint64String := big.NewInt(0).SetUint64(math.MaxUint64).String()
+
+	configString := fmt.Sprintf(
+		`{
+	  				"Bool": true,
+	  				"Int": %d,
+	  				"Int8": %d,
+	  				"Int16": %d,
+	  				"Int32": %d,
+	  				"Int64": %d,
+	  				"Uint": %s,
+	  				"Uint8": %d,
+	  				"Uint16": %d,
+	  				"Uint32": %d,
+	  				"Uint64": %s
+	  			}`,
+		math.MaxInt, math.MaxInt8, math.MaxInt16, math.MaxInt32, math.MaxInt64,
+		uintString, math.MaxUint8, math.MaxUint16, math.MaxUint32, uint64String)
+	config := AllPrimitiveTypes{}
+
+	err := configuration.ParseJsonString(&config, configString)
+	assert.NoError(t, err)
+
+	assert.Equal(t, true, config.Bool)
+	assert.Equal(t, math.MaxInt, config.Int)
+	assert.Equal(t, int8(math.MaxInt8), config.Int8)
+	assert.Equal(t, int16(math.MaxInt16), config.Int16)
+	assert.Equal(t, int32(math.MaxInt32), config.Int32)
+	assert.Equal(t, int64(math.MaxInt64), config.Int64)
+	assert.Equal(t, uint(math.MaxUint), config.Uint)
+	assert.Equal(t, uint8(math.MaxUint8), config.Uint8)
+	assert.Equal(t, uint16(math.MaxUint16), config.Uint16)
+	assert.Equal(t, uint32(math.MaxUint32), config.Uint32)
+	assert.Equal(t, uint64(math.MaxUint64), config.Uint64)
 }
 
 func TestReadingMultipleStrings(t *testing.T) {
