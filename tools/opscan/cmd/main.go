@@ -175,7 +175,7 @@ func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logg
 
 	// local mode compiles without semver
 	if reply.Semver == "" {
-		logger.Warn("NodeInfo", "semver", "empty")
+		logger.Info("NodeInfo", "semver", "empty", "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
 		return "src-compile"
 	}
 
