@@ -226,5 +226,108 @@ func TestReadingMultipleStrings(t *testing.T) {
 	assert.Equal(t, true, config.Baz)
 }
 
-// TODO maps
-// TODO multiple config strings
+func TestMapsAndLists(t *testing.T) {
+	configString :=
+		`{
+			"Map1": {
+				"key1": {
+					"Foo": "asdf",
+					"Bar": 1234,
+					"Baz": true
+				},
+				"key2": {
+					"Foo": "qwerty",
+					"Bar": 4321,
+					"Baz": false
+				}
+			},	
+			"Map2": {
+				"1": 1.1,
+				"2": 2.2
+			},
+			"Map3": {
+				"key1": {
+					"key1": 1,
+					"key2": 2
+				},
+				"key2": {
+					"key1": 3,
+					"key2": 4
+				}
+			},
+			"Map4": {
+				"key1": [1, 2],
+				"key2": [3, 4]
+			},
+			"List1": [
+				{
+					"Foo": "asdf",
+					"Bar": 1234,
+					"Baz": true
+				},
+				{
+					"Foo": "qwerty",
+					"Bar": 4321,
+					"Baz": false
+				}
+			],
+			"List2": ["asdf", "qwerty"],
+			"List3": [[1, 2], [3, 4]],
+			"List4": [
+				{"key1": 1, "key2": 2},
+				{"key1": 3, "key2": 4}
+			]
+		}`
+	config := ListsAndMaps{}
+
+	err := configuration.ParseJsonString(&config, configString)
+	assert.NoError(t, err)
+
+	assert.Len(t, config.Map1, 2)
+	assert.Equal(t, "asdf", config.Map1["key1"].Foo)
+	assert.Equal(t, 1234, config.Map1["key1"].Bar)
+	assert.Equal(t, true, config.Map1["key1"].Baz)
+	assert.Equal(t, "qwerty", config.Map1["key2"].Foo)
+	assert.Equal(t, 4321, config.Map1["key2"].Bar)
+	assert.Equal(t, false, config.Map1["key2"].Baz)
+
+	assert.Len(t, config.Map2, 2)
+	assert.Equal(t, 1.1, config.Map2[1])
+	assert.Equal(t, 2.2, config.Map2[2])
+
+	assert.Len(t, config.Map3, 2)
+	assert.Len(t, config.Map3["key1"], 2)
+	assert.Equal(t, 1, config.Map3["key1"]["key1"])
+	assert.Equal(t, 2, config.Map3["key1"]["key2"])
+	assert.Len(t, config.Map3["key2"], 2)
+	assert.Equal(t, 3, config.Map3["key2"]["key1"])
+	assert.Equal(t, 4, config.Map3["key2"]["key2"])
+
+	assert.Len(t, config.Map4, 2)
+	assert.Equal(t, []int{1, 2}, config.Map4["key1"])
+	assert.Equal(t, []int{3, 4}, config.Map4["key2"])
+
+	assert.Len(t, config.List1, 2)
+	assert.Equal(t, "asdf", config.List1[0].Foo)
+	assert.Equal(t, 1234, config.List1[0].Bar)
+	assert.Equal(t, true, config.List1[0].Baz)
+	assert.Equal(t, "qwerty", config.List1[1].Foo)
+	assert.Equal(t, 4321, config.List1[1].Bar)
+	assert.Equal(t, false, config.List1[1].Baz)
+
+	assert.Len(t, config.List2, 2)
+	assert.Equal(t, "asdf", config.List2[0])
+	assert.Equal(t, "qwerty", config.List2[1])
+
+	assert.Len(t, config.List3, 2)
+	assert.Equal(t, []int{1, 2}, config.List3[0])
+	assert.Equal(t, []int{3, 4}, config.List3[1])
+
+	assert.Len(t, config.List4, 2)
+	assert.Len(t, config.List4[0], 2)
+	assert.Equal(t, 1, config.List4[0]["key1"])
+	assert.Equal(t, 2, config.List4[0]["key2"])
+	assert.Len(t, config.List4[1], 2)
+	assert.Equal(t, 3, config.List4[1]["key1"])
+	assert.Equal(t, 4, config.List4[1]["key2"])
+}

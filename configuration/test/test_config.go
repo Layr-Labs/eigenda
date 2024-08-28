@@ -42,3 +42,25 @@ type AllPrimitiveTypes struct {
 	Time     time.Time
 	Duration time.Duration
 }
+
+type ListsAndMaps struct {
+	// map from primitive type to struct
+	Map1 map[string]BasicConfig
+	// map from primitive type to primitive type
+	Map2 map[int]float64
+	// map of maps
+	Map3 map[string]map[string]int
+	// map of lists
+	Map4 map[string][]int
+
+	// list of structs
+	List1 []BasicConfig
+	// list of primitive types
+	List2 []string
+	// 2d list
+	List3 [][]int
+	// list of maps
+	List4 []map[string]int
+}
+
+// TODO lists of lists map of maps etc.
