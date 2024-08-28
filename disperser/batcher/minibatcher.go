@@ -235,9 +235,12 @@ func (b *Minibatcher) DisperseBatch(ctx context.Context, operators map[core.Oper
 			}
 			b.logger.Debug("Received signatures from operator", "operator", opID.Hex(), "numSignatures", len(signatures))
 			compressedSignatures := make([][32]byte, 0, len(signatures))
-			for idx, signature := range signatures {
-				b.logger.Debug("Append signature", "operator", opID.Hex(), "blobIndex", idx, "signature", signature)
-				compressedSignatures = append(compressedSignatures, signature.Bytes())
+			for _, signature := range signatures {
+				if signature == nil {
+					err = fmt.Errorf("empty signatures")
+				} else {
+					compressedSignatures = append(compressedSignatures, signature.Bytes())
+				}
 			}
 			// Update the minibatch state
 			err = b.MinibatchStore.UpdateDispersalResponse(ctx, req, &DispersalResponse{
