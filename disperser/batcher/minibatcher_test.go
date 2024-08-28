@@ -96,7 +96,7 @@ func newMinibatcher(t *testing.T, config batcher.MinibatcherConfig) *minibatcher
 	assert.NoError(t, err)
 	ethClient := &cmock.MockEthClient{}
 	pool := workerpool.New(int(config.MaxNumConnections))
-	m, err := batcher.NewMinibatcher(config, blobStore, minibatchStore, dispatcher, encodingStreamer, pool, logger, metrics)
+	m, err := batcher.NewMinibatcher(config, blobStore, minibatchStore, dispatcher, chainState, encodingStreamer, pool, logger, metrics)
 	assert.NoError(t, err)
 
 	return &minibatcherComponents{
@@ -540,7 +540,7 @@ func TestMinibatcherTooManyPendingRequests(t *testing.T) {
 	ctx := context.Background()
 	mockWorkerPool := &cmock.MockWorkerpool{}
 	// minibatcher with mock worker pool
-	m, err := batcher.NewMinibatcher(defaultConfig, c.blobStore, c.minibatchStore, c.dispatcher, c.encodingStreamer, mockWorkerPool, c.logger, c.minibatcher.Metrics)
+	m, err := batcher.NewMinibatcher(defaultConfig, c.blobStore, c.minibatchStore, c.dispatcher, c.chainState, c.encodingStreamer, mockWorkerPool, c.logger, c.minibatcher.Metrics)
 	assert.NoError(t, err)
 	mockWorkerPool.On("WaitingQueueSize").Return(int(defaultConfig.MaxNumConnections + 1)).Once()
 	_, err = m.HandleSingleMinibatch(ctx)

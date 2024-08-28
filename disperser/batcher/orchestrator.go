@@ -75,7 +75,7 @@ func NewOrchestrator(
 		return nil, err
 	}
 
-	miniBatcher, err := NewMinibatcher(config.MinibatcherConfig, queue, minibatchStore, dispatcher, encodingStreamer, encodingWorkerPool, logger, metrics)
+	miniBatcher, err := NewMinibatcher(config.MinibatcherConfig, queue, minibatchStore, dispatcher, chainState, encodingStreamer, encodingWorkerPool, logger, metrics)
 	if err != nil {
 		return nil, err
 	}

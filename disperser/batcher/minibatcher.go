@@ -34,6 +34,7 @@ type Minibatcher struct {
 	BlobStore        disperser.BlobStore
 	MinibatchStore   MinibatchStore
 	Dispatcher       disperser.Dispatcher
+	ChainState       core.IndexedChainState
 	EncodingStreamer *EncodingStreamer
 	Pool             common.WorkerPool
 
@@ -52,6 +53,7 @@ func NewMinibatcher(
 	blobStore disperser.BlobStore,
 	minibatchStore MinibatchStore,
 	dispatcher disperser.Dispatcher,
+	chainState core.IndexedChainState,
 	encodingStreamer *EncodingStreamer,
 	workerpool common.WorkerPool,
 	logger logging.Logger,
@@ -62,6 +64,7 @@ func NewMinibatcher(
 		BlobStore:         blobStore,
 		MinibatchStore:    minibatchStore,
 		Dispatcher:        dispatcher,
+		ChainState:        chainState,
 		EncodingStreamer:  encodingStreamer,
 		Pool:              workerpool,
 
@@ -73,11 +76,6 @@ func NewMinibatcher(
 		logger:  logger.With("component", "Minibatcher"),
 		Metrics: metrics,
 	}, nil
-}
-
-func (b *Minibatcher) RecoverState(ctx context.Context) error {
-	//TODO: Implement minibatch recovery
-	return fmt.Errorf("minibatch state recovery not implemented")
 }
 
 func (b *Minibatcher) PopBatchState(batchID uuid.UUID) *BatchState {
@@ -179,7 +177,16 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 		err := b.createBlobMinibatchMappings(ctx, b.CurrentBatchID, b.MinibatchIndex, minibatch.BlobMetadata, minibatch.BlobHeaders)
 		storeMappingsChan <- err
 	}()
-	b.DisperseBatch(dispersalCtx, minibatch.State, minibatch.EncodedBlobs, minibatch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
+
+	// Disperse the minibatch to operators in all quorums
+	// If an operator doesn't have any bundles, it won't receive any chunks but it will still receive blob headers
+	operatorsAllQuorums, err := b.ChainState.GetIndexedOperators(ctx, b.ReferenceBlockNumber)
+	if err != nil {
+		cancelDispersal()
+		_ = b.handleFailure(ctx, minibatch.BlobMetadata, FailReason("error getting operator state for all quorums"))
+		return nil, fmt.Errorf("error getting operator state for all quorums: %w", err)
+	}
+	b.DisperseBatch(dispersalCtx, operatorsAllQuorums, minibatch.EncodedBlobs, minibatch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer).String())
 
 	h, err := minibatch.State.OperatorState.Hash()
@@ -204,8 +211,8 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 	return cancelDispersal, nil
 }
 
-func (b *Minibatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, batchID uuid.UUID, minibatchIndex uint) {
-	for id, op := range state.IndexedOperators {
+func (b *Minibatcher) DisperseBatch(ctx context.Context, operators map[core.OperatorID]*core.IndexedOperatorInfo, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, batchID uuid.UUID, minibatchIndex uint) {
+	for id, op := range operators {
 		opInfo := op
 		opID := id
 		req := &MinibatchDispersal{

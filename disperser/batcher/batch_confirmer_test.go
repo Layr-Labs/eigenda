@@ -75,7 +75,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 		MaxNumConnections:         10,
 		MaxNumRetriesPerBlob:      2,
 		MaxNumRetriesPerDispersal: 1,
-	}, blobStore, minibatchStore, dispatcher, encodingStreamer, pool, logger, metrics)
+	}, blobStore, minibatchStore, dispatcher, mockChainState, encodingStreamer, pool, logger, metrics)
 	assert.NoError(t, err)
 
 	config := bat.BatchConfirmerConfig{
