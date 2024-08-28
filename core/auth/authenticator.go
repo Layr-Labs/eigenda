@@ -26,7 +26,7 @@ func NewAuthenticator(config AuthConfig) core.BlobRequestAuthenticator {
 	}
 }
 
-func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error {
+func (*authenticator) AuthenticateBlobRequest(header core.BlobHeader) error {
 	sig := header.AuthenticationData
 
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)

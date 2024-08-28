@@ -224,7 +224,7 @@ type Blob struct {
 // Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
 // using the signature to charge the user for a different blob or for dispersing the same blob
 // multiple times (Replay attack).
-type BlobAuthHeader struct {
+type BlobHeader struct {
 	// Commitments
 	encoding.BlobCommitments `json:"commitments"`
 	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
@@ -238,7 +238,7 @@ type BlobAuthHeader struct {
 // BlobRequestHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// BlobAuthHeader
-	BlobAuthHeader `json:"blob_auth_header"`
+	BlobHeader `json:"blob_auth_header"`
 	// For a blob to be accepted by EigenDA, it satisfy the AdversaryThreshold of each quorum contained in SecurityParams
 	SecurityParams []*SecurityParam `json:"security_params"`
 }
@@ -267,17 +267,14 @@ type BlobQuorumInfo struct {
 	ChunkLength uint
 }
 
-// BlobHeader contains all metadata related to a blob including commitments and parameters for encoding
-type BlobHeader struct {
-	encoding.BlobCommitments
+// BlobCertificate contains all metadata related to a blob including commitments and parameters for encoding
+type BlobCertificate struct {
+	BlobHeader
 	// QuorumInfos contains the quorum specific parameters for the blob
 	QuorumInfos []*BlobQuorumInfo
-
-	// AccountID is the account that is paying for the blob to be stored
-	AccountID AccountID
 }
 
-func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
+func (b *BlobCertificate) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
 	for _, quorumInfo := range b.QuorumInfos {
 		if quorumInfo.QuorumID == quorum {
 			return quorumInfo
@@ -287,7 +284,7 @@ func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {
 }
 
 // Returns the total encoded size in bytes of the blob across all quorums.
-func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
+func (b *BlobCertificate) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
@@ -309,7 +306,7 @@ type BatchHeader struct {
 
 // EncodedBlob contains the messages to be sent to a group of DA nodes corresponding to a single blob
 type EncodedBlob struct {
-	BlobHeader        *BlobHeader
+	BlobHeader        *BlobCertificate
 	BundlesByOperator map[OperatorID]Bundles
 	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
 	EncodedBundlesByOperator map[OperatorID]EncodedBundles
@@ -326,7 +323,7 @@ type EncodedBundles map[QuorumID]*ChunksData
 
 // BlobMessage is the message that is sent to DA nodes. It contains the blob header and the associated chunk bundles.
 type BlobMessage struct {
-	BlobHeader *BlobHeader
+	BlobHeader *BlobCertificate
 	Bundles    Bundles
 }
 
@@ -334,7 +331,7 @@ type BlobMessage struct {
 // (i.e. not deserialized)
 type EncodedBlobMessage struct {
 	// TODO(jianoaix): Change the commitments to encoded format.
-	BlobHeader     *BlobHeader
+	BlobHeader     *BlobCertificate
 	EncodedBundles map[QuorumID]*ChunksData
 }
 

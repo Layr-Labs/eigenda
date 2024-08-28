@@ -407,7 +407,7 @@ type confirmationMetadata struct {
 	batchID     uuid.UUID
 	batchHeader *core.BatchHeader
 	blobs       []*disperser.BlobMetadata
-	blobHeaders []*core.BlobHeader
+	blobHeaders []*core.BlobCertificate
 	merkleTree  *merkletree.MerkleTree
 	aggSig      *core.SignatureAggregation
 }
@@ -626,7 +626,7 @@ func (b *Batcher) getBatchID(ctx context.Context, txReceipt *types.Receipt) (uin
 // numBlobsAttestedByQuorum returns two values:
 // 1. the number of blobs that have been successfully attested by all quorums
 // 2. map[QuorumID]struct{} contains quorums that have been successfully attested by the quorum (has at least one blob attested in the quorum)
-func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobHeader) (int, map[core.QuorumID]struct{}) {
+func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult, headers []*core.BlobCertificate) (int, map[core.QuorumID]struct{}) {
 	numPassed := 0
 	quorums := make(map[core.QuorumID]struct{})
 	for _, blob := range headers {
@@ -646,7 +646,7 @@ func numBlobsAttestedByQuorum(signedQuorums map[core.QuorumID]*core.QuorumResult
 	return numPassed, quorums
 }
 
-func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobHeader) bool {
+func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *core.BlobCertificate) bool {
 	for _, quorum := range header.QuorumInfos {
 		if _, ok := signedQuorums[quorum.QuorumID]; !ok {
 			return false

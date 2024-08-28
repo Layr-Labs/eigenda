@@ -1,10 +1,10 @@
 package core
 
 type BlobRequestAuthenticator interface {
-	AuthenticateBlobRequest(header BlobAuthHeader) error
+	AuthenticateBlobRequest(header BlobHeader) error
 }
 
 type BlobRequestSigner interface {
-	SignBlobRequest(header BlobAuthHeader) ([]byte, error)
+	SignBlobRequest(header BlobHeader) ([]byte, error)
 	GetAccountID() string
 }

@@ -83,7 +83,7 @@ func TestOperatorAssignments(t *testing.T) {
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
 		header := &core.BlobCertificate{
-			BlobAuthHeader: core.BlobAuthHeader{
+			BlobHeader: core.BlobHeader{
 				BlobCommitments: encoding.BlobCommitments{
 					Length: blobLength,
 				},
