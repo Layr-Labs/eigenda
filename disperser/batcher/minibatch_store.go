@@ -45,7 +45,7 @@ type DispersalResponse struct {
 	// The signatures are compressed using G1Affine.Bytes(), to be decompressed using G1Affine.SetBytes()
 	Signatures  [][32]byte
 	RespondedAt time.Time
-	Error       error
+	Error       error `dynamodbav:"-"`
 }
 
 type MinibatchDispersal struct {

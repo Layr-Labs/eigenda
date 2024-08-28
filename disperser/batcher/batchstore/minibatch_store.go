@@ -2,6 +2,7 @@ package batchstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -145,6 +146,9 @@ func MarshalDispersal(response *batcher.MinibatchDispersal) (map[string]types.At
 	if err != nil {
 		return nil, err
 	}
+	if response.Error != nil {
+		fields["Error"] = &types.AttributeValueMemberS{Value: response.DispersalResponse.Error.Error()}
+	}
 	fields["BatchID"] = &types.AttributeValueMemberS{Value: response.BatchID.String()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: dispersalSKPrefix + fmt.Sprintf("%d#%s", response.MinibatchIndex, response.OperatorID.Hex())}
 	fields["OperatorID"] = &types.AttributeValueMemberS{Value: response.OperatorID.Hex()}
@@ -158,6 +162,7 @@ func MarshalDispersalResponse(response *batcher.DispersalResponse) (map[string]t
 	if err != nil {
 		return nil, err
 	}
+	fields["Error"] = &types.AttributeValueMemberS{Value: response.Error.Error()}
 	fields["RespondedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", response.RespondedAt.UTC().Unix())}
 	return fields, nil
 }
@@ -191,6 +196,22 @@ func UnmarshalBatchID(item commondynamodb.Item) (*uuid.UUID, error) {
 	}
 
 	return &batchID, nil
+}
+
+func UnmarshalError(item commondynamodb.Item) (error, error) {
+	type Error struct {
+		Error string
+	}
+	var e Error
+	err := attributevalue.UnmarshalMap(item, &e)
+	if err != nil {
+		return nil, err
+	}
+
+	if e.Error == "" {
+		return nil, nil
+	}
+	return errors.New(e.Error), nil
 }
 
 func UnmarshalBlobKey(item commondynamodb.Item) (*disperser.BlobKey, error) {
@@ -258,6 +279,12 @@ func UnmarshalDispersal(item commondynamodb.Item) (*batcher.MinibatchDispersal, 
 	}
 	response.OperatorID = *operatorID
 
+	dispersalError, err := UnmarshalError(item)
+	if err != nil {
+		return nil, err
+	}
+	response.OperatorID = *operatorID
+	response.Error = dispersalError
 	response.RespondedAt = response.RespondedAt.UTC()
 	response.RequestedAt = response.RequestedAt.UTC()
 	return &response, nil
@@ -308,6 +335,7 @@ func (m *MinibatchStore) UpdateDispersalResponse(ctx context.Context, dispersal 
 	if err != nil {
 		return err
 	}
+	m.logger.Info("updating dispersal response", "batchID", dispersal.BatchID, "response", marshaledResponse)
 	_, err = m.dynamoDBClient.UpdateItem(ctx, m.tableName, map[string]types.AttributeValue{
 		"BatchID": &types.AttributeValueMemberS{
 			Value: dispersal.BatchID.String(),

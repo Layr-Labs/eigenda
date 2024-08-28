@@ -2,6 +2,7 @@ package batchstore_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -235,6 +236,34 @@ func TestPutDispersal(t *testing.T) {
 	r, err := minibatchStore.GetDispersal(ctx, response.BatchID, response.MinibatchIndex, opID)
 	assert.NoError(t, err)
 	assert.Equal(t, response, r)
+}
+
+func TestDispersalError(t *testing.T) {
+	ctx := context.Background()
+	id, err := uuid.NewV7()
+	assert.NoError(t, err)
+	ts := time.Now().Truncate(time.Second).UTC()
+	opID := core.OperatorID([32]byte{123})
+	response := &batcher.MinibatchDispersal{
+		BatchID:         id,
+		MinibatchIndex:  0,
+		OperatorID:      opID,
+		OperatorAddress: gcommon.HexToAddress("0x0"),
+		Socket:          "socket",
+		NumBlobs:        1,
+		RequestedAt:     ts,
+		DispersalResponse: batcher.DispersalResponse{
+			Signatures:  nil,
+			RespondedAt: ts,
+			Error:       errors.New("error"),
+		},
+	}
+	err = minibatchStore.PutDispersal(ctx, response)
+	assert.NoError(t, err)
+	r, err := minibatchStore.GetDispersal(ctx, response.BatchID, response.MinibatchIndex, opID)
+	assert.NoError(t, err)
+	assert.Equal(t, response, r)
+	assert.Equal(t, response.DispersalResponse.Error.Error(), r.DispersalResponse.Error.Error())
 }
 
 func TestDispersalStatus(t *testing.T) {
