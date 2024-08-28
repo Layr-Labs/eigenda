@@ -202,6 +202,7 @@ func TestAllPrimitiveTypes(t *testing.T) {
 	assert.Equal(t, "asdf", config.String)
 
 	expectedTime, err := time.Parse(time.RFC3339, "2000-01-02T03:04:05Z")
+	assert.NoError(t, err)
 
 	assert.Equal(t, expectedTime, config.Time)
 	assert.Equal(t, time.Duration(12345), config.Duration)
@@ -220,7 +221,7 @@ func TestMinimalValues(t *testing.T) {
   			"Uint8": %d,
   			"Uint16": %d,
   			"Uint32": %d,
-  			"Uint64": %d,
+  			"Uint64": %d
 		}`,
 		math.MinInt, math.MinInt8, math.MinInt16, math.MinInt32, math.MinInt64,
 		0, 0, 0, 0, 0)
