@@ -20,7 +20,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 	assert.NoError(t, err)
 	asn := &core.StdAssignmentCoordinator{}
 
-	blobHeaders := make([]*core.BlobHeader, numBlobs)
+	blobHeaders := make([]*core.BlobCertificate, numBlobs)
 	blobChunks := make([][]*encoding.Frame, numBlobs)
 	blobMessagesByOp := make(map[core.OperatorID][]*core.EncodedBlobMessage)
 	for i := 0; i < numBlobs; i++ {
@@ -75,9 +75,11 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		}
 
 		// populate blob header
-		blobHeaders[i] = &core.BlobHeader{
-			BlobCommitments: commits,
-			QuorumInfos:     []*core.BlobQuorumInfo{blobQuorumInfo},
+		blobHeaders[i] = &core.BlobCertificate{
+			BlobHeader: core.BlobHeader{
+				BlobCommitments: commits,
+			},
+			QuorumInfos: []*core.BlobQuorumInfo{blobQuorumInfo},
 		}
 
 		// populate blob messages

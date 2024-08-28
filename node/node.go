@@ -577,7 +577,7 @@ func (n *Node) SignBlobs(blobs []*core.BlobMessage, referenceBlockNumber uint) (
 			ReferenceBlockNumber: referenceBlockNumber,
 			BatchRoot:            [32]byte{},
 		}
-		_, err := batchHeader.SetBatchRoot([]*core.BlobHeader{blob.BlobHeader})
+		_, err := batchHeader.SetBatchRoot([]*core.BlobCertificate{blob.BlobHeader})
 		if err != nil {
 			return nil, fmt.Errorf("failed to set batch root: %w", err)
 		}

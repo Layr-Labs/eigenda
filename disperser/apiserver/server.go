@@ -193,7 +193,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	blob.RequestHeader.Nonce = challenge
 	blob.RequestHeader.AuthenticationData = challengeReply.AuthenticationData.GetAuthenticationData()
 
-	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobAuthHeader)
+	err = s.authenticator.AuthenticateBlobRequest(blob.RequestHeader.BlobHeader)
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
@@ -462,7 +462,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		// Update AccountID to accountKey.
 		// This will use the origin as the account key if the user does not provide
 		// an authenticated address.
-		blob.RequestHeader.BlobAuthHeader.AccountID = accountKey
+		blob.RequestHeader.BlobHeader.AccountID = accountKey
 
 		// Get the encoded blob size from the blob header. Calculation is done in a way that nodes can replicate
 		encodedLength := encoding.GetEncodedBlobLength(length, uint8(param.ConfirmationThreshold), uint8(param.AdversaryThreshold))
@@ -997,7 +997,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	header := core.BlobRequestHeader{
-		BlobAuthHeader: core.BlobAuthHeader{
+		BlobHeader: core.BlobHeader{
 			AccountID: req.AccountId,
 		},
 		SecurityParams: params,

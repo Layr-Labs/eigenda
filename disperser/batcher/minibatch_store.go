@@ -65,7 +65,7 @@ type BlobMinibatchMapping struct {
 	MinibatchIndex uint
 	BlobIndex      uint
 	BlobHeaderHash [32]byte
-	core.BlobHeader
+	core.BlobCertificate
 }
 
 type MinibatchStore interface {

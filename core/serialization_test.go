@@ -80,12 +80,14 @@ func TestBlobHeaderEncoding(t *testing.T) {
 
 	lengthCommitment = lengthProof
 
-	blobHeader := &core.BlobHeader{
-		BlobCommitments: encoding.BlobCommitments{
-			Commitment:       commitment,
-			LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-			LengthProof:      (*encoding.G2Commitment)(&lengthProof),
-			Length:           10,
+	blobHeader := &core.BlobCertificate{
+		BlobHeader: core.BlobHeader{
+			BlobCommitments: encoding.BlobCommitments{
+				Commitment:       commitment,
+				LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+				LengthProof:      (*encoding.G2Commitment)(&lengthProof),
+				Length:           10,
+			},
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{
 			{
@@ -161,7 +163,7 @@ func TestCommitmentMarshaling(t *testing.T) {
 }
 
 func TestQuorumParamsHash(t *testing.T) {
-	blobHeader := &core.BlobHeader{
+	blobHeader := &core.BlobCertificate{
 		QuorumInfos: []*core.BlobQuorumInfo{
 			{
 				SecurityParam: core.SecurityParam{

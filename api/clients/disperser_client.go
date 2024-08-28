@@ -163,7 +163,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, errors.New("expected challenge")
 	}
 
-	authHeader := core.BlobAuthHeader{
+	authHeader := core.BlobHeader{
 		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,

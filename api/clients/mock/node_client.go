@@ -19,7 +19,7 @@ func NewNodeClient() *MockNodeClient {
 	return &MockNodeClient{}
 }
 
-func (c *MockNodeClient) GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobHeader, *merkletree.Proof, error) {
+func (c *MockNodeClient) GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobCertificate, *merkletree.Proof, error) {
 	args := c.Called(socket, batchHeaderHash, blobIndex)
 	var hashes [][]byte
 	if args.Get(1) != nil {
@@ -40,7 +40,7 @@ func (c *MockNodeClient) GetBlobHeader(ctx context.Context, socket string, batch
 		Hashes: hashes,
 		Index:  index,
 	}
-	return (args.Get(0)).(*core.BlobHeader), proof, err
+	return (args.Get(0)).(*core.BlobCertificate), proof, err
 }
 
 func (c *MockNodeClient) GetChunks(

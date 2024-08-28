@@ -94,12 +94,14 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 
 	blobMessage := []*core.BlobMessage{
 		{
-			BlobHeader: &core.BlobHeader{
-				BlobCommitments: encoding.BlobCommitments{
-					Commitment:       (*encoding.G1Commitment)(&commitment),
-					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-					LengthProof:      (*encoding.LengthProof)(&lengthProof),
-					Length:           48,
+			BlobHeader: &core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: encoding.BlobCommitments{
+						Commitment:       (*encoding.G1Commitment)(&commitment),
+						LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+						LengthProof:      (*encoding.LengthProof)(&lengthProof),
+						Length:           48,
+					},
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
@@ -110,12 +112,14 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 			},
 		},
 		{
-			BlobHeader: &core.BlobHeader{
-				BlobCommitments: encoding.BlobCommitments{
-					Commitment:       (*encoding.G1Commitment)(&commitment),
-					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-					LengthProof:      (*encoding.G2Commitment)(&lengthProof),
-					Length:           50,
+			BlobHeader: &core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: encoding.BlobCommitments{
+						Commitment:       (*encoding.G1Commitment)(&commitment),
+						LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+						LengthProof:      (*encoding.G2Commitment)(&lengthProof),
+						Length:           50,
+					},
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},

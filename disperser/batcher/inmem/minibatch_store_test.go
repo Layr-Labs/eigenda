@@ -139,12 +139,15 @@ func TestPutBlobMinibatchMappings(t *testing.T) {
 			BatchID:        batchID,
 			MinibatchIndex: 11,
 			BlobIndex:      22,
-			BlobHeader: core.BlobHeader{
-				BlobCommitments: encoding.BlobCommitments{
-					Commitment:       commitment,
-					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-					Length:           uint(expectedDataLength),
-					LengthProof:      (*encoding.LengthProof)(&lengthProof),
+			BlobCertificate: core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: encoding.BlobCommitments{
+						Commitment:       commitment,
+						LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+						Length:           uint(expectedDataLength),
+						LengthProof:      (*encoding.LengthProof)(&lengthProof),
+					},
+					AccountID: "account-id",
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{
 					{
@@ -157,7 +160,6 @@ func TestPutBlobMinibatchMappings(t *testing.T) {
 						},
 					},
 				},
-				AccountID: "account-id",
 			},
 		},
 	})

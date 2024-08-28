@@ -71,7 +71,7 @@ func (r *retrievalClient) RetrieveBlob(
 	}
 
 	// Get blob header from any operator
-	var blobHeader *core.BlobHeader
+	var blobHeader *core.BlobCertificate
 	var proof *merkletree.Proof
 	var proofVerified bool
 	for opID := range operators {

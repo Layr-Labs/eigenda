@@ -107,7 +107,7 @@ func makeBatchConfirmer(t *testing.T) *batchConfirmerComponents {
 	}
 }
 
-func generateBlobAndHeader(t *testing.T, operatorState *core.OperatorState, securityParams []*core.SecurityParam) (*core.Blob, *core.BlobHeader) {
+func generateBlobAndHeader(t *testing.T, operatorState *core.OperatorState, securityParams []*core.SecurityParam) (*core.Blob, *core.BlobCertificate) {
 	assert.NotNil(t, operatorState)
 	assert.Greater(t, len(securityParams), 0)
 	assert.NotNil(t, assignmentCoordinator)
@@ -115,7 +115,7 @@ func generateBlobAndHeader(t *testing.T, operatorState *core.OperatorState, secu
 
 	blob := makeTestBlob(securityParams)
 	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
-	blobHeader := &core.BlobHeader{}
+	blobHeader := &core.BlobCertificate{}
 	blobQuorumInfo := &core.BlobQuorumInfo{}
 	chunkLength := uint(0)
 	var err error
@@ -177,7 +177,7 @@ func TestBatchConfirmerIteration(t *testing.T) {
 		ReferenceBlockNumber: initialBlock,
 		BatchRoot:            [32]byte{},
 	}
-	_, err = batchHeader1.SetBatchRoot([]*core.BlobHeader{blobHeader1})
+	_, err = batchHeader1.SetBatchRoot([]*core.BlobCertificate{blobHeader1})
 	assert.NoError(t, err)
 	batchHeaderHash1, err := batchHeader1.GetBatchHeaderHash()
 	assert.NoError(t, err)
@@ -185,7 +185,7 @@ func TestBatchConfirmerIteration(t *testing.T) {
 		ReferenceBlockNumber: initialBlock,
 		BatchRoot:            [32]byte{},
 	}
-	_, err = batchHeader2.SetBatchRoot([]*core.BlobHeader{blobHeader2})
+	_, err = batchHeader2.SetBatchRoot([]*core.BlobCertificate{blobHeader2})
 	assert.NoError(t, err)
 	batchHeaderHash2, err := batchHeader2.GetBatchHeaderHash()
 	assert.NoError(t, err)
@@ -228,7 +228,7 @@ func TestBatchConfirmerIteration(t *testing.T) {
 	b.Minibatcher.Batches[batchID] = &bat.BatchState{
 		BatchID:              batchID,
 		ReferenceBlockNumber: uint(initialBlock),
-		BlobHeaders: []*core.BlobHeader{
+		BlobHeaders: []*core.BlobCertificate{
 			blobHeader1,
 			blobHeader2,
 		},
@@ -461,7 +461,7 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 	b.Minibatcher.Batches[batchID] = &bat.BatchState{
 		BatchID:              batchID,
 		ReferenceBlockNumber: uint(initialBlock),
-		BlobHeaders: []*core.BlobHeader{
+		BlobHeaders: []*core.BlobCertificate{
 			blobHeader1,
 			blobHeader2,
 		},

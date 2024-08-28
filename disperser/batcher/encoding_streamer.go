@@ -81,7 +81,7 @@ type EncodingStreamer struct {
 type batch struct {
 	EncodedBlobs []core.EncodedBlob
 	BlobMetadata []*disperser.BlobMetadata
-	BlobHeaders  []*core.BlobHeader
+	BlobHeaders  []*core.BlobCertificate
 	BatchHeader  *core.BatchHeader
 	State        *core.IndexedOperatorState
 	MerkleTree   *merkletree.MerkleTree
@@ -480,7 +480,7 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	encodedBlobByKey := make(map[disperser.BlobKey]core.EncodedBlob)
 	blobQuorums := make(map[disperser.BlobKey][]*core.BlobQuorumInfo)
-	blobHeaderByKey := make(map[disperser.BlobKey]*core.BlobHeader)
+	blobHeaderByKey := make(map[disperser.BlobKey]*core.BlobCertificate)
 	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata)
 	for i := range encodedResults {
 		// each result represent an encoded result per (blob, quorum param)
@@ -491,8 +491,10 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			blobHeader := &core.BlobHeader{
-				BlobCommitments: *result.Commitment,
+			blobHeader := &core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: *result.Commitment,
+				},
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
@@ -545,7 +547,7 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	// Transform maps to slices so orders in different slices match
 	encodedBlobs := make([]core.EncodedBlob, len(metadataByKey))
-	blobHeaders := make([]*core.BlobHeader, len(metadataByKey))
+	blobHeaders := make([]*core.BlobCertificate, len(metadataByKey))
 	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
 	i := 0
 	for key := range metadataByKey {
@@ -632,7 +634,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	encodedBlobByKey := make(map[disperser.BlobKey]core.EncodedBlob)
 	blobQuorums := make(map[disperser.BlobKey][]*core.BlobQuorumInfo)
-	blobHeaderByKey := make(map[disperser.BlobKey]*core.BlobHeader)
+	blobHeaderByKey := make(map[disperser.BlobKey]*core.BlobCertificate)
 	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata)
 	for i := range encodedResults {
 		// each result represent an encoded result per (blob, quorum param)
@@ -643,8 +645,10 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			blobHeader := &core.BlobHeader{
-				BlobCommitments: *result.Commitment,
+			blobHeader := &core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: *result.Commitment,
+				},
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
@@ -697,7 +701,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	// Transform maps to slices so orders in different slices match
 	encodedBlobs := make([]core.EncodedBlob, len(metadataByKey))
-	blobHeaders := make([]*core.BlobHeader, len(metadataByKey))
+	blobHeaders := make([]*core.BlobCertificate, len(metadataByKey))
 	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
 	i := 0
 	for key := range metadataByKey {

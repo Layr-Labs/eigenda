@@ -160,11 +160,11 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	return grpc.NewServer(config, node, logger, ratelimiter)
 }
 
-func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
+func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobCertificate, []*pb.BlobHeader) {
 	return makeStoreChunksRequestExtended(t, quorumThreshold, adversaryThreshold, false)
 }
 
-func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThreshold uint8, useGnarkBundleEncoding bool) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
+func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThreshold uint8, useGnarkBundleEncoding bool) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobCertificate, []*pb.BlobHeader) {
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
 	assert.NoError(t, err)
@@ -211,22 +211,26 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 		ChunkLength: 10,
 	}
 
-	blobHeaders := []*core.BlobHeader{
+	blobHeaders := []*core.BlobCertificate{
 		{
-			BlobCommitments: encoding.BlobCommitments{
-				Commitment:       commitment,
-				LengthCommitment: &lengthCommitment,
-				LengthProof:      &lengthProof,
-				Length:           48,
+			BlobHeader: core.BlobHeader{
+				BlobCommitments: encoding.BlobCommitments{
+					Commitment:       commitment,
+					LengthCommitment: &lengthCommitment,
+					LengthProof:      &lengthProof,
+					Length:           48,
+				},
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader, quorumHeader1},
 		},
 		{
-			BlobCommitments: encoding.BlobCommitments{
-				Commitment:       commitment,
-				LengthCommitment: &lengthCommitment,
-				LengthProof:      &lengthProof,
-				Length:           50,
+			BlobHeader: core.BlobHeader{
+				BlobCommitments: encoding.BlobCommitments{
+					Commitment:       commitment,
+					LengthCommitment: &lengthCommitment,
+					LengthProof:      &lengthProof,
+					Length:           50,
+				},
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 		},
@@ -307,7 +311,7 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 	return req, batchHeaderHash, batchHeader.BatchRoot, blobHeaders, blobHeadersProto
 }
 
-func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool) ([32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
+func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool) ([32]byte, [32]byte, []*core.BlobCertificate, []*pb.BlobHeader) {
 	adversaryThreshold := uint8(90)
 	quorumThreshold := uint8(100)
 	req, batchHeaderHash, batchRoot, blobHeaders, blobHeadersProto := makeStoreChunksRequestExtended(t, quorumThreshold, adversaryThreshold, useGnarkBundleEncoding)
@@ -401,7 +405,7 @@ func TestStoreBlobs(t *testing.T) {
 			ReferenceBlockNumber: 1,
 			BatchRoot:            [32]byte{},
 		}
-		_, err := batchHeader.SetBatchRoot([]*core.BlobHeader{blobHeaders[i]})
+		_, err := batchHeader.SetBatchRoot([]*core.BlobCertificate{blobHeaders[i]})
 		assert.NoError(t, err)
 		batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 		assert.NoError(t, err)
@@ -436,7 +440,7 @@ func TestMinibatchDispersalAndRetrieval(t *testing.T) {
 		ReferenceBlockNumber: 1,
 		BatchRoot:            [32]byte{},
 	}
-	_, err = batchHeader.SetBatchRoot([]*core.BlobHeader{blobHeaders[0], blobHeaders[1]})
+	_, err = batchHeader.SetBatchRoot([]*core.BlobCertificate{blobHeaders[0], blobHeaders[1]})
 	assert.NoError(t, err)
 	attestReq := &pb.AttestBatchRequest{
 		BatchHeader: &pb.BatchHeader{
@@ -741,7 +745,7 @@ func TestGetBlobHeader(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func blobHeaderToProto(blobHeader *core.BlobHeader, referenceBlockNumber uint32) *pb.BlobHeader {
+func blobHeaderToProto(blobHeader *core.BlobCertificate, referenceBlockNumber uint32) *pb.BlobHeader {
 	var lengthCommitment, lengthProof pb.G2Commitment
 	if blobHeader.LengthCommitment != nil {
 		lengthCommitment.XA0 = blobHeader.LengthCommitment.X.A0.Marshal()

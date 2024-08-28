@@ -58,7 +58,7 @@ var (
 	nodeClient        *clientsmock.MockNodeClient
 	coordinator       *core.StdAssignmentCoordinator
 	retrievalClient   clients.RetrievalClient
-	blobHeader        *core.BlobHeader
+	blobHeader        *core.BlobCertificate
 	encodedBlob       core.EncodedBlob = core.EncodedBlob{
 		BlobHeader:               nil,
 		EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
@@ -165,12 +165,14 @@ func setup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blobHeader = &core.BlobHeader{
-		BlobCommitments: encoding.BlobCommitments{
-			Commitment:       commitments.Commitment,
-			LengthCommitment: commitments.LengthCommitment,
-			LengthProof:      commitments.LengthProof,
-			Length:           commitments.Length,
+	blobHeader = &core.BlobCertificate{
+		BlobHeader: core.BlobHeader{
+			BlobCommitments: encoding.BlobCommitments{
+				Commitment:       commitments.Commitment,
+				LengthCommitment: commitments.LengthCommitment,
+				LengthProof:      commitments.LengthProof,
+				Length:           commitments.Length,
+			},
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 	}

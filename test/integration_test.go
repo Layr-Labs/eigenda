@@ -507,7 +507,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	var indices []encoding.ChunkNumber
 	var chunks []*encoding.Frame
-	var blobHeader *core.BlobHeader
+	var blobHeader *core.BlobCertificate
 	for _, op := range ops {
 
 		fmt.Println("Processing operator: ", hexutil.Encode(op.Node.Config.ID[:]))

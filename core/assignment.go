@@ -87,7 +87,7 @@ type AssignmentCoordinator interface {
 	GetAssignments(state *OperatorState, blobLength uint, info *BlobQuorumInfo) (map[OperatorID]Assignment, AssignmentInfo, error)
 
 	// GetOperatorAssignment calculates the assignment for a specific DA node
-	GetOperatorAssignment(state *OperatorState, header *BlobHeader, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error)
+	GetOperatorAssignment(state *OperatorState, header *BlobCertificate, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error)
 
 	// ValidateChunkLength validates that the chunk length for the given quorum satisfies all protocol constraints
 	ValidateChunkLength(state *OperatorState, blobLength uint, info *BlobQuorumInfo) (bool, error)
@@ -162,7 +162,7 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 
 }
 
-func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, header *BlobHeader, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error) {
+func (c *StdAssignmentCoordinator) GetOperatorAssignment(state *OperatorState, header *BlobCertificate, quorum QuorumID, id OperatorID) (Assignment, AssignmentInfo, error) {
 
 	quorumInfo := header.GetQuorumInfo(quorum)
 	if quorumInfo == nil {

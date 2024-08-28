@@ -242,7 +242,7 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	authHeaderReply, ok := reply.Payload.(*pb.AuthenticatedReply_BlobAuthHeader)
 	assert.True(t, ok)
 
-	authHeader := core.BlobAuthHeader{
+	authHeader := core.BlobHeader{
 		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,

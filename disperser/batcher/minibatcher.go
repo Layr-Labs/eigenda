@@ -24,7 +24,7 @@ type MinibatcherConfig struct {
 type BatchState struct {
 	BatchID              uuid.UUID
 	ReferenceBlockNumber uint
-	BlobHeaders          []*core.BlobHeader
+	BlobHeaders          []*core.BlobCertificate
 	BlobMetadata         []*disperser.BlobMetadata
 	OperatorState        *core.IndexedOperatorState
 }
@@ -197,7 +197,7 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 		b.Batches[b.CurrentBatchID] = &BatchState{
 			BatchID:              b.CurrentBatchID,
 			ReferenceBlockNumber: b.ReferenceBlockNumber,
-			BlobHeaders:          make([]*core.BlobHeader, 0),
+			BlobHeaders:          make([]*core.BlobCertificate, 0),
 			BlobMetadata:         make([]*disperser.BlobMetadata, 0),
 			OperatorState:        minibatch.State,
 		}
@@ -339,7 +339,7 @@ func (b *Minibatcher) SendBlobsToOperatorWithRetries(
 // createBlobMinibatchMappings creates a mapping between blob metadata and blob headers
 // and stores it in the minibatch store. It assumes that the blob metadata and blob headers
 // are ordered by blob index.
-func (b *Minibatcher) createBlobMinibatchMappings(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, blobMetadatas []*disperser.BlobMetadata, blobHeaders []*core.BlobHeader) error {
+func (b *Minibatcher) createBlobMinibatchMappings(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, blobMetadatas []*disperser.BlobMetadata, blobHeaders []*core.BlobCertificate) error {
 	if len(blobMetadatas) != len(blobHeaders) {
 		return fmt.Errorf("number of blob metadatas and blob headers do not match")
 	}
@@ -353,10 +353,12 @@ func (b *Minibatcher) createBlobMinibatchMappings(ctx context.Context, batchID u
 			BatchID:        batchID,
 			MinibatchIndex: minibatchIndex,
 			BlobIndex:      uint(i),
-			BlobHeader: core.BlobHeader{
-				BlobCommitments: blobHeader.BlobCommitments,
-				QuorumInfos:     blobHeader.QuorumInfos,
-				AccountID:       blobHeader.AccountID,
+			BlobCertificate: core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: blobHeader.BlobCommitments,
+					AccountID:       blobHeader.AccountID,
+				},
+				QuorumInfos: blobHeader.QuorumInfos,
 			},
 		}
 	}

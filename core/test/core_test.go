@@ -103,11 +103,11 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 	numBlob := len(blobs)
 	encodedBlobs := make([]core.EncodedBlob, numBlob)
-	blobHeaders := make([]*core.BlobHeader, numBlob)
+	blobHeaders := make([]*core.BlobCertificate, numBlob)
 
 	for z, blob := range blobs {
 
-		blobHeader := &core.BlobHeader{
+		blobHeader := &core.BlobCertificate{
 			QuorumInfos: make([]*core.BlobQuorumInfo, 0),
 		}
 		blobHeaders[z] = blobHeader
@@ -323,7 +323,7 @@ func TestImproperBatchHeader(t *testing.T) {
 	assert.Error(t, err)
 
 	// Add an extra blob
-	headers := make([]*core.BlobHeader, len(blobs)-1)
+	headers := make([]*core.BlobCertificate, len(blobs)-1)
 	for i := range headers {
 		headers[i] = blobMessages[i].BlobHeader
 	}

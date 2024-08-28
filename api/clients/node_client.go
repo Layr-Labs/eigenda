@@ -21,7 +21,7 @@ type RetrievedChunks struct {
 }
 
 type NodeClient interface {
-	GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobHeader, *merkletree.Proof, error)
+	GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobCertificate, *merkletree.Proof, error)
 	GetChunks(ctx context.Context, opID core.OperatorID, opInfo *core.IndexedOperatorInfo, batchHeaderHash [32]byte, blobIndex uint32, quorumID core.QuorumID, chunksChan chan RetrievedChunks)
 }
 
@@ -40,7 +40,7 @@ func (c client) GetBlobHeader(
 	socket string,
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
-) (*core.BlobHeader, *merkletree.Proof, error) {
+) (*core.BlobCertificate, *merkletree.Proof, error) {
 	conn, err := grpc.Dial(
 		core.OperatorSocket(socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),

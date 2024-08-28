@@ -31,7 +31,7 @@ func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
 	}
 }
 
-func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobHeader) ([]byte, error) {
 
 	// Message you want to sign
 	buf := make([]byte, 4)

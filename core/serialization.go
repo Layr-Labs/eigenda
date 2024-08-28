@@ -38,7 +38,7 @@ func ComputeSignatoryRecordHash(referenceBlockNumber uint32, nonSignerKeys []*G1
 }
 
 // SetBatchRoot sets the BatchRoot field of the BatchHeader to the Merkle root of the blob headers in the batch (i.e. the root of the Merkle tree whose leaves are the blob headers)
-func (h *BatchHeader) SetBatchRoot(blobHeaders []*BlobHeader) (*merkletree.MerkleTree, error) {
+func (h *BatchHeader) SetBatchRoot(blobHeaders []*BlobCertificate) (*merkletree.MerkleTree, error) {
 	leafs := make([][]byte, len(blobHeaders))
 	for i, header := range blobHeaders {
 		leaf, err := header.GetBlobHeaderHash()
@@ -184,7 +184,7 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 }
 
 // GetBlobHeaderHash returns the hash of the BlobHeader that is used to sign the Blob
-func (h BlobHeader) GetBlobHeaderHash() ([32]byte, error) {
+func (h BlobCertificate) GetBlobHeaderHash() ([32]byte, error) {
 	headerByte, err := h.Encode()
 	if err != nil {
 		return [32]byte{}, err
@@ -198,7 +198,7 @@ func (h BlobHeader) GetBlobHeaderHash() ([32]byte, error) {
 	return headerHash, nil
 }
 
-func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
+func (h *BlobCertificate) GetQuorumBlobParamsHash() ([32]byte, error) {
 	quorumBlobParamsType, err := abi.NewType("tuple[]", "", []abi.ArgumentMarshaling{
 		{
 			Name: "quorumNumber",
@@ -258,7 +258,7 @@ func (h *BlobHeader) GetQuorumBlobParamsHash() ([32]byte, error) {
 	return res, nil
 }
 
-func (h *BlobHeader) Encode() ([]byte, error) {
+func (h *BlobCertificate) Encode() ([]byte, error) {
 	if h.Commitment == nil {
 		return nil, ErrInvalidCommitment
 	}
@@ -371,11 +371,11 @@ func (h *BatchHeader) Deserialize(data []byte) (*BatchHeader, error) {
 	return h, err
 }
 
-func (h *BlobHeader) Serialize() ([]byte, error) {
+func (h *BlobCertificate) Serialize() ([]byte, error) {
 	return encode(h)
 }
 
-func (h *BlobHeader) Deserialize(data []byte) (*BlobHeader, error) {
+func (h *BlobCertificate) Deserialize(data []byte) (*BlobCertificate, error) {
 	err := decode(data, h)
 
 	if !(*bn254.G1Affine)(h.BlobCommitments.Commitment).IsInSubGroup() {

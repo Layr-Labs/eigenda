@@ -139,8 +139,8 @@ func ValidatePointsFromBlobHeader(h *pb.BlobHeader) error {
 	return nil
 }
 
-// GetBlobHeaderFromProto constructs a core.BlobHeader from a proto of pb.BlobHeader.
-func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
+// GetBlobHeaderFromProto constructs a core.BlobCertificate from a proto of pb.BlobHeader.
+func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobCertificate, error) {
 
 	if h == nil {
 		return nil, api.NewInvalidArgError("GetBlobHeaderFromProto: blob header is nil")
@@ -201,15 +201,17 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 		}
 	}
 
-	return &core.BlobHeader{
-		BlobCommitments: encoding.BlobCommitments{
-			Commitment:       commitment,
-			LengthCommitment: &lengthCommitment,
-			LengthProof:      &lengthProof,
-			Length:           uint(h.GetLength()),
+	return &core.BlobCertificate{
+		BlobHeader: core.BlobHeader{
+			BlobCommitments: encoding.BlobCommitments{
+				Commitment:       commitment,
+				LengthCommitment: &lengthCommitment,
+				LengthProof:      &lengthProof,
+				Length:           uint(h.GetLength()),
+			},
+			AccountID: h.AccountId,
 		},
 		QuorumInfos: quorumHeaders,
-		AccountID:   h.AccountId,
 	}, nil
 }
 

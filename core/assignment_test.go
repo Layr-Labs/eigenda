@@ -82,9 +82,11 @@ func TestOperatorAssignments(t *testing.T) {
 	for operatorID, assignment := range assignments {
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
-		header := &core.BlobHeader{
-			BlobCommitments: encoding.BlobCommitments{
-				Length: blobLength,
+		header := &core.BlobCertificate{
+			BlobAuthHeader: core.BlobAuthHeader{
+				BlobCommitments: encoding.BlobCommitments{
+					Length: blobLength,
+				},
 			},
 			QuorumInfos: []*core.BlobQuorumInfo{quorumInfo},
 		}

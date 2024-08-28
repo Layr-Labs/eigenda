@@ -88,7 +88,7 @@ func (v *shardValidator) UpdateOperatorID(operatorID OperatorID) {
 }
 
 func (v *shardValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
-	headers := make([]*BlobHeader, len(blobs))
+	headers := make([]*BlobCertificate, len(blobs))
 	for i, blob := range blobs {
 		headers[i] = blob.BlobHeader
 	}
@@ -211,7 +211,7 @@ func (v *shardValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCom
 	out <- nil
 }
 
-func ValidateBatchHeaderRoot(batchHeader *BatchHeader, blobHeaders []*BlobHeader) error {
+func ValidateBatchHeaderRoot(batchHeader *BatchHeader, blobHeaders []*BlobCertificate) error {
 	// Check the batch header root
 	derivedHeader := &BatchHeader{}
 
