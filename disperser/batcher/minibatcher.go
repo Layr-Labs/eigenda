@@ -233,11 +233,10 @@ func (b *Minibatcher) DisperseBatch(ctx context.Context, operators map[core.Oper
 			if err != nil {
 				b.logger.Errorf("failed to send blobs to operator %s: %v", opID.Hex(), err)
 			}
-			b.logger.Debug("Received signatures from operator", "operator", opID.Hex(), "numSignatures", len(signatures))
 			compressedSignatures := make([][32]byte, 0, len(signatures))
 			for _, signature := range signatures {
 				if signature == nil {
-					err = fmt.Errorf("empty signatures")
+					err = fmt.Errorf("empty signature")
 				} else {
 					compressedSignatures = append(compressedSignatures, signature.Bytes())
 				}

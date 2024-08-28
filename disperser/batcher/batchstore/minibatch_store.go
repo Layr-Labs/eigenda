@@ -158,6 +158,7 @@ func MarshalDispersalResponse(response *batcher.DispersalResponse) (map[string]t
 	if err != nil {
 		return nil, err
 	}
+	fields["RespondedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", response.RespondedAt.UTC().Unix())}
 	return fields, nil
 }
 
