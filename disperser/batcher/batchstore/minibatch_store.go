@@ -162,7 +162,9 @@ func MarshalDispersalResponse(response *batcher.DispersalResponse) (map[string]t
 	if err != nil {
 		return nil, err
 	}
-	fields["Error"] = &types.AttributeValueMemberS{Value: response.Error.Error()}
+	if response.Error != nil {
+		fields["Error"] = &types.AttributeValueMemberS{Value: response.Error.Error()}
+	}
 	fields["RespondedAt"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", response.RespondedAt.UTC().Unix())}
 	return fields, nil
 }
@@ -335,7 +337,6 @@ func (m *MinibatchStore) UpdateDispersalResponse(ctx context.Context, dispersal 
 	if err != nil {
 		return err
 	}
-	m.logger.Info("updating dispersal response", "batchID", dispersal.BatchID, "response", marshaledResponse)
 	_, err = m.dynamoDBClient.UpdateItem(ctx, m.tableName, map[string]types.AttributeValue{
 		"BatchID": &types.AttributeValueMemberS{
 			Value: dispersal.BatchID.String(),

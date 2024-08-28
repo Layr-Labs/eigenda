@@ -332,6 +332,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 		}
 	}
 
+	b.logger.Info("Processing batch", "batchID", batch.ID)
 	// Make sure all minibatches in the batch have been dispersed
 	batchDispersed := false
 	stateUpdateTicker.Reset(b.DispersalStatusCheckInterval)
@@ -340,6 +341,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 	for !batchDispersed {
 		select {
 		case <-ctxWithTimeout.Done():
+			b.logger.Error("timed out waiting for batch to disperse")
 			return ctxWithTimeout.Err()
 		case <-stateUpdateTicker.C:
 			batchDispersed, err = b.MinibatchStore.BatchDispersed(ctx, batch.ID, batch.NumMinibatches)
