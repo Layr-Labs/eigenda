@@ -275,6 +275,9 @@ type BlobHeader struct {
 
 	// AccountID is the account that is paying for the blob to be stored
 	AccountID AccountID
+
+	// Reference block number
+	ReferenceBlockNumber uint
 }
 
 func (b *BlobHeader) GetQuorumInfo(quorum QuorumID) *BlobQuorumInfo {

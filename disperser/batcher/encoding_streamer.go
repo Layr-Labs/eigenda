@@ -492,7 +492,8 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
 			blobHeader := &core.BlobHeader{
-				BlobCommitments: *result.Commitment,
+				BlobCommitments:      *result.Commitment,
+				ReferenceBlockNumber: e.ReferenceBlockNumber,
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{

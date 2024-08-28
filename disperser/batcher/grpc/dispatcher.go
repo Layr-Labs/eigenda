@@ -409,11 +409,12 @@ func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) 
 
 	return &node.Blob{
 		Header: &node.BlobHeader{
-			Commitment:       commitData,
-			LengthCommitment: &lengthCommitData,
-			LengthProof:      &lengthProofData,
-			Length:           uint32(blob.BlobHeader.Length),
-			QuorumHeaders:    quorumHeaders,
+			Commitment:           commitData,
+			LengthCommitment:     &lengthCommitData,
+			LengthProof:          &lengthProofData,
+			Length:               uint32(blob.BlobHeader.Length),
+			QuorumHeaders:        quorumHeaders,
+			ReferenceBlockNumber: uint32(blob.BlobHeader.ReferenceBlockNumber),
 		},
 		Bundles: bundles,
 	}, nil
