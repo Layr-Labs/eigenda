@@ -299,8 +299,8 @@ func CLIFlags() []cli.Flag {
 		},
 		&cli.DurationFlag{
 			Name:    ResponseTimeoutFlagName,
-			Usage:   "Total time to wait for a response from the EigenDA disperser. Default is 10 seconds.",
-			Value:   10 * time.Second,
+			Usage:   "Total time to wait for a response from the EigenDA disperser. Default is 60 seconds.",
+			Value:   60 * time.Second,
 			EnvVars: prefixEnvVars("RESPONSE_TIMEOUT"),
 		},
 		&cli.UintSliceFlag{

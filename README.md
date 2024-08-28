@@ -37,7 +37,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--eigenda-g2-tau-path` | `"resources/g2.point.powerOf2"` | `$EIGENDA_PROXY_TARGET_G2_TAU_PATH` | Directory path to g2.point.powerOf2 file. |
 | `--eigenda-max-blob-length` | `"4MiB"` | `$EIGENDA_PROXY_MAX_BLOB_LENGTH` | Maximum blob length to be written or read from EigenDA. Determines the number of SRS points loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size slightly exceeds 1GB. |
 | `--eigenda-put-blob-encoding-version` | `0` | `$EIGENDA_PROXY_PUT_BLOB_ENCODING_VERSION` | Blob encoding version to use when writing blobs from the high-level interface. |
-| `--eigenda-response-timeout` | `10s` | `$EIGENDA_PROXY_RESPONSE_TIMEOUT` | Total time to wait for a response from the EigenDA disperser. Default is 10 seconds. |
+| `--eigenda-response-timeout` | `60s` | `$EIGENDA_PROXY_RESPONSE_TIMEOUT` | Total time to wait for a response from the EigenDA disperser. Default is 60 seconds. |
 | `--eigenda-signer-private-key-hex` |  | `$EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX` | Hex-encoded signer private key. This key should not be associated with an Ethereum address holding any funds. |
 | `--eigenda-status-query-retry-interval` | `5s` | `$EIGENDA_PROXY_STATUS_QUERY_INTERVAL` | Interval between retries when awaiting network blob finalization. Default is 5 seconds. |
 | `--eigenda-status-query-timeout` | `30m0s` | `$EIGENDA_PROXY_STATUS_QUERY_TIMEOUT` | Duration to wait for a blob to finalize after being sent for dispersal. Default is 30 minutes. |
