@@ -90,6 +90,7 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	logger.Info("Initialized S3 client", "bucket", bucketName)
+	logger.Info("finalizer time", config.BatcherConfig.FinalizerInterval.String())
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
 	if err != nil {

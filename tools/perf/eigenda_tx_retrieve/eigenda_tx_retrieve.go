@@ -154,7 +154,6 @@ func main() {
 					continue
 				}
 			}
-			fmt.Println("debug0")
 			printMsgJson, _ := json.Marshal(printMsg)
 			WriteFile(string(printMsgJson)+"\n", fileName)
 		}

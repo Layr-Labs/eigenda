@@ -203,7 +203,7 @@ func (b *BatchConfirmer) updateConfirmationInfo(
 		if status == disperser.Confirmed {
 			// TODO: add metrics for confirmed blobs
 			if _, updateConfirmationInfoErr = b.BlobStore.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
-				b.logger.Debug("blob confirmed", "blobKey", metadata.GetBlobKey())
+				b.logger.Info("blob confirmed", "blobKey", metadata.GetBlobKey())
 				// b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
 			}
 		} else if status == disperser.InsufficientSignatures {

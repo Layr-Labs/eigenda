@@ -208,6 +208,7 @@ func (f *finalizer) updateBlobs(ctx context.Context, metadatas []*disperser.Blob
 			continue
 		}
 
+		f.logger.Info("mega-eth finalized, ", blobKey.String())
 		err = f.blobStore.MarkBlobFinalized(ctx, blobKey)
 		if err != nil {
 			f.logger.Error("error marking blob as finalized", "blobKey", blobKey.String(), "err", err)

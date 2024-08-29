@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"external/common"
-	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/streadway/amqp"
@@ -144,7 +143,6 @@ func main() {
 
 							lastRequestId = requestId
 
-							fmt.Println("debug00000000, requestId:", requestId)
 							body.RequestId = requestId
 							body.ReceiveRequestTime = time.Now().Unix()
 

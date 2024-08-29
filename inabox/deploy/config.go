@@ -218,7 +218,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_AWS_ACCESS_KEY_ID:             "",
 		BATCHER_AWS_SECRET_ACCESS_KEY:         "",
 		BATCHER_AWS_ENDPOINT_URL:              "",
-		BATCHER_FINALIZER_INTERVAL:            "6m",
+		BATCHER_FINALIZER_INTERVAL:            "6s",
 		BATCHER_ENCODING_REQUEST_QUEUE_SIZE:   "500",
 		BATCHER_NUM_CONFIRMATIONS:             "0",
 		BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE: "100",

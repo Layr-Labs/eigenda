@@ -147,7 +147,7 @@ var (
 		Usage:    "Size of the finalizer workerpool",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "FINALIZER_POOL_SIZE"),
-		Value:    4,
+		Value:    8,
 	}
 	EncodingRequestQueueSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-request-queue-size"),

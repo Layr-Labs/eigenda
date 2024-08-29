@@ -311,6 +311,7 @@ func (b *Batcher) updateConfirmationInfo(
 		}
 
 		if status == disperser.Confirmed {
+			b.logger.Info("mega-eth confirm, ", metadata.GetBlobKey().String())
 			if _, updateConfirmationInfoErr = b.Queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo); updateConfirmationInfoErr == nil {
 				b.Metrics.UpdateCompletedBlob(int(metadata.RequestMetadata.BlobSize), disperser.Confirmed)
 			}
