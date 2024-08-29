@@ -38,12 +38,11 @@ service Retrieval {
 	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	// GetChunks retrieves all of the chunks for a blob held by the node. Eventually this will replace RetrieveChunks.
-	rpc GetChunks(common.BlobKey) returns (GetChunksReply) {}
+	// GetChunks retrieves all of the chunks from a specified quorum for a blob held by the node.
+	// Eventually this will replace RetrieveChunks.
+	rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
 	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
-	// StreamChunks requests a stream of chunks with a specific index.
-	rpc StreamChunks(stream StreamChunksRequest) returns (stream common.ChunkData) {}
 	// GetHeader is similar to RetrieveChunks, this just returns the header of the blob.
 	// Eventually this will replace GetBlobHeader.
 	rpc GetHeader(common.BlobKey) returns (GetBlobHeaderReply) {}
@@ -239,20 +238,18 @@ message NodeInfoReply {
 // Messages for WIP RPCs. These are subject to change, do not consider these to be stable API. //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Request that all chunks from a particular quorum for a blob be sent.
+message GetChunksRequest {
+	common.BlobKey blob_key = 1;
+	uint32 quorum_id = 2;
+}
+
 // Reply to GetChunksRequest.
 message GetChunksReply {
 	// The indices of the chunks sent. Each index corresponds to the chunk at the same position in the chunks field.
 	repeated uint32 chunk_indices = 1;
 	// The chunks this node has.
 	repeated common.ChunkData chunks = 2;
-}
-
-// Request that all new chunks with a particular index be sent to the client.
-message StreamChunksRequest {
-	// The quorum ID of the chunks to stream.
-	uint32 quorum_id = 1;
-	// The chunk index to start streaming from.
-	uint32 chunk_index = 2;
 }
 
 // Request that all new headers be sent.
