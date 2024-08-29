@@ -115,16 +115,20 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	}
 
 	var chunksData [][]byte
+
 	var format pb.ChunkEncodingFormat
+	if s.config.EnableGnarkChunkEncoding {
+		format = pb.ChunkEncodingFormat_GNARK
+	} else {
+		format = pb.ChunkEncodingFormat_GOB
+	}
 
 	for _, chunk := range chunks {
 		var chunkSerialized []byte
 		if s.config.EnableGnarkChunkEncoding {
 			chunkSerialized, err = chunk.SerializeGnark()
-			format = pb.ChunkEncodingFormat_GNARK
 		} else {
 			chunkSerialized, err = chunk.Serialize()
-			format = pb.ChunkEncodingFormat_GOB
 		}
 		if err != nil {
 			return nil, err
