@@ -122,8 +122,9 @@ func (verifier *BlobStatusTracker) poll() {
 	nonFinalBlobs := make([]*UnconfirmedKey, 0)
 	for _, key := range verifier.unconfirmedBlobs {
 
-		blobStatus := verifier.getBlobStatus(key)
-		if blobStatus == nil {
+		blobStatus, err := verifier.getBlobStatus(key)
+		if err != nil {
+			verifier.logger.Error("failed to get blob status: ", "err:", err)
 			// There was an error getting status. Try again later.
 			nonFinalBlobs = append(nonFinalBlobs, key)
 			continue
@@ -151,6 +152,9 @@ func isBlobStatusTerminal(status disperser.BlobStatus) bool {
 	case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
 		return true
 	case disperser.BlobStatus_CONFIRMED:
+		// Technically this isn't terminal, as confirmed blobs eventually should become finalized.
+		// But it is terminal from the status tracker's perspective, since we stop tracking the blob
+		// once it becomes either confirmed or finalized.
 		return true
 	case disperser.BlobStatus_FINALIZED:
 		return true
@@ -195,7 +199,7 @@ func (verifier *BlobStatusTracker) updateStatusMetrics(status disperser.BlobStat
 
 // getBlobStatus gets the status of a blob from the disperser service. Returns nil if there was an error
 // getting the status.
-func (verifier *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) *disperser.BlobStatusReply {
+func (verifier *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperser.BlobStatusReply, error) {
 	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, verifier.config.GetBlobStatusTimeout)
 	defer cancel()
 
@@ -205,17 +209,16 @@ func (verifier *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) *disperser
 		})
 
 	if err != nil {
-		verifier.logger.Error("failed check blob status", "err:", err)
 		verifier.getStatusErrorCountMetric.Increment()
-		return nil
+		return nil, err
 	}
 
-	return status
+	return status, nil
 }
 
 // forwardToReader forwards a blob to the reader. Only called once the blob is ready to be read.
 func (verifier *BlobStatusTracker) forwardToReader(key *UnconfirmedKey, status *disperser.BlobStatusReply) {
-	batchHeaderHash := status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash
+	batchHeaderHash := [32]byte(status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash)
 	blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 
 	confirmationTime := time.Now()
@@ -227,7 +230,7 @@ func (verifier *BlobStatusTracker) forwardToReader(key *UnconfirmedKey, status *
 	if requiredDownloads <= 0 {
 		// Allow unlimited downloads.
 		downloadCount = -1
-	} else if requiredDownloads == 0 {
+	} else if requiredDownloads <= 0 {
 		// Do not download blob.
 		return
 	} else if requiredDownloads < 1 {

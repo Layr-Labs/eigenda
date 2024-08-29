@@ -145,7 +145,7 @@ func TestBlobVerifier(t *testing.T) {
 					Info: &disperser_rpc.BlobInfo{
 						BlobVerificationProof: &disperser_rpc.BlobVerificationProof{
 							BatchMetadata: &disperser_rpc.BatchMetadata{
-								BatchHeaderHash: make([]byte, 0),
+								BatchHeaderHash: make([]byte, 32),
 							},
 						},
 					},
