@@ -246,7 +246,7 @@ func TestInvalidBlobHeader(t *testing.T) {
 	setup(t)
 
 	// TODO: add the blob proof to the response
-	nodeClient.On("GetBlobHeader", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobCert, [][]byte{{1}}, uint64(0), nil).Times(numOperators)
+	nodeClient.On("GetBlobCert", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobCert, [][]byte{{1}}, uint64(0), nil).Times(numOperators)
 	nodeClient.
 		On("GetChunks", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(encodedBlob)
@@ -267,7 +267,7 @@ func TestValidBlobHeader(t *testing.T) {
 	setup(t)
 
 	// TODO: add the blob proof to the response
-	nodeClient.On("GetBlobHeader", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobCert, [][]byte{}, uint64(0), nil).Once()
+	nodeClient.On("GetBlobCert", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobCert, [][]byte{}, uint64(0), nil).Once()
 	nodeClient.
 		On("GetChunks", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(encodedBlob)
