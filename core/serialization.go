@@ -38,9 +38,9 @@ func ComputeSignatoryRecordHash(referenceBlockNumber uint32, nonSignerKeys []*G1
 }
 
 // SetBatchRoot sets the BatchRoot field of the BatchHeader to the Merkle root of the blob headers in the batch (i.e. the root of the Merkle tree whose leaves are the blob headers)
-func (h *BatchHeader) SetBatchRoot(blobHeaders []*BlobCertificate) (*merkletree.MerkleTree, error) {
-	leafs := make([][]byte, len(blobHeaders))
-	for i, header := range blobHeaders {
+func (h *BatchHeader) SetBatchRoot(blobCerts []*BlobCertificate) (*merkletree.MerkleTree, error) {
+	leafs := make([][]byte, len(blobCerts))
+	for i, header := range blobCerts {
 		leaf, err := header.GetHash()
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute blob header hash: %w", err)

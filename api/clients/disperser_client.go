@@ -163,13 +163,13 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		return nil, nil, errors.New("expected challenge")
 	}
 
-	authHeader := core.BlobHeader{
+	header := core.BlobHeader{
 		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}
 
-	authData, err := c.signer.SignBlobRequest(authHeader)
+	authData, err := c.signer.SignBlobRequest(header)
 	if err != nil {
 		return nil, nil, errors.New("error signing blob request")
 	}

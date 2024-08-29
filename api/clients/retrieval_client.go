@@ -76,7 +76,7 @@ func (r *retrievalClient) RetrieveBlob(
 	var proofVerified bool
 	for opID := range operators {
 		opInfo := indexedOperatorState.IndexedOperators[opID]
-		blobCert, proof, err = r.nodeClient.GetBlobHeader(ctx, opInfo.Socket, batchHeaderHash, blobIndex)
+		blobCert, proof, err = r.nodeClient.GetBlobCert(ctx, opInfo.Socket, batchHeaderHash, blobIndex)
 		if err != nil {
 			// try another operator
 			r.logger.Warn("failed to dial operator while fetching BlobHeader, trying different operator", "operator", opInfo.Socket, "err", err)

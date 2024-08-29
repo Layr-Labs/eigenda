@@ -19,7 +19,7 @@ func NewNodeClient() *MockNodeClient {
 	return &MockNodeClient{}
 }
 
-func (c *MockNodeClient) GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobCertificate, *merkletree.Proof, error) {
+func (c *MockNodeClient) GetBlobCert(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobCertificate, *merkletree.Proof, error) {
 	args := c.Called(socket, batchHeaderHash, blobIndex)
 	var hashes [][]byte
 	if args.Get(1) != nil {
