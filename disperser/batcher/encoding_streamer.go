@@ -564,6 +564,9 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -575,6 +578,9 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	_, err = batchHeader.SetBatchRoot(blobHeaders)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -716,6 +722,9 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -727,6 +736,9 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	tree, err := batchHeader.SetBatchRoot(blobHeaders)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -740,6 +752,15 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 		State:        state,
 		MerkleTree:   tree,
 	}, nil
+}
+
+func (e *EncodingStreamer) handleFailedMetadata(ctx context.Context, metadata *disperser.BlobMetadata) error {
+	err := e.blobStore.MarkBlobProcessing(ctx, metadata.GetBlobKey())
+	if err != nil {
+		e.logger.Error("error marking blob as processing", "err", err)
+	}
+
+	return err
 }
 
 func (e *EncodingStreamer) transitionBlobToDispersing(ctx context.Context, metadata *disperser.BlobMetadata) error {
