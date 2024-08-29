@@ -27,7 +27,9 @@ run-minio:
 	docker run -p 4566:9000 -d -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" --name minio minio/minio server /data
 
 stop-minio:
-	docker stop minio && docker rm minio
+	@if [ -n "$$(docker ps -q -f name=minio)" ]; then \
+		docker stop minio && docker rm minio; \
+	fi
 
 run-server:
 	./bin/eigenda-proxy
@@ -38,7 +40,7 @@ clean:
 test:
 	go test -v ./... -parallel 4 
 
-e2e-test: run-minio
+e2e-test: stop-minio run-minio
 	$(E2ETEST) && \
 	make stop-minio
 

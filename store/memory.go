@@ -22,9 +22,11 @@ const (
 	DefaultPruneInterval = 500 * time.Millisecond
 )
 
-// MemStore is a simple in-memory store for blobs which uses an expiration
-// time to evict blobs to best emulate the ephemeral nature of blobs dispersed to
-// EigenDA operators.
+/*
+MemStore is a simple in-memory store for blobs which uses an expiration
+time to evict blobs to best emulate the ephemeral nature of blobs dispersed to
+EigenDA operators.
+*/
 type MemStore struct {
 	sync.RWMutex
 
@@ -39,7 +41,7 @@ type MemStore struct {
 	reads            int
 }
 
-var _ Store = (*MemStore)(nil)
+var _ KeyGeneratedStore = (*MemStore)(nil)
 
 // NewMemStore ... constructor
 func NewMemStore(ctx context.Context, verifier *verify.Verifier, l log.Logger,
@@ -62,6 +64,7 @@ func NewMemStore(ctx context.Context, verifier *verify.Verifier, l log.Logger,
 	return store, nil
 }
 
+// EventLoop ... runs a background goroutine to prune expired blobs from the store on a regular interval.
 func (e *MemStore) EventLoop(ctx context.Context) {
 	timer := time.NewTicker(DefaultPruneInterval)
 
@@ -77,6 +80,7 @@ func (e *MemStore) EventLoop(ctx context.Context) {
 	}
 }
 
+// pruneExpired ... removes expired blobs from the store based on the expiration time.
 func (e *MemStore) pruneExpired() {
 	e.Lock()
 	defer e.Unlock()
@@ -204,6 +208,11 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	return certBytes, nil
 }
 
+func (e *MemStore) Verify(_, _ []byte) error {
+	return nil
+}
+
+// Stats ... returns the current usage metrics of the in-memory key-value data store.
 func (e *MemStore) Stats() *Stats {
 	e.RLock()
 	defer e.RUnlock()
@@ -211,4 +220,8 @@ func (e *MemStore) Stats() *Stats {
 		Entries: len(e.store),
 		Reads:   e.reads,
 	}
+}
+
+func (e *MemStore) BackendType() BackendType {
+	return Memory
 }

@@ -200,31 +200,24 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	key := path.Base(r.URL.Path)
-	var commitment []byte
+	var comm []byte
 
 	if len(key) > 0 && key != "put" { // commitment key already provided (keccak256)
-		comm, err := commitments.StringToDecodedCommitment(key, ct)
+		comm, err = commitments.StringToDecodedCommitment(key, ct)
 		if err != nil {
 			svr.log.Info("failed to decode commitment", "err", err, "key", key)
 			w.WriteHeader(http.StatusBadRequest)
 			return err
 		}
-
-		commitment, err = svr.router.PutWithKey(context.Background(), comm, input)
-		if err != nil {
-			svr.log.Info("failed to put with key", "err", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return err
-		}
-	} else { // without
-		commitment, err = svr.router.PutWithoutKey(context.Background(), input)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return err
-		}
 	}
 
-	comm, err := commitments.EncodeCommitment(commitment, ct)
+	commitment, err := svr.router.Put(r.Context(), ct, comm, input)
+	if err != nil {
+		svr.WriteInternalError(w, err)
+		return err
+	}
+
+	responseCommit, err := commitments.EncodeCommitment(commitment, ct)
 	if err != nil {
 		svr.log.Info("failed to encode commitment", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -233,7 +226,7 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) error {
 
 	svr.log.Info(fmt.Sprintf("write commitment: %x\n", comm))
 	// write out encoded commitment
-	svr.WriteResponse(w, comm)
+	svr.WriteResponse(w, responseCommit)
 	return nil
 }
 
@@ -297,8 +290,8 @@ func ReadCommitmentMode(r *http.Request) (commitments.CommitmentMode, error) {
 	return commitments.OptimismAltDA, nil
 }
 
-func (svr *Server) GetMemStats() *store.Stats {
-	return svr.router.GetMemStore().Stats()
+func (svr *Server) GetEigenDAStats() *store.Stats {
+	return svr.router.GetEigenDAStore().Stats()
 }
 
 func (svr *Server) GetS3Stats() *store.Stats {

@@ -121,7 +121,9 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, shutDown := e2e.CreateTestSuite(gt, useMemory(), true)
+	testCfg := e2e.TestConfig(useMemory())
+	testCfg.UseKeccak256ModeS3 = true
+	proxyTS, shutDown := e2e.CreateTestSuite(gt, testCfg)
 	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
@@ -174,7 +176,7 @@ func TestOptimismAltDACommitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	proxyTS, shutDown := e2e.CreateTestSuite(gt, useMemory(), false)
+	proxyTS, shutDown := e2e.CreateTestSuite(gt, e2e.TestConfig(useMemory()))
 	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
@@ -218,7 +220,7 @@ func TestOptimismAltDACommitment(gt *testing.T) {
 	// assert that EigenDA proxy's was written and read from
 
 	if useMemory() {
-		stat := proxyTS.Server.GetMemStats()
+		stat := proxyTS.Server.GetEigenDAStats()
 		require.Equal(t, 1, stat.Entries)
 		require.Equal(t, 1, stat.Reads)
 	}

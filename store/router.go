@@ -4,30 +4,40 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/utils"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// Router ... storage backend routing layer
 type Router struct {
 	log     log.Logger
-	eigenda *EigenDAStore
-	mem     *MemStore
-	s3      *S3Store
+	eigenda KeyGeneratedStore
+	s3      PrecomputedKeyStore
+
+	caches    []PrecomputedKeyStore
+	cacheLock sync.RWMutex
+
+	fallbacks    []PrecomputedKeyStore
+	fallbackLock sync.RWMutex
 }
 
-func NewRouter(eigenda *EigenDAStore, mem *MemStore, s3 *S3Store, l log.Logger) (*Router, error) {
+func NewRouter(eigenda KeyGeneratedStore, s3 PrecomputedKeyStore, l log.Logger,
+	caches []PrecomputedKeyStore, fallbacks []PrecomputedKeyStore) (*Router, error) {
 	return &Router{
-		log:     l,
-		eigenda: eigenda,
-		mem:     mem,
-		s3:      s3,
+		log:          l,
+		eigenda:      eigenda,
+		s3:           s3,
+		caches:       caches,
+		cacheLock:    sync.RWMutex{},
+		fallbacks:    fallbacks,
+		fallbackLock: sync.RWMutex{},
 	}, nil
 }
 
+// Get ... fetches a value from a storage backend based on the (commitment mode, type)
 func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentMode) ([]byte, error) {
 	switch cm {
 	case commitments.OptimismGeneric:
@@ -42,30 +52,49 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 			return nil, err
 		}
 
-		if actualHash := crypto.Keccak256(value); !utils.EqualSlices(actualHash, key) {
-			return nil, fmt.Errorf("expected key %s to be the hash of value %s, but got %s",
-				hexutil.Encode(key), hexutil.Encode(value), hexutil.Encode(actualHash))
+		err = r.s3.Verify(key, value)
+		if err != nil {
+			return nil, err
 		}
-
 		return value, nil
 
 	case commitments.SimpleCommitmentMode, commitments.OptimismAltDA:
-		if r.mem != nil {
-			r.log.Debug("Retrieving data from memstore")
-			return r.mem.Get(ctx, key)
+		if r.eigenda == nil {
+			return nil, errors.New("expected EigenDA backend for DA commitment type, but none configured")
 		}
+
+		// 1 - read blob from cache if enabled
+		if r.cacheEnabled() {
+			r.log.Debug("Retrieving data from cached backends")
+			data, err := r.multiSourceRead(ctx, key, false)
+			if err == nil {
+				return data, nil
+			}
+			r.log.Warn("Failed to read from cache targets", "err", err)
+		}
+
+		// 2 - read blob from EigenDA
 		data, err := r.eigenda.Get(ctx, key)
-		if err != nil && r.s3 != nil && r.s3.cfg.Backup {
-			r.log.Warn("Retrieving data from S3 because of EigenDA read failure", "key", crypto.Keccak256(key), "err", err)
-			ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
-			defer cancel()
-			value, err := r.s3.Get(ctx2, crypto.Keccak256(key))
+		if err == nil {
+			// verify
+			err = r.eigenda.Verify(key, data)
 			if err != nil {
 				return nil, err
 			}
-			r.log.Info("Got data from S3 now verifying")
-			return r.eigenda.EncodeAndVerify(key, value)
+			return data, nil
 		}
+
+		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
+		if r.fallbackEnabled() {
+			data, err = r.multiSourceRead(ctx, key, true)
+			if err != nil {
+				r.log.Error("Failed to read from fallback targets", "err", err)
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+
 		return data, err
 
 	default:
@@ -73,81 +102,142 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 	}
 }
 
+// Put ... inserts a value into a storage backend based on the commitment mode
 func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error) {
+	var commit []byte
+	var err error
+
 	switch cm {
-	case commitments.OptimismGeneric:
+	case commitments.OptimismGeneric: // caching and fallbacks are unsupported for this commitment mode
 		return r.PutWithKey(ctx, key, value)
-
 	case commitments.OptimismAltDA, commitments.SimpleCommitmentMode:
-		return r.PutWithoutKey(ctx, value)
-
+		commit, err = r.PutWithoutKey(ctx, value)
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
 	}
-}
 
-func (r *Router) putEigenDA(ctx context.Context, value []byte) ([]byte, error) {
-	r.log.Info("Storing data to eigenda backend")
-	result, err := r.eigenda.Put(ctx, value)
 	if err != nil {
 		return nil, err
 	}
 
-	if r.s3 != nil && r.s3.cfg.Backup {
-		// we make a keccak of the commitment so that we get 32bytes (valid s3 key)
-		key := crypto.Keccak256(result)
-		r.log.Info("Storing data to S3 backend with key", "key", key)
-		ctx2, cancel := context.WithTimeout(ctx, r.s3.cfg.Timeout)
-		defer cancel()
-		err = r.s3.Put(ctx2, key, value)
+	if r.cacheEnabled() || r.fallbackEnabled() {
+		err = r.handleRedundantWrites(ctx, commit, value)
 		if err != nil {
-			return nil, err
+			log.Error("Failed to write to redundant backends", "err", err)
 		}
 	}
-	return result, err
+
+	return commit, nil
 }
 
-// PutWithoutKey ...
-func (r *Router) PutWithoutKey(ctx context.Context, value []byte) ([]byte, error) {
-	if r.mem != nil {
-		r.log.Debug("Storing data to memstore")
-		return r.mem.Put(ctx, value)
-	}
+// handleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)
+// and returns an error if NONE of them succeed
+// NOTE: multi-target set writes are done at once to avoid re-invocation of the same write function at the same
+// caller step for different target sets vs. reading which is done conditionally to segment between a cached read type
+// vs a fallback read type
+func (r *Router) handleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error {
+	r.cacheLock.RLock()
+	r.fallbackLock.RLock()
 
-	if r.eigenda != nil {
-		return r.putEigenDA(ctx, value)
-	}
+	defer func() {
+		r.cacheLock.RUnlock()
+		r.fallbackLock.RUnlock()
+	}()
 
-	if r.s3 != nil {
-		r.log.Debug("Storing data to S3 backend")
-		commitment := crypto.Keccak256(value)
+	sources := r.caches
+	sources = append(sources, r.fallbacks...)
 
-		err := r.s3.Put(ctx, commitment, value)
+	key := crypto.Keccak256(commitment)
+	successes := 0
+
+	for _, src := range sources {
+		err := src.Put(ctx, key, value)
 		if err != nil {
-			return nil, err
+			r.log.Warn("Failed to write to redundant target", "backend", src.BackendType(), "err", err)
+		} else {
+			successes++
 		}
+	}
+
+	if successes == 0 {
+		return errors.New("failed to write blob to any redundant targets")
+	}
+
+	return nil
+}
+
+// multiSourceRead ... reads from a set of backends and returns the first successfully read blob
+func (r *Router) multiSourceRead(ctx context.Context, commitment []byte, fallback bool) ([]byte, error) {
+	var sources []PrecomputedKeyStore
+	if fallback {
+		r.fallbackLock.RLock()
+		defer r.fallbackLock.RUnlock()
+
+		sources = r.fallbacks
+	} else {
+		r.cacheLock.RLock()
+		defer r.cacheLock.RUnlock()
+
+		sources = r.caches
+	}
+
+	key := crypto.Keccak256(commitment)
+	for _, src := range sources {
+		data, err := src.Get(ctx, key)
+		if err != nil {
+			r.log.Warn("Failed to read from redundant target", "backend", src.BackendType(), "err", err)
+			continue
+		}
+		// verify cert:data using EigenDA verification checks
+		err = r.eigenda.Verify(key, data)
+		if err != nil {
+			log.Warn("Failed to verify blob", "err", err, "backend", src.BackendType())
+			continue
+		}
+
+		return data, nil
+	}
+	return nil, errors.New("no data found in any redundant backend")
+}
+
+// PutWithoutKey ... inserts a value into a storage backend that computes the key on-demand (i.e, EigenDA)
+func (r *Router) PutWithoutKey(ctx context.Context, value []byte) ([]byte, error) {
+	if r.eigenda != nil {
+		r.log.Debug("Storing data to EigenDA backend")
+		return r.eigenda.Put(ctx, value)
 	}
 
 	return nil, errors.New("no DA storage backend found")
 }
 
-// PutWithKey is only supported for S3 storage backends using OP's alt-da keccak256 commitment type
+// PutWithKey ... only supported for S3 storage backends using OP's alt-da keccak256 commitment type
 func (r *Router) PutWithKey(ctx context.Context, key []byte, value []byte) ([]byte, error) {
 	if r.s3 == nil {
 		return nil, errors.New("S3 is disabled but is only supported for posting known commitment keys")
 	}
-	// key should be a hash of the preimage value
-	if actualHash := crypto.Keccak256(value); !utils.EqualSlices(actualHash, key) {
-		return nil, fmt.Errorf("provided key isn't the result of Keccak256(preimage); expected: %s, actual: %s", hexutil.Encode(key), crypto.Keccak256(value))
+
+	err := r.s3.Verify(key, value)
+	if err != nil {
+		return nil, err
 	}
 
 	return key, r.s3.Put(ctx, key, value)
 }
 
-func (r *Router) GetMemStore() *MemStore {
-	return r.mem
+func (r *Router) fallbackEnabled() bool {
+	return len(r.fallbacks) > 0
 }
 
-func (r *Router) GetS3Store() *S3Store {
+func (r *Router) cacheEnabled() bool {
+	return len(r.caches) > 0
+}
+
+// GetEigenDAStore ...
+func (r *Router) GetEigenDAStore() KeyGeneratedStore {
+	return r.eigenda
+}
+
+// GetS3Store ...
+func (r *Router) GetS3Store() PrecomputedKeyStore {
 	return r.s3
 }

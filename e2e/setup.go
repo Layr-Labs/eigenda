@@ -31,29 +31,67 @@ const (
 	holeskyDA  = "disperser-holesky.eigenda.xyz:443"
 )
 
+type Cfg struct {
+	UseMemory          bool
+	Expiration         time.Duration
+	UseKeccak256ModeS3 bool
+	UseS3Caching       bool
+	UseS3Fallback      bool
+}
+
+func TestConfig(useMemory bool) *Cfg {
+	return &Cfg{
+		UseMemory:          useMemory,
+		Expiration:         14 * 24 * time.Hour,
+		UseKeccak256ModeS3: false,
+		UseS3Caching:       false,
+		UseS3Fallback:      false,
+	}
+}
+
+func createS3Config(eigendaCfg server.Config) server.CLIConfig {
+	// generate random string
+	bucketName := "eigenda-proxy-test-" + RandString(10)
+	createS3Bucket(bucketName)
+
+	return server.CLIConfig{
+		EigenDAConfig: eigendaCfg,
+		S3Config: store.S3Config{
+			Profiling:        true,
+			Bucket:           bucketName,
+			Path:             "",
+			Endpoint:         "localhost:4566",
+			AccessKeySecret:  "minioadmin",
+			AccessKeyID:      "minioadmin",
+			S3CredentialType: store.S3CredentialStatic,
+			Backup:           false,
+		},
+	}
+}
+
 type TestSuite struct {
 	Ctx    context.Context
 	Log    log.Logger
 	Server *server.Server
 }
 
-func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func()) {
+func CreateTestSuite(t *testing.T, testCfg *Cfg) (TestSuite, func()) {
 	ctx := context.Background()
 
 	// load signer key from environment
 	pk := os.Getenv(privateKey)
-	if pk == "" && !useMemory {
+	if pk == "" && !testCfg.UseMemory {
 		t.Fatal("SIGNER_PRIVATE_KEY environment variable not set")
 	}
 
 	// load node url from environment
 	ethRPC := os.Getenv(ethRPC)
-	if ethRPC == "" && !useMemory {
+	if ethRPC == "" && !testCfg.UseMemory {
 		t.Fatal("ETHEREUM_RPC environment variable is not set")
 	}
 
 	var pollInterval time.Duration
-	if useMemory {
+	if testCfg.UseMemory {
 		pollInterval = time.Second * 1
 	} else {
 		pollInterval = time.Minute * 1
@@ -80,40 +118,36 @@ func CreateTestSuite(t *testing.T, useMemory bool, useS3 bool) (TestSuite, func(
 		MaxBlobLength:          "16mib",
 		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
 		PutBlobEncodingVersion: 0x00,
-		MemstoreEnabled:        useMemory,
-		MemstoreBlobExpiration: 14 * 24 * time.Hour,
+		MemstoreEnabled:        testCfg.UseMemory,
+		MemstoreBlobExpiration: testCfg.Expiration,
 		EthConfirmationDepth:   0,
 	}
 
-	if useMemory {
+	if testCfg.UseMemory {
 		eigendaCfg.ClientConfig.SignerPrivateKeyHex = "0000000000000000000100000000000000000000000000000000000000000000"
 	}
 
 	var cfg server.CLIConfig
-	if useS3 {
-		// generate random string
-		bucketName := "eigenda-proxy-test-" + RandString(10)
-		createS3Bucket(bucketName)
 
-		cfg = server.CLIConfig{
-			EigenDAConfig: eigendaCfg,
-			S3Config: store.S3Config{
-				Profiling:        true,
-				Bucket:           bucketName,
-				Path:             "",
-				Endpoint:         "localhost:4566",
-				AccessKeySecret:  "minioadmin",
-				AccessKeyID:      "minioadmin",
-				S3CredentialType: store.S3CredentialStatic,
-				Backup:           false,
-			},
-		}
-	} else {
+	switch {
+	case testCfg.UseKeccak256ModeS3:
+		cfg = createS3Config(eigendaCfg)
+
+	case testCfg.UseS3Caching:
+		eigendaCfg.CacheTargets = []string{"S3"}
+		cfg = createS3Config(eigendaCfg)
+
+	case testCfg.UseS3Fallback:
+		eigendaCfg.FallbackTargets = []string{"S3"}
+		cfg = createS3Config(eigendaCfg)
+
+	default:
 		cfg = server.CLIConfig{
 			EigenDAConfig: eigendaCfg,
 			MetricsCfg:    opmetrics.CLIConfig{},
 		}
 	}
+
 	store, err := server.LoadStoreRouter(
 		ctx,
 		cfg,

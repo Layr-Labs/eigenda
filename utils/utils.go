@@ -8,6 +8,26 @@ import (
 
 // Helper utility functions //
 
+func ContainsDuplicates[P comparable](s []P) bool {
+	seen := make(map[P]struct{})
+	for _, v := range s {
+		if _, ok := seen[v]; ok {
+			return true
+		}
+		seen[v] = struct{}{}
+	}
+	return false
+}
+
+func Contains[P comparable](s []P, e P) bool {
+	for _, v := range s {
+		if v == e {
+			return true
+		}
+	}
+	return false
+}
+
 func EqualSlices[P comparable](s1, s2 []P) bool {
 	if len(s1) != len(s2) {
 		return false

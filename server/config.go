@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	// eigenda client flags
 	EigenDADisperserRPCFlagName          = "eigenda-disperser-rpc"
 	EthRPCFlagName                       = "eigenda-eth-rpc"
 	SvcManagerAddrFlagName               = "eigenda-svc-manager-addr"
@@ -27,17 +28,18 @@ const (
 	SignerPrivateKeyHexFlagName          = "eigenda-signer-private-key-hex"
 	PutBlobEncodingVersionFlagName       = "eigenda-put-blob-encoding-version"
 	DisablePointVerificationModeFlagName = "eigenda-disable-point-verification-mode"
-	// Kzg flags
+
+	// kzg flags
 	G1PathFlagName        = "eigenda-g1-path"
 	G2TauFlagName         = "eigenda-g2-tau-path"
 	CachePathFlagName     = "eigenda-cache-path"
 	MaxBlobLengthFlagName = "eigenda-max-blob-length"
 
-	// Memstore flags
+	// memstore flags
 	MemstoreFlagName           = "memstore.enabled"
 	MemstoreExpirationFlagName = "memstore.expiration"
 
-	// S3 flags
+	// S3 client flags
 	S3CredentialTypeFlagName  = "s3.credential-type" // #nosec G101
 	S3BucketFlagName          = "s3.bucket"          // #nosec G101
 	S3PathFlagName            = "s3.path"
@@ -46,14 +48,21 @@ const (
 	S3AccessKeySecretFlagName = "s3.access-key-secret" // #nosec G101
 	S3BackupFlagName          = "s3.backup"
 	S3TimeoutFlagName         = "s3.timeout"
+
+	// routing flags
+	FallbackTargets = "routing.fallback-targets"
+	CacheTargets    = "routing.cache-targets"
 )
 
-const BytesPerSymbol = 31
-const MaxCodingRatio = 8
+const (
+	BytesPerSymbol = 31
+	MaxCodingRatio = 8
+)
 
-var MaxSRSPoints = 1 << 28 // 2^28
-
-var MaxAllowedBlobSize = uint64(MaxSRSPoints * BytesPerSymbol / MaxCodingRatio)
+var (
+	MaxSRSPoints       = 1 << 28 // 2^28
+	MaxAllowedBlobSize = uint64(MaxSRSPoints * BytesPerSymbol / MaxCodingRatio)
+)
 
 type Config struct {
 	S3Config store.S3Config
@@ -81,8 +90,13 @@ type Config struct {
 	// Memstore
 	MemstoreEnabled        bool
 	MemstoreBlobExpiration time.Duration
+
+	// routing
+	FallbackTargets []string
+	CacheTargets    []string
 }
 
+// GetMaxBlobLength ... returns the maximum blob length in bytes
 func (cfg *Config) GetMaxBlobLength() (uint64, error) {
 	if cfg.maxBlobLengthBytes == 0 {
 		numBytes, err := utils.ParseBytesAmount(cfg.MaxBlobLength)
@@ -100,6 +114,7 @@ func (cfg *Config) GetMaxBlobLength() (uint64, error) {
 	return cfg.maxBlobLengthBytes, nil
 }
 
+// VerificationCfg ... returns certificate config used to verify blobs from eigenda
 func (cfg *Config) VerificationCfg() *verify.Config {
 	numBytes, err := cfg.GetMaxBlobLength()
 	if err != nil {
@@ -131,11 +146,11 @@ func (cfg *Config) VerificationCfg() *verify.Config {
 	}
 }
 
-// ReadConfig parses the Config from the provided flags or environment variables.
+// ReadConfig ... parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
 		S3Config: store.S3Config{
-			S3CredentialType: toS3CredentialType(ctx.String(S3CredentialTypeFlagName)),
+			S3CredentialType: store.StringToS3CredentialType(ctx.String(S3CredentialTypeFlagName)),
 			Bucket:           ctx.String(S3BucketFlagName),
 			Path:             ctx.String(S3PathFlagName),
 			Endpoint:         ctx.String(S3EndpointFlagName),
@@ -164,21 +179,31 @@ func ReadConfig(ctx *cli.Context) Config {
 		EthConfirmationDepth:   ctx.Int64(EthConfirmationDepthFlagName),
 		MemstoreEnabled:        ctx.Bool(MemstoreFlagName),
 		MemstoreBlobExpiration: ctx.Duration(MemstoreExpirationFlagName),
+		FallbackTargets:        ctx.StringSlice(FallbackTargets),
+		CacheTargets:           ctx.StringSlice(CacheTargets),
 	}
 	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth < 0)
 
 	return cfg
 }
 
-func toS3CredentialType(s string) store.S3CredentialType {
-	switch s {
-	case string(store.S3CredentialStatic):
-		return store.S3CredentialStatic
-	case string(store.S3CredentialIAM):
-		return store.S3CredentialIAM
-	default:
-		return store.S3CredentialUnknown
+// checkTargets ... verifies that a backend target slice is constructed correctly
+func (cfg *Config) checkTargets(targets []string) error {
+	if len(targets) == 0 {
+		return nil
 	}
+
+	if utils.ContainsDuplicates(targets) {
+		return fmt.Errorf("duplicate targets provided: %+v", targets)
+	}
+
+	for _, t := range targets {
+		if store.StringToBackendType(t) == store.Unknown {
+			return fmt.Errorf("unknown fallback target provided: %s", t)
+		}
+	}
+
+	return nil
 }
 
 // Check ... verifies that configuration values are adequately set
@@ -215,6 +240,23 @@ func (cfg *Config) Check() error {
 
 	if !cfg.MemstoreEnabled && cfg.ClientConfig.RPC == "" {
 		return fmt.Errorf("eigenda disperser rpc url is not set")
+	}
+
+	err = cfg.checkTargets(cfg.FallbackTargets)
+	if err != nil {
+		return err
+	}
+
+	err = cfg.checkTargets(cfg.CacheTargets)
+	if err != nil {
+		return err
+	}
+
+	// verify that same target is not in both fallback and cache targets
+	for _, t := range cfg.FallbackTargets {
+		if utils.Contains(cfg.CacheTargets, t) {
+			return fmt.Errorf("target %s is in both fallback and cache targets", t)
+		}
 	}
 
 	return nil
@@ -376,6 +418,18 @@ func CLIFlags() []cli.Flag {
 			Usage:   "Duration that a mem-store blob/commitment pair are allowed to live.",
 			Value:   25 * time.Minute,
 			EnvVars: []string{"MEMSTORE_EXPIRATION"},
+		},
+		&cli.StringSliceFlag{
+			Name:    FallbackTargets,
+			Usage:   "List of read fallback targets to rollover to if cert can't be read from EigenDA.",
+			Value:   cli.NewStringSlice(),
+			EnvVars: prefixEnvVars("FALLBACK_TARGETS"),
+		},
+		&cli.StringSliceFlag{
+			Name:    CacheTargets,
+			Usage:   "List of caching targets to use fast reads from EigenDA.",
+			Value:   cli.NewStringSlice(),
+			EnvVars: prefixEnvVars("CACHE_TARGETS"),
 		},
 	}
 

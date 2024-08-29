@@ -13,10 +13,12 @@ import (
 )
 
 type EigenDAStoreConfig struct {
-	MaxBlobSizeBytes     uint64
+	MaxBlobSizeBytes uint64
+	// the # of Ethereum blocks to wait after the EigenDA L1BlockReference # before attempting to verify
+	// & accredit a blob
 	EthConfirmationDepth uint64
 
-	// The total amount of time that the client will spend waiting for EigenDA to confirm a blob
+	// total duration time that client waits for blob to confirm
 	StatusQueryTimeout time.Duration
 }
 
@@ -28,7 +30,7 @@ type EigenDAStore struct {
 	log      log.Logger
 }
 
-var _ Store = (*EigenDAStore)(nil)
+var _ KeyGeneratedStore = (*EigenDAStore)(nil)
 
 func NewEigenDAStore(client *clients.EigenDAClient,
 	v *verify.Verifier, log log.Logger, cfg *EigenDAStoreConfig) (*EigenDAStore, error) {
@@ -52,16 +54,6 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	decodedBlob, err := e.client.GetBlob(ctx, cert.BlobVerificationProof.BatchMetadata.BatchHeaderHash, cert.BlobVerificationProof.BlobIndex)
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to retrieve decoded blob: %w", err)
-	}
-	// reencode blob for verification
-	encodedBlob, err := e.client.GetCodec().EncodeBlob(decodedBlob)
-	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
-	}
-
-	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
-	if err != nil {
-		return nil, err
 	}
 
 	return decodedBlob, nil
@@ -128,28 +120,32 @@ func (e EigenDAStore) Stats() *Stats {
 	return nil
 }
 
+// Backend returns the backend type for EigenDA Store
+func (e EigenDAStore) BackendType() BackendType {
+	return EigenDA
+}
+
 // Key is used to recover certificate fields and that verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e EigenDAStore) EncodeAndVerify(key []byte, value []byte) ([]byte, error) {
+func (e EigenDAStore) Verify(key []byte, value []byte) error {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
+		return fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
 	}
 
-	// reencode blob for verification
+	// re-encode blob for verification
 	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
 	if err != nil {
-		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
-	}
-	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("encoded blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.cfg.MaxBlobSizeBytes)
+		return fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
 	}
 
+	// verify kzg data commitment
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return value, nil
+	// verify DA certificate against on-chain
+	return e.verifier.VerifyCert(&cert)
 }
