@@ -227,10 +227,10 @@ func (verifier *BlobStatusTracker) forwardToReader(key *UnconfirmedKey, status *
 
 	requiredDownloads := verifier.config.RequiredDownloads
 	var downloadCount int32
-	if requiredDownloads <= 0 {
+	if requiredDownloads < 0 {
 		// Allow unlimited downloads.
 		downloadCount = -1
-	} else if requiredDownloads <= 0 {
+	} else if requiredDownloads == 0 {
 		// Do not download blob.
 		return
 	} else if requiredDownloads < 1 {
