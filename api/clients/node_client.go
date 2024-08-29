@@ -64,7 +64,7 @@ func (c client) GetBlobHeader(
 		return nil, nil, err
 	}
 
-	blobHeader, err := node.GetBlobHeaderFromProto(reply.GetBlobHeader())
+	blobHeader, err := node.GetBlobCertFromProto(reply.GetBlobHeader())
 	if err != nil {
 		return nil, nil, err
 	}

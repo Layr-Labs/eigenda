@@ -103,17 +103,17 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 	numBlob := len(blobs)
 	encodedBlobs := make([]core.EncodedBlob, numBlob)
-	blobHeaders := make([]*core.BlobCertificate, numBlob)
+	blobCerts := make([]*core.BlobCertificate, numBlob)
 
 	for z, blob := range blobs {
 
-		blobHeader := &core.BlobCertificate{
+		blobCert := &core.BlobCertificate{
 			QuorumInfos: make([]*core.BlobQuorumInfo, 0),
 		}
-		blobHeaders[z] = blobHeader
+		blobCerts[z] = blobCert
 
 		encodedBlob := core.EncodedBlob{
-			BlobHeader:               blobHeader,
+			BlobCert:                 blobCert,
 			EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 		}
 		encodedBlobs[z] = encodedBlob
@@ -165,14 +165,14 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 				bytes = append(bytes, serialized)
 			}
 
-			blobHeader.BlobCommitments = encoding.BlobCommitments{
+			blobCert.BlobCommitments = encoding.BlobCommitments{
 				Commitment:       commitments.Commitment,
 				LengthCommitment: commitments.LengthCommitment,
 				LengthProof:      commitments.LengthProof,
 				Length:           commitments.Length,
 			}
 
-			blobHeader.QuorumInfos = append(blobHeader.QuorumInfos, quorumHeader)
+			blobCert.QuorumInfos = append(blobCert.QuorumInfos, quorumHeader)
 
 			for id, assignment := range assignments {
 				chunksData := &core.ChunksData{
@@ -196,7 +196,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 
 	// Set the batch root
 
-	_, err = batchHeader.SetBatchRoot(blobHeaders)
+	_, err = batchHeader.SetBatchRoot(blobCerts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,8 +225,8 @@ func checkBatchByUniversalVerifier(cst core.IndexedChainState, encodedBlobs []co
 				return err
 			}
 			blobMessages[z] = &core.BlobMessage{
-				BlobHeader: encodedBlob.BlobHeader,
-				Bundles:    bundles,
+				BlobCert: encodedBlob.BlobCert,
+				Bundles:  bundles,
 			}
 		}
 		err := val.ValidateBatch(&header, blobMessages, state.OperatorState, pool)
@@ -323,12 +323,12 @@ func TestImproperBatchHeader(t *testing.T) {
 	assert.Error(t, err)
 
 	// Add an extra blob
-	headers := make([]*core.BlobCertificate, len(blobs)-1)
-	for i := range headers {
-		headers[i] = blobMessages[i].BlobHeader
+	certs := make([]*core.BlobCertificate, len(blobs)-1)
+	for i := range certs {
+		certs[i] = blobMessages[i].BlobCert
 	}
 
-	_, err = header.SetBatchRoot(headers)
+	_, err = header.SetBatchRoot(certs)
 	assert.NoError(t, err)
 
 	err = checkBatchByUniversalVerifier(cst, blobMessages, header, pool)

@@ -491,14 +491,14 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			blobHeader := &core.BlobCertificate{
+			blobCert := &core.BlobCertificate{
 				BlobHeader: core.BlobHeader{
 					BlobCommitments: *result.Commitment,
 				},
 			}
-			blobHeaderByKey[blobKey] = blobHeader
+			blobHeaderByKey[blobKey] = blobCert
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:               blobHeader,
+				BlobCert:                 blobCert,
 				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
@@ -521,7 +521,7 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	// Populate the blob quorum infos
 	for blobKey, encodedBlob := range encodedBlobByKey {
-		encodedBlob.BlobHeader.QuorumInfos = blobQuorums[blobKey]
+		encodedBlob.BlobCert.QuorumInfos = blobQuorums[blobKey]
 	}
 
 	for blobKey, metadata := range metadataByKey {
@@ -645,14 +645,14 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 		if _, ok := encodedBlobByKey[blobKey]; !ok {
 			metadataByKey[blobKey] = result.BlobMetadata
 			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			blobHeader := &core.BlobCertificate{
+			blobCert := &core.BlobCertificate{
 				BlobHeader: core.BlobHeader{
 					BlobCommitments: *result.Commitment,
 				},
 			}
-			blobHeaderByKey[blobKey] = blobHeader
+			blobHeaderByKey[blobKey] = blobCert
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:               blobHeader,
+				BlobCert:                 blobCert,
 				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
@@ -675,7 +675,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	// Populate the blob quorum infos
 	for blobKey, encodedBlob := range encodedBlobByKey {
-		encodedBlob.BlobHeader.QuorumInfos = blobQuorums[blobKey]
+		encodedBlob.BlobCert.QuorumInfos = blobQuorums[blobKey]
 	}
 
 	for blobKey, metadata := range metadataByKey {

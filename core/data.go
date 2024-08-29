@@ -220,7 +220,7 @@ type Blob struct {
 	Data          []byte
 }
 
-// BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
+// BlobHeader contains the data that a user must sign to authenticate a blob request.
 // Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
 // using the signature to charge the user for a different blob or for dispersing the same blob
 // multiple times (Replay attack).
@@ -267,7 +267,8 @@ type BlobQuorumInfo struct {
 	ChunkLength uint
 }
 
-// BlobCertificate contains all metadata related to a blob including commitments and parameters for encoding
+// BlobCertificate contains all information about the blob to which the DA nodes must attest.
+// Signed blob certificates are consumed by DA end-users to verify the availability of the blob.
 type BlobCertificate struct {
 	BlobHeader
 	// QuorumInfos contains the quorum specific parameters for the blob
@@ -306,7 +307,7 @@ type BatchHeader struct {
 
 // EncodedBlob contains the messages to be sent to a group of DA nodes corresponding to a single blob
 type EncodedBlob struct {
-	BlobHeader        *BlobCertificate
+	BlobCert          *BlobCertificate
 	BundlesByOperator map[OperatorID]Bundles
 	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
 	EncodedBundlesByOperator map[OperatorID]EncodedBundles
@@ -323,15 +324,15 @@ type EncodedBundles map[QuorumID]*ChunksData
 
 // BlobMessage is the message that is sent to DA nodes. It contains the blob header and the associated chunk bundles.
 type BlobMessage struct {
-	BlobHeader *BlobCertificate
-	Bundles    Bundles
+	BlobCert *BlobCertificate
+	Bundles  Bundles
 }
 
 // This is similar to BlobMessage, but keep the commitments and chunks in encoded format
 // (i.e. not deserialized)
 type EncodedBlobMessage struct {
 	// TODO(jianoaix): Change the commitments to encoded format.
-	BlobHeader     *BlobCertificate
+	BlobCert       *BlobCertificate
 	EncodedBundles map[QuorumID]*ChunksData
 }
 

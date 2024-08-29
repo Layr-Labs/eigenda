@@ -449,13 +449,13 @@ func TestPartialBlob(t *testing.T) {
 
 	encodedBlob1 := batch.EncodedBlobs[0]
 	assert.NotNil(t, encodedBlob1)
-	assert.NotNil(t, encodedBlob1.BlobHeader)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
-	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 1)
-	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
+	assert.NotNil(t, encodedBlob1.BlobCert)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob1.BlobCert.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob1.BlobCert.QuorumInfos, 1)
+	assert.ElementsMatch(t, encodedBlob1.BlobCert.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
 			QuorumID:              0,
 			AdversaryThreshold:    75,
@@ -464,7 +464,7 @@ func TestPartialBlob(t *testing.T) {
 		ChunkLength: 8,
 	}})
 
-	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
+	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobCert)
 	assert.Len(t, encodedBlob1.EncodedBundlesByOperator, numOperators)
 	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
@@ -692,13 +692,13 @@ func TestGetBatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob1)
 	assert.NotNil(t, encodedBlob2)
 
-	assert.NotNil(t, encodedBlob1.BlobHeader)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
-	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
-	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
+	assert.NotNil(t, encodedBlob1.BlobCert)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob1.BlobCert.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob1.BlobCert.QuorumInfos, 2)
+	assert.ElementsMatch(t, encodedBlob1.BlobCert.QuorumInfos, []*core.BlobQuorumInfo{
 		{
 			SecurityParam: core.SecurityParam{
 				QuorumID:              0,
@@ -717,7 +717,7 @@ func TestGetBatch(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
+	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobCert)
 	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 2)
 		assert.Greater(t, len(bundles[0].Chunks), 0)
@@ -725,13 +725,13 @@ func TestGetBatch(t *testing.T) {
 		break
 	}
 
-	assert.NotNil(t, encodedBlob2.BlobHeader)
-	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
-	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
-	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
-	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
-	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
+	assert.NotNil(t, encodedBlob2.BlobCert)
+	assert.NotNil(t, encodedBlob2.BlobCert.BlobCommitments)
+	assert.NotNil(t, encodedBlob2.BlobCert.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob2.BlobCert.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob2.BlobCert.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob2.BlobCert.QuorumInfos, 1)
+	assert.ElementsMatch(t, encodedBlob2.BlobCert.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
 			QuorumID:              2,
 			AdversaryThreshold:    75,
@@ -860,13 +860,13 @@ func TestCreateMinibatch(t *testing.T) {
 	assert.NotNil(t, encodedBlob1)
 	assert.NotNil(t, encodedBlob2)
 
-	assert.NotNil(t, encodedBlob1.BlobHeader)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.Commitment)
-	assert.NotNil(t, encodedBlob1.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob1.BlobHeader.BlobCommitments.Length, uint(48))
-	assert.Len(t, encodedBlob1.BlobHeader.QuorumInfos, 2)
-	assert.ElementsMatch(t, encodedBlob1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{
+	assert.NotNil(t, encodedBlob1.BlobCert)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob1.BlobCert.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob1.BlobCert.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob1.BlobCert.QuorumInfos, 2)
+	assert.ElementsMatch(t, encodedBlob1.BlobCert.QuorumInfos, []*core.BlobQuorumInfo{
 		{
 			SecurityParam: core.SecurityParam{
 				QuorumID:              0,
@@ -885,7 +885,7 @@ func TestCreateMinibatch(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
+	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobCert)
 	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 2)
 		assert.Greater(t, len(bundles[0].Chunks), 0)
@@ -893,13 +893,13 @@ func TestCreateMinibatch(t *testing.T) {
 		break
 	}
 
-	assert.NotNil(t, encodedBlob2.BlobHeader)
-	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments)
-	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.Commitment)
-	assert.NotNil(t, encodedBlob2.BlobHeader.BlobCommitments.LengthProof)
-	assert.Equal(t, encodedBlob2.BlobHeader.BlobCommitments.Length, uint(48))
-	assert.Len(t, encodedBlob2.BlobHeader.QuorumInfos, 1)
-	assert.ElementsMatch(t, encodedBlob2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{{
+	assert.NotNil(t, encodedBlob2.BlobCert)
+	assert.NotNil(t, encodedBlob2.BlobCert.BlobCommitments)
+	assert.NotNil(t, encodedBlob2.BlobCert.BlobCommitments.Commitment)
+	assert.NotNil(t, encodedBlob2.BlobCert.BlobCommitments.LengthProof)
+	assert.Equal(t, encodedBlob2.BlobCert.BlobCommitments.Length, uint(48))
+	assert.Len(t, encodedBlob2.BlobCert.QuorumInfos, 1)
+	assert.ElementsMatch(t, encodedBlob2.BlobCert.QuorumInfos, []*core.BlobQuorumInfo{{
 		SecurityParam: core.SecurityParam{
 			QuorumID:              2,
 			AdversaryThreshold:    75,

@@ -47,7 +47,7 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	// Get the assignments for the quorum
-	assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, blob.BlobHeader, quorumHeader.QuorumID, v.operatorID)
+	assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, blob.BlobCert, quorumHeader.QuorumID, v.operatorID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -61,7 +61,7 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	// Validate the chunkLength against the confirmation and adversary threshold parameters
-	ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobHeader.Length, quorumHeader)
+	ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobCert.Length, quorumHeader)
 	if err != nil || !ok {
 		return nil, nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
@@ -90,7 +90,7 @@ func (v *shardValidator) UpdateOperatorID(operatorID OperatorID) {
 func (v *shardValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMessage, operatorState *OperatorState, pool common.WorkerPool) error {
 	headers := make([]*BlobCertificate, len(blobs))
 	for i, blob := range blobs {
-		headers[i] = blob.BlobHeader
+		headers[i] = blob.BlobCert
 	}
 	err := ValidateBatchHeaderRoot(batchHeader, headers)
 	if err != nil {
@@ -106,15 +106,15 @@ func (v *shardValidator) ValidateBlobs(blobs []*BlobMessage, operatorState *Oper
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
 	for k, blob := range blobs {
-		if len(blob.Bundles) != len(blob.BlobHeader.QuorumInfos) {
-			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobHeader.QuorumInfos))
+		if len(blob.Bundles) != len(blob.BlobCert.QuorumInfos) {
+			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobCert.QuorumInfos))
 		}
 
 		// Saved for the blob length validation
-		blobCommitmentList[k] = blob.BlobHeader.BlobCommitments
+		blobCommitmentList[k] = blob.BlobCert.BlobCommitments
 
 		// for each quorum
-		for _, quorumHeader := range blob.BlobHeader.QuorumInfos {
+		for _, quorumHeader := range blob.BlobCert.QuorumInfos {
 			chunks, assignment, params, err := v.validateBlobQuorum(quorumHeader, blob, operatorState)
 			if errors.Is(err, ErrBlobQuorumSkip) {
 				continue
@@ -132,7 +132,7 @@ func (v *shardValidator) ValidateBlobs(blobs []*BlobMessage, operatorState *Oper
 				samples := make([]encoding.Sample, len(chunks))
 				for ind := range chunks {
 					samples[ind] = encoding.Sample{
-						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
+						Commitment:      blob.BlobCert.BlobCommitments.Commitment,
 						Chunk:           chunks[ind],
 						AssignmentIndex: uint(indices[ind]),
 						BlobIndex:       blobIndex,

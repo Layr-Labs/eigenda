@@ -104,7 +104,7 @@ func TestBlobHeaderEncoding(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, encodedBlobHeader, hexutil.Encode(data))
 
-	h, err := blobHeader.GetBlobHeaderHash()
+	h, err := blobHeader.GetHash()
 	assert.NoError(t, err)
 	assert.Equal(t, blobHeaderHash, hexutil.Encode(h[:]))
 }

@@ -71,19 +71,19 @@ func (r *retrievalClient) RetrieveBlob(
 	}
 
 	// Get blob header from any operator
-	var blobHeader *core.BlobCertificate
+	var blobCert *core.BlobCertificate
 	var proof *merkletree.Proof
 	var proofVerified bool
 	for opID := range operators {
 		opInfo := indexedOperatorState.IndexedOperators[opID]
-		blobHeader, proof, err = r.nodeClient.GetBlobHeader(ctx, opInfo.Socket, batchHeaderHash, blobIndex)
+		blobCert, proof, err = r.nodeClient.GetBlobHeader(ctx, opInfo.Socket, batchHeaderHash, blobIndex)
 		if err != nil {
 			// try another operator
 			r.logger.Warn("failed to dial operator while fetching BlobHeader, trying different operator", "operator", opInfo.Socket, "err", err)
 			continue
 		}
 
-		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+		blobHeaderHash, err := blobCert.GetHash()
 		if err != nil {
 			r.logger.Warn("got invalid blob header, trying different operator", "operator", opInfo.Socket, "err", err)
 			continue
@@ -100,12 +100,12 @@ func (r *retrievalClient) RetrieveBlob(
 
 		break
 	}
-	if blobHeader == nil || proof == nil || !proofVerified {
+	if blobCert == nil || proof == nil || !proofVerified {
 		return nil, fmt.Errorf("failed to get blob header from all operators (header hash: %s, index: %d)", batchHeaderHash, blobIndex)
 	}
 
 	var quorumHeader *core.BlobQuorumInfo
-	for _, header := range blobHeader.QuorumInfos {
+	for _, header := range blobCert.QuorumInfos {
 		if header.QuorumID == quorumID {
 			quorumHeader = header
 			break
@@ -117,19 +117,19 @@ func (r *retrievalClient) RetrieveBlob(
 	}
 
 	// Validate the blob length
-	err = r.verifier.VerifyBlobLength(blobHeader.BlobCommitments)
+	err = r.verifier.VerifyBlobLength(blobCert.BlobCommitments)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the commitments are equivalent
-	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
+	commitmentBatch := []encoding.BlobCommitments{blobCert.BlobCommitments}
 	err = r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}
 
-	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
+	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobCert.Length, quorumHeader)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -161,7 +161,7 @@ func (r *retrievalClient) RetrieveBlob(
 			return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
 		}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobHeader.BlobCommitments, encodingParams)
+		err = r.verifier.VerifyFrames(reply.Chunks, assignment.GetIndices(), blobCert.BlobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Error("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
 			continue
@@ -173,5 +173,5 @@ func (r *retrievalClient) RetrieveBlob(
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
+	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobCert.Length)*encoding.BYTES_PER_SYMBOL)
 }

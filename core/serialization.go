@@ -41,7 +41,7 @@ func ComputeSignatoryRecordHash(referenceBlockNumber uint32, nonSignerKeys []*G1
 func (h *BatchHeader) SetBatchRoot(blobHeaders []*BlobCertificate) (*merkletree.MerkleTree, error) {
 	leafs := make([][]byte, len(blobHeaders))
 	for i, header := range blobHeaders {
-		leaf, err := header.GetBlobHeaderHash()
+		leaf, err := header.GetHash()
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute blob header hash: %w", err)
 		}
@@ -184,7 +184,7 @@ func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32
 }
 
 // GetBlobHeaderHash returns the hash of the BlobHeader that is used to sign the Blob
-func (h BlobCertificate) GetBlobHeaderHash() ([32]byte, error) {
+func (h BlobCertificate) GetHash() ([32]byte, error) {
 	headerByte, err := h.Encode()
 	if err != nil {
 		return [32]byte{}, err

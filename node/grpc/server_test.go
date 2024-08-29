@@ -432,9 +432,9 @@ func TestMinibatchDispersalAndRetrieval(t *testing.T) {
 	assert.NotNil(t, reply.GetSignatures())
 
 	assert.Len(t, blobHeaders, 2)
-	bhh0, err := blobHeaders[0].GetBlobHeaderHash()
+	bhh0, err := blobHeaders[0].GetHash()
 	assert.NoError(t, err)
-	bhh1, err := blobHeaders[1].GetBlobHeaderHash()
+	bhh1, err := blobHeaders[1].GetHash()
 	assert.NoError(t, err)
 	batchHeader := &core.BatchHeader{
 		ReferenceBlockNumber: 1,
@@ -470,7 +470,7 @@ func TestMinibatchDispersalAndRetrieval(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, blobHeaderReply)
-	blobHeader, err := node.GetBlobHeaderFromProto(blobHeaderReply.GetBlobHeader())
+	blobHeader, err := node.GetBlobCertFromProto(blobHeaderReply.GetBlobHeader())
 	assert.NoError(t, err)
 	assert.Equal(t, blobHeader, blobHeaders[0])
 	proof := &merkletree.Proof{
@@ -488,7 +488,7 @@ func TestMinibatchDispersalAndRetrieval(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, blobHeaderReply)
-	blobHeader, err = node.GetBlobHeaderFromProto(blobHeaderReply.GetBlobHeader())
+	blobHeader, err = node.GetBlobCertFromProto(blobHeaderReply.GetBlobHeader())
 	assert.NoError(t, err)
 	assert.Equal(t, blobHeader, blobHeaders[1])
 	proof = &merkletree.Proof{
@@ -708,7 +708,7 @@ func TestGetBlobHeader(t *testing.T) {
 	expected := protoBlobHeaders[0]
 	assert.True(t, proto.Equal(expected, actual))
 
-	blobHeaderHash, err := blobHeaders[0].GetBlobHeaderHash()
+	blobHeaderHash, err := blobHeaders[0].GetHash()
 	assert.NoError(t, err)
 
 	proof := &merkletree.Proof{
@@ -732,7 +732,7 @@ func TestGetBlobHeader(t *testing.T) {
 	expected = protoBlobHeaders[0]
 	assert.True(t, proto.Equal(expected, actual))
 
-	blobHeaderHash, err = blobHeaders[0].GetBlobHeaderHash()
+	blobHeaderHash, err = blobHeaders[0].GetHash()
 	assert.NoError(t, err)
 
 	proof = &merkletree.Proof{

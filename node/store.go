@@ -468,7 +468,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 			return nil, fmt.Errorf("internal error: the number of bundles in parsed blob (%d) must be the same as in raw blob (%d)", len(rawBlob.GetBundles()), len(blob.Bundles))
 		}
 
-		blobHeaderHash, err := blob.BlobHeader.GetBlobHeaderHash()
+		blobHeaderHash, err := blob.BlobCert.GetHash()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get blob header hash: %w", err)
 		}

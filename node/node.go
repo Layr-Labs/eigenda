@@ -569,7 +569,7 @@ func (n *Node) SignBlobs(blobs []*core.BlobMessage, referenceBlockNumber uint) (
 	start := time.Now()
 	signatures := make([]*core.Signature, len(blobs))
 	for i, blob := range blobs {
-		if blob == nil || blob.BlobHeader == nil {
+		if blob == nil || blob.BlobCert == nil {
 			signatures[i] = nil
 			continue
 		}
@@ -577,7 +577,7 @@ func (n *Node) SignBlobs(blobs []*core.BlobMessage, referenceBlockNumber uint) (
 			ReferenceBlockNumber: referenceBlockNumber,
 			BatchRoot:            [32]byte{},
 		}
-		_, err := batchHeader.SetBatchRoot([]*core.BlobCertificate{blob.BlobHeader})
+		_, err := batchHeader.SetBatchRoot([]*core.BlobCertificate{blob.BlobCert})
 		if err != nil {
 			return nil, fmt.Errorf("failed to set batch root: %w", err)
 		}
@@ -616,12 +616,12 @@ func (n *Node) ValidateBatchContents(ctx context.Context, blobHeaderHashes [][32
 			return errors.New("blob headers have different reference block numbers")
 		}
 
-		blobHeader, err := GetBlobHeaderFromProto(&protoBlobHeader)
+		blobHeader, err := GetBlobCertFromProto(&protoBlobHeader)
 		if err != nil {
 			return fmt.Errorf("failed to get blob header from proto: %w", err)
 		}
 
-		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+		blobHeaderHash, err := blobHeader.GetHash()
 		if err != nil {
 			return fmt.Errorf("failed to get blob header hash: %w", err)
 		}

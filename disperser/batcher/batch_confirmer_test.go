@@ -474,9 +474,9 @@ func TestBatchConfirmerInsufficientSignatures(t *testing.T) {
 		ReferenceBlockNumber: uint(initialBlock),
 		BatchRoot:            [32]byte{},
 	}
-	bhh1, err := blobHeader1.GetBlobHeaderHash()
+	bhh1, err := blobHeader1.GetHash()
 	assert.NoError(t, err)
-	bhh2, err := blobHeader2.GetBlobHeaderHash()
+	bhh2, err := blobHeader2.GetHash()
 	assert.NoError(t, err)
 	_, err = batchHeader.SetBatchRootFromBlobHeaderHashes([][32]byte{bhh1, bhh2})
 	assert.NoError(t, err)

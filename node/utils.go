@@ -42,7 +42,7 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 		i := i
 		blob := blob
 		pool.Submit(func() {
-			blobHeader, err := GetBlobHeaderFromProto(blob.GetHeader())
+			blobCert, err := GetBlobCertFromProto(blob.GetHeader())
 
 			if err != nil {
 				resultChan <- err
@@ -85,8 +85,8 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 			}
 
 			blobs[i] = &core.BlobMessage{
-				BlobHeader: blobHeader,
-				Bundles:    bundles,
+				BlobCert: blobCert,
+				Bundles:  bundles,
 			}
 
 			resultChan <- nil
@@ -139,11 +139,11 @@ func ValidatePointsFromBlobHeader(h *pb.BlobHeader) error {
 	return nil
 }
 
-// GetBlobHeaderFromProto constructs a core.BlobCertificate from a proto of pb.BlobHeader.
-func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobCertificate, error) {
+// GetBlobCertFromProto constructs a core.BlobCertificate from a proto of pb.BlobHeader.
+func GetBlobCertFromProto(h *pb.BlobHeader) (*core.BlobCertificate, error) {
 
 	if h == nil {
-		return nil, api.NewInvalidArgError("GetBlobHeaderFromProto: blob header is nil")
+		return nil, api.NewInvalidArgError("GetBlobCertFromProto: blob header is nil")
 
 	}
 
