@@ -24,9 +24,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
 		LoggerConfig:  *loggerConfig,
 		ServerConfig: &encoder.ServerConfig{
-			GrpcPort:              ctx.GlobalString(flags.GrpcPortFlag.Name),
-			MaxConcurrentRequests: ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
-			RequestPoolSize:       ctx.GlobalInt(flags.RequestPoolSizeFlag.Name),
+			GrpcPort:                 ctx.GlobalString(flags.GrpcPortFlag.Name),
+			MaxConcurrentRequests:    ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
+			RequestPoolSize:          ctx.GlobalInt(flags.RequestPoolSizeFlag.Name),
+			EnableGnarkChunkEncoding: ctx.Bool(flags.EnableGnarkChunkEncodingFlag.Name),
 		},
 		MetricsConfig: encoder.MetrisConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),

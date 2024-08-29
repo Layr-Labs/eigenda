@@ -27,9 +27,17 @@ message EncodeBlobRequest {
   EncodingParams encoding_params = 2;
 }
 
-// EncodeBlobReply returns all encoded chunks along with BlobCommitment for the same, 
+enum ChunkEncodingFormat {
+	UNKNOWN = 0;
+	GNARK = 1;
+	GOB = 2;
+}
+
+// EncodeBlobReply returns all encoded chunks along with BlobCommitment for the same,
 // where Chunk is the smallest unit that is distributed to DA nodes
 message EncodeBlobReply {
   BlobCommitment commitment = 1;
   repeated bytes chunks = 2;
+  // How the above chunks are encoded.
+  ChunkEncodingFormat chunk_encoding_format = 3;
 }
