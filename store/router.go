@@ -189,7 +189,7 @@ func (r *Router) multiSourceRead(ctx context.Context, commitment []byte, fallbac
 			continue
 		}
 		// verify cert:data using EigenDA verification checks
-		err = r.eigenda.Verify(key, data)
+		err = r.eigenda.Verify(commitment, data)
 		if err != nil {
 			log.Warn("Failed to verify blob", "err", err, "backend", src.BackendType())
 			continue
