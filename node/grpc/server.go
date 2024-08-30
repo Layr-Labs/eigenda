@@ -169,7 +169,7 @@ func (s *Server) GetHeader(context.Context, *commonpb.BlobKey) (*pb.GetBlobHeade
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeader not implemented")
 }
 
-func (s *Server) StreamHeaders(grpc.BidiStreamingServer[pb.StreamHeadersRequest, pb.GetBlobHeaderReply]) error {
+func (s *Server) StreamHeaders(pb.Retrieval_StreamHeadersServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamHeaders not implemented")
 }
 
