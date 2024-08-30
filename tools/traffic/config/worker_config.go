@@ -16,12 +16,12 @@ type WorkerConfig struct {
 	// The amount of time to wait for a blob to be written.
 	WriteTimeout time.Duration
 
-	// The amount of time between attempts by the verifier to confirm the status of blobs.
-	VerifierInterval time.Duration
+	// The amount of time between attempts by the status tracker to confirm the status of blobs.
+	TrackerInterval time.Duration
 	// The amount of time to wait for a blob status to be fetched.
 	GetBlobStatusTimeout time.Duration
-	// The size of the channel used to communicate between the writer and verifier.
-	VerificationChannelCapacity uint
+	// The size of the channel used to communicate between the writer and status tracker.
+	StatusTrackerChannelCapacity uint
 
 	// The number of worker threads that generate read traffic.
 	NumReadInstances uint

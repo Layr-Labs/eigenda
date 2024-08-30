@@ -54,7 +54,7 @@ func isStatusSuccess(status disperser_rpc.BlobStatus) bool {
 	}
 }
 
-func TestBlobVerifier(t *testing.T) {
+func TestStatusTracker(t *testing.T) {
 	tu.InitializeRandom()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -69,11 +69,11 @@ func TestBlobVerifier(t *testing.T) {
 
 	blobStore := table.NewBlobStore()
 
-	verifierMetrics := metrics.NewMockMetrics()
+	trackerMetrics := metrics.NewMockMetrics()
 
 	disperserClient := &MockDisperserClient{}
 
-	verifier := NewBlobVerifier(
+	tracker := NewBlobStatusTracker(
 		&ctx,
 		&waitGroup,
 		logger,
@@ -81,7 +81,7 @@ func TestBlobVerifier(t *testing.T) {
 		make(chan *UnconfirmedKey),
 		blobStore,
 		disperserClient,
-		verifierMetrics)
+		trackerMetrics)
 
 	expectedGetStatusCount := 0
 	statusCounts := make(map[disperser_rpc.BlobStatus]int)
@@ -117,7 +117,7 @@ func TestBlobVerifier(t *testing.T) {
 				SubmissionTime: time.Now(),
 			}
 
-			verifier.unconfirmedBlobs = append(verifier.unconfirmedBlobs, unconfirmedKey)
+			tracker.unconfirmedBlobs = append(tracker.unconfirmedBlobs, unconfirmedKey)
 		}
 
 		// Reset the mock disperser client.
@@ -152,8 +152,8 @@ func TestBlobVerifier(t *testing.T) {
 				}, nil)
 		}
 
-		// Simulate advancement of time, allowing the verifier to process the new keys.
-		verifier.poll()
+		// Simulate advancement of time, allowing the tracker to process the new keys.
+		tracker.poll()
 
 		// Validate the number of calls made to the disperser client.
 		disperserClient.mock.AssertNumberOfCalls(t, "GetBlobStatus", expectedGetStatusCount)
@@ -191,10 +191,10 @@ func TestBlobVerifier(t *testing.T) {
 		// Verify metrics.
 		for status, count := range statusCounts { // TODO
 			metricName := fmt.Sprintf("get_status_%s", status.String())
-			assert.Equal(t, float64(count), verifierMetrics.GetCount(metricName), "status: %s", status.String())
+			assert.Equal(t, float64(count), trackerMetrics.GetCount(metricName), "status: %s", status.String())
 		}
-		if float64(blobsInFlight) != verifierMetrics.GetGaugeValue("blobs_in_flight") {
-			assert.Equal(t, float64(blobsInFlight), verifierMetrics.GetGaugeValue("blobs_in_flight"))
+		if float64(blobsInFlight) != trackerMetrics.GetGaugeValue("blobs_in_flight") {
+			assert.Equal(t, float64(blobsInFlight), trackerMetrics.GetGaugeValue("blobs_in_flight"))
 		}
 	}
 

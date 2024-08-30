@@ -14,7 +14,7 @@ import (
 )
 
 // BlobStatusTracker periodically polls the disperser service to verify the status of blobs that were recently written.
-// When blobs become confirmed, the status verifier updates the blob blobsToRead accordingly.
+// When blobs become confirmed, the status tracker updates the blob blobsToRead accordingly.
 // This is a thread safe data structure.
 type BlobStatusTracker struct {
 
@@ -55,8 +55,8 @@ type BlobStatusTracker struct {
 	finalizedCountMetric              metrics.CountMetric
 }
 
-// NewBlobVerifier creates a new BlobStatusTracker instance.
-func NewBlobVerifier(
+// NewBlobStatusTracker creates a new BlobStatusTracker instance.
+func NewBlobStatusTracker(
 	ctx *context.Context,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
@@ -91,57 +91,57 @@ func NewBlobVerifier(
 
 // Start begins the status goroutine, which periodically polls
 // the disperser service to verify the status of blobs.
-func (verifier *BlobStatusTracker) Start() {
-	verifier.waitGroup.Add(1)
-	go verifier.monitor()
+func (tracker *BlobStatusTracker) Start() {
+	tracker.waitGroup.Add(1)
+	go tracker.monitor()
 }
 
 // monitor periodically polls the disperser service to verify the status of blobs.
-func (verifier *BlobStatusTracker) monitor() {
-	ticker := time.NewTicker(verifier.config.VerifierInterval)
+func (tracker *BlobStatusTracker) monitor() {
+	ticker := time.NewTicker(tracker.config.TrackerInterval)
 	for {
 		select {
-		case <-(*verifier.ctx).Done():
-			verifier.waitGroup.Done()
+		case <-(*tracker.ctx).Done():
+			tracker.waitGroup.Done()
 			return
-		case key := <-verifier.keyChannel:
-			verifier.unconfirmedBlobs = append(verifier.unconfirmedBlobs, key)
+		case key := <-tracker.keyChannel:
+			tracker.unconfirmedBlobs = append(tracker.unconfirmedBlobs, key)
 		case <-ticker.C:
-			verifier.poll()
+			tracker.poll()
 		}
 	}
 }
 
 // poll checks all unconfirmed keys to see if they have been confirmed by the disperser service.
 // If a Key is confirmed, it is added to the blob confirmedBlobs and removed from the list of unconfirmed keys.
-func (verifier *BlobStatusTracker) poll() {
+func (tracker *BlobStatusTracker) poll() {
 
 	// FUTURE WORK If the number of unconfirmed blobs is high and the time to confirm is high, this is not efficient.
 	// Revisit this method if there are performance problems.
 
 	nonFinalBlobs := make([]*UnconfirmedKey, 0)
-	for _, key := range verifier.unconfirmedBlobs {
+	for _, key := range tracker.unconfirmedBlobs {
 
-		blobStatus, err := verifier.getBlobStatus(key)
+		blobStatus, err := tracker.getBlobStatus(key)
 		if err != nil {
-			verifier.logger.Error("failed to get blob status: ", "err:", err)
+			tracker.logger.Error("failed to get blob status: ", "err:", err)
 			// There was an error getting status. Try again later.
 			nonFinalBlobs = append(nonFinalBlobs, key)
 			continue
 		}
 
-		verifier.updateStatusMetrics(blobStatus.Status)
+		tracker.updateStatusMetrics(blobStatus.Status)
 		if isBlobStatusTerminal(blobStatus.Status) {
 			if isBlobStatusConfirmed(blobStatus.Status) {
-				verifier.forwardToReader(key, blobStatus)
+				tracker.forwardToReader(key, blobStatus)
 			}
 		} else {
 			// try again later
 			nonFinalBlobs = append(nonFinalBlobs, key)
 		}
 	}
-	verifier.unconfirmedBlobs = nonFinalBlobs
-	verifier.blobsInFlightMetric.Set(float64(len(verifier.unconfirmedBlobs)))
+	tracker.unconfirmedBlobs = nonFinalBlobs
+	tracker.blobsInFlightMetric.Set(float64(len(tracker.unconfirmedBlobs)))
 }
 
 // isBlobStatusTerminal returns true if the status is a terminal status.
@@ -176,40 +176,40 @@ func isBlobStatusConfirmed(status disperser.BlobStatus) bool {
 }
 
 // updateStatusMetrics updates the metrics for the reported status of a blob.
-func (verifier *BlobStatusTracker) updateStatusMetrics(status disperser.BlobStatus) {
+func (tracker *BlobStatusTracker) updateStatusMetrics(status disperser.BlobStatus) {
 	switch status {
 	case disperser.BlobStatus_UNKNOWN:
-		verifier.unknownCountMetric.Increment()
+		tracker.unknownCountMetric.Increment()
 	case disperser.BlobStatus_PROCESSING:
-		verifier.processingCountMetric.Increment()
+		tracker.processingCountMetric.Increment()
 	case disperser.BlobStatus_DISPERSING:
-		verifier.dispersingCountMetric.Increment()
+		tracker.dispersingCountMetric.Increment()
 	case disperser.BlobStatus_FAILED:
-		verifier.failedCountMetric.Increment()
+		tracker.failedCountMetric.Increment()
 	case disperser.BlobStatus_INSUFFICIENT_SIGNATURES:
-		verifier.insufficientSignaturesCountMetric.Increment()
+		tracker.insufficientSignaturesCountMetric.Increment()
 	case disperser.BlobStatus_CONFIRMED:
-		verifier.confirmedCountMetric.Increment()
+		tracker.confirmedCountMetric.Increment()
 	case disperser.BlobStatus_FINALIZED:
-		verifier.finalizedCountMetric.Increment()
+		tracker.finalizedCountMetric.Increment()
 	default:
-		verifier.logger.Error("unknown blob status", "status:", status)
+		tracker.logger.Error("unknown blob status", "status:", status)
 	}
 }
 
 // getBlobStatus gets the status of a blob from the disperser service. Returns nil if there was an error
 // getting the status.
-func (verifier *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperser.BlobStatusReply, error) {
-	ctxTimeout, cancel := context.WithTimeout(*verifier.ctx, verifier.config.GetBlobStatusTimeout)
+func (tracker *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperser.BlobStatusReply, error) {
+	ctxTimeout, cancel := context.WithTimeout(*tracker.ctx, tracker.config.GetBlobStatusTimeout)
 	defer cancel()
 
-	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](verifier.getStatusLatencyMetric,
+	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](tracker.getStatusLatencyMetric,
 		func() (*disperser.BlobStatusReply, error) {
-			return verifier.disperser.GetBlobStatus(ctxTimeout, key.Key)
+			return tracker.disperser.GetBlobStatus(ctxTimeout, key.Key)
 		})
 
 	if err != nil {
-		verifier.getStatusErrorCountMetric.Increment()
+		tracker.getStatusErrorCountMetric.Increment()
 		return nil, err
 	}
 
@@ -217,15 +217,15 @@ func (verifier *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperse
 }
 
 // forwardToReader forwards a blob to the reader. Only called once the blob is ready to be read.
-func (verifier *BlobStatusTracker) forwardToReader(key *UnconfirmedKey, status *disperser.BlobStatusReply) {
+func (tracker *BlobStatusTracker) forwardToReader(key *UnconfirmedKey, status *disperser.BlobStatusReply) {
 	batchHeaderHash := [32]byte(status.GetInfo().BlobVerificationProof.BatchMetadata.BatchHeaderHash)
 	blobIndex := status.GetInfo().BlobVerificationProof.GetBlobIndex()
 
 	confirmationTime := time.Now()
 	confirmationLatency := confirmationTime.Sub(key.SubmissionTime)
-	verifier.confirmationLatencyMetric.ReportLatency(confirmationLatency)
+	tracker.confirmationLatencyMetric.ReportLatency(confirmationLatency)
 
-	requiredDownloads := verifier.config.RequiredDownloads
+	requiredDownloads := tracker.config.RequiredDownloads
 	var downloadCount int32
 	if requiredDownloads < 0 {
 		// Allow unlimited downloads.
@@ -249,8 +249,8 @@ func (verifier *BlobStatusTracker) forwardToReader(key *UnconfirmedKey, status *
 
 	blobMetadata, err := table.NewBlobMetadata(key.Key, key.Checksum, key.Size, uint(blobIndex), batchHeaderHash, int(downloadCount))
 	if err != nil {
-		verifier.logger.Error("failed to create blob metadata", "err:", err)
+		tracker.logger.Error("failed to create blob metadata", "err:", err)
 		return
 	}
-	verifier.confirmedBlobs.Add(blobMetadata)
+	tracker.confirmedBlobs.Add(blobMetadata)
 }
