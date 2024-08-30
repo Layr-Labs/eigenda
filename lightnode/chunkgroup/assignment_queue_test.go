@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-func randomAssignment(nextShuffleTime time.Time) *assignment {
+func randomAssignment(nextShuffleTime time.Time) *chunkGroupAssignment {
 	id := rand.Uint64()
 	seed := rand.Uint64()
 	registrationTime := tu.RandomTime()
 
 	registration := lightnode.NewRegistration(id, seed, registrationTime)
 
-	return &assignment{
+	return &chunkGroupAssignment{
 		registration: registration,
 		endOfEpoch:   nextShuffleTime,
 		chunkGroup:   rand.Uint32(),
@@ -39,7 +39,7 @@ func TestInOrderInsertion(t *testing.T) {
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
-	expectedOrder := make([]*assignment, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Insert elements in order.
 	for i := uint(0); i < numberOfElements; i++ {
@@ -76,7 +76,7 @@ func TestReverseOrderInsertion(t *testing.T) {
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
-	expectedOrder := make([]*assignment, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
@@ -117,7 +117,7 @@ func TestRandomInsertion(t *testing.T) {
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
-	expectedOrder := make([]*assignment, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
@@ -160,8 +160,8 @@ func TestPeriodicRemoval(t *testing.T) {
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
-	expectedOrder := make([]*assignment, 0, numberOfElements)
-	expectedOrderWithRemovals := make([]*assignment, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrderWithRemovals := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
@@ -227,8 +227,8 @@ func TestContiguousRemoval(t *testing.T) {
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
-	expectedOrder := make([]*assignment, 0, numberOfElements)
-	expectedOrderWithRemovals := make([]*assignment, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
+	expectedOrderWithRemovals := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
@@ -294,7 +294,7 @@ func TestRemoveFollowedByPush(t *testing.T) {
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
-	expectedOrder := make([]*assignment, 0, numberOfElements)
+	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {

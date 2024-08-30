@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-// assignmentHeap implements the heap.Interface for assignment objects, used to create a priority queue.
+// assignmentHeap implements the heap.Interface for chunkGroupAssignment objects, used to create a priority queue.
 type assignmentHeap struct {
-	data []*assignment
+	data []*chunkGroupAssignment
 }
 
 // Len returns the number of elements in the priority queue.
@@ -30,7 +30,7 @@ func (h *assignmentHeap) Swap(i int, j int) {
 
 // Push adds an element to the end of the priority queue.
 func (h *assignmentHeap) Push(x any) {
-	h.data = append(h.data, x.(*assignment))
+	h.data = append(h.data, x.(*chunkGroupAssignment))
 }
 
 // Pop removes and returns the last element in the priority queue.
@@ -60,7 +60,7 @@ type assignmentQueue struct {
 func newAssignmentQueue() *assignmentQueue {
 	return &assignmentQueue{
 		heap: &assignmentHeap{
-			data: make([]*assignment, 0),
+			data: make([]*chunkGroupAssignment, 0),
 		},
 		nodeIdSet: make(map[uint64]bool),
 	}
@@ -71,8 +71,8 @@ func (queue *assignmentQueue) Size() uint {
 	return queue.size
 }
 
-// Push adds an assignment to the priority queue. This is a no-op if the assignment is already in the queue.
-func (queue *assignmentQueue) Push(assignment *assignment) {
+// Push adds an chunkGroupAssignment to the priority queue. This is a no-op if the chunkGroupAssignment is already in the queue.
+func (queue *assignmentQueue) Push(assignment *chunkGroupAssignment) {
 	notRemoved, present := queue.nodeIdSet[assignment.registration.ID()]
 	if present && notRemoved {
 		return
@@ -87,21 +87,21 @@ func (queue *assignmentQueue) Push(assignment *assignment) {
 	queue.nodeIdSet[assignment.registration.ID()] = true
 }
 
-// Pop removes and returns the assignment with the earliest endOfEpoch.
-func (queue *assignmentQueue) Pop() *assignment {
+// Pop removes and returns the chunkGroupAssignment with the earliest endOfEpoch.
+func (queue *assignmentQueue) Pop() *chunkGroupAssignment {
 	queue.collectGarbage()
 	if queue.size == 0 {
 		return nil
 	}
-	assignment := heap.Pop(queue.heap).(*assignment)
+	assignment := heap.Pop(queue.heap).(*chunkGroupAssignment)
 	delete(queue.nodeIdSet, assignment.registration.ID())
 	queue.size--
 	return assignment
 }
 
-// Peek returns the assignment with the earliest endOfEpoch without removing it from the queue. Returns
+// Peek returns the chunkGroupAssignment with the earliest endOfEpoch without removing it from the queue. Returns
 // nil if the queue is empty.
-func (queue *assignmentQueue) Peek() *assignment {
+func (queue *assignmentQueue) Peek() *chunkGroupAssignment {
 	queue.collectGarbage()
 	if queue.size == 0 {
 		return nil
@@ -111,7 +111,7 @@ func (queue *assignmentQueue) Peek() *assignment {
 
 // Remove removes the light node with the given ID from the priority queue.
 // This is a no-op if the light node is not in the queue.
-func (queue *assignmentQueue) Remove(lightNodeId uint64) {
+func (queue *assignmentQueue) Remove(lightNodeId uint64) { // TODO light node ID is no longer a good primary key
 	// Deletion is lazy. The node is fully removed when it reaches the top of the heap.
 
 	notRemoved, present := queue.nodeIdSet[lightNodeId]

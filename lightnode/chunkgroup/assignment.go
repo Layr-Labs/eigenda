@@ -5,42 +5,56 @@ import (
 	"time"
 )
 
-// assignment is a struct that holds a registration and the chunk group it is currently assigned to.
-type assignment struct {
+// chunkGroupAssignment is a struct that holds a registration and the chunk group it is currently assigned to.
+type chunkGroupAssignment struct {
 
 	// registration contains publicly known information about a light node that is registered on-chain.
 	registration *lightnode.Registration
 
-	// shuffleOffset is the offset at which a light node should be shuffled into a new chunk group relative
-	// the beginning of each shuffle interval. This is a function of the light node's seed and the shuffle period
-	// and does not change, so we cache it here.
+	// assignmentIndex describes which of a light node's multiple groups this struct represents.
+	// The first of a light node's groups has an chunkGroupAssignment index of 0, the second has an index of 1, and so on.
+	assignmentIndex uint32
+
+	// assignmentSeed is the seed used for this group chunkGroupAssignment.
+	//
+	// This value is deterministic and does not change, so we cache it here.
+	assignmentSeed uint64
+
+	// shuffleOffset is the offset at which this group chunkGroupAssignment should be shuffled into a new chunk group relative
+	// the beginning of each shuffle interval.
+	//
+	// This value is deterministic and does not change, so we cache it here.
 	shuffleOffset time.Duration
 
-	// chunkGroup is the chunk group that the light node is currently assigned to.
+	// chunkGroup is the chunk group currently associated with this chunkGroupAssignment index.
 	chunkGroup uint32
 
 	// startOfEpoch is the start of the current shuffle epoch,
-	// i.e. the time when this light node was last shuffled into the current chunk group.
+	// i.e. the time when this chunkGroupAssignment index was last shuffled into the current chunk group.
 	startOfEpoch time.Time
 
 	// endOfEpoch is the end of the current shuffle epoch,
-	// i.e. the next time when this light node will be shuffled into a new chunk group.
+	// i.e. the next time when this chunkGroupAssignment index will be shuffled into a new chunk group.
 	endOfEpoch time.Time
 }
 
-// newAssignment creates a new assignment.
-func newAssignment(
+// newChunkGroupAssignment creates a new chunkGroupAssignment.
+func newChunkGroupAssignment(
 	registration *lightnode.Registration,
+	assignmentIndex uint32,
+	assignmentSeed uint64,
 	shuffleOffset time.Duration,
 	chunkGroup uint32,
 	startOfEpoch time.Time,
-	endOfEpoch time.Time) *assignment {
+	endOfEpoch time.Time) *chunkGroupAssignment {
 
-	return &assignment{
-		registration:  registration,
-		shuffleOffset: shuffleOffset,
-		chunkGroup:    chunkGroup,
-		startOfEpoch:  startOfEpoch,
-		endOfEpoch:    endOfEpoch,
+	return &chunkGroupAssignment{
+		registration:    registration,
+		assignmentIndex: assignmentIndex,
+		assignmentSeed:  assignmentSeed,
+		shuffleOffset:   shuffleOffset,
+		chunkGroup:      chunkGroup,
+		startOfEpoch:    startOfEpoch,
+		endOfEpoch:      endOfEpoch,
 	}
 }
