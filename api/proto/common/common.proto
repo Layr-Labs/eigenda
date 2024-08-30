@@ -17,7 +17,7 @@ message G1Commitment {
 message BlobKey {
   oneof key {
     HeaderBlobKey header_blob_key = 1;
-    CertificateBlobKey certificate_blob_key = 2;
+    BatchBlobKey batch_blob_key = 2;
   }
 }
 
@@ -27,7 +27,7 @@ message HeaderBlobKey {
 }
 
 // Uniquely identifies a blob based on its certificate hash and blob index.
-message CertificateBlobKey {
+message BatchBlobKey {
   bytes certificate_hash = 1;
   uint32 blob_index = 2;
 }
@@ -35,8 +35,7 @@ message CertificateBlobKey {
 // A unique identifier for a chunk.
 message ChunkKey {
   BlobKey blob_key = 1;
-  uint32 quorum_id = 2;
-  uint32 chunk_index = 3;
+  uint32 chunk_index = 2;
 }
 
 // A blob.
