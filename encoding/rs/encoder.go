@@ -36,7 +36,7 @@ type RsComputeDevice interface {
 	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
 }
 
-// The function creates a high level struct that determines the encoding the a data of a
+// The function creates a high level struct that determines the encoding the data of a
 // specific length under (num systematic node, num parity node) setup. A systematic node
 // stores a systematic data chunk that contains part of the original data. A parity node
 // stores a parity data chunk which is an encoding of the original data. A receiver that
