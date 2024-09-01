@@ -116,8 +116,20 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	var chunksData [][]byte
 
+	var format pb.ChunkEncodingFormat
+	if s.config.EnableGnarkChunkEncoding {
+		format = pb.ChunkEncodingFormat_GNARK
+	} else {
+		format = pb.ChunkEncodingFormat_GOB
+	}
+
 	for _, chunk := range chunks {
-		chunkSerialized, err := chunk.Serialize()
+		var chunkSerialized []byte
+		if s.config.EnableGnarkChunkEncoding {
+			chunkSerialized, err = chunk.SerializeGnark()
+		} else {
+			chunkSerialized, err = chunk.Serialize()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +147,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 			LengthProof:      lengthProofData,
 			Length:           uint32(commits.Length),
 		},
-		Chunks: chunksData,
+		Chunks:              chunksData,
+		ChunkEncodingFormat: format,
 	}, nil
 }
 
