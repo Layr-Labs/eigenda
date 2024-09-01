@@ -2,7 +2,6 @@ package encoder
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -67,8 +66,8 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams enco
 		format = core.GnarkChunkEncodingFormat
 	case pb.ChunkEncodingFormat_GOB:
 		format = core.GobChunkEncodingFormat
-	default:
-		return nil, nil, errors.New("invalid chunk encoding format")
+	case pb.ChunkEncodingFormat_UNKNOWN:
+		format = core.GobChunkEncodingFormat
 	}
 	chunksData := &core.ChunksData{
 		Chunks:   reply.GetChunks(),
