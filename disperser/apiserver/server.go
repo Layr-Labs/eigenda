@@ -280,8 +280,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 
 	requestedAt := uint64(time.Now().UnixNano())
-	badContext, _ := context.WithTimeout(ctx, 5*time.Millisecond)
-	metadataKey, err := s.blobStore.StoreBlob(badContext, blob, requestedAt)
+	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
 	if err != nil {
 		for _, param := range securityParams {
 			quorumId := string(param.QuorumID)
