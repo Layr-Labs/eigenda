@@ -167,7 +167,7 @@ func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey di
 	}
 	alreadyConfirmed, _ := refreshedMetadata.IsConfirmed()
 	if alreadyConfirmed {
-		s.logger.Error("error marking blob as dispersing", "blobKey", metadataKey.String())
+		s.logger.Error("error marking blob as dispersing already confirmed", "blobKey", metadataKey.String())
 		return errAlreadyConfirmed
 	}
 
