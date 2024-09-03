@@ -21,6 +21,8 @@ const (
 
 var errAlreadyConfirmed = errors.New("blob already confirmed")
 
+var errProcessingToDispersing = errors.New("blob transit to dispersing from non processing")
+
 // The shared blob store that the disperser is operating on.
 // The metadata store is backed by DynamoDB and the blob store is backed by S3.
 //
@@ -169,6 +171,12 @@ func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey di
 	if alreadyConfirmed {
 		s.logger.Error("error marking blob as dispersing already confirmed", "blobKey", metadataKey.String())
 		return errAlreadyConfirmed
+	}
+
+	status := refreshedMetadata.BlobStatus
+	if status != disperser.Processing {
+		s.logger.Error("error marking blob as dispersing from non processing state", "blobKey", metadataKey.String(), "status", status)
+		return errProcessingToDispersing
 	}
 
 	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Dispersing)
