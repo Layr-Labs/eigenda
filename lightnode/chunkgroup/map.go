@@ -6,27 +6,23 @@ import (
 	"time"
 )
 
-// assignmentKey uniquely identifies a light node chunkGroupAssignment.
-type assignmentKey struct {
-	lightNodeID     uint64
-	assignmentIndex uint32
-}
-
-// A set of light node assignments.
+// A set of light node assignments. A map is used instead of an array to allow for O(1) removals.
 type assignmentSet map[assignmentKey]*chunkGroupAssignment
 
 // Map keeps track of light nodes and their chunk group assignments.
 type Map struct {
-	// A map from light node ID to a list of assignments.
+	// A map from light node ID to a list of assignments. If each light node is assigned to N chunk groups,
+	// then each light node will have N assignments in this map.
 	assignmentMap map[uint64][]*chunkGroupAssignment
 
 	// A map from light node ID to the light node registration.
 	lightNodes map[uint64]*lightnode.Registration
 
-	// A map from chunk group ID to a set of light nodes in that chunk group.
+	// A map from chunk group ID to a set of light nodes assigned to that chunk group.
 	chunkGroups map[uint32]assignmentSet
 
-	// Light node registrations are stored in this queue. The next light node to be shuffled is always at the front.
+	// Light node assignments are stored in this queue. The queue maintains an internal ordering based on the time
+	// when the assignment should be shuffled. The next assignment to be shuffled is always at the front.
 	shuffleQueue *assignmentQueue
 
 	// The number of chunk groups.
@@ -75,7 +71,7 @@ func (m *Map) Add(now time.Time, registration *lightnode.Registration) {
 		startOfEpoch := ComputeStartOfShuffleEpoch(m.shufflePeriod, shuffleOffset, epoch)
 		endOfEpoch := ComputeEndOfShuffleEpoch(m.shufflePeriod, shuffleOffset, epoch)
 
-		entry := newChunkGroupAssignment(
+		assignment := newChunkGroupAssignment(
 			registration,
 			assignmentIndex,
 			assignmentSeed,
@@ -84,9 +80,9 @@ func (m *Map) Add(now time.Time, registration *lightnode.Registration) {
 			startOfEpoch,
 			endOfEpoch)
 
-		m.addToChunkGroupMap(chunkGroup, registration.ID(), assignmentIndex)
-		assignments = append(assignments, entry)
-		m.shuffleQueue.Push(entry)
+		m.addToChunkGroup(chunkGroup, assignment)
+		assignments = append(assignments, assignment)
+		m.shuffleQueue.Push(assignment)
 	}
 
 	m.assignmentMap[registration.ID()] = assignments
@@ -103,8 +99,8 @@ func (m *Map) Remove(lightNodeID uint64) {
 	delete(m.assignmentMap, lightNodeID)
 	delete(m.lightNodes, lightNodeID)
 
-	for _, entry := range assignments {
-		m.removeFromChunkGroupMap(entry.chunkGroup, entry.registration.ID(), entry.assignmentIndex)
+	for _, assignment := range assignments {
+		m.removeFromChunkGroup(assignment.chunkGroup, assignment)
 	}
 }
 
@@ -128,8 +124,8 @@ func (m *Map) GetChunkGroups(now time.Time, lightNodeID uint64) ([]uint32, bool)
 	}
 
 	chunkGroupSet := make(map[uint32]bool)
-	for _, entry := range assignments {
-		chunkGroupSet[entry.chunkGroup] = true
+	for _, assignment := range assignments {
+		chunkGroupSet[assignment.chunkGroup] = true
 	}
 
 	chunkGroupList := make([]uint32, 0, m.assignmentCount)
@@ -141,8 +137,8 @@ func (m *Map) GetChunkGroups(now time.Time, lightNodeID uint64) ([]uint32, bool)
 }
 
 // Size returns the number of light nodes in the map.
-func (m *Map) Size() uint {
-	return uint(len(m.lightNodes))
+func (m *Map) Size() uint32 {
+	return uint32(len(m.lightNodes))
 }
 
 // GetNodesInChunkGroup returns the IDs of the light nodes in the given chunk group.
@@ -189,7 +185,8 @@ func (m *Map) GetRandomNode(
 	assignments := m.chunkGroups[chunkGroup]
 
 	// Collect unique assignments that have been in the group for at least minimumTimeInGroup.
-	qualifiedAssignments := map[uint64] /* node ID */ *chunkGroupAssignment{}
+	// Key in this map is the node ID (nodes assigned to the same chunk group more than once will only appear once).
+	qualifiedAssignments := map[uint64]*chunkGroupAssignment{}
 	for key := range assignments {
 		assignment := assignments[key]
 		notYetPresent := qualifiedAssignments[key.lightNodeID] == nil
@@ -199,9 +196,9 @@ func (m *Map) GetRandomNode(
 		}
 	}
 
-	for entry := range qualifiedAssignments {
+	for assignment := range qualifiedAssignments {
 		// golang map iteration starts at a random position, so we can return the first node we find
-		return qualifiedAssignments[entry].registration, true
+		return qualifiedAssignments[assignment].registration, true
 	}
 	return nil, false
 }
@@ -213,7 +210,7 @@ func (m *Map) shuffle(now time.Time) {
 	}
 
 	// As a sanity check, ensure that we don't shuffle each light node more than once during this call.
-	shufflesRemaining := int(m.Size()) + 1
+	shufflesRemaining := len(m.assignmentMap) + 1
 
 	for {
 		shufflesRemaining--
@@ -239,34 +236,26 @@ func (m *Map) shuffle(now time.Time) {
 		next.endOfEpoch = endOfEpoch
 
 		if newChunkGroup != previousChunkGroup {
-			m.removeFromChunkGroupMap(previousChunkGroup, next.registration)
-			m.addToChunkGroupMap(newChunkGroup, next.registration)
+			m.removeFromChunkGroup(previousChunkGroup, next)
+			m.addToChunkGroup(newChunkGroup, next)
 		}
 
 		m.shuffleQueue.Push(next)
 	}
 }
 
-// addToChunkGroupMap adds a light node to the given chunk group.
-func (m *Map) addToChunkGroupMap(chunkGroup uint32, lightNodeId uint64, assignmentIndex uint32) {
+// addToChunkGroup adds a light node to the given chunk group.
+func (m *Map) addToChunkGroup(chunkGroup uint32, assignment *chunkGroupAssignment) {
 	group := m.chunkGroups[chunkGroup]
 	if group == nil {
 		group = make(assignmentSet)
 		m.chunkGroups[chunkGroup] = group
 	}
-	key := assignmentKey{
-		lightNodeID:     lightNodeId,
-		assignmentIndex: assignmentIndex,
-	}
-	group[key] = true
+	group[assignment.key] = assignment
 }
 
-// removeFromChunkGroupMap removes a light node from the given chunk group.
-func (m *Map) removeFromChunkGroupMap(chunkGroup uint32, lightNodeId uint64, assignmentIndex uint32) {
+// removeFromChunkGroup removes a light node from the given chunk group.
+func (m *Map) removeFromChunkGroup(chunkGroup uint32, assignment *chunkGroupAssignment) {
 	group := m.chunkGroups[chunkGroup]
-	key := assignmentKey{
-		lightNodeID:     lightNodeId,
-		assignmentIndex: assignmentIndex,
-	}
-	delete(group, key)
+	delete(group, assignment.key)
 }
