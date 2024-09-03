@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/lightnode"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
+	"sort"
 	"testing"
 	"time"
 )
@@ -226,96 +227,125 @@ func TestChunkGroupCalculationsSingleAssignment(t *testing.T) {
 	}
 }
 
-//func TestChunkGroupCalculationsMultipleAssignments(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	chunkGroupCount := uint32(rand.Intn(100) + 1)
-//	startTime := tu.RandomTime()
-//	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
-//	assignmentCount := uint32(rand.Intn(3) + 2)
-//
-//	cgMap := NewMap(chunkGroupCount, assignmentCount, shufflePeriod)
-//	assert.Equal(t, uint32(0), cgMap.Size())
-//
-//	expectedRegistrations := make(map[uint64]*lightnode.Registration)
-//
-//	// Add elements
-//	count := 1_000
-//	for i := 0; i < count; i++ {
-//		registration := randomRegistration()
-//		expectedRegistrations[registration.ID()] = registration
-//		cgMap.Add(startTime, registration)
-//	}
-//
-//	now := startTime
-//	steps := 100
-//	for step := 0; step < steps; step++ {
-//		if rand.Float64() < (1.0 / 3.0) {
-//			// Add less than a full shuffle period.
-//			now = now.Add(shufflePeriod * time.Duration(rand.Float64()))
-//		} else if rand.Float64() < (2.0 / 3.0) {
-//			// Add exactly one shuffle period.
-//			now = now.Add(shufflePeriod)
-//		} else {
-//			// Add several shuffle periods.
-//			now = now.Add(shufflePeriod * time.Duration(rand.Intn(10)+2))
-//		}
-//
-//		// Add a few elements.
-//		numberToAdd := rand.Intn(10)
-//		count += numberToAdd
-//		for i := 0; i < numberToAdd; i++ {
-//			registration := randomRegistration()
-//			expectedRegistrations[registration.ID()] = registration
-//			cgMap.Add(now, registration)
-//		}
-//
-//		// Remove a few elements.
-//		numberToRemove := rand.Intn(10)
-//		count -= numberToRemove
-//		for key := range expectedRegistrations {
-//			if numberToRemove == 0 {
-//				break
-//			}
-//			cgMap.Remove(key)
-//			delete(expectedRegistrations, key)
-//			numberToRemove--
-//		}
-//
-//		// Verify the chunk group for each element.
-//		for id, registration := range expectedRegistrations {
-//			chunkGroups, ok := cgMap.GetChunkGroups(now, id)
-//
-//			assert.Equal(t, assignmentCount, len(chunkGroups)) // TODO
-//			chunkGroup := chunkGroups[0]
-//
-//			assert.True(t, ok)
-//			offset := ComputeShuffleOffset(registration.Seed(), shufflePeriod)
-//			epoch := ComputeShuffleEpoch(shufflePeriod, offset, now)
-//			expectedChunkGroup := ComputeChunkGroup(registration.Seed(), epoch, chunkGroupCount)
-//
-//			assert.Equal(t, expectedChunkGroup, chunkGroup)
-//		}
-//
-//		// Query for full chunk groups.
-//		nodesReported := 0
-//		for chunkIndex := uint32(0); chunkIndex < chunkGroupCount; chunkIndex++ {
-//			chunk := cgMap.GetNodesInChunkGroup(now, chunkIndex)
-//			nodesReported += len(chunk)
-//
-//			for _, nodeId := range chunk {
-//				chunkGroups, ok := cgMap.GetChunkGroups(now, nodeId)
-//				assert.True(t, ok)
-//				assert.Equal(t, 1, len(chunkGroups)) // TODO
-//				chunkGroup := chunkGroups[0]
-//
-//				assert.Equal(t, chunkIndex, chunkGroup)
-//			}
-//		}
-//
-//		assert.Equal(t, count, nodesReported)
-//	}
-//}
+func TestChunkGroupCalculationsMultipleAssignments(t *testing.T) {
+	tu.InitializeRandom()
+
+	chunkGroupCount := uint32(rand.Intn(100) + 1)
+	startTime := tu.RandomTime()
+	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+	assignmentCount := uint32(rand.Intn(3) + 2)
+	//assignmentCount := uint32(rand.Intn(3) + 2)
+
+	cgMap := NewMap(chunkGroupCount, assignmentCount, shufflePeriod)
+	assert.Equal(t, uint32(0), cgMap.Size())
+
+	expectedRegistrations := make(map[uint64]*lightnode.Registration)
+
+	// Add elements
+	count := 1_000
+	for i := 0; i < count; i++ {
+		registration := randomRegistration()
+		expectedRegistrations[registration.ID()] = registration
+		cgMap.Add(startTime, registration)
+	}
+
+	now := startTime
+	steps := 100
+	for step := 0; step < steps; step++ {
+		if rand.Float64() < (1.0 / 3.0) {
+			// Add less than a full shuffle period.
+			now = now.Add(shufflePeriod * time.Duration(rand.Float64()))
+		} else if rand.Float64() < (2.0 / 3.0) {
+			// Add exactly one shuffle period.
+			now = now.Add(shufflePeriod)
+		} else {
+			// Add several shuffle periods.
+			now = now.Add(shufflePeriod * time.Duration(rand.Intn(10)+2))
+		}
+
+		// Add a few elements.
+		numberToAdd := rand.Intn(10)
+		count += numberToAdd
+		for i := 0; i < numberToAdd; i++ {
+			registration := randomRegistration()
+			expectedRegistrations[registration.ID()] = registration
+			cgMap.Add(now, registration)
+		}
+
+		// Remove a few elements.
+		numberToRemove := rand.Intn(10)
+		count -= numberToRemove
+		for key := range expectedRegistrations {
+			if numberToRemove == 0 {
+				break
+			}
+			cgMap.Remove(key)
+			delete(expectedRegistrations, key)
+			numberToRemove--
+		}
+
+		// A map from chunk group ID to set of nodes expected to be in that chunk group.
+		expectedChunkMembership := make(map[uint32]map[uint64]bool)
+
+		// Verify the chunk groups for each element.
+		for id, registration := range expectedRegistrations {
+			chunkGroups, _ := cgMap.GetChunkGroups(now, id)
+
+			// Note that a light node may be assigned to the same chunk group multiple times,
+			// resulting in a smaller number of chunk groups than the number of assignments.
+			groupCount := len(chunkGroups)
+			assert.True(t, groupCount > 0 && groupCount <= int(assignmentCount))
+
+			uniqueExpectedChunkGroups := make(map[uint32]bool)
+			for assignmentIndex := uint32(0); assignmentIndex < assignmentCount; assignmentIndex++ {
+				shuffleOffset := ComputeShuffleOffset(registration.Seed(), assignmentIndex, shufflePeriod)
+				epoch := ComputeShuffleEpoch(shufflePeriod, shuffleOffset, now)
+				expectedChunkGroup := ComputeChunkGroup(registration.Seed(), assignmentIndex, epoch, chunkGroupCount)
+				uniqueExpectedChunkGroups[expectedChunkGroup] = true
+			}
+			expectedChunkGroups := make([]uint32, 0, assignmentCount)
+			for g := range uniqueExpectedChunkGroups {
+				expectedChunkGroups = append(expectedChunkGroups, g)
+
+				if _, ok := expectedChunkMembership[g]; !ok {
+					expectedChunkMembership[g] = make(map[uint64]bool)
+				}
+				expectedChunkMembership[g][id] = true
+			}
+
+			// sort the lists to make comparison easier
+			sort.Slice(chunkGroups, func(i, j int) bool {
+				return chunkGroups[i] < chunkGroups[j]
+			})
+			sort.Slice(expectedChunkGroups, func(i, j int) bool {
+				return expectedChunkGroups[i] < expectedChunkGroups[j]
+			})
+			assert.Equal(t, expectedChunkGroups, chunkGroups)
+		}
+
+		// Query GetNodesInChunkGroup()
+		for chunkIndex := uint32(0); chunkIndex < chunkGroupCount; chunkIndex++ {
+			nodes := cgMap.GetNodesInChunkGroup(now, chunkIndex)
+
+			expectedNodes := make([]uint64, 0)
+			for node := range expectedChunkMembership[chunkIndex] {
+				expectedNodes = append(expectedNodes, node)
+			}
+
+			// Sort for easier comparison
+			sort.Slice(nodes, func(i, j int) bool {
+				return nodes[i] < nodes[j]
+			})
+			sort.Slice(expectedNodes, func(i, j int) bool {
+				return expectedNodes[i] < expectedNodes[j]
+			})
+
+			assert.Equal(t, expectedNodes, nodes)
+		}
+	}
+}
+
+// TODO continue below here
 
 func TestGetRandomNode(t *testing.T) {
 	tu.InitializeRandom()

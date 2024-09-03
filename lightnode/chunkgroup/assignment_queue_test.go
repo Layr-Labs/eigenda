@@ -13,13 +13,19 @@ func randomAssignment(nextShuffleTime time.Time) *chunkGroupAssignment {
 	id := rand.Uint64()
 	seed := rand.Uint64()
 	registrationTime := tu.RandomTime()
+	assignmentIndex := uint32(rand.Intn(64))
 
 	registration := lightnode.NewRegistration(id, seed, registrationTime)
 
 	return &chunkGroupAssignment{
-		registration: registration,
-		endOfEpoch:   nextShuffleTime,
-		chunkGroup:   rand.Uint32(),
+		registration:    registration,
+		endOfEpoch:      nextShuffleTime,
+		chunkGroup:      rand.Uint32(),
+		assignmentIndex: assignmentIndex,
+		key: assignmentKey{
+			lightNodeID:     id,
+			assignmentIndex: assignmentIndex,
+		},
 	}
 }
 
@@ -165,12 +171,12 @@ func TestPeriodicRemoval(t *testing.T) {
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, element)
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, assignment)
 
-		// We will remove every 7th element.
+		// We will remove every 7th assignment.
 		if i%7 != 0 {
-			expectedOrderWithRemovals = append(expectedOrderWithRemovals, element)
+			expectedOrderWithRemovals = append(expectedOrderWithRemovals, assignment)
 		}
 	}
 
@@ -194,12 +200,12 @@ func TestPeriodicRemoval(t *testing.T) {
 	// Remove every 7th element.
 	for i := uint(0); i < numberOfElements; i++ {
 		if i%7 == 0 {
-			queue.Remove(expectedOrder[i].registration.ID())
+			queue.Remove(expectedOrder[i].key)
 
 			// Removing more than once should be a no-op.
 			removeCount := rand.Intn(3)
 			for j := 0; j < removeCount; j++ {
-				queue.Remove(expectedOrder[i].registration.ID())
+				queue.Remove(expectedOrder[i].key)
 			}
 
 			removalCount++
@@ -232,12 +238,12 @@ func TestContiguousRemoval(t *testing.T) {
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, element)
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, assignment)
 
 		// We will remove all elements after index 10 and before index 90
 		if i <= 10 || i >= 90 {
-			expectedOrderWithRemovals = append(expectedOrderWithRemovals, element)
+			expectedOrderWithRemovals = append(expectedOrderWithRemovals, assignment)
 		}
 	}
 
@@ -261,12 +267,12 @@ func TestContiguousRemoval(t *testing.T) {
 	// Remove all elements after index 10 and before index 90
 	for i := uint(0); i < numberOfElements; i++ {
 		if i > 10 && i < 90 {
-			queue.Remove(expectedOrder[i].registration.ID())
+			queue.Remove(expectedOrder[i].key)
 
 			// Removing more than once should be a no-op.
 			removeCount := rand.Intn(3)
 			for j := 0; j < removeCount; j++ {
-				queue.Remove(expectedOrder[i].registration.ID())
+				queue.Remove(expectedOrder[i].key)
 			}
 
 			removalCount++
@@ -298,8 +304,8 @@ func TestRemoveFollowedByPush(t *testing.T) {
 
 	// Generate the elements that will eventually be inserted.
 	for i := uint(0); i < numberOfElements; i++ {
-		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
-		expectedOrder = append(expectedOrder, element)
+		assignment := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
+		expectedOrder = append(expectedOrder, assignment)
 	}
 
 	// Insert elements in random order.
@@ -322,12 +328,12 @@ func TestRemoveFollowedByPush(t *testing.T) {
 	// Remove every seventh element.
 	for i := uint(0); i < numberOfElements; i++ {
 		if i%7 == 0 {
-			queue.Remove(expectedOrder[i].registration.ID())
+			queue.Remove(expectedOrder[i].key)
 
 			// Removing more than once should be a no-op.
 			removeCount := rand.Intn(3)
 			for j := 0; j < removeCount; j++ {
-				queue.Remove(expectedOrder[i].registration.ID())
+				queue.Remove(expectedOrder[i].key)
 			}
 
 			removalCount++

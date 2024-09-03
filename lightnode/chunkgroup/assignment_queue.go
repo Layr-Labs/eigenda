@@ -46,10 +46,10 @@ type assignmentQueue struct {
 	// The heap that stores the light nodes. Nodes are sorted by their endOfEpoch.
 	heap *assignmentHeap
 
-	// A set of node IDs in the queue. This is used to do efficient removals.
-	// A true value indicates that the node is in the queue. A false value indicates
+	// A set assignments in the queue. This is used to do efficient removals.
+	// A true value indicates that the assignment is in the queue. A false value indicates
 	// that the node was removed from the queue but has not yet been fully deleted.
-	nodeIdSet map[uint64]bool
+	assignmentSet map[assignmentKey]bool
 
 	// The number of elements in the queue. Tracked separately since the heap and NodeIdSet
 	// may contain removed nodes that have not yet been fully garbage collected.
@@ -62,7 +62,7 @@ func newAssignmentQueue() *assignmentQueue {
 		heap: &assignmentHeap{
 			data: make([]*chunkGroupAssignment, 0),
 		},
-		nodeIdSet: make(map[uint64]bool),
+		assignmentSet: make(map[assignmentKey]bool),
 	}
 }
 
@@ -71,9 +71,10 @@ func (queue *assignmentQueue) Size() uint {
 	return queue.size
 }
 
-// Push adds an chunkGroupAssignment to the priority queue. This is a no-op if the chunkGroupAssignment is already in the queue.
+// Push adds an chunkGroupAssignment to the priority queue.
+// This is a no-op if the chunkGroupAssignment is already in the queue.
 func (queue *assignmentQueue) Push(assignment *chunkGroupAssignment) {
-	notRemoved, present := queue.nodeIdSet[assignment.registration.ID()]
+	notRemoved, present := queue.assignmentSet[assignment.key]
 	if present && notRemoved {
 		return
 	}
@@ -84,7 +85,7 @@ func (queue *assignmentQueue) Push(assignment *chunkGroupAssignment) {
 		heap.Push(queue.heap, assignment)
 	}
 
-	queue.nodeIdSet[assignment.registration.ID()] = true
+	queue.assignmentSet[assignment.key] = true
 }
 
 // Pop removes and returns the chunkGroupAssignment with the earliest endOfEpoch.
@@ -94,7 +95,7 @@ func (queue *assignmentQueue) Pop() *chunkGroupAssignment {
 		return nil
 	}
 	assignment := heap.Pop(queue.heap).(*chunkGroupAssignment)
-	delete(queue.nodeIdSet, assignment.registration.ID())
+	delete(queue.assignmentSet, assignment.key)
 	queue.size--
 	return assignment
 }
@@ -109,12 +110,12 @@ func (queue *assignmentQueue) Peek() *chunkGroupAssignment {
 	return queue.heap.data[0]
 }
 
-// Remove removes the light node with the given ID from the priority queue.
-// This is a no-op if the light node is not in the queue.
-func (queue *assignmentQueue) Remove(lightNodeId uint64) { // TODO light node ID is no longer a good primary key
-	// Deletion is lazy. The node is fully removed when it reaches the top of the heap.
+// Remove removes the assignment with the given key from the queue.
+// This is a no-op if the assignment is not in the queue.
+func (queue *assignmentQueue) Remove(key assignmentKey) {
+	// Deletion is lazy. The assignment is fully removed when it reaches the top of the heap.
 
-	notRemoved, present := queue.nodeIdSet[lightNodeId]
+	notRemoved, present := queue.assignmentSet[key]
 	if !present || !notRemoved {
 		// Element is either not in the queue or has already been marked for removal.
 		return
@@ -122,7 +123,7 @@ func (queue *assignmentQueue) Remove(lightNodeId uint64) { // TODO light node ID
 
 	queue.size--
 
-	queue.nodeIdSet[lightNodeId] = false
+	queue.assignmentSet[key] = false
 }
 
 // collectGarbage removes all nodes that have been removed from the queue but have not yet been fully deleted.
@@ -143,9 +144,9 @@ func (queue *assignmentQueue) collectGarbage() {
 
 		next := queue.heap.data[0]
 
-		notRemoved, present := queue.nodeIdSet[next.registration.ID()]
+		notRemoved, present := queue.assignmentSet[next.key]
 		if !present {
-			panic(fmt.Sprintf("node %d is not in the nodeIdSet", next.registration.ID()))
+			panic(fmt.Sprintf("node %d is not in the assignmentSet", next.registration.ID()))
 		}
 
 		if notRemoved {

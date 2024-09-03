@@ -91,7 +91,10 @@ func (m *Map) Remove(lightNodeID uint64) {
 		return
 	}
 
-	m.shuffleQueue.Remove(lightNodeID)
+	for _, assignment := range assignments {
+		m.shuffleQueue.Remove(assignment.key)
+	}
+
 	delete(m.assignmentMap, lightNodeID)
 	delete(m.lightNodes, lightNodeID)
 
@@ -206,7 +209,7 @@ func (m *Map) shuffle(now time.Time) {
 	}
 
 	// As a sanity check, ensure that we don't shuffle each light node more than once during this call.
-	shufflesRemaining := len(m.assignmentMap) + 1
+	shufflesRemaining := m.Size()*m.assignmentCount + 1
 
 	for {
 		shufflesRemaining--
