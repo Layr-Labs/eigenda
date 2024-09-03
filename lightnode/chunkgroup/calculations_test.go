@@ -243,11 +243,10 @@ func TestComputeEndOfShuffleEpoch(t *testing.T) {
 
 func TestComputeStartOfShuffleEpochHandCraftedScenario(t *testing.T) {
 
-	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
 	shufflePeriod := time.Second * 100
 	shuffleOffset := time.Second * 50
 
-	assert.Equal(t, unixEpoch, ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 0))
+	assert.Equal(t, time.Unix(-50, 0), ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 0))
 	assert.Equal(t, time.Unix(50, 0), ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 1))
 	assert.Equal(t, time.Unix(150, 0), ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 2))
 	assert.Equal(t, time.Unix(250, 0), ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 3))
@@ -255,13 +254,13 @@ func TestComputeStartOfShuffleEpochHandCraftedScenario(t *testing.T) {
 }
 
 func TestComputeStartOfShuffleEpoch(t *testing.T) {
-	tu.InitializeRandom()
+	tu.InitializeRandom(3929746706491848856) // TODO
 
 	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
 
-	assert.Equal(t, unixEpoch,
+	assert.Equal(t, unixEpoch.Add(shuffleOffset-shufflePeriod),
 		ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 0))
 	assert.Equal(t, unixEpoch.Add(shuffleOffset),
 		ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, 1))

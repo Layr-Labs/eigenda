@@ -96,7 +96,7 @@ func ComputeStartOfShuffleEpoch(
 	// Note that this will be before unix epoch.
 	genesis := unixEpoch.Add(shuffleOffset - shufflePeriod)
 
-	return genesis.Add(shuffleOffset * time.Duration(currentEpoch))
+	return genesis.Add(shufflePeriod * time.Duration(currentEpoch))
 }
 
 // ComputeEndOfShuffleEpoch given an epoch, return the time when that epoch will end and the next epoch will begin.

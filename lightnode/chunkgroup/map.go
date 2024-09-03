@@ -167,6 +167,8 @@ func (m *Map) GetNodesInChunkGroup(
 	return nodeList
 }
 
+// TODO perhaps this should just return nil if no node is found?
+
 // GetRandomNode returns a random light node in the given chunk group. If minimumTimeInGroup is
 // non-zero, the light node must have been in the chunk group for at least that amount of time. Returns nil
 // if no light node is found that satisfies the constraints.
