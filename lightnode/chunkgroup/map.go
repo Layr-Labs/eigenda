@@ -62,8 +62,6 @@ func (m *Map) Add(now time.Time, registration *lightnode.Registration) {
 	assignments := make([]*chunkGroupAssignment, 0, m.assignmentCount)
 
 	for assignmentIndex := uint32(0); assignmentIndex < m.assignmentCount; assignmentIndex++ {
-		// TODO can some of this logic be de-duplicated?
-
 		assignmentSeed := rotateLeft(registration.Seed(), assignmentIndex)
 		shuffleOffset := ComputeShuffleOffset(assignmentSeed, m.shufflePeriod)
 		epoch := ComputeShuffleEpoch(m.shufflePeriod, shuffleOffset, now)
@@ -167,15 +165,13 @@ func (m *Map) GetNodesInChunkGroup(
 	return nodeList
 }
 
-// TODO perhaps this should just return nil if no node is found?
-
 // GetRandomNode returns a random light node in the given chunk group. If minimumTimeInGroup is
 // non-zero, the light node must have been in the chunk group for at least that amount of time. Returns nil
 // if no light node is found that satisfies the constraints.
 func (m *Map) GetRandomNode(
 	now time.Time,
 	chunkGroup uint32,
-	minimumTimeInGroup time.Duration) (*lightnode.Registration, bool) {
+	minimumTimeInGroup time.Duration) *lightnode.Registration {
 
 	if chunkGroup >= m.chunkGroupCount {
 		panic(fmt.Sprintf("chunk group %d is out of bounds, there are only %d chunk groups",
@@ -200,9 +196,9 @@ func (m *Map) GetRandomNode(
 
 	for assignment := range qualifiedAssignments {
 		// golang map iteration starts at a random position, so we can return the first node we find
-		return qualifiedAssignments[assignment].registration, true
+		return qualifiedAssignments[assignment].registration
 	}
-	return nil, false
+	return nil
 }
 
 // shuffle shuffles the light nodes into new chunk groups given the current time.

@@ -198,8 +198,8 @@ func TestGetRandomNode(t *testing.T) {
 
 		if len(chunk) == 0 {
 			// There shouldn't be any nodes in the chunk group, so GetRandomNode shouldn't return anything.
-			_, ok := cgMap.GetRandomNode(now, chunkIndex, 0)
-			assert.False(t, ok)
+			node := cgMap.GetRandomNode(now, chunkIndex, 0)
+			assert.Nil(t, node)
 			continue
 		}
 
@@ -212,10 +212,9 @@ func TestGetRandomNode(t *testing.T) {
 				minimumTimeInGroup = shufflePeriod / time.Duration(rand.Intn(5)+1)
 			}
 
-			randomNode, ok := cgMap.GetRandomNode(now, chunkIndex, minimumTimeInGroup)
+			randomNode := cgMap.GetRandomNode(now, chunkIndex, minimumTimeInGroup)
 
-			if ok {
-				assert.NotNil(t, randomNode)
+			if randomNode != nil {
 				assert.Contains(t, chunk, randomNode.ID())
 			} else {
 				// there shouldn't be any nodes in the chunk group for the minimum time

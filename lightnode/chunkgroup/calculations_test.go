@@ -254,7 +254,7 @@ func TestComputeStartOfShuffleEpochHandCraftedScenario(t *testing.T) {
 }
 
 func TestComputeStartOfShuffleEpoch(t *testing.T) {
-	tu.InitializeRandom(3929746706491848856) // TODO
+	tu.InitializeRandom()
 
 	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
