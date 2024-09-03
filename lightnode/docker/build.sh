@@ -5,7 +5,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "${SCRIPT_DIR}"
 
 source default-args.sh
-# Create a file called docker/args.sh to override the default values of GIT_URL and BRANCH_OR_COMMIT.
+# Create a file called args.sh to override the default values of GIT_URL and BRANCH_OR_COMMIT.
 source args.sh
 
 echo "git url: ${GIT_URL}"
@@ -27,49 +27,16 @@ fi
 
 echo "docker build commit: $(git rev-parse HEAD)" >> build-info.txt
 
-
-# Docker image is split into three parts:
-#  - the base image with OS level packages installed
-#  - the git image with the code cloned and go modules downloaded
-#  - final image with the code built.
-#
-# The purpose for this split is to prevent docker from deleting intermediate layers which are time consuming to build.
-# This also permits higher layers to be deleted and rebuilt without having to rebuild the lower layers.
-
 # Add the --no-cache flag to force a rebuild.
 # Add the --progress=plain flag to show verbose output during the build.
 
 docker build \
   --build-arg="GO_URL=${GO_URL}" \
-  -f lnode-base.dockerfile \
-  --tag lnode-base:latest \
-  .
-if [ $? -ne 0 ]; then
-  echo "Failed to build lnode-base"
-  exit 1
-fi
-
-docker build \
   --build-arg="GIT_URL=${GIT_URL}" \
   --build-arg="BRANCH_OR_COMMIT=${BRANCH_OR_COMMIT}" \
-  -f lnode-git.dockerfile \
-  --tag lnode-git:latest \
-  .
-if [ $? -ne 0 ]; then
-  echo "Failed to build lnode-git"
-  exit 1
-fi
-
-docker build \
-  --build-arg="GIT_URL=${GIT_URL}" \
-  --build-arg="BRANCH_OR_COMMIT=${BRANCH_OR_COMMIT}" \
-  -f lnode.dockerfile \
+  -f Dockerfile \
   --tag lnode:latest \
   .
-if [ $? -ne 0 ]; then
-  echo "Failed to build lnode"
-  exit 1
-fi
 
 # Don't leave trash on the filesystem.
 rm build-info.txt 2> /dev/null || true
