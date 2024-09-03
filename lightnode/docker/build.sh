@@ -10,7 +10,6 @@ source args.sh
 
 echo "git url: ${GIT_URL}"
 echo "branch or commit: ${BRANCH_OR_COMMIT}"
-echo "go url: ${GO_URL}"
 
 # Create a file with information about this build. This file will be copied into the docker image.
 rm build-info.txt 2> /dev/null || true
