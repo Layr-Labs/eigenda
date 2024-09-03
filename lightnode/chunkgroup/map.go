@@ -189,7 +189,16 @@ func (m *Map) GetRandomNode(
 	for key := range assignments {
 		assignment := assignments[key]
 		notYetPresent := qualifiedAssignments[key.lightNodeID] == nil
-		meetsTimeRequirement := minimumTimeInGroup == 0 || now.Sub(assignment.startOfEpoch) >= minimumTimeInGroup
+
+		var joinTime time.Time
+		if assignment.startOfEpoch.After(assignment.registration.RegistrationTime()) {
+			joinTime = assignment.startOfEpoch
+		} else {
+			joinTime = assignment.registration.RegistrationTime()
+		}
+		timeInGroup := now.Sub(joinTime)
+
+		meetsTimeRequirement := minimumTimeInGroup == 0 || timeInGroup >= minimumTimeInGroup
 		if notYetPresent && meetsTimeRequirement {
 			qualifiedAssignments[key.lightNodeID] = assignment
 		}
