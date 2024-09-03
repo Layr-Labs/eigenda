@@ -1,9 +1,6 @@
 # Default arguments for building the docker image.
 # To override these values locally, create a file named `args.sh` in the same directory. 'args.sh' is ignored by git.
 
-# The location where the go binary will be downloaded from.
-export GO_URL=https://go.dev/dl/go1.21.12.linux-arm64.tar.gz
-
 # The location of the code to clone.
 export GIT_URL=https://github.com/Layr-Labs/eigenda.git
 

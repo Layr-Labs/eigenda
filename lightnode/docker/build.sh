@@ -31,7 +31,6 @@ echo "docker build commit: $(git rev-parse HEAD)" >> build-info.txt
 # Add the --progress=plain flag to show verbose output during the build.
 
 docker build \
-  --build-arg="GO_URL=${GO_URL}" \
   --build-arg="GIT_URL=${GIT_URL}" \
   --build-arg="BRANCH_OR_COMMIT=${BRANCH_OR_COMMIT}" \
   -f Dockerfile \

@@ -1,7 +1,5 @@
-FROM debian
+FROM golang:1.21.12-bookworm AS base
 
-# The url where the go binary can be downloaded from.
-ARG GO_URL
 # The url of the git repository to clone.
 ARG GIT_URL
 # The branch or commit to check out.
@@ -9,7 +7,7 @@ ARG BRANCH_OR_COMMIT
 
 # Install core dependencies
 RUN apt update
-RUN apt install -y wget git build-essential bash
+RUN apt install -y git build-essential bash
 
 # Set up lnode user
 RUN useradd -m -s /bin/bash lnode
@@ -20,19 +18,6 @@ RUN rm .bashrc
 RUN rm .bash_logout
 RUN rm .profile
 
-# Install golang
-RUN bash -c "wget $GO_URL"
-RUN tar -xf ./*.tar.gz
-RUN rm ./*.tar.gz
-RUN mkdir -p ~/.local/share
-RUN mv go ~/.local/share/go
-RUN rm .wget-hsts
-
-# Setup golang environment for lnode user
-RUN touch ~/.bashrc
-RUN echo 'export GOPATH=~/.local/share/go' >> ~/.bashrc
-RUN echo 'export PATH=~/.local/share/go/bin:$PATH' >> ~/.bashrc
-
 # Clone eigenda repository
 RUN git clone $GIT_URL eigenda
 WORKDIR /home/lnode/eigenda
@@ -42,7 +27,7 @@ WORKDIR /home/lnode
 # Download all go dependencies.
 # This is done as a separate step to avoid repeat work every time the latest commit in the branch is updated.
 WORKDIR /home/lnode/eigenda/lightnode
-RUN bash -c 'source ~/.bashrc && go mod download'
+RUN go mod download
 WORKDIR /home/lnode
 
 # Copy a file containing build information. Useful for detective work on an otherwise unlabelled image.
@@ -58,20 +43,27 @@ WORKDIR /home/lnode
 
 # Build the light node binary.
 WORKDIR /home/lnode/eigenda/lightnode
-RUN bash -c 'source ~/.bashrc && make build'
-RUN ln -s /home/lnode/eigenda/lightnode/bin/lnode ~/lnode
+RUN make build
 WORKDIR /home/lnode
 
-# Data that should persist between container restarts will be stored in this mount point.
-RUN mkdir ~/data
+# In order to equip this image with a shell for debugging,
+# swap out the "FROM scratch" below with "FROM golang:1.21.12-bookworm"
+FROM scratch AS final
 
-# Data that shouldn't persist between container restarts will be stored in this location.
-RUN mkdir ~/tmp
+# Copy over files needed for lnode user.
+COPY --from=base /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=base /etc/passwd /etc/passwd
+COPY --from=base /etc/group /etc/group
 
-# Make everything except ~/tmp and ~/data read only to enforce good file system hygiene.
-RUN chmod -R -w ~
-RUN chmod -R +w ~/tmp
-RUN chmod -R +w ~/data
+USER lnode
+WORKDIR /home/lnode
+
+# Copy the executable binary.
+COPY --from=base /home/lnode/eigenda/lightnode/bin/lnode /home/lnode/lnode
+
+# Copy the build info file.
+COPY --from=base /home/lnode/build-info.txt /home/lnode/build-info.txt
 
 # Run the light node when the container starts.
 CMD ["/home/lnode/lnode"]
