@@ -17,8 +17,31 @@ func randomRegistration(startTime time.Time, lastRegistration time.Time) *lightn
 		tu.RandomTimeInRange(startTime, lastRegistration))
 }
 
-// TODO test that deletes things and ensures there is no garbage left in maps
-// TODO take into account when a light node was registered
+// Delete everything from the map and verify that the internal data structures have been cleaned up.
+func verifyMapDeletion(
+	t *testing.T,
+	now time.Time,
+	m *Map,
+	expectedRegistrations *map[uint64]*lightnode.Registration) {
+
+	// Delete remaining elements.
+	for id := range *expectedRegistrations {
+		m.Remove(id)
+	}
+
+	assert.Equal(t, uint32(0), m.Size())
+	assert.Equal(t, 0, len(m.assignmentMap))
+	assert.Equal(t, 0, len(m.lightNodes))
+
+	assert.Equal(t, m.chunkGroupCount, uint32(len(m.chunkGroups)))
+	for chunkIndex := uint32(0); chunkIndex < m.chunkGroupCount; chunkIndex++ {
+		assert.Equal(t, 0, len(m.chunkGroups[chunkIndex]))
+	}
+
+	assert.Equal(t, uint32(0), m.shuffleQueue.Size())
+	assert.Equal(t, 0, len(m.shuffleQueue.assignmentSet))
+	assert.Equal(t, 0, len(m.shuffleQueue.heap.data))
+}
 
 func TestAddRemoveGetOneAssignment(t *testing.T) {
 	tu.InitializeRandom()
@@ -78,6 +101,8 @@ func TestAddRemoveGetOneAssignment(t *testing.T) {
 			assert.Equal(t, registration, cgMap.Get(id))
 		}
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestAddRemoveGetMultipleAssignments(t *testing.T) {
@@ -138,6 +163,8 @@ func TestAddRemoveGetMultipleAssignments(t *testing.T) {
 			assert.Equal(t, registration, cgMap.Get(id))
 		}
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestChunkGroupCalculationsSingleAssignment(t *testing.T) {
@@ -230,6 +257,8 @@ func TestChunkGroupCalculationsSingleAssignment(t *testing.T) {
 
 		assert.Equal(t, count, nodesReported)
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestChunkGroupCalculationsMultipleAssignments(t *testing.T) {
@@ -348,6 +377,8 @@ func TestChunkGroupCalculationsMultipleAssignments(t *testing.T) {
 			assert.Equal(t, expectedNodes, nodes)
 		}
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestGetRandomNodeSingleAssignment(t *testing.T) {
@@ -425,6 +456,8 @@ func TestGetRandomNodeSingleAssignment(t *testing.T) {
 			}
 		}
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestGetRandomNodeMultipleAssignments(t *testing.T) {
@@ -511,6 +544,8 @@ func TestGetRandomNodeMultipleAssignments(t *testing.T) {
 			}
 		}
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestSingleChunkGroupSingleAssignment(t *testing.T) {
@@ -602,6 +637,8 @@ func TestSingleChunkGroupSingleAssignment(t *testing.T) {
 
 		assert.Equal(t, count, nodesReported)
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }
 
 func TestSingleChunkGroupMultipleAssignments(t *testing.T) {
@@ -693,4 +730,6 @@ func TestSingleChunkGroupMultipleAssignments(t *testing.T) {
 
 		assert.Equal(t, count, nodesReported)
 	}
+
+	verifyMapDeletion(t, startTime, &cgMap, &expectedRegistrations)
 }

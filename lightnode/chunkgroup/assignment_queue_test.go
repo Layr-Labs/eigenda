@@ -31,17 +31,17 @@ func randomAssignment(nextShuffleTime time.Time) *chunkGroupAssignment {
 
 func TestEmptyQueue(t *testing.T) {
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 	assert.Nil(t, queue.Pop())
 	assert.Nil(t, queue.Peek())
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 }
 
 func TestInOrderInsertion(t *testing.T) {
 	tu.InitializeRandom()
 
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
@@ -59,18 +59,18 @@ func TestInOrderInsertion(t *testing.T) {
 			queue.Push(element)
 		}
 
-		assert.Equal(t, i+1, queue.Size())
+		assert.Equal(t, uint32(i+1), queue.Size())
 	}
 
 	// Pop elements in order.
 	for i := uint(0); i < numberOfElements; i++ {
 		preview := queue.Peek()
 		assert.Equal(t, expectedOrder[i], preview)
-		assert.Equal(t, numberOfElements-i, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i), queue.Size())
 
 		next := queue.Pop()
 		assert.Equal(t, expectedOrder[i], next)
-		assert.Equal(t, numberOfElements-i-1, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-1), queue.Size())
 	}
 }
 
@@ -78,14 +78,14 @@ func TestReverseOrderInsertion(t *testing.T) {
 	tu.InitializeRandom()
 
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 
 	startTime := tu.RandomTime()
-	numberOfElements := uint(100)
+	numberOfElements := uint32(100)
 	expectedOrder := make([]*chunkGroupAssignment, 0, numberOfElements)
 
 	// Generate the elements that will eventually be inserted.
-	for i := uint(0); i < numberOfElements; i++ {
+	for i := uint32(0); i < numberOfElements; i++ {
 		element := randomAssignment(startTime.Add(time.Second * time.Duration(i)))
 		expectedOrder = append(expectedOrder, element)
 	}
@@ -100,11 +100,11 @@ func TestReverseOrderInsertion(t *testing.T) {
 			queue.Push(expectedOrder[i])
 		}
 
-		assert.Equal(t, numberOfElements-uint(i), queue.Size())
+		assert.Equal(t, numberOfElements-uint32(i), queue.Size())
 	}
 
 	// Pop elements in order.
-	for i := uint(0); i < numberOfElements; i++ {
+	for i := uint32(0); i < numberOfElements; i++ {
 		preview := queue.Peek()
 		assert.Equal(t, expectedOrder[i], preview)
 		assert.Equal(t, numberOfElements-i, queue.Size())
@@ -119,7 +119,7 @@ func TestRandomInsertion(t *testing.T) {
 	tu.InitializeRandom()
 
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
@@ -143,18 +143,18 @@ func TestRandomInsertion(t *testing.T) {
 			queue.Push(expectedOrder[perm[i]])
 		}
 
-		assert.Equal(t, i+1, queue.Size())
+		assert.Equal(t, uint32(i+1), queue.Size())
 	}
 
 	// Pop elements in order.
 	for i := uint(0); i < numberOfElements; i++ {
 		preview := queue.Peek()
 		assert.Equal(t, expectedOrder[i], preview)
-		assert.Equal(t, numberOfElements-i, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i), queue.Size())
 
 		next := queue.Pop()
 		assert.Equal(t, expectedOrder[i], next)
-		assert.Equal(t, numberOfElements-i-1, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-1), queue.Size())
 	}
 }
 
@@ -162,7 +162,7 @@ func TestPeriodicRemoval(t *testing.T) {
 	tu.InitializeRandom()
 
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
@@ -192,7 +192,7 @@ func TestPeriodicRemoval(t *testing.T) {
 			queue.Push(expectedOrder[perm[i]])
 		}
 
-		assert.Equal(t, i+1, queue.Size())
+		assert.Equal(t, uint32(i+1), queue.Size())
 	}
 
 	removalCount := uint(0)
@@ -209,7 +209,7 @@ func TestPeriodicRemoval(t *testing.T) {
 			}
 
 			removalCount++
-			assert.Equal(t, numberOfElements-removalCount, queue.Size())
+			assert.Equal(t, uint32(numberOfElements-removalCount), queue.Size())
 		}
 	}
 
@@ -217,11 +217,11 @@ func TestPeriodicRemoval(t *testing.T) {
 	for i := uint(0); i < (numberOfElements - removalCount); i++ {
 		preview := queue.Peek()
 		assert.Equal(t, expectedOrderWithRemovals[i], preview)
-		assert.Equal(t, numberOfElements-i-removalCount, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-removalCount), queue.Size())
 
 		next := queue.Pop()
 		assert.Equal(t, expectedOrderWithRemovals[i], next)
-		assert.Equal(t, numberOfElements-i-removalCount-1, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-removalCount-1), queue.Size())
 	}
 }
 
@@ -229,7 +229,7 @@ func TestContiguousRemoval(t *testing.T) {
 	tu.InitializeRandom()
 
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
@@ -259,7 +259,7 @@ func TestContiguousRemoval(t *testing.T) {
 			queue.Push(expectedOrder[perm[i]])
 		}
 
-		assert.Equal(t, i+1, queue.Size())
+		assert.Equal(t, uint32(i+1), queue.Size())
 	}
 
 	removalCount := uint(0)
@@ -276,7 +276,7 @@ func TestContiguousRemoval(t *testing.T) {
 			}
 
 			removalCount++
-			assert.Equal(t, numberOfElements-removalCount, queue.Size())
+			assert.Equal(t, uint32(numberOfElements-removalCount), queue.Size())
 		}
 	}
 
@@ -284,11 +284,11 @@ func TestContiguousRemoval(t *testing.T) {
 	for i := uint(0); i < (numberOfElements - removalCount); i++ {
 		preview := queue.Peek()
 		assert.Equal(t, expectedOrderWithRemovals[i], preview)
-		assert.Equal(t, numberOfElements-i-removalCount, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-removalCount), queue.Size())
 
 		next := queue.Pop()
 		assert.Equal(t, expectedOrderWithRemovals[i], next)
-		assert.Equal(t, numberOfElements-i-removalCount-1, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-removalCount-1), queue.Size())
 	}
 }
 
@@ -296,7 +296,7 @@ func TestRemoveFollowedByPush(t *testing.T) {
 	tu.InitializeRandom()
 
 	queue := newAssignmentQueue()
-	assert.Equal(t, uint(0), queue.Size())
+	assert.Equal(t, uint32(0), queue.Size())
 
 	startTime := tu.RandomTime()
 	numberOfElements := uint(100)
@@ -320,7 +320,7 @@ func TestRemoveFollowedByPush(t *testing.T) {
 			queue.Push(expectedOrder[perm[i]])
 		}
 
-		assert.Equal(t, i+1, queue.Size())
+		assert.Equal(t, uint32(i+1), queue.Size())
 	}
 
 	removalCount := uint(0)
@@ -337,7 +337,7 @@ func TestRemoveFollowedByPush(t *testing.T) {
 			}
 
 			removalCount++
-			assert.Equal(t, numberOfElements-removalCount, queue.Size())
+			assert.Equal(t, uint32(numberOfElements-removalCount), queue.Size())
 		}
 	}
 
@@ -346,7 +346,7 @@ func TestRemoveFollowedByPush(t *testing.T) {
 		if i%7 == 0 {
 			queue.Push(expectedOrder[i])
 			removalCount--
-			assert.Equal(t, numberOfElements-removalCount, queue.Size())
+			assert.Equal(t, uint32(numberOfElements-removalCount), queue.Size())
 		}
 	}
 
@@ -354,10 +354,10 @@ func TestRemoveFollowedByPush(t *testing.T) {
 	for i := uint(0); i < (numberOfElements - removalCount); i++ {
 		preview := queue.Peek()
 		assert.Equal(t, expectedOrder[i], preview)
-		assert.Equal(t, numberOfElements-i, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i), queue.Size())
 
 		next := queue.Pop()
 		assert.Equal(t, expectedOrder[i], next)
-		assert.Equal(t, numberOfElements-i-1, queue.Size())
+		assert.Equal(t, uint32(numberOfElements-i-1), queue.Size())
 	}
 }

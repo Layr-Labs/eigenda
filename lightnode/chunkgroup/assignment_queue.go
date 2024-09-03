@@ -53,7 +53,7 @@ type assignmentQueue struct {
 
 	// The number of elements in the queue. Tracked separately since the heap and NodeIdSet
 	// may contain removed nodes that have not yet been fully garbage collected.
-	size uint
+	size uint32
 }
 
 // newAssignmentQueue creates a new priority queue.
@@ -67,7 +67,7 @@ func newAssignmentQueue() *assignmentQueue {
 }
 
 // Size returns the number of elements in the priority queue.
-func (queue *assignmentQueue) Size() uint {
+func (queue *assignmentQueue) Size() uint32 {
 	return queue.size
 }
 
@@ -124,6 +124,7 @@ func (queue *assignmentQueue) Remove(key assignmentKey) {
 	queue.size--
 
 	queue.assignmentSet[key] = false
+	queue.collectGarbage()
 }
 
 // collectGarbage removes all nodes that have been removed from the queue but have not yet been fully deleted.
@@ -134,12 +135,16 @@ func (queue *assignmentQueue) collectGarbage() {
 	}
 
 	// sanity check to prevent infinite loops
-	maxIterations := len(queue.heap.data)
+	maxIterations := len(queue.heap.data) + 1
 
 	for {
 		maxIterations--
 		if maxIterations < 0 {
 			panic("garbage collection did not terminate")
+		}
+
+		if len(queue.heap.data) == 0 {
+			return
 		}
 
 		next := queue.heap.data[0]
@@ -155,5 +160,6 @@ func (queue *assignmentQueue) collectGarbage() {
 		}
 
 		heap.Pop(queue.heap)
+		delete(queue.assignmentSet, next.key)
 	}
 }
