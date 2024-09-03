@@ -43,8 +43,6 @@ func randomInt(seed uint64) uint64 {
 	return bytesToUint64(value)
 }
 
-// TODO make this incorporate assignment index
-
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
 func ComputeShuffleOffset(
@@ -120,8 +118,6 @@ func ComputeEndOfShuffleEpoch(
 
 	return ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, currentEpoch+1)
 }
-
-// TODO make this incorporate assignment index
 
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
 func ComputeChunkGroup(

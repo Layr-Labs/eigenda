@@ -218,7 +218,7 @@ func (m *Map) shuffle(now time.Time) {
 	}
 
 	// As a sanity check, ensure that we don't shuffle each light node more than once during this call.
-	shufflesRemaining := m.Size()*m.assignmentCount + 1
+	shufflesRemaining := int(m.Size()*m.assignmentCount + 1)
 
 	for {
 		shufflesRemaining--
