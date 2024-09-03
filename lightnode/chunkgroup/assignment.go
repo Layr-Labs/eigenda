@@ -26,11 +26,6 @@ type chunkGroupAssignment struct {
 	// is also stored in the registration, but we cache this object here for convenience.
 	key assignmentKey
 
-	// assignmentSeed is the seed used for this group chunkGroupAssignment.
-	//
-	// This value is deterministic and does not change, so we cache it here.
-	assignmentSeed uint64
-
 	// shuffleOffset is the offset at which this group chunkGroupAssignment should be shuffled into a
 	// new chunk group relative the beginning of each shuffle interval.
 	//
@@ -53,7 +48,6 @@ type chunkGroupAssignment struct {
 func newChunkGroupAssignment(
 	registration *lightnode.Registration,
 	assignmentIndex uint32,
-	assignmentSeed uint64,
 	shuffleOffset time.Duration,
 	chunkGroup uint32,
 	startOfEpoch time.Time,
@@ -66,10 +60,9 @@ func newChunkGroupAssignment(
 			lightNodeID:     registration.ID(),
 			assignmentIndex: assignmentIndex,
 		},
-		assignmentSeed: assignmentSeed,
-		shuffleOffset:  shuffleOffset,
-		chunkGroup:     chunkGroup,
-		startOfEpoch:   startOfEpoch,
-		endOfEpoch:     endOfEpoch,
+		shuffleOffset: shuffleOffset,
+		chunkGroup:    chunkGroup,
+		startOfEpoch:  startOfEpoch,
+		endOfEpoch:    endOfEpoch,
 	}
 }

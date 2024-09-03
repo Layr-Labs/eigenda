@@ -62,17 +62,15 @@ func (m *Map) Add(now time.Time, registration *lightnode.Registration) {
 	assignments := make([]*chunkGroupAssignment, 0, m.assignmentCount)
 
 	for assignmentIndex := uint32(0); assignmentIndex < m.assignmentCount; assignmentIndex++ {
-		assignmentSeed := rotateLeft(registration.Seed(), assignmentIndex)
-		shuffleOffset := ComputeShuffleOffset(assignmentSeed, m.shufflePeriod)
+		shuffleOffset := ComputeShuffleOffset(registration.Seed(), assignmentIndex, m.shufflePeriod)
 		epoch := ComputeShuffleEpoch(m.shufflePeriod, shuffleOffset, now)
-		chunkGroup := ComputeChunkGroup(assignmentSeed, epoch, m.chunkGroupCount)
+		chunkGroup := ComputeChunkGroup(registration.Seed(), assignmentIndex, epoch, m.chunkGroupCount)
 		startOfEpoch := ComputeStartOfShuffleEpoch(m.shufflePeriod, shuffleOffset, epoch)
 		endOfEpoch := ComputeEndOfShuffleEpoch(m.shufflePeriod, shuffleOffset, epoch)
 
 		assignment := newChunkGroupAssignment(
 			registration,
 			assignmentIndex,
-			assignmentSeed,
 			shuffleOffset,
 			chunkGroup,
 			startOfEpoch,
@@ -224,7 +222,7 @@ func (m *Map) shuffle(now time.Time) {
 		m.shuffleQueue.Pop()
 
 		newEpoch := ComputeShuffleEpoch(m.shufflePeriod, next.shuffleOffset, now)
-		newChunkGroup := ComputeChunkGroup(next.assignmentSeed, newEpoch, m.chunkGroupCount)
+		newChunkGroup := ComputeChunkGroup(next.registration.Seed(), next.assignmentIndex, newEpoch, m.chunkGroupCount)
 		startOfEpoch := ComputeStartOfShuffleEpoch(m.shufflePeriod, next.shuffleOffset, newEpoch)
 		endOfEpoch := ComputeEndOfShuffleEpoch(m.shufflePeriod, next.shuffleOffset, newEpoch)
 

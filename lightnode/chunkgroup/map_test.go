@@ -17,14 +17,15 @@ func randomRegistration() *lightnode.Registration {
 // TODO test that deletes things and ensures there is no garbage left in maps
 // TODO take into account when a light node was registered
 
-func TestAddRemoveGet(t *testing.T) {
+func TestAddRemoveGetOneAssignment(t *testing.T) {
 	tu.InitializeRandom()
 
 	chunkGroupCount := uint32(rand.Intn(100) + 1)
 	startTime := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+	assignmentCount := uint32(1)
 
-	cgMap := NewMap(chunkGroupCount, 1, shufflePeriod)
+	cgMap := NewMap(chunkGroupCount, assignmentCount, shufflePeriod)
 	assert.Equal(t, uint32(0), cgMap.Size())
 
 	expectedRegistrations := make(map[uint64]*lightnode.Registration)
@@ -75,14 +76,74 @@ func TestAddRemoveGet(t *testing.T) {
 	}
 }
 
-func TestChunkGroupCalculations(t *testing.T) {
+func TestAddRemoveGetMultipleAssignments(t *testing.T) {
 	tu.InitializeRandom()
 
 	chunkGroupCount := uint32(rand.Intn(100) + 1)
 	startTime := tu.RandomTime()
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+	assignmentCount := uint32(rand.Intn(3) + 2)
 
-	cgMap := NewMap(chunkGroupCount, 1, shufflePeriod)
+	cgMap := NewMap(chunkGroupCount, assignmentCount, shufflePeriod)
+	assert.Equal(t, uint32(0), cgMap.Size())
+
+	expectedRegistrations := make(map[uint64]*lightnode.Registration)
+
+	// Add elements
+	elementsToAdd := 1_000
+	for i := 0; i < elementsToAdd; i++ {
+		registration := randomRegistration()
+		expectedRegistrations[registration.ID()] = registration
+
+		assert.Nil(t, cgMap.Get(registration.ID()))
+		cgMap.Add(startTime, registration)
+		assert.Equal(t, registration, cgMap.Get(registration.ID()))
+
+		assert.Equal(t, uint32(i+1), cgMap.Size())
+	}
+
+	// Removing non-existent elements should be a no-op.
+	for i := 0; i < 10; i++ {
+		cgMap.Remove(rand.Uint64())
+		assert.Equal(t, uint32(elementsToAdd), cgMap.Size())
+	}
+
+	// Verify that get returns the correct registrations.
+	for id, registration := range expectedRegistrations {
+		assert.Equal(t, registration, cgMap.Get(id))
+	}
+
+	// Remove all nodes that have an ID divisible by 2.
+	removalCount := 0
+	for id, registration := range expectedRegistrations {
+		if id%2 == 0 {
+			assert.Equal(t, registration, cgMap.Get(id))
+			cgMap.Remove(id)
+			assert.Nil(t, cgMap.Get(id))
+			removalCount++
+			assert.Equal(t, uint32(elementsToAdd-removalCount), cgMap.Size())
+		}
+	}
+
+	// Verify that get returns the correct registrations.
+	for id, registration := range expectedRegistrations {
+		if id%2 == 0 {
+			assert.Nil(t, cgMap.Get(id))
+		} else {
+			assert.Equal(t, registration, cgMap.Get(id))
+		}
+	}
+}
+
+func TestChunkGroupCalculationsSingleAssignment(t *testing.T) {
+	tu.InitializeRandom()
+
+	chunkGroupCount := uint32(rand.Intn(100) + 1)
+	startTime := tu.RandomTime()
+	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+	assignmentCount := uint32(1)
+
+	cgMap := NewMap(chunkGroupCount, assignmentCount, shufflePeriod)
 	assert.Equal(t, uint32(0), cgMap.Size())
 
 	expectedRegistrations := make(map[uint64]*lightnode.Registration)
@@ -134,13 +195,13 @@ func TestChunkGroupCalculations(t *testing.T) {
 		for id, registration := range expectedRegistrations {
 			chunkGroups, ok := cgMap.GetChunkGroups(now, id)
 
-			assert.Equal(t, 1, len(chunkGroups)) // TODO
+			assert.Equal(t, 1, len(chunkGroups))
 			chunkGroup := chunkGroups[0]
 
 			assert.True(t, ok)
-			offset := ComputeShuffleOffset(registration.Seed(), shufflePeriod)
+			offset := ComputeShuffleOffset(registration.Seed(), 0, shufflePeriod)
 			epoch := ComputeShuffleEpoch(shufflePeriod, offset, now)
-			expectedChunkGroup := ComputeChunkGroup(registration.Seed(), epoch, chunkGroupCount)
+			expectedChunkGroup := ComputeChunkGroup(registration.Seed(), 0, epoch, chunkGroupCount)
 
 			assert.Equal(t, expectedChunkGroup, chunkGroup)
 		}
@@ -154,7 +215,7 @@ func TestChunkGroupCalculations(t *testing.T) {
 			for _, nodeId := range chunk {
 				chunkGroups, ok := cgMap.GetChunkGroups(now, nodeId)
 				assert.True(t, ok)
-				assert.Equal(t, 1, len(chunkGroups)) // TODO
+				assert.Equal(t, 1, len(chunkGroups))
 				chunkGroup := chunkGroups[0]
 
 				assert.Equal(t, chunkIndex, chunkGroup)
@@ -164,6 +225,97 @@ func TestChunkGroupCalculations(t *testing.T) {
 		assert.Equal(t, count, nodesReported)
 	}
 }
+
+//func TestChunkGroupCalculationsMultipleAssignments(t *testing.T) {
+//	tu.InitializeRandom()
+//
+//	chunkGroupCount := uint32(rand.Intn(100) + 1)
+//	startTime := tu.RandomTime()
+//	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
+//	assignmentCount := uint32(rand.Intn(3) + 2)
+//
+//	cgMap := NewMap(chunkGroupCount, assignmentCount, shufflePeriod)
+//	assert.Equal(t, uint32(0), cgMap.Size())
+//
+//	expectedRegistrations := make(map[uint64]*lightnode.Registration)
+//
+//	// Add elements
+//	count := 1_000
+//	for i := 0; i < count; i++ {
+//		registration := randomRegistration()
+//		expectedRegistrations[registration.ID()] = registration
+//		cgMap.Add(startTime, registration)
+//	}
+//
+//	now := startTime
+//	steps := 100
+//	for step := 0; step < steps; step++ {
+//		if rand.Float64() < (1.0 / 3.0) {
+//			// Add less than a full shuffle period.
+//			now = now.Add(shufflePeriod * time.Duration(rand.Float64()))
+//		} else if rand.Float64() < (2.0 / 3.0) {
+//			// Add exactly one shuffle period.
+//			now = now.Add(shufflePeriod)
+//		} else {
+//			// Add several shuffle periods.
+//			now = now.Add(shufflePeriod * time.Duration(rand.Intn(10)+2))
+//		}
+//
+//		// Add a few elements.
+//		numberToAdd := rand.Intn(10)
+//		count += numberToAdd
+//		for i := 0; i < numberToAdd; i++ {
+//			registration := randomRegistration()
+//			expectedRegistrations[registration.ID()] = registration
+//			cgMap.Add(now, registration)
+//		}
+//
+//		// Remove a few elements.
+//		numberToRemove := rand.Intn(10)
+//		count -= numberToRemove
+//		for key := range expectedRegistrations {
+//			if numberToRemove == 0 {
+//				break
+//			}
+//			cgMap.Remove(key)
+//			delete(expectedRegistrations, key)
+//			numberToRemove--
+//		}
+//
+//		// Verify the chunk group for each element.
+//		for id, registration := range expectedRegistrations {
+//			chunkGroups, ok := cgMap.GetChunkGroups(now, id)
+//
+//			assert.Equal(t, assignmentCount, len(chunkGroups)) // TODO
+//			chunkGroup := chunkGroups[0]
+//
+//			assert.True(t, ok)
+//			offset := ComputeShuffleOffset(registration.Seed(), shufflePeriod)
+//			epoch := ComputeShuffleEpoch(shufflePeriod, offset, now)
+//			expectedChunkGroup := ComputeChunkGroup(registration.Seed(), epoch, chunkGroupCount)
+//
+//			assert.Equal(t, expectedChunkGroup, chunkGroup)
+//		}
+//
+//		// Query for full chunk groups.
+//		nodesReported := 0
+//		for chunkIndex := uint32(0); chunkIndex < chunkGroupCount; chunkIndex++ {
+//			chunk := cgMap.GetNodesInChunkGroup(now, chunkIndex)
+//			nodesReported += len(chunk)
+//
+//			for _, nodeId := range chunk {
+//				chunkGroups, ok := cgMap.GetChunkGroups(now, nodeId)
+//				assert.True(t, ok)
+//				assert.Equal(t, 1, len(chunkGroups)) // TODO
+//				chunkGroup := chunkGroups[0]
+//
+//				assert.Equal(t, chunkIndex, chunkGroup)
+//			}
+//		}
+//
+//		assert.Equal(t, count, nodesReported)
+//	}
+//}
 
 func TestGetRandomNode(t *testing.T) {
 	tu.InitializeRandom()
@@ -221,7 +373,7 @@ func TestGetRandomNode(t *testing.T) {
 				for _, nodeId := range chunk {
 					registration := cgMap.Get(nodeId)
 
-					offset := ComputeShuffleOffset(registration.Seed(), shufflePeriod)
+					offset := ComputeShuffleOffset(registration.Seed(), 0, shufflePeriod)
 					epoch := ComputeShuffleEpoch(shufflePeriod, offset, startTime)
 					epochBeginning := ComputeStartOfShuffleEpoch(shufflePeriod, offset, epoch)
 					timeInGroup := now.Sub(epochBeginning)
@@ -294,9 +446,9 @@ func TestSingleChunkGroup(t *testing.T) {
 			assert.Equal(t, 1, len(chunkGroups)) // TODO
 			chunkGroup := chunkGroups[0]
 
-			offset := ComputeShuffleOffset(registration.Seed(), shufflePeriod)
+			offset := ComputeShuffleOffset(registration.Seed(), 0, shufflePeriod)
 			epoch := ComputeShuffleEpoch(shufflePeriod, offset, now)
-			expectedChunkGroup := ComputeChunkGroup(registration.Seed(), epoch, chunkGroupCount)
+			expectedChunkGroup := ComputeChunkGroup(registration.Seed(), 0, epoch, chunkGroupCount)
 
 			assert.Equal(t, expectedChunkGroup, chunkGroup)
 		}

@@ -27,6 +27,10 @@ func bytesToUint64(bytes []byte) uint64 {
 // rotateLeft shifts the bits of x to the left by k bits, with bits that fall off the
 // left side wrapping around to the right.
 func rotateLeft(x uint64, k uint32) uint64 {
+	if k >= 64 {
+		panic(fmt.Sprintf("rotation amount must be less than 64, got %d", k))
+	}
+
 	return (x << k) | (x >> (64 - k))
 }
 
@@ -39,12 +43,23 @@ func randomInt(seed uint64) uint64 {
 	return bytesToUint64(value)
 }
 
+// TODO make this incorporate assignment index
+
 // ComputeShuffleOffset returns the offset at which a light node should be shuffled into a new chunk group,
 // relative to the beginning each shuffle interval.
-func ComputeShuffleOffset(assignmentSeed uint64, shufflePeriod time.Duration) time.Duration {
+func ComputeShuffleOffset(
+	seed uint64,
+	assignmentIndex uint32,
+	shufflePeriod time.Duration) time.Duration {
+
 	if shufflePeriod <= 0 {
 		panic(fmt.Sprintf("shuffle period must be positive, got %s", shufflePeriod))
 	}
+	if assignmentIndex >= 64 {
+		panic(fmt.Sprintf("assignment index must be between 0 and 63, got %d", assignmentIndex))
+	}
+
+	assignmentSeed := rotateLeft(seed, assignmentIndex)
 
 	return time.Duration(int64(randomInt(assignmentSeed) % uint64(shufflePeriod)))
 }
@@ -55,7 +70,6 @@ func ComputeShuffleEpoch(
 	shuffleOffset time.Duration,
 	now time.Time) uint64 {
 
-	// TODO can this be a static constant?
 	unixEpoch := time.Unix(0, 0)
 
 	if shufflePeriod <= 0 {
@@ -89,7 +103,6 @@ func ComputeStartOfShuffleEpoch(
 		panic(fmt.Sprintf("shuffle offset must be non-negative, got %s", shuffleOffset))
 	}
 
-	// TODO can this be a static constant?
 	unixEpoch := time.Unix(0, 0)
 
 	// The time when the first shuffle epoch for this node begins.
@@ -108,11 +121,20 @@ func ComputeEndOfShuffleEpoch(
 	return ComputeStartOfShuffleEpoch(shufflePeriod, shuffleOffset, currentEpoch+1)
 }
 
+// TODO make this incorporate assignment index
+
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
 func ComputeChunkGroup(
-	assignmentSeed uint64,
+	seed uint64,
+	assignmentIndex uint32,
 	shuffleEpoch uint64,
 	chunkGroupCount uint32) uint32 {
+
+	if assignmentIndex >= 64 {
+		panic(fmt.Sprintf("assignment index must be between 0 and 63, got %d", assignmentIndex))
+	}
+
+	assignmentSeed := rotateLeft(seed, assignmentIndex)
 
 	return uint32(randomInt(assignmentSeed^shuffleEpoch) % uint64(chunkGroupCount))
 }

@@ -50,6 +50,43 @@ func TestByteRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRotateLeft(t *testing.T) {
+	tu.InitializeRandom()
+
+	// Test rotating 0 by 0 bits.
+	assert.Equal(t, uint64(0), rotateLeft(0, 0))
+
+	// Test rotating 0 by 1 bit.
+	assert.Equal(t, uint64(0), rotateLeft(0, 1))
+
+	// Test rotating 1 by 0 bits.
+	assert.Equal(t, uint64(1), rotateLeft(1, 0))
+
+	// Test rotating 1 by 1 bit.
+	assert.Equal(t, uint64(1)<<1, rotateLeft(1, 1))
+
+	// test rotating 1 by a random number of bits.
+	r := rand.Intn(64)
+	assert.Equal(t, uint64(1)<<r, rotateLeft(1, uint32(r)))
+
+	x := uint64(0xAABBCCDDEEFF9988)
+	expectedRot8 := uint64(0xBBCCDDEEFF9988AA)
+	expectedRot16 := uint64(0xCCDDEEFF9988AABB)
+	expectedRot32 := uint64(0xEEFF9988AABBCCDD)
+	expectedRot48 := uint64(0x9988AABBCCDDEEFF)
+	assert.Equal(t, expectedRot8, rotateLeft(x, 8))
+	assert.Equal(t, expectedRot16, rotateLeft(x, 16))
+	assert.Equal(t, expectedRot32, rotateLeft(x, 32))
+	assert.Equal(t, expectedRot48, rotateLeft(x, 48))
+
+	assert.Panics(t, func() {
+		_ = rotateLeft(0, 64)
+	})
+	assert.Panics(t, func() {
+		_ = rotateLeft(0, 12345)
+	})
+}
+
 func TestComputeShuffleOffset(t *testing.T) {
 	tu.InitializeRandom()
 
@@ -61,14 +98,20 @@ func TestComputeShuffleOffset(t *testing.T) {
 	iterations := 1000
 	for i := 0; i < iterations; i++ {
 		seed := rand.Uint64()
-		offset := ComputeShuffleOffset(seed, shufflePeriod)
+		index := uint32(rand.Intn(64))
+		offset := ComputeShuffleOffset(seed, index, shufflePeriod)
 		assert.True(t, offset >= 0)
 		assert.True(t, offset < shufflePeriod)
 		uniqueOffsets[offset] = true
 
 		// Computing the offset a second time should yield the same result.
-		offset2 := ComputeShuffleOffset(seed, shufflePeriod)
+		offset2 := ComputeShuffleOffset(seed, index, shufflePeriod)
 		assert.Equal(t, offset, offset2)
+
+		// Changing the seed should yield a different result.
+		index2 := (index + 1) % 64
+		offset3 := ComputeShuffleOffset(seed, index2, shufflePeriod)
+		assert.NotEqual(t, offset, offset3)
 	}
 
 	// Although it's possible we end up with two offsets that are the same, the probability
@@ -79,7 +122,16 @@ func TestComputeShuffleOffset(t *testing.T) {
 
 func TestComputeShuffleOffsetNegativeShufflePeriod(t *testing.T) {
 	assert.Panics(t, func() {
-		_ = ComputeShuffleOffset(0, -time.Second)
+		_ = ComputeShuffleOffset(0, 0, -time.Second)
+	})
+}
+
+func TestComputeShuffleOffsetTooLargeAssignmentIndex(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = ComputeShuffleOffset(0, 64, time.Second)
+	})
+	assert.Panics(t, func() {
+		_ = ComputeShuffleOffset(0, 12345, time.Second)
 	})
 }
 
@@ -87,7 +139,7 @@ func TestComputeShuffleEpochHandCraftedScenario(t *testing.T) {
 	shufflePeriod := time.Second * 100
 	shuffleOffset := time.Second * 50
 
-	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
+	unixEpoch := time.Unix(0, 0)
 
 	// Requesting the epoch before genesis should return an error.
 	assert.Panics(t, func() {
@@ -139,11 +191,12 @@ func TestComputeShuffleEpochHandCraftedScenario(t *testing.T) {
 func TestComputeShuffleEpochTimeWalk(t *testing.T) {
 	tu.InitializeRandom()
 
-	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
+	unixEpoch := time.Unix(0, 0)
 
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	seed := rand.Uint64()
-	offset := ComputeShuffleOffset(seed, shufflePeriod)
+	index := uint32(rand.Intn(64))
+	offset := ComputeShuffleOffset(seed, index, shufflePeriod)
 
 	// If we move forward in time 1000 shuffle periods, we should see the epoch increase 1000 times.
 	endTime := unixEpoch.Add(shufflePeriod * 1000)
@@ -184,6 +237,7 @@ func TestComputeChunkGroup(t *testing.T) {
 
 	chunkGroupCount := uint32(rand.Intn(1_000) + 10_000)
 	seed := rand.Uint64()
+	index := uint32(rand.Intn(64))
 	firstEpoch := uint64(rand.Intn(1000))
 
 	uniqueChunkGroups := make(map[uint32]bool)
@@ -192,7 +246,7 @@ func TestComputeChunkGroup(t *testing.T) {
 	iterations := 1000
 	for i := 0; i < iterations; i++ {
 		epoch := firstEpoch + uint64(i)
-		chunkGroup := ComputeChunkGroup(seed, epoch, chunkGroupCount)
+		chunkGroup := ComputeChunkGroup(seed, index, epoch, chunkGroupCount)
 		assert.True(t, chunkGroup < chunkGroupCount)
 		uniqueChunkGroups[chunkGroup] = true
 	}
@@ -225,7 +279,7 @@ func TestComputeEndOfShuffleEpochHandCraftedScenario(t *testing.T) {
 func TestComputeEndOfShuffleEpoch(t *testing.T) {
 	tu.InitializeRandom()
 
-	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
+	unixEpoch := time.Unix(0, 0)
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
 
@@ -256,7 +310,7 @@ func TestComputeStartOfShuffleEpochHandCraftedScenario(t *testing.T) {
 func TestComputeStartOfShuffleEpoch(t *testing.T) {
 	tu.InitializeRandom()
 
-	unixEpoch := time.Unix(0, 0) // TODO can this be a static constant?
+	unixEpoch := time.Unix(0, 0)
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	shuffleOffset := time.Second * time.Duration(rand.Intn(10)+1)
 
