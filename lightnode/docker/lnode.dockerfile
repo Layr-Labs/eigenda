@@ -12,7 +12,7 @@ ARG BRANCH_OR_COMMIT
 # Copy a file containing build information. Useful for detective work on an otherwise unlabelled image.
 # This is also useful for forcing docker to invalidate caches when the build target is the latest commit in a branch.
 WORKDIR /home/lnode/eigenda/lightnode
-COPY --chown=lnode docker/build-info.txt /home/lnode
+COPY --chown=lnode build-info.txt /home/lnode
 WORKDIR /home/lnode
 
 # Just in case we are tracking the latest commit in a branch, pull again. This is a no-op if the target is a commit sha.
