@@ -29,19 +29,19 @@ import (
 
 // Generator simulates read/write traffic to the DA service.
 //
-//	┌------------┐                                       ┌------------┐
-//	|   writer   |-┐             ┌------------┐          |   reader   |-┐
-//	└------------┘ |-┐  -------> |  verifier  | -------> └------------┘ |-┐
-//	  └------------┘ |           └------------┘            └------------┘ |
-//	    └------------┘                                       └------------┘
+//	┌------------┐                                           ┌------------┐
+//	|   writer   |-┐             ┌----------------┐          |   reader   |-┐
+//	└------------┘ |-┐  -------> | status tracker | -------> └------------┘ |-┐
+//	  └------------┘ |           └----------------┘            └------------┘ |
+//	    └------------┘                                           └------------┘
 //
 // The traffic generator is built from three principal components: one or more writers
-// that write blobs, a verifier that polls the dispenser service until blobs are confirmed,
+// that write blobs, a statusTracker that polls the dispenser service until blobs are confirmed,
 // and one or more readers that read blobs.
 //
-// When a writer finishes writing a blob, it sends information about that blob to the verifier.
-// When the verifier observes that a blob has been confirmed, it sends information about the blob
-// to the readers. The readers only attempt to read blobs that have been confirmed by the verifier.
+// When a writer finishes writing a blob, it sends information about that blob to the statusTracker.
+// When the statusTracker observes that a blob has been confirmed, it sends information about the blob
+// to the readers. The readers only attempt to read blobs that have been confirmed by the statusTracker.
 type Generator struct {
 	ctx              *context.Context
 	cancel           *context.CancelFunc
@@ -52,9 +52,9 @@ type Generator struct {
 	eigenDAClient    *clients.EigenDAClient
 	config           *config.Config
 
-	writers  []*workers.BlobWriter
-	verifier *workers.BlobVerifier
-	readers  []*workers.BlobReader
+	writers       []*workers.BlobWriter
+	statusTracker *workers.BlobStatusTracker
+	readers       []*workers.BlobReader
 }
 
 func NewTrafficGenerator(config *config.Config) (*Generator, error) {
@@ -84,7 +84,7 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
 
 	disperserClient := clients.NewDisperserClient(config.DisperserClientConfig, signer)
-	statusVerifier := workers.NewBlobVerifier(
+	statusVerifier := workers.NewBlobStatusTracker(
 		&ctx,
 		&waitGroup,
 		logger,
@@ -134,7 +134,7 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 		eigenDAClient:    client,
 		config:           config,
 		writers:          writers,
-		verifier:         &statusVerifier,
+		statusTracker:    &statusVerifier,
 		readers:          readers,
 	}, nil
 }
@@ -172,7 +172,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, true)
 	if err != nil {
-		panic(fmt.Sprintf("Unable to build verifier: %s", err))
+		panic(fmt.Sprintf("Unable to build statusTracker: %s", err))
 	}
 
 	retriever, err := clients.NewRetrievalClient(
@@ -196,7 +196,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 func (generator *Generator) Start() error {
 
 	generator.generatorMetrics.Start()
-	generator.verifier.Start()
+	generator.statusTracker.Start()
 
 	for _, writer := range generator.writers {
 		writer.Start()

@@ -54,7 +54,7 @@ func isStatusSuccess(status disperser_rpc.BlobStatus) bool {
 	}
 }
 
-func TestBlobVerifier(t *testing.T) {
+func TestStatusTracker(t *testing.T) {
 	tu.InitializeRandom()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -62,26 +62,26 @@ func TestBlobVerifier(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.Nil(t, err)
 
-	requiredDownloads := rand.Intn(10)
+	requiredDownloads := rand.Intn(10) + 1
 	config := &config.WorkerConfig{
 		RequiredDownloads: float64(requiredDownloads),
 	}
 
-	blobTable := table.NewBlobStore()
+	blobStore := table.NewBlobStore()
 
-	verifierMetrics := metrics.NewMockMetrics()
+	trackerMetrics := metrics.NewMockMetrics()
 
 	disperserClient := &MockDisperserClient{}
 
-	verifier := NewBlobVerifier(
+	tracker := NewBlobStatusTracker(
 		&ctx,
 		&waitGroup,
 		logger,
 		config,
 		make(chan *UnconfirmedKey),
-		blobTable,
+		blobStore,
 		disperserClient,
-		verifierMetrics)
+		trackerMetrics)
 
 	expectedGetStatusCount := 0
 	statusCounts := make(map[disperser_rpc.BlobStatus]int)
@@ -117,7 +117,7 @@ func TestBlobVerifier(t *testing.T) {
 				SubmissionTime: time.Now(),
 			}
 
-			verifier.unconfirmedKeys = append(verifier.unconfirmedKeys, unconfirmedKey)
+			tracker.unconfirmedBlobs = append(tracker.unconfirmedBlobs, unconfirmedKey)
 		}
 
 		// Reset the mock disperser client.
@@ -145,22 +145,22 @@ func TestBlobVerifier(t *testing.T) {
 					Info: &disperser_rpc.BlobInfo{
 						BlobVerificationProof: &disperser_rpc.BlobVerificationProof{
 							BatchMetadata: &disperser_rpc.BatchMetadata{
-								BatchHeaderHash: make([]byte, 0),
+								BatchHeaderHash: make([]byte, 32),
 							},
 						},
 					},
 				}, nil)
 		}
 
-		// Simulate advancement of time, allowing the verifier to process the new keys.
-		verifier.poll()
+		// Simulate advancement of time, allowing the tracker to process the new keys.
+		tracker.poll()
 
 		// Validate the number of calls made to the disperser client.
 		disperserClient.mock.AssertNumberOfCalls(t, "GetBlobStatus", expectedGetStatusCount)
 
-		// Read the data in the table into a map for quick lookup.
+		// Read the data in the confirmedBlobs into a map for quick lookup.
 		tableData := make(map[string]*table.BlobMetadata)
-		for _, metadata := range blobTable.GetAll() {
+		for _, metadata := range blobStore.GetAll() {
 			tableData[string(metadata.Key)] = metadata
 		}
 
@@ -173,10 +173,10 @@ func TestBlobVerifier(t *testing.T) {
 			}
 
 			if isStatusSuccess(status) {
-				// Successful blobs should be in the table.
+				// Successful blobs should be in the confirmedBlobs.
 				assert.True(t, present)
 			} else {
-				// Non-successful blobs should not be in the table.
+				// Non-successful blobs should not be in the confirmedBlobs.
 				assert.False(t, present)
 			}
 
@@ -189,12 +189,12 @@ func TestBlobVerifier(t *testing.T) {
 		}
 
 		// Verify metrics.
-		for status, count := range statusCounts {
+		for status, count := range statusCounts { // TODO
 			metricName := fmt.Sprintf("get_status_%s", status.String())
-			assert.Equal(t, float64(count), verifierMetrics.GetCount(metricName))
+			assert.Equal(t, float64(count), trackerMetrics.GetCount(metricName), "status: %s", status.String())
 		}
-		if float64(blobsInFlight) != verifierMetrics.GetGaugeValue("blobs_in_flight") {
-			assert.Equal(t, float64(blobsInFlight), verifierMetrics.GetGaugeValue("blobs_in_flight"))
+		if float64(blobsInFlight) != trackerMetrics.GetGaugeValue("blobs_in_flight") {
+			assert.Equal(t, float64(blobsInFlight), trackerMetrics.GetGaugeValue("blobs_in_flight"))
 		}
 	}
 

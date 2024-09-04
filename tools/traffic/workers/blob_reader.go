@@ -39,7 +39,7 @@ type BlobReader struct {
 	chainClient eth.ChainClient
 
 	// blobsToRead blobs we are required to read a certain number of times.
-	blobsToRead *table.BlobTable // TODO class to blob table (as opposed to changing names)
+	blobsToRead *table.BlobStore
 
 	generatorMetrics           metrics.Metrics
 	fetchBatchHeaderMetric     metrics.LatencyMetric
@@ -67,7 +67,7 @@ func NewBlobReader(
 	config *config2.WorkerConfig,
 	retriever clients.RetrievalClient,
 	chainClient eth.ChainClient,
-	blobTable *table.BlobTable,
+	blobStore *table.BlobStore,
 	generatorMetrics metrics.Metrics) BlobReader {
 
 	return BlobReader{
@@ -78,7 +78,7 @@ func NewBlobReader(
 		config:                     config,
 		retriever:                  retriever,
 		chainClient:                chainClient,
-		blobsToRead:                blobTable,
+		blobsToRead:                blobStore,
 		generatorMetrics:           generatorMetrics,
 		fetchBatchHeaderMetric:     generatorMetrics.NewLatencyMetric("fetch_batch_header"),
 		fetchBatchHeaderSuccess:    generatorMetrics.NewCountMetric("fetch_batch_header_success"),
@@ -135,7 +135,7 @@ func (reader *BlobReader) randomRead() {
 			return reader.chainClient.FetchBatchHeader(
 				ctxTimeout,
 				gcommon.HexToAddress(reader.config.EigenDAServiceManager),
-				metadata.BatchHeaderHash,
+				metadata.BatchHeaderHash[:],
 				big.NewInt(int64(0)),
 				nil)
 		})
@@ -148,7 +148,7 @@ func (reader *BlobReader) randomRead() {
 	reader.fetchBatchHeaderSuccess.Increment()
 
 	var batchHeaderHash [32]byte
-	copy(batchHeaderHash[:], metadata.BatchHeaderHash)
+	copy(batchHeaderHash[:], metadata.BatchHeaderHash[:])
 
 	ctxTimeout, cancel = context.WithTimeout(*reader.ctx, reader.config.RetrieveBlobChunksTimeout)
 	chunks, err := metrics.InvokeAndReportLatency(reader.readLatencyMetric, func() (*clients.BlobChunks, error) {

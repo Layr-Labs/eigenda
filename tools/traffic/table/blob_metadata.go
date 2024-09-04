@@ -10,8 +10,8 @@ type BlobMetadata struct {
 	// BlobIndex of the blob.
 	BlobIndex uint
 
-	// batchHeaderHash of the blob.
-	BatchHeaderHash []byte
+	// Hash of the batch header that the blob was written in.
+	BatchHeaderHash [32]byte
 
 	// Checksum of the blob.
 	Checksum [16]byte
@@ -31,7 +31,7 @@ func NewBlobMetadata(
 	checksum [16]byte,
 	size uint,
 	blobIndex uint,
-	batchHeaderHash []byte,
+	batchHeaderHash [32]byte,
 	readPermits int) (*BlobMetadata, error) {
 
 	if readPermits == 0 {

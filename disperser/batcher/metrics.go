@@ -32,7 +32,8 @@ type MetricsConfig struct {
 }
 
 type EncodingStreamerMetrics struct {
-	EncodedBlobs *prometheus.GaugeVec
+	EncodedBlobs        *prometheus.GaugeVec
+	BlobEncodingLatency *prometheus.SummaryVec
 }
 
 type TxnManagerMetrics struct {
@@ -65,6 +66,8 @@ type Metrics struct {
 	Batch                     *prometheus.CounterVec
 	BatchProcLatency          *prometheus.SummaryVec
 	BatchProcLatencyHistogram *prometheus.HistogramVec
+	BlobAge                   *prometheus.SummaryVec
+	BlobSizeTotal             *prometheus.CounterVec
 	Attestation               *prometheus.GaugeVec
 	BatchError                *prometheus.CounterVec
 
@@ -85,6 +88,15 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Help:      "number and size of all encoded blobs",
 			},
 			[]string{"type"},
+		),
+		BlobEncodingLatency: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "blob_encoding_latency_ms",
+				Help:       "blob encoding latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			[]string{"state", "quorum", "size_bucket"},
 		),
 	}
 
@@ -177,7 +189,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and unencoded size of total dispersal blobs",
+				Help:      "the number and unencoded size of total dispersal blobs, if a blob is in multiple quorums, it'll only be counted once",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
@@ -207,6 +219,25 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Buckets: []float64{60_000, 120_000, 180_000, 300_000, 480_000, 600_000, 780_000, 900_000, 1_260_000, 2_040_000, 3_300_000, 5_340_000},
 			},
 			[]string{"stage"},
+		),
+		BlobAge: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "blob_age_ms",
+				Help:       "blob age (in ms) since dispersal request time at different stages of its lifecycle",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			// The stage would be:
+			// encoding_requested -> encoded -> batched -> attestation_requested -> attested -> confirmed
+			[]string{"stage"},
+		),
+		BlobSizeTotal: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "blob_size_total",
+				Help:      "the size in bytes of unencoded blobs, if a blob is in multiple quorums, it'll be acounted multiple times",
+			},
+			[]string{"stage", "quorum"},
 		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -294,6 +325,14 @@ func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 	g.BatchProcLatencyHistogram.WithLabelValues(stage).Observe(latencyMs)
 }
 
+func (g *Metrics) ObserveBlobAge(stage string, ageMs float64) {
+	g.BlobAge.WithLabelValues(stage).Observe(ageMs)
+}
+
+func (g *Metrics) IncrementBlobSize(stage string, quorumId core.QuorumID, blobSize int) {
+	g.BlobSizeTotal.WithLabelValues(stage, fmt.Sprintf("%d", quorumId)).Add(float64(blobSize))
+}
+
 func (g *Metrics) Start(ctx context.Context) {
 	g.logger.Info("starting metrics server at ", "port", g.httpPort)
 	addr := fmt.Sprintf(":%s", g.httpPort)
@@ -312,6 +351,10 @@ func (g *Metrics) Start(ctx context.Context) {
 func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
 	e.EncodedBlobs.WithLabelValues("size").Set(float64(size))
 	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
+}
+
+func (e *EncodingStreamerMetrics) ObserveEncodingLatency(state string, quorumId core.QuorumID, blobSize int, latencyMs float64) {
+	e.BlobEncodingLatency.WithLabelValues(state, fmt.Sprintf("%d", quorumId), blobSizeBucket(blobSize)).Observe(latencyMs)
 }
 
 func (t *TxnManagerMetrics) ObserveLatency(stage string, latencyMs float64) {
@@ -348,4 +391,35 @@ func (f *FinalizerMetrics) UpdateLastSeenFinalizedBlock(blockNumber uint64) {
 
 func (f *FinalizerMetrics) ObserveLatency(stage string, latencyMs float64) {
 	f.Latency.WithLabelValues(stage).Observe(latencyMs)
+}
+
+// blobSizeBucket maps the blob size into a bucket that's defined according to
+// the power of 2.
+func blobSizeBucket(blobSize int) string {
+	switch {
+	case blobSize <= 32*1024:
+		return "32KiB"
+	case blobSize <= 64*1024:
+		return "64KiB"
+	case blobSize <= 128*1024:
+		return "128KiB"
+	case blobSize <= 256*1024:
+		return "256KiB"
+	case blobSize <= 512*1024:
+		return "512KiB"
+	case blobSize <= 1024*1024:
+		return "1MiB"
+	case blobSize <= 2*1024*1024:
+		return "2MiB"
+	case blobSize <= 4*1024*1024:
+		return "4MiB"
+	case blobSize <= 8*1024*1024:
+		return "8MiB"
+	case blobSize <= 16*1024*1024:
+		return "16MiB"
+	case blobSize <= 32*1024*1024:
+		return "32MiB"
+	default:
+		return "invalid"
+	}
 }

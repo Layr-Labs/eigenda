@@ -77,8 +77,8 @@ func TestBlobReader(t *testing.T) {
 			checksum = md5.Sum(blobData)
 		}
 
-		batchHeaderHash := make([]byte, 32)
-		_, err = rand.Read(batchHeaderHash)
+		batchHeaderHash := [32]byte{}
+		_, err = rand.Read(batchHeaderHash[:])
 		assert.Nil(t, err)
 
 		blobMetadata, err := table.NewBlobMetadata(
