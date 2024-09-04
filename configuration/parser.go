@@ -67,9 +67,8 @@ func ParseJsonString[T interface{}](t *T, configString string) error {
 	if err != nil {
 		// Add the line number and column number to the error message.
 		var syntaxErr *json.SyntaxError
-		errors.As(err, &syntaxErr)
-
-		if syntaxErr == nil {
+		ok := errors.As(err, &syntaxErr)
+		if !ok {
 			// The json parser didn't tell us where the error was. Nothing we can do to extract line number.
 			return err
 		}
