@@ -19,8 +19,6 @@ const (
 	maxS3BlobFetchWorkers = 64
 )
 
-var errAlreadyConfirmed = errors.New("blob already confirmed")
-
 var errProcessingToDispersing = errors.New("blob transit to dispersing from non processing")
 
 // The shared blob store that the disperser is operating on.
@@ -166,11 +164,6 @@ func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey di
 	if err != nil {
 		s.logger.Error("error getting blob metadata while marking blobDispersing", "err", err)
 		return err
-	}
-	alreadyConfirmed, _ := refreshedMetadata.IsConfirmed()
-	if alreadyConfirmed {
-		s.logger.Error("error marking blob as dispersing already confirmed", "blobKey", metadataKey.String())
-		return errAlreadyConfirmed
 	}
 
 	status := refreshedMetadata.BlobStatus
