@@ -25,21 +25,17 @@ var (
 	}
 )
 
-// Implementation
-
-// AssignmentCoordinator is responsible for taking the current OperatorState and the security requirements represented by a
-// given QuorumResults and determining or validating system parameters that will satisfy these security requirements given the
-// OperatorStates. There are two classes of parameters that must be determined or validated: 1) the chunk indices that will be
-// assigned to each DA node, and 2) the length of each chunk.
+// AssignmentCoordinator is responsible for assigning chunks to operators in a way that satisfies the security
+// requirements of the protocol, as well as the constraints imposed by the specific blob version.
 type AssignmentCoordinatorV2 interface {
 
-	// GetAssignments calculates the full set of node assignments.
+	// GetAssignments calculates the full set of node assignments
 	GetAssignments(state *OperatorState, blobVersion byte, quorum QuorumID) (map[OperatorID]Assignment, error)
 
-	// GetOperatorAssignment calculates the assignment for a specific DA node
+	// GetAssignment calculates the assignment for a specific operator
 	GetAssignment(state *OperatorState, blobVersion byte, quorum QuorumID, id OperatorID) (Assignment, error)
 
-	// ValidateChunkLength validates that the chunk length for the given quorum satisfies all protocol constraints
+	// GetChunkLength determines the length of a chunk given the blob version and blob length
 	GetChunkLength(blobVersion byte, blobLength uint) (uint, error)
 }
 
