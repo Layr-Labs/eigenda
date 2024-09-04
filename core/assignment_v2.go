@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 )
@@ -10,6 +11,12 @@ type BlobParameters struct {
 	CodingRate              uint
 	ReconstructionThreshold float64
 	NumChunks               uint
+}
+
+func (p BlobParameters) MaxNumOperators() uint {
+
+	return uint(math.Floor(float64(p.NumChunks) * (1 - 1/(p.ReconstructionThreshold*float64(p.CodingRate)))))
+
 }
 
 var (
@@ -43,9 +50,21 @@ var _ AssignmentCoordinatorV2 = (*StdAssignmentCoordinatorV2)(nil)
 
 func (c *StdAssignmentCoordinatorV2) GetAssignments(state *OperatorState, blobVersion byte, quorum QuorumID) (map[OperatorID]Assignment, error) {
 
-	params := ParametersMap[blobVersion]
+	params, ok := ParametersMap[blobVersion]
+	if !ok {
+		return nil, fmt.Errorf("blob version %d not found", blobVersion)
+	}
 
-	n := big.NewInt(int64(len(state.Operators[quorum])))
+	ops, ok := state.Operators[quorum]
+	if !ok {
+		return nil, fmt.Errorf("no operators found for quorum %d", quorum)
+	}
+
+	if len(ops) > int(params.MaxNumOperators()) {
+		return nil, fmt.Errorf("too many operators for blob version %d", blobVersion)
+	}
+
+	n := big.NewInt(int64(len(ops)))
 	m := big.NewInt(int64(params.NumChunks))
 
 	type assignment struct {
@@ -55,15 +74,13 @@ func (c *StdAssignmentCoordinatorV2) GetAssignments(state *OperatorState, blobVe
 		stake  *big.Int
 	}
 
-	chunkAssignments := make([]assignment, 0, len(state.Operators[quorum]))
+	chunkAssignments := make([]assignment, 0, len(ops))
 	for ID, r := range state.Operators[quorum] {
 
 		num := new(big.Int).Mul(r.Stake, new(big.Int).Sub(m, n))
 		denom := state.Totals[quorum].Stake
 
 		chunks := roundUpDivideBig(num, denom)
-
-		// delta := new(big.Int).Sub(new(big.Int).Mul(r.Stake, m), new(big.Int).Mul(denom, chunks))
 
 		chunkAssignments = append(chunkAssignments, assignment{id: ID, index: r.Index, chunks: uint(chunks.Uint64()), stake: r.Stake})
 	}
@@ -123,6 +140,24 @@ func (c *StdAssignmentCoordinatorV2) GetAssignment(state *OperatorState, blobVer
 
 func (c *StdAssignmentCoordinatorV2) GetChunkLength(blobVersion byte, blobLength uint) (uint, error) {
 
-	return blobLength * ParametersMap[blobVersion].CodingRate / ParametersMap[blobVersion].NumChunks, nil
+	if blobLength == 0 {
+		return 0, fmt.Errorf("blob length must be greater than 0")
+	}
+
+	// Check that the blob length is a power of 2
+	if blobLength&(blobLength-1) != 0 {
+		return 0, fmt.Errorf("blob length %d is not a power of 2", blobLength)
+	}
+
+	if _, ok := ParametersMap[blobVersion]; !ok {
+		return 0, fmt.Errorf("blob version %d not found", blobVersion)
+	}
+
+	chunkLength := blobLength * ParametersMap[blobVersion].CodingRate / ParametersMap[blobVersion].NumChunks
+	if chunkLength == 0 {
+		chunkLength = 1
+	}
+
+	return chunkLength, nil
 
 }

@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	maxNumOperators = 3537
+)
+
 func TestOperatorAssignmentsV2(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
@@ -60,6 +64,41 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 
 }
 
+func TestMaxNumOperators(t *testing.T) {
+
+	assert.Equal(t, core.ParametersMap[0].MaxNumOperators(), uint(maxNumOperators))
+
+}
+
+func TestAssignmentWithTooManyOperators(t *testing.T) {
+
+	asn := &core.StdAssignmentCoordinatorV2{}
+
+	numOperators := maxNumOperators + 1
+
+	stakes := map[core.QuorumID]map[core.OperatorID]int{
+		0: {},
+	}
+	for i := 0; i < numOperators; i++ {
+		stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
+	}
+
+	dat, err := mock.NewChainDataMock(stakes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := dat.GetTotalOperatorState(context.Background(), 0)
+
+	assert.Equal(t, len(state.Operators[0]), numOperators)
+
+	blobVersion := byte(0)
+
+	_, err = asn.GetAssignments(state.OperatorState, blobVersion, 0)
+	assert.Error(t, err)
+
+}
+
 func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	// Add distributions to fuzz
@@ -71,6 +110,10 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	for i := 0; i < 100; i++ {
 		f.Add(rand.Intn(2048) + 100)
+	}
+
+	for i := 0; i < 5; i++ {
+		f.Add(maxNumOperators)
 	}
 
 	f.Fuzz(func(t *testing.T, numOperators int) {
@@ -117,5 +160,68 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		}
 
 	})
+
+}
+
+func TestChunkLength(t *testing.T) {
+
+	asn := &core.StdAssignmentCoordinatorV2{}
+
+	blobVersion := byte(0)
+
+	pairs := []struct {
+		blobLength  uint
+		chunkLength uint
+	}{
+		{512, 1},
+		{1024, 1},
+		{2048, 2},
+		{4096, 4},
+		{8192, 8},
+	}
+
+	for _, pair := range pairs {
+
+		chunkLength, err := asn.GetChunkLength(blobVersion, pair.blobLength)
+
+		assert.NoError(t, err)
+
+		assert.Equal(t, pair.chunkLength, chunkLength)
+	}
+
+}
+
+func TestInvalidChunkLength(t *testing.T) {
+
+	asn := &core.StdAssignmentCoordinatorV2{}
+
+	blobVersion := byte(0)
+
+	invalidLengths := []uint{
+		0,
+		3,
+		5,
+		6,
+		7,
+		9,
+		10,
+		11,
+		12,
+		13,
+		14,
+		15,
+		31,
+		63,
+		127,
+		255,
+		511,
+		1023,
+	}
+
+	for _, length := range invalidLengths {
+
+		_, err := asn.GetChunkLength(blobVersion, length)
+		assert.Error(t, err)
+	}
 
 }
