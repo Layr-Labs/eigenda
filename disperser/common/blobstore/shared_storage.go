@@ -21,6 +21,8 @@ const (
 
 var errProcessingToDispersing = errors.New("blob transit to dispersing from non processing")
 
+var errProcessingInitialization = errors.New("blob status initialization")
+
 // The shared blob store that the disperser is operating on.
 // The metadata store is backed by DynamoDB and the blob store is backed by S3.
 //
@@ -89,6 +91,12 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 	}
 	metadataKey.BlobHash = blobHash
 	metadataKey.MetadataHash = metadataHash
+
+	refreshedMetadata, err := s.GetBlobMetadata(ctx, metadataKey)
+	if !errors.Is(err, disperser.ErrMetadataNotFound) {
+		s.logger.Error("error intentionally get blob status before creation", "err", err, "status", refreshedMetadata.BlobStatus, "metadataKey", refreshedMetadata.GetBlobKey().String())
+		return metadataKey, errProcessingInitialization
+	}
 
 	err = s.s3Client.UploadObject(ctx, s.bucketName, blobObjectKey(blobHash), blob.Data)
 	if err != nil {
