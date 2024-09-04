@@ -53,7 +53,7 @@ type assignmentQueue struct {
 
 	// The number of elements in the queue. Tracked separately since the heap and NodeIdSet
 	// may contain removed nodes that have not yet been fully garbage collected.
-	size uint32
+	size uint64
 }
 
 // newAssignmentQueue creates a new priority queue.
@@ -67,7 +67,7 @@ func newAssignmentQueue() *assignmentQueue {
 }
 
 // Size returns the number of elements in the priority queue.
-func (queue *assignmentQueue) Size() uint32 {
+func (queue *assignmentQueue) Size() uint64 {
 	return queue.size
 }
 

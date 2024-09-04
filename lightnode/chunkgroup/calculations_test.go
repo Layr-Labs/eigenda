@@ -9,20 +9,41 @@ import (
 )
 
 func TestUint64ToBytes(t *testing.T) {
+	bytes := make([]byte, 8)
+
 	// Test the conversion of 0 to bytes.
-	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, uint64ToBytes(0))
+	uint64ToBytes(0, bytes)
+	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, bytes)
 
 	// Test the conversion of 1 to bytes.
-	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 1}, uint64ToBytes(1))
+	uint64ToBytes(1, bytes)
+	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 1}, bytes)
 
 	// Test the conversion of 256 to bytes.
-	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 1, 0}, uint64ToBytes(256))
+	uint64ToBytes(256, bytes)
+	assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 1, 0}, bytes)
 
 	// Test the conversion of 0xAABBCCDDEEFF9988 to bytes.
-	assert.Equal(t, []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99, 0x88}, uint64ToBytes(0xAABBCCDDEEFF9988))
+	uint64ToBytes(0xAABBCCDDEEFF9988, bytes)
+	assert.Equal(t, []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99, 0x88}, bytes)
 
 	// Test the conversion of 0xFFFFFFFFFFFFFFFF to bytes.
-	assert.Equal(t, []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, uint64ToBytes(0xFFFFFFFFFFFFFFFF))
+	uint64ToBytes(0xFFFFFFFFFFFFFFFF, bytes)
+	assert.Equal(t, []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, bytes)
+
+	bytes = make([]byte, 32)
+
+	// Test the conversion of 0xAABBCCDDEEFF9988, 0x1122334455667788, 0x99AABBCCDDEEFF00, 0x0011223344556677 to bytes.
+	uint64ToBytes(0xAABBCCDDEEFF9988, bytes[:8])
+	uint64ToBytes(0x1122334455667788, bytes[8:16])
+	uint64ToBytes(0x99AABBCCDDEEFF00, bytes[16:24])
+	uint64ToBytes(0x0011223344556677, bytes[24:32])
+	assert.Equal(t, []byte{
+		0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99, 0x88,
+		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+		0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00,
+		0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+	}, bytes)
 }
 
 func TestBytesToUint64(t *testing.T) {
@@ -44,47 +65,28 @@ func TestBytesToUint64(t *testing.T) {
 
 func TestByteRoundTrip(t *testing.T) {
 	tu.InitializeRandom()
+	bytes := make([]byte, 8)
 	for i := 0; i < 1000; i++ {
 		value := uint64(rand.Int63())
-		assert.Equal(t, value, bytesToUint64(uint64ToBytes(value)))
+		uint64ToBytes(value, bytes)
+		assert.Equal(t, value, bytesToUint64(bytes))
 	}
-}
 
-func TestRotateLeft(t *testing.T) {
-	tu.InitializeRandom()
-
-	// Test rotating 0 by 0 bits.
-	assert.Equal(t, uint64(0), rotateLeft(0, 0))
-
-	// Test rotating 0 by 1 bit.
-	assert.Equal(t, uint64(0), rotateLeft(0, 1))
-
-	// Test rotating 1 by 0 bits.
-	assert.Equal(t, uint64(1), rotateLeft(1, 0))
-
-	// Test rotating 1 by 1 bit.
-	assert.Equal(t, uint64(1)<<1, rotateLeft(1, 1))
-
-	// test rotating 1 by a random number of bits.
-	r := rand.Intn(64)
-	assert.Equal(t, uint64(1)<<r, rotateLeft(1, uint32(r)))
-
-	x := uint64(0xAABBCCDDEEFF9988)
-	expectedRot8 := uint64(0xBBCCDDEEFF9988AA)
-	expectedRot16 := uint64(0xCCDDEEFF9988AABB)
-	expectedRot32 := uint64(0xEEFF9988AABBCCDD)
-	expectedRot48 := uint64(0x9988AABBCCDDEEFF)
-	assert.Equal(t, expectedRot8, rotateLeft(x, 8))
-	assert.Equal(t, expectedRot16, rotateLeft(x, 16))
-	assert.Equal(t, expectedRot32, rotateLeft(x, 32))
-	assert.Equal(t, expectedRot48, rotateLeft(x, 48))
-
-	assert.Panics(t, func() {
-		_ = rotateLeft(0, 64)
-	})
-	assert.Panics(t, func() {
-		_ = rotateLeft(0, 12345)
-	})
+	bytes = make([]byte, 32)
+	for i := 0; i < 1000; i++ {
+		value1 := uint64(rand.Int63())
+		value2 := uint64(rand.Int63())
+		value3 := uint64(rand.Int63())
+		value4 := uint64(rand.Int63())
+		uint64ToBytes(value1, bytes[:8])
+		uint64ToBytes(value2, bytes[8:16])
+		uint64ToBytes(value3, bytes[16:24])
+		uint64ToBytes(value4, bytes[24:32])
+		assert.Equal(t, value1, bytesToUint64(bytes[:8]))
+		assert.Equal(t, value2, bytesToUint64(bytes[8:16]))
+		assert.Equal(t, value3, bytesToUint64(bytes[16:24]))
+		assert.Equal(t, value4, bytesToUint64(bytes[24:32]))
+	}
 }
 
 func TestComputeShuffleOffset(t *testing.T) {
@@ -98,7 +100,7 @@ func TestComputeShuffleOffset(t *testing.T) {
 	iterations := 1000
 	for i := 0; i < iterations; i++ {
 		seed := rand.Uint64()
-		index := uint32(rand.Intn(64))
+		index := uint64(rand.Intn(64))
 		offset := ComputeShuffleOffset(seed, index, shufflePeriod)
 		assert.True(t, offset >= 0)
 		assert.True(t, offset < shufflePeriod)
@@ -195,7 +197,7 @@ func TestComputeShuffleEpochTimeWalk(t *testing.T) {
 
 	shufflePeriod := time.Second * time.Duration(rand.Intn(10)+1)
 	seed := rand.Uint64()
-	index := uint32(rand.Intn(64))
+	index := uint64(rand.Intn(64))
 	offset := ComputeShuffleOffset(seed, index, shufflePeriod)
 
 	// If we move forward in time 1000 shuffle periods, we should see the epoch increase 1000 times.
@@ -235,12 +237,12 @@ func TestComputeShuffleEpochInvalidShuffleOffset(t *testing.T) {
 func TestComputeChunkGroup(t *testing.T) {
 	tu.InitializeRandom()
 
-	chunkGroupCount := uint32(rand.Intn(1_000) + 10_000)
+	chunkGroupCount := uint64(rand.Intn(1_000) + 10_000)
 	seed := rand.Uint64()
-	index := uint32(rand.Intn(64))
+	index := uint64(rand.Intn(64))
 	firstEpoch := uint64(rand.Intn(1000))
 
-	uniqueChunkGroups := make(map[uint32]bool)
+	uniqueChunkGroups := make(map[uint64]bool)
 
 	// Ensure that the chunk group is always between 0 and chunkGroupCount.
 	iterations := 1000

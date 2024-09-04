@@ -6,16 +6,14 @@ import (
 	"time"
 )
 
-// uint64ToBytes converts a uint64 to a byte array in big-endian order.
-func uint64ToBytes(value uint64) []byte {
-	bytes := [8]byte{}
+// uint64ToBytes writes a uint64 to a byte array in big-endian order.
+func uint64ToBytes(value uint64, bytes []byte) {
 	for i := 0; i < 8; i++ {
 		bytes[i] = byte(value >> (56 - 8*i))
 	}
-	return bytes[:]
 }
 
-// bytesToUint64 converts a byte array to a uint64 in big-endian order.
+// bytesToUint64 converts a byte array in big-endian order to a uint64.
 func bytesToUint64(bytes []byte) uint64 {
 	var value uint64
 	for i := 0; i < 8; i++ {
@@ -24,21 +22,17 @@ func bytesToUint64(bytes []byte) uint64 {
 	return value
 }
 
-// rotateLeft shifts the bits of x to the left by k bits, with bits that fall off the
-// left side wrapping around to the right.
-func rotateLeft(x uint64, k uint32) uint64 {
-	if k >= 64 {
-		panic(fmt.Sprintf("rotation amount must be less than 64, got %d", k))
-	}
-
-	return (x << k) | (x >> (64 - k))
-}
-
 // hash hashes a seed using the Keccak-256 algorithm. The returned value is an integer formed from the
 // first 8 bytes of the hash.
-func randomInt(seed uint64) uint64 {
+func randomInt(seeds ...uint64) uint64 {
+	seedBytes := make([]byte, 8*len(seeds))
+
+	for i, seed := range seeds {
+		uint64ToBytes(seed, seedBytes[i*8:(i+1)*8])
+	}
+
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(uint64ToBytes(seed))
+	hasher.Write(seedBytes)
 	value := hasher.Sum(nil)
 	return bytesToUint64(value)
 }
@@ -47,7 +41,7 @@ func randomInt(seed uint64) uint64 {
 // relative to the beginning each shuffle interval.
 func ComputeShuffleOffset(
 	seed uint64,
-	assignmentIndex uint32,
+	assignmentIndex uint64,
 	shufflePeriod time.Duration) time.Duration {
 
 	if shufflePeriod <= 0 {
@@ -57,9 +51,7 @@ func ComputeShuffleOffset(
 		panic(fmt.Sprintf("assignment index must be between 0 and 63, got %d", assignmentIndex))
 	}
 
-	assignmentSeed := rotateLeft(seed, assignmentIndex)
-
-	return time.Duration(int64(randomInt(assignmentSeed) % uint64(shufflePeriod)))
+	return time.Duration(int64(randomInt(seed, assignmentIndex) % uint64(shufflePeriod)))
 }
 
 // ComputeShuffleEpoch returns the epoch number of a light node's group chunkGroupAssignment at the current time.
@@ -122,15 +114,13 @@ func ComputeEndOfShuffleEpoch(
 // ComputeChunkGroup returns the chunk group of a light node given its current shuffle epoch.
 func ComputeChunkGroup(
 	seed uint64,
-	assignmentIndex uint32,
+	assignmentIndex uint64,
 	shuffleEpoch uint64,
-	chunkGroupCount uint32) uint32 {
+	chunkGroupCount uint64) uint64 {
 
 	if assignmentIndex >= 64 {
 		panic(fmt.Sprintf("assignment index must be between 0 and 63, got %d", assignmentIndex))
 	}
 
-	assignmentSeed := rotateLeft(seed, assignmentIndex)
-
-	return uint32(randomInt(assignmentSeed^shuffleEpoch) % uint64(chunkGroupCount))
+	return randomInt(seed, assignmentIndex, shuffleEpoch) % chunkGroupCount
 }

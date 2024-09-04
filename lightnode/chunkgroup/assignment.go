@@ -8,7 +8,7 @@ import (
 // assignmentKey uniquely identifies a light node chunkGroupAssignment.
 type assignmentKey struct {
 	lightNodeID     uint64
-	assignmentIndex uint32
+	assignmentIndex uint64
 }
 
 // chunkGroupAssignment is a struct that holds a registration and the chunk group it is currently assigned to.
@@ -20,7 +20,7 @@ type chunkGroupAssignment struct {
 	// assignmentIndex describes which of a light node's multiple groups this struct represents.
 	// The first of a light node's groups has an chunkGroupAssignment index of 0, the second has
 	// an index of 1, and so on.
-	assignmentIndex uint32
+	assignmentIndex uint64
 
 	// assignmentKey is the key that uniquely identifies this chunkGroupAssignment. Note that this information
 	// is also stored in the registration, but we cache this object here for convenience.
@@ -33,7 +33,7 @@ type chunkGroupAssignment struct {
 	shuffleOffset time.Duration
 
 	// chunkGroup is the chunk group currently associated with this chunkGroupAssignment index.
-	chunkGroup uint32
+	chunkGroup uint64
 
 	// startOfEpoch is the start of the current shuffle epoch,
 	// i.e. the time when this chunkGroupAssignment index was last shuffled into the current chunk group.
@@ -47,9 +47,9 @@ type chunkGroupAssignment struct {
 // newChunkGroupAssignment creates a new chunkGroupAssignment.
 func newChunkGroupAssignment(
 	registration *lightnode.Registration,
-	assignmentIndex uint32,
+	assignmentIndex uint64,
 	shuffleOffset time.Duration,
-	chunkGroup uint32,
+	chunkGroup uint64,
 	startOfEpoch time.Time,
 	endOfEpoch time.Time) *chunkGroupAssignment {
 

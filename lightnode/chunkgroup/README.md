@@ -77,24 +77,16 @@ A light node's seed is an 8 byte value that is randomly assigned to the node at 
 be generated using on-chain randomness that is difficult for an attacker to predict. The light node's seed
 is public information and stored on-chain.
 
-## `randomInt(seed)`
+## `randomInt(uint64, uint64, ..., uint64)`
 
-Define a function `randomInt(seed)` that takes an 8 byte unsigned integer as a seed and returns a pseudo-random 
-8 byte unsigned integer. 
+Define a function `randomInt(uint64, uint64, ..., uint64)` that takes a variable number of 8 byte unsigned integers
+and returns a pseudo-random 8 byte unsigned integer. 
 
-- Copy the 8 byte unsigned integer `seed` into an 8 byte array `seedBytes` in big endian order.
+- For each unsigned integer from left to right, append the integer's bytes into a byte array called 
+  `seedBytes` in big endian order.
 - Use the `seedBytes` as the input to `keccak256` to generate a 32 byte array called `hashBytes`.
 - Use the first 8 bytes of `hashBytes` to create an 8 byte unsigned integer using big endian order called `result`.
 - Return `result`.
-
-## Function `rotateLeft(x, n)`
-
-Define a function `rotateLeft(x, n)` that shifts the bits in an 8 byte unsigned integer `x` to the left by `n` bits
-and moves the bits that fall off the left side to the right side.
-
-```
-rotateLeft(x, n) := (x << n) | (x >> (64 - n))
-```
 
 ## Determining a node's shuffle offset for a particular assignment index
 
@@ -102,7 +94,7 @@ A node's shuffle offset for a particular assignment index is a duration between 
 nanosecond granularity. The shuffle offset is determined as follows:
 
 ```
-shuffleOffset := randomInt(rotateLeft(nodeSeed, assignmentIndex)) % shufflePeriod_nanoseconds
+shuffleOffset := randomInt(nodeSeed, assignmentIndex) % shufflePeriod_nanoseconds
 ```
 
 ## Shuffle Epoch Calculation
@@ -116,5 +108,5 @@ To determine a node's chunk group, first compute the current epoch for the node,
 function:
 
 ```
-chunkGroup := randomInt(rotateLeft(nodeSeed, assignmentIndex) ^ shuffleEpoch) % numberOfChunks
+chunkGroup := randomInt(nodeSeed, assignmentIndex, shuffleEpoch) % numberOfChunks
 ```
