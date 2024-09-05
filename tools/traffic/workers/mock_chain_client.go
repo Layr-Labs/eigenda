@@ -4,20 +4,12 @@ import (
 	"context"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/mock"
 	"math/big"
-	"sync"
 )
 
 type mockChainClient struct {
-	lock  *sync.Mutex
-	Count uint
-}
-
-func newMockChainClient(lock *sync.Mutex) *mockChainClient {
-	return &mockChainClient{
-		lock: lock,
-	}
-
+	mock mock.Mock
 }
 
 func (m *mockChainClient) FetchBatchHeader(
@@ -27,10 +19,6 @@ func (m *mockChainClient) FetchBatchHeader(
 	fromBlock *big.Int,
 	toBlock *big.Int) (*binding.IEigenDAServiceManagerBatchHeader, error) {
 
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.Count++
-
+	m.mock.Called(serviceManagerAddress, batchHeaderHash, fromBlock, toBlock)
 	return &binding.IEigenDAServiceManagerBatchHeader{}, nil
 }
