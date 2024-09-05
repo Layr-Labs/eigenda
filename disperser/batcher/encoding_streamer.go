@@ -674,19 +674,17 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 	}
 
 	// Transform maps to slices so orders in different slices match
-	encodedBlobs := make([]core.EncodedBlob, len(metadataByKey))
-	blobHeaders := make([]*core.BlobHeader, len(metadataByKey))
-	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
-	i := 0
+	encodedBlobs := make([]core.EncodedBlob, 0, len(metadataByKey))
+	blobHeaders := make([]*core.BlobHeader, 0, len(metadataByKey))
+	metadatas := make([]*disperser.BlobMetadata, 0, len(metadataByKey))
 	for key := range metadataByKey {
 		err := e.transitionBlobToDispersing(ctx, metadataByKey[key])
 		if err != nil {
 			continue
 		}
-		encodedBlobs[i] = encodedBlobByKey[key]
-		blobHeaders[i] = blobHeaderByKey[key]
-		metadatas[i] = metadataByKey[key]
-		i++
+		encodedBlobs = append(encodedBlobs, encodedBlobByKey[key])
+		blobHeaders = append(blobHeaders, blobHeaderByKey[key])
+		metadatas = append(metadatas, metadataByKey[key])
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), e.ChainStateTimeout)
