@@ -43,9 +43,9 @@ func (c *Certificate) ReadBlobHeader() BlobHeader {
 	qps := make([]QuorumBlobParam, len(c.BlobHeader.BlobQuorumParams))
 	for i, qp := range c.BlobHeader.BlobQuorumParams {
 		qps[i] = QuorumBlobParam{
-			QuorumNumber:                    uint8(qp.QuorumNumber),
-			AdversaryThresholdPercentage:    uint8(qp.AdversaryThresholdPercentage),
-			ConfirmationThresholdPercentage: uint8(qp.ConfirmationThresholdPercentage),
+			QuorumNumber:                    uint8(qp.QuorumNumber),                    // #nosec G115
+			AdversaryThresholdPercentage:    uint8(qp.AdversaryThresholdPercentage),    // #nosec G115
+			ConfirmationThresholdPercentage: uint8(qp.ConfirmationThresholdPercentage), // #nosec G115
 			ChunkLength:                     qp.ChunkLength,
 		}
 	}

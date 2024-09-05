@@ -60,6 +60,10 @@ lint:
 
 	@golangci-lint run
 
+go-gen-mocks:
+	@echo "generating go mocks..."
+	@GO111MODULE=on go generate --run "mockgen*" ./...
+
 install-lint:
 	@echo "Installing golangci-lint..."
 	@sh -c $(GET_LINT_CMD)

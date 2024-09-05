@@ -150,7 +150,7 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	mockBatchRoot := crypto.Keccak256Hash(entropy)
 	blockNum, _ := rand.Int(rand.Reader, big.NewInt(1000))
 
-	num := uint32(blockNum.Uint64())
+	num := uint32(blockNum.Uint64()) // #nosec G115
 
 	cert := &verify.Certificate{
 		BlobHeader: &disperser.BlobHeader{
@@ -158,7 +158,7 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 				X: commitment.X.Marshal(),
 				Y: commitment.Y.Marshal(),
 			},
-			DataLength: uint32(len(encodedVal)),
+			DataLength: uint32(len(encodedVal)), // #nosec G115
 			BlobQuorumParams: []*disperser.BlobQuorumParam{
 				{
 					QuorumNumber:                    1,

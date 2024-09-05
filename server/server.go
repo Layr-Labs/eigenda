@@ -38,14 +38,14 @@ const (
 type Server struct {
 	log        log.Logger
 	endpoint   string
-	router     *store.Router
+	router     store.IRouter
 	m          metrics.Metricer
 	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
 
-func NewServer(host string, port int, router *store.Router, log log.Logger,
+func NewServer(host string, port int, router store.IRouter, log log.Logger,
 	m metrics.Metricer) *Server {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &Server{
@@ -266,7 +266,7 @@ func ReadCommitmentMode(r *http.Request) (commitments.CommitmentMode, error) {
 	}
 
 	commit := path.Base(r.URL.Path)
-	if len(commit) > 0 && commit != "put" { // provided commitment in request params
+	if len(commit) > 0 && commit != "put" { // provided commitment in request params (op keccak256)
 		if !strings.HasPrefix(commit, "0x") {
 			commit = "0x" + commit
 		}
@@ -274,6 +274,10 @@ func ReadCommitmentMode(r *http.Request) (commitments.CommitmentMode, error) {
 		decodedCommit, err := hexutil.Decode(commit)
 		if err != nil {
 			return commitments.SimpleCommitmentMode, err
+		}
+
+		if len(decodedCommit) < 3 {
+			return commitments.SimpleCommitmentMode, fmt.Errorf("commitment is too short")
 		}
 
 		switch decodedCommit[0] {

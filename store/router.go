@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks --destination ../mocks/router.go . IRouter
+
 package store
 
 import (
@@ -10,6 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
+
+type IRouter interface {
+	Get(ctx context.Context, key []byte, cm commitments.CommitmentMode) ([]byte, error)
+	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
+
+	GetEigenDAStore() KeyGeneratedStore
+	GetS3Store() PrecomputedKeyStore
+}
 
 // Router ... storage backend routing layer
 type Router struct {
@@ -25,7 +35,7 @@ type Router struct {
 }
 
 func NewRouter(eigenda KeyGeneratedStore, s3 PrecomputedKeyStore, l log.Logger,
-	caches []PrecomputedKeyStore, fallbacks []PrecomputedKeyStore) (*Router, error) {
+	caches []PrecomputedKeyStore, fallbacks []PrecomputedKeyStore) (IRouter, error) {
 	return &Router{
 		log:          l,
 		eigenda:      eigenda,
@@ -109,9 +119,9 @@ func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, va
 
 	switch cm {
 	case commitments.OptimismGeneric: // caching and fallbacks are unsupported for this commitment mode
-		return r.PutWithKey(ctx, key, value)
+		return r.putWithKey(ctx, key, value)
 	case commitments.OptimismAltDA, commitments.SimpleCommitmentMode:
-		commit, err = r.PutWithoutKey(ctx, value)
+		commit, err = r.putWithoutKey(ctx, value)
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
 	}
@@ -200,8 +210,8 @@ func (r *Router) multiSourceRead(ctx context.Context, commitment []byte, fallbac
 	return nil, errors.New("no data found in any redundant backend")
 }
 
-// PutWithoutKey ... inserts a value into a storage backend that computes the key on-demand (i.e, EigenDA)
-func (r *Router) PutWithoutKey(ctx context.Context, value []byte) ([]byte, error) {
+// putWithoutKey ... inserts a value into a storage backend that computes the key on-demand (i.e, EigenDA)
+func (r *Router) putWithoutKey(ctx context.Context, value []byte) ([]byte, error) {
 	if r.eigenda != nil {
 		r.log.Debug("Storing data to EigenDA backend")
 		return r.eigenda.Put(ctx, value)
@@ -210,8 +220,8 @@ func (r *Router) PutWithoutKey(ctx context.Context, value []byte) ([]byte, error
 	return nil, errors.New("no DA storage backend found")
 }
 
-// PutWithKey ... only supported for S3 storage backends using OP's alt-da keccak256 commitment type
-func (r *Router) PutWithKey(ctx context.Context, key []byte, value []byte) ([]byte, error) {
+// putWithKey ... only supported for S3 storage backends using OP's alt-da keccak256 commitment type
+func (r *Router) putWithKey(ctx context.Context, key []byte, value []byte) ([]byte, error) {
 	if r.s3 == nil {
 		return nil, errors.New("S3 is disabled but is only supported for posting known commitment keys")
 	}

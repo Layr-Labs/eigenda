@@ -115,7 +115,7 @@ func (cv *CertVerifier) getContextBlock() (*big.Int, error) {
 	}
 
 	blockNumber = new(big.Int)
-	blockNumber.Sub(blockHeader.Number(), big.NewInt(int64(cv.ethConfirmationDepth-1)))
+	blockNumber.Sub(blockHeader.Number(), big.NewInt(int64(cv.ethConfirmationDepth-1))) // #nosec G115
 
 	return blockNumber, nil
 }

@@ -27,10 +27,6 @@ func StringToCommitmentMode(s string) (CommitmentMode, error) {
 }
 
 func StringToDecodedCommitment(key string, c CommitmentMode) ([]byte, error) {
-	if len(key) <= 2 {
-		return nil, fmt.Errorf("commitment is empty")
-	}
-
 	offset := 0
 	if key[:2] == "0x" {
 		offset = 2
@@ -39,6 +35,10 @@ func StringToDecodedCommitment(key string, c CommitmentMode) ([]byte, error) {
 	b, err := hex.DecodeString(key[offset:])
 	if err != nil {
 		return nil, err
+	}
+
+	if len(b) < 3 {
+		return nil, fmt.Errorf("commitment is too short")
 	}
 
 	switch c {

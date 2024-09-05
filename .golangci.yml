@@ -116,6 +116,7 @@ linters:
   disable-all: true
   enable:
     ## enabled by default
+    - gosec # Golang Security Checker
     - errcheck # checking for unchecked errors, these unchecked errors can be critical bugs in some cases
     - gosimple # specializes in simplifying a code
     - ineffassign # detects when assignments to existing variables are not used
