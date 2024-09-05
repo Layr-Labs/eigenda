@@ -29,25 +29,15 @@ compile-dl:
 	cd contracts && ./compile.sh compile-dl
 
 clean:
-	find $(PROTO_GEN) -name "*.pb.go" -type f | xargs rm -rf
-	mkdir -p $(PROTO_GEN)
-	find $(PROTO_GEN_DISPERSER_PATH) -name "*.pb.go" -type f | xargs rm -rf
-	mkdir -p $(PROTO_GEN_DISPERSER_PATH)
+	./api/builder/clean.sh
 
+# Builds the protobuf files inside a docker container.
 protoc: clean
-	protoc -I $(PROTOS) \
-	--go_out=$(PROTO_GEN) \
-	--go_opt=paths=source_relative \
-	--go-grpc_out=$(PROTO_GEN) \
-	--go-grpc_opt=paths=source_relative \
-	$(PROTOS)/**/*.proto
-	# Generate Protobuf for sub directories of ./api/proto/disperser
-	protoc -I $(PROTOS_DISPERSER) -I $(PROTOS) \
-	--go_out=$(PROTO_GEN_DISPERSER_PATH) \
-	--go_opt=paths=source_relative \
-	--go-grpc_out=$(PROTO_GEN_DISPERSER_PATH) \
-	--go-grpc_opt=paths=source_relative \
-	$(PROTOS_DISPERSER)/**/*.proto
+	./api/builder/protoc-docker.sh
+
+# Builds the protobuf files locally (i.e. without docker).
+protoc-local: clean
+	./api/builder/protoc.sh
 
 lint:
 	golint -set_exit_status ./...
