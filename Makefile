@@ -17,11 +17,6 @@ endif
 
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
-PROTOS := ./api/proto
-PROTOS_DISPERSER := ./disperser/api/proto
-PROTO_GEN := ./api/grpc
-PROTO_GEN_DISPERSER_PATH = ./disperser/api/grpc
-
 compile-el:
 	cd contracts && ./compile.sh compile-el
 
