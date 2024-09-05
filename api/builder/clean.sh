@@ -10,5 +10,5 @@ GRPC_DIR="${API_DIR}/grpc"
 find "${GRPC_DIR}" -name '*.pb.go' -type f | xargs rm -rf
 
 DISPERSER_DIR="$SCRIPT_DIR/../../disperser"
-DISPERSER_GRPC_DIR="$DISPERSER_DIR/api/proto"
+DISPERSER_GRPC_DIR="$DISPERSER_DIR/api/grpc"
 find "${DISPERSER_GRPC_DIR}" -name '*.pb.go' -type f | xargs rm -rf
