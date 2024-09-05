@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 const (
@@ -311,11 +312,11 @@ func (s *BlobMetadataStore) GetBlobMetadataInBatch(ctx context.Context, batchHea
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: there is no metadata for batch %s and blob index %d", disperser.ErrMetadataNotFound, batchHeaderHash, blobIndex)
+		return nil, fmt.Errorf("%w: there is no metadata for batch %s and blob index %d", disperser.ErrMetadataNotFound, hexutil.Encode(batchHeaderHash[:]), blobIndex)
 	}
 
 	if len(items) > 1 {
-		s.logger.Error("there are multiple metadata for batch %s and blob index %d", batchHeaderHash, blobIndex)
+		s.logger.Error("there are multiple metadata for batch %s and blob index %d", hexutil.Encode(batchHeaderHash[:]), blobIndex)
 	}
 
 	metadata, err := UnmarshalBlobMetadata(items[0])
