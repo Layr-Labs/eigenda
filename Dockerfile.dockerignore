@@ -1,2 +1,9 @@
-!/go.mod
-!/go.sum
+# Ignore everything
+*
+
+# Re-include necessary files only
+!go.mod
+!go.sum
+!*/**/*.go
+!Makefile
+!resources
