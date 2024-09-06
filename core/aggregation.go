@@ -21,6 +21,7 @@ const maxNumOperatorAddresses = 300
 var (
 	ErrPubKeysNotEqual     = errors.New("public keys are not equal")
 	ErrInsufficientEthSigs = errors.New("insufficient eth signatures")
+	ErrAggPubKeyNotValid   = errors.New("aggregated public key is not valid")
 	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
 )
 
@@ -223,6 +224,11 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 			PercentSigned: percent,
 		}
 
+		if percent == 0 {
+			a.Logger.Warn("no stake signed for quorum", "quorumID", quorumID)
+			continue
+		}
+
 		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
 		quorumAggPubKeys[quorumID] = quorumAggKey
@@ -236,7 +242,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		}
 
 		if aggPubKeys[quorumID] == nil {
-			return nil, ErrAggSigNotValid
+			return nil, ErrAggPubKeyNotValid
 		}
 
 		ok, err := signersAggKey.VerifyEquivalence(aggPubKeys[quorumID])

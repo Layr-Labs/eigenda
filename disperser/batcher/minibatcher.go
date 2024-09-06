@@ -218,7 +218,16 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 		err := b.createBlobMinibatchMappings(ctx, b.CurrentBatchID, b.MinibatchIndex, minibatch.BlobMetadata, minibatch.BlobHeaders)
 		storeMappingsChan <- err
 	}()
-	b.DisperseBatch(dispersalCtx, minibatch.State, minibatch.EncodedBlobs, minibatch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
+
+	// Disperse the minibatch to operators in all quorums
+	// If an operator doesn't have any bundles, it won't receive any chunks but it will still receive blob headers
+	operatorsAllQuorums, err := b.ChainState.GetIndexedOperators(ctx, b.ReferenceBlockNumber)
+	if err != nil {
+		cancelDispersal()
+		_ = b.handleFailure(ctx, minibatch.BlobMetadata, FailReason("error getting operator state for all quorums"))
+		return nil, fmt.Errorf("error getting operator state for all quorums: %w", err)
+	}
+	b.DisperseBatch(dispersalCtx, operatorsAllQuorums, minibatch.EncodedBlobs, minibatch.BatchHeader, b.CurrentBatchID, b.MinibatchIndex)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer).String())
 
 	h, err := minibatch.State.OperatorState.Hash()
@@ -243,8 +252,8 @@ func (b *Minibatcher) HandleSingleMinibatch(ctx context.Context) (context.Cancel
 	return cancelDispersal, nil
 }
 
-func (b *Minibatcher) DisperseBatch(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, batchID uuid.UUID, minibatchIndex uint) {
-	for id, op := range state.IndexedOperators {
+func (b *Minibatcher) DisperseBatch(ctx context.Context, operators map[core.OperatorID]*core.IndexedOperatorInfo, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, batchID uuid.UUID, minibatchIndex uint) {
+	for id, op := range operators {
 		opInfo := op
 		opID := id
 		req := &MinibatchDispersal{
@@ -291,20 +300,12 @@ func (b *Minibatcher) SendBlobsToOperatorWithRetries(
 	maxNumRetries int,
 ) ([]*core.Signature, error) {
 	blobMessages := make([]*core.EncodedBlobMessage, 0)
-	hasAnyBundles := false
 	for _, blob := range blobs {
-		if _, ok := blob.EncodedBundlesByOperator[opID]; ok {
-			hasAnyBundles = true
-		}
 		blobMessages = append(blobMessages, &core.EncodedBlobMessage{
 			BlobHeader: blob.BlobHeader,
 			// Bundles will be empty if the operator is not in the quorums blob is dispersed on
 			EncodedBundles: blob.EncodedBundlesByOperator[opID],
 		})
-	}
-	if !hasAnyBundles {
-		// Operator is not part of any quorum, no need to send chunks
-		return nil, fmt.Errorf("operator %s is not part of any quorum", opID.Hex())
 	}
 
 	numRetries := 0
