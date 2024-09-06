@@ -32,7 +32,7 @@ type BlobWriter struct {
 	disperser clients.DisperserClient
 
 	// Unconfirmed keys are sent here.
-	unconfirmedKeyHandler KeyHandler
+	unconfirmedKeyChannel chan *UnconfirmedKey
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData []byte
@@ -54,7 +54,7 @@ func NewBlobWriter(
 	logger logging.Logger,
 	config *config.WorkerConfig,
 	disperser clients.DisperserClient,
-	unconfirmedKeyHandler KeyHandler,
+	unconfirmedKeyChannel chan *UnconfirmedKey,
 	generatorMetrics metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
@@ -77,7 +77,7 @@ func NewBlobWriter(
 		logger:                logger,
 		config:                config,
 		disperser:             disperser,
-		unconfirmedKeyHandler: unconfirmedKeyHandler,
+		unconfirmedKeyChannel: unconfirmedKeyChannel,
 		fixedRandomData:       fixedRandomData,
 		writeLatencyMetric:    generatorMetrics.NewLatencyMetric("write"),
 		writeSuccessMetric:    generatorMetrics.NewCountMetric("write_success"),
@@ -123,7 +123,13 @@ func (writer *BlobWriter) writeNextBlob() {
 	writer.writeSuccessMetric.Increment()
 
 	checksum := md5.Sum(data)
-	writer.unconfirmedKeyHandler.AddUnconfirmedKey(key, checksum, uint(len(data)))
+
+	writer.unconfirmedKeyChannel <- &UnconfirmedKey{
+		Key:            key,
+		Checksum:       checksum,
+		Size:           uint(len(data)),
+		SubmissionTime: time.Now(),
+	}
 }
 
 // getRandomData returns a slice of random data to be used for a blob.

@@ -70,8 +70,9 @@ type EncodingStreamer struct {
 
 	encodingCtxCancelFuncs []context.CancelFunc
 
-	metrics *EncodingStreamerMetrics
-	logger  logging.Logger
+	metrics        *EncodingStreamerMetrics
+	batcherMetrics *Metrics
+	logger         logging.Logger
 
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
@@ -103,6 +104,7 @@ func NewEncodingStreamer(
 	encodedSizeNotifier *EncodedSizeNotifier,
 	workerPool common.WorkerPool,
 	metrics *EncodingStreamerMetrics,
+	batcherMetrics *Metrics,
 	logger logging.Logger) (*EncodingStreamer, error) {
 	if config.EncodingQueueLimit <= 0 {
 		return nil, errors.New("EncodingQueueLimit should be greater than 0")
@@ -119,6 +121,7 @@ func NewEncodingStreamer(
 		assignmentCoordinator:  assignmentCoordinator,
 		encodingCtxCancelFuncs: make([]context.CancelFunc, 0),
 		metrics:                metrics,
+		batcherMetrics:         batcherMetrics,
 		logger:                 logger.With("component", "EncodingStreamer"),
 		exclusiveStartKey:      nil,
 	}, nil
@@ -356,6 +359,11 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		})
 	}
 
+	if len(pending) > 0 {
+		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
+		e.batcherMetrics.ObserveBlobAge("encoding_requested", float64(time.Since(requestTime).Milliseconds()))
+	}
+
 	// Execute the encoding requests
 	for ind := range pending {
 		res := pending[ind]
@@ -371,12 +379,14 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		e.mu.Unlock()
 		e.Pool.Submit(func() {
 			defer cancel()
+			start := time.Now()
 			commits, chunks, err := e.encoderClient.EncodeBlob(encodingCtx, blob.Data, res.EncodingParams)
 			if err != nil {
 				encoderChan <- EncodingResultOrStatus{Err: err, EncodingResult: EncodingResult{
 					BlobMetadata:   metadata,
 					BlobQuorumInfo: res.BlobQuorumInfo,
 				}}
+				e.metrics.ObserveEncodingLatency("failed", res.BlobQuorumInfo.QuorumID, len(blob.Data), float64(time.Since(start).Milliseconds()))
 				return
 			}
 
@@ -386,11 +396,12 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 					ReferenceBlockNumber: referenceBlockNumber,
 					BlobQuorumInfo:       res.BlobQuorumInfo,
 					Commitment:           commits,
-					Chunks:               chunks,
+					ChunksData:           chunks,
 					Assignments:          res.Assignments,
 				},
 				Err: nil,
 			}
+			e.metrics.ObserveEncodingLatency("success", res.BlobQuorumInfo.QuorumID, len(blob.Data), float64(time.Since(start).Milliseconds()))
 		})
 		e.EncodedBlobstore.PutEncodingRequest(blobKey, res.BlobQuorumInfo.QuorumID)
 	}
@@ -406,6 +417,10 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 	if err != nil {
 		return fmt.Errorf("failed to putEncodedBlob: %w", err)
 	}
+
+	requestTime := time.Unix(0, int64(result.BlobMetadata.RequestMetadata.RequestedAt))
+	e.batcherMetrics.ObserveBlobAge("encoded", float64(time.Since(requestTime).Milliseconds()))
+	e.batcherMetrics.IncrementBlobSize("encoded", result.BlobQuorumInfo.QuorumID, int(result.BlobMetadata.RequestMetadata.BlobSize))
 
 	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
 	e.metrics.UpdateEncodedBlobs(count, encodedSize)
@@ -482,19 +497,22 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:        blobHeader,
-				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+				BlobHeader:               blobHeader,
+				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
 
 		// Populate the assigned bundles
 		for opID, assignment := range result.Assignments {
-			bundles, ok := encodedBlobByKey[blobKey].BundlesByOperator[opID]
+			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			if !ok {
-				encodedBlobByKey[blobKey].BundlesByOperator[opID] = make(core.Bundles)
-				bundles = encodedBlobByKey[blobKey].BundlesByOperator[opID]
+				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
+				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
-			bundles[result.BlobQuorumInfo.QuorumID] = append(bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
+			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
+			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
 		}
 
 		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)
@@ -547,6 +565,9 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -558,6 +579,9 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	_, err = batchHeader.SetBatchRoot(blobHeaders)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -631,19 +655,22 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 			}
 			blobHeaderByKey[blobKey] = blobHeader
 			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:        blobHeader,
-				BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+				BlobHeader:               blobHeader,
+				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 			}
 		}
 
 		// Populate the assigned bundles
 		for opID, assignment := range result.Assignments {
-			bundles, ok := encodedBlobByKey[blobKey].BundlesByOperator[opID]
+			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			if !ok {
-				encodedBlobByKey[blobKey].BundlesByOperator[opID] = make(core.Bundles)
-				bundles = encodedBlobByKey[blobKey].BundlesByOperator[opID]
+				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
+				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
 			}
-			bundles[result.BlobQuorumInfo.QuorumID] = append(bundles[result.BlobQuorumInfo.QuorumID], result.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
+			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
+			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
 		}
 
 		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)
@@ -676,19 +703,17 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 	}
 
 	// Transform maps to slices so orders in different slices match
-	encodedBlobs := make([]core.EncodedBlob, len(metadataByKey))
-	blobHeaders := make([]*core.BlobHeader, len(metadataByKey))
-	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
-	i := 0
+	encodedBlobs := make([]core.EncodedBlob, 0, len(metadataByKey))
+	blobHeaders := make([]*core.BlobHeader, 0, len(metadataByKey))
+	metadatas := make([]*disperser.BlobMetadata, 0, len(metadataByKey))
 	for key := range metadataByKey {
 		err := e.transitionBlobToDispersing(ctx, metadataByKey[key])
 		if err != nil {
 			continue
 		}
-		encodedBlobs[i] = encodedBlobByKey[key]
-		blobHeaders[i] = blobHeaderByKey[key]
-		metadatas[i] = metadataByKey[key]
-		i++
+		encodedBlobs = append(encodedBlobs, encodedBlobByKey[key])
+		blobHeaders = append(blobHeaders, blobHeaderByKey[key])
+		metadatas = append(metadatas, metadataByKey[key])
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), e.ChainStateTimeout)
@@ -696,6 +721,9 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -707,6 +735,9 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	tree, err := batchHeader.SetBatchRoot(blobHeaders)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -720,6 +751,15 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 		State:        state,
 		MerkleTree:   tree,
 	}, nil
+}
+
+func (e *EncodingStreamer) handleFailedMetadata(ctx context.Context, metadata *disperser.BlobMetadata) error {
+	err := e.blobStore.MarkBlobProcessing(ctx, metadata.GetBlobKey())
+	if err != nil {
+		e.logger.Error("error marking blob as processing", "err", err)
+	}
+
+	return err
 }
 
 func (e *EncodingStreamer) transitionBlobToDispersing(ctx context.Context, metadata *disperser.BlobMetadata) error {

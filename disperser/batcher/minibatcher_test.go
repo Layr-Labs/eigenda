@@ -27,6 +27,7 @@ import (
 var (
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	opId2, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568313")
 	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
 		0: {
 			opId0: 1,
@@ -34,6 +35,9 @@ var (
 		},
 		1: {
 			opId0: 1,
+		},
+		2: {
+			opId2: 1,
 		},
 	})
 	defaultConfig = batcher.MinibatcherConfig{
@@ -52,7 +56,7 @@ type minibatcherComponents struct {
 	blobStore             disperser.BlobStore
 	minibatchStore        batcher.MinibatchStore
 	dispatcher            *dmock.Dispatcher
-	chainState            *coremock.MockIndexedChainState
+	chainState            *coremock.ChainDataMock
 	assignmentCoordinator core.AssignmentCoordinator
 	encodingStreamer      *batcher.EncodingStreamer
 	pool                  *workerpool.WorkerPool
@@ -68,7 +72,6 @@ func newMinibatcher(t *testing.T, config batcher.MinibatcherConfig) *minibatcher
 	assert.NoError(t, err)
 	state := chainState.GetTotalOperatorState(context.Background(), 0)
 	dispatcher := dmock.NewDispatcher(state)
-	ics := &coremock.MockIndexedChainState{}
 	streamerConfig := batcher.StreamerConfig{
 		SRSOrder:                 3000,
 		EncodingRequestTimeout:   5 * time.Second,
@@ -89,18 +92,19 @@ func newMinibatcher(t *testing.T, config batcher.MinibatcherConfig) *minibatcher
 		make(chan struct{}, 1),
 		10*1024*1024,
 	)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, chainState, encoderClient, asgn, trigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, chainState, encoderClient, asgn, trigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, metrics, logger)
 	assert.NoError(t, err)
 	ethClient := &cmock.MockEthClient{}
 	pool := workerpool.New(int(config.MaxNumConnections))
 	m, err := batcher.NewMinibatcher(config, blobStore, minibatchStore, dispatcher, chainState, asgn, encodingStreamer, ethClient, pool, logger)
 	assert.NoError(t, err)
+
 	return &minibatcherComponents{
 		minibatcher:           m,
 		blobStore:             blobStore,
 		minibatchStore:        minibatchStore,
 		dispatcher:            dispatcher,
-		chainState:            ics,
+		chainState:            chainState,
 		assignmentCoordinator: asgn,
 		encodingStreamer:      encodingStreamer,
 		pool:                  pool,
@@ -153,15 +157,39 @@ func TestDisperseMinibatch(t *testing.T) {
 
 	_, err = c.minibatcher.HandleSingleMinibatch(ctx)
 	assert.NoError(t, err)
+
+	// Check the minibatcher state
 	assert.NotNil(t, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, c.minibatcher.MinibatchIndex, uint(1))
 	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, initialBlock)
 	assert.Len(t, c.minibatcher.Batches, 1)
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BatchID, c.minibatcher.CurrentBatchID)
-	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].NumMinibatches, uint(1))
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].ReferenceBlockNumber, initialBlock)
 	assert.Len(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobHeaders, 2)
 	assert.ElementsMatch(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobMetadata, []*disperser.BlobMetadata{encoded1.BlobMetadata, encoded2.BlobMetadata})
+
+	// Check the dispersal records
+	dispersal, err := c.minibatchStore.GetDispersal(ctx, c.minibatcher.CurrentBatchID, 0, opId0)
+	assert.NoError(t, err)
+	operatorState, err := c.chainState.GetIndexedOperatorState(context.Background(), 0, []core.QuorumID{0, 1})
+	assert.NoError(t, err)
+	assert.Equal(t, dispersal.BatchID, c.minibatcher.CurrentBatchID)
+	assert.Equal(t, dispersal.MinibatchIndex, uint(0))
+	assert.Equal(t, dispersal.OperatorID, opId0)
+	assert.Equal(t, dispersal.Socket, operatorState.IndexedOperators[opId0].Socket)
+	assert.Equal(t, dispersal.NumBlobs, uint(2))
+	assert.NotNil(t, dispersal.RequestedAt)
+
+	dispersal, err = c.minibatchStore.GetDispersal(ctx, c.minibatcher.CurrentBatchID, 0, opId1)
+	assert.NoError(t, err)
+	assert.Equal(t, dispersal.BatchID, c.minibatcher.CurrentBatchID)
+	assert.Equal(t, dispersal.MinibatchIndex, uint(0))
+	assert.Equal(t, dispersal.OperatorID, opId1)
+	assert.Equal(t, dispersal.Socket, operatorState.IndexedOperators[opId1].Socket)
+	assert.Equal(t, dispersal.NumBlobs, uint(2))
+	assert.NotNil(t, dispersal.RequestedAt)
+
+	// Check the blob minibatch mappings
 	blobKey1 := encoded1.BlobMetadata.GetBlobKey()
 	blobMinibatchMappings, err := c.minibatchStore.GetBlobMinibatchMappings(ctx, blobKey1)
 	assert.NoError(t, err)
@@ -170,7 +198,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, mapping1.BlobKey, &blobKey1)
 	assert.Equal(t, mapping1.BatchID, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, mapping1.MinibatchIndex, uint(0))
-	assert.Equal(t, mapping1.BlobQuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
+	assert.Equal(t, mapping1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
 	serializedCommitment1, err := encoded1.Commitment.Commitment.Serialize()
 	assert.NoError(t, err)
 	expectedCommitment1, err := mapping1.Commitment.Serialize()
@@ -194,7 +222,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, mapping2.BlobKey, &blobKey2)
 	assert.Equal(t, mapping2.BatchID, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, mapping2.MinibatchIndex, uint(0))
-	assert.Equal(t, mapping2.BlobQuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
+	assert.Equal(t, mapping2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
 	if mapping1.BlobIndex != 0 {
 		assert.Equal(t, mapping2.BlobIndex, uint(1))
 	} else if mapping1.BlobIndex != 1 {
@@ -237,7 +265,6 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, initialBlock)
 	assert.Len(t, c.minibatcher.Batches, 1)
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BatchID, c.minibatcher.CurrentBatchID)
-	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].NumMinibatches, uint(2))
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].ReferenceBlockNumber, initialBlock)
 	assert.Len(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobHeaders, 3)
 	assert.ElementsMatch(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobMetadata, []*disperser.BlobMetadata{encoded1.BlobMetadata, encoded2.BlobMetadata, encoded3.BlobMetadata})
@@ -249,22 +276,6 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, c.minibatcher.CurrentBatchID, b.ID)
 	assert.NotNil(t, b.CreatedAt)
 	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, b.ReferenceBlockNumber)
-	mb, err := c.minibatchStore.GetMinibatch(ctx, c.minibatcher.CurrentBatchID, 0)
-	assert.NoError(t, err)
-	assert.NotNil(t, mb)
-	assert.Equal(t, c.minibatcher.CurrentBatchID, mb.BatchID)
-	assert.Equal(t, uint(0), mb.MinibatchIndex)
-	assert.Len(t, mb.BlobHeaderHashes, 2)
-	assert.Equal(t, uint64(12800), mb.BatchSize)
-	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, mb.ReferenceBlockNumber)
-	mb, err = c.minibatchStore.GetMinibatch(ctx, c.minibatcher.CurrentBatchID, 1)
-	assert.NoError(t, err)
-	assert.NotNil(t, mb)
-	assert.Equal(t, c.minibatcher.CurrentBatchID, mb.BatchID)
-	assert.Equal(t, uint(1), mb.MinibatchIndex)
-	assert.Len(t, mb.BlobHeaderHashes, 1)
-	assert.Equal(t, uint64(7680), mb.BatchSize)
-	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, mb.ReferenceBlockNumber)
 
 	blobKey3 := encoded3.BlobMetadata.GetBlobKey()
 	blobMinibatchMappings, err = c.minibatchStore.GetBlobMinibatchMappings(ctx, blobKey3)
@@ -309,7 +320,6 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, initialBlock+10)
 	assert.Len(t, c.minibatcher.Batches, 2)
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BatchID, c.minibatcher.CurrentBatchID)
-	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].NumMinibatches, uint(1))
 	assert.Equal(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].ReferenceBlockNumber, initialBlock+10)
 	assert.Len(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobHeaders, 2)
 	assert.ElementsMatch(t, c.minibatcher.Batches[c.minibatcher.CurrentBatchID].BlobMetadata, []*disperser.BlobMetadata{encoded4.BlobMetadata, encoded5.BlobMetadata})
@@ -326,38 +336,29 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.NotNil(t, batchState)
 	assert.Equal(t, batchState.BatchID, b.ID)
 	assert.Equal(t, batchState.ReferenceBlockNumber, initialBlock)
-	assert.Equal(t, batchState.NumMinibatches, uint(2))
 	assert.Len(t, batchState.BlobHeaders, 3)
 	assert.ElementsMatch(t, batchState.BlobMetadata, []*disperser.BlobMetadata{encoded1.BlobMetadata, encoded2.BlobMetadata, encoded3.BlobMetadata})
 	assert.NotNil(t, batchState.OperatorState)
 	assert.Len(t, c.minibatcher.Batches, 1)
 	assert.Nil(t, c.minibatcher.Batches[b.ID])
 
-	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 6)
-	dispersalRequests, err := c.minibatchStore.GetMinibatchDispersalRequests(ctx, b.ID, 0)
+	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 9)
+	dispersals, err := c.minibatchStore.GetDispersalsByMinibatch(ctx, b.ID, 0)
 	assert.NoError(t, err)
-	assert.Len(t, dispersalRequests, 2)
-	opIDs := make([]core.OperatorID, 2)
-	for i, req := range dispersalRequests {
-		assert.Equal(t, req.BatchID, b.ID)
-		assert.Equal(t, req.MinibatchIndex, uint(0))
-		assert.Equal(t, req.NumBlobs, uint(2))
-		assert.NotNil(t, req.Socket)
-		assert.NotNil(t, req.RequestedAt)
-		opIDs[i] = req.OperatorID
+	assert.Len(t, dispersals, 3)
+	opIDs := make([]core.OperatorID, 3)
+	for i, dispersal := range dispersals {
+		assert.Equal(t, dispersal.BatchID, b.ID)
+		assert.Equal(t, dispersal.MinibatchIndex, uint(0))
+		assert.Equal(t, dispersal.NumBlobs, uint(2))
+		assert.NotNil(t, dispersal.Socket)
+		assert.NotNil(t, dispersal.RequestedAt)
+		opIDs[i] = dispersal.OperatorID
+		assert.NotNil(t, dispersal.RespondedAt)
+		assert.NoError(t, dispersal.Error)
+		assert.Len(t, dispersal.Signatures, 1)
 	}
-	assert.ElementsMatch(t, opIDs, []core.OperatorID{opId0, opId1})
-
-	dispersalResponses, err := c.minibatchStore.GetMinibatchDispersalResponses(ctx, b.ID, 0)
-	assert.NoError(t, err)
-	assert.Len(t, dispersalResponses, 2)
-	for _, resp := range dispersalResponses {
-		assert.Equal(t, resp.BatchID, b.ID)
-		assert.Equal(t, resp.MinibatchIndex, uint(0))
-		assert.NotNil(t, resp.RespondedAt)
-		assert.NoError(t, resp.Error)
-		assert.Len(t, resp.Signatures, 1)
-	}
+	assert.ElementsMatch(t, opIDs, []core.OperatorID{opId0, opId1, opId2})
 }
 
 func TestDisperseMinibatchFailure(t *testing.T) {
@@ -411,44 +412,27 @@ func TestDisperseMinibatchFailure(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, b)
 	assert.Equal(t, c.minibatcher.CurrentBatchID, b.ID)
-	assert.NotNil(t, b.HeaderHash)
 	assert.NotNil(t, b.CreatedAt)
 	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, b.ReferenceBlockNumber)
-	mb, err := c.minibatchStore.GetMinibatch(ctx, c.minibatcher.CurrentBatchID, 0)
-	assert.NoError(t, err)
-	assert.NotNil(t, mb)
-	assert.Equal(t, c.minibatcher.CurrentBatchID, mb.BatchID)
-	assert.Equal(t, uint(0), mb.MinibatchIndex)
-	assert.Len(t, mb.BlobHeaderHashes, 2)
-	assert.Equal(t, uint64(12800), mb.BatchSize)
-	assert.Equal(t, c.minibatcher.ReferenceBlockNumber, mb.ReferenceBlockNumber)
 
 	c.pool.StopWait()
-	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 2)
-	dispersalRequests, err := c.minibatchStore.GetMinibatchDispersalRequests(ctx, c.minibatcher.CurrentBatchID, 0)
+	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 3)
+	dispersals, err := c.minibatchStore.GetDispersalsByMinibatch(ctx, c.minibatcher.CurrentBatchID, 0)
 	assert.NoError(t, err)
-	assert.Len(t, dispersalRequests, 2)
-	opIDs := make([]core.OperatorID, 2)
-	for i, req := range dispersalRequests {
-		assert.Equal(t, req.BatchID, c.minibatcher.CurrentBatchID)
-		assert.Equal(t, req.MinibatchIndex, uint(0))
-		assert.Equal(t, req.NumBlobs, uint(2))
-		assert.NotNil(t, req.Socket)
-		assert.NotNil(t, req.RequestedAt)
-		opIDs[i] = req.OperatorID
+	assert.Len(t, dispersals, 3)
+	opIDs := make([]core.OperatorID, 3)
+	for i, dispersal := range dispersals {
+		assert.Equal(t, dispersal.BatchID, c.minibatcher.CurrentBatchID)
+		assert.Equal(t, dispersal.MinibatchIndex, uint(0))
+		assert.Equal(t, dispersal.NumBlobs, uint(2))
+		assert.NotNil(t, dispersal.Socket)
+		assert.NotNil(t, dispersal.RequestedAt)
+		opIDs[i] = dispersal.OperatorID
+		assert.NotNil(t, dispersal.RespondedAt)
+		assert.NoError(t, dispersal.Error)
+		assert.Len(t, dispersal.Signatures, 1)
 	}
-	assert.ElementsMatch(t, opIDs, []core.OperatorID{opId0, opId1})
-
-	dispersalResponses, err := c.minibatchStore.GetMinibatchDispersalResponses(ctx, c.minibatcher.CurrentBatchID, 0)
-	assert.NoError(t, err)
-	assert.Len(t, dispersalResponses, 2)
-	for _, resp := range dispersalResponses {
-		assert.Equal(t, resp.BatchID, c.minibatcher.CurrentBatchID)
-		assert.Equal(t, resp.MinibatchIndex, uint(0))
-		assert.NotNil(t, resp.RespondedAt)
-		assert.NoError(t, resp.Error)
-		assert.Len(t, resp.Signatures, 1)
-	}
+	assert.ElementsMatch(t, opIDs, []core.OperatorID{opId0, opId1, opId2})
 }
 
 func TestSendBlobsToOperatorWithRetries(t *testing.T) {
@@ -499,10 +483,17 @@ func TestSendBlobsToOperatorWithRetries(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, signatures, 1)
 
+	c.dispatcher.On("SendBlobsToOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fail")).Twice()
+	c.dispatcher.On("SendBlobsToOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]*core.Signature{sig}, nil).Once()
+	signatures, err = c.minibatcher.SendBlobsToOperatorWithRetries(ctx, batch.EncodedBlobs, batch.BatchHeader, batch.State.IndexedOperators[opId2], opId2, 3)
+	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 6)
+	assert.NoError(t, err)
+	assert.Len(t, signatures, 1)
+
 	c.dispatcher.On("SendBlobsToOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fail")).Times(3)
 	c.dispatcher.On("SendBlobsToOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]*core.Signature{sig}, nil).Once()
 	signatures, err = c.minibatcher.SendBlobsToOperatorWithRetries(ctx, batch.EncodedBlobs, batch.BatchHeader, batch.State.IndexedOperators[opId1], opId1, 3)
-	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 6)
+	c.dispatcher.AssertNumberOfCalls(t, "SendBlobsToOperator", 9)
 	assert.ErrorContains(t, err, "failed to send chunks to operator")
 	assert.Nil(t, signatures)
 }
@@ -525,26 +516,22 @@ func TestSendBlobsToOperatorWithRetriesCanceled(t *testing.T) {
 	assert.NoError(t, err)
 	batch, err := c.encodingStreamer.CreateMinibatch(ctx)
 	assert.NoError(t, err)
+	operators, err := c.chainState.GetIndexedOperators(ctx, initialBlock)
+	assert.NoError(t, err)
 	minibatchIndex := uint(12)
 	c.dispatcher.On("SendBlobsToOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, context.Canceled)
-	c.minibatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader, c.minibatcher.CurrentBatchID, minibatchIndex)
+	c.minibatcher.DisperseBatch(ctx, operators, batch.EncodedBlobs, batch.BatchHeader, c.minibatcher.CurrentBatchID, minibatchIndex)
 	c.pool.StopWait()
-	requests, err := c.minibatchStore.GetMinibatchDispersalRequests(ctx, c.minibatcher.CurrentBatchID, minibatchIndex)
+	dispersals, err := c.minibatchStore.GetDispersalsByMinibatch(ctx, c.minibatcher.CurrentBatchID, minibatchIndex)
 	assert.NoError(t, err)
-	assert.Len(t, requests, 2)
+	assert.Len(t, dispersals, 3)
 
-	responses, err := c.minibatchStore.GetMinibatchDispersalResponses(ctx, c.minibatcher.CurrentBatchID, minibatchIndex)
+	indexedState, err := mockChainState.GetIndexedOperatorState(ctx, initialBlock, []core.QuorumID{0, 1, 2})
 	assert.NoError(t, err)
-	indexedState, err := mockChainState.GetIndexedOperatorState(ctx, initialBlock, []core.QuorumID{0})
-	assert.NoError(t, err)
-	assert.Len(t, responses, len(indexedState.IndexedOperators))
-	for _, response := range responses {
-		assert.ErrorContains(t, response.Error, "context canceled")
-		for _, request := range requests {
-			if request.OperatorID == response.OperatorID {
-				assert.GreaterOrEqual(t, response.RespondedAt, request.RequestedAt)
-			}
-		}
+	assert.Len(t, dispersals, len(indexedState.IndexedOperators))
+	for _, dispersal := range dispersals {
+		assert.ErrorContains(t, dispersal.Error, "context canceled")
+		assert.GreaterOrEqual(t, dispersal.RespondedAt, dispersal.RequestedAt)
 	}
 }
 

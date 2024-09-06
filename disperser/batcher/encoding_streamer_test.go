@@ -54,7 +54,7 @@ func createEncodingStreamer(t *testing.T, initialBlockNumber uint, batchThreshol
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), batchThreshold)
 	workerpool := workerpool.New(5)
 	metrics := batcher.NewMetrics("9100", logger)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, metrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = initialBlockNumber
 
@@ -80,7 +80,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 	sizeNotifier := batcher.NewEncodedSizeNotifier(make(chan struct{}, 1), 100000)
 	pool := &cmock.MockWorkerpool{}
 	metrics := batcher.NewMetrics("9100", logger)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, pool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, pool, metrics.EncodingStreamerMetrics, metrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 
@@ -142,7 +142,7 @@ func TestEncodingQueueLimit(t *testing.T) {
 }
 
 func TestBatchTrigger(t *testing.T) {
-	encodingStreamer, c := createEncodingStreamer(t, 10, 20_000, streamerConfig)
+	encodingStreamer, c := createEncodingStreamer(t, 10, 30_000, streamerConfig)
 
 	blob := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
@@ -160,7 +160,7 @@ func TestBatchTrigger(t *testing.T) {
 	assert.Nil(t, err)
 	count, size := encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 
 	// try encode the same blobs again at different block (this happens when the blob is retried)
 	encodingStreamer.ReferenceBlockNumber = 11
@@ -171,7 +171,7 @@ func TestBatchTrigger(t *testing.T) {
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 
 	// don't notify yet
 	select {
@@ -190,7 +190,7 @@ func TestBatchTrigger(t *testing.T) {
 
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 2)
-	assert.Equal(t, size, uint64(16384)*2)
+	assert.Equal(t, size, uint64(26630)*2)
 
 	// notify
 	select {
@@ -246,12 +246,12 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.NotNil(t, encodedResult.Commitment.LengthProof)
 	assert.Greater(t, encodedResult.Commitment.Length, uint(0))
 	assert.Len(t, encodedResult.Assignments, numOperators)
-	assert.Len(t, encodedResult.Chunks, 32)
+	assert.Len(t, encodedResult.ChunksData.Chunks, 32)
 	isRequested = encodingStreamer.EncodedBlobstore.HasEncodingRequested(metadataKey, core.QuorumID(0), 10)
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 
 	// Cancel previous blob so it doesn't get reencoded.
 	err = c.blobStore.MarkBlobFailed(ctx, metadataKey)
@@ -281,7 +281,7 @@ func TestStreamingEncoding(t *testing.T) {
 	assert.True(t, isRequested)
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 
 	// Request the same blob, which should be dedupped
 	_, err = c.blobStore.StoreBlob(ctx, &blob, requestedAt)
@@ -292,7 +292,7 @@ func TestStreamingEncoding(t *testing.T) {
 	// It should not have been added to the encoded blob store
 	count, size = encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, count, 1)
-	assert.Equal(t, size, uint64(16384))
+	assert.Equal(t, size, uint64(26630))
 }
 
 func TestEncodingFailure(t *testing.T) {
@@ -315,7 +315,7 @@ func TestEncodingFailure(t *testing.T) {
 		MaxBlobsToFetchFromStore: 10,
 	}
 	metrics := batcher.NewMetrics("9100", logger)
-	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := batcher.NewEncodingStreamer(streamerConfig, blobStore, cst, encoderClient, asgn, sizeNotifier, workerpool, metrics.EncodingStreamerMetrics, metrics, logger)
 	assert.Nil(t, err)
 	encodingStreamer.ReferenceBlockNumber = 10
 
@@ -445,7 +445,7 @@ func TestPartialBlob(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 1)
-	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].EncodedBundlesByOperator, numOperators)
 
 	encodedBlob1 := batch.EncodedBlobs[0]
 	assert.NotNil(t, encodedBlob1)
@@ -465,10 +465,10 @@ func TestPartialBlob(t *testing.T) {
 	}})
 
 	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
-	assert.Len(t, encodedBlob1.BundlesByOperator, numOperators)
-	for _, bundles := range encodedBlob1.BundlesByOperator {
+	assert.Len(t, encodedBlob1.EncodedBundlesByOperator, numOperators)
+	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
-		assert.Greater(t, len(bundles[0]), 0)
+		assert.Greater(t, len(bundles[0].Chunks), 0)
 		break
 	}
 
@@ -674,7 +674,7 @@ func TestGetBatch(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
-	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].EncodedBundlesByOperator, numOperators)
 
 	var encodedBlob1 core.EncodedBlob
 	var encodedBlob2 core.EncodedBlob
@@ -718,10 +718,10 @@ func TestGetBatch(t *testing.T) {
 	})
 
 	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
-	for _, bundles := range encodedBlob1.BundlesByOperator {
+	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 2)
-		assert.Greater(t, len(bundles[0]), 0)
-		assert.Greater(t, len(bundles[1]), 0)
+		assert.Greater(t, len(bundles[0].Chunks), 0)
+		assert.Greater(t, len(bundles[1].Chunks), 0)
 		break
 	}
 
@@ -739,9 +739,9 @@ func TestGetBatch(t *testing.T) {
 		},
 		ChunkLength: 8,
 	}})
-	for _, bundles := range encodedBlob2.BundlesByOperator {
+	for _, bundles := range encodedBlob2.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
-		assert.Greater(t, len(bundles[core.QuorumID(2)]), 0)
+		assert.Greater(t, len(bundles[core.QuorumID(2)].Chunks), 0)
 		break
 	}
 	assert.Len(t, batch.BlobHeaders, 2)
@@ -842,7 +842,7 @@ func TestCreateMinibatch(t *testing.T) {
 
 	// Check EncodedBlobs
 	assert.Len(t, batch.EncodedBlobs, 2)
-	assert.Len(t, batch.EncodedBlobs[0].BundlesByOperator, numOperators)
+	assert.Len(t, batch.EncodedBlobs[0].EncodedBundlesByOperator, numOperators)
 
 	var encodedBlob1 core.EncodedBlob
 	var encodedBlob2 core.EncodedBlob
@@ -886,10 +886,10 @@ func TestCreateMinibatch(t *testing.T) {
 	})
 
 	assert.Contains(t, batch.BlobHeaders, encodedBlob1.BlobHeader)
-	for _, bundles := range encodedBlob1.BundlesByOperator {
+	for _, bundles := range encodedBlob1.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 2)
-		assert.Greater(t, len(bundles[0]), 0)
-		assert.Greater(t, len(bundles[1]), 0)
+		assert.Greater(t, len(bundles[0].Chunks), 0)
+		assert.Greater(t, len(bundles[1].Chunks), 0)
 		break
 	}
 
@@ -907,9 +907,9 @@ func TestCreateMinibatch(t *testing.T) {
 		},
 		ChunkLength: 8,
 	}})
-	for _, bundles := range encodedBlob2.BundlesByOperator {
+	for _, bundles := range encodedBlob2.EncodedBundlesByOperator {
 		assert.Len(t, bundles, 1)
-		assert.Greater(t, len(bundles[core.QuorumID(2)]), 0)
+		assert.Greater(t, len(bundles[core.QuorumID(2)].Chunks), 0)
 		break
 	}
 	assert.Len(t, batch.BlobHeaders, 2)

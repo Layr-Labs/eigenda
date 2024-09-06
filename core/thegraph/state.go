@@ -133,7 +133,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	aggKeys := make(map[uint8]*core.G1Point)
 	for _, apk := range aggregatePublicKeys {
 		if apk.Err != nil {
-			ics.logger.Warn("Error getting aggregate public key", "err", apk.Err)
+			ics.logger.Error("Error getting aggregate public key", "err", apk.Err)
 			continue
 		}
 		if apk.Err == nil && apk.AggregatePubk != nil {
@@ -174,6 +174,15 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		AggKeys:          aggKeys,
 	}
 	return state, nil
+}
+
+func (ics *indexedChainState) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
+	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+
+	return indexedOperators, nil
 }
 
 // GetIndexedOperatorInfoByOperatorId returns the IndexedOperatorInfo for the operator with the given operatorId at the given block number

@@ -63,6 +63,11 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, metadata2, fetchedMetadata)
 
+	fetchBulk, err := blobMetadataStore.GetBulkBlobMetadata(ctx, []disperser.BlobKey{blobKey1, blobKey2})
+	assert.NoError(t, err)
+	assert.Equal(t, metadata1, fetchBulk[0])
+	assert.Equal(t, metadata2, fetchBulk[1])
+
 	processing, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
 	assert.NoError(t, err)
 	assert.Len(t, processing, 1)

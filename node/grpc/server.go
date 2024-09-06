@@ -512,7 +512,7 @@ func (s *Server) GetBlobHeader(ctx context.Context, in *pb.GetBlobHeaderRequest)
 func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte) (*merkletree.MerkleTree, error) {
 	batchHeaderBytes, err := s.node.Store.GetBatchHeader(context.Background(), batchHeaderHash)
 	if err != nil {
-		return nil, errors.New("failed to get the batch header from Store")
+		return nil, err
 	}
 
 	batchHeader, err := new(core.BatchHeader).Deserialize(batchHeaderBytes)
@@ -570,7 +570,7 @@ func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, bl
 
 	blobHeaderBytes, err := s.node.Store.GetBlobHeader(ctx, batchHeaderHash, blobIndex)
 	if err != nil {
-		return nil, nil, errors.New("failed to get the blob header from Store")
+		return nil, nil, fmt.Errorf("failed to get the blob header from Store: %w", err)
 	}
 
 	var protoBlobHeader pb.BlobHeader
