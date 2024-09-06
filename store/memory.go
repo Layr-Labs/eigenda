@@ -65,14 +65,14 @@ func NewMemStore(
 
 	if store.config.BlobExpiration != 0 {
 		l.Info("memstore expiration enabled", "time", store.config.BlobExpiration)
-		go store.EventLoop(ctx)
+		go store.pruningLoop(ctx)
 	}
 
 	return store, nil
 }
 
-// EventLoop ... runs a background goroutine to prune expired blobs from the store on a regular interval.
-func (e *MemStore) EventLoop(ctx context.Context) {
+// pruningLoop ... runs a background goroutine to prune expired blobs from the store on a regular interval.
+func (e *MemStore) pruningLoop(ctx context.Context) {
 	timer := time.NewTicker(DefaultPruneInterval)
 
 	for {
