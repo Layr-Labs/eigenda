@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/configuration"
+	"github.com/Layr-Labs/eigenda/common/configuration"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"math/big"
