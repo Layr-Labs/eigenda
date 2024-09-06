@@ -3,10 +3,10 @@ package common;
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
 
 message G1Commitment {
-  // The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
-  bytes x = 1;
-  // The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
-  bytes y = 2;
+	// The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+	bytes x = 1;
+	// The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+	bytes y = 2;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,35 +15,35 @@ message G1Commitment {
 
 // A unique identifier for a blob.
 message BlobKey {
-  oneof key {
-    HeaderBlobKey header_blob_key = 1;
-    BatchBlobKey batch_blob_key = 2;
-  }
+	oneof key {
+		HeaderBlobKey header_blob_key = 1;
+		BatchBlobKey batch_blob_key = 2;
+	}
 }
 
 // Uniquely identifies a blob based on its blob header hash.
 message HeaderBlobKey {
-  bytes header_hash = 1;
+	bytes header_hash = 1;
 }
 
 // Uniquely identifies a blob based on its batch header hash and blob index.
 message BatchBlobKey {
-  bytes batch_header_hash = 1;
-  uint32 blob_index = 2;
+	bytes batch_header_hash = 1;
+	uint32 blob_index = 2;
 }
 
 // A unique identifier for a chunk.
 message ChunkKey {
-  BlobKey blob_key = 1;
-  uint32 chunk_index = 2;
+	BlobKey blob_key = 1;
+	uint32 chunk_index = 2;
 }
 
 // A blob.
 message BlobData {
-  bytes data = 1;
+	bytes data = 1;
 }
 
 // A chunk of a blob.
 message ChunkData {
-  bytes data = 1;
+	bytes data = 1;
 }

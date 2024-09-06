@@ -51,17 +51,17 @@ service Disperser {
 // Authenicated Message Types
 
 message AuthenticatedRequest {
-    oneof payload {
-        DisperseBlobRequest disperse_request = 1;
-        AuthenticationData authentication_data = 2;
-    }
+		oneof payload {
+				DisperseBlobRequest disperse_request = 1;
+				AuthenticationData authentication_data = 2;
+		}
 }
 
 message AuthenticatedReply {
-    oneof payload {
-        BlobAuthHeader blob_auth_header = 1;
-        DisperseBlobReply disperse_reply = 2;
-    }
+		oneof payload {
+				BlobAuthHeader blob_auth_header = 1;
+				DisperseBlobReply disperse_reply = 2;
+		}
 }
 
 // BlobAuthHeader contains information about the blob for the client to verify and sign.
