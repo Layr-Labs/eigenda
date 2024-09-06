@@ -4,8 +4,11 @@ import (
 	"context"
 	"crypto/md5"
 	"github.com/Layr-Labs/eigenda/api/clients"
+	apiMock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	retrieverMock "github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
@@ -30,15 +33,15 @@ func TestBlobReader(t *testing.T) {
 
 	readerMetrics := metrics.NewMockMetrics()
 
-	chainClient := &mockChainClient{}
-	chainClient.mock.On(
+	chainClient := &retrieverMock.MockChainClient{}
+	chainClient.On(
 		"FetchBatchHeader",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything)
-	retrievalClient := &mockRetrievalClient{}
+		mock.Anything).Return(&binding.IEigenDAServiceManagerBatchHeader{}, nil)
+	retrievalClient := &apiMock.MockRetrievalClient{}
 
 	blobReader := NewBlobReader(
 		&ctx,
@@ -93,13 +96,13 @@ func TestBlobReader(t *testing.T) {
 		// Simplify tracking by hijacking the BlobHeaderLength field to store the blob index,
 		// which is used as a unique identifier within this test.
 		chunks := &clients.BlobChunks{BlobHeaderLength: blobMetadata.BlobIndex}
-		retrievalClient.mock.On("RetrieveBlobChunks",
+		retrievalClient.On("RetrieveBlobChunks",
 			blobMetadata.BatchHeaderHash,
 			uint32(blobMetadata.BlobIndex),
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).Return(chunks, nil)
-		retrievalClient.mock.On("CombineChunks", chunks).Return(blobData, nil)
+		retrievalClient.On("CombineChunks", chunks).Return(blobData, nil)
 
 		blobTable.Add(blobMetadata)
 	}
@@ -109,9 +112,9 @@ func TestBlobReader(t *testing.T) {
 	for i := uint(0); i < expectedTotalReads; i++ {
 		blobReader.randomRead()
 
-		chainClient.mock.AssertNumberOfCalls(t, "FetchBatchHeader", int(i+1))
-		retrievalClient.mock.AssertNumberOfCalls(t, "RetrieveBlobChunks", int(i+1))
-		retrievalClient.mock.AssertNumberOfCalls(t, "CombineChunks", int(i+1))
+		chainClient.AssertNumberOfCalls(t, "FetchBatchHeader", int(i+1))
+		retrievalClient.AssertNumberOfCalls(t, "RetrieveBlobChunks", int(i+1))
+		retrievalClient.AssertNumberOfCalls(t, "CombineChunks", int(i+1))
 
 		remainingPermits := uint(0)
 		for _, metadata := range blobTable.GetAll() {
