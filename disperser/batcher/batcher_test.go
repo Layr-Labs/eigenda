@@ -448,8 +448,8 @@ func TestBlobRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, disperser.Dispersing, meta.BlobStatus)
 	encodedResult, err = components.encodingStreamer.EncodedBlobstore.GetEncodingResult(blobKey, 0)
-	assert.ErrorContains(t, err, "no such key")
-	assert.Nil(t, encodedResult)
+	assert.NoError(t, err)
+	assert.NotNil(t, encodedResult)
 
 	err = components.encodingStreamer.RequestEncoding(ctx, out)
 	assert.NoError(t, err)

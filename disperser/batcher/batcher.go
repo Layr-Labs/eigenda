@@ -321,6 +321,7 @@ func (b *Batcher) updateConfirmationInfo(
 		} else {
 			updateConfirmationInfoErr = fmt.Errorf("HandleSingleBatch: trying to update confirmation info for blob in status other than confirmed or insufficient signatures: %s", status.String())
 		}
+		b.EncodingStreamer.RemoveEncodedBlob(metadata)
 		if updateConfirmationInfoErr != nil {
 			b.logger.Error("HandleSingleBatch: error updating blob confirmed metadata", "err", updateConfirmationInfoErr)
 			blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
