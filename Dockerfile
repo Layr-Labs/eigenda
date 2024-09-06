@@ -32,4 +32,4 @@ COPY --from=builder /app/resources/ /app/resources/
 EXPOSE 4242 7300
 
 # Run app
-CMD ["./eigenda-proxy"]
+ENTRYPOINT ["./eigenda-proxy"]
