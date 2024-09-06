@@ -1,7 +1,7 @@
 package storeutil
 
 import (
-	"github.com/Layr-Labs/eigenda/kvstore"
+	"github.com/Layr-Labs/eigenda/lightnode/kvstore"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"sync"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/kvstore/mapstore"
+	"github.com/Layr-Labs/eigenda/lightnode/kvstore/mapstore"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"sort"
