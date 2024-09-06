@@ -26,7 +26,7 @@ message HeaderBlobKey {
   bytes header_hash = 1;
 }
 
-// Uniquely identifies a blob based on its certificate hash and blob index.
+// Uniquely identifies a blob based on its batch header hash and blob index.
 message BatchBlobKey {
   bytes batch_header_hash = 1;
   uint32 blob_index = 2;
