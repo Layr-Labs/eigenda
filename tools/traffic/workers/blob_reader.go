@@ -132,6 +132,7 @@ func (r *BlobReader) randomRead() {
 	r.metrics.requiredReadPoolSizeMetric.Set(float64(r.blobsToRead.Size()))
 
 	ctxTimeout, cancel := context.WithTimeout(*r.ctx, r.config.FetchBatchHeaderTimeout)
+	defer cancel()
 	batchHeader, err := metrics.InvokeAndReportLatency(r.metrics.fetchBatchHeaderMetric,
 		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
 			return r.chainClient.FetchBatchHeader(
@@ -141,7 +142,6 @@ func (r *BlobReader) randomRead() {
 				big.NewInt(int64(0)),
 				nil)
 		})
-	cancel()
 	if err != nil {
 		r.logger.Error("failed to get batch header", "err:", err)
 		r.metrics.fetchBatchHeaderFailure.Increment()
@@ -149,14 +149,11 @@ func (r *BlobReader) randomRead() {
 	}
 	r.metrics.fetchBatchHeaderSuccess.Increment()
 
-	var batchHeaderHash [32]byte
-	copy(batchHeaderHash[:], metadata.BatchHeaderHash[:])
-
 	ctxTimeout, cancel = context.WithTimeout(*r.ctx, r.config.RetrieveBlobChunksTimeout)
 	chunks, err := metrics.InvokeAndReportLatency(r.metrics.readLatencyMetric, func() (*clients.BlobChunks, error) {
 		return r.retriever.RetrieveBlobChunks(
 			ctxTimeout,
-			batchHeaderHash,
+			metadata.BatchHeaderHash,
 			uint32(metadata.BlobIndex),
 			uint(batchHeader.ReferenceBlockNumber),
 			batchHeader.BlobHeadersRoot,
