@@ -207,7 +207,7 @@ func (x *HeaderBlobKey) GetHeaderHash() []byte {
 	return nil
 }
 
-// Uniquely identifies a blob based on its certificate hash and blob index.
+// Uniquely identifies a blob based on its batch header hash and blob index.
 type BatchBlobKey struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

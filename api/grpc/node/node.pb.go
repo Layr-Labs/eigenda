@@ -1262,7 +1262,7 @@ func (x *NodeInfoReply) GetMemBytes() uint64 {
 	return 0
 }
 
-// Request that all chunks from a particular quorum for a blob be sent.
+// Request all custodied chunks from a particular quorum
 type GetChunksRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1324,7 +1324,7 @@ type GetChunksReply struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The indices of the chunks sent. Each index corresponds to the chunk at the same position in the chunks field.
+	// The indices of the chunks custodied. Each index corresponds to the chunk at the same position in the chunks field.
 	ChunkIndices []uint32 `protobuf:"varint,1,rep,packed,name=chunk_indices,json=chunkIndices,proto3" json:"chunk_indices,omitempty"`
 	// The chunks this node has.
 	Chunks []*common.ChunkData `protobuf:"bytes,2,rep,name=chunks,proto3" json:"chunks,omitempty"`

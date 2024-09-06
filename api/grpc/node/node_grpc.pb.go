@@ -270,7 +270,7 @@ type RetrievalClient interface {
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
 	GetChunk(ctx context.Context, in *common.ChunkKey, opts ...grpc.CallOption) (*common.ChunkData, error)
-	// GetHeader is similar to RetrieveChunks, this just returns the header of the blob.
+	// Get the header of a blob.
 	// Eventually this will replace GetBlobHeader.
 	GetHeader(ctx context.Context, in *common.BlobKey, opts ...grpc.CallOption) (*GetBlobHeaderReply, error)
 	// StreamHeaders requests a stream all new headers.
@@ -396,7 +396,7 @@ type RetrievalServer interface {
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
 	GetChunk(context.Context, *common.ChunkKey) (*common.ChunkData, error)
-	// GetHeader is similar to RetrieveChunks, this just returns the header of the blob.
+	// Get the header of a blob.
 	// Eventually this will replace GetBlobHeader.
 	GetHeader(context.Context, *common.BlobKey) (*GetBlobHeaderReply, error)
 	// StreamHeaders requests a stream all new headers.
