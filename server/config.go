@@ -38,6 +38,8 @@ const (
 	// memstore flags
 	MemstoreFlagName           = "memstore.enabled"
 	MemstoreExpirationFlagName = "memstore.expiration"
+	MemstorePutLatencyFlagName = "memstore.put-latency"
+	MemstoreGetLatencyFlagName = "memstore.get-latency"
 
 	// S3 client flags
 	S3CredentialTypeFlagName  = "s3.credential-type" // #nosec G101
@@ -90,6 +92,8 @@ type Config struct {
 	// Memstore
 	MemstoreEnabled        bool
 	MemstoreBlobExpiration time.Duration
+	MemstoreGetLatency     time.Duration
+	MemstorePutLatency     time.Duration
 
 	// routing
 	FallbackTargets []string
@@ -179,6 +183,8 @@ func ReadConfig(ctx *cli.Context) Config {
 		EthConfirmationDepth:   ctx.Int64(EthConfirmationDepthFlagName),
 		MemstoreEnabled:        ctx.Bool(MemstoreFlagName),
 		MemstoreBlobExpiration: ctx.Duration(MemstoreExpirationFlagName),
+		MemstoreGetLatency:     ctx.Duration(MemstoreGetLatencyFlagName),
+		MemstorePutLatency:     ctx.Duration(MemstorePutLatencyFlagName),
 		FallbackTargets:        ctx.StringSlice(FallbackTargets),
 		CacheTargets:           ctx.StringSlice(CacheTargets),
 	}
@@ -418,6 +424,18 @@ func CLIFlags() []cli.Flag {
 			Usage:   "Duration that a mem-store blob/commitment pair are allowed to live.",
 			Value:   25 * time.Minute,
 			EnvVars: []string{"MEMSTORE_EXPIRATION"},
+		},
+		&cli.DurationFlag{
+			Name:    MemstorePutLatencyFlagName,
+			Usage:   "Artificial latency added for memstore backend to mimic EigenDA's dispersal latency.",
+			Value:   0,
+			EnvVars: []string{"MEMSTORE_PUT_LATENCY"},
+		},
+		&cli.DurationFlag{
+			Name:    MemstoreGetLatencyFlagName,
+			Usage:   "Artificial latency added for memstore backend to mimic EigenDA's retrieval latency.",
+			Value:   0,
+			EnvVars: []string{"MEMSTORE_GET_LATENCY"},
 		},
 		&cli.StringSliceFlag{
 			Name:    FallbackTargets,

@@ -1,8 +1,6 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/urfave/cli/v2"
 
@@ -22,37 +20,27 @@ func prefixEnvVars(name string) []string {
 	return opservice.PrefixEnvVar(EnvVarPrefix, name)
 }
 
-var (
-	ListenAddrFlag = &cli.StringFlag{
+// Flags contains the list of configuration options available to the binary.
+var Flags = []cli.Flag{
+	&cli.StringFlag{
 		Name:    ListenAddrFlagName,
 		Usage:   "server listening address",
-		Value:   "127.0.0.1",
+		Value:   "0.0.0.0",
 		EnvVars: prefixEnvVars("ADDR"),
-	}
-	PortFlag = &cli.IntFlag{
+	},
+	&cli.IntFlag{
 		Name:    PortFlagName,
 		Usage:   "server listening port",
 		Value:   3100,
 		EnvVars: prefixEnvVars("PORT"),
-	}
-)
-
-var requiredFlags = []cli.Flag{
-	ListenAddrFlag,
-	PortFlag,
+	},
 }
-
-var optionalFlags = []cli.Flag{}
 
 func init() {
-	optionalFlags = append(optionalFlags, oplog.CLIFlags(EnvVarPrefix)...)
-	optionalFlags = append(optionalFlags, CLIFlags()...)
-	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
-	Flags = append(requiredFlags, optionalFlags...) //nolint:gocritic // this is a global variable
+	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, CLIFlags()...)
+	Flags = append(Flags, opmetrics.CLIFlags(EnvVarPrefix)...)
 }
-
-// Flags contains the list of configuration options available to the binary.
-var Flags []cli.Flag
 
 type CLIConfig struct {
 	S3Config      store.S3Config
@@ -73,15 +61,6 @@ func (c CLIConfig) Check() error {
 	err := c.EigenDAConfig.Check()
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-func CheckRequired(ctx *cli.Context) error {
-	for _, f := range requiredFlags {
-		if !ctx.IsSet(f.Names()[0]) {
-			return fmt.Errorf("flag %s is required", f.Names()[0])
-		}
 	}
 	return nil
 }

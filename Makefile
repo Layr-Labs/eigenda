@@ -31,8 +31,8 @@ stop-minio:
 		docker stop minio && docker rm minio; \
 	fi
 
-run-server:
-	./bin/eigenda-proxy
+run-memstore-server:
+	./bin/eigenda-proxy --memstore.enabled
 
 clean:
 	rm bin/eigenda-proxy

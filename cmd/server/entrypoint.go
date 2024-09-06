@@ -13,9 +13,6 @@ import (
 )
 
 func StartProxySvr(cliCtx *cli.Context) error {
-	if err := server.CheckRequired(cliCtx); err != nil {
-		return err
-	}
 	cfg := server.ReadCLIConfig(cliCtx)
 	if err := cfg.Check(); err != nil {
 		return err
