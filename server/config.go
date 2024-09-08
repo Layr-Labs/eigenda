@@ -41,6 +41,12 @@ const (
 	MemstorePutLatencyFlagName = "memstore.put-latency"
 	MemstoreGetLatencyFlagName = "memstore.get-latency"
 
+	// redis client flags
+	RedisEndpointFlagName = "redis.endpoint"
+	RedisPasswordFlagName = "redis.password"
+	RedisDBFlagName       = "redis.db"
+	RedisEvictionFlagName = "redis.eviction"
+
 	// S3 client flags
 	S3CredentialTypeFlagName  = "s3.credential-type" // #nosec G101
 	S3BucketFlagName          = "s3.bucket"          // #nosec G101
@@ -67,29 +73,28 @@ var (
 )
 
 type Config struct {
-	S3Config store.S3Config
-
+	// eigenda
 	ClientConfig clients.EigenDAClientConfig
 
-	// The blob encoding version to use when writing blobs from the high level interface.
+	// the blob encoding version to use when writing blobs from the high level interface.
 	PutBlobEncodingVersion codecs.BlobEncodingVersion
 
-	// ETH vars
+	// eth vars
 	EthRPC               string
 	SvcManagerAddr       string
 	EthConfirmationDepth int64
 
-	// KZG vars
+	// kzg vars
 	CacheDir         string
 	G1Path           string
 	G2Path           string
 	G2PowerOfTauPath string
 
-	// Size constraints
+	// size constraints
 	MaxBlobLength      string
 	maxBlobLengthBytes uint64
 
-	// Memstore
+	// memstore
 	MemstoreEnabled        bool
 	MemstoreBlobExpiration time.Duration
 	MemstoreGetLatency     time.Duration
@@ -98,6 +103,10 @@ type Config struct {
 	// routing
 	FallbackTargets []string
 	CacheTargets    []string
+
+	// secondary storage
+	RedisCfg store.RedisConfig
+	S3Config store.S3Config
 }
 
 // GetMaxBlobLength ... returns the maximum blob length in bytes
@@ -153,6 +162,12 @@ func (cfg *Config) VerificationCfg() *verify.Config {
 // ReadConfig ... parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
 	cfg := Config{
+		RedisCfg: store.RedisConfig{
+			Endpoint: ctx.String(RedisEndpointFlagName),
+			Password: ctx.String(RedisPasswordFlagName),
+			DB:       ctx.Int(RedisDBFlagName),
+			Eviction: ctx.Duration(RedisEvictionFlagName),
+		},
 		S3Config: store.S3Config{
 			S3CredentialType: store.StringToS3CredentialType(ctx.String(S3CredentialTypeFlagName)),
 			Bucket:           ctx.String(S3BucketFlagName),
@@ -244,6 +259,10 @@ func (cfg *Config) Check() error {
 		}
 	}
 
+	if cfg.RedisCfg.Endpoint == "" && cfg.RedisCfg.Password != "" {
+		return fmt.Errorf("redis password is set, but endpoint is not")
+	}
+
 	if !cfg.MemstoreEnabled && cfg.ClientConfig.RPC == "" {
 		return fmt.Errorf("eigenda disperser rpc url is not set")
 	}
@@ -268,7 +287,7 @@ func (cfg *Config) Check() error {
 	return nil
 }
 
-// flags used for S3 backend configuration
+// s3Flags ... used for S3 backend configuration
 func s3Flags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -315,6 +334,34 @@ func s3Flags() []cli.Flag {
 			Usage:   "timeout for S3 storage operations (e.g. get, put)",
 			Value:   5 * time.Second,
 			EnvVars: prefixEnvVars("S3_TIMEOUT"),
+		},
+	}
+}
+
+// redisFlags ... used for Redis backend configuration
+func redisFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    RedisEndpointFlagName,
+			Usage:   "Redis endpoint",
+			EnvVars: prefixEnvVars("REDIS_ENDPOINT"),
+		},
+		&cli.StringFlag{
+			Name:    RedisPasswordFlagName,
+			Usage:   "Redis password",
+			EnvVars: prefixEnvVars("REDIS_PASSWORD"),
+		},
+		&cli.IntFlag{
+			Name:    RedisDBFlagName,
+			Usage:   "Redis database",
+			Value:   0,
+			EnvVars: prefixEnvVars("REDIS_DB"),
+		},
+		&cli.DurationFlag{
+			Name:    RedisEvictionFlagName,
+			Usage:   "Redis eviction time",
+			Value:   24 * time.Hour,
+			EnvVars: prefixEnvVars("REDIS_EVICTION"),
 		},
 	}
 }
@@ -452,5 +499,6 @@ func CLIFlags() []cli.Flag {
 	}
 
 	flags = append(flags, s3Flags()...)
+	flags = append(flags, redisFlags()...)
 	return flags
 }

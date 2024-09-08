@@ -36,6 +36,34 @@ func (m *MockIRouter) EXPECT() *MockIRouterMockRecorder {
 	return m.recorder
 }
 
+// Caches mocks base method.
+func (m *MockIRouter) Caches() []store.PrecomputedKeyStore {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Caches")
+	ret0, _ := ret[0].([]store.PrecomputedKeyStore)
+	return ret0
+}
+
+// Caches indicates an expected call of Caches.
+func (mr *MockIRouterMockRecorder) Caches() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Caches", reflect.TypeOf((*MockIRouter)(nil).Caches))
+}
+
+// Fallbacks mocks base method.
+func (m *MockIRouter) Fallbacks() []store.PrecomputedKeyStore {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Fallbacks")
+	ret0, _ := ret[0].([]store.PrecomputedKeyStore)
+	return ret0
+}
+
+// Fallbacks indicates an expected call of Fallbacks.
+func (mr *MockIRouterMockRecorder) Fallbacks() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fallbacks", reflect.TypeOf((*MockIRouter)(nil).Fallbacks))
+}
+
 // Get mocks base method.
 func (m *MockIRouter) Get(arg0 context.Context, arg1 []byte, arg2 commitments.CommitmentMode) ([]byte, error) {
 	m.ctrl.T.Helper()

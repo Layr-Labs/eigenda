@@ -36,6 +36,7 @@ type Cfg struct {
 	Expiration         time.Duration
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
+	UseRedisCaching    bool
 	UseS3Fallback      bool
 }
 
@@ -45,7 +46,21 @@ func TestConfig(useMemory bool) *Cfg {
 		Expiration:         14 * 24 * time.Hour,
 		UseKeccak256ModeS3: false,
 		UseS3Caching:       false,
+		UseRedisCaching:    false,
 		UseS3Fallback:      false,
+	}
+}
+
+func createRedisConfig(eigendaCfg server.Config) server.CLIConfig {
+	return server.CLIConfig{
+		EigenDAConfig: eigendaCfg,
+		RedisCfg: store.RedisConfig{
+			Endpoint: "127.0.0.1:9001",
+			Password: "",
+			DB:       0,
+			Eviction: 10 * time.Minute,
+			Profile:  true,
+		},
 	}
 }
 
@@ -140,6 +155,10 @@ func CreateTestSuite(t *testing.T, testCfg *Cfg) (TestSuite, func()) {
 	case testCfg.UseS3Fallback:
 		eigendaCfg.FallbackTargets = []string{"S3"}
 		cfg = createS3Config(eigendaCfg)
+
+	case testCfg.UseRedisCaching:
+		eigendaCfg.CacheTargets = []string{"redis"}
+		cfg = createRedisConfig(eigendaCfg)
 
 	default:
 		cfg = server.CLIConfig{

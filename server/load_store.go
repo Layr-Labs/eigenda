@@ -10,14 +10,53 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// populateTargets ... creates a list of storage backends based on the provided target strings
+func populateTargets(targets []string, s3 *store.S3Store, redis *store.RedStore) []store.PrecomputedKeyStore {
+	stores := make([]store.PrecomputedKeyStore, len(targets))
+
+	for i, f := range targets {
+		b := store.StringToBackendType(f)
+
+		switch b {
+		case store.Redis:
+			stores[i] = redis
+
+		case store.S3:
+			stores[i] = s3
+
+		case store.EigenDA, store.Memory:
+			panic(fmt.Sprintf("Invalid target for fallback: %s", f))
+
+		case store.Unknown:
+			fallthrough
+
+		default:
+			panic(fmt.Sprintf("Unknown fallback target: %s", f))
+		}
+	}
+
+	return stores
+}
+
 // LoadStoreRouter ... creates storage backend clients and instruments them into a storage routing abstraction
 func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.IRouter, error) {
 	// create S3 backend store (if enabled)
 	var err error
 	var s3 *store.S3Store
+	var redis *store.RedStore
+
 	if cfg.S3Config.Bucket != "" && cfg.S3Config.Endpoint != "" {
 		log.Info("Using S3 backend")
 		s3, err = store.NewS3(cfg.S3Config)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if cfg.RedisCfg.Endpoint != "" {
+		log.Info("Using Redis backend")
+		// create Redis backend store
+		redis, err = store.NewRedisStore(&cfg.RedisCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -78,52 +117,8 @@ func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.
 	}
 
 	// determine read fallbacks
-	fallbacks := make([]store.PrecomputedKeyStore, len(cfg.EigenDAConfig.FallbackTargets))
-
-	for i, f := range cfg.EigenDAConfig.FallbackTargets {
-		b := store.StringToBackendType(f)
-
-		switch b {
-		case store.S3:
-			fallbacks[i] = s3
-
-		case store.EigenDA, store.Memory:
-			return nil, fmt.Errorf("EigenDA cannot be used as a fallback target")
-
-		case store.Redis:
-			return nil, fmt.Errorf("redis is not supported yet")
-
-		case store.Unknown:
-			fallthrough
-
-		default:
-			panic(fmt.Sprintf("Unknown fallback target: %s", f))
-		}
-	}
-
-	// determine caches for priority reads
-	caches := make([]store.PrecomputedKeyStore, len(cfg.EigenDAConfig.CacheTargets))
-
-	for i, f := range cfg.EigenDAConfig.CacheTargets {
-		b := store.StringToBackendType(f)
-
-		switch b {
-		case store.S3:
-			caches[i] = s3
-
-		case store.EigenDA, store.Memory:
-			return nil, fmt.Errorf("EigenDA cannot be used as a cache target")
-
-		case store.Redis:
-			return nil, fmt.Errorf("redis is not supported yet")
-
-		case store.Unknown:
-			fallthrough
-
-		default:
-			log.Warn("Unknown fallback target", "target", f)
-		}
-	}
+	fallbacks := populateTargets(cfg.EigenDAConfig.FallbackTargets, s3, redis)
+	caches := populateTargets(cfg.EigenDAConfig.CacheTargets, s3, redis)
 
 	log.Info("Creating storage router", "eigenda backend type", eigenda != nil, "s3 backend type", s3 != nil)
 	return store.NewRouter(eigenda, s3, log, caches, fallbacks)

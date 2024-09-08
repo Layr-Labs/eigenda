@@ -26,9 +26,17 @@ docker-build:
 run-minio:
 	docker run -p 4566:9000 -d -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" --name minio minio/minio server /data
 
+run-redis:
+	docker run -p 9001:6379 -d --name redis redis
+
 stop-minio:
 	@if [ -n "$$(docker ps -q -f name=minio)" ]; then \
 		docker stop minio && docker rm minio; \
+	fi
+
+stop-redis:
+	@if [ -n "$$(docker ps -q -f name=redis)" ]; then \
+		docker stop redis && docker rm redis; \
 	fi
 
 run-memstore-server:
@@ -40,13 +48,15 @@ clean:
 test:
 	go test -v ./... -parallel 4 
 
-e2e-test: stop-minio run-minio
+e2e-test: stop-minio stop-redis run-minio run-redis
 	$(E2ETEST) && \
-	make stop-minio
+	make stop-minio && \
+	make stop-redis
 
-holesky-test: run-minio
+holesky-test: stop-minio stop-redis run-minio run-redis
 	$(HOLESKYTEST) && \
-	make stop-minio
+	make stop-minio && \
+	make stop-redis
 
 .PHONY: lint
 lint:

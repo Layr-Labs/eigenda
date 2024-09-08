@@ -64,6 +64,10 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--routing.fallback-targets` | `[]` | `$EIGENDA_PROXY_FALLBACK_TARGETS` | Fall back backend targets. Supports S3. | Backup storage locations to read from in the event of eigenda retrieval failure. |
 | `--routing.cache-targets` | `[]` | `$EIGENDA_PROXY_CACHE_TARGETS` | Caching targets. Supports S3. | Caches data to backend targets after dispersing to DA, retrieved from before trying read from EigenDA. |
 | `--s3.timeout` | `5s` | `$EIGENDA_PROXY_S3_TIMEOUT` | timeout for S3 storage operations (e.g. get, put) |
+| `--redis.db` | `0` |  `$EIGENDA_PROXY_REDIS_DB` | redis database to use after connecting to server |
+| `--redis.endpoint` | `""` | `$EIGENDA_PROXY_REDIS_ENDPOINT` | redis endpoint url |
+| `--redis.password` | `""` | `$EIGENDA_PROXY_REDIS_PASSWORD` | redis password |
+| `--redis.eviction` | `24h0m0s`  | `$EIGENDA_PROXY_REDIS_EVICTION` | entry eviction/expiration time |
 | `--help, -h` | `false` |  | Show help. |
 | `--version, -v` | `false` |  | Print the version. |
 

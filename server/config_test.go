@@ -11,6 +11,12 @@ import (
 
 func validCfg() *Config {
 	return &Config{
+		RedisCfg: store.RedisConfig{
+			Endpoint: "localhost:6379",
+			Password: "password",
+			DB:       0,
+			Eviction: 10 * time.Minute,
+		},
 		S3Config: store.S3Config{
 			Bucket:          "test-bucket",
 			Path:            "",
@@ -170,6 +176,14 @@ func TestConfigVerification(t *testing.T) {
 		cfg := validCfg()
 		cfg.FallbackTargets = []string{"s3"}
 		cfg.CacheTargets = []string{"s3"}
+
+		err := cfg.Check()
+		require.Error(t, err)
+	})
+
+	t.Run("BadRedisConfiguration", func(t *testing.T) {
+		cfg := validCfg()
+		cfg.RedisCfg.Endpoint = ""
 
 		err := cfg.Check()
 		require.Error(t, err)

@@ -1,6 +1,9 @@
 package store
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 type BackendType uint8
 
@@ -31,16 +34,18 @@ func (b BackendType) String() string {
 }
 
 func StringToBackendType(s string) BackendType {
-	switch s {
-	case "EigenDA":
+	lower := strings.ToLower(s)
+
+	switch lower {
+	case "eigenda":
 		return EigenDA
-	case "Memory":
+	case "memory":
 		return Memory
-	case "S3":
+	case "s3":
 		return S3
-	case "Redis":
+	case "redis":
 		return Redis
-	case "Unknown":
+	case "unknown":
 		fallthrough
 	default:
 		return Unknown
