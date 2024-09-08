@@ -94,7 +94,8 @@ integration-tests-dataapi:
 	go test -v ./disperser/dataapi
 
 docker-release-build:
-	RELEASE_TAG=${SEMVER} docker compose -f docker-compose-release.yaml build --build-arg SEMVER=${SEMVER} --build-arg GITCOMMIT=${GITCOMMIT} --build-arg GITDATE=${GITDATE} ${PUSH_FLAG}
+	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITCOMMIT=${GITCOMMIT} GITDATE=${GITDATE} \
+	docker buildx bake node-group-release ${PUSH_FLAG}
 
 semver:
 	echo "${SEMVER}"
