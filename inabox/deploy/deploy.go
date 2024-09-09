@@ -3,6 +3,7 @@ package deploy
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"os"
@@ -126,7 +127,7 @@ func (env *Config) DeployExperiment() {
 		log.Panicf("error opening file: %v", err)
 	}
 	defer f.Close()
-	log.SetOutput(f)
+	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
 	// Create a new experiment and deploy the contracts
 
