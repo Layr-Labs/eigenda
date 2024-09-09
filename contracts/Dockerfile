@@ -10,4 +10,4 @@ RUN forge build
 RUN forge test
 
 # Set the entrypoint to the forge command
-ENTRYPOINT ["forge"]
+ENTRYPOINT ["/bin/sh", "-c"]
