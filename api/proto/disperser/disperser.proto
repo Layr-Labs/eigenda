@@ -37,13 +37,8 @@ service Disperser {
 	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	// Retrieves the requested blob from the disperser's backend.
-	// This RPC is is a work in progress with undefined behavior, use with caution.
-	rpc GetBlob(common.BlobKey) returns (common.BlobData) {}
-
 	// Retrieves the requested chunk from the Disperser's backend.
-	// This RPC is is a work in progress with undefined behavior, use with caution.
-	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
+	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
 }
 
 // Requests and Responses
@@ -261,4 +256,22 @@ message BatchHeader {
 	// The Disperser will encode and disperse the blobs based on the onchain info
 	// (e.g. operator stakes) at this block number.
 	uint32 reference_block_number = 4;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Messages for WIP RPCs. These are subject to change, do not consider these to be stable API. //
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Request a specific chunk
+message GetChunkRequest {
+	// The hash of the blob's header.
+	bytes header_hash = 1;
+	// The index of the chunk within the blob.
+	uint32 chunk_index = 2;
+}
+
+// Reply to GetChunkRequest
+message GetChunkReply {
+	// The chunk requested.
+	common.ChunkData chunk = 1;
 }

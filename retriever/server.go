@@ -3,9 +3,6 @@ package retriever
 import (
 	"context"
 	"errors"
-	"github.com/Layr-Labs/eigenda/api/grpc/common"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -78,8 +75,4 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	return &pb.BlobReply{
 		Data: data,
 	}, nil
-}
-
-func (s *Server) GetBlob(context.Context, *common.BlobKey) (*common.BlobData, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlob not implemented")
 }

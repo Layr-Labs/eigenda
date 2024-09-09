@@ -8,7 +8,6 @@ package lightnode
 
 import (
 	context "context"
-	common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -29,7 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LightNodeClient interface {
 	// GetChunk retrieves a specific chunk held by the light node.
-	GetChunk(ctx context.Context, in *common.ChunkKey, opts ...grpc.CallOption) (*common.ChunkData, error)
+	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
 	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
 	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
 	StreamAvailabilityStatus(ctx context.Context, in *StreamAvailabilityStatusRequest, opts ...grpc.CallOption) (LightNode_StreamAvailabilityStatusClient, error)
@@ -43,8 +42,8 @@ func NewLightNodeClient(cc grpc.ClientConnInterface) LightNodeClient {
 	return &lightNodeClient{cc}
 }
 
-func (c *lightNodeClient) GetChunk(ctx context.Context, in *common.ChunkKey, opts ...grpc.CallOption) (*common.ChunkData, error) {
-	out := new(common.ChunkData)
+func (c *lightNodeClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error) {
+	out := new(GetChunkReply)
 	err := c.cc.Invoke(ctx, LightNode_GetChunk_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -68,7 +67,7 @@ func (c *lightNodeClient) StreamAvailabilityStatus(ctx context.Context, in *Stre
 }
 
 type LightNode_StreamAvailabilityStatusClient interface {
-	Recv() (*common.ChunkKey, error)
+	Recv() (*StreamAvailabilityStatusReply, error)
 	grpc.ClientStream
 }
 
@@ -76,8 +75,8 @@ type lightNodeStreamAvailabilityStatusClient struct {
 	grpc.ClientStream
 }
 
-func (x *lightNodeStreamAvailabilityStatusClient) Recv() (*common.ChunkKey, error) {
-	m := new(common.ChunkKey)
+func (x *lightNodeStreamAvailabilityStatusClient) Recv() (*StreamAvailabilityStatusReply, error) {
+	m := new(StreamAvailabilityStatusReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -89,7 +88,7 @@ func (x *lightNodeStreamAvailabilityStatusClient) Recv() (*common.ChunkKey, erro
 // for forward compatibility
 type LightNodeServer interface {
 	// GetChunk retrieves a specific chunk held by the light node.
-	GetChunk(context.Context, *common.ChunkKey) (*common.ChunkData, error)
+	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
 	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
 	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
 	StreamAvailabilityStatus(*StreamAvailabilityStatusRequest, LightNode_StreamAvailabilityStatusServer) error
@@ -100,7 +99,7 @@ type LightNodeServer interface {
 type UnimplementedLightNodeServer struct {
 }
 
-func (UnimplementedLightNodeServer) GetChunk(context.Context, *common.ChunkKey) (*common.ChunkData, error) {
+func (UnimplementedLightNodeServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 func (UnimplementedLightNodeServer) StreamAvailabilityStatus(*StreamAvailabilityStatusRequest, LightNode_StreamAvailabilityStatusServer) error {
@@ -120,7 +119,7 @@ func RegisterLightNodeServer(s grpc.ServiceRegistrar, srv LightNodeServer) {
 }
 
 func _LightNode_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(common.ChunkKey)
+	in := new(GetChunkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -132,7 +131,7 @@ func _LightNode_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(
 		FullMethod: LightNode_GetChunk_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LightNodeServer).GetChunk(ctx, req.(*common.ChunkKey))
+		return srv.(LightNodeServer).GetChunk(ctx, req.(*GetChunkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -146,7 +145,7 @@ func _LightNode_StreamAvailabilityStatus_Handler(srv interface{}, stream grpc.Se
 }
 
 type LightNode_StreamAvailabilityStatusServer interface {
-	Send(*common.ChunkKey) error
+	Send(*StreamAvailabilityStatusReply) error
 	grpc.ServerStream
 }
 
@@ -154,7 +153,7 @@ type lightNodeStreamAvailabilityStatusServer struct {
 	grpc.ServerStream
 }
 
-func (x *lightNodeStreamAvailabilityStatusServer) Send(m *common.ChunkKey) error {
+func (x *lightNodeStreamAvailabilityStatusServer) Send(m *StreamAvailabilityStatusReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 

@@ -8,7 +8,6 @@ package disperser
 
 import (
 	context "context"
-	common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -24,7 +23,6 @@ const (
 	Disperser_DisperseBlobAuthenticated_FullMethodName = "/disperser.Disperser/DisperseBlobAuthenticated"
 	Disperser_GetBlobStatus_FullMethodName             = "/disperser.Disperser/GetBlobStatus"
 	Disperser_RetrieveBlob_FullMethodName              = "/disperser.Disperser/RetrieveBlob"
-	Disperser_GetBlob_FullMethodName                   = "/disperser.Disperser/GetBlob"
 	Disperser_GetChunk_FullMethodName                  = "/disperser.Disperser/GetChunk"
 )
 
@@ -55,12 +53,8 @@ type DisperserClient interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(ctx context.Context, in *RetrieveBlobRequest, opts ...grpc.CallOption) (*RetrieveBlobReply, error)
-	// Retrieves the requested blob from the disperser's backend.
-	// This RPC is is a work in progress with undefined behavior, use with caution.
-	GetBlob(ctx context.Context, in *common.BlobKey, opts ...grpc.CallOption) (*common.BlobData, error)
 	// Retrieves the requested chunk from the Disperser's backend.
-	// This RPC is is a work in progress with undefined behavior, use with caution.
-	GetChunk(ctx context.Context, in *common.ChunkKey, opts ...grpc.CallOption) (*common.ChunkData, error)
+	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
 }
 
 type disperserClient struct {
@@ -129,17 +123,8 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, in *RetrieveBlobRequ
 	return out, nil
 }
 
-func (c *disperserClient) GetBlob(ctx context.Context, in *common.BlobKey, opts ...grpc.CallOption) (*common.BlobData, error) {
-	out := new(common.BlobData)
-	err := c.cc.Invoke(ctx, Disperser_GetBlob_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *disperserClient) GetChunk(ctx context.Context, in *common.ChunkKey, opts ...grpc.CallOption) (*common.ChunkData, error) {
-	out := new(common.ChunkData)
+func (c *disperserClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error) {
+	out := new(GetChunkReply)
 	err := c.cc.Invoke(ctx, Disperser_GetChunk_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -174,12 +159,8 @@ type DisperserServer interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error)
-	// Retrieves the requested blob from the disperser's backend.
-	// This RPC is is a work in progress with undefined behavior, use with caution.
-	GetBlob(context.Context, *common.BlobKey) (*common.BlobData, error)
 	// Retrieves the requested chunk from the Disperser's backend.
-	// This RPC is is a work in progress with undefined behavior, use with caution.
-	GetChunk(context.Context, *common.ChunkKey) (*common.ChunkData, error)
+	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -199,10 +180,7 @@ func (UnimplementedDisperserServer) GetBlobStatus(context.Context, *BlobStatusRe
 func (UnimplementedDisperserServer) RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveBlob not implemented")
 }
-func (UnimplementedDisperserServer) GetBlob(context.Context, *common.BlobKey) (*common.BlobData, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlob not implemented")
-}
-func (UnimplementedDisperserServer) GetChunk(context.Context, *common.ChunkKey) (*common.ChunkData, error) {
+func (UnimplementedDisperserServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
@@ -298,26 +276,8 @@ func _Disperser_RetrieveBlob_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Disperser_GetBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(common.BlobKey)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DisperserServer).GetBlob(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Disperser_GetBlob_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DisperserServer).GetBlob(ctx, req.(*common.BlobKey))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Disperser_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(common.ChunkKey)
+	in := new(GetChunkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -329,7 +289,7 @@ func _Disperser_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(
 		FullMethod: Disperser_GetChunk_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DisperserServer).GetChunk(ctx, req.(*common.ChunkKey))
+		return srv.(DisperserServer).GetChunk(ctx, req.(*GetChunkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -352,10 +312,6 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RetrieveBlob",
 			Handler:    _Disperser_RetrieveBlob_Handler,
-		},
-		{
-			MethodName: "GetBlob",
-			Handler:    _Disperser_GetBlob_Handler,
 		},
 		{
 			MethodName: "GetChunk",

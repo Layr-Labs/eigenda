@@ -1,7 +1,6 @@
 syntax = "proto3";
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever";
-import "common/common.proto";
 package retriever;
 
 // The Retriever is a service for retrieving chunks corresponding to a blob from
@@ -21,14 +20,6 @@ service Retriever {
 	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 	// reconstructed original blob in response.
 	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////
-	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
-	////////////////////////////////////////////////////////////////////////////////////////////////
-
-	// Obtain the chunks necessary to reconstruct a blob and return it.
-	// Eventually this will replace RetrieveBlob.
-	rpc GetBlob(common.BlobKey) returns (common.BlobData) {}
 }
 
 message BlobRequest {

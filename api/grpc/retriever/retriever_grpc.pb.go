@@ -8,7 +8,6 @@ package retriever
 
 import (
 	context "context"
-	common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -21,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Retriever_RetrieveBlob_FullMethodName = "/retriever.Retriever/RetrieveBlob"
-	Retriever_GetBlob_FullMethodName      = "/retriever.Retriever/GetBlob"
 )
 
 // RetrieverClient is the client API for Retriever service.
@@ -31,9 +29,6 @@ type RetrieverClient interface {
 	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 	// reconstructed original blob in response.
 	RetrieveBlob(ctx context.Context, in *BlobRequest, opts ...grpc.CallOption) (*BlobReply, error)
-	// Obtain the chunks necessary to reconstruct a blob and return it.
-	// Eventually this will replace RetrieveBlob.
-	GetBlob(ctx context.Context, in *common.BlobKey, opts ...grpc.CallOption) (*common.BlobData, error)
 }
 
 type retrieverClient struct {
@@ -53,15 +48,6 @@ func (c *retrieverClient) RetrieveBlob(ctx context.Context, in *BlobRequest, opt
 	return out, nil
 }
 
-func (c *retrieverClient) GetBlob(ctx context.Context, in *common.BlobKey, opts ...grpc.CallOption) (*common.BlobData, error) {
-	out := new(common.BlobData)
-	err := c.cc.Invoke(ctx, Retriever_GetBlob_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // RetrieverServer is the server API for Retriever service.
 // All implementations must embed UnimplementedRetrieverServer
 // for forward compatibility
@@ -69,9 +55,6 @@ type RetrieverServer interface {
 	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 	// reconstructed original blob in response.
 	RetrieveBlob(context.Context, *BlobRequest) (*BlobReply, error)
-	// Obtain the chunks necessary to reconstruct a blob and return it.
-	// Eventually this will replace RetrieveBlob.
-	GetBlob(context.Context, *common.BlobKey) (*common.BlobData, error)
 	mustEmbedUnimplementedRetrieverServer()
 }
 
@@ -81,9 +64,6 @@ type UnimplementedRetrieverServer struct {
 
 func (UnimplementedRetrieverServer) RetrieveBlob(context.Context, *BlobRequest) (*BlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveBlob not implemented")
-}
-func (UnimplementedRetrieverServer) GetBlob(context.Context, *common.BlobKey) (*common.BlobData, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlob not implemented")
 }
 func (UnimplementedRetrieverServer) mustEmbedUnimplementedRetrieverServer() {}
 
@@ -116,24 +96,6 @@ func _Retriever_RetrieveBlob_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retriever_GetBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(common.BlobKey)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RetrieverServer).GetBlob(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Retriever_GetBlob_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrieverServer).GetBlob(ctx, req.(*common.BlobKey))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Retriever_ServiceDesc is the grpc.ServiceDesc for Retriever service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -144,10 +106,6 @@ var Retriever_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RetrieveBlob",
 			Handler:    _Retriever_RetrieveBlob_Handler,
-		},
-		{
-			MethodName: "GetBlob",
-			Handler:    _Retriever_GetBlob_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

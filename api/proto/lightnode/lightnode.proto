@@ -9,16 +9,31 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/lightnode";
 
 service LightNode {
 	// GetChunk retrieves a specific chunk held by the light node.
-	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
+	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
 
 	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
 	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	rpc StreamAvailabilityStatus(StreamAvailabilityStatusRequest) returns (stream common.ChunkKey) {}
+	rpc StreamAvailabilityStatus(StreamAvailabilityStatusRequest) returns (stream StreamAvailabilityStatusReply) {}
+}
+
+// A request for a specific chunk from a light node.
+message GetChunkRequest {
+	bytes header_hash = 1;
+}
+
+// A reply to a GetChunk request.
+message GetChunkReply {
+	// The chunk data.
+	common.ChunkData chunk = 1;
 }
 
 // A request from a DA node to an agent light node to stream the availability status of all chunks
 // assigned to the light node.
 message StreamAvailabilityStatusRequest {
-	// TODO describe protocol for authentication
 	bytes authentication_token = 1;
+}
+
+// A reply to a StreamAvailabilityStatus request.
+message StreamAvailabilityStatusReply {
+	bytes header_hash = 1;
 }

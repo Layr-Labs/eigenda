@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"reflect"
@@ -157,24 +156,12 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
 }
 
-func (s *Server) GetChunks(context.Context, *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
-}
-
-func (s *Server) GetChunk(context.Context, *commonpb.ChunkKey) (*commonpb.ChunkData, error) {
+func (s *Server) GetChunk(context.Context, *pb.GetChunkRequest) (*pb.GetChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
-}
-
-func (s *Server) GetHeader(context.Context, *commonpb.BlobKey) (*pb.GetBlobHeaderReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetHeader not implemented")
 }
 
 func (s *Server) StreamHeaders(pb.Retrieval_StreamHeadersServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamHeaders not implemented")
-}
-
-func (s *Server) GetNodeInfo(context.Context, *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetNodeInfo not implemented")
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {

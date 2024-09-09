@@ -77,296 +77,6 @@ func (x *G1Commitment) GetY() []byte {
 	return nil
 }
 
-// A unique identifier for a blob.
-type BlobKey struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	// Types that are assignable to Key:
-	//
-	//	*BlobKey_HeaderBlobKey
-	//	*BlobKey_BatchBlobKey
-	Key isBlobKey_Key `protobuf_oneof:"key"`
-}
-
-func (x *BlobKey) Reset() {
-	*x = BlobKey{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_common_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *BlobKey) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BlobKey) ProtoMessage() {}
-
-func (x *BlobKey) ProtoReflect() protoreflect.Message {
-	mi := &file_common_common_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BlobKey.ProtoReflect.Descriptor instead.
-func (*BlobKey) Descriptor() ([]byte, []int) {
-	return file_common_common_proto_rawDescGZIP(), []int{1}
-}
-
-func (m *BlobKey) GetKey() isBlobKey_Key {
-	if m != nil {
-		return m.Key
-	}
-	return nil
-}
-
-func (x *BlobKey) GetHeaderBlobKey() *HeaderBlobKey {
-	if x, ok := x.GetKey().(*BlobKey_HeaderBlobKey); ok {
-		return x.HeaderBlobKey
-	}
-	return nil
-}
-
-func (x *BlobKey) GetBatchBlobKey() *BatchBlobKey {
-	if x, ok := x.GetKey().(*BlobKey_BatchBlobKey); ok {
-		return x.BatchBlobKey
-	}
-	return nil
-}
-
-type isBlobKey_Key interface {
-	isBlobKey_Key()
-}
-
-type BlobKey_HeaderBlobKey struct {
-	HeaderBlobKey *HeaderBlobKey `protobuf:"bytes,1,opt,name=header_blob_key,json=headerBlobKey,proto3,oneof"`
-}
-
-type BlobKey_BatchBlobKey struct {
-	BatchBlobKey *BatchBlobKey `protobuf:"bytes,2,opt,name=batch_blob_key,json=batchBlobKey,proto3,oneof"`
-}
-
-func (*BlobKey_HeaderBlobKey) isBlobKey_Key() {}
-
-func (*BlobKey_BatchBlobKey) isBlobKey_Key() {}
-
-// Uniquely identifies a blob based on its blob header hash.
-type HeaderBlobKey struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	HeaderHash []byte `protobuf:"bytes,1,opt,name=header_hash,json=headerHash,proto3" json:"header_hash,omitempty"`
-}
-
-func (x *HeaderBlobKey) Reset() {
-	*x = HeaderBlobKey{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_common_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *HeaderBlobKey) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HeaderBlobKey) ProtoMessage() {}
-
-func (x *HeaderBlobKey) ProtoReflect() protoreflect.Message {
-	mi := &file_common_common_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HeaderBlobKey.ProtoReflect.Descriptor instead.
-func (*HeaderBlobKey) Descriptor() ([]byte, []int) {
-	return file_common_common_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *HeaderBlobKey) GetHeaderHash() []byte {
-	if x != nil {
-		return x.HeaderHash
-	}
-	return nil
-}
-
-// Uniquely identifies a blob based on its batch header hash and blob index.
-type BatchBlobKey struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	BatchHeaderHash []byte `protobuf:"bytes,1,opt,name=batch_header_hash,json=batchHeaderHash,proto3" json:"batch_header_hash,omitempty"`
-	BlobIndex       uint32 `protobuf:"varint,2,opt,name=blob_index,json=blobIndex,proto3" json:"blob_index,omitempty"`
-}
-
-func (x *BatchBlobKey) Reset() {
-	*x = BatchBlobKey{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_common_proto_msgTypes[3]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *BatchBlobKey) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BatchBlobKey) ProtoMessage() {}
-
-func (x *BatchBlobKey) ProtoReflect() protoreflect.Message {
-	mi := &file_common_common_proto_msgTypes[3]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BatchBlobKey.ProtoReflect.Descriptor instead.
-func (*BatchBlobKey) Descriptor() ([]byte, []int) {
-	return file_common_common_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *BatchBlobKey) GetBatchHeaderHash() []byte {
-	if x != nil {
-		return x.BatchHeaderHash
-	}
-	return nil
-}
-
-func (x *BatchBlobKey) GetBlobIndex() uint32 {
-	if x != nil {
-		return x.BlobIndex
-	}
-	return 0
-}
-
-// A unique identifier for a chunk.
-type ChunkKey struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	BlobKey    *BlobKey `protobuf:"bytes,1,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
-	ChunkIndex uint32   `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
-}
-
-func (x *ChunkKey) Reset() {
-	*x = ChunkKey{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_common_proto_msgTypes[4]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *ChunkKey) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ChunkKey) ProtoMessage() {}
-
-func (x *ChunkKey) ProtoReflect() protoreflect.Message {
-	mi := &file_common_common_proto_msgTypes[4]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ChunkKey.ProtoReflect.Descriptor instead.
-func (*ChunkKey) Descriptor() ([]byte, []int) {
-	return file_common_common_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ChunkKey) GetBlobKey() *BlobKey {
-	if x != nil {
-		return x.BlobKey
-	}
-	return nil
-}
-
-func (x *ChunkKey) GetChunkIndex() uint32 {
-	if x != nil {
-		return x.ChunkIndex
-	}
-	return 0
-}
-
-// A blob.
-type BlobData struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-}
-
-func (x *BlobData) Reset() {
-	*x = BlobData{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_common_common_proto_msgTypes[5]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *BlobData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BlobData) ProtoMessage() {}
-
-func (x *BlobData) ProtoReflect() protoreflect.Message {
-	mi := &file_common_common_proto_msgTypes[5]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BlobData.ProtoReflect.Descriptor instead.
-func (*BlobData) Descriptor() ([]byte, []int) {
-	return file_common_common_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *BlobData) GetData() []byte {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
 // A chunk of a blob.
 type ChunkData struct {
 	state         protoimpl.MessageState
@@ -379,7 +89,7 @@ type ChunkData struct {
 func (x *ChunkData) Reset() {
 	*x = ChunkData{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_common_common_proto_msgTypes[6]
+		mi := &file_common_common_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -392,7 +102,7 @@ func (x *ChunkData) String() string {
 func (*ChunkData) ProtoMessage() {}
 
 func (x *ChunkData) ProtoReflect() protoreflect.Message {
-	mi := &file_common_common_proto_msgTypes[6]
+	mi := &file_common_common_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +115,7 @@ func (x *ChunkData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChunkData.ProtoReflect.Descriptor instead.
 func (*ChunkData) Descriptor() ([]byte, []int) {
-	return file_common_common_proto_rawDescGZIP(), []int{6}
+	return file_common_common_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ChunkData) GetData() []byte {
@@ -422,38 +132,13 @@ var file_common_common_proto_rawDesc = []byte{
 	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x06, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x22, 0x2a, 0x0a,
 	0x0c, 0x47, 0x31, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x6d, 0x65, 0x6e, 0x74, 0x12, 0x0c, 0x0a,
 	0x01, 0x78, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x01, 0x78, 0x12, 0x0c, 0x0a, 0x01, 0x79,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x01, 0x79, 0x22, 0x8f, 0x01, 0x0a, 0x07, 0x42, 0x6c,
-	0x6f, 0x62, 0x4b, 0x65, 0x79, 0x12, 0x3f, 0x0a, 0x0f, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f,
-	0x62, 0x6c, 0x6f, 0x62, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15,
-	0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x42, 0x6c,
-	0x6f, 0x62, 0x4b, 0x65, 0x79, 0x48, 0x00, 0x52, 0x0d, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x42,
-	0x6c, 0x6f, 0x62, 0x4b, 0x65, 0x79, 0x12, 0x3c, 0x0a, 0x0e, 0x62, 0x61, 0x74, 0x63, 0x68, 0x5f,
-	0x62, 0x6c, 0x6f, 0x62, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14,
-	0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x42, 0x61, 0x74, 0x63, 0x68, 0x42, 0x6c, 0x6f,
-	0x62, 0x4b, 0x65, 0x79, 0x48, 0x00, 0x52, 0x0c, 0x62, 0x61, 0x74, 0x63, 0x68, 0x42, 0x6c, 0x6f,
-	0x62, 0x4b, 0x65, 0x79, 0x42, 0x05, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x22, 0x30, 0x0a, 0x0d, 0x48,
-	0x65, 0x61, 0x64, 0x65, 0x72, 0x42, 0x6c, 0x6f, 0x62, 0x4b, 0x65, 0x79, 0x12, 0x1f, 0x0a, 0x0b,
-	0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x0c, 0x52, 0x0a, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x48, 0x61, 0x73, 0x68, 0x22, 0x59, 0x0a,
-	0x0c, 0x42, 0x61, 0x74, 0x63, 0x68, 0x42, 0x6c, 0x6f, 0x62, 0x4b, 0x65, 0x79, 0x12, 0x2a, 0x0a,
-	0x11, 0x62, 0x61, 0x74, 0x63, 0x68, 0x5f, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f, 0x68, 0x61,
-	0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0f, 0x62, 0x61, 0x74, 0x63, 0x68, 0x48,
-	0x65, 0x61, 0x64, 0x65, 0x72, 0x48, 0x61, 0x73, 0x68, 0x12, 0x1d, 0x0a, 0x0a, 0x62, 0x6c, 0x6f,
-	0x62, 0x5f, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x09, 0x62,
-	0x6c, 0x6f, 0x62, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x22, 0x57, 0x0a, 0x08, 0x43, 0x68, 0x75, 0x6e,
-	0x6b, 0x4b, 0x65, 0x79, 0x12, 0x2a, 0x0a, 0x08, 0x62, 0x6c, 0x6f, 0x62, 0x5f, 0x6b, 0x65, 0x79,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e,
-	0x42, 0x6c, 0x6f, 0x62, 0x4b, 0x65, 0x79, 0x52, 0x07, 0x62, 0x6c, 0x6f, 0x62, 0x4b, 0x65, 0x79,
-	0x12, 0x1f, 0x0a, 0x0b, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x5f, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x0a, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x49, 0x6e, 0x64, 0x65,
-	0x78, 0x22, 0x1e, 0x0a, 0x08, 0x42, 0x6c, 0x6f, 0x62, 0x44, 0x61, 0x74, 0x61, 0x12, 0x12, 0x0a,
-	0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74,
-	0x61, 0x22, 0x1f, 0x0a, 0x09, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x44, 0x61, 0x74, 0x61, 0x12, 0x12,
-	0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61,
-	0x74, 0x61, 0x42, 0x2e, 0x5a, 0x2c, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x4c, 0x61, 0x79, 0x72, 0x2d, 0x4c, 0x61, 0x62, 0x73, 0x2f, 0x65, 0x69, 0x67, 0x65, 0x6e,
-	0x64, 0x61, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x67, 0x72, 0x70, 0x63, 0x2f, 0x63, 0x6f, 0x6d, 0x6d,
-	0x6f, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x01, 0x79, 0x22, 0x1f, 0x0a, 0x09, 0x43, 0x68, 0x75,
+	0x6e, 0x6b, 0x44, 0x61, 0x74, 0x61, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x42, 0x2e, 0x5a, 0x2c, 0x67, 0x69,
+	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x4c, 0x61, 0x79, 0x72, 0x2d, 0x4c, 0x61,
+	0x62, 0x73, 0x2f, 0x65, 0x69, 0x67, 0x65, 0x6e, 0x64, 0x61, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x67,
+	0x72, 0x70, 0x63, 0x2f, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x33,
 }
 
 var (
@@ -468,25 +153,17 @@ func file_common_common_proto_rawDescGZIP() []byte {
 	return file_common_common_proto_rawDescData
 }
 
-var file_common_common_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_common_common_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_common_common_proto_goTypes = []interface{}{
-	(*G1Commitment)(nil),  // 0: common.G1Commitment
-	(*BlobKey)(nil),       // 1: common.BlobKey
-	(*HeaderBlobKey)(nil), // 2: common.HeaderBlobKey
-	(*BatchBlobKey)(nil),  // 3: common.BatchBlobKey
-	(*ChunkKey)(nil),      // 4: common.ChunkKey
-	(*BlobData)(nil),      // 5: common.BlobData
-	(*ChunkData)(nil),     // 6: common.ChunkData
+	(*G1Commitment)(nil), // 0: common.G1Commitment
+	(*ChunkData)(nil),    // 1: common.ChunkData
 }
 var file_common_common_proto_depIdxs = []int32{
-	2, // 0: common.BlobKey.header_blob_key:type_name -> common.HeaderBlobKey
-	3, // 1: common.BlobKey.batch_blob_key:type_name -> common.BatchBlobKey
-	1, // 2: common.ChunkKey.blob_key:type_name -> common.BlobKey
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_common_common_proto_init() }
@@ -508,66 +185,6 @@ func file_common_common_proto_init() {
 			}
 		}
 		file_common_common_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BlobKey); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_common_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*HeaderBlobKey); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_common_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BatchBlobKey); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_common_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ChunkKey); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_common_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BlobData); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_common_common_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ChunkData); i {
 			case 0:
 				return &v.state
@@ -580,17 +197,13 @@ func file_common_common_proto_init() {
 			}
 		}
 	}
-	file_common_common_proto_msgTypes[1].OneofWrappers = []interface{}{
-		(*BlobKey_HeaderBlobKey)(nil),
-		(*BlobKey_BatchBlobKey)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_common_common_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

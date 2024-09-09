@@ -774,10 +774,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}, nil
 }
 
-func (s *DispersalServer) GetBlob(context.Context, *commonpb.BlobKey) (*commonpb.BlobData, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlob not implemented")
-}
-func (s *DispersalServer) GetChunk(context.Context, *commonpb.ChunkKey) (*commonpb.ChunkData, error) {
+func (s *DispersalServer) GetChunk(context.Context, *pb.GetChunkRequest) (*pb.GetChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 

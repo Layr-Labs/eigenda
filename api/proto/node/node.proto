@@ -38,18 +38,10 @@ service Retrieval {
 	// These RPCs are a work in progress and are not yet fully functional. API may not be stable. //
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	// GetChunks retrieves all of the chunks from a specified quorum for a blob held by the node.
-	// Eventually this will replace RetrieveChunks.
-	rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	rpc GetChunk(common.ChunkKey) returns (common.ChunkData) {}
-	// Get the header of a blob.
-	// Eventually this will replace GetBlobHeader.
-	rpc GetHeader(common.BlobKey) returns (GetBlobHeaderReply) {}
+	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
 	// StreamHeaders requests a stream all new headers.
-	rpc StreamHeaders(stream StreamHeadersRequest) returns (stream GetBlobHeaderReply) {}
-	// Retrieve node info metadata. Eventually this will replace NodeInfo.
-	rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
+	rpc StreamHeaders(stream StreamHeadersRequest) returns (stream StreamHeadersReply) {}
 }
 
 // Requests and replies
@@ -238,33 +230,30 @@ message NodeInfoReply {
 // Messages for WIP RPCs. These are subject to change, do not consider these to be stable API. //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Request all custodied chunks from a particular quorum
-message GetChunksRequest {
-	common.BlobKey blob_key = 1;
-	uint32 quorum_id = 2;
+// Request a specific chunk
+message GetChunkRequest {
+	// The hash of the blob's header.
+	bytes header_hash = 1;
+	// The index of the chunk within the blob.
+	uint32 chunk_index = 2;
 }
 
-// Reply to GetChunksRequest.
-message GetChunksReply {
-	// The indices of the chunks custodied. Each index corresponds to the chunk at the same position in the chunks field.
-	repeated uint32 chunk_indices = 1;
-	// The chunks this node has.
-	repeated common.ChunkData chunks = 2;
+// Reply to GetChunkRequest
+message GetChunkReply {
+	// The chunk requested.
+	common.ChunkData chunk = 1;
 }
 
 // Request that all new headers be sent.
 message StreamHeadersRequest {
 }
 
-// Node info request.
-message GetNodeInfoRequest {
-}
-
-// Node info reply.
-message GetNodeInfoReply {
-	string semver = 1;
-	string arch = 2;
-	string os = 3;
-	uint32 num_cpu = 4;
-	uint64 mem_bytes = 5;
+// Reply to StreamHeadersRequest
+message StreamHeadersReply {
+	// The header of the blob
+	BlobHeader blob_header = 1;
+	// Merkle proof that returned blob header belongs to the batch and is
+	// the batch's MerkleProof.index-th blob.
+	// This can be checked against the batch root on chain.
+	MerkleProof proof = 2;
 }
