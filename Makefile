@@ -42,6 +42,9 @@ stop-redis:
 run-memstore-server:
 	./bin/eigenda-proxy --memstore.enabled
 
+disperse-test-blob:
+	curl -X POST -d my-blob-content http://127.0.0.1:3100/put/
+
 clean:
 	rm bin/eigenda-proxy
 
