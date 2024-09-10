@@ -23,7 +23,7 @@ group "default" {
 }
 
 group "all" {
-  targets = ["node-group", "disperser-group"]
+  targets = ["node-group", "disperser-group", "retriever", "churner"]
 }
 
 group "node-group" {
@@ -31,7 +31,7 @@ group "node-group" {
 }
 
 group "disperser-group" {
-  targets = ["batcher", "disperser", "encoder", "retriever", "churner"]
+  targets = ["batcher", "disperser", "encoder"]
 }
 
 group "node-group-release" {
@@ -99,15 +99,15 @@ target "nodeplugin" {
 # RELEASE TARGETS
 
 target "_release" {
-    platforms = ["linux/amd64", "linux/arm64"]
+  platforms = ["linux/amd64", "linux/arm64"]
 }
 
 target "node-release" {
-  inherits  = ["node", "_release"]
-  tags       = ["ghcr.io/layr-labs/eigenda/opr-node:${BUILD_TAG}"]
+  inherits = ["node", "_release"]
+  tags     = ["ghcr.io/layr-labs/eigenda/opr-node:${BUILD_TAG}"]
 }
 
 target "nodeplugin-release" {
-  inherits  = ["nodeplugin", "_release"]
-  tags       = ["ghcr.io/layr-labs/eigenda/opr-nodeplugin:${BUILD_TAG}"]
+  inherits = ["nodeplugin", "_release"]
+  tags     = ["ghcr.io/layr-labs/eigenda/opr-nodeplugin:${BUILD_TAG}"]
 }
