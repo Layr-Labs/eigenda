@@ -68,11 +68,11 @@ func RunScan(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 		}
-		logger.Info("Scanning operators", "registrations", len(registrations), "deregistrations", len(deregistrations))
 
 		// Count registrations
 		operators := make(map[string]int)
 		for _, registration := range registrations {
+			logger.Info("Operator", "operatorId", string(registration.OperatorId), "info", registration)
 			operators[string(registration.OperatorId)]++
 		}
 
@@ -120,7 +120,7 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 			}
 			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			retrievalSocket := operatorSocket.GetRetrievalSocket()
-			semver := getNodeInfo(context.Background(), retrievalSocket, config.Timeout, logger)
+			semver := getNodeInfo(context.Background(), operatorId, retrievalSocket, config.Timeout, logger)
 
 			mu.Lock()
 			semvers[semver]++
@@ -146,10 +146,10 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 	return semvers
 }
 
-func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logger logging.Logger) string {
+func getNodeInfo(ctx context.Context, operatorId string, socket string, timeout time.Duration, logger logging.Logger) string {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.Error("Failed to dial grpc operator socket", "socket", socket, "error", err)
+		logger.Error("Failed to dial grpc operator socket", "operatorId", operatorId, "socket", socket, "error", err)
 		return "unreachable"
 	}
 	defer conn.Close()
@@ -169,17 +169,16 @@ func getNodeInfo(ctx context.Context, socket string, timeout time.Duration, logg
 			semver = "error"
 		}
 
-		logger.Warn("NodeInfo", "semver", semver, "error", err)
+		logger.Warn("NodeInfo", "operatorId", operatorId, "semver", semver, "error", err)
 		return semver
 	}
 
-	// local mode compiles without semver
+	// local node source compiles without semver
 	if reply.Semver == "" {
-		logger.Info("NodeInfo", "semver", "empty", "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
-		return "src-compile"
+		reply.Semver = "src-compile"
 	}
 
-	logger.Info("NodeInfo", "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+	logger.Info("NodeInfo", "operatorId", operatorId, "socker", socket, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
 	return reply.Semver
 }
 
