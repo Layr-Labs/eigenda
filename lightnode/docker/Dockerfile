@@ -13,12 +13,19 @@ RUN rm .bashrc
 RUN rm .bash_logout
 RUN rm .profile
 
-# Copy the eigenda repository
+# Copy go.mod and download dependencies without copying the entire repository.
+# Prevents us from downloading dependencies every time we make a change to the repository.
+RUN mkdir -p /home/lnode/eigenda
+COPY --chown=lnode go.mod /home/lnode/eigenda/go.mod
+COPY --chown=lnode go.sum /home/lnode/eigenda/go.sum
+WORKDIR /home/lnode/eigenda
+RUN go mod download
+
+# Copy the remainder of the eigenda repository
 COPY --chown=lnode . /home/lnode/eigenda
 
 # Download all go dependencies and build the binary.
 WORKDIR /home/lnode/eigenda/lightnode
-RUN go mod download
 RUN make build
 
 # In order to equip this image with a shell for debugging,
