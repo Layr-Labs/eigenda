@@ -34,6 +34,7 @@ func main() {
 		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
 		plugin.NumConfirmationsFlag,
+		plugin.PubIPProviderFlag,
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
