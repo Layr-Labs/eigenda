@@ -5,6 +5,7 @@
 ![Go Coverage](https://github.com/Layr-Labs/eigenda/wiki/coverage.svg)
 
 # EigenDA
+Test
 
 ## Overview
 
