@@ -104,8 +104,10 @@ target "_release" {
 
 target "node-release" {
   inherits  = ["node", "_release"]
+  tags       = ["ghcr.io/layr-labs/eigenda/opr-node:${BUILD_TAG}"]
 }
 
 target "nodeplugin-release" {
   inherits  = ["nodeplugin", "_release"]
+  tags       = ["ghcr.io/layr-labs/eigenda/opr-nodeplugin:${BUILD_TAG}"]
 }
