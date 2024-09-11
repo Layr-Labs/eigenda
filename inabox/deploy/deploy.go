@@ -92,7 +92,7 @@ func (env *Config) deployEigenDAContracts() {
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	writeFile("script/eigenda_deploy_config.json", data)
+	writeFile("script/input/eigenda_deploy_config.json", data)
 
 	execForgeScript("script/SetUpEigenDA.s.sol:SetupEigenDA", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, nil)
 

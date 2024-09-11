@@ -25,7 +25,7 @@ import "forge-std/StdJson.sol";
 // forge script script/Deployer.s.sol:SetupEigenDA --rpc-url $RPC_URL  --private-key $PRIVATE_KEY --broadcast -vvvv
 contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
-    string deployConfigPath = "script/eigenda_deploy_config.json";
+    string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
     // deploy all the EigenDA contracts. Relies on many EL contracts having already been deployed.
     function run() external {
