@@ -29,6 +29,10 @@ type ttlStore struct {
 
 // TTLWrapper extends the given store with TTL capabilities. Periodically checks for expired keys and deletes them
 // with a period of gcPeriod. If gcPeriod is 0, no background goroutine is spawned to check for expired keys.
+//
+// Note: it is unsafe to access the wrapped store directly while the TTLStore is in use. The TTLStore uses special
+// key formatting, and direct access to the wrapped store may violate the TTLStore's invariants, resulting in
+// undefined behavior.
 func TTLWrapper(
 	ctx context.Context,
 	logger logging.Logger,
