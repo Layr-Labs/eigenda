@@ -76,7 +76,7 @@ func newMinibatcher(t *testing.T, config batcher.MinibatcherConfig) *minibatcher
 		SRSOrder:                 3000,
 		EncodingRequestTimeout:   5 * time.Second,
 		EncodingQueueLimit:       10,
-		TargetNumChunks:          8092,
+		TargetNumChunks:          0,
 		MaxBlobsToFetchFromStore: 10,
 		FinalizationBlockDelay:   0,
 		ChainStateTimeout:        5 * time.Second,

@@ -105,18 +105,14 @@ func FuzzOperatorAssignments(f *testing.F) {
 	asn := &core.StdAssignmentCoordinator{}
 
 	for i := 1; i < 100; i++ {
-		f.Add(i, true)
-	}
-
-	for i := 1; i < 100; i++ {
-		f.Add(i, false)
+		f.Add(i)
 	}
 
 	for i := 0; i < 100; i++ {
-		f.Add(rand.Intn(254)+1, rand.Intn(2) == 0)
+		f.Add(rand.Intn(254) + 1)
 	}
 
-	f.Fuzz(func(t *testing.T, numOperators int, useTargetNumChunks bool) {
+	f.Fuzz(func(t *testing.T, numOperators int) {
 
 		// Generate a random slice of integers of length n
 
@@ -145,15 +141,12 @@ func FuzzOperatorAssignments(f *testing.F) {
 
 		blobLength := uint(rand.Intn(100000))
 
-		targetNumChunks := uint(0)
-		if useTargetNumChunks {
-			targetNumChunks = uint(rand.Intn(1000))
-		}
-
 		fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "blobLength", blobLength)
 
-		chunkLength, err := asn.CalculateChunkLength(state.OperatorState, blobLength, targetNumChunks, param)
+		chunkLength, err := asn.CalculateChunkLength(state.OperatorState, blobLength, 0, param)
 		assert.NoError(t, err)
+
+		assert.LessOrEqual(t, chunkLength, blobLength)
 
 		quorumInfo := &core.BlobQuorumInfo{
 			SecurityParam: *param,
@@ -164,23 +157,10 @@ func FuzzOperatorAssignments(f *testing.F) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 
-		assignments, info, err := asn.GetAssignments(state.OperatorState, blobLength, quorumInfo)
+		assignments, _, err := asn.GetAssignments(state.OperatorState, blobLength, quorumInfo)
 		assert.NoError(t, err)
 
 		// fmt.Println("advThreshold", advThreshold, "quorumThreshold", quorumThreshold, "numOperators", numOperators, "chunkLength", chunkLength, "blobLength", blobLength)
-
-		if useTargetNumChunks {
-
-			quorumInfo.ChunkLength = chunkLength * 2
-			ok, err := asn.ValidateChunkLength(state.OperatorState, blobLength, quorumInfo)
-
-			// Make sure that the number of chunks is less than the target
-			// TODO: Make sure that the number of chunks is no less than half the target (this currently fails in some rare cases
-			// but it isn't a critical problem)
-			if ok && err == nil {
-				assert.GreaterOrEqual(t, targetNumChunks, info.TotalChunks)
-			}
-		}
 
 		// Check that each operator's assignment satisfies the security requirement
 		for operatorID, assignment := range assignments {
