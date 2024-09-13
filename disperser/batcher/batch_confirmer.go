@@ -108,6 +108,11 @@ func (b *BatchConfirmer) Start(ctx context.Context) error {
 	}()
 	b.TransactionManager.Start(ctx)
 
+	err = b.RecoverState(ctx)
+	if err != nil {
+		b.logger.Error("failed to recover state", "err", err)
+	}
+
 	go func() {
 		ticker := time.NewTicker(b.PullInterval)
 		defer ticker.Stop()
@@ -125,6 +130,95 @@ func (b *BatchConfirmer) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func (b *BatchConfirmer) RecoverState(ctx context.Context) error {
+	b.logger.Info("Recovering state...")
+	start := time.Now()
+
+	// Get the pending batch
+	b.logger.Debug("Getting latest formed batch...")
+	batch, err := b.MinibatchStore.GetLatestFormedBatch(ctx)
+	if err != nil {
+		b.logger.Error("error getting latest formed batch", "err", err)
+	}
+
+	stageTimer := time.Now()
+	dispersals, err := b.MinibatchStore.GetDispersalsByBatchID(ctx, batch.ID)
+	if err != nil {
+		return fmt.Errorf("error getting minibatch dispersals: %w", err)
+	}
+	b.logger.Debug("GetDispersals took", "duration", time.Since(stageTimer))
+
+	// Get the batch state
+	stageTimer = time.Now()
+	blobMinibatchMappings, err := b.MinibatchStore.GetBlobMinibatchMappingsByBatchID(ctx, batch.ID)
+	if err != nil {
+		return fmt.Errorf("error getting blob minibatch mappings: %w", err)
+	}
+	b.logger.Debug("GetBlobMinibatchMappingsByBatchID took", "duration", time.Since(stageTimer))
+
+	operators, err := b.ChainState.GetIndexedOperators(ctx, batch.ReferenceBlockNumber)
+	if err != nil {
+		return fmt.Errorf("error getting indexed operators: %w", err)
+	}
+	successful, failed, err := DispersedBlobs(operators, dispersals, blobMinibatchMappings)
+	if err != nil {
+		return fmt.Errorf("error getting dispersed blobs: %w", err)
+	}
+
+	for _, failedBlob := range failed {
+		err = b.BlobStore.MarkBlobProcessing(ctx, *failedBlob.BlobKey)
+		if err != nil {
+			return fmt.Errorf("error marking blob (%s) processing: %w", failedBlob.BlobKey.String(), err)
+		}
+	}
+
+	blobHeaders := make([]*core.BlobHeader, len(successful))
+	blobKeys := make([]disperser.BlobKey, len(successful))
+	quorumSet := make(map[core.QuorumID]struct{})
+	for i, blobMinibatchMapping := range successful {
+		if blobMinibatchMapping == nil {
+			return fmt.Errorf("blob minibatch mapping is nil")
+		}
+		blobHeaders[i] = &core.BlobHeader{
+			BlobCommitments: blobMinibatchMapping.BlobCommitments,
+			QuorumInfos:     blobMinibatchMapping.QuorumInfos,
+			AccountID:       blobMinibatchMapping.AccountID,
+		}
+		blobKeys[i] = *blobMinibatchMapping.BlobKey
+
+		for _, quorum := range blobMinibatchMapping.QuorumInfos {
+			if _, ok := quorumSet[quorum.QuorumID]; !ok {
+				quorumSet[quorum.QuorumID] = struct{}{}
+			}
+		}
+	}
+	stageTimer = time.Now()
+	metadatas, err := b.BlobStore.GetBulkBlobMetadata(ctx, blobKeys)
+	if err != nil {
+		return fmt.Errorf("error getting blob metadata: %w", err)
+	}
+	b.logger.Debug("GetBulkBlobMetadata took", "duration", time.Since(stageTimer))
+
+	quorums := make([]core.QuorumID, 0, len(quorumSet))
+	for quorum := range quorumSet {
+		quorums = append(quorums, quorum)
+	}
+	state, err := b.ChainState.GetIndexedOperatorState(ctx, batch.ReferenceBlockNumber, quorums)
+	if err != nil {
+		return fmt.Errorf("error getting indexed operator state: %w", err)
+	}
+	batchState := &BatchState{
+		BatchID:              batch.ID,
+		ReferenceBlockNumber: batch.ReferenceBlockNumber,
+		BlobHeaders:          blobHeaders,
+		BlobMetadata:         metadatas,
+		OperatorState:        state,
+	}
+
+	b.logger.Debug("RecoverState took", "duration", time.Since(start))
+	return b.AttestAndConfirmBatch(ctx, batchState)
 }
 
 // updateConfirmationInfo updates the confirmation info for each blob in the batch and returns failed blobs to retry.
@@ -352,10 +446,13 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 		return fmt.Errorf("no batch state found for batch %s", batch.ID)
 	}
 
+	return b.AttestAndConfirmBatch(ctx, batchState)
+}
+func (b *BatchConfirmer) AttestAndConfirmBatch(ctx context.Context, batchState *BatchState) error {
 	// Construct batch header
 	b.logger.Debug("Constructing batch header...")
 	batchHeader := &core.BatchHeader{
-		ReferenceBlockNumber: batch.ReferenceBlockNumber,
+		ReferenceBlockNumber: batchState.ReferenceBlockNumber,
 		BatchRoot:            [32]byte{},
 	}
 	blobHeaderHashes := make([][32]byte, 0)
@@ -401,7 +498,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 	b.logger.Debug("Aggregating signatures...")
 	quorumAttestation, err := b.Aggregator.ReceiveSignatures(ctx, batchState.OperatorState, batchHeaderHash, replyChan)
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.ID, batchState.BlobMetadata, FailAggregateSignatures)
+		_ = b.handleFailure(ctx, batchState.BatchID, batchState.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("error receiving and validating signatures: %w", err)
 	}
 	operatorCount := make(map[core.QuorumID]int)
@@ -425,7 +522,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 	numPassed, passedQuorums := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batchState.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
-		_ = b.handleFailure(ctx, batch.ID, batchState.BlobMetadata, FailNoSignatures)
+		_ = b.handleFailure(ctx, batchState.BatchID, batchState.BlobMetadata, FailNoSignatures)
 		return errors.New("no blobs received sufficient signatures")
 	}
 
@@ -438,7 +535,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 	// Aggregate the signatures across only the non-empty quorums. Excluding empty quorums reduces the gas cost.
 	aggSig, err := b.Aggregator.AggregateSignatures(ctx, b.ChainState, batchHeader.ReferenceBlockNumber, quorumAttestation, nonEmptyQuorums)
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.ID, batchState.BlobMetadata, FailAggregateSignatures)
+		_ = b.handleFailure(ctx, batchState.BatchID, batchState.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("error aggregating signatures: %w", err)
 	}
 
@@ -446,11 +543,11 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 
 	txn, err := b.Transactor.BuildConfirmBatchTxn(ctx, batchHeader, aggSig.QuorumResults, aggSig)
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.ID, batchState.BlobMetadata, FailConfirmBatch)
+		_ = b.handleFailure(ctx, batchState.BatchID, batchState.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("error building confirmBatch transaction: %w", err)
 	}
 	err = b.TransactionManager.ProcessTransaction(ctx, NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
-		batchID:     batch.ID,
+		batchID:     batchState.BatchID,
 		batchHeader: batchHeader,
 		blobs:       batchState.BlobMetadata,
 		blobHeaders: batchState.BlobHeaders,
@@ -458,7 +555,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 		aggSig:      aggSig,
 	}))
 	if err != nil {
-		_ = b.handleFailure(ctx, batch.ID, batchState.BlobMetadata, FailConfirmBatch)
+		_ = b.handleFailure(ctx, batchState.BatchID, batchState.BlobMetadata, FailConfirmBatch)
 		return fmt.Errorf("error sending confirmBatch transaction: %w", err)
 	}
 
