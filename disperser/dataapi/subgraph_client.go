@@ -36,6 +36,7 @@ type (
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
 		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
+		QueryOperatorDeregistrations(ctx context.Context, limit int) ([]*Operator, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -105,6 +106,23 @@ var _ SubgraphClient = (*subgraphClient)(nil)
 
 func NewSubgraphClient(api subgraph.Api, logger logging.Logger) *subgraphClient {
 	return &subgraphClient{api: api, logger: logger.With("component", "SubgraphClient")}
+}
+
+func (sc *subgraphClient) QueryOperatorDeregistrations(ctx context.Context, limit int) ([]*Operator, error) {
+	// Implement the logic to query operator deregistrations
+	operatorsGql, err := sc.api.QueryOperatorDeregistrations(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	operators := make([]*Operator, len(operatorsGql))
+	for i, operatorGql := range operatorsGql {
+		operator, err := convertOperator(operatorGql)
+		if err != nil {
+			return nil, err
+		}
+		operators[i] = operator
+	}
+	return operators, nil
 }
 
 func (sc *subgraphClient) QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error) {

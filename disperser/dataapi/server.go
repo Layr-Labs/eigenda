@@ -153,6 +153,10 @@ type (
 		DispersalOnline bool   `json:"dispersal_online"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 	}
+	HostInfoReportResponse struct {
+		HostInfo map[string]int `json:"hostinfo"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
@@ -801,6 +805,30 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
 	c.JSON(http.StatusOK, portCheckResponse)
+}
+
+// HostInfo report godoc
+//
+//	@Summary	Active operator hostinfo report
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200			{object}	OperatorPortCheckResponse
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/hostinfo-scan [get]
+func (s *server) HostInfoReport(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("HostInfoReport", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	hostInfo, err := s.scanOperatorsHostInfo(c.Request.Context(), s.logger)
+	if err != nil {
+		s.logger.Error("failed to scan operators host info", "error", err)
+		s.metrics.IncrementFailedRequestNum("HostInfoReport")
+		errorResponse(c, err)
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, hostInfo)
 }
 
 // FetchDisperserServiceAvailability godoc

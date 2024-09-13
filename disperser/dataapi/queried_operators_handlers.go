@@ -210,8 +210,8 @@ func (s *server) getOperatorInfo(ctx context.Context, operatorId string) (*core.
 	return operatorInfo, nil
 }
 
-func (s *server) scanOperatorsNodeInfo(ctx context.Context, operatorIds []string, logger logging.Logger) (map[string]int, error) {
-	registrations, err := s.subgraphClient.subgraphClient.api.QueryOperators(context.Background(), 10000)
+func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logger) (*HostInfoReportResponse, error) {
+	registrations, err := s.subgraphClient.QueryOperatorsWithLimit(context.Background(), 10000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed registered operator state - %s", err)
 	}
@@ -243,14 +243,14 @@ func (s *server) scanOperatorsNodeInfo(ctx context.Context, operatorIds []string
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	numWorkers := 5
-	operatorChan := make(chan string, len(operatorIds))
-	semvers := make(map[string]int)
+	operatorChan := make(chan string, len(activeOperators))
+	hostInfo := make(map[string]int)
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorInfo, err := s.getOperatorInfo(ctx, operatorId)
 			if err != nil {
 				mu.Lock()
-				semvers["not-found"]++
+				hostInfo["not-found"]++
 				mu.Unlock()
 				continue
 			}
@@ -259,7 +259,7 @@ func (s *server) scanOperatorsNodeInfo(ctx context.Context, operatorIds []string
 			semver := getSemverInfo(context.Background(), operatorId, dispersalSocket, logger)
 
 			mu.Lock()
-			semvers[semver]++
+			hostInfo[semver]++
 			mu.Unlock()
 		}
 		wg.Done()
@@ -272,14 +272,20 @@ func (s *server) scanOperatorsNodeInfo(ctx context.Context, operatorIds []string
 	}
 
 	// Send operator IDs to the channel
-	for _, operatorId := range operatorIds {
+	for _, operatorId := range activeOperators {
 		operatorChan <- operatorId
 	}
 	close(operatorChan)
 
 	// Wait for all workers to finish
 	wg.Wait()
-	return semvers, nil
+
+	// Create HostInfoReportResponse instance
+	hostInfoReport := &HostInfoReportResponse{
+		HostInfo: hostInfo,
+	}
+
+	return hostInfoReport, nil
 }
 
 // query operator host info endpoint if available

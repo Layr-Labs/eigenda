@@ -27,6 +27,7 @@ type (
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*IndexedOperatorInfo, error)
 		QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
+		QueryOperatorDeregistrations(ctx context.Context, first int) ([]*Operator, error)
 	}
 
 	api struct {
