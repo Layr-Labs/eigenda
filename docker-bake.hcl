@@ -86,7 +86,7 @@ target "churner" {
 target "traffic-generator" {
   inherits = ["docker-metadata-action"]
   context    = "."
-  dockerfile = "./traffic-generator.Dockerfile"
+  dockerfile = "./trafficgenerator.Dockerfile"
   target     = "traffic-generator"
 }
 
