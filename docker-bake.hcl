@@ -19,35 +19,6 @@ variable "GITDATE" {
   default = "0"
 }
 
-variable "BATCHER_PATH" {
-  default =  "batcher"
-}
-
-variable "DISPERSER_PATH" {
-  default =  "disperser"
-}
-
-variable "DATAAPI_PATH" {
-  default =  "dataapi"
-}
-
-variable "ENCODER_PATH" {
-  default =  "encoder"
-}
-
-variable "RETRIEVER_PATH" {
-  default =  "retriever"
-}
-
-variable "CHURNER_PATH" {
-  default =  "churner"
-}
-
-variable "NODE_PATH" {
-  default =  "node"
-}
-
-
 # GROUPS
 
 group "default" {
@@ -82,7 +53,6 @@ target "batcher" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
-  tags       = ["${REGISTRY}/${BATCHER_PATH}:${BUILD_TAG}"]
 }
 
 target "disperser" {
@@ -90,7 +60,6 @@ target "disperser" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
-  tags       = ["${REGISTRY}/${DISPERSER_PATH}:${BUILD_TAG}"]
 }
 
 target "encoder" {
@@ -98,7 +67,6 @@ target "encoder" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
-  tags       = ["${REGISTRY}/${ENCODER_PATH}:${BUILD_TAG}"]
 }
 
 target "retriever" {
@@ -106,7 +74,6 @@ target "retriever" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
-  tags       = ["${REGISTRY}/${RETRIEVER_PATH}:${BUILD_TAG}"]
 }
 
 target "churner" {
@@ -114,7 +81,6 @@ target "churner" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
-  tags       = ["${REGISTRY}/${CHURNER_PATH}:${BUILD_TAG}"]
 }
 
 target "traffic-generator" {
@@ -122,7 +88,6 @@ target "traffic-generator" {
   context    = "."
   dockerfile = "./traffic-generator.Dockerfile"
   target     = "traffic-generator"
-  tags       = []
 }
 
 target "dataapi" {
@@ -130,7 +95,6 @@ target "dataapi" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "dataapi"
-  tags       = ["${REGISTRY}/${DATAAPI_PATH}:${BUILD_TAG}"]
 }
 
 # NODE TARGETS
@@ -140,7 +104,6 @@ target "node" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
-  tags       = ["${REGISTRY}/${NODE_PATH}:${BUILD_TAG}"]
   args = {
     SEMVER    = "${SEMVER}"
     GITCOMMIT = "${GITCOMMIT}"
@@ -153,7 +116,6 @@ target "nodeplugin" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "nodeplugin"
-  tags       = ["${REGISTRY}/nodeplugin:${BUILD_TAG}"]
 }
 
 # RELEASE TARGETS
