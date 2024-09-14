@@ -1,4 +1,11 @@
 # VARIABLES
+variable "REGISTRY" {
+  default = "ghcr.io"
+}
+
+variable "REPOSITORY" {
+  default = "layr-labs/eigenda"
+}
 
 variable "BUILD_TAG" {
   default = "latest"
@@ -44,35 +51,35 @@ target "batcher" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
-  tags       = ["ghcr.io/layr-labs/eigenda/batcher:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/batcher:${BUILD_TAG}"]
 }
 
 target "disperser" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
-  tags       = ["ghcr.io/layr-labs/eigenda/disperser:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/disperser:${BUILD_TAG}"]
 }
 
 target "encoder" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
-  tags       = ["ghcr.io/layr-labs/eigenda/encoder:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/encoder:${BUILD_TAG}"]
 }
 
 target "retriever" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
-  tags       = ["ghcr.io/layr-labs/eigenda/retriever:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/retriever:${BUILD_TAG}"]
 }
 
 target "churner" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
-  tags       = ["ghcr.io/layr-labs/eigenda/churner:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/churner:${BUILD_TAG}"]
 }
 
 # NODE TARGETS
@@ -81,7 +88,7 @@ target "node" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
-  tags       = ["ghcr.io/layr-labs/eigenda/node:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/node:${BUILD_TAG}"]
   args = {
     SEMVER    = "${SEMVER}"
     GITCOMMIT = "${GITCOMMIT}"
@@ -93,7 +100,7 @@ target "nodeplugin" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "nodeplugin"
-  tags       = ["ghcr.io/layr-labs/eigenda/nodeplugin:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPOSITORY}/nodeplugin:${BUILD_TAG}"]
 }
 
 # RELEASE TARGETS
@@ -104,10 +111,10 @@ target "_release" {
 
 target "node-release" {
   inherits = ["node", "_release"]
-  tags     = ["ghcr.io/layr-labs/eigenda/opr-node:${BUILD_TAG}"]
+  tags     = ["${REGISTRY}/${REPOSITORY}/opr-node:${BUILD_TAG}"]
 }
 
 target "nodeplugin-release" {
   inherits = ["nodeplugin", "_release"]
-  tags     = ["ghcr.io/layr-labs/eigenda/opr-nodeplugin:${BUILD_TAG}"]
+  tags     = ["${REGISTRY}/${REPOSITORY}/opr-nodeplugin:${BUILD_TAG}"]
 }
