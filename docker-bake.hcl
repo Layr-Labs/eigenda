@@ -1,10 +1,6 @@
 # VARIABLES
 variable "REGISTRY" {
-  default = "ghcr.io"
-}
-
-variable "REPOSITORY" {
-  default = "layr-labs/eigenda"
+  default = "ghcr.io/layr-labs/eigenda"
 }
 
 variable "BUILD_TAG" {
@@ -51,35 +47,35 @@ target "batcher" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
-  tags       = ["${REGISTRY}/${REPOSITORY}/batcher:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/batcher:${BUILD_TAG}"]
 }
 
 target "disperser" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
-  tags       = ["${REGISTRY}/${REPOSITORY}/disperser:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/disperser:${BUILD_TAG}"]
 }
 
 target "encoder" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
-  tags       = ["${REGISTRY}/${REPOSITORY}/encoder:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/encoder:${BUILD_TAG}"]
 }
 
 target "retriever" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
-  tags       = ["${REGISTRY}/${REPOSITORY}/retriever:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/retriever:${BUILD_TAG}"]
 }
 
 target "churner" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
-  tags       = ["${REGISTRY}/${REPOSITORY}/churner:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/churner:${BUILD_TAG}"]
 }
 
 # NODE TARGETS
@@ -88,7 +84,7 @@ target "node" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
-  tags       = ["${REGISTRY}/${REPOSITORY}/node:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/node:${BUILD_TAG}"]
   args = {
     SEMVER    = "${SEMVER}"
     GITCOMMIT = "${GITCOMMIT}"
@@ -100,7 +96,7 @@ target "nodeplugin" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "nodeplugin"
-  tags       = ["${REGISTRY}/${REPOSITORY}/nodeplugin:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/nodeplugin:${BUILD_TAG}"]
 }
 
 # RELEASE TARGETS
@@ -111,10 +107,10 @@ target "_release" {
 
 target "node-release" {
   inherits = ["node", "_release"]
-  tags     = ["${REGISTRY}/${REPOSITORY}/opr-node:${BUILD_TAG}"]
+  tags     = ["${REGISTRY}/opr-node:${BUILD_TAG}"]
 }
 
 target "nodeplugin-release" {
   inherits = ["nodeplugin", "_release"]
-  tags     = ["${REGISTRY}/${REPOSITORY}/opr-nodeplugin:${BUILD_TAG}"]
+  tags     = ["${REGISTRY}/opr-nodeplugin:${BUILD_TAG}"]
 }
