@@ -27,6 +27,10 @@ variable "DISPERSER_PATH" {
   default =  "disperser"
 }
 
+variable "DATAAPI_PATH" {
+  default =  "dataapi"
+}
+
 variable "ENCODER_PATH" {
   default =  "encoder"
 }
@@ -111,6 +115,22 @@ target "churner" {
   dockerfile = "./Dockerfile"
   target     = "churner"
   tags       = ["${REGISTRY}/${CHURNER_PATH}:${BUILD_TAG}"]
+}
+
+target "traffic-generator" {
+  inherits = ["docker-metadata-action"]
+  context    = "."
+  dockerfile = "./traffic-generator.Dockerfile"
+  target     = "traffic-generator"
+  tags       = []
+}
+
+target "dataapi" {
+  inherits = ["docker-metadata-action"]
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "dataapi"
+  tags       = ["${REGISTRY}/${DATAAPI_PATH}:${BUILD_TAG}"]
 }
 
 # NODE TARGETS
