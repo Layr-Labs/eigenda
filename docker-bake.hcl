@@ -87,7 +87,7 @@ target "traffic-generator" {
   inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./trafficgenerator.Dockerfile"
-  target     = "traffic-generator"
+  target     = "generator"
 }
 
 target "dataapi" {
