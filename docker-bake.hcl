@@ -66,9 +66,15 @@ group "node-group-release" {
   targets = ["node-release", "nodeplugin-release"]
 }
 
+# DOCKER METADATA TARGET
+# See https://github.com/docker/metadata-action?tab=readme-ov-file#bake-definition
+
+target "docker-metadata-action" {}
+
 # DISPERSER TARGETS
 
 target "batcher" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
@@ -76,6 +82,7 @@ target "batcher" {
 }
 
 target "disperser" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
@@ -83,6 +90,7 @@ target "disperser" {
 }
 
 target "encoder" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
@@ -90,6 +98,7 @@ target "encoder" {
 }
 
 target "retriever" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
@@ -97,6 +106,7 @@ target "retriever" {
 }
 
 target "churner" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
@@ -106,6 +116,7 @@ target "churner" {
 # NODE TARGETS
 
 target "node" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
@@ -118,6 +129,7 @@ target "node" {
 }
 
 target "nodeplugin" {
+  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "nodeplugin"
@@ -139,3 +151,4 @@ target "nodeplugin-release" {
   inherits = ["nodeplugin", "_release"]
   tags     = ["${REGISTRY}/opr-nodeplugin:${BUILD_TAG}"]
 }
+
