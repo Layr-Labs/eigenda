@@ -19,6 +19,27 @@ variable "GITDATE" {
   default = "0"
 }
 
+variable "BATCHER_PATH" {
+  default =  "batcher"
+}
+
+variable "DISPERSER_PATH" {
+  default =  "disperser"
+}
+
+variable "ENCODER_PATH" {
+  default =  "encoder"
+}
+
+variable "RETRIEVER_PATH" {
+  default =  "retriever"
+}
+
+variable "CHURNER_PATH" {
+  default =  "churner"
+}
+
+
 # GROUPS
 
 group "default" {
@@ -47,35 +68,35 @@ target "batcher" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
-  tags       = ["${REGISTRY}/batcher:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${BATCHER_PATH}:${BUILD_TAG}"]
 }
 
 target "disperser" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
-  tags       = ["${REGISTRY}/disperser:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${DISPERSER_PATH}:${BUILD_TAG}"]
 }
 
 target "encoder" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
-  tags       = ["${REGISTRY}/encoder:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${ENCODER_PATH}:${BUILD_TAG}"]
 }
 
 target "retriever" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
-  tags       = ["${REGISTRY}/retriever:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${RETRIEVER_PATH}:${BUILD_TAG}"]
 }
 
 target "churner" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
-  tags       = ["${REGISTRY}/churner:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${CHURNER_PATH}:${BUILD_TAG}"]
 }
 
 # NODE TARGETS
