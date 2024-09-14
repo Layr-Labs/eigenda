@@ -39,6 +39,10 @@ variable "CHURNER_PATH" {
   default =  "churner"
 }
 
+variable "NODE_PATH" {
+  default =  "node"
+}
+
 
 # GROUPS
 
@@ -105,7 +109,7 @@ target "node" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
-  tags       = ["${REGISTRY}/node:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${NODE_PATH}:${BUILD_TAG}"]
   args = {
     SEMVER    = "${SEMVER}"
     GITCOMMIT = "${GITCOMMIT}"
