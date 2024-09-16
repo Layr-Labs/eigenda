@@ -578,6 +578,22 @@ paths:
         is a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
+  /operators-info/hostinfo-scan:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Active operator semver report
+      tags:
+      - OperatorsInfo
   /operators-info/port-check:
     get:
       parameters:

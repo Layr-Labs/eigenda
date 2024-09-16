@@ -813,8 +813,8 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 //	@Summary	Active operator semver report
 //	@Tags		OperatorsInfo
 //	@Produce	json
-//	@Success	200			{object}	OperatorPortCheckResponse
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Success	200	{object}	OperatorPortCheckResponse
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/hostinfo-scan [get]
 func (s *server) SemverReport(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
