@@ -250,6 +250,7 @@ func (s *server) Start() error {
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
+			operatorsInfo.GET("/semver-report", s.SemverReport)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -807,24 +808,24 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, portCheckResponse)
 }
 
-// HostInfo report godoc
+// Semver report godoc
 //
-//	@Summary	Active operator hostinfo report
+//	@Summary	Active operator semver report
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Success	200			{object}	OperatorPortCheckResponse
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/hostinfo-scan [get]
-func (s *server) HostInfoReport(c *gin.Context) {
+func (s *server) SemverReport(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("HostInfoReport", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("SemverReport", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
 	hostInfo, err := s.scanOperatorsHostInfo(c.Request.Context(), s.logger)
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
-		s.metrics.IncrementFailedRequestNum("HostInfoReport")
+		s.metrics.IncrementFailedRequestNum("SemverReport")
 		errorResponse(c, err)
 	}
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
