@@ -464,25 +464,25 @@ func CLIFlags() []cli.Flag {
 		&cli.BoolFlag{
 			Name:    MemstoreFlagName,
 			Usage:   "Whether to use mem-store for DA logic.",
-			EnvVars: []string{"MEMSTORE_ENABLED"},
+			EnvVars: prefixEnvVars("MEMSTORE_ENABLED"),
 		},
 		&cli.DurationFlag{
 			Name:    MemstoreExpirationFlagName,
 			Usage:   "Duration that a mem-store blob/commitment pair are allowed to live.",
 			Value:   25 * time.Minute,
-			EnvVars: []string{"MEMSTORE_EXPIRATION"},
+			EnvVars: prefixEnvVars("MEMSTORE_EXPIRATION"),
 		},
 		&cli.DurationFlag{
 			Name:    MemstorePutLatencyFlagName,
 			Usage:   "Artificial latency added for memstore backend to mimic EigenDA's dispersal latency.",
 			Value:   0,
-			EnvVars: []string{"MEMSTORE_PUT_LATENCY"},
+			EnvVars: prefixEnvVars("MEMSTORE_PUT_LATENCY"),
 		},
 		&cli.DurationFlag{
 			Name:    MemstoreGetLatencyFlagName,
 			Usage:   "Artificial latency added for memstore backend to mimic EigenDA's retrieval latency.",
 			Value:   0,
-			EnvVars: []string{"MEMSTORE_GET_LATENCY"},
+			EnvVars: prefixEnvVars("MEMSTORE_GET_LATENCY"),
 		},
 		&cli.StringSliceFlag{
 			Name:    FallbackTargets,

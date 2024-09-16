@@ -46,10 +46,10 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--log.format` | `text` | `$EIGENDA_PROXY_LOG_FORMAT` | Format the log output. Supported formats: 'text', 'terminal', 'logfmt', 'json', 'json-pretty'. |
 | `--log.level` | `INFO` | `$EIGENDA_PROXY_LOG_LEVEL` | The lowest log level that will be output. |
 | `--log.pid` | `false` | `$EIGENDA_PROXY_LOG_PID` | Show pid in the log. |
-| `--memstore.enabled` | `false` | `$MEMSTORE_ENABLED` | Whether to use mem-store for DA logic. |
-| `--memstore.expiration` | `25m0s` | `$MEMSTORE_EXPIRATION` | Duration that a mem-store blob/commitment pair are allowed to live. |
-| `--memstore.put-latency` | `0` | `$MEMSTORE_PUT_LATENCY` | Artificial latency added for memstore backend to mimic EigenDA's dispersal latency. |
-| `--memstore.get-latency` | `0` | `$MEMSTORE_GET_LATENCY` | Artificial latency added for memstore backend to mimic EigenDA's retrieval latency. |
+| `--memstore.enabled` | `false` | `$EIGENDA_PROXY_MEMSTORE_ENABLED` | Whether to use mem-store for DA logic. |
+| `--memstore.expiration` | `25m0s` | `$EIGENDA_PROXY_MEMSTORE_EXPIRATION` | Duration that a mem-store blob/commitment pair are allowed to live. |
+| `--memstore.put-latency` | `0` | `$EIGENDA_PROXY_MEMSTORE_PUT_LATENCY` | Artificial latency added for memstore backend to mimic EigenDA's dispersal latency. |
+| `--memstore.get-latency` | `0` | `$EIGENDA_PROXY_MEMSTORE_GET_LATENCY` | Artificial latency added for memstore backend to mimic EigenDA's retrieval latency. |
 | `--metrics.addr` | `"0.0.0.0"` | `$EIGENDA_PROXY_METRICS_ADDR` | Metrics listening address. |
 | `--metrics.enabled` | `false` | `$EIGENDA_PROXY_METRICS_ENABLED` | Enable the metrics server. |
 | `--metrics.port` | `7300` | `$EIGENDA_PROXY_METRICS_PORT` | Metrics listening port. |
