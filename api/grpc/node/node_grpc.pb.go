@@ -244,11 +244,11 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Retrieval_RetrieveChunks_FullMethodName = "/node.Retrieval/RetrieveChunks"
-	Retrieval_GetBlobHeader_FullMethodName  = "/node.Retrieval/GetBlobHeader"
-	Retrieval_NodeInfo_FullMethodName       = "/node.Retrieval/NodeInfo"
-	Retrieval_GetChunk_FullMethodName       = "/node.Retrieval/GetChunk"
-	Retrieval_StreamHeaders_FullMethodName  = "/node.Retrieval/StreamHeaders"
+	Retrieval_RetrieveChunks_FullMethodName    = "/node.Retrieval/RetrieveChunks"
+	Retrieval_GetBlobHeader_FullMethodName     = "/node.Retrieval/GetBlobHeader"
+	Retrieval_NodeInfo_FullMethodName          = "/node.Retrieval/NodeInfo"
+	Retrieval_GetChunk_FullMethodName          = "/node.Retrieval/GetChunk"
+	Retrieval_StreamBlobHeaders_FullMethodName = "/node.Retrieval/StreamBlobHeaders"
 )
 
 // RetrievalClient is the client API for Retrieval service.
@@ -264,7 +264,7 @@ type RetrievalClient interface {
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
 	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
 	// StreamHeaders requests a stream all new headers.
-	StreamHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamHeadersClient, error)
+	StreamBlobHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamBlobHeadersClient, error)
 }
 
 type retrievalClient struct {
@@ -311,30 +311,30 @@ func (c *retrievalClient) GetChunk(ctx context.Context, in *GetChunkRequest, opt
 	return out, nil
 }
 
-func (c *retrievalClient) StreamHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamHeadersClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Retrieval_ServiceDesc.Streams[0], Retrieval_StreamHeaders_FullMethodName, opts...)
+func (c *retrievalClient) StreamBlobHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamBlobHeadersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Retrieval_ServiceDesc.Streams[0], Retrieval_StreamBlobHeaders_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &retrievalStreamHeadersClient{stream}
+	x := &retrievalStreamBlobHeadersClient{stream}
 	return x, nil
 }
 
-type Retrieval_StreamHeadersClient interface {
-	Send(*StreamHeadersRequest) error
+type Retrieval_StreamBlobHeadersClient interface {
+	Send(*StreamBlobHeadersRequest) error
 	Recv() (*StreamHeadersReply, error)
 	grpc.ClientStream
 }
 
-type retrievalStreamHeadersClient struct {
+type retrievalStreamBlobHeadersClient struct {
 	grpc.ClientStream
 }
 
-func (x *retrievalStreamHeadersClient) Send(m *StreamHeadersRequest) error {
+func (x *retrievalStreamBlobHeadersClient) Send(m *StreamBlobHeadersRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *retrievalStreamHeadersClient) Recv() (*StreamHeadersReply, error) {
+func (x *retrievalStreamBlobHeadersClient) Recv() (*StreamHeadersReply, error) {
 	m := new(StreamHeadersReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -355,7 +355,7 @@ type RetrievalServer interface {
 	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
 	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
 	// StreamHeaders requests a stream all new headers.
-	StreamHeaders(Retrieval_StreamHeadersServer) error
+	StreamBlobHeaders(Retrieval_StreamBlobHeadersServer) error
 	mustEmbedUnimplementedRetrievalServer()
 }
 
@@ -375,8 +375,8 @@ func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) 
 func (UnimplementedRetrievalServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
-func (UnimplementedRetrievalServer) StreamHeaders(Retrieval_StreamHeadersServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamHeaders not implemented")
+func (UnimplementedRetrievalServer) StreamBlobHeaders(Retrieval_StreamBlobHeadersServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamBlobHeaders not implemented")
 }
 func (UnimplementedRetrievalServer) mustEmbedUnimplementedRetrievalServer() {}
 
@@ -463,26 +463,26 @@ func _Retrieval_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_StreamHeaders_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(RetrievalServer).StreamHeaders(&retrievalStreamHeadersServer{stream})
+func _Retrieval_StreamBlobHeaders_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(RetrievalServer).StreamBlobHeaders(&retrievalStreamBlobHeadersServer{stream})
 }
 
-type Retrieval_StreamHeadersServer interface {
+type Retrieval_StreamBlobHeadersServer interface {
 	Send(*StreamHeadersReply) error
-	Recv() (*StreamHeadersRequest, error)
+	Recv() (*StreamBlobHeadersRequest, error)
 	grpc.ServerStream
 }
 
-type retrievalStreamHeadersServer struct {
+type retrievalStreamBlobHeadersServer struct {
 	grpc.ServerStream
 }
 
-func (x *retrievalStreamHeadersServer) Send(m *StreamHeadersReply) error {
+func (x *retrievalStreamBlobHeadersServer) Send(m *StreamHeadersReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *retrievalStreamHeadersServer) Recv() (*StreamHeadersRequest, error) {
-	m := new(StreamHeadersRequest)
+func (x *retrievalStreamBlobHeadersServer) Recv() (*StreamBlobHeadersRequest, error) {
+	m := new(StreamBlobHeadersRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -515,8 +515,8 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamHeaders",
-			Handler:       _Retrieval_StreamHeaders_Handler,
+			StreamName:    "StreamBlobHeaders",
+			Handler:       _Retrieval_StreamBlobHeaders_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

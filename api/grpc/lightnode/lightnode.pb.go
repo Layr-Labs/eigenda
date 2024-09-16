@@ -173,6 +173,8 @@ type StreamAvailabilityStatusReply struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The hash of a blob header corresponding to a chunk the agent received and verified. From the light node's
+	// perspective, the blob is available if the chunk is available.
 	HeaderHash []byte `protobuf:"bytes,1,opt,name=header_hash,json=headerHash,proto3" json:"header_hash,omitempty"`
 }
 

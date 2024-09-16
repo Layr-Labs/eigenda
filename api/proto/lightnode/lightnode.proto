@@ -3,9 +3,9 @@ package lightnode;
 import "common/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/lightnode";
 
-///////////////////////////////////////////////////////////////////////////////////
-// Warning: light node APIs are currently in flux. This is not yet a stable API. //
-///////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+// Experimental: the following definitions are experimental and subject to change. //
+/////////////////////////////////////////////////////////////////////////////////////
 
 service LightNode {
 	// GetChunk retrieves a specific chunk held by the light node.
@@ -35,5 +35,7 @@ message StreamAvailabilityStatusRequest {
 
 // A reply to a StreamAvailabilityStatus request.
 message StreamAvailabilityStatusReply {
+	// The hash of a blob header corresponding to a chunk the agent received and verified. From the light node's
+	// perspective, the blob is available if the chunk is available.
 	bytes header_hash = 1;
 }

@@ -160,8 +160,8 @@ func (s *Server) GetChunk(context.Context, *pb.GetChunkRequest) (*pb.GetChunkRep
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 
-func (s *Server) StreamHeaders(pb.Retrieval_StreamHeadersServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamHeaders not implemented")
+func (s *Server) StreamBlobHeaders(pb.Retrieval_StreamBlobHeadersServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamBlobHeaders not implemented")
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
