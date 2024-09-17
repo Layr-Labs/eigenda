@@ -1,0 +1,30 @@
+syntax = "proto3";
+package node;
+import "google/protobuf/wrappers.proto";
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
+
+/////////////////////////////////////////////////////////////////////////////////////
+// Experimental: the following definitions are experimental and subject to change. //
+/////////////////////////////////////////////////////////////////////////////////////
+
+service Relay {
+  // Note: the relay API is still being fleshed out. This definition is not yet complete.
+
+  // GetChunk retrieves a specific chunk for a blob custodied at the Node.
+  rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
+}
+
+// Request a specific chunk
+message GetChunkRequest {
+  // The hash of the blob's header.
+  bytes header_hash = 1;
+  // The index of the chunk within the blob.
+  uint32 chunk_index = 2;
+}
+
+// Reply to GetChunkRequest
+message GetChunkReply {
+  // The chunk requested.
+  common.ChunkData chunk = 1;
+}

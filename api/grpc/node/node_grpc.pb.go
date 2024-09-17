@@ -247,7 +247,6 @@ const (
 	Retrieval_RetrieveChunks_FullMethodName    = "/node.Retrieval/RetrieveChunks"
 	Retrieval_GetBlobHeader_FullMethodName     = "/node.Retrieval/GetBlobHeader"
 	Retrieval_NodeInfo_FullMethodName          = "/node.Retrieval/NodeInfo"
-	Retrieval_GetChunk_FullMethodName          = "/node.Retrieval/GetChunk"
 	Retrieval_StreamBlobHeaders_FullMethodName = "/node.Retrieval/StreamBlobHeaders"
 )
 
@@ -261,8 +260,6 @@ type RetrievalClient interface {
 	GetBlobHeader(ctx context.Context, in *GetBlobHeaderRequest, opts ...grpc.CallOption) (*GetBlobHeaderReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
-	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
 	// StreamHeaders requests a stream all new headers.
 	StreamBlobHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamBlobHeadersClient, error)
 }
@@ -296,15 +293,6 @@ func (c *retrievalClient) GetBlobHeader(ctx context.Context, in *GetBlobHeaderRe
 func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
 	out := new(NodeInfoReply)
 	err := c.cc.Invoke(ctx, Retrieval_NodeInfo_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *retrievalClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error) {
-	out := new(GetChunkReply)
-	err := c.cc.Invoke(ctx, Retrieval_GetChunk_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -352,8 +340,6 @@ type RetrievalServer interface {
 	GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
-	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
 	// StreamHeaders requests a stream all new headers.
 	StreamBlobHeaders(Retrieval_StreamBlobHeadersServer) error
 	mustEmbedUnimplementedRetrievalServer()
@@ -371,9 +357,6 @@ func (UnimplementedRetrievalServer) GetBlobHeader(context.Context, *GetBlobHeade
 }
 func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
-}
-func (UnimplementedRetrievalServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 func (UnimplementedRetrievalServer) StreamBlobHeaders(Retrieval_StreamBlobHeadersServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamBlobHeaders not implemented")
@@ -445,24 +428,6 @@ func _Retrieval_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetChunkRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RetrievalServer).GetChunk(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Retrieval_GetChunk_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrievalServer).GetChunk(ctx, req.(*GetChunkRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Retrieval_StreamBlobHeaders_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(RetrievalServer).StreamBlobHeaders(&retrievalStreamBlobHeadersServer{stream})
 }
@@ -507,10 +472,6 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NodeInfo",
 			Handler:    _Retrieval_NodeInfo_Handler,
-		},
-		{
-			MethodName: "GetChunk",
-			Handler:    _Retrieval_GetChunk_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
