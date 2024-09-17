@@ -256,7 +256,7 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 			}
 			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			dispersalSocket := operatorSocket.GetDispersalSocket()
-			semver := getSemverInfo(context.Background(), operatorId, dispersalSocket, logger)
+			semver := getSemverInfo(context.Background(), dispersalSocket, operatorId, logger)
 
 			mu.Lock()
 			semvers[semver]++
