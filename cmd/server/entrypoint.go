@@ -34,7 +34,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	server := server.NewServer(cliCtx.String(server.ListenAddrFlagName), cliCtx.Int(server.PortFlagName), daRouter, log, m)
 
 	if err := server.Start(); err != nil {
-		return fmt.Errorf("failed to start the DA server")
+		return fmt.Errorf("failed to start the DA server: %w", err)
 	}
 
 	log.Info("Started EigenDA proxy server")
