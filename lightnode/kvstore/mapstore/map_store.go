@@ -6,6 +6,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"sort"
+	"sync"
 )
 
 var _ kvstore.Store = &mapStore{}
@@ -14,6 +15,7 @@ var _ kvstore.Store = &mapStore{}
 // production implementation -- there are things that may not be performant with this implementation.
 type mapStore struct {
 	data      map[string][]byte
+	lock      sync.RWMutex
 	destroyed bool
 }
 
@@ -26,6 +28,9 @@ func NewStore() kvstore.Store {
 
 // Put adds a key-value pair to the store.
 func (store *mapStore) Put(key []byte, value []byte) error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
 	}
@@ -38,6 +43,9 @@ func (store *mapStore) Put(key []byte, value []byte) error {
 
 // Delete removes a key-value pair from the store.
 func (store *mapStore) Delete(key []byte) error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
 	}
@@ -49,21 +57,25 @@ func (store *mapStore) Delete(key []byte) error {
 
 // DeleteBatch removes multiple key-value pairs from the store.
 func (store *mapStore) DeleteBatch(keys [][]byte) error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
 	}
 
 	for _, key := range keys {
-		err := store.Delete(key)
-		if err != nil {
-			return err
-		}
+		stringifiedKey := string(key)
+		delete(store.data, stringifiedKey)
 	}
 	return nil
 }
 
 // WriteBatch adds multiple key-value pairs to the store.
 func (store *mapStore) WriteBatch(keys, values [][]byte) error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
 	if store.destroyed {
 		return fmt.Errorf("mapStore is destroyed")
 	}
@@ -73,10 +85,8 @@ func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 	}
 
 	for i, key := range keys {
-		err := store.Put(key, values[i])
-		if err != nil {
-			return err
-		}
+		stringifiedKey := string(key)
+		store.data[stringifiedKey] = values[i]
 	}
 	return nil
 }
@@ -158,6 +168,9 @@ func (it *mapIterator) Value() []byte {
 // WARNING: this implementation does a full copy to return the iterator. This is not efficient.
 // Not for production use.
 func (store *mapStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
+	store.lock.RLock()
+	defer store.lock.RUnlock()
+
 	if store.destroyed {
 		return nil, fmt.Errorf("mapStore is destroyed")
 	}
@@ -203,6 +216,9 @@ func (store *mapStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 
 // Get retrieves data from the mapStore. Returns nil if the data is not found.
 func (store *mapStore) Get(key []byte) ([]byte, error) {
+	store.lock.RLock()
+	defer store.lock.RUnlock()
+
 	if store.destroyed {
 		return nil, fmt.Errorf("mapStore is destroyed")
 	}
@@ -226,6 +242,9 @@ func (store *mapStore) Shutdown() error {
 
 // Destroy permanently stops the mapStore and deletes all data (including data on disk).
 func (store *mapStore) Destroy() error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
 	store.data = nil
 	store.destroyed = true
 	return nil

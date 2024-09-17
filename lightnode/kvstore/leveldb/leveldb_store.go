@@ -97,7 +97,7 @@ func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 }
 
 // WriteBatch adds multiple key-value pairs to the store.
-func (store *levelDBStore) WriteBatch(keys, values [][]byte) error {
+func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 	if store.shutdown {
 		return fmt.Errorf("store is shut down")
 	}

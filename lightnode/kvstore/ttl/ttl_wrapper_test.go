@@ -1,4 +1,4 @@
-package storeutil
+package ttl
 
 import (
 	"context"

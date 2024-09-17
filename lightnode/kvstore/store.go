@@ -7,9 +7,7 @@ import (
 
 // Store implements a key-value store. May be backed by a database like LevelDB.
 //
-// Some implementations of Store may be thread safe, others may not. If a Store is not thread safe but the use
-// case calls for concurrent access, the caller is responsible for synchronizing access to the Store, e.g. by
-// wrapping the store via ThreadSafeWrapper(store) or by protecting access with a mutex.
+// Implementations of this interface are expected to be thread-safe.
 type Store interface {
 
 	// Put stores the given key / value pair in the database, overwriting any existing value for that key.

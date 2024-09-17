@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/lightnode/kvstore"
 	"github.com/Layr-Labs/eigenda/lightnode/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/lightnode/kvstore/mapstore"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore/storeutil"
+	"github.com/Layr-Labs/eigenda/lightnode/kvstore/ttl"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -21,10 +21,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		return mapstore.NewStore(), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		return storeutil.ThreadSafeWrapper(mapstore.NewStore()), nil
-	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		return storeutil.TTLWrapper(context.Background(), logger, mapstore.NewStore(), 0), nil
+		return ttl.TTLWrapper(context.Background(), logger, mapstore.NewStore(), 0), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return leveldb.NewStore(logger, path)
@@ -34,14 +31,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		if err != nil {
 			return nil, err
 		}
-		return storeutil.ThreadSafeWrapper(store), nil
-	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		store, err := leveldb.NewStore(logger, path)
-		if err != nil {
-			return nil, err
-		}
-		return storeutil.TTLWrapper(context.Background(), logger, store, 0), nil
+		return ttl.TTLWrapper(context.Background(), logger, store, 0), nil
 	},
 }
 
@@ -447,5 +437,3 @@ func TestIterationWithPrefix(t *testing.T) {
 		iterationWithPrefixTest(t, store)
 	}
 }
-
-// TODO test iteration order
