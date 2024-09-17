@@ -6,12 +6,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/node/leveldb"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -28,7 +29,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
-	db     DB
+	db     kvstore.Store
 	logger logging.Logger
 
 	blockStaleMeasure   uint32
@@ -43,7 +44,7 @@ type Store struct {
 func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
 	// Create the db at the path. This is currently hardcoded to use
 	// levelDB.
-	db, err := leveldb.NewLevelDBStore(path)
+	db, err := leveldb.NewStore(logger, path)
 	if err != nil {
 		logger.Error("Could not create leveldb database", "err", err)
 		return nil, err
@@ -111,7 +112,11 @@ func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint
 // All blobs & blob headers in a batch are expired by deleteNBatches method.
 func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int, error) {
 	// Scan for expired batches.
-	iter := s.db.NewIterator(EncodeBlobExpirationKeyPrefix())
+	iter, err := s.db.NewIterator(EncodeBlobExpirationKeyPrefix())
+	if err != nil {
+		return -1, fmt.Errorf("failed to create the iterator: %w", err)
+	}
+
 	expiredKeys := make([][]byte, 0)
 	expiredBlobHeaders := make([][32]byte, 0)
 	for iter.Next() {
@@ -148,14 +153,20 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 	// Scan for the batch header, blob headers and chunks of each expired batch.
 	for _, blobHeaderHash := range expiredBlobHeaders {
 		// Blob headers.
-		blobHeaderIter := s.db.NewIterator(EncodeBlobHeaderKeyByHash(blobHeaderHash))
+		blobHeaderIter, err := s.db.NewIterator(EncodeBlobHeaderKeyByHash(blobHeaderHash))
+		if err != nil {
+			return -1, fmt.Errorf("failed to create the iterator: %w", err)
+		}
 		for blobHeaderIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
 		}
 		blobHeaderIter.Release()
 
 		// Blob chunks.
-		blobIter := s.db.NewIterator(EncodeBlobKeyByHashPrefix(blobHeaderHash))
+		blobIter, err := s.db.NewIterator(EncodeBlobKeyByHashPrefix(blobHeaderHash))
+		if err != nil {
+			return -1, fmt.Errorf("failed to create the iterator: %w", err)
+		}
 		for blobIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
 			size += int64(len(blobIter.Value()))
@@ -164,7 +175,7 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 	}
 
 	// Perform the removal.
-	err := s.db.DeleteBatch(expiredKeys)
+	err = s.db.DeleteBatch(expiredKeys)
 	if err != nil {
 		return -1, fmt.Errorf("failed to delete the expired keys in batch: %w", err)
 	}
@@ -180,7 +191,10 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 // The second return value is the number of batch header entries deleted.
 func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches int) (numExpiredMappings int, numExpiredBatches int, err error) {
 	// Scan for expired batches.
-	iter := s.db.NewIterator(EncodeBatchMappingExpirationKeyPrefix())
+	iter, err := s.db.NewIterator(EncodeBatchMappingExpirationKeyPrefix())
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to create the iterator: %w", err)
+	}
 	expiredKeys := make([][]byte, 0)
 	expiredBatches := make([][]byte, 0)
 	for iter.Next() {
@@ -216,7 +230,10 @@ func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches i
 		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
 
 		// Blob index mapping.
-		blobIndexIter := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
+		blobIndexIter, err := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
+		if err != nil {
+			return -1, -1, fmt.Errorf("failed to create the iterator: %w", err)
+		}
 		for blobIndexIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobIndexIter.Key()))
 			numMappings++
@@ -240,7 +257,10 @@ func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches i
 // is set to -1 (invalid value) if the deletion status is an error.
 func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, error) {
 	// Scan for expired batches.
-	iter := s.db.NewIterator(EncodeBatchExpirationKeyPrefix())
+	iter, err := s.db.NewIterator(EncodeBatchExpirationKeyPrefix())
+	if err != nil {
+		return -1, fmt.Errorf("failed to create the iterator: %w", err)
+	}
 	expiredKeys := make([][]byte, 0)
 	expiredBatches := make([][]byte, 0)
 	for iter.Next() {
@@ -278,7 +298,10 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
 
 		// Blob headers.
-		blobHeaderIter := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
+		blobHeaderIter, err := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
+		if err != nil {
+			return -1, fmt.Errorf("failed to create the iterator: %w", err)
+		}
 		for blobHeaderIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
 			numBlobs++
@@ -286,7 +309,10 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		blobHeaderIter.Release()
 
 		// Blob chunks.
-		blobIter := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
+		blobIter, err := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
+		if err != nil {
+			return -1, fmt.Errorf("failed to create the iterator: %w", err)
+		}
 		for blobIter.Next() {
 			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
 			size += int64(len(blobIter.Value()))
@@ -295,7 +321,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 	}
 
 	// Perform the removal.
-	err := s.db.DeleteBatch(expiredKeys)
+	err = s.db.DeleteBatch(expiredKeys)
 	if err != nil {
 		s.logger.Error("Failed to delete the expired keys in batch", "keys", expiredKeys, "error", err)
 		return -1, err
@@ -630,7 +656,7 @@ func (s *Store) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) ([
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
 	data, err := s.db.Get(batchHeaderKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -649,16 +675,16 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 		return data, nil
 	}
 
-	if !errors.Is(err, leveldb.ErrNotFound) {
+	if !errors.Is(err, kvstore.ErrNotFound) {
 		return nil, err
 	}
 
-	// error is leveldb.ErrNotFound
+	// error is kvstore.ErrNotFound
 	// try to get blob header by blobIndexPrefix
 	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
 	blobHeaderHashBytes, err := s.db.Get(blobIndexKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -673,7 +699,7 @@ func (s *Store) GetBlobHeaderByHeaderHash(ctx context.Context, blobHeaderHash [3
 	blobHeaderKey := EncodeBlobHeaderKeyByHash(blobHeaderHash)
 	data, err := s.db.Get(blobHeaderKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -708,7 +734,7 @@ func (s *Store) GetBlobHeaderHashAtIndex(ctx context.Context, batchHeaderHash [3
 	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
 	data, err := s.db.Get(blobIndexKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
