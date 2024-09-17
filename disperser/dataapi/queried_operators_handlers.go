@@ -242,7 +242,7 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	numWorkers := 5
+	numWorkers := 10
 	operatorChan := make(chan string, len(activeOperators))
 	semvers := make(map[string]int)
 	worker := func() {
@@ -300,7 +300,9 @@ func getSemverInfo(ctx context.Context, socket string, operatorId string, logger
 	}
 	defer conn.Close()
 	client := node.NewDispersalClient(conn)
-	reply, err := client.NodeInfo(ctx, &node.NodeInfoRequest{})
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second * time.Duration(3))
+	defer cancel()
+	reply, err := client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
 	if err != nil {
 		var semver string
 		if strings.Contains(err.Error(), "Unimplemented") {

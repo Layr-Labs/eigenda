@@ -108,7 +108,7 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 	var mu sync.Mutex
 	semvers := make(map[string]int)
 	operatorChan := make(chan string, len(operatorIds))
-	numWorkers := 5 // Adjust the number of workers as needed
+	numWorkers := 10 // Adjust the number of workers as needed
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorInfo, err := getOperatorInfo(subgraphClient, operatorId, logger)
