@@ -153,8 +153,8 @@ type (
 		DispersalOnline bool   `json:"dispersal_online"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 	}
-	HostInfoReportResponse struct {
-		HostInfo map[string]int `json:"hostinfo"`
+	SemverReportResponse struct {
+		Semver map[string]int `json:"semver"`
 	}
 
 	ErrorResponse struct {
@@ -250,7 +250,7 @@ func (s *server) Start() error {
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
-			operatorsInfo.GET("/semver-report", s.SemverReport)
+			operatorsInfo.GET("/semver-scan", s.SemverScan)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -808,28 +808,28 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, portCheckResponse)
 }
 
-// Semver report godoc
+// Semver scan godoc
 //
-//	@Summary	Active operator semver report
+//	@Summary	Active operator semver scan
 //	@Tags		OperatorsInfo
 //	@Produce	json
-//	@Success	200	{object}	OperatorPortCheckResponse
+//	@Success	200	{object}	SemverReportResponse
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators-info/hostinfo-scan [get]
-func (s *server) SemverReport(c *gin.Context) {
+//	@Router		/operators-info/semver-scan [get]
+func (s *server) SemverScan(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("SemverReport", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("SemverScan", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
-	hostInfo, err := s.scanOperatorsHostInfo(c.Request.Context(), s.logger)
+	report, err := s.scanOperatorsHostInfo(c.Request.Context(), s.logger)
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
-		s.metrics.IncrementFailedRequestNum("SemverReport")
+		s.metrics.IncrementFailedRequestNum("SemverScan")
 		errorResponse(c, err)
 	}
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
-	c.JSON(http.StatusOK, hostInfo)
+	c.JSON(http.StatusOK, report)
 }
 
 // FetchDisperserServiceAvailability godoc

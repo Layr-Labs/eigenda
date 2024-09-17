@@ -528,31 +528,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/hostinfo-scan": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OperatorsInfo"
-                ],
-                "summary": "Active operator semver report",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorPortCheckResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/operators-info/port-check": {
             "get": {
                 "produces": [
@@ -625,6 +600,31 @@ const docTemplate = `{
                         "description": "error: Not found",
                         "schema": {
                             "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators-info/semver-scan": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Active operator semver scan",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.SemverReportResponse"
                         }
                     },
                     "500": {
@@ -874,6 +874,17 @@ const docTemplate = `{
                 },
                 "meta": {
                     "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.SemverReportResponse": {
+            "type": "object",
+            "properties": {
+                "semver": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
                 }
             }
         },

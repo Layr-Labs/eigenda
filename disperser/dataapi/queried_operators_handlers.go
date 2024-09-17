@@ -210,7 +210,7 @@ func (s *server) getOperatorInfo(ctx context.Context, operatorId string) (*core.
 	return operatorInfo, nil
 }
 
-func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logger) (*HostInfoReportResponse, error) {
+func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logger) (*SemverReportResponse, error) {
 	registrations, err := s.subgraphClient.QueryOperatorsWithLimit(context.Background(), 10000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed registered operator state - %s", err)
@@ -244,13 +244,13 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 	var mu sync.Mutex
 	numWorkers := 5
 	operatorChan := make(chan string, len(activeOperators))
-	hostInfo := make(map[string]int)
+	semvers := make(map[string]int)
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorInfo, err := s.getOperatorInfo(ctx, operatorId)
 			if err != nil {
 				mu.Lock()
-				hostInfo["not-found"]++
+				semvers["not-found"]++
 				mu.Unlock()
 				continue
 			}
@@ -259,7 +259,7 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 			semver := getSemverInfo(context.Background(), operatorId, dispersalSocket, logger)
 
 			mu.Lock()
-			hostInfo[semver]++
+			semvers[semver]++
 			mu.Unlock()
 		}
 		wg.Done()
@@ -281,11 +281,11 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 	wg.Wait()
 
 	// Create HostInfoReportResponse instance
-	hostInfoReport := &HostInfoReportResponse{
-		HostInfo: hostInfo,
+	semverReport := &SemverReportResponse{
+		Semver: semvers,
 	}
 
-	return hostInfoReport, nil
+	return semverReport, nil
 }
 
 // query operator host info endpoint if available

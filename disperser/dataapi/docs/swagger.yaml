@@ -162,6 +162,13 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
+  dataapi.SemverReportResponse:
+    properties:
+      semver:
+        additionalProperties:
+          type: integer
+        type: object
+    type: object
   dataapi.ServiceAvailability:
     properties:
       service_name:
@@ -578,22 +585,6 @@ paths:
         is a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
-  /operators-info/hostinfo-scan:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Active operator semver report
-      tags:
-      - OperatorsInfo
   /operators-info/port-check:
     get:
       parameters:
@@ -647,6 +638,22 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch list of operators that have been registered for days. Days is
         a query parameter with a default value of 14 and max value of 30.
+      tags:
+      - OperatorsInfo
+  /operators-info/semver-scan:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.SemverReportResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Active operator semver scan
       tags:
       - OperatorsInfo
 schemes:
