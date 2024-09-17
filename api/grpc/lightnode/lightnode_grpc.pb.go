@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	LightNode_GetChunk_FullMethodName                 = "/lightnode.LightNode/GetChunk"
-	LightNode_StreamAvailabilityStatus_FullMethodName = "/lightnode.LightNode/StreamAvailabilityStatus"
+	LightNode_GetChunk_FullMethodName                = "/lightnode.LightNode/GetChunk"
+	LightNode_StreamChunkAvailability_FullMethodName = "/lightnode.LightNode/StreamChunkAvailability"
 )
 
 // LightNodeClient is the client API for LightNode service.
@@ -31,7 +31,7 @@ type LightNodeClient interface {
 	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
 	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
 	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	StreamAvailabilityStatus(ctx context.Context, in *StreamAvailabilityStatusRequest, opts ...grpc.CallOption) (LightNode_StreamAvailabilityStatusClient, error)
+	StreamChunkAvailability(ctx context.Context, in *StreamChunkAvailabilityRequest, opts ...grpc.CallOption) (LightNode_StreamChunkAvailabilityClient, error)
 }
 
 type lightNodeClient struct {
@@ -51,12 +51,12 @@ func (c *lightNodeClient) GetChunk(ctx context.Context, in *GetChunkRequest, opt
 	return out, nil
 }
 
-func (c *lightNodeClient) StreamAvailabilityStatus(ctx context.Context, in *StreamAvailabilityStatusRequest, opts ...grpc.CallOption) (LightNode_StreamAvailabilityStatusClient, error) {
-	stream, err := c.cc.NewStream(ctx, &LightNode_ServiceDesc.Streams[0], LightNode_StreamAvailabilityStatus_FullMethodName, opts...)
+func (c *lightNodeClient) StreamChunkAvailability(ctx context.Context, in *StreamChunkAvailabilityRequest, opts ...grpc.CallOption) (LightNode_StreamChunkAvailabilityClient, error) {
+	stream, err := c.cc.NewStream(ctx, &LightNode_ServiceDesc.Streams[0], LightNode_StreamChunkAvailability_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &lightNodeStreamAvailabilityStatusClient{stream}
+	x := &lightNodeStreamChunkAvailabilityClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -66,17 +66,17 @@ func (c *lightNodeClient) StreamAvailabilityStatus(ctx context.Context, in *Stre
 	return x, nil
 }
 
-type LightNode_StreamAvailabilityStatusClient interface {
-	Recv() (*StreamAvailabilityStatusReply, error)
+type LightNode_StreamChunkAvailabilityClient interface {
+	Recv() (*StreamChunkAvailabilityReply, error)
 	grpc.ClientStream
 }
 
-type lightNodeStreamAvailabilityStatusClient struct {
+type lightNodeStreamChunkAvailabilityClient struct {
 	grpc.ClientStream
 }
 
-func (x *lightNodeStreamAvailabilityStatusClient) Recv() (*StreamAvailabilityStatusReply, error) {
-	m := new(StreamAvailabilityStatusReply)
+func (x *lightNodeStreamChunkAvailabilityClient) Recv() (*StreamChunkAvailabilityReply, error) {
+	m := new(StreamChunkAvailabilityReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ type LightNodeServer interface {
 	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
 	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
 	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	StreamAvailabilityStatus(*StreamAvailabilityStatusRequest, LightNode_StreamAvailabilityStatusServer) error
+	StreamChunkAvailability(*StreamChunkAvailabilityRequest, LightNode_StreamChunkAvailabilityServer) error
 	mustEmbedUnimplementedLightNodeServer()
 }
 
@@ -102,8 +102,8 @@ type UnimplementedLightNodeServer struct {
 func (UnimplementedLightNodeServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
-func (UnimplementedLightNodeServer) StreamAvailabilityStatus(*StreamAvailabilityStatusRequest, LightNode_StreamAvailabilityStatusServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamAvailabilityStatus not implemented")
+func (UnimplementedLightNodeServer) StreamChunkAvailability(*StreamChunkAvailabilityRequest, LightNode_StreamChunkAvailabilityServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamChunkAvailability not implemented")
 }
 func (UnimplementedLightNodeServer) mustEmbedUnimplementedLightNodeServer() {}
 
@@ -136,24 +136,24 @@ func _LightNode_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _LightNode_StreamAvailabilityStatus_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamAvailabilityStatusRequest)
+func _LightNode_StreamChunkAvailability_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamChunkAvailabilityRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(LightNodeServer).StreamAvailabilityStatus(m, &lightNodeStreamAvailabilityStatusServer{stream})
+	return srv.(LightNodeServer).StreamChunkAvailability(m, &lightNodeStreamChunkAvailabilityServer{stream})
 }
 
-type LightNode_StreamAvailabilityStatusServer interface {
-	Send(*StreamAvailabilityStatusReply) error
+type LightNode_StreamChunkAvailabilityServer interface {
+	Send(*StreamChunkAvailabilityReply) error
 	grpc.ServerStream
 }
 
-type lightNodeStreamAvailabilityStatusServer struct {
+type lightNodeStreamChunkAvailabilityServer struct {
 	grpc.ServerStream
 }
 
-func (x *lightNodeStreamAvailabilityStatusServer) Send(m *StreamAvailabilityStatusReply) error {
+func (x *lightNodeStreamChunkAvailabilityServer) Send(m *StreamChunkAvailabilityReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -171,8 +171,8 @@ var LightNode_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamAvailabilityStatus",
-			Handler:       _LightNode_StreamAvailabilityStatus_Handler,
+			StreamName:    "StreamChunkAvailability",
+			Handler:       _LightNode_StreamChunkAvailability_Handler,
 			ServerStreams: true,
 		},
 	},

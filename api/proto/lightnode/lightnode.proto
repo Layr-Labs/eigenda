@@ -13,7 +13,7 @@ service LightNode {
 
 	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
 	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	rpc StreamAvailabilityStatus(StreamAvailabilityStatusRequest) returns (stream StreamAvailabilityStatusReply) {}
+	rpc StreamChunkAvailability(StreamChunkAvailabilityRequest) returns (stream StreamChunkAvailabilityReply) {}
 }
 
 // A request for a specific chunk from a light node.
@@ -29,12 +29,12 @@ message GetChunkReply {
 
 // A request from a DA node to an agent light node to stream the availability status of all chunks
 // assigned to the light node.
-message StreamAvailabilityStatusRequest {
+message StreamChunkAvailabilityRequest {
 	bytes authentication_token = 1;
 }
 
 // A reply to a StreamAvailabilityStatus request.
-message StreamAvailabilityStatusReply {
+message StreamChunkAvailabilityReply {
 	// The hash of a blob header corresponding to a chunk the agent received and verified. From the light node's
 	// perspective, the blob is available if the chunk is available.
 	bytes header_hash = 1;
