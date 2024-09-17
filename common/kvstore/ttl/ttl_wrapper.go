@@ -2,6 +2,7 @@ package ttl
 
 import (
 	"context"
+	"fmt"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -64,6 +65,12 @@ func (store *ttlStore) PutWithTTL(key []byte, value []byte, ttl time.Duration) e
 	return store.PutWithExpiration(key, value, expiryTime)
 }
 
+// PutBatchWithTTL adds multiple key-value pairs to the store that expire after a specified time-to-live (TTL).
+func (store *ttlStore) PutBatchWithTTL(keys [][]byte, values [][]byte, ttl time.Duration) error {
+	expiryTime := time.Now().Add(ttl)
+	return store.PutBatchWithExpiration(keys, values, expiryTime)
+}
+
 // buildExpiryKey creates an expiry key from the given expiry time.
 // The expiry key is composed of the following 3 components appended one after the other:
 // - a one byte "e" prefix
@@ -112,6 +119,28 @@ func (store *ttlStore) PutWithExpiration(key []byte, value []byte, expiryTime ti
 
 	batchKeys[1] = buildExpiryKey(key, expiryTime)
 	batchValues[1] = make([]byte, 0)
+
+	return store.store.WriteBatch(batchKeys, batchValues)
+}
+
+// PutBatchWithExpiration adds multiple key-value pairs to the store that expire at a specified time.
+func (store *ttlStore) PutBatchWithExpiration(keys [][]byte, values [][]byte, expiryTime time.Time) error {
+	if len(keys) != len(values) {
+		return fmt.Errorf("keys and values must have the same length (keys: %d, values: %d)", len(keys), len(values))
+	}
+
+	batchKeys := make([][]byte, len(keys)*2)
+	batchValues := make([][]byte, len(keys)*2)
+
+	for i, key := range keys {
+		prefixedKey := append(keyPrefix, key...)
+
+		batchKeys[i*2] = prefixedKey
+		batchValues[i*2] = values[i]
+
+		batchKeys[i*2+1] = buildExpiryKey(key, expiryTime)
+		batchValues[i*2+1] = make([]byte, 0)
+	}
 
 	return store.store.WriteBatch(batchKeys, batchValues)
 }

@@ -131,6 +131,79 @@ func TestRandomDataExpired(t *testing.T) {
 	}
 }
 
+func TestBatchRandomDataExpired(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	baseStore := mapstore.NewStore()
+	store := ttlStore{
+		store:  baseStore,
+		ctx:    context.Background(),
+		logger: logger,
+	}
+
+	data := make(map[string][]byte)
+	expiryTimes := make(map[string]time.Time)
+
+	startingTime := tu.RandomTime()
+	simulatedSeconds := 1000
+	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
+
+	// Generate some random data
+	for i := 0; i < 100; i++ {
+
+		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
+
+		keys := make([][]byte, 0)
+		values := make([][]byte, 0)
+
+		// Generate a batch of random data
+		for j := 0; j < 10; j++ {
+			key := tu.RandomBytes(10)
+			keys = append(keys, key)
+			stringifiedKey := string(key)
+			value := tu.RandomBytes(10)
+			values = append(values, value)
+
+			data[stringifiedKey] = value
+			expiryTimes[stringifiedKey] = expiryTime
+		}
+
+		err := store.PutBatchWithExpiration(keys, values, expiryTime)
+		assert.NoError(t, err)
+	}
+
+	currentTime := startingTime
+
+	// Simulate time passing
+	for currentTime.Before(endingTime) {
+
+		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
+		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
+
+		err = store.expireKeys(currentTime)
+		assert.NoError(t, err)
+
+		for key := range data {
+			keyExpirationTime := expiryTimes[key]
+			expired := !currentTime.Before(keyExpirationTime)
+
+			if expired {
+				value, err := store.Get([]byte(key))
+				assert.Error(t, err)
+				assert.Nil(t, value)
+			} else {
+				value, err := store.Get([]byte(key))
+				assert.NoError(t, err)
+				expectedValue := data[key]
+				assert.Equal(t, expectedValue, value)
+			}
+		}
+	}
+}
+
 func TestBigBatchOfDeletions(t *testing.T) {
 	tu.InitializeRandom()
 
