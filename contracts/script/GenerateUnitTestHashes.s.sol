@@ -12,7 +12,7 @@ import "forge-std/console.sol";
 
 contract GenerateHashes is Script {
 
-    string deployConfigPath = "script/eigenda_deploy_config.json";
+    string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
     // deploy all the EigenDA contracts. Relies on many EL contracts having already been deployed.
     function run() external {
