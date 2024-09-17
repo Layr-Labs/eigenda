@@ -285,6 +285,9 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 		Semver: semvers,
 	}
 
+	// Publish semver report metrics
+	s.metrics.UpdateSemverCounts(semvers)
+
 	return semverReport, nil
 }
 
