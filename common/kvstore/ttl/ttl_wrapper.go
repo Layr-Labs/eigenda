@@ -2,7 +2,7 @@ package ttl
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"

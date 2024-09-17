@@ -3,8 +3,8 @@ package ttl
 import (
 	"context"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore/mapstore"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"sort"

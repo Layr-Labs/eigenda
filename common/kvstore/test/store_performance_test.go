@@ -3,10 +3,10 @@ package test
 import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore/leveldb"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore/mapstore"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
 	"testing"

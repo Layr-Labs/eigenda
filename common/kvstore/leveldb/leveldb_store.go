@@ -3,7 +3,7 @@ package leveldb
 import (
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/lightnode/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"os"
 
