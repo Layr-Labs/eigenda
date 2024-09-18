@@ -19,19 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	LightNode_GetChunk_FullMethodName                = "/lightnode.LightNode/GetChunk"
-	LightNode_StreamChunkAvailability_FullMethodName = "/lightnode.LightNode/StreamChunkAvailability"
+	LightNode_StreamBlobAvailability_FullMethodName = "/lightnode.LightNode/StreamBlobAvailability"
 )
 
 // LightNodeClient is the client API for LightNode service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LightNodeClient interface {
-	// GetChunk retrieves a specific chunk held by the light node.
-	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
-	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
-	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	StreamChunkAvailability(ctx context.Context, in *StreamChunkAvailabilityRequest, opts ...grpc.CallOption) (LightNode_StreamChunkAvailabilityClient, error)
+	// StreamBlobAvailability streams the availability status blobs from the light node's perspective.
+	// A light node considers a blob to be available if all chunks it wants to sample are available.
+	// This API is for use by a DA node for monitoring the availability of chunks through its
+	// constellation of agent light nodes.
+	StreamBlobAvailability(ctx context.Context, in *StreamChunkAvailabilityRequest, opts ...grpc.CallOption) (LightNode_StreamBlobAvailabilityClient, error)
 }
 
 type lightNodeClient struct {
@@ -42,21 +41,12 @@ func NewLightNodeClient(cc grpc.ClientConnInterface) LightNodeClient {
 	return &lightNodeClient{cc}
 }
 
-func (c *lightNodeClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error) {
-	out := new(GetChunkReply)
-	err := c.cc.Invoke(ctx, LightNode_GetChunk_FullMethodName, in, out, opts...)
+func (c *lightNodeClient) StreamBlobAvailability(ctx context.Context, in *StreamChunkAvailabilityRequest, opts ...grpc.CallOption) (LightNode_StreamBlobAvailabilityClient, error) {
+	stream, err := c.cc.NewStream(ctx, &LightNode_ServiceDesc.Streams[0], LightNode_StreamBlobAvailability_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
-}
-
-func (c *lightNodeClient) StreamChunkAvailability(ctx context.Context, in *StreamChunkAvailabilityRequest, opts ...grpc.CallOption) (LightNode_StreamChunkAvailabilityClient, error) {
-	stream, err := c.cc.NewStream(ctx, &LightNode_ServiceDesc.Streams[0], LightNode_StreamChunkAvailability_FullMethodName, opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &lightNodeStreamChunkAvailabilityClient{stream}
+	x := &lightNodeStreamBlobAvailabilityClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -66,16 +56,16 @@ func (c *lightNodeClient) StreamChunkAvailability(ctx context.Context, in *Strea
 	return x, nil
 }
 
-type LightNode_StreamChunkAvailabilityClient interface {
+type LightNode_StreamBlobAvailabilityClient interface {
 	Recv() (*StreamChunkAvailabilityReply, error)
 	grpc.ClientStream
 }
 
-type lightNodeStreamChunkAvailabilityClient struct {
+type lightNodeStreamBlobAvailabilityClient struct {
 	grpc.ClientStream
 }
 
-func (x *lightNodeStreamChunkAvailabilityClient) Recv() (*StreamChunkAvailabilityReply, error) {
+func (x *lightNodeStreamBlobAvailabilityClient) Recv() (*StreamChunkAvailabilityReply, error) {
 	m := new(StreamChunkAvailabilityReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -87,11 +77,11 @@ func (x *lightNodeStreamChunkAvailabilityClient) Recv() (*StreamChunkAvailabilit
 // All implementations must embed UnimplementedLightNodeServer
 // for forward compatibility
 type LightNodeServer interface {
-	// GetChunk retrieves a specific chunk held by the light node.
-	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
-	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
-	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	StreamChunkAvailability(*StreamChunkAvailabilityRequest, LightNode_StreamChunkAvailabilityServer) error
+	// StreamBlobAvailability streams the availability status blobs from the light node's perspective.
+	// A light node considers a blob to be available if all chunks it wants to sample are available.
+	// This API is for use by a DA node for monitoring the availability of chunks through its
+	// constellation of agent light nodes.
+	StreamBlobAvailability(*StreamChunkAvailabilityRequest, LightNode_StreamBlobAvailabilityServer) error
 	mustEmbedUnimplementedLightNodeServer()
 }
 
@@ -99,11 +89,8 @@ type LightNodeServer interface {
 type UnimplementedLightNodeServer struct {
 }
 
-func (UnimplementedLightNodeServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
-}
-func (UnimplementedLightNodeServer) StreamChunkAvailability(*StreamChunkAvailabilityRequest, LightNode_StreamChunkAvailabilityServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamChunkAvailability not implemented")
+func (UnimplementedLightNodeServer) StreamBlobAvailability(*StreamChunkAvailabilityRequest, LightNode_StreamBlobAvailabilityServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamBlobAvailability not implemented")
 }
 func (UnimplementedLightNodeServer) mustEmbedUnimplementedLightNodeServer() {}
 
@@ -118,42 +105,24 @@ func RegisterLightNodeServer(s grpc.ServiceRegistrar, srv LightNodeServer) {
 	s.RegisterService(&LightNode_ServiceDesc, srv)
 }
 
-func _LightNode_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetChunkRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(LightNodeServer).GetChunk(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: LightNode_GetChunk_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LightNodeServer).GetChunk(ctx, req.(*GetChunkRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _LightNode_StreamChunkAvailability_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _LightNode_StreamBlobAvailability_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(StreamChunkAvailabilityRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(LightNodeServer).StreamChunkAvailability(m, &lightNodeStreamChunkAvailabilityServer{stream})
+	return srv.(LightNodeServer).StreamBlobAvailability(m, &lightNodeStreamBlobAvailabilityServer{stream})
 }
 
-type LightNode_StreamChunkAvailabilityServer interface {
+type LightNode_StreamBlobAvailabilityServer interface {
 	Send(*StreamChunkAvailabilityReply) error
 	grpc.ServerStream
 }
 
-type lightNodeStreamChunkAvailabilityServer struct {
+type lightNodeStreamBlobAvailabilityServer struct {
 	grpc.ServerStream
 }
 
-func (x *lightNodeStreamChunkAvailabilityServer) Send(m *StreamChunkAvailabilityReply) error {
+func (x *lightNodeStreamBlobAvailabilityServer) Send(m *StreamChunkAvailabilityReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -163,16 +132,11 @@ func (x *lightNodeStreamChunkAvailabilityServer) Send(m *StreamChunkAvailability
 var LightNode_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "lightnode.LightNode",
 	HandlerType: (*LightNodeServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetChunk",
-			Handler:    _LightNode_GetChunk_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamChunkAvailability",
-			Handler:       _LightNode_StreamChunkAvailability_Handler,
+			StreamName:    "StreamBlobAvailability",
+			Handler:       _LightNode_StreamBlobAvailability_Handler,
 			ServerStreams: true,
 		},
 	},
