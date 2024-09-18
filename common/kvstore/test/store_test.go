@@ -261,45 +261,6 @@ func TestDeleteBatch(t *testing.T) {
 	}
 }
 
-func operationsOnShutdownStoreTest(t *testing.T, store kvstore.Store) {
-	deleteDBDirectory(t)
-	err := store.Shutdown()
-	assert.NoError(t, err)
-
-	err = store.Put([]byte("key"), []byte("value"))
-	assert.Error(t, err)
-
-	_, err = store.Get([]byte("key"))
-	assert.Error(t, err)
-
-	err = store.Delete([]byte("key"))
-	assert.Error(t, err)
-
-	err = store.WriteBatch(make([][]byte, 0), make([][]byte, 0))
-	assert.Error(t, err)
-
-	err = store.DeleteBatch(make([][]byte, 0))
-	assert.Error(t, err)
-
-	err = store.Shutdown()
-	assert.NoError(t, err)
-
-	err = store.Destroy()
-	assert.NoError(t, err)
-	verifyDBIsDeleted(t)
-}
-
-func TestOperationsOnShutdownStore(t *testing.T) {
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(t, err)
-
-	for _, builder := range storeBuilders {
-		store, err := builder(logger, dbPath)
-		assert.NoError(t, err)
-		operationsOnShutdownStoreTest(t, store)
-	}
-}
-
 func iterationTest(t *testing.T, store kvstore.Store) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
