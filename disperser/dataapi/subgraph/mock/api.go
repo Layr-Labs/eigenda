@@ -66,7 +66,7 @@ func (m *MockSubgraphApi) QueryOperators(ctx context.Context, first int) ([]*sub
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorDeregistrations(ctx context.Context, first int) ([]*subgraph.Operator, error) {
+func (m *MockSubgraphApi) QueryOperatorsDeregistered(ctx context.Context, first int) ([]*subgraph.Operator, error) {
 	args := m.Called()
 
 	var value []*subgraph.Operator

@@ -110,7 +110,7 @@ func NewSubgraphClient(api subgraph.Api, logger logging.Logger) *subgraphClient 
 
 func (sc *subgraphClient) QueryOperatorDeregistrations(ctx context.Context, limit int) ([]*Operator, error) {
 	// Implement the logic to query operator deregistrations
-	operatorsGql, err := sc.api.QueryOperatorDeregistrations(ctx, limit)
+	operatorsGql, err := sc.api.QueryOperatorsDeregistered(ctx, limit)
 	if err != nil {
 		return nil, err
 	}

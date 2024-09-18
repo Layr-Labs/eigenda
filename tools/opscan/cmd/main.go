@@ -64,7 +64,7 @@ func RunScan(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 		}
-		deregistrations, err := subgraphApi.QueryOperatorDeregistrations(context.Background(), 10000)
+		deregistrations, err := subgraphApi.QueryOperatorsDeregistered(context.Background(), 10000)
 		if err != nil {
 			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 		}
