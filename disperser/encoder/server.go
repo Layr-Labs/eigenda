@@ -60,12 +60,15 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 		return nil, ctx.Err()
 	}
 
-	reply, err := s.handleEncoding(ctx, req, startTime)
+	s.metrics.ObserveLatency("queuing", time.Since(startTime))
+	reply, err := s.handleEncoding(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedBlobRequestNum(len(req.GetData()))
 	} else {
 		s.metrics.IncrementSuccessfulBlobRequestNum(len(req.GetData()))
 	}
+	s.metrics.ObserveLatency("total", time.Since(startTime))
+
 	return reply, err
 }
 
@@ -74,8 +77,7 @@ func (s *Server) popRequest() {
 	<-s.runningRequests
 }
 
-func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest, startTime time.Time) (*pb.EncodeBlobReply, error) {
-	s.metrics.ObserveLatency("queuing", time.Since(startTime))
+func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 
 	begin := time.Now()
 
@@ -142,7 +144,6 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest, 
 	}
 
 	s.metrics.ObserveLatency("serialization", time.Since(begin))
-	s.metrics.ObserveLatency("total", time.Since(startTime))
 
 	return &pb.EncodeBlobReply{
 		Commitment: &pb.BlobCommitment{
