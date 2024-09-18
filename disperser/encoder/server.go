@@ -44,6 +44,7 @@ func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prove
 }
 
 func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
+	startTime := time.Now()
 	select {
 	case s.requestPool <- struct{}{}:
 	default:
@@ -59,7 +60,7 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 		return nil, ctx.Err()
 	}
 
-	reply, err := s.handleEncoding(ctx, req)
+	reply, err := s.handleEncoding(ctx, req, startTime)
 	if err != nil {
 		s.metrics.IncrementFailedBlobRequestNum(len(req.GetData()))
 	} else {
@@ -73,7 +74,9 @@ func (s *Server) popRequest() {
 	<-s.runningRequests
 }
 
-func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
+func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest, startTime time.Time) (*pb.EncodeBlobReply, error) {
+	s.metrics.ObserveLatency("queuing", time.Since(startTime))
+
 	begin := time.Now()
 
 	if len(req.Data) == 0 {
@@ -97,7 +100,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		return nil, err
 	}
 
-	encodingTime := time.Since(begin)
+	s.metrics.ObserveLatency("encoding", time.Since(begin))
+	begin = time.Now()
 
 	commitData, err := commits.Commitment.Serialize()
 	if err != nil {
@@ -137,8 +141,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		chunksData = append(chunksData, chunkSerialized)
 	}
 
-	totalTime := time.Since(begin)
-	s.metrics.TakeLatency(encodingTime, totalTime)
+	s.metrics.ObserveLatency("serialization", time.Since(begin))
+	s.metrics.ObserveLatency("total", time.Since(startTime))
 
 	return &pb.EncodeBlobReply{
 		Commitment: &pb.BlobCommitment{
