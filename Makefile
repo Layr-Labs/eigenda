@@ -1,15 +1,14 @@
-IMAGE_NAME = ghcr.io/layr-labs/eigenda-proxy
 LINTER_VERSION = v1.52.1
 LINTER_URL = https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
 GET_LINT_CMD = "curl -sSfL $(LINTER_URL) | sh -s -- -b $(go env GOPATH)/bin $(LINTER_VERSION)"
 
-GITCOMMIT ?= $(shell git rev-parse HEAD)
-GITDATE ?= $(shell git show -s --format='%ct')
-VERSION := v0.0.0
+GIT_COMMIT ?= $(shell git rev-parse HEAD)
+BUILD_TIME := $(shell date -u '+%Y-%m-%d--%H:%M:%S')
+GIT_TAG := $(shell git describe --tags --always --dirty)
 
-LDFLAGSSTRING +=-X main.GitCommit=$(GITCOMMIT)
-LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
-LDFLAGSSTRING +=-X main.Version=$(VERSION)
+LDFLAGSSTRING +=-X main.Commit=$(GIT_COMMIT)
+LDFLAGSSTRING +=-X main.Date=$(BUILD_TIME)
+LDFLAGSSTRING +=-X main.Version=$(GIT_TAG)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
 E2ETEST = INTEGRATION=true go test -timeout 1m -v ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
@@ -21,7 +20,8 @@ eigenda-proxy:
 
 .PHONY: docker-build
 docker-build:
-	@docker build -t $(IMAGE_NAME) .
+	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
+	@docker build -t ghcr.io/layr-labs/eigenda-proxy:dev .
 
 run-minio:
 	docker run -p 4566:9000 -d -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" --name minio minio/minio server /data

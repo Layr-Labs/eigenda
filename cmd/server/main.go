@@ -16,7 +16,11 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
 
-var Version = "v1.1.0"
+var (
+	Version = "unknown"
+	Commit  = "unknown"
+	Date    = "unknown"
+)
 
 func main() {
 	oplog.SetupDefaults()

@@ -55,13 +55,13 @@ func (cv *CertVerifier) VerifyBatch(
 ) error {
 	blockNumber, err := cv.getConfDeepBlockNumber()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get context block: %w", err)
 	}
 
 	// 1. ensure that a batch hash can be looked up for a batch ID for a given block number
 	expectedHash, err := cv.manager.BatchIdToBatchMetadataHash(&bind.CallOpts{BlockNumber: blockNumber}, id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get batch metadata hash: %w", err)
 	}
 	if bytes.Equal(expectedHash[:], make([]byte, 32)) {
 		return ErrBatchMetadataHashNotFound
@@ -69,9 +69,8 @@ func (cv *CertVerifier) VerifyBatch(
 
 	// 2. ensure that hash generated from local cert matches one stored on-chain
 	actualHash, err := HashBatchMetadata(header, recordHash, confirmationNumber)
-
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hash batch metadata: %w", err)
 	}
 
 	equal := slices.Equal(expectedHash[:], actualHash[:])

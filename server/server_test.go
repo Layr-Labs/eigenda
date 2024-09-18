@@ -84,7 +84,7 @@ func TestGetHandler(t *testing.T) {
 			expectedCode:           http.StatusInternalServerError,
 			expectedBody:           "",
 			expectError:            true,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismGeneric, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{},
 		},
 		{
 			name: "Success - OP Keccak256",
@@ -106,7 +106,7 @@ func TestGetHandler(t *testing.T) {
 			expectedCode:           http.StatusInternalServerError,
 			expectedBody:           "",
 			expectError:            true,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismAltDA, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{},
 		},
 		{
 			name: "Success - OP Alt-DA",

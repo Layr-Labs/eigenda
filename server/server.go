@@ -25,14 +25,10 @@ var (
 )
 
 const (
-	invalidDomain         = "invalid domain type"
-	invalidCommitmentMode = "invalid commitment mode"
-
 	GetRoute = "/get/"
 	PutRoute = "/put/"
 	Put      = "put"
 
-	DomainFilterKey   = "domain"
 	CommitmentModeKey = "commitment_mode"
 )
 
@@ -153,26 +149,27 @@ func (svr *Server) Health(w http.ResponseWriter, _ *http.Request) error {
 func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) (commitments.CommitmentMeta, error) {
 	meta, err := ReadCommitmentMeta(r)
 	if err != nil {
-		svr.WriteBadRequest(w, invalidCommitmentMode)
-		return meta, err
+		err = fmt.Errorf("invalid commitment mode: %w", err)
+		svr.WriteBadRequest(w, err)
+		return commitments.CommitmentMeta{}, err
 	}
 	key := path.Base(r.URL.Path)
 	comm, err := commitments.StringToDecodedCommitment(key, meta.Mode)
 	if err != nil {
-		svr.log.Info("failed to decode commitment", "err", err, "commitment", comm)
-		w.WriteHeader(http.StatusBadRequest)
-		return meta, err
+		err = fmt.Errorf("failed to decode commitment from key %v (commitment mode %v): %w", key, meta.Mode, err)
+		svr.WriteBadRequest(w, err)
+		return commitments.CommitmentMeta{}, err
 	}
 
 	input, err := svr.router.Get(r.Context(), comm, meta.Mode)
-	if err != nil && errors.Is(err, ErrNotFound) {
-		svr.WriteNotFound(w, err.Error())
-		return meta, err
-	}
-
 	if err != nil {
-		svr.WriteInternalError(w, err)
-		return meta, err
+		err = fmt.Errorf("get request failed with commitment %v (commitment mode %v): %w", comm, meta.Mode, err)
+		if errors.Is(err, ErrNotFound) {
+			svr.WriteNotFound(w, err)
+		} else {
+			svr.WriteInternalError(w, err)
+		}
+		return commitments.CommitmentMeta{}, err
 	}
 
 	svr.WriteResponse(w, input)
@@ -182,15 +179,16 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) (commitment
 func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitments.CommitmentMeta, error) {
 	meta, err := ReadCommitmentMeta(r)
 	if err != nil {
-		svr.WriteBadRequest(w, invalidCommitmentMode)
-		return meta, err
+		err = fmt.Errorf("invalid commitment mode: %w", err)
+		svr.WriteBadRequest(w, err)
+		return commitments.CommitmentMeta{}, err
 	}
 
 	input, err := io.ReadAll(r.Body)
 	if err != nil {
-		svr.log.Error("Failed to read request body", "err", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return meta, err
+		err = fmt.Errorf("failed to read request body: %w", err)
+		svr.WriteBadRequest(w, err)
+		return commitments.CommitmentMeta{}, err
 	}
 
 	key := path.Base(r.URL.Path)
@@ -199,23 +197,24 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 	if len(key) > 0 && key != Put { // commitment key already provided (keccak256)
 		comm, err = commitments.StringToDecodedCommitment(key, meta.Mode)
 		if err != nil {
-			svr.log.Info("failed to decode commitment", "err", err, "key", key)
-			w.WriteHeader(http.StatusBadRequest)
-			return meta, err
+			err = fmt.Errorf("failed to decode commitment from key %v (commitment mode %v): %w", key, meta.Mode, err)
+			svr.WriteBadRequest(w, err)
+			return commitments.CommitmentMeta{}, err
 		}
 	}
 
 	commitment, err := svr.router.Put(r.Context(), meta.Mode, comm, input)
 	if err != nil {
+		err = fmt.Errorf("put request failed with commitment %v (commitment mode %v): %w", comm, meta.Mode, err)
 		svr.WriteInternalError(w, err)
 		return meta, err
 	}
 
 	responseCommit, err := commitments.EncodeCommitment(commitment, meta.Mode)
 	if err != nil {
-		svr.log.Info("failed to encode commitment", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return meta, err
+		err = fmt.Errorf("failed to encode commitment %v (commitment mode %v): %w", commitment, meta.Mode, err)
+		svr.WriteInternalError(w, err)
+		return commitments.CommitmentMeta{}, err
 	}
 
 	svr.log.Info(fmt.Sprintf("write commitment: %x\n", comm))
@@ -235,13 +234,13 @@ func (svr *Server) WriteInternalError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func (svr *Server) WriteNotFound(w http.ResponseWriter, msg string) {
-	svr.log.Info("not found", "msg", msg)
+func (svr *Server) WriteNotFound(w http.ResponseWriter, err error) {
+	svr.log.Info("not found", "err", err)
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (svr *Server) WriteBadRequest(w http.ResponseWriter, msg string) {
-	svr.log.Info("bad request", "msg", msg)
+func (svr *Server) WriteBadRequest(w http.ResponseWriter, err error) {
+	svr.log.Info("bad request", "err", err)
 	w.WriteHeader(http.StatusBadRequest)
 }
 
