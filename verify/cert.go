@@ -50,9 +50,10 @@ func NewCertVerifier(cfg *Config, l log.Logger) (*CertVerifier, error) {
 }
 
 // verifies on-chain batch ID for equivalence to certificate batch header fields
-func (cv *CertVerifier) VerifyBatch(header *binding.IEigenDAServiceManagerBatchHeader,
-	id uint32, recordHash [32]byte, confirmationNumber uint32) error {
-	blockNumber, err := cv.getContextBlock()
+func (cv *CertVerifier) VerifyBatch(
+	header *binding.IEigenDAServiceManagerBatchHeader, id uint32, recordHash [32]byte, confirmationNumber uint32,
+) error {
+	blockNumber, err := cv.getConfDeepBlockNumber()
 	if err != nil {
 		return err
 	}
@@ -103,19 +104,10 @@ func (cv *CertVerifier) VerifyMerkleProof(inclusionProof []byte, root []byte,
 }
 
 // fetches a block number provided a subtraction of a user defined conf depth from latest block
-func (cv *CertVerifier) getContextBlock() (*big.Int, error) {
-	var blockNumber *big.Int
-	blockHeader, err := cv.ethClient.BlockByNumber(context.Background(), nil)
+func (cv *CertVerifier) getConfDeepBlockNumber() (*big.Int, error) {
+	blockNumber, err := cv.ethClient.BlockNumber(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get latest block number: %w", err)
 	}
-
-	if cv.ethConfirmationDepth == 0 {
-		return blockHeader.Number(), nil
-	}
-
-	blockNumber = new(big.Int)
-	blockNumber.Sub(blockHeader.Number(), big.NewInt(int64(cv.ethConfirmationDepth-1))) // #nosec G115
-
-	return blockNumber, nil
+	return new(big.Int).SetUint64(max(blockNumber-cv.ethConfirmationDepth, 0)), nil
 }

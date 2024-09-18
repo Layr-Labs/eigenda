@@ -203,7 +203,15 @@ func ReadConfig(ctx *cli.Context) Config {
 		FallbackTargets:        ctx.StringSlice(FallbackTargets),
 		CacheTargets:           ctx.StringSlice(CacheTargets),
 	}
-	cfg.ClientConfig.WaitForFinalization = (cfg.EthConfirmationDepth < 0)
+	// the eigenda client can only wait for 0 confirmations or finality
+	// the da-proxy has a more fine-grained notion of confirmation depth
+	// we use -1 to let the da client wait for finality, and then need to set the confirmation depth
+	// for the da-proxy to 0 (because negative confirmation depth doesn't mean anything and leads to errors)
+	// TODO: should the eigenda-client implement this feature for us instead?
+	if cfg.EthConfirmationDepth < 0 {
+		cfg.ClientConfig.WaitForFinalization = true
+		cfg.EthConfirmationDepth = 0
+	}
 
 	return cfg
 }
@@ -457,7 +465,7 @@ func CLIFlags() []cli.Flag {
 		},
 		&cli.Int64Flag{
 			Name:    EthConfirmationDepthFlagName,
-			Usage:   "The number of Ethereum blocks of confirmation that the DA batch submission tx must have before it is assumed by the proxy to be final. The value of `0` indicates that the proxy shouldn't wait for any confirmations.",
+			Usage:   "The number of Ethereum blocks to wait before considering a submitted blob's DA batch submission confirmed. `0` means wait for inclusion only. `-1` means wait for finality.",
 			EnvVars: prefixEnvVars("ETH_CONFIRMATION_DEPTH"),
 			Value:   -1,
 		},

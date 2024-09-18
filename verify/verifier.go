@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
@@ -26,7 +26,7 @@ type Config struct {
 
 type Verifier struct {
 	verifyCert  bool
-	kzgVerifier *verifier.Verifier
+	kzgVerifier *kzgverifier.Verifier
 	cv          *CertVerifier
 }
 
@@ -41,7 +41,7 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 		}
 	}
 
-	kzgVerifier, err := verifier.NewVerifier(cfg.KzgConfig, false)
+	kzgVerifier, err := kzgverifier.NewVerifier(cfg.KzgConfig, false)
 	if err != nil {
 		return nil, err
 	}
