@@ -14,9 +14,8 @@ var _ kvstore.Store = &mapStore{}
 // mapStore is a simple in-memory implementation of KVStore. Designed more as a correctness test than a
 // production implementation -- there are things that may not be performant with this implementation.
 type mapStore struct {
-	data      map[string][]byte
-	lock      sync.RWMutex
-	destroyed bool
+	data map[string][]byte
+	lock sync.RWMutex
 }
 
 // NewStore creates a new mapStore.
@@ -31,10 +30,6 @@ func (store *mapStore) Put(key []byte, value []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 
-	if store.destroyed {
-		return fmt.Errorf("mapStore is destroyed")
-	}
-
 	stringifiedKey := string(key)
 
 	store.data[stringifiedKey] = value
@@ -46,10 +41,6 @@ func (store *mapStore) Delete(key []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 
-	if store.destroyed {
-		return fmt.Errorf("mapStore is destroyed")
-	}
-
 	stringifiedKey := string(key)
 	delete(store.data, stringifiedKey)
 	return nil
@@ -59,10 +50,6 @@ func (store *mapStore) Delete(key []byte) error {
 func (store *mapStore) DeleteBatch(keys [][]byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
-
-	if store.destroyed {
-		return fmt.Errorf("mapStore is destroyed")
-	}
 
 	for _, key := range keys {
 		stringifiedKey := string(key)
@@ -75,10 +62,6 @@ func (store *mapStore) DeleteBatch(keys [][]byte) error {
 func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
-
-	if store.destroyed {
-		return fmt.Errorf("mapStore is destroyed")
-	}
 
 	if len(keys) != len(values) {
 		return fmt.Errorf("keys and values slices must have the same length")
@@ -171,10 +154,6 @@ func (store *mapStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	store.lock.RLock()
 	defer store.lock.RUnlock()
 
-	if store.destroyed {
-		return nil, fmt.Errorf("mapStore is destroyed")
-	}
-
 	mapCopy := make(map[string][]byte)
 	keys := make([]string, 0, len(store.data))
 
@@ -219,10 +198,6 @@ func (store *mapStore) Get(key []byte) ([]byte, error) {
 	store.lock.RLock()
 	defer store.lock.RUnlock()
 
-	if store.destroyed {
-		return nil, fmt.Errorf("mapStore is destroyed")
-	}
-
 	data, ok := store.data[string(key)]
 
 	if !ok {
@@ -237,15 +212,14 @@ func (store *mapStore) Get(key []byte) ([]byte, error) {
 
 // Shutdown stops the mapStore and releases any resources it holds. Does not delete any on-disk data.
 func (store *mapStore) Shutdown() error {
-	return store.Destroy()
-}
-
-// Destroy permanently stops the mapStore and deletes all data (including data on disk).
-func (store *mapStore) Destroy() error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 
 	store.data = nil
-	store.destroyed = true
 	return nil
+}
+
+// Destroy permanently stops the mapStore and deletes all data (including data on disk).
+func (store *mapStore) Destroy() error {
+	return store.Shutdown()
 }

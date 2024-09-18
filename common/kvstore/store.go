@@ -14,6 +14,7 @@ type Store interface {
 	Put(key []byte, value []byte) error
 
 	// Get retrieves the value for the given key. Returns a ErrNotFound error if the key does not exist.
+	// The value returned is safe to modify.
 	Get(key []byte) ([]byte, error)
 
 	// Delete removes the key from the database. Does not return an error if the key does not exist.
@@ -33,9 +34,15 @@ type Store interface {
 	NewIterator(prefix []byte) (iterator.Iterator, error)
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
+	//
+	// Warning: it is not thread safe to call this method concurrently with other methods on this class,
+	// or while there exist unclosed iterators.
 	Shutdown() error
 
 	// Destroy shuts down and permanently deletes all data in the store.
+	//
+	// Warning: it is not thread safe to call this method concurrently with other methods on this class,
+	// or while there exist unclosed iterators.
 	Destroy() error
 }
 

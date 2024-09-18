@@ -21,8 +21,7 @@ type levelDBStore struct {
 
 	logger logging.Logger
 
-	shutdown  bool
-	destroyed bool
+	shutdown bool
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
@@ -42,19 +41,11 @@ func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 
 // Put stores a data in the store.
 func (store *levelDBStore) Put(key []byte, value []byte) error {
-	if store.shutdown {
-		return fmt.Errorf("store is shut down")
-	}
-
 	return store.db.Put(key, value, nil)
 }
 
 // Get retrieves data from the store. Returns kvstore.ErrNotFound if the data is not found.
 func (store *levelDBStore) Get(key []byte) ([]byte, error) {
-	if store.shutdown {
-		return nil, fmt.Errorf("store is shut down")
-	}
-
 	data, err := store.db.Get(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
@@ -67,28 +58,16 @@ func (store *levelDBStore) Get(key []byte) ([]byte, error) {
 
 // NewIterator creates a new iterator. Only keys prefixed with the given prefix will be iterated.
 func (store *levelDBStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
-	if store.shutdown {
-		return nil, fmt.Errorf("store is shut down")
-	}
-
 	return store.db.NewIterator(util.BytesPrefix(prefix), nil), nil
 }
 
 // Delete deletes data from the store.
 func (store *levelDBStore) Delete(key []byte) error {
-	if store.shutdown {
-		return fmt.Errorf("store is shut down")
-	}
-
 	return store.db.Delete(key, nil)
 }
 
 // DeleteBatch deletes multiple key-value pairs from the store.
 func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
-	if store.shutdown {
-		return fmt.Errorf("store is shut down")
-	}
-
 	batch := new(leveldb.Batch)
 	for _, key := range keys {
 		batch.Delete(key)
@@ -98,10 +77,6 @@ func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 
 // WriteBatch adds multiple key-value pairs to the store.
 func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
-	if store.shutdown {
-		return fmt.Errorf("store is shut down")
-	}
-
 	batch := new(leveldb.Batch)
 	for i, key := range keys {
 		batch.Put(key, values[i])
@@ -110,11 +85,10 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 }
 
 // Shutdown shuts down the store.
+//
+// Warning: it is not thread safe to call this method concurrently with other methods on this class,
+// or while there exist unclosed iterators.
 func (store *levelDBStore) Shutdown() error {
-	if store.shutdown {
-		return nil
-	}
-
 	err := store.db.Close()
 	if err != nil {
 		return err
@@ -125,11 +99,10 @@ func (store *levelDBStore) Shutdown() error {
 }
 
 // Destroy destroys the store.
+//
+// Warning: it is not thread safe to call this method concurrently with other methods on this class,
+// or while there exist unclosed iterators.
 func (store *levelDBStore) Destroy() error {
-	if store.destroyed {
-		return nil
-	}
-
 	if !store.shutdown {
 		err := store.Shutdown()
 		if err != nil {
@@ -142,6 +115,5 @@ func (store *levelDBStore) Destroy() error {
 	if err != nil {
 		return err
 	}
-	store.destroyed = true
 	return nil
 }
