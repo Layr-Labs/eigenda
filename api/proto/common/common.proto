@@ -8,3 +8,12 @@ message G1Commitment {
 	// The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
 	bytes y = 2;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
+// Experimental: the following definitions are experimental and subject to change. //
+/////////////////////////////////////////////////////////////////////////////////////
+
+// A chunk of a blob.
+message ChunkData {
+	bytes data = 1;
+}
