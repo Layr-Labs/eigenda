@@ -12,16 +12,22 @@ import (
 )
 
 // query operator host info endpoint if available
-func GetSemverInfo(ctx context.Context, socket string, operatorId string, logger logging.Logger) string {
+func GetSemverInfo(ctx context.Context, socket string, operatorId string, useRetrievalSocket bool, logger logging.Logger) string {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "unreachable"
 	}
 	defer conn.Close()
-	client := node.NewDispersalClient(conn)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*time.Duration(3))
 	defer cancel()
-	reply, err := client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	reply := &node.NodeInfoReply{}
+	if useRetrievalSocket {
+		client := node.NewRetrievalClient(conn)
+		reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	} else {
+		client := node.NewDispersalClient(conn)
+		reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	}
 	if err != nil {
 		var semver string
 		if strings.Contains(err.Error(), "Unimplemented") {

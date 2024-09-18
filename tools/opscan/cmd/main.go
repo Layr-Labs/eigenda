@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"sync"
-	"time"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	"github.com/Layr-Labs/eigenda/tools/opscan"
@@ -19,8 +17,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -120,7 +116,7 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 			}
 			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			retrievalSocket := operatorSocket.GetRetrievalSocket()
-			semver := getNodeInfo(context.Background(), operatorId, retrievalSocket, config.Timeout, logger)
+			semver := semver.GetSemverInfo(context.Background(), retrievalSocket, operatorId, true, logger)
 
 			mu.Lock()
 			semvers[semver]++
@@ -144,42 +140,6 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 	// Wait for all workers to finish
 	wg.Wait()
 	return semvers
-}
-
-func getNodeInfo(ctx context.Context, operatorId string, socket string, timeout time.Duration, logger logging.Logger) string {
-	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Error("Failed to dial grpc operator socket", "operatorId", operatorId, "socket", socket, "error", err)
-		return "unreachable"
-	}
-	defer conn.Close()
-	client := node.NewRetrievalClient(conn)
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	reply, err := client.NodeInfo(ctx, &node.NodeInfoRequest{})
-	if err != nil {
-		var semver string
-		if strings.Contains(err.Error(), "Unimplemented") {
-			semver = "<0.8.0"
-		} else if strings.Contains(err.Error(), "DeadlineExceeded") {
-			semver = "timeout"
-		} else if strings.Contains(err.Error(), "Unavailable") {
-			semver = "refused"
-		} else {
-			semver = "error"
-		}
-
-		logger.Warn("NodeInfo", "operatorId", operatorId, "semver", semver, "error", err)
-		return semver
-	}
-
-	// local node source compiles without semver
-	if reply.Semver == "" {
-		reply.Semver = "src-compile"
-	}
-
-	logger.Info("NodeInfo", "operatorId", operatorId, "socker", socket, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
-	return reply.Semver
 }
 
 func displayResults(results map[string]int) {
