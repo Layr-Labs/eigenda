@@ -106,6 +106,8 @@ An optional storage caching CLI flag `--routing.cache-targets` can be leveraged 
 
 To the see list of available metrics, run `./bin/eigenda-proxy doc metrics`
 
+To quickly set up monitoring dashboard, add eigenda-proxy metrics endpoint to a reachable prometheus server config as a scrape target, add prometheus datasource to Grafana to, and import the existing [Grafana dashboard JSON file](./grafana_dashboard.json)
+
 ## Deployment Guide
 
 ### Hardware Requirements

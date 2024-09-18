@@ -106,7 +106,7 @@ func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.
 			log,
 			&store.EigenDAStoreConfig{
 				MaxBlobSizeBytes:     maxBlobLength,
-				EthConfirmationDepth: uint64(cfg.EigenDAConfig.EthConfirmationDepth),
+				EthConfirmationDepth: uint64(cfg.EigenDAConfig.EthConfirmationDepth), // #nosec G115
 				StatusQueryTimeout:   cfg.EigenDAConfig.ClientConfig.StatusQueryTimeout,
 			},
 		)

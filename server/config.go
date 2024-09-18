@@ -138,9 +138,9 @@ func (cfg *Config) VerificationCfg() *verify.Config {
 		G1Path:          cfg.G1Path,
 		G2PowerOf2Path:  cfg.G2PowerOfTauPath,
 		CacheDir:        cfg.CacheDir,
-		SRSOrder:        268435456,     // 2 ^ 32
-		SRSNumberToLoad: numBytes / 32, // # of fp.Elements
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		SRSOrder:        268435456,                     // 2 ^ 32
+		SRSNumberToLoad: numBytes / 32,                 // # of fr.Elements
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 	}
 
 	if cfg.EthRPC == "" || cfg.SvcManagerAddr == "" {
@@ -155,7 +155,7 @@ func (cfg *Config) VerificationCfg() *verify.Config {
 		RPCURL:               cfg.EthRPC,
 		SvcManagerAddr:       cfg.SvcManagerAddr,
 		KzgConfig:            kzgCfg,
-		EthConfirmationDepth: uint64(cfg.EthConfirmationDepth),
+		EthConfirmationDepth: uint64(cfg.EthConfirmationDepth), // #nosec G115
 	}
 }
 

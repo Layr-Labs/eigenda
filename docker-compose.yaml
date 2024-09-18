@@ -1,0 +1,57 @@
+services:
+  eigenda_proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eigenda-proxy
+    environment:
+      - EIGENDA_PROXY_ADDR=0.0.0.0
+      - EIGENDA_PROXY_PORT=4242
+      - MEMSTORE_ENABLED=false
+      - MEMSTORE_EXPIRATION=45m
+      - EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX=$PRIVATE_KEY
+      - EIGENDA_PROXY_EIGENDA_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443
+      - EIGENDA_PROXY_SERVICE_MANAGER_ADDR=0xD4A7E1Bd8015057293f0D0A557088c286942e84b
+      - EIGENDA_PROXY_ETH_RPC=$ETH_RPC
+      - EIGENDA_PROXY_ETH_CONFIRMATION_DEPTH=0
+      - EIGENDA_PROXY_METRICS_ADDR=0.0.0.0
+      - EIGENDA_PROXY_METRICS_ENABLED=true
+      - EIGENDA_PROXY_METRICS_PORT=7300
+    ports:
+      - 4242:4242
+      - 7300:7300
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./monitor/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./monitor/grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - ./monitor/grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
+  traffic-generator:
+    image: alpine:latest
+    build: scripts/
+    container_name: traffic_generator
+    depends_on:
+      - eigenda_proxy
+    volumes:
+      - ./scripts/:/scripts/
+
+volumes:
+  grafana-data:

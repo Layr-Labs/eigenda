@@ -5,6 +5,12 @@ import (
 	"fmt"
 )
 
+type CommitmentMeta struct {
+	Mode CommitmentMode
+	// CertVersion is shared for all modes and denotes version of the EigenDA certificate
+	CertVersion byte
+}
+
 type CommitmentMode string
 
 const (
