@@ -97,11 +97,6 @@ func (m *Metrics) ObserveLatency(stage string, duration time.Duration) {
 	m.Latency.WithLabelValues(stage).Observe(float64(duration.Milliseconds()))
 }
 
-func (m *Metrics) TakeLatency(encoding, total time.Duration) {
-	m.Latency.WithLabelValues("encoding").Observe(float64(encoding.Milliseconds()))
-	m.Latency.WithLabelValues("total").Observe(float64(total.Milliseconds()))
-}
-
 func (m *Metrics) Start(ctx context.Context) {
 	m.logger.Info("Starting metrics server at ", "port", m.httpPort)
 
