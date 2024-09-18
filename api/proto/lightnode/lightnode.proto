@@ -8,23 +8,11 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/lightnode";
 /////////////////////////////////////////////////////////////////////////////////////
 
 service LightNode {
-	// GetChunk retrieves a specific chunk held by the light node.
-	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
-
-	// StreamAvailabilityStatus streams the availability status of all chunks assigned to the light node.
-	// For use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes.
-	rpc StreamChunkAvailability(StreamChunkAvailabilityRequest) returns (stream StreamChunkAvailabilityReply) {}
-}
-
-// A request for a specific chunk from a light node.
-message GetChunkRequest {
-	bytes header_hash = 1;
-}
-
-// A reply to a GetChunk request.
-message GetChunkReply {
-	// The chunk data.
-	common.ChunkData chunk = 1;
+	// StreamBlobAvailability streams the availability status blobs from the light node's perspective.
+	// A light node considers a blob to be available if all chunks it wants to sample are available.
+	// This API is for use by a DA node for monitoring the availability of chunks through its
+	// constellation of agent light nodes.
+	rpc StreamBlobAvailability(StreamChunkAvailabilityRequest) returns (stream StreamChunkAvailabilityReply) {}
 }
 
 // A request from a DA node to an agent light node to stream the availability status of all chunks
@@ -36,6 +24,6 @@ message StreamChunkAvailabilityRequest {
 // A reply to a StreamAvailabilityStatus request.
 message StreamChunkAvailabilityReply {
 	// The hash of a blob header corresponding to a chunk the agent received and verified. From the light node's
-	// perspective, the blob is available if the chunk is available.
+	// perspective, the blob is available if all chunks the light node wants to sample are available.
 	bytes header_hash = 1;
 }
