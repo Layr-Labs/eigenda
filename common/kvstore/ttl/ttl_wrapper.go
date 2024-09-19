@@ -95,10 +95,7 @@ func buildExpiryKey(
 
 // parseExpiryKey extracts the expiry time and base key from the given expiry key.
 func parseExpiryKey(expiryKey []byte) (baseKey []byte, expiryTime time.Time) {
-	expiryUnixNano := int64(0)
-	for i := 0; i < 8; i++ {
-		expiryUnixNano |= int64(expiryKey[1+i]) << (56 - i*8)
-	}
+	expiryUnixNano := int64(binary.BigEndian.Uint64(expiryKey[1:]))
 	expiryTime = time.Unix(0, expiryUnixNano)
 
 	baseKey = expiryKey[9:]
