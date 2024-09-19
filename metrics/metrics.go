@@ -99,7 +99,7 @@ func NewMetrics(subsystem string) *Metrics {
 			Buckets: prometheus.ExponentialBucketsRange(0.05, 1200, 20),
 			Help:    "Histogram of HTTP server request durations",
 		}, []string{
-			"method", "commitment_mode", "DA_cert_version", // no status on histograms because those are very expensive
+			"method", // no status on histograms because those are very expensive
 		}),
 		registry: registry,
 		factory:  factory,
