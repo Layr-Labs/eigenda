@@ -32,8 +32,9 @@ const (
 )
 
 type Cfg struct {
-	UseMemory          bool
-	Expiration         time.Duration
+	UseMemory  bool
+	Expiration time.Duration
+	// at most one of the below options should be true
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
 	UseRedisCaching    bool
@@ -84,15 +85,7 @@ func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 	}
 }
 
-type TestSuite struct {
-	Ctx    context.Context
-	Log    log.Logger
-	Server *server.Server
-}
-
-func CreateTestSuite(t *testing.T, testCfg *Cfg) (TestSuite, func()) {
-	ctx := context.Background()
-
+func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
 	// load signer key from environment
 	pk := os.Getenv(privateKey)
 	if pk == "" && !testCfg.UseMemory {
@@ -111,12 +104,6 @@ func CreateTestSuite(t *testing.T, testCfg *Cfg) (TestSuite, func()) {
 	} else {
 		pollInterval = time.Minute * 1
 	}
-
-	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
-		Level:  log.LevelDebug,
-		Format: oplog.FormatLogFmt,
-		Color:  true,
-	}).New("role", svcName)
 
 	eigendaCfg := server.Config{
 		ClientConfig: clients.EigenDAClientConfig{
@@ -143,7 +130,6 @@ func CreateTestSuite(t *testing.T, testCfg *Cfg) (TestSuite, func()) {
 	}
 
 	var cfg server.CLIConfig
-
 	switch {
 	case testCfg.UseKeccak256ModeS3:
 		cfg = createS3Config(eigendaCfg)
@@ -167,9 +153,26 @@ func CreateTestSuite(t *testing.T, testCfg *Cfg) (TestSuite, func()) {
 		}
 	}
 
+	return cfg
+}
+
+type TestSuite struct {
+	Ctx    context.Context
+	Log    log.Logger
+	Server *server.Server
+}
+
+func CreateTestSuite(t *testing.T, testSuiteCfg server.CLIConfig) (TestSuite, func()) {
+	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
+		Level:  log.LevelDebug,
+		Format: oplog.FormatLogFmt,
+		Color:  true,
+	}).New("role", svcName)
+
+	ctx := context.Background()
 	store, err := server.LoadStoreRouter(
 		ctx,
-		cfg,
+		testSuiteCfg,
 		log,
 	)
 	require.NoError(t, err)

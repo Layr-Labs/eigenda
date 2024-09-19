@@ -11,7 +11,7 @@ import (
 )
 
 // populateTargets ... creates a list of storage backends based on the provided target strings
-func populateTargets(targets []string, s3 *store.S3Store, redis *store.RedStore) []store.PrecomputedKeyStore {
+func populateTargets(targets []string, s3 store.PrecomputedKeyStore, redis *store.RedStore) []store.PrecomputedKeyStore {
 	stores := make([]store.PrecomputedKeyStore, len(targets))
 
 	for i, f := range targets {
@@ -42,7 +42,7 @@ func populateTargets(targets []string, s3 *store.S3Store, redis *store.RedStore)
 func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.IRouter, error) {
 	// create S3 backend store (if enabled)
 	var err error
-	var s3 *store.S3Store
+	var s3 store.PrecomputedKeyStore
 	var redis *store.RedStore
 
 	if cfg.S3Config.Bucket != "" && cfg.S3Config.Endpoint != "" {
