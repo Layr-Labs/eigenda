@@ -2,6 +2,7 @@ package ttl
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -85,9 +86,7 @@ func buildExpiryKey(
 
 	expiryKey[0] = 'e'
 	expiryUnixNano := expiryTime.UnixNano()
-	for i := 0; i < 8; i++ {
-		expiryKey[1+i] = byte((expiryUnixNano >> (56 - i*8)) & 0xff)
-	}
+	binary.BigEndian.PutUint64(expiryKey[1:], uint64(expiryUnixNano))
 
 	copy(expiryKey[9:], baseKey)
 
@@ -155,8 +154,7 @@ func (store *ttlStore) expireKeysInBackground(gcPeriod time.Duration) {
 				err := store.expireKeys(now)
 				if err != nil {
 					store.logger.Error("Error expiring keys", err)
-					store.cancel()
-					return
+					continue
 				}
 			case <-store.ctx.Done():
 				ticker.Stop()
