@@ -21,14 +21,14 @@ abstract contract EigenDABlobVerifier is IEigenDABlobVerifier {
      * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
      * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
-    bytes public constant quorumAdversaryThresholdPercentages = hex"2121";
+    bytes public constant quorumAdversaryThresholdPercentages = hex"212121";
 
     /**
      * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
      * this is the percentage of the total stake needed to confirm a blob.
      * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
-    bytes public constant quorumConfirmationThresholdPercentages = hex"3737";
+    bytes public constant quorumConfirmationThresholdPercentages = hex"373737";
 
     /**
      * @notice The quorum numbers required for confirmation stored as an ordered bytes array
@@ -123,8 +123,8 @@ abstract contract EigenDABlobVerifier is IEigenDABlobVerifier {
         bytes memory requiredQuorumNumbers
     ) internal view virtual {
         require(
-            EigenDAHasher.hashBatchMetadata(blobVerificationProof.batchMetadata) 
-                == IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(blobVerificationProof.batchId),
+            EigenDAHasher.hashBatchMetadata(blobVerificationProof.batchMetadata) ==
+            IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(blobVerificationProof.batchId),
             "EigenDABlobVerifier._verifyBlobForQuorums: batchMetadata does not match stored metadata"
         );
 
@@ -149,19 +149,16 @@ abstract contract EigenDABlobVerifier is IEigenDABlobVerifier {
             );
 
             require(
-                blobHeader.quorumBlobParams[i].adversaryThresholdPercentage < 
-                blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
+                blobHeader.quorumBlobParams[i].confirmationThresholdPercentage >
+                blobHeader.quorumBlobParams[i].adversaryThresholdPercentage, 
                 "EigenDABlobVerifier._verifyBlobForQuorums: threshold percentages are not valid"
             );
 
-            uint8 _adversaryThresholdPercentage = getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
-            if(_adversaryThresholdPercentage > 0){
-                require(
-                    blobHeader.quorumBlobParams[i].adversaryThresholdPercentage >= 
-                    _adversaryThresholdPercentage, 
-                    "EigenDABlobVerifier._verifyBlobForQuorums: adversaryThresholdPercentage is not met"
-                );
-            }
+            require(
+                blobHeader.quorumBlobParams[i].confirmationThresholdPercentage >= 
+                getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber), 
+                "EigenDABlobVerifier._verifyBlobForQuorums: confirmationThresholdPercentage is not met"
+            );
 
             require(
                 uint8(blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProof.quorumIndices[i])]) >= 
@@ -201,10 +198,8 @@ abstract contract EigenDABlobVerifier is IEigenDABlobVerifier {
 
         bytes32 reducedBatchHeaderHash = miniBatchHeader.hashBatchHeaderToReducedBatchHeader();
 
-        (
-            IEigenDASignatureVerifier.QuorumStakeTotals memory quorumStakeTotals,
-            bytes32 signatoryRecordHash
-        ) = IEigenDASignatureVerifier(signatureVerifier).checkSignatures(
+        (IEigenDASignatureVerifier.QuorumStakeTotals memory quorumStakeTotals, ) = 
+        IEigenDASignatureVerifier(signatureVerifier).checkSignatures(
             reducedBatchHeaderHash, 
             miniBatchHeader.quorumNumbers, 
             miniBatchHeader.referenceBlockNumber, 
