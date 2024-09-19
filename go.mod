@@ -3,10 +3,11 @@ module github.com/Layr-Labs/eigenda-proxy
 go 1.21
 
 require (
-	github.com/Layr-Labs/eigenda v0.8.1
+	github.com/Layr-Labs/eigenda v0.8.4-0.20240918205210-351526af1e80
 	github.com/consensys/gnark-crypto v0.12.1
 	github.com/ethereum-optimism/optimism v1.9.0
 	github.com/ethereum/go-ethereum v1.14.0
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.2.0
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.74
@@ -89,7 +90,6 @@ require (
 	github.com/getsentry/sentry-go v0.20.0 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
@@ -229,7 +229,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
-	go.uber.org/automaxprocs v1.5.2 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/fx v1.21.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
