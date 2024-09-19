@@ -191,6 +191,10 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 		svr.WriteBadRequest(w, err)
 		return meta, err
 	}
+	// ReadCommitmentMeta function invoked inside HandlePut will not return a valid certVersion
+	// Current simple fix is using the hardcoded default value of 0 (also the only supported value)
+	//TODO: smarter decode needed when there's more than one version
+	meta.CertVersion = byte(commitments.CertV0)
 
 	input, err := io.ReadAll(r.Body)
 	if err != nil {
