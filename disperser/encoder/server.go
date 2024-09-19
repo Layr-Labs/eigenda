@@ -47,7 +47,7 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 	select {
 	case s.requestPool <- struct{}{}:
 	default:
-		s.metrics.IncrementRateLimitedBlobRequestNum()
+		s.metrics.IncrementRateLimitedBlobRequestNum(len(req.GetData()))
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, errors.New("too many requests")
 	}
@@ -55,15 +55,15 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 	defer s.popRequest()
 
 	if ctx.Err() != nil {
-		s.metrics.IncrementCanceledBlobRequestNum()
+		s.metrics.IncrementCanceledBlobRequestNum(len(req.GetData()))
 		return nil, ctx.Err()
 	}
 
 	reply, err := s.handleEncoding(ctx, req)
 	if err != nil {
-		s.metrics.IncrementFailedBlobRequestNum()
+		s.metrics.IncrementFailedBlobRequestNum(len(req.GetData()))
 	} else {
-		s.metrics.IncrementSuccessfulBlobRequestNum()
+		s.metrics.IncrementSuccessfulBlobRequestNum(len(req.GetData()))
 	}
 	return reply, err
 }
@@ -116,8 +116,20 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	var chunksData [][]byte
 
+	var format pb.ChunkEncodingFormat
+	if s.config.EnableGnarkChunkEncoding {
+		format = pb.ChunkEncodingFormat_GNARK
+	} else {
+		format = pb.ChunkEncodingFormat_GOB
+	}
+
 	for _, chunk := range chunks {
-		chunkSerialized, err := chunk.Serialize()
+		var chunkSerialized []byte
+		if s.config.EnableGnarkChunkEncoding {
+			chunkSerialized, err = chunk.SerializeGnark()
+		} else {
+			chunkSerialized, err = chunk.Serialize()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +147,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 			LengthProof:      lengthProofData,
 			Length:           uint32(commits.Length),
 		},
-		Chunks: chunksData,
+		Chunks:              chunksData,
+		ChunkEncodingFormat: format,
 	}, nil
 }
 

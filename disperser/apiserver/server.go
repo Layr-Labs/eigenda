@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/status"
 	"math/rand"
 	"net"
 	"slices"
@@ -133,14 +134,14 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
+		return api.NewInvalidArgError(fmt.Sprintf("failed to decode account ID (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
+		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", hexutil.Encode(publicKeyBytes), err))
 	}
 
 	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
@@ -262,8 +263,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		for _, param := range securityParams {
-			quorumId := string(param.QuorumID)
-			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), quorumId, blobSize, apiMethodName)
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 		}
 		s.metrics.HandleInvalidArgRpcRequest(apiMethodName)
 		return nil, api.NewInvalidArgError(err.Error())
@@ -283,8 +283,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
 	if err != nil {
 		for _, param := range securityParams {
-			quorumId := string(param.QuorumID)
-			s.metrics.HandleBlobStoreFailedRequest(quorumId, blobSize, apiMethodName)
+			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		s.logger.Error("failed to store blob", "err", err)
@@ -292,8 +291,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}
 
 	for _, param := range securityParams {
-		quorumId := string(param.QuorumID)
-		s.metrics.HandleSuccessfulRequest(quorumId, blobSize, apiMethodName)
+		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 	}
 
 	return &pb.DisperseBlobReply{
@@ -774,6 +772,10 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	return &pb.RetrieveBlobReply{
 		Data: data,
 	}, nil
+}
+
+func (s *DispersalServer) GetChunk(context.Context, *pb.GetChunkRequest) (*pb.GetChunkReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 
 func (s *DispersalServer) GetRateConfig() *RateConfig {

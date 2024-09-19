@@ -60,11 +60,18 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams enco
 	if err != nil {
 		return nil, nil, err
 	}
+	var format core.ChunkEncodingFormat
+	switch reply.GetChunkEncodingFormat() {
+	case pb.ChunkEncodingFormat_GNARK:
+		format = core.GnarkChunkEncodingFormat
+	case pb.ChunkEncodingFormat_GOB:
+		format = core.GobChunkEncodingFormat
+	case pb.ChunkEncodingFormat_UNKNOWN:
+		format = core.GobChunkEncodingFormat
+	}
 	chunksData := &core.ChunksData{
-		Chunks: reply.GetChunks(),
-		// TODO(jianoaix): plumb the encoding format for the encoder server. For now it's fine
-		// as it's hard coded using Gob at Encoder server.
-		Format:   core.GobChunkEncodingFormat,
+		Chunks:   reply.GetChunks(),
+		Format:   format,
 		ChunkLen: int(encodingParams.ChunkLength),
 	}
 	return &encoding.BlobCommitments{

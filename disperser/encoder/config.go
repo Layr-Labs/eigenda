@@ -5,7 +5,8 @@ const (
 )
 
 type ServerConfig struct {
-	GrpcPort              string
-	MaxConcurrentRequests int
-	RequestPoolSize       int
+	GrpcPort                 string
+	MaxConcurrentRequests    int
+	RequestPoolSize          int
+	EnableGnarkChunkEncoding bool
 }

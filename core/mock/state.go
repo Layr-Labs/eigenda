@@ -244,6 +244,12 @@ func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber
 
 }
 
+func (d *ChainDataMock) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
+	state := d.GetTotalOperatorState(ctx, blockNumber)
+
+	return state.IndexedOperatorState.IndexedOperators, nil
+}
+
 func (d *ChainDataMock) GetCurrentBlockNumber() (uint, error) {
 	args := d.Called()
 	return args.Get(0).(uint), args.Error(1)

@@ -76,6 +76,31 @@ func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	return state, nil
 }
 
+func (ics *IndexedChainState) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
+
+	pubkeys, sockets, err := ics.getObjects(blockNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	ops := make(map[core.OperatorID]*core.IndexedOperatorInfo, len(pubkeys.Operators))
+	for id, op := range pubkeys.Operators {
+
+		socket, ok := sockets[id]
+		if !ok {
+			return nil, errors.New("socket for operator not found")
+		}
+
+		ops[id] = &core.IndexedOperatorInfo{
+			PubkeyG1: &core.G1Point{G1Affine: op.PubKeyG1},
+			PubkeyG2: &core.G2Point{G2Affine: op.PubKeyG2},
+			Socket:   socket,
+		}
+	}
+
+	return ops, nil
+}
+
 func (ics *IndexedChainState) GetCurrentBlockNumber() (uint, error) {
 	header, err := ics.Indexer.GetLatestHeader(false)
 	if err != nil {
