@@ -182,7 +182,7 @@ func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.Enco
 	}
 
 	signaturesInBytes := reply.GetSignatures()
-	signatures := make([]*core.Signature, len(signaturesInBytes))
+	signatures := make([]*core.Signature, 0, len(signaturesInBytes))
 	for _, sigBytes := range signaturesInBytes {
 		sig := sigBytes.GetValue()
 		if sig != nil {
