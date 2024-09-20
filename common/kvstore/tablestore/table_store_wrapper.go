@@ -10,16 +10,13 @@ import (
 )
 
 // Table ID 0 is reserved for use internal use by the metadata table.
-const metadataTableID = 0
+const metadataTableID uint32 = 0
 
-// Table ID 1 is reserved for use by the namespace table. This stores a mapping between table names and table IDs.
-const namespaceTableID = 1
+// Table ID 1 is reserved for use by the namespace table. This stores a mapping between IDs and table names.
+const namespaceTableID uint32 = 1
 
 // The first table ID that can be used for user-created tables.
-const firstTableID = 2
-
-// This key is used to store the maximum table count in the metadata table.
-const maxTableCountKey = "max_table_count"
+const firstUserTableID uint32 = 2
 
 // This key is used to store the schema version in the metadata table.
 const schemaVersionKey = "schema_version"
@@ -28,8 +25,6 @@ const schemaVersionKey = "schema_version"
 const currentSchemaVersion uint64 = 0
 
 var _ kvstore.TableStore = &tableStore{}
-var _ kvstore.Key = &key{}
-var _ kvstore.KeyBuilder = &keyBuilder{}
 
 var ERR_TABLE_LIMIT_EXCEEDED = errors.New("table limit exceeded")
 
@@ -39,95 +34,19 @@ type tableStore struct {
 	base kvstore.Store
 
 	// A map from table names to table IDs.
-	tableMap map[string]uint64
+	tableMap map[string]uint32
 
 	// A map from table IDs to table prefixes.
-	prefixMap map[uint64][]byte
+	prefixMap map[uint32][]byte
 
 	// The highest ID of all tables in the store.
-	highestTableID uint64
-
-	// The maximum number of tables that can be created in the store without resizing. This count includes
-	// the two reserved tables for metadata and namespace.
-	maxTableCount uint64
+	highestTableID uint32
 
 	// Builds keys for the metadata table.
 	metadataTable kvstore.KeyBuilder
 
 	// Builds keys for the namespace table.
 	namespaceTable kvstore.KeyBuilder
-}
-
-// key is a key in a TableStore.
-type key struct {
-	// the prefix for the table
-	prefix []byte
-	// the key within the table
-	key []byte
-}
-
-// GetKeyBytes returns the key within the table, interpreted as a byte slice.
-func (k *key) GetKeyBytes() []byte {
-	return k.key
-}
-
-// GetKeyString returns the key within the table, interpreted as a string. Calling this
-// method on keys that do not represent a string may return odd results.
-func (k *key) GetKeyString() string {
-	return string(k.key)
-}
-
-// GetKeyUint64 returns the key within the table, interpreted as a uint64. Calling this
-// method on keys that do not represent a uint64 may return odd results.
-func (k *key) GetKeyUint64() uint64 {
-	if len(k.key) != 8 {
-		return binary.BigEndian.Uint64(k.key)
-	} else if len(k.key) == 0 {
-		return 0
-	} else if len(k.key) < 8 {
-		slice := make([]byte, 8)
-		copy(slice[8-len(k.key):], k.key)
-		return binary.BigEndian.Uint64(slice)
-	} else {
-		return binary.BigEndian.Uint64(k.key[:8])
-	}
-}
-
-// GetRawBytes gets the representation of the key as used internally by the store.
-func (k *key) GetRawBytes() []byte {
-	return append(k.prefix, k.key...)
-}
-
-// keyBuilder is used to create new keys in a specific table.
-type keyBuilder struct {
-	// the prefix for the table
-	prefix []byte
-}
-
-// Key creates a new key in a specific table using the given key bytes.
-func (k *keyBuilder) Key(keyBytes []byte) kvstore.Key {
-	return &key{
-		prefix: k.prefix,
-		key:    keyBytes,
-	}
-}
-
-// StringKey creates a new key in a specific table using the given key string.
-func (k *keyBuilder) StringKey(keyString string) kvstore.Key {
-	return &key{
-		prefix: k.prefix,
-		key:    []byte(keyString),
-	}
-}
-
-// Uint64Key creates a new key in a specific table using the given uint64 as a key.
-func (k *keyBuilder) Uint64Key(uKey uint64) kvstore.Key {
-	keyBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(keyBytes, uKey)
-	return &key{
-		prefix: k.prefix,
-		key:    keyBytes,
-	}
 }
 
 // TODO consider what happens if we crash during metadata operations. Probably needs to be batched.
@@ -138,53 +57,34 @@ func (k *keyBuilder) Uint64Key(uKey uint64) kvstore.Key {
 // table size, which is (2^8 - 2) for new tables, or equal to the previous maximum table size if the TableStore is
 // reloaded from disk. If the need arises, we may need to write migration code to resize the maximum number of tables,
 // but this feature is not currently supported.
-func TableStoreWrapper(
-	base kvstore.Store,
-	maxTableCount uint64) (kvstore.TableStore, error) {
+func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 
-	prefixMap := make(map[uint64][]byte, maxTableCount)
-	// TODO we don't know the prefix length without reading from disk... circular dependency?
-	prefixLength := getPrefixLength(maxTableCount)
+	prefixMap := make(map[uint32][]byte)
+	tableMap := make(map[string]uint32)
 
 	// Set up metadata table.
-	metadataPrefix, err := getPrefix(metadataTableID, prefixLength)
-	if err != nil {
-		return nil, fmt.Errorf("error getting prefix for metadata table: %w", err)
-	}
+	metadataPrefix := getPrefix(metadataTableID)
 	prefixMap[metadataTableID] = metadataPrefix
 	metadataTable := &keyBuilder{
 		prefix: metadataPrefix,
 	}
 
 	// Set up namespace table.
-	namespacePrefix, err := getPrefix(namespaceTableID, prefixLength)
-	if err != nil {
-		return nil, fmt.Errorf("error getting prefix for namespace table: %w", err)
-	}
+	namespacePrefix := getPrefix(namespaceTableID)
 	prefixMap[namespaceTableID] = namespacePrefix
 	namespaceTable := &keyBuilder{
 		prefix: namespacePrefix,
 	}
+	highestTableID := namespaceTableID
 
 	schemaKey := metadataTable.StringKey(schemaVersionKey).GetRawBytes()
-	countKey := metadataTable.StringKey(maxTableCountKey).GetRawBytes()
-
 	onDiskSchemaBytes, err := base.Get(schemaKey)
+
 	if errors.Is(err, kvstore.ErrNotFound) {
 		// This store is new, no on disk schema version exists.
 		err = base.Put(schemaKey, []byte{byte(currentSchemaVersion)})
 		if err != nil {
 			return nil, fmt.Errorf("error setting schema version in metadata table: %w", err)
-		}
-
-		if maxTableCount == 0 {
-			// Use the default value.
-			maxTableCount = uint64(math.Pow(2, 8))
-		}
-
-		err = base.Put(countKey, []byte{byte(maxTableCount)})
-		if err != nil {
-			return nil, fmt.Errorf("error setting max table count in metadata table: %w", err)
 		}
 	} else {
 		// This store is not new. Load data from disk.
@@ -198,67 +98,55 @@ func TableStoreWrapper(
 				currentSchemaVersion, onDiskSchema)
 		}
 
-		// Verify max table count.
-		onDiskMaxTableCountBytes, err := base.Get(metadataTable.StringKey(maxTableCountKey).GetRawBytes())
-		if err != nil {
-			return nil, fmt.Errorf("error reading max table count from metadata table: %w", err)
-		}
-
-		onDiskMaxTableCount := binary.BigEndian.Uint64(onDiskMaxTableCountBytes)
-		if maxTableCount == 0 {
-			// Use the on disk value.
-			maxTableCount = onDiskMaxTableCount
-		} else if maxTableCount != onDiskMaxTableCount {
-			return nil, fmt.Errorf(
-				"max table count mismatch: code expects %d, data on disk is %d",
-				maxTableCount, onDiskMaxTableCount)
-		}
-
 		// Load namespace table.
-		iterator, err := base.NewIterator(namespacePrefix)
+		it, err := base.NewIterator(namespacePrefix)
 		if err != nil {
 			return nil, fmt.Errorf("error creating namespace table iterator: %w", err)
 		}
-		defer iterator.Release()
+		defer it.Release()
 
+		// TODO verify this is the correct pattern, i.e. we aren't skipping the first entry
+		for it.Next() {
+			keyBytes := it.Key()
+			valueBytes := it.Value()
+
+			_, tableIDBytes := parseKeyBytes(keyBytes)
+			tableName := string(valueBytes)
+			tableID := binary.BigEndian.Uint32(tableIDBytes)
+			tableMap[tableName] = tableID
+
+			prefixMap[tableID] = getPrefix(tableID)
+
+			if tableID > highestTableID {
+				highestTableID = tableID
+			}
+		}
 	}
 
 	store := &tableStore{
 		base:           base,
-		tableMap:       make(map[string]uint64, maxTableCount),
+		tableMap:       tableMap,
 		prefixMap:      prefixMap,
-		highestTableID: firstTableID - 1,
-		maxTableCount:  maxTableCount + 2, /* 2 tables are reserved for internal use */
+		highestTableID: highestTableID,
 		metadataTable:  metadataTable,
 		namespaceTable: namespaceTable,
 	}
 
-	// TODO other stuff
-
 	return store, nil
 }
 
-// Get the length of the prefix required to support the given number of tables. This method does not
-// give special treatment to the metadata table or the namespace table.
-func getPrefixLength(maxTableCount uint64) uint64 {
-	log2 := math.Log2(float64(maxTableCount))
-
-	// Round up to the nearest integer, this is the number of bits we need to represent the table ID.
-	bits := math.Ceil(log2)
-
-	// Round up to the nearest multiple of 8, this is the number of bytes we need to represent the table ID.
-	return uint64(math.Ceil(bits / 8))
+// Get the prefix for the given table ID and prefix length.
+func getPrefix(tableID uint32) []byte {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, tableID)
+	return bytes
 }
 
-// Get the prefix for the given table ID and prefix length.
-func getPrefix(tableID uint64, prefixLength uint64) ([]byte, error) {
-	if prefixLength > 8 {
-		return nil, errors.New("prefix length greater than 8 is not supported")
-	}
-
-	bytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(bytes, tableID)
-	return bytes[8-prefixLength:], nil
+// Parse the table ID and key bytes from the given key bytes.
+func parseKeyBytes(keyBytes []byte) (tableID uint32, key []byte) {
+	tableID = binary.BigEndian.Uint32(keyBytes[:4])
+	key = keyBytes[4:]
+	return
 }
 
 // GetOrCreateTable creates a new table with the given name if one does not exist.
@@ -272,18 +160,18 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 		}, nil
 	}
 
-	currentTableCount := uint64(len(t.tableMap))
-	if currentTableCount == t.maxTableCount {
+	currentTableCount := uint32(len(t.prefixMap))
+	if currentTableCount == math.MaxUint32 {
 		return nil, ERR_TABLE_LIMIT_EXCEEDED
 	}
 
-	if t.highestTableID-1 == currentTableCount {
+	if t.highestTableID+1 == currentTableCount {
 		// There are no gaps in the table IDs, so we can just use the next available ID.
 		tableID = t.highestTableID + 1
 		t.highestTableID = tableID
 	} else {
 		// Find the first unused table ID.
-		for i := uint64(firstTableID); i < t.maxTableCount; i++ {
+		for i := firstUserTableID; i < t.highestTableID; i++ {
 			_, ok = t.prefixMap[i]
 			if !ok {
 				// We've found an unused table ID.
@@ -294,14 +182,10 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 	}
 
 	t.tableMap[name] = tableID
-
-	prefix, err := getPrefix(tableID, getPrefixLength(t.maxTableCount))
-	if err != nil {
-		return nil, fmt.Errorf("error getting prefix for table ID %d: %w", tableID, err)
-	}
+	prefix := getPrefix(tableID)
 	t.prefixMap[tableID] = prefix
 
-	err = t.base.Put(t.namespaceTable.Uint64Key(tableID).GetRawBytes(), []byte(name))
+	err := t.base.Put(t.namespaceTable.Uint32Key(tableID).GetRawBytes(), []byte(name))
 	if err != nil {
 		return nil, fmt.Errorf("error updating namespace table: %w", err)
 	}
@@ -311,72 +195,126 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 	}, nil
 }
 
+// DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 func (t *tableStore) DropTable(name string) error {
-	//TODO implement me
-	panic("implement me")
+	tableID, ok := t.tableMap[name]
+	if !ok {
+		// Table does not exist, nothing to do.
+		return nil
+	}
+
+	prefix := t.prefixMap[tableID]
+	it, err := t.base.NewIterator(prefix)
+	if err != nil {
+		return fmt.Errorf("error creating iterator for table: %w", err)
+	}
+	defer it.Release()
+
+	// Future work: if this is a performance bottleneck, use batching.
+	for it.Next() {
+		err = t.base.Delete(it.Key())
+		if err != nil {
+			return fmt.Errorf("error deleting key from table: %w", err)
+		}
+	}
+
+	// All table entries have been deleted. Now delete the table from the namespace table.
+	err = t.base.Delete(t.namespaceTable.Uint32Key(tableID).GetRawBytes())
+	if err != nil {
+		return fmt.Errorf("error deleting from namespace table: %w", err)
+	}
+	delete(t.tableMap, name)
+	delete(t.prefixMap, tableID)
+
+	return nil
 }
 
-func (t *tableStore) ResizeMaxTables(newCount uint64) error {
-	//TODO implement me
-	panic("implement me")
-}
-
+// GetKeyBuilder returns a key builder for the table with the given name. Throws an error if the table does not exist.
 func (t *tableStore) GetKeyBuilder(name string) (kvstore.KeyBuilder, error) {
-	//TODO implement me
-	panic("implement me")
+	tableID, ok := t.tableMap[name]
+	if !ok {
+		return nil, fmt.Errorf("table %s does not exist", name)
+	}
+
+	return &keyBuilder{
+		prefix: getPrefix(tableID),
+	}, nil
 }
 
+// GetMaxTableCount returns the maximum number of tables that can be created in the store.
 func (t *tableStore) GetMaxTableCount() uint64 {
-	//TODO implement me
-	panic("implement me")
+	return math.MaxUint32 - 2
 }
 
+// GetCurrentTableCount returns the current number of tables in the store.
 func (t *tableStore) GetCurrentTableCount() uint64 {
-	//TODO implement me
-	panic("implement me")
+	return uint64(len(t.prefixMap)) - 2
 }
 
-func (t *tableStore) GetTables() ([]string, error) {
-	//TODO implement me
-	panic("implement me")
+// GetTables returns a list of all tables in the store in no particular order.
+func (t *tableStore) GetTables() []string {
+	tables := make([]string, 0, len(t.tableMap))
+	for name := range t.tableMap {
+		tables = append(tables, name)
+	}
+
+	return tables
 }
 
+// Put stores the given key / value pair in the database, overwriting any existing value for that key.
 func (t *tableStore) Put(key kvstore.Key, value []byte) error {
-	//TODO implement me
-	panic("implement me")
+	return t.base.Put(key.GetRawBytes(), value)
 }
 
+// Get retrieves the value for the given key from the database.
+// Returns a kvstore.ErrNotFound error if the key does not exist.
 func (t *tableStore) Get(key kvstore.Key) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	return t.base.Get(key.GetRawBytes())
 }
 
+// Delete removes the key from the database. Does not return an error if the key does not exist.
 func (t *tableStore) Delete(key kvstore.Key) error {
-	//TODO implement me
-	panic("implement me")
+	return t.base.Delete(key.GetRawBytes())
 }
 
+// DeleteBatch atomically removes a list of keys from the database.
 func (t *tableStore) DeleteBatch(keys []kvstore.Key) error {
-	//TODO implement me
-	panic("implement me")
+	keyBytes := make([][]byte, len(keys))
+
+	for i, key := range keys {
+		keyBytes[i] = key.GetRawBytes()
+	}
+
+	return t.base.DeleteBatch(keyBytes)
 }
 
+// WriteBatch atomically writes a list of key / value pairs to the database.
 func (t *tableStore) WriteBatch(keys []kvstore.Key, values [][]byte) error {
-	//TODO implement me
-	panic("implement me")
+	keyBytes := make([][]byte, len(keys))
+
+	for i, key := range keys {
+		keyBytes[i] = key.GetRawBytes()
+	}
+
+	return t.base.WriteBatch(keyBytes, values)
 }
 
+// NewIterator returns an iterator that can be used to iterate over a subset of the keys in the database.
+// Only keys with the given key's table with prefix matching the key will be iterated. The iterator must be closed
+// by calling Release() when done. The iterator will return keys in lexicographically sorted order. The iterator
+// walks over a consistent snapshot of the database, so it will not see any writes that occur after the iterator
+// is created.
 func (t *tableStore) NewIterator(prefix kvstore.Key) (iterator.Iterator, error) {
-	//TODO implement me
-	panic("implement me")
+	iteratorPrefix := prefix.GetRawBytes()
+	return t.base.NewIterator(iteratorPrefix)
 }
 
+// Shutdown shuts down the store, flushing any remaining cached data to disk.
 func (t *tableStore) Shutdown() error {
-	//TODO implement me
-	panic("implement me")
+	return t.base.Shutdown()
 }
 
+// Destroy shuts down and permanently deletes all data in the store.
 func (t *tableStore) Destroy() error {
-	//TODO implement me
-	panic("implement me")
+	return t.base.Destroy()
 }

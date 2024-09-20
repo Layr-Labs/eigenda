@@ -13,6 +13,10 @@ type Key interface {
 	// method on keys that do not represent a string may return odd results.
 	GetKeyString() string
 
+	// GetKeyUint32 returns the key within the table, interpreted as a uint32. Calling this
+	// method on keys that do not represent a uint32 may return odd results.
+	GetKeyUint32() uint32
+
 	// GetKeyUint64 returns the key within the table, interpreted as a uint64. Calling this
 	// method on keys that do not represent a uint64 may return odd results.
 	GetKeyUint64() uint64
@@ -29,6 +33,9 @@ type KeyBuilder interface {
 	// StringKey creates a new key in a specific table using the given key string.
 	StringKey(key string) Key
 
+	// Uint32Key creates a new key in a specific table using the given uint32 as a key.
+	Uint32Key(key uint32) Key
+
 	// Uint64Key creates a new key in a specific table using the given uint64 as a key.
 	Uint64Key(key uint64) Key
 }
@@ -37,38 +44,41 @@ type KeyBuilder interface {
 // A "table" in this context is a disjoint keyspace. Keys in one table to not collide with keys in another table,
 // and keys within a particular table can be iterated over efficiently.
 //
-// Implementations of this interface are expected to be thread-safe.
+// A TableStore is only required to support a maximum of 2^32-X unique, where X is a small integer number of tables
+// reserved for internal use by the table store. The exact value of X is implementation dependent.
+//
+// Implementations of this interface are expected to be thread-safe, except where noted.
 type TableStore interface {
 
 	// GetOrCreateTable creates a new table with the given name if one does not exist
 	// and returns a key builder for that table.
 	//
-	// WARNING: this method is not thread safe with respect to any other methods on this class.
+	// WARNING: this method is not thread safe with respect to any other methods in this interface.
 	GetOrCreateTable(name string) (KeyBuilder, error)
 
-	// DropTable deletes the table with the given name.
+	// DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 	//
-	// WARNING: this method is not thread safe with respect to any other methods on this class.
+	// This method may not be not atomic. That is, if a table is being dropped and there is a crash,
+	// then at reload time the table may only be partially deleted. If this happens, call this method
+	// again to finish the deletion. TODO should we make this atomic?
+	//
+	// WARNING: this method is not thread safe with respect to any other methods in this interface.
 	DropTable(name string) error
-
-	// ResizeMaxTables changes the maximum number of tables that can be created in the store.
-	// This may be a very expensive operation, as it may require reading and rewriting the entire database.
-	//
-	// WARNING: this method is not thread safe with respect to any other methods on this class.
-	ResizeMaxTables(newCount uint64) error
 
 	// GetKeyBuilder returns a key builder for the table with the given name,
 	// returning an error if the table does not exist.
 	GetKeyBuilder(name string) (KeyBuilder, error)
 
-	// GetMaxTableCount returns the maximum number of tables that can be created in the store.
+	// GetMaxTableCount returns the maximum number of tables that can be created in the store
+	// (excluding internal tables utilized by the store).
 	GetMaxTableCount() uint64
 
-	// GetCurrentTableCount returns the current number of tables in the store.
+	// GetCurrentTableCount returns the current number of tables in the store
+	// (excluding internal tables utilized by the store).
 	GetCurrentTableCount() uint64
 
-	// GetTables returns a list of all tables in the store.
-	GetTables() ([]string, error)
+	// GetTables returns a list of all tables in the store (excluding internal tables utilized by the store).
+	GetTables() []string
 
 	// Put stores the given key / value pair in the database, overwriting any existing value for that key.
 	Put(key Key, value []byte) error
@@ -96,13 +106,13 @@ type TableStore interface {
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
 	//
-	// Warning: it is not thread safe to call this method concurrently with other methods on this class,
+	// Warning: it is not thread safe to call this method concurrently with other methods in this interface,
 	// or while there exist unclosed iterators.
 	Shutdown() error
 
 	// Destroy shuts down and permanently deletes all data in the store.
 	//
-	// Warning: it is not thread safe to call this method concurrently with other methods on this class,
+	// Warning: it is not thread safe to call this method concurrently with other methods in this interface,
 	// or while there exist unclosed iterators.
 	Destroy() error
 }
