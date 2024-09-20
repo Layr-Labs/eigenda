@@ -95,7 +95,7 @@ func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.
 	} else {
 		var client *clients.EigenDAClient
 		log.Info("Using EigenDA backend")
-		client, err = clients.NewEigenDAClient(log, daCfg.ClientConfig)
+		client, err = clients.NewEigenDAClient(log.With("subsystem", "eigenda-client"), daCfg.ClientConfig)
 		if err != nil {
 			return nil, err
 		}

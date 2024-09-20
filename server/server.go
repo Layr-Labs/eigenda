@@ -58,8 +58,10 @@ func NewServer(host string, port int, router store.IRouter, log log.Logger,
 }
 
 // WithMetrics is a middleware that records metrics for the route path.
-func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) (commitments.CommitmentMeta, error),
-	m metrics.Metricer) func(http.ResponseWriter, *http.Request) error {
+func WithMetrics(
+	handleFn func(http.ResponseWriter, *http.Request) (commitments.CommitmentMeta, error),
+	m metrics.Metricer,
+) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		recordDur := m.RecordRPCServerRequest(r.Method)
 
@@ -71,8 +73,10 @@ func WithMetrics(handleFn func(http.ResponseWriter, *http.Request) (commitments.
 }
 
 // WithLogging is a middleware that logs the request method and URL.
-func WithLogging(handleFn func(http.ResponseWriter, *http.Request) error,
-	log log.Logger) func(http.ResponseWriter, *http.Request) {
+func WithLogging(
+	handleFn func(http.ResponseWriter, *http.Request) error,
+	log log.Logger,
+) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Info("request", "method", r.Method, "url", r.URL)
 		err := handleFn(w, r)

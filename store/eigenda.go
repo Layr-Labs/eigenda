@@ -143,7 +143,7 @@ func (e EigenDAStore) Verify(key []byte, value []byte) error {
 	// verify kzg data commitment
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to verify commitment: %w", err)
 	}
 
 	// verify DA certificate against on-chain
