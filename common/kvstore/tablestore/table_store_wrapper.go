@@ -34,6 +34,7 @@ const currentSchemaVersion uint64 = 0
 
 var _ kvstore.TableStore = &tableStore{}
 
+// ERR_TABLE_LIMIT_EXCEEDED is returned when the maximum number of tables has been reached.
 var ERR_TABLE_LIMIT_EXCEEDED = errors.New("table limit exceeded")
 
 // tableStore is an implementation of TableStore that wraps a Store.
@@ -56,10 +57,9 @@ type tableStore struct {
 
 // TableStoreWrapper wraps the given Store to create a TableStore.
 //
-// Note that the max table count cannot be changed once the TableStore is created. Use the value 0 to use the default
-// table size, which is (2^8 - 3) for new tables, or equal to the previous maximum table size if the TableStore is
-// reloaded from disk. If the need arises, we may need to write migration code to resize the maximum number of tables,
-// but this feature is not currently supported.
+// WARNING: it is not safe to access the wrapped store directly while the TableStore is in use. The TableStore uses
+// special key formatting, and direct access to the wrapped store may violate the TableStore's invariants, resulting
+// in undefined behavior.
 func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 
 	tableMap := make(map[string]uint32)
