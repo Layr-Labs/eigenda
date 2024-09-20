@@ -6,16 +6,31 @@ import (
 
 // Key is a key in a TableStore. It is a combination of a table name and a key within that table.
 type Key interface {
-	// GetKey returns the key within the table.
-	GetKey() []byte
-	// GetInternalRepresentation gets the representation of the key as used internally by the store.
-	GetInternalRepresentation() []byte // TODO necessary?
+	// GetKeyBytes returns the key within the table, interpreted as a byte slice.
+	GetKeyBytes() []byte
+
+	// GetKeyString returns the key within the table, interpreted as a string. Calling this
+	// method on keys that do not represent a string may return odd results.
+	GetKeyString() string
+
+	// GetKeyUint64 returns the key within the table, interpreted as a uint64. Calling this
+	// method on keys that do not represent a uint64 may return odd results.
+	GetKeyUint64() uint64
+
+	// GetRawBytes gets the representation of the key as used internally by the store.
+	GetRawBytes() []byte
 }
 
 // KeyBuilder is used to create new keys in a specific table.
 type KeyBuilder interface {
 	// Key creates a new key in a specific table using the given key bytes.
 	Key(key []byte) Key
+
+	// StringKey creates a new key in a specific table using the given key string.
+	StringKey(key string) Key
+
+	// Uint64Key creates a new key in a specific table using the given uint64 as a key.
+	Uint64Key(key uint64) Key
 }
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.

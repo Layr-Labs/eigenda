@@ -5,6 +5,9 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
+// ErrNotFound is returned when a key is not found in the database.
+var ErrNotFound = errors.New("not found")
+
 // Store implements a key-value store. May be backed by a database like LevelDB.
 //
 // Implementations of this interface are expected to be thread-safe.
@@ -45,6 +48,3 @@ type Store interface {
 	// or while there exist unclosed iterators.
 	Destroy() error
 }
-
-// ErrNotFound is returned when a key is not found in the database.
-var ErrNotFound = errors.New("not found")
