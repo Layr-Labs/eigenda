@@ -58,10 +58,6 @@ type TableStore interface {
 
 	// DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 	//
-	// This method may not be not atomic. That is, if a table is being dropped and there is a crash,
-	// then at reload time the table may only be partially deleted. If this happens, call this method
-	// again to finish the deletion. TODO should we make this atomic?
-	//
 	// WARNING: this method is not thread safe with respect to any other methods in this interface.
 	DropTable(name string) error
 

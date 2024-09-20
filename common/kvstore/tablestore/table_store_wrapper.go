@@ -7,9 +7,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"math"
+	"sort"
 )
-
-// TODO instead use high numbered tables!
 
 // Table ID 0 is reserved for use internal use by the metadata table.
 const metadataTableID uint32 = math.MaxUint32
@@ -17,17 +16,18 @@ const metadataTableID uint32 = math.MaxUint32
 // Table ID 1 is reserved for use by the namespace table. This stores a mapping between IDs and table names.
 const namespaceTableID uint32 = math.MaxUint32 - 1
 
-// Table ID 2 is reserved for use by the deletion table. This is used to make table deletion atomic.
-const deletionTableID uint32 = math.MaxUint32 - 2
-
 // The number of tables reserved for internal use.
-const reservedTableCount uint32 = 3
+const reservedTableCount uint32 = 2
 
 // The first table ID that can be used by user tables.
 const maxUserTableCount = math.MaxUint32 - reservedTableCount
 
 // This key is used to store the schema version in the metadata table.
 const schemaVersionKey = "schema_version"
+
+// The deletionKey holds the value of the table name that is being deleted if one is currently being deleted.
+// This is required for atomic deletion of tables.
+const deletionKey = "deletion"
 
 // The current schema version of the metadata table.
 const currentSchemaVersion uint64 = 0
@@ -44,9 +44,6 @@ type tableStore struct {
 	// A map from table names to table IDs.
 	tableMap map[string]uint32
 
-	// A map from table IDs to table prefixes.
-	prefixMap map[uint32][]byte
-
 	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
 	highestTableID int64
 
@@ -55,9 +52,6 @@ type tableStore struct {
 
 	// Builds keys for the namespace table.
 	namespaceTable kvstore.KeyBuilder
-
-	// Builds keys for the deletion table.
-	deletionTable kvstore.KeyBuilder
 }
 
 // TableStoreWrapper wraps the given Store to create a TableStore.
@@ -68,16 +62,11 @@ type tableStore struct {
 // but this feature is not currently supported.
 func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 
-	prefixMap := make(map[uint32][]byte)
 	tableMap := make(map[string]uint32)
 
 	// Setup tables for internal use.
-	metadataPrefix := getPrefix(metadataTableID)
-	metadataTable := &keyBuilder{prefix: metadataPrefix}
-	namespacePrefix := getPrefix(namespaceTableID)
-	namespaceTable := &keyBuilder{prefix: namespacePrefix}
-	deletionPrefix := getPrefix(deletionTableID)
-	deletionTable := &keyBuilder{prefix: deletionPrefix}
+	metadataTable := &keyBuilder{prefix: getPrefix(metadataTableID)}
+	namespaceTable := &keyBuilder{prefix: getPrefix(namespaceTableID)}
 
 	highestTableID := int64(-1)
 
@@ -102,44 +91,70 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 				currentSchemaVersion, onDiskSchema)
 		}
 
-		// Load namespace table.
-		it, err := base.NewIterator(namespacePrefix)
+		highestTableID, err = loadNamespaceTable(base, tableMap)
 		if err != nil {
-			return nil, fmt.Errorf("error creating namespace table iterator: %w", err)
-		}
-		defer it.Release()
-
-		// TODO verify this is the correct pattern, i.e. we aren't skipping the first entry
-		for it.Next() {
-			keyBytes := it.Key()
-			valueBytes := it.Value()
-
-			_, tableIDBytes := parseKeyBytes(keyBytes)
-			tableName := string(valueBytes)
-			tableID := binary.BigEndian.Uint32(tableIDBytes)
-			tableMap[tableName] = tableID
-
-			prefixMap[tableID] = getPrefix(tableID)
-
-			if int64(tableID) > highestTableID {
-				highestTableID = int64(tableID)
-			}
+			return nil, fmt.Errorf("error loading namespace table: %w", err)
 		}
 	}
-
-	// TODO handle deletion that was started but not finished
 
 	store := &tableStore{
 		base:           base,
 		tableMap:       tableMap,
-		prefixMap:      prefixMap,
 		highestTableID: highestTableID,
 		metadataTable:  metadataTable,
 		namespaceTable: namespaceTable,
-		deletionTable:  deletionTable,
+	}
+
+	err = store.handleIncompleteDeletion()
+	if err != nil {
+		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
 	return store, nil
+}
+
+// loadNamespaceTable loads the namespace table from disk into the given map. Returns the highest table ID found.
+func loadNamespaceTable(base kvstore.Store, tableMap map[string]uint32) (int64, error) {
+	highestTableID := int64(-1)
+
+	it, err := base.NewIterator(getPrefix(namespaceTableID))
+	if err != nil {
+		return -1, fmt.Errorf("error creating namespace table iterator: %w", err)
+	}
+	defer it.Release()
+
+	// TODO verify this is the correct pattern, i.e. we aren't skipping the first entry
+	for it.Next() {
+		keyBytes := it.Key()
+		valueBytes := it.Value()
+
+		_, tableIDBytes := parseKeyBytes(keyBytes)
+		tableName := string(valueBytes)
+		tableID := binary.BigEndian.Uint32(tableIDBytes)
+		tableMap[tableName] = tableID
+
+		if int64(tableID) > highestTableID {
+			highestTableID = int64(tableID)
+		}
+	}
+
+	return highestTableID, nil
+}
+
+// This method handles cleanup of incomplete deletions. Since deletion of a table requires multiple operations that
+// are not atomic in aggregate, it is possible that a table deletion may have been started without being completed.
+// This method makes sure that any such incomplete deletions are completed.
+func (t *tableStore) handleIncompleteDeletion() error {
+	deletionTableNameBytes, err := t.base.Get(t.metadataTable.StringKey(deletionKey).GetRawBytes())
+	if errors.Is(err, kvstore.ErrNotFound) {
+		// No deletion in progress, nothing to do.
+		return nil
+	}
+
+	deletionTableName := string(deletionTableNameBytes)
+	// TODO log something
+
+	return t.DropTable(deletionTableName)
 }
 
 // Get the prefix for the given table ID and prefix length.
@@ -161,9 +176,8 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 	tableID, ok := t.tableMap[name]
 	if ok {
 		// Table already exists.
-		prefix := t.prefixMap[tableID]
 		return &keyBuilder{
-			prefix: prefix,
+			prefix: getPrefix(tableID),
 		}, nil
 	}
 
@@ -177,20 +191,26 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 		tableID = uint32(t.highestTableID + 1)
 		t.highestTableID = int64(tableID)
 	} else {
-		// Find the first unused table ID.
-		for i := uint32(0); i < maxUserTableCount; i++ {
-			_, ok = t.prefixMap[i]
-			if !ok {
-				// We've found an unused table ID.
-				tableID = i
+		// Find the first unused table ID. This may not be efficient for a large number of table deletions
+		// followed by a large number of table creations, but let's cross that bridge when we get to it.
+		sortedTableIDs := make([]uint32, 0, currentTableCount)
+		for _, id := range t.tableMap {
+			sortedTableIDs = append(sortedTableIDs, id)
+		}
+		sort.Slice(sortedTableIDs, func(i, j int) bool {
+			return sortedTableIDs[i] < sortedTableIDs[j]
+		})
+		next := uint32(0)
+		for _, id := range sortedTableIDs {
+			if id != next {
+				tableID = next
 				break
 			}
+			next++
 		}
 	}
 
 	t.tableMap[name] = tableID
-	prefix := getPrefix(tableID)
-	t.prefixMap[tableID] = prefix
 
 	err := t.base.Put(t.namespaceTable.Uint32Key(tableID).GetRawBytes(), []byte(name))
 	if err != nil {
@@ -198,7 +218,7 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 	}
 
 	return &keyBuilder{
-		prefix: prefix,
+		prefix: getPrefix(tableID),
 	}, nil
 }
 
@@ -210,8 +230,15 @@ func (t *tableStore) DropTable(name string) error {
 		return nil
 	}
 
-	prefix := t.prefixMap[tableID]
-	it, err := t.base.NewIterator(prefix)
+	// This single atomic operation ensures that the table is deleted completely, even if we crash
+	// in the middle of the operation. When next starting up, if an entry is observed in this location,
+	// then the interrupted deletion can be completed.
+	err := t.base.Put(t.metadataTable.StringKey(deletionKey).GetRawBytes(), []byte(name))
+	if err != nil {
+		return fmt.Errorf("error updating metadata table for deletion: %w", err)
+	}
+
+	it, err := t.base.NewIterator(getPrefix(tableID))
 	if err != nil {
 		return fmt.Errorf("error creating iterator for table: %w", err)
 	}
@@ -231,9 +258,9 @@ func (t *tableStore) DropTable(name string) error {
 		return fmt.Errorf("error deleting from namespace table: %w", err)
 	}
 	delete(t.tableMap, name)
-	delete(t.prefixMap, tableID)
 
-	return nil
+	// Finally, remove the deletion key from the metadata table.
+	return t.base.Delete(t.metadataTable.StringKey(deletionKey).GetRawBytes())
 }
 
 // GetKeyBuilder returns a key builder for the table with the given name. Throws an error if the table does not exist.
