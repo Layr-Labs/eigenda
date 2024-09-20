@@ -182,8 +182,8 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 		OperatorLatency: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
-				Name:      "operator_latency",
-				Help:      "the attestation latency observed for operators",
+				Name:      "operator_attestation_latency_ms",
+				Help:      "attestation latency in ms observed for operators",
 			},
 			[]string{"operator_id"},
 		),
