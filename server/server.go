@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -37,7 +36,6 @@ type Server struct {
 	endpoint   string
 	router     store.IRouter
 	m          metrics.Metricer
-	tls        *rpc.ServerTLSConfig
 	httpServer *http.Server
 	listener   net.Listener
 }
@@ -105,14 +103,8 @@ func (svr *Server) Start() error {
 	svr.log.Info("Starting DA server", "endpoint", svr.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
-		if svr.tls != nil {
-			if err := svr.httpServer.ServeTLS(svr.listener, "", ""); err != nil {
-				errCh <- err
-			}
-		} else {
-			if err := svr.httpServer.Serve(svr.listener); err != nil {
-				errCh <- err
-			}
+		if err := svr.httpServer.Serve(svr.listener); err != nil {
+			errCh <- err
 		}
 	}()
 
