@@ -1,9 +1,9 @@
 build: clean
 	go mod tidy
-	go build -o ./bin/opscan ./cmd
+	go build -o ./bin/semverscan ./cmd
 
 clean:
 	rm -rf ./bin
 
 run: build 
-	./bin/opscan --help
+	./bin/semverscan --help

@@ -1,10 +1,10 @@
-package opscan
+package semverscan
 
 import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/tools/opscan/flags"
+	"github.com/Layr-Labs/eigenda/tools/semverscan/flags"
 	"github.com/urfave/cli"
 )
 

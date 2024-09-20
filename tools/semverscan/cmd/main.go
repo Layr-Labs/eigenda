@@ -12,8 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
-	"github.com/Layr-Labs/eigenda/tools/opscan"
-	"github.com/Layr-Labs/eigenda/tools/opscan/flags"
+	"github.com/Layr-Labs/eigenda/tools/semverscan"
+	"github.com/Layr-Labs/eigenda/tools/semverscan/flags"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/urfave/cli"
@@ -28,8 +28,8 @@ var (
 func main() {
 	app := cli.NewApp()
 	app.Version = fmt.Sprintf("%s,%s,%s", version, gitCommit, gitDate)
-	app.Name = "opscan"
-	app.Description = "operator network scanner"
+	app.Name = "semverscan"
+	app.Description = "operator semver scan"
 	app.Usage = ""
 	app.Flags = flags.Flags
 	app.Action = RunScan
@@ -39,7 +39,7 @@ func main() {
 }
 
 func RunScan(ctx *cli.Context) error {
-	config, err := opscan.NewConfig(ctx)
+	config, err := semverscan.NewConfig(ctx)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func getOperatorInfo(subgraphClient dataapi.SubgraphClient, operatorId string, l
 	return operatorInfo, nil
 }
 
-func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, config *opscan.Config, logger logging.Logger) map[string]int {
+func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, config *semverscan.Config, logger logging.Logger) map[string]int {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	semvers := make(map[string]int)
