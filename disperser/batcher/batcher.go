@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gammazero/workerpool"
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wealdtech/go-merkletree/v2"
@@ -118,7 +119,7 @@ func NewBatcher(
 		ChainStateTimeout:        timeoutConfig.ChainStateTimeout,
 	}
 	encodingWorkerPool := workerpool.New(config.NumConnections)
-	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, logger)
+	encodingStreamer, err := NewEncodingStreamer(streamerConfig, queue, chainState, encoderClient, assignmentCoordinator, batchTrigger, encodingWorkerPool, metrics.EncodingStreamerMetrics, metrics, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +148,8 @@ func NewBatcher(
 }
 
 func (b *Batcher) RecoverState(ctx context.Context) error {
+	b.logger.Info("Recovering state...")
+	start := time.Now()
 	metas, err := b.Queue.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
 	if err != nil {
 		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
@@ -157,6 +160,7 @@ func (b *Batcher) RecoverState(ctx context.Context) error {
 			return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
 		}
 	}
+	b.logger.Info("Recovering state took", "duration", time.Since(start), "numBlobs", len(metas))
 	return nil
 }
 
@@ -323,6 +327,10 @@ func (b *Batcher) updateConfirmationInfo(
 		}
 		requestTime := time.Unix(0, int64(metadata.RequestMetadata.RequestedAt))
 		b.Metrics.ObserveLatency("E2E", float64(time.Since(requestTime).Milliseconds()))
+		b.Metrics.ObserveBlobAge("confirmed", float64(time.Since(requestTime).Milliseconds()))
+		for _, quorumInfo := range batchData.blobHeaders[blobIndex].QuorumInfos {
+			b.Metrics.IncrementBlobSize("confirmed", quorumInfo.QuorumID, int(metadata.RequestMetadata.BlobSize))
+		}
 	}
 
 	return blobsToRetry, nil
@@ -399,11 +407,29 @@ func (b *Batcher) handleFailure(ctx context.Context, blobMetadatas []*disperser.
 }
 
 type confirmationMetadata struct {
+	batchID     uuid.UUID
 	batchHeader *core.BatchHeader
 	blobs       []*disperser.BlobMetadata
 	blobHeaders []*core.BlobHeader
 	merkleTree  *merkletree.MerkleTree
 	aggSig      *core.SignatureAggregation
+}
+
+func (b *Batcher) observeBlobAge(stage string, batch *batch) {
+	for _, m := range batch.BlobMetadata {
+		requestTime := time.Unix(0, int64(m.RequestMetadata.RequestedAt))
+		b.Metrics.ObserveBlobAge(stage, float64(time.Since(requestTime).Milliseconds()))
+	}
+}
+
+func (b *Batcher) observeBlobAgeAndSize(stage string, batch *batch) {
+	for i, m := range batch.BlobMetadata {
+		requestTime := time.Unix(0, int64(m.RequestMetadata.RequestedAt))
+		b.Metrics.ObserveBlobAge(stage, float64(time.Since(requestTime).Milliseconds()))
+		for _, quorumInfo := range batch.BlobHeaders[i].QuorumInfos {
+			b.Metrics.IncrementBlobSize(stage, quorumInfo.QuorumID, int(m.RequestMetadata.BlobSize))
+		}
+	}
 }
 
 func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
@@ -424,12 +450,14 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		return err
 	}
 	log.Debug("CreateBatch took", "duration", time.Since(stageTimer))
+	b.observeBlobAge("batched", batch)
 
 	// Dispatch encoded batch
 	log.Debug("Dispatching encoded batch...")
 	stageTimer = time.Now()
 	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Debug("DisperseBatch took", "duration", time.Since(stageTimer))
+	b.observeBlobAge("attestation_requested", batch)
 	h, err := batch.State.OperatorState.Hash()
 	if err != nil {
 		log.Error("HandleSingleBatch: error getting operator state hash", "err", err)
@@ -475,6 +503,8 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		log.Info("Aggregated quorum result", "quorumID", quorumResult.QuorumID, "percentSigned", quorumResult.PercentSigned)
 	}
 
+	b.observeBlobAgeAndSize("attested", batch)
+
 	numPassed, passedQuorums := numBlobsAttestedByQuorum(quorumAttestation.QuorumResults, batch.BlobHeaders)
 	// TODO(mooselumph): Determine whether to confirm the batch based on the number of successes
 	if numPassed == 0 {
@@ -507,6 +537,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 		return fmt.Errorf("HandleSingleBatch: error building confirmBatch transaction: %w", err)
 	}
 	err = b.TransactionManager.ProcessTransaction(ctx, NewTxnRequest(txn, "confirmBatch", big.NewInt(0), confirmationMetadata{
+		batchID:     uuid.Nil,
 		batchHeader: batch.BatchHeader,
 		blobs:       batch.BlobMetadata,
 		blobHeaders: batch.BlobHeaders,

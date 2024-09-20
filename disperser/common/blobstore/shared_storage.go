@@ -19,6 +19,8 @@ const (
 	maxS3BlobFetchWorkers = 64
 )
 
+var errProcessingToDispersing = errors.New("blob transit to dispersing from non processing")
+
 // The shared blob store that the disperser is operating on.
 // The metadata store is backed by DynamoDB and the blob store is backed by S3.
 //
@@ -158,6 +160,18 @@ func (s *SharedBlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadat
 }
 
 func (s *SharedBlobStore) MarkBlobDispersing(ctx context.Context, metadataKey disperser.BlobKey) error {
+	refreshedMetadata, err := s.GetBlobMetadata(ctx, metadataKey)
+	if err != nil {
+		s.logger.Error("error getting blob metadata while marking blobDispersing", "err", err)
+		return err
+	}
+
+	status := refreshedMetadata.BlobStatus
+	if status != disperser.Processing {
+		s.logger.Error("error marking blob as dispersing from non processing state", "blobKey", metadataKey.String(), "status", status)
+		return errProcessingToDispersing
+	}
+
 	return s.blobMetadataStore.SetBlobStatus(ctx, metadataKey, disperser.Dispersing)
 }
 
@@ -242,9 +256,17 @@ func (s *SharedBlobStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHe
 	return s.blobMetadataStore.GetAllBlobMetadataByBatch(ctx, batchHeaderHash)
 }
 
+func (s *SharedBlobStore) GetAllBlobMetadataByBatchWithPagination(ctx context.Context, batchHeaderHash [32]byte, limit int32, exclusiveStartKey *disperser.BatchIndexExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BatchIndexExclusiveStartKey, error) {
+	return s.blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, batchHeaderHash, limit, exclusiveStartKey)
+}
+
 // GetMetadata returns a blob metadata given a metadata key
 func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
+}
+
+func (s *SharedBlobStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []disperser.BlobKey) ([]*disperser.BlobMetadata, error) {
+	return s.blobMetadataStore.GetBulkBlobMetadata(ctx, blobKeys)
 }
 
 func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *disperser.BlobMetadata, maxRetry uint) (bool, error) {

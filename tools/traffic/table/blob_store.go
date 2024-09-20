@@ -11,7 +11,7 @@ type BlobStore struct {
 	// nextKey describes the next key to used for the blobs map.
 	nextKey uint64
 
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 // NewBlobStore creates a new BlobStore instance.
@@ -35,8 +35,8 @@ func (store *BlobStore) Add(blob *BlobMetadata) {
 // from the store if the permits are exhausted. This method makes no guarantees about the order
 // in which blobs are returned. Returns nil if no blobs are available.
 func (store *BlobStore) GetNext() *BlobMetadata {
-	store.lock.Lock()
-	defer store.lock.Unlock()
+	store.lock.RLock()
+	defer store.lock.RUnlock()
 
 	for key, blob := range store.blobs {
 		// Always return the first blob found.
@@ -55,8 +55,20 @@ func (store *BlobStore) GetNext() *BlobMetadata {
 
 // Size returns the number of blobs currently stored.
 func (store *BlobStore) Size() uint {
-	store.lock.Lock()
-	defer store.lock.Unlock()
+	store.lock.RLock()
+	defer store.lock.RUnlock()
 
 	return uint(len(store.blobs))
+}
+
+// GetAll returns all blobs currently stored. For testing purposes only.
+func (store *BlobStore) GetAll() []*BlobMetadata {
+	store.lock.RLock()
+	defer store.lock.RUnlock()
+
+	blobs := make([]*BlobMetadata, 0, len(store.blobs))
+	for _, blob := range store.blobs {
+		blobs = append(blobs, blob)
+	}
+	return blobs
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 )
@@ -15,12 +16,13 @@ type BatchStatus uint
 // Formed: the batch has been formed and no more minibatches can be added. Implies that all minibatch records and dispersal request records have been created.
 //
 // Attested: the batch has been attested.
-// Failed: the batch has failed.
+// Failed: the batch has failed. Retries will be attempted at the blob level.
 //
 // The batch lifecycle is as follows:
 // Pending -> Formed -> Attested
 // \              /
-//  \-> Failed <-/
+//
+//	\-> Failed <-/
 const (
 	BatchStatusPending BatchStatus = iota
 	BatchStatusFormed
@@ -33,20 +35,20 @@ type BatchRecord struct {
 	CreatedAt            time.Time
 	ReferenceBlockNumber uint
 	Status               BatchStatus `dynamodbav:"BatchStatus"`
-	HeaderHash           [32]byte
-	AggregatePubKey      *core.G2Point
-	AggregateSignature   *core.Signature
+
+	NumMinibatches uint
 }
 
-type MinibatchRecord struct {
-	BatchID              uuid.UUID `dynamodbav:"-"`
-	MinibatchIndex       uint
-	BlobHeaderHashes     [][32]byte
-	BatchSize            uint64 // in bytes
-	ReferenceBlockNumber uint
+type DispersalResponse struct {
+	// Signatures is the signatures of the blobs that were dispersed to the operator
+	// The order of the signatures is the same as the order of the blobs in the minibatch
+	// The signatures are compressed using G1Affine.Bytes(), to be decompressed using G1Affine.SetBytes()
+	Signatures  [][32]byte
+	RespondedAt time.Time
+	Error       error
 }
 
-type DispersalRequest struct {
+type MinibatchDispersal struct {
 	BatchID         uuid.UUID `dynamodbav:"-"`
 	MinibatchIndex  uint
 	core.OperatorID `dynamodbav:"-"`
@@ -54,35 +56,35 @@ type DispersalRequest struct {
 	Socket          string
 	NumBlobs        uint
 	RequestedAt     time.Time
-	BlobHash        string
-	MetadataHash    string
+	DispersalResponse
 }
 
-type DispersalResponse struct {
-	DispersalRequest
-	Signatures  []*core.Signature
-	RespondedAt time.Time
-	Error       error
+type BlobMinibatchMapping struct {
+	BlobKey        *disperser.BlobKey `dynamodbav:"-"`
+	BatchID        uuid.UUID          `dynamodbav:"-"`
+	MinibatchIndex uint
+	BlobIndex      uint
+	BlobHeaderHash [32]byte
+	core.BlobHeader
 }
 
 type MinibatchStore interface {
 	PutBatch(ctx context.Context, batch *BatchRecord) error
 	GetBatch(ctx context.Context, batchID uuid.UUID) (*BatchRecord, error)
 	GetBatchesByStatus(ctx context.Context, status BatchStatus) ([]*BatchRecord, error)
+	MarkBatchFormed(ctx context.Context, batchID uuid.UUID, numMinibatches uint) error
 	UpdateBatchStatus(ctx context.Context, batchID uuid.UUID, status BatchStatus) error
-	PutMinibatch(ctx context.Context, minibatch *MinibatchRecord) error
-	GetMinibatch(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) (*MinibatchRecord, error)
-	GetMinibatches(ctx context.Context, batchID uuid.UUID) ([]*MinibatchRecord, error)
-	PutDispersalRequest(ctx context.Context, request *DispersalRequest) error
-	GetDispersalRequest(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, opID core.OperatorID) (*DispersalRequest, error)
-	GetMinibatchDispersalRequests(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*DispersalRequest, error)
-	PutDispersalResponse(ctx context.Context, response *DispersalResponse) error
-	GetDispersalResponse(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, opID core.OperatorID) (*DispersalResponse, error)
-	GetMinibatchDispersalResponses(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*DispersalResponse, error)
-
+	PutDispersal(ctx context.Context, dispersal *MinibatchDispersal) error
+	UpdateDispersalResponse(ctx context.Context, dispersal *MinibatchDispersal, response *DispersalResponse) error
+	GetDispersal(ctx context.Context, batchID uuid.UUID, minibatchIndex uint, opID core.OperatorID) (*MinibatchDispersal, error)
+	GetDispersalsByBatchID(ctx context.Context, batchID uuid.UUID) ([]*MinibatchDispersal, error)
+	GetDispersalsByMinibatch(ctx context.Context, batchID uuid.UUID, minibatchIndex uint) ([]*MinibatchDispersal, error)
+	GetBlobMinibatchMappings(ctx context.Context, blobKey disperser.BlobKey) ([]*BlobMinibatchMapping, error)
+	GetBlobMinibatchMappingsByBatchID(ctx context.Context, batchID uuid.UUID) ([]*BlobMinibatchMapping, error)
+	PutBlobMinibatchMappings(ctx context.Context, blobMinibatchMappings []*BlobMinibatchMapping) error
 	// GetLatestFormedBatch returns the latest batch that has been formed.
 	// If there is no formed batch, it returns nil.
 	// It also returns the minibatches that belong to the batch in the ascending order of minibatch index.
-	GetLatestFormedBatch(ctx context.Context) (batch *BatchRecord, minibatches []*MinibatchRecord, err error)
-	BatchDispersed(ctx context.Context, batchID uuid.UUID) (bool, error)
+	GetLatestFormedBatch(ctx context.Context) (batch *BatchRecord, err error)
+	BatchDispersed(ctx context.Context, batchID uuid.UUID, numMinibatches uint) (bool, error)
 }

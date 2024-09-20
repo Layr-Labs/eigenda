@@ -30,6 +30,7 @@ type SecurityParam struct {
 	QuorumRate common.RateParam
 }
 
+type ChunkEncodingFormat = uint8
 type BundleEncodingFormat = uint8
 
 const (
@@ -52,7 +53,155 @@ const (
 	// in protobuf, UNKNOWN as 0 is a convention).
 	GobBundleEncodingFormat   BundleEncodingFormat = 0
 	GnarkBundleEncodingFormat BundleEncodingFormat = 1
+
+	// Similar to bundle encoding format, this describes the encoding format of chunks.
+	// The difference is ChunkEncodingFormat is just about chunks, whereas BundleEncodingFormat
+	// is also about how multiple chunks of the same bundle are packed into a single byte array.
+	GobChunkEncodingFormat   ChunkEncodingFormat = 0
+	GnarkChunkEncodingFormat ChunkEncodingFormat = 1
 )
+
+type ChunksData struct {
+	// Chunks is the encoded bytes of the chunks.
+	Chunks [][]byte
+	// Format describes how the bytes of the chunks are encoded.
+	Format ChunkEncodingFormat
+	// The number of symbols in each chunk.
+	// Note each chunk of the same blob will always have the same number of symbols.
+	ChunkLen int
+}
+
+func (cd *ChunksData) Size() uint64 {
+	if len(cd.Chunks) == 0 {
+		return 0
+	}
+	// GnarkChunkEncoding will create chunks of equal size.
+	if cd.Format == GnarkChunkEncodingFormat {
+		return uint64(len(cd.Chunks)) * uint64(len(cd.Chunks[0]))
+	}
+	// GobChunkEncoding can create chunks of different sizes.
+	size := uint64(0)
+	for _, c := range cd.Chunks {
+		size += uint64(len(c))
+	}
+	return size
+}
+
+func (cd *ChunksData) FromFrames(fr []*encoding.Frame) (*ChunksData, error) {
+	if len(fr) == 0 {
+		return nil, errors.New("no frame is provided")
+	}
+	var c ChunksData
+	c.Format = GnarkChunkEncodingFormat
+	c.ChunkLen = fr[0].Length()
+	c.Chunks = make([][]byte, 0, len(fr))
+	for _, f := range fr {
+		bytes, err := f.SerializeGnark()
+		if err != nil {
+			return nil, err
+		}
+		c.Chunks = append(c.Chunks, bytes)
+	}
+	return &c, nil
+}
+
+func (cd *ChunksData) ToFrames() ([]*encoding.Frame, error) {
+	frames := make([]*encoding.Frame, 0, len(cd.Chunks))
+	switch cd.Format {
+	case GobChunkEncodingFormat:
+		for _, data := range cd.Chunks {
+			fr, err := new(encoding.Frame).Deserialize(data)
+			if err != nil {
+				return nil, err
+			}
+			frames = append(frames, fr)
+		}
+	case GnarkChunkEncodingFormat:
+		for _, data := range cd.Chunks {
+			fr, err := new(encoding.Frame).DeserializeGnark(data)
+			if err != nil {
+				return nil, err
+			}
+			frames = append(frames, fr)
+		}
+	default:
+		return nil, fmt.Errorf("invalid chunk encoding format: %v", cd.Format)
+	}
+	return frames, nil
+}
+
+func (cd *ChunksData) FlattenToBundle() ([]byte, error) {
+	// Only Gnark coded chunks are dispersed as a byte array.
+	// Gob coded chunks are not flattened.
+	if cd.Format != GnarkChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format to flatten: %v", cd.Format)
+	}
+	result := make([]byte, cd.Size()+8)
+	buf := result
+	metadata := (uint64(cd.Format) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(cd.ChunkLen)
+	binary.LittleEndian.PutUint64(buf, metadata)
+	buf = buf[8:]
+	for _, c := range cd.Chunks {
+		if len(c) != len(cd.Chunks[0]) {
+			return nil, errors.New("all chunks must be of same size")
+		}
+		copy(buf, c)
+		buf = buf[len(c):]
+	}
+	return result, nil
+}
+
+func (cd *ChunksData) ToGobFormat() (*ChunksData, error) {
+	if cd.Format == GobChunkEncodingFormat {
+		return cd, nil
+	}
+	if cd.Format != GnarkChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format: %d", cd.Format)
+	}
+	gobChunks := make([][]byte, 0, len(cd.Chunks))
+	for _, chunk := range cd.Chunks {
+		c, err := new(encoding.Frame).DeserializeGnark(chunk)
+		if err != nil {
+			return nil, err
+		}
+		gob, err := c.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		gobChunks = append(gobChunks, gob)
+	}
+	return &ChunksData{
+		Chunks:   gobChunks,
+		Format:   GobChunkEncodingFormat,
+		ChunkLen: cd.ChunkLen,
+	}, nil
+}
+
+func (cd *ChunksData) ToGnarkFormat() (*ChunksData, error) {
+	if cd.Format == GnarkChunkEncodingFormat {
+		return cd, nil
+	}
+	if cd.Format != GobChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format: %d", cd.Format)
+	}
+	gnarkChunks := make([][]byte, 0, len(cd.Chunks))
+	for _, chunk := range cd.Chunks {
+		c, err := new(encoding.Frame).Deserialize(chunk)
+		if err != nil {
+			return nil, err
+		}
+		gnark, err := c.SerializeGnark()
+		if err != nil {
+			return nil, err
+		}
+		gnarkChunks = append(gnarkChunks, gnark)
+	}
+	return &ChunksData{
+		Chunks:   gnarkChunks,
+		Format:   GnarkChunkEncodingFormat,
+		ChunkLen: cd.ChunkLen,
+	}, nil
+}
 
 func (s *SecurityParam) String() string {
 	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, ConfirmationThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.ConfirmationThreshold)
@@ -162,6 +311,8 @@ type BatchHeader struct {
 type EncodedBlob struct {
 	BlobHeader        *BlobHeader
 	BundlesByOperator map[OperatorID]Bundles
+	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
+	EncodedBundlesByOperator map[OperatorID]EncodedBundles
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
@@ -170,10 +321,21 @@ type Bundle []*encoding.Frame
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
 
+// This is similar to Bundle, but tracks chunks in encoded format (i.e. not deserialized).
+type EncodedBundles map[QuorumID]*ChunksData
+
 // BlobMessage is the message that is sent to DA nodes. It contains the blob header and the associated chunk bundles.
 type BlobMessage struct {
 	BlobHeader *BlobHeader
 	Bundles    Bundles
+}
+
+// This is similar to BlobMessage, but keep the commitments and chunks in encoded format
+// (i.e. not deserialized)
+type EncodedBlobMessage struct {
+	// TODO(jianoaix): Change the commitments to encoded format.
+	BlobHeader     *BlobHeader
+	EncodedBundles map[QuorumID]*ChunksData
 }
 
 func (b Bundle) Size() uint64 {
@@ -283,4 +445,28 @@ func (cb Bundles) Size() uint64 {
 		size += bundle.Size()
 	}
 	return size
+}
+
+func (cb Bundles) ToEncodedBundles() (EncodedBundles, error) {
+	eb := make(EncodedBundles)
+	for quorum, bundle := range cb {
+		cd, err := new(ChunksData).FromFrames(bundle)
+		if err != nil {
+			return nil, err
+		}
+		eb[quorum] = cd
+	}
+	return eb, nil
+}
+
+func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
+	c := make(Bundles)
+	for quorum, chunkData := range eb {
+		fr, err := chunkData.ToFrames()
+		if err != nil {
+			return nil, err
+		}
+		c[quorum] = fr
+	}
+	return c, nil
 }

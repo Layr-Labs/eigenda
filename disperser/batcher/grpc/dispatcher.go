@@ -52,20 +52,20 @@ func (c *dispatcher) DisperseBatch(ctx context.Context, state *core.IndexedOpera
 func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOperatorState, blobs []core.EncodedBlob, batchHeader *core.BatchHeader, update chan core.SigningMessage) {
 	for id, op := range state.IndexedOperators {
 		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
-			blobMessages := make([]*core.BlobMessage, 0)
+			blobMessages := make([]*core.EncodedBlobMessage, 0)
 			hasAnyBundles := false
 			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 			if err != nil {
 				return
 			}
 			for _, blob := range blobs {
-				if _, ok := blob.BundlesByOperator[id]; ok {
+				if _, ok := blob.EncodedBundlesByOperator[id]; ok {
 					hasAnyBundles = true
 				}
-				blobMessages = append(blobMessages, &core.BlobMessage{
+				blobMessages = append(blobMessages, &core.EncodedBlobMessage{
 					BlobHeader: blob.BlobHeader,
 					// Bundles will be empty if the operator is not in the quorums blob is dispersed on
-					Bundles: blob.BundlesByOperator[id],
+					EncodedBundles: blob.EncodedBundlesByOperator[id],
 				})
 			}
 			if !hasAnyBundles {
@@ -111,7 +111,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 	}
 }
 
-func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
+func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
 	// TODO Add secure Grpc
 
 	conn, err := grpc.Dial(
@@ -132,7 +132,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 	if err != nil {
 		return nil, err
 	}
-	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "num blobs", len(blobs), "size", totalSize, "request message size", proto.Size(request), "request serialization time", time.Since(start))
+	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "num blobs", len(blobs), "size", totalSize, "request message size", proto.Size(request), "request serialization time", time.Since(start), "use Gnark chunk encoding", c.EnableGnarkBundleEncoding)
 	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
 	reply, err := gc.StoreChunks(ctx, request, opt)
 
@@ -152,7 +152,7 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.BlobMessage, 
 // SendBlobsToOperator sends blobs to an operator via the node's StoreBlobs endpoint
 // It returns the signatures of the blobs sent to the operator in the same order as the blobs
 // with nil values for blobs that were not attested by the operator
-func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error) {
+func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error) {
 	// TODO Add secure Grpc
 
 	conn, err := grpc.Dial(
@@ -173,7 +173,7 @@ func (c *dispatcher) SendBlobsToOperator(ctx context.Context, blobs []*core.Blob
 	if err != nil {
 		return nil, err
 	}
-	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "num blobs", len(blobs), "size", totalSize, "request message size", proto.Size(request), "request serialization time", time.Since(start))
+	c.logger.Debug("sending chunks to operator", "operator", op.Socket, "num blobs", len(blobs), "size", totalSize, "request message size", proto.Size(request), "request serialization time", time.Since(start), "use Gnark chunk encoding", c.EnableGnarkBundleEncoding)
 	opt := grpc.MaxCallSendMsgSize(60 * 1024 * 1024 * 1024)
 	reply, err := gc.StoreBlobs(ctx, request, opt)
 
@@ -280,7 +280,7 @@ func (c *dispatcher) SendAttestBatchRequest(ctx context.Context, nodeDispersalCl
 	return &core.Signature{G1Point: point}, nil
 }
 
-func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreChunksRequest, int64, error) {
+func GetStoreChunksRequest(blobMessages []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreChunksRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
@@ -289,7 +289,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 		if err != nil {
 			return nil, 0, err
 		}
-		totalSize += int64(blob.Bundles.Size())
+		totalSize += getBundlesSize(blob)
 	}
 
 	request := &node.StoreChunksRequest{
@@ -300,7 +300,7 @@ func GetStoreChunksRequest(blobMessages []*core.BlobMessage, batchHeader *core.B
 	return request, totalSize, nil
 }
 
-func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreBlobsRequest, int64, error) {
+func GetStoreBlobsRequest(blobMessages []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, useGnarkBundleEncoding bool) (*node.StoreBlobsRequest, int64, error) {
 	blobs := make([]*node.Blob, len(blobMessages))
 	totalSize := int64(0)
 	for i, blob := range blobMessages {
@@ -309,7 +309,7 @@ func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.Ba
 		if err != nil {
 			return nil, 0, err
 		}
-		totalSize += int64(blob.Bundles.Size())
+		totalSize += getBundlesSize(blob)
 	}
 
 	request := &node.StoreBlobsRequest{
@@ -320,7 +320,7 @@ func GetStoreBlobsRequest(blobMessages []*core.BlobMessage, batchHeader *core.Ba
 	return request, totalSize, nil
 }
 
-func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
+func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
 	if blob.BlobHeader == nil {
 		return nil, errors.New("blob header is nil")
 	}
@@ -357,13 +357,20 @@ func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.
 		}
 	}
 
+	var err error
 	bundles := make([]*node.Bundle, len(quorumHeaders))
 	if useGnarkBundleEncoding {
 		// the ordering of quorums in bundles must be same as in quorumHeaders
 		for i, quorumHeader := range quorumHeaders {
 			quorum := quorumHeader.QuorumId
-			if bundle, ok := blob.Bundles[uint8(quorum)]; ok {
-				bundleBytes, err := bundle.Serialize()
+			if chunksData, ok := blob.EncodedBundles[uint8(quorum)]; ok {
+				if chunksData.Format != core.GnarkChunkEncodingFormat {
+					chunksData, err = chunksData.ToGnarkFormat()
+					if err != nil {
+						return nil, err
+					}
+				}
+				bundleBytes, err := chunksData.FlattenToBundle()
 				if err != nil {
 					return nil, err
 				}
@@ -378,16 +385,18 @@ func getBlobMessage(blob *core.BlobMessage, useGnarkBundleEncoding bool) (*node.
 			}
 		}
 	} else {
-		data, err := blob.Bundles.Serialize()
-		if err != nil {
-			return nil, err
-		}
 		// the ordering of quorums in bundles must be same as in quorumHeaders
 		for i, quorumHeader := range quorumHeaders {
 			quorum := quorumHeader.QuorumId
-			if _, ok := blob.Bundles[uint8(quorum)]; ok {
+			if chunksData, ok := blob.EncodedBundles[uint8(quorum)]; ok {
+				if chunksData.Format != core.GobChunkEncodingFormat {
+					chunksData, err = chunksData.ToGobFormat()
+					if err != nil {
+						return nil, err
+					}
+				}
 				bundles[i] = &node.Bundle{
-					Chunks: data[quorum],
+					Chunks: chunksData.Chunks,
 				}
 			} else {
 				bundles[i] = &node.Bundle{
@@ -416,4 +425,12 @@ func getBatchHeaderMessage(header *core.BatchHeader) *node.BatchHeader {
 		BatchRoot:            header.BatchRoot[:],
 		ReferenceBlockNumber: uint32(header.ReferenceBlockNumber),
 	}
+}
+
+func getBundlesSize(blob *core.EncodedBlobMessage) int64 {
+	size := int64(0)
+	for _, bundle := range blob.EncodedBundles {
+		size += int64(bundle.Size())
+	}
+	return size
 }

@@ -93,3 +93,13 @@ func RandomTime() time.Time {
 func RandomTimeInRange(start time.Time, end time.Time) time.Time {
 	return start.Add(time.Duration(rand.Int63n(int64(end.Sub(start)))))
 }
+
+// RandomBytes generates a random byte slice of a given length.
+func RandomBytes(length int) []byte {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		panic(err)
+	}
+	return bytes
+}

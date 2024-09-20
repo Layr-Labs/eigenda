@@ -56,7 +56,6 @@ func newComponents(t *testing.T) *components {
 	tx := &coremock.MockTransactor{}
 
 	mockVal := coremock.NewMockShardValidator()
-	mockVal.On("ValidateBlob", mock.Anything, mock.Anything).Return(nil)
 	mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{

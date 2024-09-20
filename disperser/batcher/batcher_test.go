@@ -227,7 +227,7 @@ func TestBatcherIterations(t *testing.T) {
 	assert.NoError(t, err)
 	count, size := components.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, 2, count)
-	assert.Equal(t, uint64(24576), size) // Robert checks it
+	assert.Equal(t, uint64(27631), size)
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {

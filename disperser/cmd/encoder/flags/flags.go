@@ -47,6 +47,12 @@ var (
 		Value:    32,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "REQUEST_POOL_SIZE"),
 	}
+	EnableGnarkChunkEncodingFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-gnark-chunk-encoding"),
+		Usage:    "if true, will produce chunks in Gnark, instead of Gob",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_CHUNK_ENCODING"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -58,6 +64,7 @@ var optionalFlags = []cli.Flag{
 	EnableMetrics,
 	MaxConcurrentRequestsFlag,
 	RequestPoolSizeFlag,
+	EnableGnarkChunkEncodingFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

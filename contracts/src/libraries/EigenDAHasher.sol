@@ -39,7 +39,7 @@ library EigenDAHasher {
     }
 
     /**
-     * @notice given the a batchHeader in the provided metdata, calculates the hash of the batchMetadata
+     * @notice given the batchHeader in the provided metdata, calculates the hash of the batchMetadata
      * @param batchMetadata the metadata of the batch
      * @return the hash of the batchMetadata
      */

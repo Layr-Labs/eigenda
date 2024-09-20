@@ -5,7 +5,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type ProofComputer interface {
+// Proof device represents a device capable of computing various KZG-related computations.
+type ProofDevice interface {
 	// blobFr are coefficients
 	ComputeCommitment(blobFr []fr.Element) (*bn254.G1Affine, error)
 	ComputeMultiFrameProof(blobFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error)

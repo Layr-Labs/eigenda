@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \ 
     go build -o ./bin/generator ./cmd
 
-FROM alpine:3.18
+FROM alpine:3.18 as generator
 
 COPY --from=builder /app/tools/traffic/bin/generator /usr/local/bin
 

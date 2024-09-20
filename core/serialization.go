@@ -57,6 +57,20 @@ func (h *BatchHeader) SetBatchRoot(blobHeaders []*BlobHeader) (*merkletree.Merkl
 	return tree, nil
 }
 
+func (h *BatchHeader) SetBatchRootFromBlobHeaderHashes(blobHeaderHashes [][32]byte) (*merkletree.MerkleTree, error) {
+	leafs := make([][]byte, len(blobHeaderHashes))
+	for i, hash := range blobHeaderHashes {
+		leafs[i] = hash[:]
+	}
+	tree, err := merkletree.NewTree(merkletree.WithData(leafs), merkletree.WithHashType(keccak256.New()))
+	if err != nil {
+		return nil, err
+	}
+
+	copy(h.BatchRoot[:], tree.Root())
+	return tree, nil
+}
+
 func (h *BatchHeader) Encode() ([]byte, error) {
 	// The order here has to match the field ordering of ReducedBatchHeader defined in IEigenDAServiceManager.sol
 	// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43

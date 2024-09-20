@@ -24,6 +24,7 @@ type Metrics struct {
 	httpPort string
 
 	NumEncodeBlobRequests *prometheus.CounterVec
+	BlobSizeTotal         *prometheus.CounterVec
 	Latency               *prometheus.SummaryVec
 }
 
@@ -40,7 +41,15 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: "eigenda_encoder",
 				Name:      "request_total",
-				Help:      "the number and size of total encode blob request at server side per state",
+				Help:      "the number of total encode blob request at server side per state",
+			},
+			[]string{"state"}, // state is either success, ratelimited, canceled, or failure
+		),
+		BlobSizeTotal: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "eigenda_encoder",
+				Name:      "blob_size_total",
+				Help:      "the size in bytes of total blob requests at server side per state",
 			},
 			[]string{"state"}, // state is either success, ratelimited, canceled, or failure
 		),
@@ -51,38 +60,41 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Help:       "latency summary in milliseconds",
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
-			[]string{"time"},
+			[]string{"time"}, // time is either encoding or total
 		),
 	}
 }
 
 // IncrementSuccessfulBlobRequestNum increments the number of successful requests
 // this counter incrementation is atomic
-func (m *Metrics) IncrementSuccessfulBlobRequestNum() {
+func (m *Metrics) IncrementSuccessfulBlobRequestNum(blobSize int) {
 	m.NumEncodeBlobRequests.WithLabelValues("success").Inc()
+	m.BlobSizeTotal.WithLabelValues("success").Add(float64(blobSize))
 }
 
 // IncrementFailedBlobRequestNum increments the number of failed requests
 // this counter incrementation is atomic
-func (m *Metrics) IncrementFailedBlobRequestNum() {
+func (m *Metrics) IncrementFailedBlobRequestNum(blobSize int) {
 	m.NumEncodeBlobRequests.WithLabelValues("failed").Inc()
+	m.BlobSizeTotal.WithLabelValues("failed").Add(float64(blobSize))
 }
 
 // IncrementRateLimitedBlobRequestNum increments the number of rate limited requests
 // this counter incrementation is atomic
-func (m *Metrics) IncrementRateLimitedBlobRequestNum() {
+func (m *Metrics) IncrementRateLimitedBlobRequestNum(blobSize int) {
 	m.NumEncodeBlobRequests.WithLabelValues("ratelimited").Inc()
+	m.BlobSizeTotal.WithLabelValues("ratelimited").Add(float64(blobSize))
 }
 
 // IncrementCanceledBlobRequestNum increments the number of canceled requests
 // this counter incrementation is atomic
-func (m *Metrics) IncrementCanceledBlobRequestNum() {
+func (m *Metrics) IncrementCanceledBlobRequestNum(blobSize int) {
 	m.NumEncodeBlobRequests.WithLabelValues("canceled").Inc()
+	m.BlobSizeTotal.WithLabelValues("canceled").Add(float64(blobSize))
 }
 
-func (m *Metrics) TakeLatency(encoding, total time.Duration) {
-	m.Latency.WithLabelValues("encoding").Observe(float64(encoding.Milliseconds()))
-	m.Latency.WithLabelValues("total").Observe(float64(total.Milliseconds()))
+func (m *Metrics) ObserveLatency(stage string, duration time.Duration) {
+	m.Latency.WithLabelValues(stage).Observe(float64(duration.Milliseconds()))
 }
 
 func (m *Metrics) Start(ctx context.Context) {

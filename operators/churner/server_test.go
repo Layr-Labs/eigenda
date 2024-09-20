@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -92,7 +93,7 @@ func TestChurn(t *testing.T) {
 	// retry prior to expiry should fail
 	_, err = s.Churn(ctx, request)
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 3600 seconds")
+	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 900 seconds")
 }
 
 func TestChurnWithInvalidQuorum(t *testing.T) {
@@ -169,6 +170,7 @@ func newTestServer(t *testing.T) *churner.Server {
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,
 		},
+		ChurnApprovalInterval: 15 * time.Minute,
 	}
 
 	var err error
