@@ -13,7 +13,7 @@ To build the docker image, run the following command:
 Once the docker image is built, you can build the protobufs via the following command:
 
 ```bash
-./api/builder/build-protobufs.sh
+./api/builder/protoc-docker.sh
 ```
 
 # Caveats
