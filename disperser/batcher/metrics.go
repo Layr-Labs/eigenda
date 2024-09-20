@@ -51,7 +51,8 @@ type FinalizerMetrics struct {
 }
 
 type DispatcherMetrics struct {
-	Latency *prometheus.SummaryVec
+	Latency         *prometheus.SummaryVec
+	OperatorLatency *prometheus.GaugeVec
 }
 
 type Metrics struct {
@@ -178,6 +179,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"operator_id", "status"},
 		),
+		OperatorLatency: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "operator_latency",
+				Help:      "the attestation latency observed for operators",
+			},
+			[]string{"operator_id"},
+		),
 	}
 
 	metrics := &Metrics{
@@ -288,7 +297,14 @@ func (t *DispatcherMetrics) ObserveLatency(operatorId string, success bool, late
 	if !success {
 		label = "failure"
 	}
-	t.Latency.WithLabelValues(operatorId, label).Observe(latencyMS)
+	// The Latency metric has "operator_id" but we null it out because it's separately
+	// tracked in OperatorLatency.
+	t.Latency.WithLabelValues("", label).Observe(latencyMS)
+	// Only tracks successful requests, so there is one stream per operator.
+	// This is sufficient to provide insights of operators' performance.
+	if success {
+		t.OperatorLatency.WithLabelValues(operatorId).Set(latencyMS)
+	}
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.
