@@ -52,9 +52,6 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 	if c.ResponseTimeout == 0 {
 		c.ResponseTimeout = 30 * time.Second
 	}
-	if len(c.SignerPrivateKeyHex) != 64 {
-		return fmt.Errorf("EigenDAClientConfig.SignerPrivateKeyHex should be 64 hex characters long, should not have 0x prefix")
-	}
 	if len(c.RPC) == 0 {
 		return fmt.Errorf("EigenDAClientConfig.RPC not set")
 	}
