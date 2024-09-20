@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree/v2"
+	grpc_metadata "google.golang.org/grpc/metadata"
 )
 
 const encodingInterval = 2 * time.Second
@@ -377,6 +378,14 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		e.mu.Lock()
 		e.encodingCtxCancelFuncs = append(e.encodingCtxCancelFuncs, cancel)
 		e.mu.Unlock()
+
+		// Add headers for routing
+		md := grpc_metadata.New(map[string]string{
+			"content-type":   "application/grpc",
+			"x-payload-size": fmt.Sprintf("%d", len(blob.Data)),
+		})
+		encodingCtx = grpc_metadata.NewOutgoingContext(encodingCtx, md)
+
 		e.Pool.Submit(func() {
 			defer cancel()
 			start := time.Now()
