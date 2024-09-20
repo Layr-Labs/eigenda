@@ -85,7 +85,7 @@ func TestGetHandler(t *testing.T) {
 			expectedCode:           http.StatusInternalServerError,
 			expectedBody:           "",
 			expectError:            true,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismGeneric, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{},
 		},
 		{
 			name: "Success - OP Keccak256",
@@ -107,7 +107,7 @@ func TestGetHandler(t *testing.T) {
 			expectedCode:           http.StatusInternalServerError,
 			expectedBody:           "",
 			expectError:            true,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismAltDA, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{},
 		},
 		{
 			name: "Success - OP Alt-DA",
@@ -217,11 +217,10 @@ func TestPutHandler(t *testing.T) {
 			mockBehavior: func() {
 				mockRouter.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("internal error"))
 			},
-			expectedCode: http.StatusInternalServerError,
-			expectedBody: "",
-			expectError:  true,
-			// certification version is the third byte of the body, in this case it's "m"
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismAltDA, CertVersion: 0},
+			expectedCode:           http.StatusInternalServerError,
+			expectedBody:           "",
+			expectError:            true,
+			expectedCommitmentMeta: commitments.CommitmentMeta{},
 		},
 		{
 			name: "Success OP Mode Alt-DA",

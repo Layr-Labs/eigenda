@@ -66,9 +66,18 @@ func WithMetrics(
 		recordDur := m.RecordRPCServerRequest(r.Method)
 
 		meta, err := handleFn(w, r)
+		if err != nil {
+			var metaErr MetaError
+			if errors.As(err, &metaErr) {
+				recordDur(w.Header().Get("status"), string(metaErr.Meta.Mode), string(metaErr.Meta.CertVersion))
+			} else {
+				recordDur(w.Header().Get("status"), string("NoCommitmentMode"), string("NoCertVersion"))
+			}
+			return err
+		}
 		// we assume that every route will set the status header
 		recordDur(w.Header().Get("status"), string(meta.Mode), string(meta.CertVersion))
-		return err
+		return nil
 	}
 }
 
@@ -151,14 +160,17 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) (commitment
 	if err != nil {
 		err = fmt.Errorf("invalid commitment mode: %w", err)
 		svr.WriteBadRequest(w, err)
-		return meta, err
+		return commitments.CommitmentMeta{}, err
 	}
 	key := path.Base(r.URL.Path)
 	comm, err := commitments.StringToDecodedCommitment(key, meta.Mode)
 	if err != nil {
 		err = fmt.Errorf("failed to decode commitment from key %v (commitment mode %v): %w", key, meta.Mode, err)
 		svr.WriteBadRequest(w, err)
-		return meta, err
+		return commitments.CommitmentMeta{}, MetaError{
+			Err:  err,
+			Meta: meta,
+		}
 	}
 
 	input, err := svr.router.Get(r.Context(), comm, meta.Mode)
@@ -169,7 +181,10 @@ func (svr *Server) HandleGet(w http.ResponseWriter, r *http.Request) (commitment
 		} else {
 			svr.WriteInternalError(w, err)
 		}
-		return meta, err
+		return commitments.CommitmentMeta{}, MetaError{
+			Err:  err,
+			Meta: meta,
+		}
 	}
 
 	svr.WriteResponse(w, input)
@@ -185,7 +200,7 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 	if err != nil {
 		err = fmt.Errorf("invalid commitment mode: %w", err)
 		svr.WriteBadRequest(w, err)
-		return meta, err
+		return commitments.CommitmentMeta{}, err
 	}
 	// ReadCommitmentMeta function invoked inside HandlePut will not return a valid certVersion
 	// Current simple fix is using the hardcoded default value of 0 (also the only supported value)
@@ -196,7 +211,10 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 	if err != nil {
 		err = fmt.Errorf("failed to read request body: %w", err)
 		svr.WriteBadRequest(w, err)
-		return meta, err
+		return commitments.CommitmentMeta{}, MetaError{
+			Err:  err,
+			Meta: meta,
+		}
 	}
 
 	key := path.Base(r.URL.Path)
@@ -207,7 +225,10 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 		if err != nil {
 			err = fmt.Errorf("failed to decode commitment from key %v (commitment mode %v): %w", key, meta.Mode, err)
 			svr.WriteBadRequest(w, err)
-			return meta, err
+			return commitments.CommitmentMeta{}, MetaError{
+				Err:  err,
+				Meta: meta,
+			}
 		}
 	}
 
@@ -215,14 +236,20 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 	if err != nil {
 		err = fmt.Errorf("put request failed with commitment %v (commitment mode %v): %w", comm, meta.Mode, err)
 		svr.WriteInternalError(w, err)
-		return meta, err
+		return commitments.CommitmentMeta{}, MetaError{
+			Err:  err,
+			Meta: meta,
+		}
 	}
 
 	responseCommit, err := commitments.EncodeCommitment(commitment, meta.Mode)
 	if err != nil {
 		err = fmt.Errorf("failed to encode commitment %v (commitment mode %v): %w", commitment, meta.Mode, err)
 		svr.WriteInternalError(w, err)
-		return meta, err
+		return commitments.CommitmentMeta{}, MetaError{
+			Err:  err,
+			Meta: meta,
+		}
 	}
 
 	svr.log.Info(fmt.Sprintf("write commitment: %x\n", comm))
