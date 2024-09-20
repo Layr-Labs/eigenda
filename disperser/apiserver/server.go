@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/status"
 	"math/rand"
 	"net"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/status"
 
 	"github.com/Layr-Labs/eigenda/api"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -677,6 +678,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
+	stageTimer := time.Now()
 	// Check blob rate limit
 	if s.ratelimiter != nil {
 		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
@@ -702,7 +704,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			return nil, api.NewResourceExhaustedError(errorString)
 		}
 	}
-
+	s.logger.Debug("checked retrieval blob rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()), "duration (ms)", time.Since(stageTimer).Milliseconds())
 	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex)
 
 	batchHeaderHash := req.GetBatchHeaderHash()
@@ -712,6 +714,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 
 	blobIndex := req.GetBlobIndex()
 
+	stageTimer = time.Now()
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
@@ -731,6 +734,9 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewNotFoundError("no metadata found for the given batch header hash and blob index")
 	}
 
+	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration (ms)", time.Since(stageTimer).Milliseconds())
+
+	stageTimer = time.Now()
 	// Check throughout rate limit
 	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
 
@@ -758,7 +764,9 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			return nil, api.NewResourceExhaustedError(errorString)
 		}
 	}
+	s.logger.Debug("checked retrieval throughput rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()), "duration (ms)", time.Since(stageTimer).Milliseconds())
 
+	stageTimer = time.Now()
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob", "err", err)
@@ -768,6 +776,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}
 	s.metrics.HandleSuccessfulRpcRequest("RetrieveBlob")
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
+
+	s.logger.Debug("fetched blob content", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration (ms)", time.Since(stageTimer).Milliseconds())
 
 	return &pb.RetrieveBlobReply{
 		Data: data,
