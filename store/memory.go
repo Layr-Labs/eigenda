@@ -134,7 +134,7 @@ func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	time.Sleep(e.config.PutLatency)
 	if uint64(len(value)) > e.config.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("blob is larger than max blob size: blob length %d, max blob size %d", len(value), e.config.MaxBlobSizeBytes)
+		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
 	}
 
 	e.Lock()

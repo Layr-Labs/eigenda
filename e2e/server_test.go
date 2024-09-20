@@ -1,6 +1,8 @@
 package e2e_test
 
 import (
+	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -309,6 +311,7 @@ func TestProxyServerWithOversizedBlob(t *testing.T) {
 	}
 
 	require.True(t, oversizedError)
+	require.Contains(t, err.Error(), fmt.Sprint(http.StatusBadRequest))
 
 }
 

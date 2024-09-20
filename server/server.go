@@ -235,6 +235,14 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 	commitment, err := svr.router.Put(r.Context(), meta.Mode, comm, input)
 	if err != nil {
 		err = fmt.Errorf("put request failed with commitment %v (commitment mode %v): %w", comm, meta.Mode, err)
+
+		if errors.Is(err, store.ErrEigenDAOversizedBlob) || errors.Is(err, store.ErrProxyOversizedBlob) {
+			// we add here any error that should be returned as a 400 instead of a 500.
+			// currently only includes oversized blob requests
+			svr.WriteBadRequest(w, err)
+			return meta, err
+		}
+
 		svr.WriteInternalError(w, err)
 		return commitments.CommitmentMeta{}, MetaError{
 			Err:  err,
