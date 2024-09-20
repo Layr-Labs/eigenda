@@ -9,14 +9,22 @@ import (
 	"math"
 )
 
+// TODO instead use high numbered tables!
+
 // Table ID 0 is reserved for use internal use by the metadata table.
-const metadataTableID uint32 = 0
+const metadataTableID uint32 = math.MaxUint32
 
 // Table ID 1 is reserved for use by the namespace table. This stores a mapping between IDs and table names.
-const namespaceTableID uint32 = 1
+const namespaceTableID uint32 = math.MaxUint32 - 1
 
-// The first table ID that can be used for user-created tables.
-const firstUserTableID uint32 = 2
+// Table ID 2 is reserved for use by the deletion table. This is used to make table deletion atomic.
+const deletionTableID uint32 = math.MaxUint32 - 2
+
+// The number of tables reserved for internal use.
+const reservedTableCount uint32 = 3
+
+// The first table ID that can be used by user tables.
+const maxUserTableCount = math.MaxUint32 - reservedTableCount
 
 // This key is used to store the schema version in the metadata table.
 const schemaVersionKey = "schema_version"
@@ -39,22 +47,23 @@ type tableStore struct {
 	// A map from table IDs to table prefixes.
 	prefixMap map[uint32][]byte
 
-	// The highest ID of all tables in the store.
-	highestTableID uint32
+	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
+	highestTableID int64
 
 	// Builds keys for the metadata table.
 	metadataTable kvstore.KeyBuilder
 
 	// Builds keys for the namespace table.
 	namespaceTable kvstore.KeyBuilder
-}
 
-// TODO consider what happens if we crash during metadata operations. Probably needs to be batched.
+	// Builds keys for the deletion table.
+	deletionTable kvstore.KeyBuilder
+}
 
 // TableStoreWrapper wraps the given Store to create a TableStore.
 //
 // Note that the max table count cannot be changed once the TableStore is created. Use the value 0 to use the default
-// table size, which is (2^8 - 2) for new tables, or equal to the previous maximum table size if the TableStore is
+// table size, which is (2^8 - 3) for new tables, or equal to the previous maximum table size if the TableStore is
 // reloaded from disk. If the need arises, we may need to write migration code to resize the maximum number of tables,
 // but this feature is not currently supported.
 func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
@@ -62,20 +71,15 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 	prefixMap := make(map[uint32][]byte)
 	tableMap := make(map[string]uint32)
 
-	// Set up metadata table.
+	// Setup tables for internal use.
 	metadataPrefix := getPrefix(metadataTableID)
-	prefixMap[metadataTableID] = metadataPrefix
-	metadataTable := &keyBuilder{
-		prefix: metadataPrefix,
-	}
-
-	// Set up namespace table.
+	metadataTable := &keyBuilder{prefix: metadataPrefix}
 	namespacePrefix := getPrefix(namespaceTableID)
-	prefixMap[namespaceTableID] = namespacePrefix
-	namespaceTable := &keyBuilder{
-		prefix: namespacePrefix,
-	}
-	highestTableID := namespaceTableID
+	namespaceTable := &keyBuilder{prefix: namespacePrefix}
+	deletionPrefix := getPrefix(deletionTableID)
+	deletionTable := &keyBuilder{prefix: deletionPrefix}
+
+	highestTableID := int64(-1)
 
 	schemaKey := metadataTable.StringKey(schemaVersionKey).GetRawBytes()
 	onDiskSchemaBytes, err := base.Get(schemaKey)
@@ -117,11 +121,13 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 
 			prefixMap[tableID] = getPrefix(tableID)
 
-			if tableID > highestTableID {
-				highestTableID = tableID
+			if int64(tableID) > highestTableID {
+				highestTableID = int64(tableID)
 			}
 		}
 	}
+
+	// TODO handle deletion that was started but not finished
 
 	store := &tableStore{
 		base:           base,
@@ -130,6 +136,7 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 		highestTableID: highestTableID,
 		metadataTable:  metadataTable,
 		namespaceTable: namespaceTable,
+		deletionTable:  deletionTable,
 	}
 
 	return store, nil
@@ -160,18 +167,18 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 		}, nil
 	}
 
-	currentTableCount := uint32(len(t.prefixMap))
-	if currentTableCount == math.MaxUint32 {
+	currentTableCount := uint32(len(t.tableMap))
+	if currentTableCount == math.MaxUint32-reservedTableCount {
 		return nil, ERR_TABLE_LIMIT_EXCEEDED
 	}
 
-	if t.highestTableID+1 == currentTableCount {
+	if uint32(t.highestTableID+1) == currentTableCount {
 		// There are no gaps in the table IDs, so we can just use the next available ID.
-		tableID = t.highestTableID + 1
-		t.highestTableID = tableID
+		tableID = uint32(t.highestTableID + 1)
+		t.highestTableID = int64(tableID)
 	} else {
 		// Find the first unused table ID.
-		for i := firstUserTableID; i < t.highestTableID; i++ {
+		for i := uint32(0); i < maxUserTableCount; i++ {
 			_, ok = t.prefixMap[i]
 			if !ok {
 				// We've found an unused table ID.
@@ -242,13 +249,13 @@ func (t *tableStore) GetKeyBuilder(name string) (kvstore.KeyBuilder, error) {
 }
 
 // GetMaxTableCount returns the maximum number of tables that can be created in the store.
-func (t *tableStore) GetMaxTableCount() uint64 {
-	return math.MaxUint32 - 2
+func (t *tableStore) GetMaxTableCount() uint32 {
+	return maxUserTableCount
 }
 
 // GetCurrentTableCount returns the current number of tables in the store.
-func (t *tableStore) GetCurrentTableCount() uint64 {
-	return uint64(len(t.prefixMap)) - 2
+func (t *tableStore) GetCurrentTableCount() uint32 {
+	return uint32(len(t.tableMap))
 }
 
 // GetTables returns a list of all tables in the store in no particular order.

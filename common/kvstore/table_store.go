@@ -71,11 +71,11 @@ type TableStore interface {
 
 	// GetMaxTableCount returns the maximum number of tables that can be created in the store
 	// (excluding internal tables utilized by the store).
-	GetMaxTableCount() uint64
+	GetMaxTableCount() uint32
 
 	// GetCurrentTableCount returns the current number of tables in the store
 	// (excluding internal tables utilized by the store).
-	GetCurrentTableCount() uint64
+	GetCurrentTableCount() uint32
 
 	// GetTables returns a list of all tables in the store (excluding internal tables utilized by the store).
 	GetTables() []string
