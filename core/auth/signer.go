@@ -47,9 +47,23 @@ func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobAuthHeader) ([]
 	return sig, nil
 }
 
-func (s *LocalBlobRequestSigner) GetAccountID() string {
+func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
 
 	publicKeyBytes := crypto.FromECDSAPub(&s.PrivateKey.PublicKey)
-	return hexutil.Encode(publicKeyBytes)
+	return hexutil.Encode(publicKeyBytes), nil
 
+}
+
+type LocalNoopSigner struct{}
+
+func NewLocalNoopSigner() *LocalNoopSigner {
+	return &LocalNoopSigner{}
+}
+
+func (s *LocalNoopSigner) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
+	return nil, fmt.Errorf("noop signer cannot sign blob request")
+}
+
+func (s *LocalNoopSigner) GetAccountID() (string, error) {
+	return "", fmt.Errorf("noop signer cannot get accountID")
 }

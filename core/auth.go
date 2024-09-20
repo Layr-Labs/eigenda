@@ -6,5 +6,5 @@ type BlobRequestAuthenticator interface {
 
 type BlobRequestSigner interface {
 	SignBlobRequest(header BlobAuthHeader) ([]byte, error)
-	GetAccountID() string
+	GetAccountID() (string, error)
 }

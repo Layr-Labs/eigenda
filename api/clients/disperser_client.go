@@ -138,10 +138,16 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	if err != nil {
 		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
 	}
+
+	accountId, err := c.signer.GetAccountID()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
-		AccountId:           c.signer.GetAccountID(),
+		AccountId:           accountId,
 	}
 
 	// Send the initial request
