@@ -239,7 +239,8 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	numWorkers := 10
+	numWorkers := 40
+	timeout := 2 * time.Second
 	operatorChan := make(chan string, len(activeOperators))
 	semvers := make(map[string]int)
 	worker := func() {
@@ -253,7 +254,7 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logge
 			}
 			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			dispersalSocket := operatorSocket.GetDispersalSocket()
-			semverInfo := semver.GetSemverInfo(context.Background(), dispersalSocket, operatorId, false, logger)
+			semverInfo := semver.GetSemverInfo(context.Background(), dispersalSocket, operatorId, false, logger, timeout)
 
 			mu.Lock()
 			semvers[semverInfo]++

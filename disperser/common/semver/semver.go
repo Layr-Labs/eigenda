@@ -12,13 +12,13 @@ import (
 )
 
 // query operator host info endpoint if available
-func GetSemverInfo(ctx context.Context, socket string, operatorId string, useRetrievalSocket bool, logger logging.Logger) string {
+func GetSemverInfo(ctx context.Context, socket string, operatorId string, useRetrievalSocket bool, logger logging.Logger, timeout time.Duration) string {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "unreachable"
 	}
 	defer conn.Close()
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second*time.Duration(3))
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	reply := &node.NodeInfoReply{}
 	if useRetrievalSocket {

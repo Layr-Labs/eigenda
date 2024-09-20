@@ -104,7 +104,7 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 	var mu sync.Mutex
 	semvers := make(map[string]int)
 	operatorChan := make(chan string, len(operatorIds))
-	numWorkers := 10 // Adjust the number of workers as needed
+	numWorkers := config.MaxConnections // Adjust the number of workers as needed
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorInfo, err := getOperatorInfo(subgraphClient, operatorId, logger)
@@ -116,7 +116,7 @@ func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, 
 			}
 			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 			retrievalSocket := operatorSocket.GetRetrievalSocket()
-			semver := semver.GetSemverInfo(context.Background(), retrievalSocket, operatorId, true, logger)
+			semver := semver.GetSemverInfo(context.Background(), retrievalSocket, operatorId, true, logger, config.Timeout)
 
 			mu.Lock()
 			semvers[semver]++

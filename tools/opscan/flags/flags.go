@@ -33,7 +33,7 @@ var (
 		Usage:    "maximum number of connections to DA nodes",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "MAX_CONNECTIONS"),
-		Value:    30,
+		Value:    10,
 	}
 	OperatorIdFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "operator-id"),
