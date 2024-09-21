@@ -45,8 +45,10 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	var signer core.BlobRequestSigner
 	if len(config.SignerPrivateKeyHex) == 64 {
 		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
-	} else {
+	} else if len(config.SignerPrivateKeyHex) == 0 {
 		signer = auth.NewLocalNoopSigner()
+	} else {
+		return nil, fmt.Errorf("invalid length for signer private key")
 	}
 
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)

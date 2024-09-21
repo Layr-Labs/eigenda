@@ -107,10 +107,14 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	if c.signer == nil {
+		return nil, nil, fmt.Errorf("uninitialized signer for authenticated dispersal")
+	}
+
 	// first check if signer is valid
 	accountId, err := c.signer.GetAccountID()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("please configure signer key if you want to use authenticated endpoint %w", err)
 	}
 
 	quorumNumbers := make([]uint32, len(quorums))
