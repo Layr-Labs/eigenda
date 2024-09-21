@@ -704,7 +704,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			return nil, api.NewResourceExhaustedError(errorString)
 		}
 	}
-	s.logger.Debug("checked retrieval blob rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()), "duration (ms)", time.Since(stageTimer).Milliseconds())
+	s.logger.Debug("checked retrieval blob rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()), "duration", time.Since(stageTimer).String())
 	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex)
 
 	batchHeaderHash := req.GetBatchHeaderHash()
@@ -734,7 +734,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewNotFoundError("no metadata found for the given batch header hash and blob index")
 	}
 
-	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration (ms)", time.Since(stageTimer).Milliseconds())
+	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration", time.Since(stageTimer).String())
 
 	stageTimer = time.Now()
 	// Check throughout rate limit
@@ -764,7 +764,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			return nil, api.NewResourceExhaustedError(errorString)
 		}
 	}
-	s.logger.Debug("checked retrieval throughput rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()), "duration (ms)", time.Since(stageTimer).Milliseconds())
+	s.logger.Debug("checked retrieval throughput rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()), "duration (ms)", time.Since(stageTimer).String())
 
 	stageTimer = time.Now()
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
@@ -777,7 +777,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	s.metrics.HandleSuccessfulRpcRequest("RetrieveBlob")
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
 
-	s.logger.Debug("fetched blob content", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "data size (bytes)", len(data), "duration (ms)", time.Since(stageTimer).Milliseconds())
+	s.logger.Debug("fetched blob content", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "data size (bytes)", len(data), "duration", time.Since(stageTimer).String())
 
 	return &pb.RetrieveBlobReply{
 		Data: data,
