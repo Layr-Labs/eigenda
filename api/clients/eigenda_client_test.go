@@ -515,5 +515,5 @@ func TestPutBlobNoopSigner(t *testing.T) {
 	test[0] = 0x00 // make sure the first byte of the requst is always 0
 	quorums := []uint8{0}
 	_, _, err := disperserClient.DisperseBlobAuthenticated(context.Background(), test, quorums)
-	assert.EqualError(t, err, "noop signer cannot get accountID")
+	assert.EqualError(t, err, "please configure signer key if you want to use authenticated endpoint noop signer cannot get accountID")
 }
