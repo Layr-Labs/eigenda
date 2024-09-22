@@ -49,7 +49,7 @@ func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.
 		log.Info("Using S3 backend")
 		s3, err = store.NewS3(cfg.S3Config)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create S3 store: %w", err)
 		}
 	}
 
@@ -58,7 +58,7 @@ func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.
 		// create Redis backend store
 		redis, err = store.NewRedisStore(&cfg.RedisCfg)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create Redis store: %w", err)
 		}
 	}
 
@@ -68,10 +68,10 @@ func LoadStoreRouter(ctx context.Context, cfg CLIConfig, log log.Logger) (store.
 
 	verifier, err := verify.NewVerifier(vCfg, log)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}
 
-	if vCfg.Verify {
+	if vCfg.VerifyCerts {
 		log.Info("Certificate verification with Ethereum enabled")
 	} else {
 		log.Warn("Verification disabled")

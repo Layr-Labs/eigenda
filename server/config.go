@@ -17,9 +17,6 @@ import (
 const (
 	// eigenda client flags
 	EigenDADisperserRPCFlagName          = "eigenda-disperser-rpc"
-	EthRPCFlagName                       = "eigenda-eth-rpc"
-	SvcManagerAddrFlagName               = "eigenda-svc-manager-addr"
-	EthConfirmationDepthFlagName         = "eigenda-eth-confirmation-depth"
 	StatusQueryRetryIntervalFlagName     = "eigenda-status-query-retry-interval"
 	StatusQueryTimeoutFlagName           = "eigenda-status-query-timeout"
 	DisableTLSFlagName                   = "eigenda-disable-tls"
@@ -28,6 +25,12 @@ const (
 	SignerPrivateKeyHexFlagName          = "eigenda-signer-private-key-hex"
 	PutBlobEncodingVersionFlagName       = "eigenda-put-blob-encoding-version"
 	DisablePointVerificationModeFlagName = "eigenda-disable-point-verification-mode"
+
+	// cert verification flags
+	CertVerificationEnabledFlagName = "eigenda-cert-verification-enabled"
+	EthRPCFlagName                  = "eigenda-eth-rpc"
+	SvcManagerAddrFlagName          = "eigenda-svc-manager-addr"
+	EthConfirmationDepthFlagName    = "eigenda-eth-confirmation-depth"
 
 	// kzg flags
 	G1PathFlagName        = "eigenda-g1-path"
@@ -79,10 +82,13 @@ type Config struct {
 	// the blob encoding version to use when writing blobs from the high level interface.
 	PutBlobEncodingVersion codecs.BlobEncodingVersion
 
-	// eth vars
-	EthRPC               string
-	SvcManagerAddr       string
-	EthConfirmationDepth int64
+	// eth verification vars
+	// TODO: right now verification and confirmation depth are tightly coupled
+	//       we should decouple them
+	CertVerificationEnabled bool
+	EthRPC                  string
+	SvcManagerAddr          string
+	EthConfirmationDepth    int64
 
 	// kzg vars
 	CacheDir         string
@@ -143,18 +149,11 @@ func (cfg *Config) VerificationCfg() *verify.Config {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 	}
 
-	if cfg.EthRPC == "" || cfg.SvcManagerAddr == "" {
-		return &verify.Config{
-			Verify:    false,
-			KzgConfig: kzgCfg,
-		}
-	}
-
 	return &verify.Config{
-		Verify:               true,
+		KzgConfig:            kzgCfg,
+		VerifyCerts:          cfg.CertVerificationEnabled,
 		RPCURL:               cfg.EthRPC,
 		SvcManagerAddr:       cfg.SvcManagerAddr,
-		KzgConfig:            kzgCfg,
 		EthConfirmationDepth: uint64(cfg.EthConfirmationDepth), // #nosec G115
 	}
 }
@@ -189,19 +188,20 @@ func ReadConfig(ctx *cli.Context) Config {
 			PutBlobEncodingVersion:       codecs.BlobEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),
 			DisablePointVerificationMode: ctx.Bool(DisablePointVerificationModeFlagName),
 		},
-		G1Path:                 ctx.String(G1PathFlagName),
-		G2PowerOfTauPath:       ctx.String(G2TauFlagName),
-		CacheDir:               ctx.String(CachePathFlagName),
-		MaxBlobLength:          ctx.String(MaxBlobLengthFlagName),
-		SvcManagerAddr:         ctx.String(SvcManagerAddrFlagName),
-		EthRPC:                 ctx.String(EthRPCFlagName),
-		EthConfirmationDepth:   ctx.Int64(EthConfirmationDepthFlagName),
-		MemstoreEnabled:        ctx.Bool(MemstoreFlagName),
-		MemstoreBlobExpiration: ctx.Duration(MemstoreExpirationFlagName),
-		MemstoreGetLatency:     ctx.Duration(MemstoreGetLatencyFlagName),
-		MemstorePutLatency:     ctx.Duration(MemstorePutLatencyFlagName),
-		FallbackTargets:        ctx.StringSlice(FallbackTargets),
-		CacheTargets:           ctx.StringSlice(CacheTargets),
+		G1Path:                  ctx.String(G1PathFlagName),
+		G2PowerOfTauPath:        ctx.String(G2TauFlagName),
+		CacheDir:                ctx.String(CachePathFlagName),
+		CertVerificationEnabled: ctx.Bool(CertVerificationEnabledFlagName),
+		MaxBlobLength:           ctx.String(MaxBlobLengthFlagName),
+		SvcManagerAddr:          ctx.String(SvcManagerAddrFlagName),
+		EthRPC:                  ctx.String(EthRPCFlagName),
+		EthConfirmationDepth:    ctx.Int64(EthConfirmationDepthFlagName),
+		MemstoreEnabled:         ctx.Bool(MemstoreFlagName),
+		MemstoreBlobExpiration:  ctx.Duration(MemstoreExpirationFlagName),
+		MemstoreGetLatency:      ctx.Duration(MemstoreGetLatencyFlagName),
+		MemstorePutLatency:      ctx.Duration(MemstorePutLatencyFlagName),
+		FallbackTargets:         ctx.StringSlice(FallbackTargets),
+		CacheTargets:            ctx.StringSlice(CacheTargets),
 	}
 	// the eigenda client can only wait for 0 confirmations or finality
 	// the da-proxy has a more fine-grained notion of confirmation depth
@@ -246,16 +246,22 @@ func (cfg *Config) Check() error {
 		return fmt.Errorf("max blob length is 0")
 	}
 
-	if cfg.SvcManagerAddr != "" && cfg.EthRPC == "" {
-		return fmt.Errorf("svc manager address is set, but Eth RPC is not set")
+	if !cfg.MemstoreEnabled {
+		if cfg.ClientConfig.RPC == "" {
+			return fmt.Errorf("using eigenda backend (memstore.enabled=false) but eigenda disperser rpc url is not set")
+		}
 	}
 
-	if cfg.EthRPC != "" && cfg.SvcManagerAddr == "" {
-		return fmt.Errorf("eth rpc is set, but svc manager address is not set")
-	}
-
-	if cfg.EthConfirmationDepth >= 0 && (cfg.SvcManagerAddr == "" || cfg.EthRPC == "") {
-		return fmt.Errorf("eth confirmation depth is set for certificate verification, but Eth RPC or SvcManagerAddr is not set")
+	if cfg.CertVerificationEnabled {
+		if cfg.MemstoreEnabled {
+			return fmt.Errorf("cannot enable cert verification when memstore is enabled")
+		}
+		if cfg.EthRPC == "" {
+			return fmt.Errorf("cert verification enabled but eth rpc is not set")
+		}
+		if cfg.SvcManagerAddr == "" {
+			return fmt.Errorf("cert verification enabled but svc manager address is not set")
+		}
 	}
 
 	if cfg.S3Config.S3CredentialType == store.S3CredentialUnknown && cfg.S3Config.Endpoint != "" {
@@ -269,10 +275,6 @@ func (cfg *Config) Check() error {
 
 	if cfg.RedisCfg.Endpoint == "" && cfg.RedisCfg.Password != "" {
 		return fmt.Errorf("redis password is set, but endpoint is not")
-	}
-
-	if !cfg.MemstoreEnabled && cfg.ClientConfig.RPC == "" {
-		return fmt.Errorf("eigenda disperser rpc url is not set")
 	}
 
 	err = cfg.checkTargets(cfg.FallbackTargets)
@@ -453,19 +455,31 @@ func CLIFlags() []cli.Flag {
 			EnvVars: prefixEnvVars("TARGET_CACHE_PATH"),
 			Value:   "resources/SRSTables/",
 		},
+		&cli.BoolFlag{
+			Name:    CertVerificationEnabledFlagName,
+			Usage:   "Whether to verify certificates received from EigenDA disperser.",
+			EnvVars: prefixEnvVars("CERT_VERIFICATION_ENABLED"),
+			// TODO: ideally we'd want this to be turned on by default when eigenda backend is used (memstore.enabled=false)
+			Value: false,
+		},
 		&cli.StringFlag{
-			Name:    EthRPCFlagName,
-			Usage:   "JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/",
+			Name: EthRPCFlagName,
+			Usage: "JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs.\n" +
+				"See available list here: https://docs.eigenlayer.xyz/eigenda/networks/\n" +
+				fmt.Sprintf("Mandatory when %s is true.", CertVerificationEnabledFlagName),
 			EnvVars: prefixEnvVars("ETH_RPC"),
 		},
 		&cli.StringFlag{
-			Name:    SvcManagerAddrFlagName,
-			Usage:   "The deployed EigenDA service manager address. The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
+			Name: SvcManagerAddrFlagName,
+			Usage: "The deployed EigenDA service manager address.\n" +
+				"The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment\n" +
+				fmt.Sprintf("Mandatory when %s is true.", CertVerificationEnabledFlagName),
 			EnvVars: prefixEnvVars("SERVICE_MANAGER_ADDR"),
 		},
 		&cli.Int64Flag{
-			Name:    EthConfirmationDepthFlagName,
-			Usage:   "The number of Ethereum blocks to wait before considering a submitted blob's DA batch submission confirmed. `0` means wait for inclusion only. `-1` means wait for finality.",
+			Name: EthConfirmationDepthFlagName,
+			Usage: "The number of Ethereum blocks to wait before considering a submitted blob's DA batch submission confirmed.\n" +
+				"`0` means wait for inclusion only. `-1` means wait for finality.",
 			EnvVars: prefixEnvVars("ETH_CONFIRMATION_DEPTH"),
 			Value:   -1,
 		},

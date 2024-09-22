@@ -17,16 +17,19 @@ import (
 )
 
 type Config struct {
-	Verify               bool
+	KzgConfig   *kzg.KzgConfig
+	VerifyCerts bool
+	// below 3 fields are only required if VerifyCerts is true
 	RPCURL               string
 	SvcManagerAddr       string
-	KzgConfig            *kzg.KzgConfig
 	EthConfirmationDepth uint64
 }
 
 type Verifier struct {
-	verifyCert  bool
+	// kzgVerifier is needed to commit blobs to the memstore
 	kzgVerifier *kzgverifier.Verifier
+	// cert verification is optional, and verifies certs retrieved from eigenDA when turned on
+	verifyCerts bool
 	cv          *CertVerifier
 }
 
@@ -34,28 +37,28 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 	var cv *CertVerifier
 	var err error
 
-	if cfg.Verify {
+	if cfg.VerifyCerts {
 		cv, err = NewCertVerifier(cfg, l)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 		}
 	}
 
 	kzgVerifier, err := kzgverifier.NewVerifier(cfg.KzgConfig, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create kzg verifier: %w", err)
 	}
 
 	return &Verifier{
-		verifyCert:  cfg.Verify,
 		kzgVerifier: kzgVerifier,
+		verifyCerts: cfg.VerifyCerts,
 		cv:          cv,
 	}, nil
 }
 
 // verifies V0 eigenda certificate type
 func (v *Verifier) VerifyCert(cert *Certificate) error {
-	if !v.verifyCert {
+	if !v.verifyCerts {
 		return nil
 	}
 

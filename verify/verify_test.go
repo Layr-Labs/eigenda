@@ -40,8 +40,8 @@ func TestCommitmentVerification(t *testing.T) {
 	}
 
 	cfg := &Config{
-		Verify:    false,
-		KzgConfig: kzgConfig,
+		VerifyCerts: false,
+		KzgConfig:   kzgConfig,
 	}
 
 	v, err := NewVerifier(cfg, nil)
@@ -78,8 +78,8 @@ func TestCommitmentWithTooLargeBlob(t *testing.T) {
 	}
 
 	cfg := &Config{
-		Verify:    false,
-		KzgConfig: kzgConfig,
+		VerifyCerts: false,
+		KzgConfig:   kzgConfig,
 	}
 
 	v, err := NewVerifier(cfg, nil)

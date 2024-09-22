@@ -27,7 +27,7 @@ func getDefaultMemStoreTestConfig() MemStoreConfig {
 
 func getDefaultVerifierTestConfig() *verify.Config {
 	return &verify.Config{
-		Verify: false,
+		VerifyCerts: false,
 		KzgConfig: &kzg.KzgConfig{
 			G1Path:          "../resources/g1.point",
 			G2PowerOf2Path:  "../resources/g2.point.powerOf2",

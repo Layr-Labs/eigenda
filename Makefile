@@ -49,7 +49,7 @@ clean:
 	rm bin/eigenda-proxy
 
 test:
-	go test -v ./... -parallel 4 
+	go test ./... -parallel 4 
 
 e2e-test: stop-minio stop-redis run-minio run-redis
 	$(E2ETEST) && \

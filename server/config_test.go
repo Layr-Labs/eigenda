@@ -35,15 +35,16 @@ func validCfg() *Config {
 			PutBlobEncodingVersion:       0,
 			DisablePointVerificationMode: false,
 		},
-		G1Path:                 "path/to/g1",
-		G2PowerOfTauPath:       "path/to/g2",
-		CacheDir:               "path/to/cache",
-		MaxBlobLength:          "2MiB",
-		SvcManagerAddr:         "0x1234567890abcdef",
-		EthRPC:                 "http://localhost:8545",
-		EthConfirmationDepth:   12,
-		MemstoreEnabled:        true,
-		MemstoreBlobExpiration: 25 * time.Minute,
+		G1Path:                  "path/to/g1",
+		G2PowerOfTauPath:        "path/to/g2",
+		CacheDir:                "path/to/cache",
+		MaxBlobLength:           "2MiB",
+		CertVerificationEnabled: false,
+		SvcManagerAddr:          "0x1234567890abcdef",
+		EthRPC:                  "http://localhost:8545",
+		EthConfirmationDepth:    12,
+		MemstoreEnabled:         true,
+		MemstoreBlobExpiration:  25 * time.Minute,
 	}
 }
 
@@ -71,37 +72,39 @@ func TestConfigVerification(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("MissingSvcManagerAddr", func(t *testing.T) {
-		cfg := validCfg()
+	t.Run("CertVerificationEnabled", func(t *testing.T) {
+		// when eigenDABackend is enabled (memstore.enabled = false),
+		// some extra fields are required.
+		t.Run("MissingSvcManagerAddr", func(t *testing.T) {
+			cfg := validCfg()
+			// cert verification only makes sense when memstore is disabled (we use eigenda as backend)
+			cfg.MemstoreEnabled = false
+			cfg.CertVerificationEnabled = true
+			cfg.SvcManagerAddr = ""
 
-		cfg.EthRPC = "http://localhost:6969"
-		cfg.EthConfirmationDepth = 12
-		cfg.SvcManagerAddr = ""
+			err := cfg.Check()
+			require.Error(t, err)
+		})
 
-		err := cfg.Check()
-		require.Error(t, err)
-	})
+		t.Run("MissingEthRPC", func(t *testing.T) {
+			cfg := validCfg()
+			// cert verification only makes sense when memstore is disabled (we use eigenda as backend)
+			cfg.MemstoreEnabled = false
+			cfg.CertVerificationEnabled = true
+			cfg.EthRPC = ""
 
-	t.Run("MissingCertVerificationParams", func(t *testing.T) {
-		cfg := validCfg()
+			err := cfg.Check()
+			require.Error(t, err)
+		})
 
-		cfg.EthConfirmationDepth = 12
-		cfg.SvcManagerAddr = ""
-		cfg.EthRPC = "http://localhost:6969"
+		t.Run("CantDoCertVerificationWhenMemstoreEnabled", func(t *testing.T) {
+			cfg := validCfg()
+			cfg.MemstoreEnabled = true
+			cfg.CertVerificationEnabled = true
 
-		err := cfg.Check()
-		require.Error(t, err)
-	})
-
-	t.Run("MissingEthRPC", func(t *testing.T) {
-		cfg := validCfg()
-
-		cfg.EthConfirmationDepth = 12
-		cfg.SvcManagerAddr = "0x00000000123"
-		cfg.EthRPC = ""
-
-		err := cfg.Check()
-		require.Error(t, err)
+			err := cfg.Check()
+			require.Error(t, err)
+		})
 	})
 
 	t.Run("MissingS3AccessKeys", func(t *testing.T) {
