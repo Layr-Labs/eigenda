@@ -260,7 +260,7 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 		}
 	}
 
-	svr.log.Info(fmt.Sprintf("write commitment: %x\n", comm))
+	svr.log.Info(fmt.Sprintf("response commitment: %x\n", responseCommit))
 	// write out encoded commitment
 	svr.WriteResponse(w, responseCommit)
 	return meta, nil
