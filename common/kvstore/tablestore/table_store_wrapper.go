@@ -172,18 +172,19 @@ func parseKeyBytes(keyBytes []byte) (tableID uint32, key []byte) {
 }
 
 // GetOrCreateTable creates a new table with the given name if one does not exist.
-func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
+func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.Store, error) {
 	tableID, ok := t.tableMap[name]
 	if ok {
 		// Table already exists.
-		return &keyBuilder{
+		kb := &keyBuilder{
 			prefix: getPrefix(tableID),
-		}, nil
+		}
+		return kb, NewTableView(t.base, kb), nil
 	}
 
 	currentTableCount := uint32(len(t.tableMap))
 	if currentTableCount == math.MaxUint32-reservedTableCount {
-		return nil, ERR_TABLE_LIMIT_EXCEEDED
+		return nil, nil, ERR_TABLE_LIMIT_EXCEEDED
 	}
 
 	if uint32(t.highestTableID+1) == currentTableCount {
@@ -214,12 +215,13 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, error) {
 
 	err := t.base.Put(t.namespaceTable.Uint32Key(tableID).GetRawBytes(), []byte(name))
 	if err != nil {
-		return nil, fmt.Errorf("error updating namespace table: %w", err)
+		return nil, nil, fmt.Errorf("error updating namespace table: %w", err)
 	}
 
-	return &keyBuilder{
+	kb := &keyBuilder{
 		prefix: getPrefix(tableID),
-	}, nil
+	}
+	return kb, NewTableView(t.base, kb), nil
 }
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.

@@ -50,11 +50,12 @@ type KeyBuilder interface {
 // Implementations of this interface are expected to be thread-safe, except where noted.
 type TableStore interface {
 
-	// GetOrCreateTable creates a new table with the given name if one does not exist
-	// and returns a key builder for that table.
+	// GetOrCreateTable creates a new table with the given name if one does not exist. Returns
+	// a KeyBuilder that can be used to create keys in that table, and a Store that can be used to
+	// interact with the table as if it were the only table in the store.
 	//
 	// WARNING: this method is not thread safe with respect to any other methods in this interface.
-	GetOrCreateTable(name string) (KeyBuilder, error)
+	GetOrCreateTable(name string) (KeyBuilder, Store, error)
 
 	// DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 	//
