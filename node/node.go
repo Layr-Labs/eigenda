@@ -24,6 +24,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -35,8 +37,9 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gammazero/workerpool"
+
+	blssignerV1 "github.com/Layr-Labs/remote-bls-api/pkg/api/v1"
 )
 
 const (
@@ -65,6 +68,7 @@ type Node struct {
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
+	BLSSigner               blssignerV1.SignerClient
 
 	mu            sync.Mutex
 	CurrentSocket string
@@ -164,6 +168,15 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
+	nodeLogger.Info("createing signer client", "url", config.BLSRemoteSignerUrl)
+	conn, err := grpc.NewClient(
+		config.BLSRemoteSignerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new BLS remote signer client: %w", err)
+	}
+	blsClient := blssignerV1.NewSignerClient(conn)
+
 	return &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -177,6 +190,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
+		BLSSigner:               blsClient,
 	}, nil
 }
 
@@ -384,12 +398,31 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
-	sig := n.KeyPair.SignMessage(batchHeaderHash)
+	// sig := n.KeyPair.SignMessage(batchHeaderHash)
+	sigResp, err := n.BLSSigner.SignGeneric(
+		ctx,
+		&blssignerV1.SignGenericRequest{
+			PublicKey: n.Config.BLSPublicKeyHex,
+			Data:      batchHeaderHash[:],
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign batch: %w", err)
+	}
+	sig := new(core.Signature)
+	g, err := sig.Deserialize(sigResp.Signature)
+	finalSig := &core.Signature{
+		G1Point: g,
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize signature: %w", err)
+	}
+
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", n.Config.BLSPublicKeyHex, "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
-	return sig, nil
+	return finalSig, nil
 }
 
 // ProcessBlobs validates the blobs are correct, stores data into the node's Store, and then returns a signature for each blob.
@@ -506,7 +539,7 @@ func (n *Node) ProcessBlobs(ctx context.Context, blobs []*core.BlobMessage, rawB
 		return nil, fmt.Errorf("failed to sign blobs: %w", err)
 	}
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("SignBlobs succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
+	log.Debug("SignBlobs succeeded", "pubkey", n.Config.BLSPublicKeyHex, "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting ProcessBlobs", "duration", time.Since(start))
 	return signatures, nil
@@ -585,8 +618,26 @@ func (n *Node) SignBlobs(blobs []*core.BlobMessage, referenceBlockNumber uint) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to get batch header hash: %w", err)
 		}
-		sig := n.KeyPair.SignMessage(batchHeaderHash)
-		signatures[i] = sig
+		// sig := n.KeyPair.SignMessage(batchHeaderHash)
+		sigResp, err := n.BLSSigner.SignGeneric(
+			context.Background(),
+			&blssignerV1.SignGenericRequest{
+				PublicKey: n.Config.BLSPublicKeyHex,
+				Data:      batchHeaderHash[:],
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign batch: %w", err)
+		}
+		sig := new(core.Signature)
+		g, err := sig.Deserialize(sigResp.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize signature: %w", err)
+		}
+		finalSig := &core.Signature{
+			G1Point: g,
+		}
+		signatures[i] = finalSig
 	}
 
 	n.Logger.Debug("SignBlobs completed", "duration", time.Since(start))

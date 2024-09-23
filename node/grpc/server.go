@@ -33,6 +33,8 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+
+	blssignerV1 "github.com/Layr-Labs/remote-bls-api/pkg/api/v1"
 )
 
 const localhost = "0.0.0.0"
@@ -375,7 +377,22 @@ func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*p
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the batch header hash: %w", err)
 	}
-	sig := s.node.KeyPair.SignMessage(batchHeaderHash)
+	// sig := s.node.KeyPair.SignMessage(batchHeaderHash)
+	sigResp, err := s.node.BLSSigner.SignGeneric(
+		ctx,
+		&blssignerV1.SignGenericRequest{
+			PublicKey: s.node.Config.BLSPublicKeyHex,
+			Data:      batchHeaderHash[:],
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign batch: %w", err)
+	}
+	sig := new(core.Signature)
+	_, err = sig.Deserialize(sigResp.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize signature: %w", err)
+	}
 
 	s.node.Logger.Info("AttestBatch complete", "duration", time.Since(start))
 	return &pb.AttestBatchReply{
