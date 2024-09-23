@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/ttl"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -32,6 +33,33 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 			return nil, err
 		}
 		return ttl.TTLWrapper(context.Background(), logger, store, 0), nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		store := mapstore.NewStore()
+		tableStore, err := tablestore.TableStoreWrapper(store)
+		if err != nil {
+			return nil, err
+		}
+		_, store, err = tableStore.GetOrCreateTable("test")
+		if err != nil {
+			return nil, err
+		}
+		return store, nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		store, err := leveldb.NewStore(logger, path)
+		if err != nil {
+			return nil, err
+		}
+		tableStore, err := tablestore.TableStoreWrapper(store)
+		if err != nil {
+			return nil, err
+		}
+		_, store, err = tableStore.GetOrCreateTable("test")
+		if err != nil {
+			return nil, err
+		}
+		return store, nil
 	},
 }
 

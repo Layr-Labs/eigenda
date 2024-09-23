@@ -23,6 +23,9 @@ type Key interface {
 
 	// GetRawBytes gets the representation of the key as used internally by the store.
 	GetRawBytes() []byte
+
+	// GetKeyBuilder returns the key builder for the table that this key belongs to.
+	GetKeyBuilder() KeyBuilder
 }
 
 // KeyBuilder is used to create new keys in a specific table.

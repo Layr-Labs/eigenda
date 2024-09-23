@@ -62,3 +62,10 @@ func (k *key) GetKeyUint64() uint64 {
 func (k *key) GetRawBytes() []byte {
 	return append(k.prefix, k.key...)
 }
+
+// GetKeyBuilder returns the key builder for the table that this key belongs to.
+func (k *key) GetKeyBuilder() kvstore.KeyBuilder {
+	return &keyBuilder{
+		prefix: k.prefix,
+	}
+}

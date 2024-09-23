@@ -179,7 +179,7 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 		kb := &keyBuilder{
 			prefix: getPrefix(tableID),
 		}
-		return kb, NewTableView(t.base, kb), nil
+		return kb, newTableView(t.base, kb), nil
 	}
 
 	currentTableCount := uint32(len(t.tableMap))
@@ -221,7 +221,7 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 	kb := &keyBuilder{
 		prefix: getPrefix(tableID),
 	}
-	return kb, NewTableView(t.base, kb), nil
+	return kb, newTableView(t.base, kb), nil
 }
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
@@ -342,7 +342,12 @@ func (t *tableStore) WriteBatch(keys []kvstore.Key, values [][]byte) error {
 // is created.
 func (t *tableStore) NewIterator(prefix kvstore.Key) (iterator.Iterator, error) {
 	iteratorPrefix := prefix.GetRawBytes()
-	return t.base.NewIterator(iteratorPrefix)
+	it, err := t.base.NewIterator(iteratorPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return newTableIterator(it, prefix.GetKeyBuilder()), nil
 }
 
 // Shutdown shuts down the store, flushing any remaining cached data to disk.

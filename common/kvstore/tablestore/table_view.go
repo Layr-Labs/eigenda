@@ -14,7 +14,7 @@ type tableView struct {
 }
 
 // NewTableView creates a new view into a table in a TableStore.
-func NewTableView(base kvstore.Store, keyBuilder kvstore.KeyBuilder) kvstore.Store {
+func newTableView(base kvstore.Store, keyBuilder kvstore.KeyBuilder) kvstore.Store {
 	return &tableView{
 		base:       base,
 		keyBuilder: keyBuilder,
@@ -50,15 +50,18 @@ func (t *tableView) WriteBatch(keys [][]byte, values [][]byte) error {
 }
 
 func (t *tableView) NewIterator(prefix []byte) (iterator.Iterator, error) {
-	return t.base.NewIterator(t.keyBuilder.Key(prefix).GetRawBytes())
+	it, err := t.base.NewIterator(t.keyBuilder.Key(prefix).GetRawBytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return newTableIterator(it, t.keyBuilder), nil
 }
 
 func (t *tableView) Shutdown() error {
-	// Intentional no-op, this is just a view into the table
-	return nil
+	return t.base.Shutdown()
 }
 
 func (t *tableView) Destroy() error {
-	// Intentional no-op, this is just a view into the table
-	return nil
+	return t.base.Destroy()
 }
