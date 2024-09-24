@@ -75,7 +75,10 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 
 	if errors.Is(err, kvstore.ErrNotFound) {
 		// This store is new, no on disk schema version exists.
-		err = base.Put(schemaKey, []byte{byte(currentSchemaVersion)})
+		onDiskSchemaBytes = make([]byte, 8)
+		binary.BigEndian.PutUint64(onDiskSchemaBytes, currentSchemaVersion)
+
+		err = base.Put(schemaKey, onDiskSchemaBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error setting schema version in metadata table: %w", err)
 		}
@@ -123,7 +126,6 @@ func loadNamespaceTable(base kvstore.Store, tableMap map[string]uint32) (int64, 
 	}
 	defer it.Release()
 
-	// TODO verify this is the correct pattern, i.e. we aren't skipping the first entry
 	for it.Next() {
 		keyBytes := it.Key()
 		valueBytes := it.Value()
@@ -192,6 +194,7 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 		tableID = uint32(t.highestTableID + 1)
 		t.highestTableID = int64(tableID)
 	} else {
+		// TODO write a unit test for this case specifically
 		// Find the first unused table ID. This may not be efficient for a large number of table deletions
 		// followed by a large number of table creations, but let's cross that bridge when we get to it.
 		sortedTableIDs := make([]uint32, 0, currentTableCount)
@@ -282,8 +285,8 @@ func (t *tableStore) GetMaxTableCount() uint32 {
 	return maxUserTableCount
 }
 
-// GetCurrentTableCount returns the current number of tables in the store.
-func (t *tableStore) GetCurrentTableCount() uint32 {
+// GetTableCount returns the current number of tables in the store.
+func (t *tableStore) GetTableCount() uint32 {
 	return uint32(len(t.tableMap))
 }
 
