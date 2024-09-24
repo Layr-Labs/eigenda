@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"math"
 	"sort"
@@ -39,6 +40,8 @@ var ERR_TABLE_LIMIT_EXCEEDED = errors.New("table limit exceeded")
 
 // tableStore is an implementation of TableStore that wraps a Store.
 type tableStore struct {
+	logger logging.Logger
+
 	// A base store implementation that this TableStore wraps.
 	base kvstore.Store
 
@@ -63,7 +66,7 @@ type tableStore struct {
 // WARNING: it is not safe to access the wrapped store directly while the TableStore is in use. The TableStore uses
 // special key formatting, and direct access to the wrapped store may violate the TableStore's invariants, resulting
 // in undefined behavior.
-func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
+func TableStoreWrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, error) {
 
 	tableMap := make(map[string]uint32)
 	tableIdSet := make(map[uint32]bool)
@@ -105,6 +108,7 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 	}
 
 	store := &tableStore{
+		logger:         logger,
 		base:           base,
 		tableMap:       tableMap,
 		tableIDSet:     tableIdSet,
@@ -160,7 +164,7 @@ func (t *tableStore) handleIncompleteDeletion() error {
 	}
 
 	deletionTableName := string(deletionTableNameBytes)
-	// TODO log something
+	t.logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
 
 	return t.DropTable(deletionTableName)
 }
@@ -200,7 +204,6 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 		tableID = uint32(t.highestTableID + 1)
 		t.highestTableID = int64(tableID)
 	} else {
-		// TODO write a unit test for this case specifically
 		// Find the first unused table ID. This may not be efficient for a large number of table deletions
 		// followed by a large number of table creations, but let's cross that bridge when we get to it.
 		sortedTableIDs := make([]uint32, 0, currentTableCount)
