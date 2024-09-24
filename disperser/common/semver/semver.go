@@ -38,7 +38,7 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numW
 	}
 
 	// Send operator IDs to the channel
-	for operatorId, _ := range operators {
+	for operatorId := range operators {
 		operatorChan <- operatorId
 	}
 	close(operatorChan)
