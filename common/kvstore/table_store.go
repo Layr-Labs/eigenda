@@ -65,10 +65,6 @@ type TableStore interface {
 	// WARNING: this method is not thread safe with respect to any other methods in this interface.
 	DropTable(name string) error
 
-	// GetKeyBuilder returns a key builder for the table with the given name,
-	// returning an error if the table does not exist.
-	GetKeyBuilder(name string) (KeyBuilder, error)
-
 	// GetMaxTableCount returns the maximum number of tables that can be created in the store
 	// (excluding internal tables utilized by the store).
 	GetMaxTableCount() uint32

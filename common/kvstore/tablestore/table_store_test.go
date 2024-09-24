@@ -624,7 +624,13 @@ func TestRestart(t *testing.T) {
 func TestRandomOperations(t *testing.T) {
 	tu.InitializeRandom()
 
-	base := mapstore.NewStore()
+	deleteDBDirectory(t)
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	base, err := leveldb.NewStore(logger, dbPath)
+	assert.NoError(t, err)
 	store, err := TableStoreWrapper(base)
 	assert.NoError(t, err)
 
@@ -636,15 +642,21 @@ func TestRandomOperations(t *testing.T) {
 
 		choice := rand.Float64()
 
-		if len(tables) == 0 || choice < 0.1 {
+		if choice < 0.01 {
+			// restart the store
+			err = store.Shutdown()
+			assert.NoError(t, err)
+
+			base, err = leveldb.NewStore(logger, dbPath)
+			assert.NoError(t, err)
+			store, err = TableStoreWrapper(base)
+		} else if len(tables) == 0 || choice < 0.1 {
 			// Create a new table.
 			name := tu.RandomString(8)
 			kb, _, err := store.GetOrCreateTable(name)
 			keysByTable[name] = make([]kvstore.Key, 0)
 			assert.NoError(t, err)
 			tables[name] = kb
-
-			fmt.Printf("Created table %s\n", name) // TODO
 		} else if choice < 0.15 {
 			// Drop a table
 
@@ -653,7 +665,6 @@ func TestRandomOperations(t *testing.T) {
 				name = n
 				break
 			}
-			fmt.Printf("About to drop table %s\n", name) // TODO
 
 			err := store.DropTable(name)
 			assert.NoError(t, err)
@@ -674,7 +685,7 @@ func TestRandomOperations(t *testing.T) {
 			}
 			kb := tables[tableName]
 
-			k := kb.Key(tu.RandomBytes(32))
+			k := kb.StringKey(tu.RandomString(32))
 			v := tu.RandomBytes(32)
 
 			keysByTable[tableName] = append(keysByTable[tableName], k)
@@ -684,7 +695,6 @@ func TestRandomOperations(t *testing.T) {
 
 			expectedData[k] = v
 
-			fmt.Printf("Put %s : %s -> %s\n", tableName, k.GetKeyString(), v) // TODO
 		} else {
 			// Drop a value
 			var k kvstore.Key
@@ -694,8 +704,6 @@ func TestRandomOperations(t *testing.T) {
 			delete(expectedData, k)
 			err := store.Delete(k)
 			assert.NoError(t, err)
-
-			fmt.Printf("Deleted %s\n", k.GetKeyString()) // TODO
 		}
 
 		// Every once in a while, check that the store matches the expected data
@@ -703,13 +711,6 @@ func TestRandomOperations(t *testing.T) {
 			// Every so often, check that the store matches the expected data.
 			for k, expectedValue := range expectedData {
 				value, err := store.Get(k)
-
-				if err != nil {
-					fmt.Printf("Error getting %s: %s\n", k.GetKeyString(), err) // TODO
-					fmt.Printf("full key bytes: %v\n", k.GetRawBytes())         // TODO
-					continue
-				}
-
 				assert.NoError(t, err)
 				assert.Equal(t, expectedValue, value)
 			}

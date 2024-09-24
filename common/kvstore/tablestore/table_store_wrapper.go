@@ -45,6 +45,9 @@ type tableStore struct {
 	// A map from table names to table IDs.
 	tableMap map[string]uint32
 
+	// A set of table IDs that are currently in use.
+	tableIDSet map[uint32]bool
+
 	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
 	highestTableID int64
 
@@ -63,6 +66,7 @@ type tableStore struct {
 func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 
 	tableMap := make(map[string]uint32)
+	tableIdSet := make(map[uint32]bool)
 
 	// Setup tables for internal use.
 	metadataTable := &keyBuilder{prefix: getPrefix(metadataTableID)}
@@ -94,7 +98,7 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 				currentSchemaVersion, onDiskSchema)
 		}
 
-		highestTableID, err = loadNamespaceTable(base, tableMap)
+		highestTableID, err = loadNamespaceTable(base, tableMap, tableIdSet)
 		if err != nil {
 			return nil, fmt.Errorf("error loading namespace table: %w", err)
 		}
@@ -103,6 +107,7 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 	store := &tableStore{
 		base:           base,
 		tableMap:       tableMap,
+		tableIDSet:     tableIdSet,
 		highestTableID: highestTableID,
 		metadataTable:  metadataTable,
 		namespaceTable: namespaceTable,
@@ -117,7 +122,7 @@ func TableStoreWrapper(base kvstore.Store) (kvstore.TableStore, error) {
 }
 
 // loadNamespaceTable loads the namespace table from disk into the given map. Returns the highest table ID found.
-func loadNamespaceTable(base kvstore.Store, tableMap map[string]uint32) (int64, error) {
+func loadNamespaceTable(base kvstore.Store, tableMap map[string]uint32, tableIdSet map[uint32]bool) (int64, error) {
 	highestTableID := int64(-1)
 
 	it, err := base.NewIterator(getPrefix(namespaceTableID))
@@ -133,6 +138,7 @@ func loadNamespaceTable(base kvstore.Store, tableMap map[string]uint32) (int64, 
 		_, tableIDBytes := parseKeyBytes(keyBytes)
 		tableName := string(valueBytes)
 		tableID := binary.BigEndian.Uint32(tableIDBytes)
+		tableIdSet[tableID] = true
 		tableMap[tableName] = tableID
 
 		if int64(tableID) > highestTableID {
@@ -214,6 +220,8 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 		}
 	}
 
+	t.tableIDSet[tableID] = true
+
 	t.tableMap[name] = tableID
 
 	err := t.base.Put(t.namespaceTable.Uint32Key(tableID).GetRawBytes(), []byte(name))
@@ -229,10 +237,6 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 func (t *tableStore) DropTable(name string) error {
-
-	fmt.Printf("tableStore.DropTable %s\n", name)     // TODO
-	fmt.Printf("Table index: %d\n", t.tableMap[name]) // TODO
-
 	tableID, ok := t.tableMap[name]
 	if !ok {
 		// Table does not exist, nothing to do.
@@ -267,21 +271,17 @@ func (t *tableStore) DropTable(name string) error {
 		return fmt.Errorf("error deleting from namespace table: %w", err)
 	}
 	delete(t.tableMap, name)
+	delete(t.tableIDSet, tableID)
+
+	// Update highestTableID as needed.
+	for ; t.highestTableID >= 0; t.highestTableID-- {
+		if _, ok := t.tableIDSet[uint32(t.highestTableID)]; ok {
+			break
+		}
+	}
 
 	// Finally, remove the deletion key from the metadata table.
 	return t.base.Delete(t.metadataTable.StringKey(deletionKey).GetRawBytes())
-}
-
-// GetKeyBuilder returns a key builder for the table with the given name. Throws an error if the table does not exist.
-func (t *tableStore) GetKeyBuilder(name string) (kvstore.KeyBuilder, error) {
-	tableID, ok := t.tableMap[name]
-	if !ok {
-		return nil, fmt.Errorf("table %s does not exist", name)
-	}
-
-	return &keyBuilder{
-		prefix: getPrefix(tableID),
-	}, nil
 }
 
 // GetMaxTableCount returns the maximum number of tables that can be created in the store.
