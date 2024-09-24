@@ -4,6 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
@@ -18,6 +19,7 @@ type Config struct {
 	LoggerConfig     common.LoggerConfig
 	PrometheusConfig prometheus.Config
 	MetricsConfig    dataapi.MetricsConfig
+	ChainStateConfig thegraph.Config
 
 	SocketAddr                   string
 	PrometheusApiAddr            string
@@ -69,6 +71,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
+		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
 	}
 	return config, nil
 }

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	"github.com/Layr-Labs/eigenda/tools/semverscan"
 	"github.com/Layr-Labs/eigenda/tools/semverscan/flags"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/urfave/cli"
 )
@@ -49,97 +49,34 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
-	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
-
-	activeOperators := make([]string, 0)
-	if config.OperatorId != "" {
-		activeOperators = append(activeOperators, config.OperatorId)
-	} else {
-		registrations, err := subgraphApi.QueryOperators(context.Background(), 10000)
-		if err != nil {
-			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
-		}
-		deregistrations, err := subgraphApi.QueryOperatorsDeregistered(context.Background(), 10000)
-		if err != nil {
-			return fmt.Errorf("failed to fetch indexed operator state - %s", err)
-		}
-
-		// Count registrations
-		operators := make(map[string]int)
-		for _, registration := range registrations {
-			logger.Info("Operator", "operatorId", string(registration.OperatorId), "info", registration)
-			operators[string(registration.OperatorId)]++
-		}
-
-		// Count deregistrations
-		for _, deregistration := range deregistrations {
-			operators[string(deregistration.OperatorId)]--
-		}
-
-		for operatorId, count := range operators {
-			if count > 0 {
-				activeOperators = append(activeOperators, operatorId)
-			}
-		}
-		logger.Info("Active operators", "count", len(activeOperators))
+	gethClient, err := geth.NewClient(config.EthClientConfig, gethcommon.Address{}, 0, logger)
+	if err != nil {
+		logger.Error("Cannot create chain.Client", "err", err)
+		return err
 	}
 
-	semvers := scanOperators(subgraphClient, activeOperators, config, logger)
+	tx, err := eth.NewTransactor(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
+	cs := eth.NewChainState(tx, gethClient)
+
+	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+
+	currentBlock, err := ics.GetCurrentBlockNumber()
+	if err != nil {
+		return fmt.Errorf("failed to fetch current block number - %s", err)
+	}
+	operatorState, err := ics.GetIndexedOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+	if err != nil {
+		return fmt.Errorf("failed to fetch indexed operator state - %s", err)
+	}
+	logger.Info("Queried operator state", "count", len(operatorState.IndexedOperators))
+
+	semvers := semver.ScanOperators(operatorState.IndexedOperators, config.Workers, config.Timeout, logger)
 	displayResults(semvers)
 	return nil
-}
-
-func getOperatorInfo(subgraphClient dataapi.SubgraphClient, operatorId string, logger logging.Logger) (*core.IndexedOperatorInfo, error) {
-	operatorInfo, err := subgraphClient.QueryOperatorInfoByOperatorId(context.Background(), operatorId)
-	if err != nil {
-		logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
-		return nil, fmt.Errorf("operator info not found for operatorId %s", operatorId)
-	}
-	return operatorInfo, nil
-}
-
-func scanOperators(subgraphClient dataapi.SubgraphClient, operatorIds []string, config *semverscan.Config, logger logging.Logger) map[string]int {
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	semvers := make(map[string]int)
-	operatorChan := make(chan string, len(operatorIds))
-	numWorkers := config.MaxConnections // Adjust the number of workers as needed
-	worker := func() {
-		for operatorId := range operatorChan {
-			operatorInfo, err := getOperatorInfo(subgraphClient, operatorId, logger)
-			if err != nil {
-				mu.Lock()
-				semvers["not-found"]++
-				mu.Unlock()
-				continue
-			}
-			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-			retrievalSocket := operatorSocket.GetRetrievalSocket()
-			semver := semver.GetSemverInfo(context.Background(), retrievalSocket, operatorId, true, logger, config.Timeout)
-
-			mu.Lock()
-			semvers[semver]++
-			mu.Unlock()
-		}
-		wg.Done()
-	}
-
-	// Launch worker goroutines
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go worker()
-	}
-
-	// Send operator IDs to the channel
-	for _, operatorId := range operatorIds {
-		operatorChan <- operatorId
-	}
-	close(operatorChan)
-
-	// Wait for all workers to finish
-	wg.Wait()
-	return semvers
 }
 
 func displayResults(results map[string]int) {

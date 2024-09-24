@@ -162,15 +162,16 @@ type (
 	}
 
 	server struct {
-		serverMode     string
-		socketAddr     string
-		allowOrigins   []string
-		logger         logging.Logger
-		blobstore      disperser.BlobStore
-		promClient     PrometheusClient
-		subgraphClient SubgraphClient
-		transactor     core.Transactor
-		chainState     core.ChainState
+		serverMode        string
+		socketAddr        string
+		allowOrigins      []string
+		logger            logging.Logger
+		blobstore         disperser.BlobStore
+		promClient        PrometheusClient
+		subgraphClient    SubgraphClient
+		transactor        core.Transactor
+		chainState        core.ChainState
+		indexedChainState core.IndexedChainState
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -188,6 +189,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
+	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -218,6 +220,7 @@ func NewServer(
 		subgraphClient:            subgraphClient,
 		transactor:                transactor,
 		chainState:                chainState,
+		indexedChainState:         indexedChainState,
 		metrics:                   metrics,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
@@ -822,7 +825,7 @@ func (s *server) SemverScan(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	report, err := s.scanOperatorsHostInfo(c.Request.Context(), s.logger)
+	report, err := s.scanOperatorsHostInfo(c.Request.Context())
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
 		s.metrics.IncrementFailedRequestNum("SemverScan")

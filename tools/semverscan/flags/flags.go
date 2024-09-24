@@ -4,21 +4,29 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/urfave/cli"
 )
 
 const (
 	FlagPrefix = ""
-	envPrefix  = "OPSCAN"
+	envPrefix  = "SEMVERSCAN"
 )
 
 var (
 	/* Required Flags*/
-	SubgraphEndpointFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "subgraph-endpoint"),
-		Usage:    "Subgraph endpoint to query operator state",
+	BlsOperatorStateRetrieverFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage:    "Address of the BLS Operator State Retriever",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "SUBGRAPH_ENDPOINT"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+	}
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Address of the EigenDA Service Manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	/* Optional Flags*/
 	TimeoutFlag = cli.DurationFlag{
@@ -28,11 +36,11 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 		Value:    3 * time.Second,
 	}
-	MaxConnectionsFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "max-connections"),
-		Usage:    "maximum number of connections to DA nodes",
+	WorkersFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "workers"),
+		Usage:    "maximum number of concurrent node info requests",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "MAX_CONNECTIONS"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "WORKERS"),
 		Value:    10,
 	}
 	OperatorIdFlag = cli.StringFlag{
@@ -45,12 +53,13 @@ var (
 )
 
 var requiredFlags = []cli.Flag{
-	SubgraphEndpointFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 var optionalFlags = []cli.Flag{
 	TimeoutFlag,
-	MaxConnectionsFlag,
+	WorkersFlag,
 	OperatorIdFlag,
 }
 
@@ -60,4 +69,6 @@ var Flags []cli.Flag
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
+	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
+	Flags = append(Flags, thegraph.CLIFlags(envPrefix)...)
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -207,76 +206,20 @@ func (s *server) getOperatorInfo(ctx context.Context, operatorId string) (*core.
 	return operatorInfo, nil
 }
 
-func (s *server) scanOperatorsHostInfo(ctx context.Context, logger logging.Logger) (*SemverReportResponse, error) {
-	registrations, err := s.subgraphClient.QueryOperatorsWithLimit(context.Background(), 10000)
+func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch indexed registered operator state - %s", err)
+		return nil, fmt.Errorf("failed to fetch current block number - %s", err)
 	}
-	deregistrations, err := s.subgraphClient.QueryOperatorDeregistrations(context.Background(), 10000)
+	operatorState, err := s.indexedChainState.GetIndexedOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch indexed deregistered operator state - %s", err)
+		return nil, fmt.Errorf("failed to fetch indexed operator state - %s", err)
 	}
+	s.logger.Info("Queried operator state", "count", len(operatorState.IndexedOperators))
 
-	operators := make(map[string]int)
-
-	// Add registrations
-	for _, registration := range registrations {
-		logger.Info("Operator", "operatorId", string(registration.OperatorId), "info", registration)
-		operators[string(registration.OperatorId)]++
-	}
-	// Deduct deregistrations
-	for _, deregistration := range deregistrations {
-		operators[string(deregistration.OperatorId)]--
-	}
-
-	activeOperators := make([]string, 0)
-	for operatorId, count := range operators {
-		if count > 0 {
-			activeOperators = append(activeOperators, operatorId)
-		}
-	}
-	logger.Info("Active operators found", "count", len(activeOperators))
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	numWorkers := 40
-	timeout := 2 * time.Second
-	operatorChan := make(chan string, len(activeOperators))
-	semvers := make(map[string]int)
-	worker := func() {
-		for operatorId := range operatorChan {
-			operatorInfo, err := s.getOperatorInfo(ctx, operatorId)
-			if err != nil {
-				mu.Lock()
-				semvers["not-found"]++
-				mu.Unlock()
-				continue
-			}
-			operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-			dispersalSocket := operatorSocket.GetDispersalSocket()
-			semverInfo := semver.GetSemverInfo(context.Background(), dispersalSocket, operatorId, false, logger, timeout)
-
-			mu.Lock()
-			semvers[semverInfo]++
-			mu.Unlock()
-		}
-		wg.Done()
-	}
-
-	// Launch worker goroutines
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go worker()
-	}
-
-	// Send operator IDs to the channel
-	for _, operatorId := range activeOperators {
-		operatorChan <- operatorId
-	}
-	close(operatorChan)
-
-	// Wait for all workers to finish
-	wg.Wait()
+	nodeInfoWorkers := 20
+	nodeInfoTimeout := time.Duration(1 * time.Second)
+	semvers := semver.ScanOperators(operatorState.IndexedOperators, nodeInfoWorkers, nodeInfoTimeout, s.logger)
 
 	// Create HostInfoReportResponse instance
 	semverReport := &SemverReportResponse{
