@@ -1,6 +1,10 @@
 # VARIABLES
 variable "REGISTRY" {
-  default = "ghcr.io/layr-labs/eigenda"
+  default = "ghcr.io"
+}
+
+variable "REPO" {
+  default = "layr-labs/eigenda"
 }
 
 variable "BUILD_TAG" {
@@ -126,11 +130,11 @@ target "_release" {
 
 target "node-release" {
   inherits = ["node", "_release"]
-  tags     = ["${REGISTRY}/opr-node:${BUILD_TAG}"]
+  tags     = ["${REGISTRY}/${REPO}/opr-node:${BUILD_TAG}"]
 }
 
 target "nodeplugin-release" {
   inherits = ["nodeplugin", "_release"]
-  tags     = ["${REGISTRY}/opr-nodeplugin:${BUILD_TAG}"]
+  tags     = ["${REGISTRY}/${REPO}/opr-nodeplugin:${BUILD_TAG}"]
 }
 
