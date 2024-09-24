@@ -41,6 +41,8 @@ func (store *mapStore) Delete(key []byte) error {
 	store.lock.Lock()
 	defer store.lock.Unlock()
 
+	fmt.Printf("Deleting key: %v\n", key) // TODO
+
 	stringifiedKey := string(key)
 	delete(store.data, stringifiedKey)
 	return nil

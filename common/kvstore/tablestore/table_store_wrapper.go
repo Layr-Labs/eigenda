@@ -229,6 +229,10 @@ func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 func (t *tableStore) DropTable(name string) error {
+
+	fmt.Printf("tableStore.DropTable %s\n", name)     // TODO
+	fmt.Printf("Table index: %d\n", t.tableMap[name]) // TODO
+
 	tableID, ok := t.tableMap[name]
 	if !ok {
 		// Table does not exist, nothing to do.
