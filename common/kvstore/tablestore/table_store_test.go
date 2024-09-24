@@ -75,6 +75,7 @@ func TestTableList(t *testing.T) {
 	// Add some tables
 
 	_, _, err = store.GetOrCreateTable("table1")
+	assert.NoError(t, err)
 
 	tables = store.GetTables()
 	assert.Equal(t, 1, len(tables))
@@ -221,7 +222,7 @@ func TestUniqueKeySpace(t *testing.T) {
 	err = table1.Delete([]byte("key1"))
 	assert.NoError(t, err)
 
-	value, err = table1.Get([]byte("key1"))
+	_, err = table1.Get([]byte("key1"))
 	assert.Equal(t, kvstore.ErrNotFound, err)
 
 	value, err = table2.Get([]byte("key1"))
@@ -233,7 +234,7 @@ func TestUniqueKeySpace(t *testing.T) {
 	err = store.Delete(kb1.StringKey("key2"))
 	assert.NoError(t, err)
 
-	value, err = store.Get(kb1.StringKey("key2"))
+	_, err = store.Get(kb1.StringKey("key2"))
 	assert.Equal(t, kvstore.ErrNotFound, err)
 
 	value, err = store.Get(kb2.StringKey("key"))
@@ -395,11 +396,12 @@ func TestDropTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = store.Get(kb3.Uint64Key(uint64(i)))
+		_, err = store.Get(kb3.Uint64Key(uint64(i)))
 		assert.NoError(t, err)
 	}
 
 	err = store.DropTable("table2")
+	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
 		expectedValue := make([]byte, 8)
@@ -414,9 +416,11 @@ func TestDropTable(t *testing.T) {
 
 		value, err = store.Get(kb3.Uint64Key(uint64(i)))
 		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
 	}
 
 	err = store.DropTable("table1")
+	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
 		expectedValue := make([]byte, 8)
@@ -434,6 +438,8 @@ func TestDropTable(t *testing.T) {
 	}
 
 	err = store.DropTable("table3")
+	assert.NoError(t, err)
+
 	for i := 0; i < 100; i++ {
 		_, err := store.Get(kb1.Uint64Key(uint64(i)))
 		assert.Equal(t, kvstore.ErrNotFound, err)
@@ -492,6 +498,7 @@ func TestIteration(t *testing.T) {
 		assert.NoError(t, err)
 
 		err = store.Put(kb2.Key(k), value)
+		assert.NoError(t, err)
 	}
 
 	// Prefix "asdf"

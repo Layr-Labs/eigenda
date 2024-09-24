@@ -36,7 +36,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		store := mapstore.NewStore()
-		tableStore, err := tablestore.TableStoreWrapper(store)
+		tableStore, err := tablestore.TableStoreWrapper(logger, store)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +51,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		if err != nil {
 			return nil, err
 		}
-		tableStore, err := tablestore.TableStoreWrapper(store)
+		tableStore, err := tablestore.TableStoreWrapper(logger, store)
 		if err != nil {
 			return nil, err
 		}
