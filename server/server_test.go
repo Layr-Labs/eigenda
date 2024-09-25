@@ -96,7 +96,7 @@ func TestGetHandler(t *testing.T) {
 			expectedCode:           http.StatusOK,
 			expectedBody:           testCommitStr,
 			expectError:            false,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismGeneric, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismKeccak, CertVersion: 0},
 		},
 		{
 			name: "Failure - OP Alt-DA Internal Server Error",
@@ -118,7 +118,7 @@ func TestGetHandler(t *testing.T) {
 			expectedCode:           http.StatusOK,
 			expectedBody:           testCommitStr,
 			expectError:            false,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismAltDA, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismGeneric, CertVersion: 0},
 		},
 	}
 
@@ -232,7 +232,7 @@ func TestPutHandler(t *testing.T) {
 			expectedCode:           http.StatusOK,
 			expectedBody:           opGenericPrefixStr + testCommitStr,
 			expectError:            false,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismAltDA, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismGeneric, CertVersion: 0},
 		},
 		{
 			name: "Success OP Mode Keccak256",
@@ -244,7 +244,7 @@ func TestPutHandler(t *testing.T) {
 			expectedCode:           http.StatusOK,
 			expectedBody:           opKeccakPrefix + testCommitStr,
 			expectError:            false,
-			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismGeneric, CertVersion: 0},
+			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismKeccak, CertVersion: 0},
 		},
 		{
 			name: "Success Simple Commitment Mode",

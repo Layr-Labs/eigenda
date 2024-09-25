@@ -173,7 +173,7 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 	require.Equal(t, 1, stat.Reads)
 }
 
-func TestOptimismAltDACommitment(gt *testing.T) {
+func TestOptimismGenericCommitment(gt *testing.T) {
 	if !runIntegrationTests && !runTestnetIntegrationTests {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}

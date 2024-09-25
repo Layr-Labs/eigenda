@@ -52,7 +52,7 @@ func NewRouter(eigenda KeyGeneratedStore, s3 PrecomputedKeyStore, l log.Logger,
 // Get ... fetches a value from a storage backend based on the (commitment mode, type)
 func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentMode) ([]byte, error) {
 	switch cm {
-	case commitments.OptimismGeneric:
+	case commitments.OptimismKeccak:
 
 		if r.s3 == nil {
 			return nil, errors.New("expected S3 backend for OP keccak256 commitment type, but none configured")
@@ -70,7 +70,7 @@ func (r *Router) Get(ctx context.Context, key []byte, cm commitments.CommitmentM
 		}
 		return value, nil
 
-	case commitments.SimpleCommitmentMode, commitments.OptimismAltDA:
+	case commitments.SimpleCommitmentMode, commitments.OptimismGeneric:
 		if r.eigenda == nil {
 			return nil, errors.New("expected EigenDA backend for DA commitment type, but none configured")
 		}
@@ -121,9 +121,9 @@ func (r *Router) Put(ctx context.Context, cm commitments.CommitmentMode, key, va
 	var err error
 
 	switch cm {
-	case commitments.OptimismGeneric: // caching and fallbacks are unsupported for this commitment mode
+	case commitments.OptimismKeccak: // caching and fallbacks are unsupported for this commitment mode
 		return r.putWithKey(ctx, key, value)
-	case commitments.OptimismAltDA, commitments.SimpleCommitmentMode:
+	case commitments.OptimismGeneric, commitments.SimpleCommitmentMode:
 		commit, err = r.putWithoutKey(ctx, value)
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
