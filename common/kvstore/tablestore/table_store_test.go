@@ -512,6 +512,7 @@ func TestIteration(t *testing.T) {
 		assert.NoError(t, err)
 
 		err = store.Put(kb2.Key(k), value)
+		assert.NoError(t, err)
 	}
 
 	// Add some "interfering" keys in table 1. These should not be seen when iterating over table 2.
@@ -673,6 +674,7 @@ func TestRandomOperations(t *testing.T) {
 			base, err = leveldb.NewStore(logger, dbPath)
 			assert.NoError(t, err)
 			store, err = TableStoreWrapper(logger, base)
+			assert.NoError(t, err)
 		} else if len(tables) == 0 || choice < 0.1 {
 			// Create a new table.
 			name := tu.RandomString(8)
