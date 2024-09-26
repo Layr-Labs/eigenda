@@ -57,6 +57,7 @@ target "batcher" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
+  tags       = ["${REGISTRY}/${REPO}/batcher:${BUILD_TAG}"]
 }
 
 target "disperser" {
@@ -64,6 +65,7 @@ target "disperser" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
+  tags       = ["${REGISTRY}/${REPO}/apiserver:${BUILD_TAG}"]
 }
 
 target "encoder" {
@@ -71,6 +73,7 @@ target "encoder" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
+  tags       = ["${REGISTRY}/${REPO}/encoder:${BUILD_TAG}"]
 }
 
 target "retriever" {
@@ -78,6 +81,7 @@ target "retriever" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
+  tags       = ["${REGISTRY}/${REPO}/retriever:${BUILD_TAG}"]
 }
 
 target "churner" {
@@ -85,13 +89,15 @@ target "churner" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
+  tags       = ["${REGISTRY}/${REPO}/churner:${BUILD_TAG}"]
 }
 
 target "traffic-generator" {
   inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./trafficgenerator.Dockerfile"
-  target     = "generator"
+  target     = "trafficgenerator"
+  tags       = ["${REGISTRY}/${REPO}/trafficgenerator:${BUILD_TAG}"]
 }
 
 target "dataapi" {
@@ -99,6 +105,7 @@ target "dataapi" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "dataapi"
+  tags       = ["${REGISTRY}/${REPO}/dataapi:${BUILD_TAG}"]
 }
 
 # NODE TARGETS
@@ -113,6 +120,7 @@ target "node" {
     GITCOMMIT = "${GITCOMMIT}"
     GITDATE   = "${GITDATE}"
   }
+  tags = ["${REGISTRY}/${REPO}/node:${BUILD_TAG}"]
 }
 
 target "nodeplugin" {
@@ -120,6 +128,7 @@ target "nodeplugin" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "nodeplugin"
+  tags       = ["${REGISTRY}/${REPO}/nodeplugin:${BUILD_TAG}"]
 }
 
 # RELEASE TARGETS
