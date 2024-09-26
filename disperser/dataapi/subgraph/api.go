@@ -195,8 +195,6 @@ func (a *api) QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx context.Co
 }
 
 func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*IndexedOperatorInfo, error) {
-	fmt.Printf("==QueryOperatorInfoByOperatorIdAtBlockNumber ==== operatorId: %v\n", operatorId)
-
 	var (
 		query     queryOperatorById
 		variables = map[string]any{

@@ -24,6 +24,7 @@ type Metrics struct {
 
 	NumRequests *prometheus.CounterVec
 	Latency     *prometheus.SummaryVec
+	Semvers     *prometheus.GaugeVec
 
 	httpPort string
 	logger   logging.Logger
@@ -52,6 +53,13 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			},
 			[]string{"method"},
+		),
+		Semvers: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers",
+				Help: "Node semver install base",
+			},
+			[]string{"semver"},
 		),
 		registry: reg,
 		httpPort: httpPort,
@@ -87,6 +95,13 @@ func (g *Metrics) IncrementNotFoundRequestNum(method string) {
 		"status": "not found",
 		"method": method,
 	}).Inc()
+}
+
+// UpdateSemverMetrics updates the semver metrics
+func (g *Metrics) UpdateSemverCounts(semverData map[string]int) {
+	for semver, count := range semverData {
+		g.Semvers.WithLabelValues(semver).Set(float64(count))
+	}
 }
 
 // Start starts the metrics server
