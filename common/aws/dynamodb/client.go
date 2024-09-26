@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -154,6 +155,52 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	}
 
 	return resp.Attributes, err
+}
+
+func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key Key, item Item) (Item, error) {
+	update := expression.UpdateBuilder{}
+	for itemKey, itemValue := range item {
+		if _, ok := key[itemKey]; ok {
+			// Cannot update the key
+			continue
+		}
+		fmt.Println("updating item", itemKey, itemValue)
+		// ADD numeric values
+		if n, ok := itemValue.(*types.AttributeValueMemberN); ok {
+			fmt.Println("is a number", n.Value)
+			// update = update.Add(expression.Name(itemKey), expression.Value(n.Value))
+			// update = update.Add(expression.Name(itemKey), expression.Value(n.Value))
+			f, _ := strconv.ParseFloat(n.Value, 64)
+			update = update.Add(expression.Name(itemKey), expression.Value(aws.Float64(f)))
+
+		} else {
+			// For non-numeric values, use SET as before
+			update = update.Set(expression.Name(itemKey), expression.Value(itemValue))
+		}
+	}
+
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("update item increment", expr.Update())
+	resp, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       key,
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	})
+	if err != nil {
+		fmt.Println("error updating item", err)
+		return nil, err
+	}
+
+	fmt.Println("update item increment", resp.Attributes)
+
+	return resp.Attributes, nil
 }
 
 func (c *Client) GetItem(ctx context.Context, tableName string, key Key) (Item, error) {

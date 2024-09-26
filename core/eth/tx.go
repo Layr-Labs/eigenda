@@ -979,3 +979,99 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 	}
 	return bytesArray
 }
+
+// // GetActiveReservations retrieves all active reservations from the payment contract
+// func (t *Transactor) GetActiveReservations(ctx context.Context, blockNumber uint) (map[string]*core.ActiveReservation, error) {
+// 	opts := &bind.CallOpts{
+// 		Context:     ctx,
+// 		BlockNumber: big.NewInt(int64(blockNumber)),
+// 	}
+
+// 	// Assuming the contract has a method to get all active reservation accounts
+// 	accounts, err := t.Bindings.PaymentContract.GetActiveReservationAccounts(opts)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	reservations := make(map[string]*core.ActiveReservation)
+// 	for _, account := range accounts {
+// 		reservation, err := t.Bindings.PaymentContract.GetReservation(opts, account)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		reservations[account.String()] = &core.ActiveReservation{
+// 			DataRate:    reservation.DataRate,
+// 			StartEpoch:  reservation.StartEpoch,
+// 			EndEpoch:    reservation.EndEpoch,
+// 			QuorumSplit: reservation.QuorumSplit,
+// 		}
+// 	}
+
+// 	return reservations, nil
+// }
+
+// // GetActiveReservationByAccount retrieves the active reservation for a specific account
+// func (t *Transactor) GetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*core.ActiveReservation, error) {
+// 	opts := &bind.CallOpts{
+// 		Context:     ctx,
+// 		BlockNumber: big.NewInt(int64(blockNumber)),
+// 	}
+
+// 	account := common.HexToAddress(accountID)
+// 	reservation, err := t.Bindings.PaymentContract.GetReservation(opts, account)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &core.ActiveReservation{
+// 		DataRate:    reservation.DataRate,
+// 		StartEpoch:  reservation.StartEpoch,
+// 		EndEpoch:    reservation.EndEpoch,
+// 		QuorumSplit: reservation.QuorumSplit,
+// 	}, nil
+// }
+
+// // GetOnDemandPayments retrieves all on-demand payments from the payment contract
+// func (t *Transactor) GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]*core.OnDemandPayment, error) {
+// 	opts := &bind.CallOpts{
+// 		Context:     ctx,
+// 		BlockNumber: big.NewInt(int64(blockNumber)),
+// 	}
+
+// 	// Assuming the contract has a method to get all on-demand payment accounts
+// 	accounts, err := t.Bindings.PaymentContract.GetOnDemandPaymentAccounts(opts)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	payments := make(map[string]*core.OnDemandPayment)
+// 	for _, account := range accounts {
+// 		payment, err := t.Bindings.PaymentContract.GetOnDemandPayment(opts, account)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		payments[account.String()] = &core.OnDemandPayment{
+// 			CumulativePayment: core.TokenAmount(payment.CumulativePayment.Uint64()),
+// 		}
+// 	}
+
+// 	return payments, nil
+// }
+
+// // GetOnDemandPaymentByAccount retrieves the on-demand payment for a specific account
+// func (t *Transactor) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*core.OnDemandPayment, error) {
+// 	opts := &bind.CallOpts{
+// 		Context:     ctx,
+// 		BlockNumber: big.NewInt(int64(blockNumber)),
+// 	}
+
+// 	account := common.HexToAddress(accountID)
+// 	payment, err := t.Bindings.PaymentContract.GetOnDemandPayment(opts, account)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &core.OnDemandPayment{
+// 		CumulativePayment: core.TokenAmount(payment.CumulativePayment.Uint64()),
+// 	}, nil
+// }
