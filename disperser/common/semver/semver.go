@@ -21,8 +21,8 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numW
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorSocket := core.OperatorSocket(operators[operatorId].Socket)
-			retrievalSocket := operatorSocket.GetRetrievalSocket()
-			semver := GetSemverInfo(context.Background(), retrievalSocket, operatorId, true, logger, nodeInfoTimeout)
+			dispersalSocket := operatorSocket.GetDispersalSocket()
+			semver := GetSemverInfo(context.Background(), dispersalSocket, operatorId, logger, nodeInfoTimeout)
 
 			mu.Lock()
 			semvers[semver]++
@@ -49,7 +49,7 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numW
 }
 
 // query operator host info endpoint if available
-func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorID, useRetrievalSocket bool, logger logging.Logger, timeout time.Duration) string {
+func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorID, logger logging.Logger, timeout time.Duration) string {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "unreachable"
@@ -58,17 +58,14 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	reply := &node.NodeInfoReply{}
-	if useRetrievalSocket {
-		client := node.NewRetrievalClient(conn)
-		reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
-	} else {
-		client := node.NewDispersalClient(conn)
-		reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
-	}
+	client := node.NewDispersalClient(conn)
+	reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
 	if err != nil {
 		var semver string
-		if strings.Contains(err.Error(), "Unimplemented") {
+		if strings.Contains(err.Error(), "unknown method NodeInfo") {
 			semver = "<0.8.0"
+		} else if strings.Contains(err.Error(), "unknown service") {
+			semver = "filtered"
 		} else if strings.Contains(err.Error(), "DeadlineExceeded") {
 			semver = "timeout"
 		} else if strings.Contains(err.Error(), "Unavailable") {

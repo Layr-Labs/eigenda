@@ -229,6 +229,7 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportRespon
 	// Publish semver report metrics
 	s.metrics.UpdateSemverCounts(semvers)
 
+	s.logger.Info("Semver scan completed", "semverReport", semverReport)
 	return semverReport, nil
 }
 
