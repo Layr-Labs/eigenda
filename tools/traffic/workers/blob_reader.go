@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
-	contractEigenDAServiceManager "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
@@ -133,37 +132,45 @@ func (r *BlobReader) randomRead() {
 
 	ctxTimeout, cancel := context.WithTimeout(*r.ctx, r.config.FetchBatchHeaderTimeout)
 	defer cancel()
-	batchHeader, err := metrics.InvokeAndReportLatency(r.metrics.fetchBatchHeaderMetric,
-		func() (*contractEigenDAServiceManager.IEigenDAServiceManagerBatchHeader, error) {
-			return r.chainClient.FetchBatchHeader(
-				ctxTimeout,
-				gcommon.HexToAddress(r.config.EigenDAServiceManager),
-				metadata.BatchHeaderHash[:],
-				big.NewInt(int64(0)),
-				nil)
-		})
+
+	start := time.Now()
+	batchHeader, err := r.chainClient.FetchBatchHeader(
+		ctxTimeout,
+		gcommon.HexToAddress(r.config.EigenDAServiceManager),
+		metadata.BatchHeaderHash[:],
+		big.NewInt(int64(0)),
+		nil)
 	if err != nil {
 		r.logger.Error("failed to get batch header", "err:", err)
 		r.metrics.fetchBatchHeaderFailure.Increment()
 		return
+	} else {
+		end := time.Now()
+		duration := end.Sub(start)
+		r.metrics.fetchBatchHeaderMetric.ReportLatency(duration)
 	}
+
 	r.metrics.fetchBatchHeaderSuccess.Increment()
 
 	ctxTimeout, cancel = context.WithTimeout(*r.ctx, r.config.RetrieveBlobChunksTimeout)
-	chunks, err := metrics.InvokeAndReportLatency(r.metrics.readLatencyMetric, func() (*clients.BlobChunks, error) {
-		return r.retriever.RetrieveBlobChunks(
-			ctxTimeout,
-			metadata.BatchHeaderHash,
-			uint32(metadata.BlobIndex),
-			uint(batchHeader.ReferenceBlockNumber),
-			batchHeader.BlobHeadersRoot,
-			core.QuorumID(0))
-	})
+
+	start = time.Now()
+	chunks, err := r.retriever.RetrieveBlobChunks(
+		ctxTimeout,
+		metadata.BatchHeaderHash,
+		uint32(metadata.BlobIndex),
+		uint(batchHeader.ReferenceBlockNumber),
+		batchHeader.BlobHeadersRoot,
+		core.QuorumID(0))
 	cancel()
 	if err != nil {
 		r.logger.Error("failed to read chunks", "err:", err)
 		r.metrics.readFailureMetric.Increment()
 		return
+	} else {
+		end := time.Now()
+		duration := end.Sub(start)
+		r.metrics.readLatencyMetric.ReportLatency(duration)
 	}
 	r.metrics.readSuccessMetric.Increment()
 

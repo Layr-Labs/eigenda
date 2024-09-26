@@ -203,14 +203,16 @@ func (tracker *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperser
 	ctxTimeout, cancel := context.WithTimeout(*tracker.ctx, tracker.config.GetBlobStatusTimeout)
 	defer cancel()
 
-	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](tracker.getStatusLatencyMetric,
-		func() (*disperser.BlobStatusReply, error) {
-			return tracker.disperser.GetBlobStatus(ctxTimeout, key.Key)
-		})
+	start := time.Now()
+	status, err := tracker.disperser.GetBlobStatus(ctxTimeout, key.Key)
 
 	if err != nil {
 		tracker.getStatusErrorCountMetric.Increment()
 		return nil, err
+	} else {
+		end := time.Now()
+		duration := end.Sub(start)
+		tracker.getStatusLatencyMetric.ReportLatency(duration)
 	}
 
 	return status, nil

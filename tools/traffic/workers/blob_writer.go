@@ -111,13 +111,16 @@ func (writer *BlobWriter) writeNextBlob() {
 		writer.logger.Error("failed to get random data", "err", err)
 		return
 	}
-	key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
-		return writer.sendRequest(data)
-	})
+	start := time.Now()
+	key, err := writer.sendRequest(data)
 	if err != nil {
 		writer.writeFailureMetric.Increment()
 		writer.logger.Error("failed to send blob request", "err", err)
 		return
+	} else {
+		end := time.Now()
+		duration := end.Sub(start)
+		writer.writeLatencyMetric.ReportLatency(duration)
 	}
 
 	writer.writeSuccessMetric.Increment()
