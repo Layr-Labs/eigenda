@@ -153,6 +153,7 @@ func (r *BlobReader) randomRead() {
 	r.metrics.fetchBatchHeaderSuccess.Increment()
 
 	ctxTimeout, cancel = context.WithTimeout(*r.ctx, r.config.RetrieveBlobChunksTimeout)
+	defer cancel()
 
 	start = time.Now()
 	chunks, err := r.retriever.RetrieveBlobChunks(
@@ -162,7 +163,6 @@ func (r *BlobReader) randomRead() {
 		uint(batchHeader.ReferenceBlockNumber),
 		batchHeader.BlobHeadersRoot,
 		core.QuorumID(0))
-	cancel()
 	if err != nil {
 		r.logger.Error("failed to read chunks", "err:", err)
 		r.metrics.readFailureMetric.Increment()
