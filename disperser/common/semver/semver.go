@@ -57,9 +57,8 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 	defer conn.Close()
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	reply := &node.NodeInfoReply{}
 	client := node.NewDispersalClient(conn)
-	reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	reply, err := client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
 	if err != nil {
 		var semver string
 		if strings.Contains(err.Error(), "unknown method NodeInfo") {

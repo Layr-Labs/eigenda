@@ -84,9 +84,6 @@ type (
 	queryOperatorRegistereds struct {
 		OperatorRegistereds []*Operator `graphql:"operatorRegistereds(first: $first)"`
 	}
-	queryOperatorDeregistereds struct {
-		OperatorDeregistereds []*Operator `graphql:"operatorDeregistereds(first: $first)"`
-	}
 	queryBatchNonSigningOperatorIdsInInterval struct {
 		BatchNonSigningOperatorIds []*BatchNonSigningOperatorIds `graphql:"batches(first: $first, skip: $skip, where: {blockTimestamp_gt: $blockTimestamp_gt})"`
 	}
