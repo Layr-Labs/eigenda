@@ -1,4 +1,4 @@
-package store
+package s3
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/minio/minio-go/v7"
 
@@ -16,44 +17,44 @@ import (
 )
 
 const (
-	S3CredentialStatic  S3CredentialType = "static"
-	S3CredentialIAM     S3CredentialType = "iam"
-	S3CredentialUnknown S3CredentialType = "unknown"
+	CredentialTypeStatic  CredentialType = "static"
+	CredentialTypeIAM     CredentialType = "iam"
+	CredentialTypeUnknown CredentialType = "unknown"
 )
 
-func StringToS3CredentialType(s string) S3CredentialType {
+func StringToCredentialType(s string) CredentialType {
 	switch s {
 	case "static":
-		return S3CredentialStatic
+		return CredentialTypeStatic
 	case "iam":
-		return S3CredentialIAM
+		return CredentialTypeIAM
 	default:
-		return S3CredentialUnknown
+		return CredentialTypeUnknown
 	}
 }
 
-var _ PrecomputedKeyStore = (*S3Store)(nil)
+var _ store.PrecomputedKeyStore = (*Store)(nil)
 
-type S3CredentialType string
-type S3Config struct {
-	S3CredentialType S3CredentialType
-	Bucket           string
-	Path             string
-	Endpoint         string
-	AccessKeyID      string
-	AccessKeySecret  string
-	Profiling        bool
-	Backup           bool
-	Timeout          time.Duration
+type CredentialType string
+type Config struct {
+	CredentialType  CredentialType
+	Endpoint        string
+	AccessKeyID     string
+	AccessKeySecret string
+	Bucket          string
+	Path            string
+	Backup          bool
+	Timeout         time.Duration
+	Profiling       bool
 }
 
-type S3Store struct {
-	cfg    S3Config
+type Store struct {
+	cfg    Config
 	client *minio.Client
-	stats  *Stats
+	stats  *store.Stats
 }
 
-func NewS3(cfg S3Config) (*S3Store, error) {
+func NewS3(cfg Config) (*Store, error) {
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  creds(cfg),
 		Secure: false,
@@ -62,17 +63,17 @@ func NewS3(cfg S3Config) (*S3Store, error) {
 		return nil, err
 	}
 
-	return &S3Store{
+	return &Store{
 		cfg:    cfg,
 		client: client,
-		stats: &Stats{
+		stats: &store.Stats{
 			Entries: 0,
 			Reads:   0,
 		},
 	}, nil
 }
 
-func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
+func (s *Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 	result, err := s.client.GetObject(ctx, s.cfg.Bucket, path.Join(s.cfg.Path, hex.EncodeToString(key)), minio.GetObjectOptions{})
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
@@ -94,7 +95,7 @@ func (s *S3Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
+func (s *Store) Put(ctx context.Context, key []byte, value []byte) error {
 	_, err := s.client.PutObject(ctx, s.cfg.Bucket, path.Join(s.cfg.Path, hex.EncodeToString(key)), bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
 	if err != nil {
 		return err
@@ -107,7 +108,7 @@ func (s *S3Store) Put(ctx context.Context, key []byte, value []byte) error {
 	return nil
 }
 
-func (s *S3Store) Verify(key []byte, value []byte) error {
+func (s *Store) Verify(key []byte, value []byte) error {
 	h := crypto.Keccak256Hash(value)
 	if !bytes.Equal(h[:], key) {
 		return errors.New("key does not match value")
@@ -116,16 +117,16 @@ func (s *S3Store) Verify(key []byte, value []byte) error {
 	return nil
 }
 
-func (s *S3Store) Stats() *Stats {
+func (s *Store) Stats() *store.Stats {
 	return s.stats
 }
 
-func (s *S3Store) BackendType() BackendType {
-	return S3
+func (s *Store) BackendType() store.BackendType {
+	return store.S3BackendType
 }
 
-func creds(cfg S3Config) *credentials.Credentials {
-	if cfg.S3CredentialType == S3CredentialIAM {
+func creds(cfg Config) *credentials.Credentials {
+	if cfg.CredentialType == CredentialTypeIAM {
 		return credentials.NewIAM("")
 	}
 	return credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, "")

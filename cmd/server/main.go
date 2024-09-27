@@ -8,8 +8,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
 
+	"github.com/Layr-Labs/eigenda-proxy/flags"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/ethereum-optimism/optimism/op-service/cliapp"
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
@@ -26,7 +26,7 @@ func main() {
 	oplog.SetupDefaults()
 
 	app := cli.NewApp()
-	app.Flags = cliapp.ProtectFlags(server.Flags)
+	app.Flags = cliapp.ProtectFlags(flags.Flags)
 	app.Version = Version
 	app.Name = "eigenda-proxy"
 	app.Usage = "EigenDA Proxy Sidecar Service"

@@ -17,7 +17,7 @@ type IRouter interface {
 	Get(ctx context.Context, key []byte, cm commitments.CommitmentMode) ([]byte, error)
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
 
-	GetEigenDAStore() KeyGeneratedStore
+	GetEigenDAStore() GeneratedKeyStore
 	GetS3Store() PrecomputedKeyStore
 	Caches() []PrecomputedKeyStore
 	Fallbacks() []PrecomputedKeyStore
@@ -26,7 +26,7 @@ type IRouter interface {
 // Router ... storage backend routing layer
 type Router struct {
 	log     log.Logger
-	eigenda KeyGeneratedStore
+	eigenda GeneratedKeyStore
 	s3      PrecomputedKeyStore
 
 	caches    []PrecomputedKeyStore
@@ -36,7 +36,7 @@ type Router struct {
 	fallbackLock sync.RWMutex
 }
 
-func NewRouter(eigenda KeyGeneratedStore, s3 PrecomputedKeyStore, l log.Logger,
+func NewRouter(eigenda GeneratedKeyStore, s3 PrecomputedKeyStore, l log.Logger,
 	caches []PrecomputedKeyStore, fallbacks []PrecomputedKeyStore) (IRouter, error) {
 	return &Router{
 		log:          l,
@@ -252,7 +252,7 @@ func (r *Router) cacheEnabled() bool {
 }
 
 // GetEigenDAStore ...
-func (r *Router) GetEigenDAStore() KeyGeneratedStore {
+func (r *Router) GetEigenDAStore() GeneratedKeyStore {
 	return r.eigenda
 }
 

@@ -4,13 +4,19 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
-	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
+	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
+	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
+	"github.com/Layr-Labs/eigenda-proxy/utils"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -53,15 +59,15 @@ func TestConfig(useMemory bool) *Cfg {
 }
 
 func createRedisConfig(eigendaCfg server.Config) server.CLIConfig {
+	eigendaCfg.RedisConfig = redis.Config{
+		Endpoint: "127.0.0.1:9001",
+		Password: "",
+		DB:       0,
+		Eviction: 10 * time.Minute,
+		Profile:  true,
+	}
 	return server.CLIConfig{
 		EigenDAConfig: eigendaCfg,
-		RedisCfg: store.RedisConfig{
-			Endpoint: "127.0.0.1:9001",
-			Password: "",
-			DB:       0,
-			Eviction: 10 * time.Minute,
-			Profile:  true,
-		},
 	}
 }
 
@@ -70,18 +76,18 @@ func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 	bucketName := "eigenda-proxy-test-" + RandString(10)
 	createS3Bucket(bucketName)
 
+	eigendaCfg.S3Config = s3.Config{
+		Profiling:       true,
+		Bucket:          bucketName,
+		Path:            "",
+		Endpoint:        "localhost:4566",
+		AccessKeySecret: "minioadmin",
+		AccessKeyID:     "minioadmin",
+		CredentialType:  s3.CredentialTypeStatic,
+		Backup:          false,
+	}
 	return server.CLIConfig{
 		EigenDAConfig: eigendaCfg,
-		S3Config: store.S3Config{
-			Profiling:        true,
-			Bucket:           bucketName,
-			Path:             "",
-			Endpoint:         "localhost:4566",
-			AccessKeySecret:  "minioadmin",
-			AccessKeyID:      "minioadmin",
-			S3CredentialType: store.S3CredentialStatic,
-			Backup:           false,
-		},
 	}
 }
 
@@ -105,28 +111,39 @@ func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
 		pollInterval = time.Minute * 1
 	}
 
+	maxBlobLengthBytes, err := utils.ParseBytesAmount("16mib")
+	require.NoError(t, err)
 	eigendaCfg := server.Config{
-		ClientConfig: clients.EigenDAClientConfig{
+		EdaClientConfig: clients.EigenDAClientConfig{
 			RPC:                      holeskyDA,
 			StatusQueryTimeout:       time.Minute * 45,
 			StatusQueryRetryInterval: pollInterval,
 			DisableTLS:               false,
 			SignerPrivateKeyHex:      pk,
 		},
-		EthRPC:                 ethRPC,
-		SvcManagerAddr:         "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
-		CacheDir:               "../resources/SRSTables",
-		G1Path:                 "../resources/g1.point",
-		MaxBlobLength:          "16mib",
-		G2PowerOfTauPath:       "../resources/g2.point.powerOf2",
-		PutBlobEncodingVersion: 0x00,
-		MemstoreEnabled:        testCfg.UseMemory,
-		MemstoreBlobExpiration: testCfg.Expiration,
-		EthConfirmationDepth:   0,
+		VerifierConfig: verify.Config{
+			VerifyCerts:          false,
+			RPCURL:               ethRPC,
+			SvcManagerAddr:       "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
+			EthConfirmationDepth: 0,
+			KzgConfig: &kzg.KzgConfig{
+				G1Path:          "../resources/g1.point",
+				G2PowerOf2Path:  "../resources/g2.point.powerOf2",
+				CacheDir:        "../resources/SRSTables",
+				SRSOrder:        268435456,
+				SRSNumberToLoad: maxBlobLengthBytes / 32,
+				NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+			},
+		},
+		MemstoreEnabled: testCfg.UseMemory,
+		MemstoreConfig: memstore.Config{
+			BlobExpiration:   testCfg.Expiration,
+			MaxBlobSizeBytes: maxBlobLengthBytes,
+		},
 	}
 
 	if testCfg.UseMemory {
-		eigendaCfg.ClientConfig.SignerPrivateKeyHex = "0000000000000000000100000000000000000000000000000000000000000000"
+		eigendaCfg.EdaClientConfig.SignerPrivateKeyHex = "0000000000000000000100000000000000000000000000000000000000000000"
 	}
 
 	var cfg server.CLIConfig

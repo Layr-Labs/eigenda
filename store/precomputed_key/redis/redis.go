@@ -1,4 +1,4 @@
-package store
+package redis
 
 import (
 	"context"
@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/go-redis/redis/v8"
 )
 
-// RedisConfig ... user configurable
-type RedisConfig struct {
+// Config ... user configurable
+type Config struct {
 	Endpoint string
 	Password string
 	DB       int
@@ -18,8 +19,8 @@ type RedisConfig struct {
 	Profile  bool
 }
 
-// RedStore ... Redis storage backend implementation (This not safe for concurrent usage)
-type RedStore struct {
+// Store ... Redis storage backend implementation (This not safe for concurrent usage)
+type Store struct {
 	eviction time.Duration
 
 	client *redis.Client
@@ -29,10 +30,10 @@ type RedStore struct {
 	entries int
 }
 
-var _ PrecomputedKeyStore = (*RedStore)(nil)
+var _ store.PrecomputedKeyStore = (*Store)(nil)
 
-// NewRedisStore ... constructor
-func NewRedisStore(cfg *RedisConfig) (*RedStore, error) {
+// NewStore ... constructor
+func NewStore(cfg *Config) (*Store, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.Endpoint,
 		Password: cfg.Password,
@@ -48,7 +49,7 @@ func NewRedisStore(cfg *RedisConfig) (*RedStore, error) {
 		return nil, fmt.Errorf("failed to ping redis server: %w", cmd.Err())
 	}
 
-	return &RedStore{
+	return &Store{
 		eviction: cfg.Eviction,
 		client:   client,
 		profile:  cfg.Profile,
@@ -58,7 +59,7 @@ func NewRedisStore(cfg *RedisConfig) (*RedStore, error) {
 
 // Get ... retrieves a value from the Redis store. Returns nil if the key is not found vs. an error
 // if the key is found but the value is not retrievable.
-func (r *RedStore) Get(ctx context.Context, key []byte) ([]byte, error) {
+func (r *Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 	value, err := r.client.Get(ctx, string(key)).Result()
 	if errors.Is(err, redis.Nil) { // key DNE
 		return nil, nil
@@ -75,7 +76,7 @@ func (r *RedStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 // Put ... inserts a value into the Redis store
-func (r *RedStore) Put(ctx context.Context, key []byte, value []byte) error {
+func (r *Store) Put(ctx context.Context, key []byte, value []byte) error {
 	err := r.client.Set(ctx, string(key), string(value), r.eviction).Err()
 	if err == nil && r.profile {
 		r.entries++
@@ -84,16 +85,16 @@ func (r *RedStore) Put(ctx context.Context, key []byte, value []byte) error {
 	return err
 }
 
-func (r *RedStore) Verify(_ []byte, _ []byte) error {
+func (r *Store) Verify(_ []byte, _ []byte) error {
 	return nil
 }
 
-func (r *RedStore) BackendType() BackendType {
-	return Redis
+func (r *Store) BackendType() store.BackendType {
+	return store.RedisBackendType
 }
 
-func (r *RedStore) Stats() *Stats {
-	return &Stats{
+func (r *Store) Stats() *store.Stats {
+	return &store.Stats{
 		Entries: r.entries,
 		Reads:   r.reads,
 	}

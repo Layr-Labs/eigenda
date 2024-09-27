@@ -25,6 +25,7 @@ type Config struct {
 	EthConfirmationDepth uint64
 }
 
+// TODO: right now verification and confirmation depth are tightly coupled. we should decouple them
 type Verifier struct {
 	// kzgVerifier is needed to commit blobs to the memstore
 	kzgVerifier *kzgverifier.Verifier

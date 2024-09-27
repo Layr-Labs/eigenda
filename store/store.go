@@ -9,10 +9,10 @@ import (
 type BackendType uint8
 
 const (
-	EigenDA BackendType = iota
-	Memory
-	S3
-	Redis
+	EigenDABackendType BackendType = iota
+	MemoryBackendType
+	S3BackendType
+	RedisBackendType
 
 	Unknown
 )
@@ -24,13 +24,13 @@ var (
 
 func (b BackendType) String() string {
 	switch b {
-	case EigenDA:
+	case EigenDABackendType:
 		return "EigenDA"
-	case Memory:
+	case MemoryBackendType:
 		return "Memory"
-	case S3:
+	case S3BackendType:
 		return "S3"
-	case Redis:
+	case RedisBackendType:
 		return "Redis"
 	case Unknown:
 		fallthrough
@@ -44,13 +44,13 @@ func StringToBackendType(s string) BackendType {
 
 	switch lower {
 	case "eigenda":
-		return EigenDA
+		return EigenDABackendType
 	case "memory":
-		return Memory
+		return MemoryBackendType
 	case "s3":
-		return S3
+		return S3BackendType
 	case "redis":
-		return Redis
+		return RedisBackendType
 	case "unknown":
 		fallthrough
 	default:
@@ -73,7 +73,7 @@ type Store interface {
 	Verify(key []byte, value []byte) error
 }
 
-type KeyGeneratedStore interface {
+type GeneratedKeyStore interface {
 	Store
 	// Get retrieves the given key if it's present in the key-value data store.
 	Get(ctx context.Context, key []byte) ([]byte, error)

@@ -1,4 +1,4 @@
-package store
+package memstore
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -22,7 +23,7 @@ const (
 	DefaultPruneInterval = 500 * time.Millisecond
 )
 
-type MemStoreConfig struct {
+type Config struct {
 	MaxBlobSizeBytes uint64
 	BlobExpiration   time.Duration
 	// artificial latency added for memstore backend to mimic eigenda's latency
@@ -38,7 +39,7 @@ EigenDA operators.
 type MemStore struct {
 	sync.RWMutex
 
-	config    MemStoreConfig
+	config    Config
 	l         log.Logger
 	keyStarts map[string]time.Time
 	store     map[string][]byte
@@ -48,11 +49,11 @@ type MemStore struct {
 	reads int
 }
 
-var _ KeyGeneratedStore = (*MemStore)(nil)
+var _ store.GeneratedKeyStore = (*MemStore)(nil)
 
-// NewMemStore ... constructor
-func NewMemStore(
-	ctx context.Context, verifier *verify.Verifier, l log.Logger, config MemStoreConfig,
+// New ... constructor
+func New(
+	ctx context.Context, verifier *verify.Verifier, l log.Logger, config Config,
 ) (*MemStore, error) {
 	store := &MemStore{
 		l:         l,
@@ -134,7 +135,7 @@ func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	time.Sleep(e.config.PutLatency)
 	if uint64(len(value)) > e.config.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
+		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", store.ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
 	}
 
 	e.Lock()
@@ -222,15 +223,15 @@ func (e *MemStore) Verify(_, _ []byte) error {
 }
 
 // Stats ... returns the current usage metrics of the in-memory key-value data store.
-func (e *MemStore) Stats() *Stats {
+func (e *MemStore) Stats() *store.Stats {
 	e.RLock()
 	defer e.RUnlock()
-	return &Stats{
+	return &store.Stats{
 		Entries: len(e.store),
 		Reads:   e.reads,
 	}
 }
 
-func (e *MemStore) BackendType() BackendType {
-	return Memory
+func (e *MemStore) BackendType() store.BackendType {
+	return store.MemoryBackendType
 }

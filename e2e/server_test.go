@@ -110,7 +110,7 @@ func TestKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T) {
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := e2e.TestSuiteConfig(t, testCfg)
-	tsConfig.S3Config.Endpoint = ""
+	tsConfig.EigenDAConfig.S3Config.Endpoint = ""
 	ts, kill := e2e.CreateTestSuite(t, tsConfig)
 	defer kill()
 
@@ -393,7 +393,7 @@ func TestProxyServerCachingWithRedis(t *testing.T) {
 	require.Equal(t, testPreimage, preimage)
 
 	// ensure that read was from cache
-	redStats, err := ts.Server.GetStoreStats(store.Redis)
+	redStats, err := ts.Server.GetStoreStats(store.RedisBackendType)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, redStats.Reads)

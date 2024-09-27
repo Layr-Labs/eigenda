@@ -80,10 +80,10 @@ func (mr *MockIRouterMockRecorder) Get(arg0, arg1, arg2 interface{}) *gomock.Cal
 }
 
 // GetEigenDAStore mocks base method.
-func (m *MockIRouter) GetEigenDAStore() store.KeyGeneratedStore {
+func (m *MockIRouter) GetEigenDAStore() store.GeneratedKeyStore {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEigenDAStore")
-	ret0, _ := ret[0].(store.KeyGeneratedStore)
+	ret0, _ := ret[0].(store.GeneratedKeyStore)
 	return ret0
 }
 

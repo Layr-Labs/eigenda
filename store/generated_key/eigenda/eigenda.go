@@ -1,4 +1,4 @@
-package store
+package eigenda
 
 import (
 	"context"
@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-type EigenDAStoreConfig struct {
+type StoreConfig struct {
 	MaxBlobSizeBytes uint64
 	// the # of Ethereum blocks to wait after the EigenDA L1BlockReference # before attempting to verify
 	// & accredit a blob
@@ -22,19 +23,19 @@ type EigenDAStoreConfig struct {
 	StatusQueryTimeout time.Duration
 }
 
-// EigenDAStore does storage interactions and verifications for blobs with DA.
-type EigenDAStore struct {
+// Store does storage interactions and verifications for blobs with DA.
+type Store struct {
 	client   *clients.EigenDAClient
 	verifier *verify.Verifier
-	cfg      *EigenDAStoreConfig
+	cfg      *StoreConfig
 	log      log.Logger
 }
 
-var _ KeyGeneratedStore = (*EigenDAStore)(nil)
+var _ store.GeneratedKeyStore = (*Store)(nil)
 
-func NewEigenDAStore(client *clients.EigenDAClient,
-	v *verify.Verifier, log log.Logger, cfg *EigenDAStoreConfig) (*EigenDAStore, error) {
-	return &EigenDAStore{
+func NewStore(client *clients.EigenDAClient,
+	v *verify.Verifier, log log.Logger, cfg *StoreConfig) (*Store, error) {
+	return &Store{
 		client:   client,
 		verifier: v,
 		log:      log,
@@ -44,7 +45,7 @@ func NewEigenDAStore(client *clients.EigenDAClient,
 
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
+func (e Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
@@ -60,13 +61,13 @@ func (e EigenDAStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 // Put disperses a blob for some pre-image and returns the associated RLP encoded certificate commit.
-func (e EigenDAStore) Put(ctx context.Context, value []byte) ([]byte, error) {
+func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	encodedBlob, err := e.client.GetCodec().EncodeBlob(value)
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
 	}
 	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", ErrProxyOversizedBlob, len(value), e.cfg.MaxBlobSizeBytes)
+		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", store.ErrProxyOversizedBlob, len(value), e.cfg.MaxBlobSizeBytes)
 	}
 
 	dispersalStart := time.Now()
@@ -116,18 +117,18 @@ func (e EigenDAStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 }
 
 // Entries are a no-op for EigenDA Store
-func (e EigenDAStore) Stats() *Stats {
+func (e Store) Stats() *store.Stats {
 	return nil
 }
 
 // Backend returns the backend type for EigenDA Store
-func (e EigenDAStore) BackendType() BackendType {
-	return EigenDA
+func (e Store) BackendType() store.BackendType {
+	return store.EigenDABackendType
 }
 
 // Key is used to recover certificate fields and that verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e EigenDAStore) Verify(key []byte, value []byte) error {
+func (e Store) Verify(key []byte, value []byte) error {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
