@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
+	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions"
 	"github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
-	plasma "github.com/ethereum-optimism/optimism/op-plasma"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum/go-ethereum/common"
@@ -17,12 +17,12 @@ import (
 
 var defaultAlloc = &e2eutils.AllocParams{PrefundTestUsers: true}
 
-// L2PlasmaDA is a test harness for manipulating plasma DA state.
-type L2PlasmaDA struct {
+// L2AltDA is a test harness for manipulating altda DA state.
+type L2AltDA struct {
 	log       log.Logger
-	storage   *plasma.DAClient
-	daMgr     *plasma.DA
-	plasmaCfg plasma.Config
+	storage   *altda.DAClient
+	daMgr     *altda.DA
+	altdaCfg  altda.Config
 	batcher   *actions.L2Batcher
 	sequencer *actions.L2Sequencer
 	engine    *actions.L2Engine
@@ -32,30 +32,30 @@ type L2PlasmaDA struct {
 	miner     *actions.L1Miner
 }
 
-func (a *L2PlasmaDA) ActL1Blocks(t actions.Testing, n uint64) {
+func (a *L2AltDA) ActL1Blocks(t actions.Testing, n uint64) {
 	for i := uint64(0); i < n; i++ {
 		a.miner.ActL1StartBlock(12)(t)
 		a.miner.ActL1EndBlock(t)
 	}
 }
 
-func NewL2PlasmaDA(t actions.Testing, daHost string, altDA bool) *L2PlasmaDA {
+func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 	p := &e2eutils.TestParams{
 		MaxSequencerDrift:   40,
 		SequencerWindowSize: 120,
 		ChannelTimeout:      120,
 		L1BlockTime:         12,
-		UsePlasma:           true,
+		UseAltDA:            true,
 	}
 
 	log := testlog.Logger(t, log.LvlDebug)
 
-	config.DeployConfig.DACommitmentType = plasma.GenericCommitmentString
+	config.DeployConfig.DACommitmentType = altda.GenericCommitmentString
 	dp := e2eutils.MakeDeployParams(t, p)
 	dp.DeployConfig.DAChallengeProxy = common.Address{0x42}
 	sd := e2eutils.Setup(t, dp, defaultAlloc)
 
-	require.True(t, sd.RollupCfg.PlasmaEnabled())
+	require.True(t, sd.RollupCfg.AltDAEnabled())
 
 	miner := actions.NewL1Miner(t, log, sd.L1Cfg)
 	l1Client := miner.EthClient()
@@ -64,41 +64,41 @@ func NewL2PlasmaDA(t actions.Testing, daHost string, altDA bool) *L2PlasmaDA {
 	engine := actions.NewL2Engine(t, log, sd.L2Cfg, sd.RollupCfg.Genesis.L1, jwtPath)
 	engCl := engine.EngineClient(t, sd.RollupCfg)
 
-	var storage *plasma.DAClient
+	var storage *altda.DAClient
 	if !altDA {
-		storage = plasma.NewDAClient(daHost, true, true)
+		storage = altda.NewDAClient(daHost, true, true)
 	} else {
-		storage = plasma.NewDAClient(daHost, false, false)
+		storage = altda.NewDAClient(daHost, false, false)
 	}
 
 	l1F, err := sources.NewL1Client(miner.RPCClient(), log, nil, sources.L1ClientDefaultConfig(sd.RollupCfg, false, sources.RPCKindBasic))
 	require.NoError(t, err)
 
-	plasmaCfg, err := sd.RollupCfg.GetOPPlasmaConfig()
+	altdaCfg, err := sd.RollupCfg.GetOPAltDAConfig()
 	require.NoError(t, err)
 
 	if altDA {
-		plasmaCfg.CommitmentType = plasma.GenericCommitmentType
+		altdaCfg.CommitmentType = altda.GenericCommitmentType
 	} else {
-		plasmaCfg.CommitmentType = plasma.Keccak256CommitmentType
+		altdaCfg.CommitmentType = altda.Keccak256CommitmentType
 	}
 
-	daMgr := plasma.NewPlasmaDAWithStorage(log, plasmaCfg, storage, &plasma.NoopMetrics{})
+	daMgr := altda.NewAltDAWithStorage(log, altdaCfg, storage, &altda.NoopMetrics{})
 
-	enabled := sd.RollupCfg.PlasmaEnabled()
+	enabled := sd.RollupCfg.AltDAEnabled()
 	require.True(t, enabled)
 
 	sequencer := actions.NewL2Sequencer(t, log, l1F, nil, daMgr, engCl, sd.RollupCfg, 0)
 	miner.ActL1SetFeeRecipient(common.Address{'A'})
 	sequencer.ActL2PipelineFull(t)
 
-	batcher := actions.NewL2Batcher(log, sd.RollupCfg, actions.PlasmaBatcherCfg(dp, storage), sequencer.RollupClient(), l1Client, engine.EthClient(), engCl)
+	batcher := actions.NewL2Batcher(log, sd.RollupCfg, actions.AltDABatcherCfg(dp, storage), sequencer.RollupClient(), l1Client, engine.EthClient(), engCl)
 
-	return &L2PlasmaDA{
+	return &L2AltDA{
 		log:       log,
 		storage:   storage,
 		daMgr:     daMgr,
-		plasmaCfg: plasmaCfg,
+		altdaCfg:  altdaCfg,
 		batcher:   batcher,
 		sequencer: sequencer,
 		engine:    engine,
@@ -109,7 +109,7 @@ func NewL2PlasmaDA(t actions.Testing, daHost string, altDA bool) *L2PlasmaDA {
 	}
 }
 
-func (a *L2PlasmaDA) ActL1Finalized(t actions.Testing) {
+func (a *L2AltDA) ActL1Finalized(t actions.Testing) {
 	latest := uint64(2)
 	a.miner.ActL1Safe(t, latest)
 	a.miner.ActL1Finalize(t, latest)
@@ -130,7 +130,7 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 
 	t := actions.NewDefaultTesting(gt)
 
-	optimism := NewL2PlasmaDA(t, proxyTS.Address(), false)
+	optimism := NewL2AltDA(t, proxyTS.Address(), false)
 
 	// build L1 block #1
 	optimism.ActL1Blocks(t, 1)
@@ -184,7 +184,7 @@ func TestOptimismGenericCommitment(gt *testing.T) {
 
 	t := actions.NewDefaultTesting(gt)
 
-	optimism := NewL2PlasmaDA(t, proxyTS.Address(), true)
+	optimism := NewL2AltDA(t, proxyTS.Address(), true)
 
 	// build L1 block #1
 	optimism.ActL1Blocks(t, 1)

@@ -8,8 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/urfave/cli/v2"
 
+	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
-	"github.com/ethereum-optimism/optimism/op-service/opio"
 )
 
 func StartProxySvr(cliCtx *cli.Context) error {
@@ -63,7 +63,5 @@ func StartProxySvr(cliCtx *cli.Context) error {
 		m.RecordUp()
 	}
 
-	opio.BlockOnInterrupts()
-
-	return nil
+	return ctxinterrupt.Wait(cliCtx.Context)
 }

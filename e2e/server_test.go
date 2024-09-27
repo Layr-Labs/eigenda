@@ -11,7 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 	"github.com/Layr-Labs/eigenda-proxy/store"
-	op_plasma "github.com/ethereum-optimism/optimism/op-plasma"
+	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ func isNilPtrDerefPanic(err string) bool {
 		strings.Contains(err, "nil pointer dereference")
 }
 
-// TestOpClientKeccak256MalformedInputs tests the NewDAClient from op_plasma by setting and getting against []byte("")
+// TestOpClientKeccak256MalformedInputs tests the NewDAClient from altda by setting and getting against []byte("")
 // preimage. It sets the precompute option to false on the NewDAClient.
 func TestOpClientKeccak256MalformedInputs(t *testing.T) {
 	if !runIntegrationTests || runTestnetIntegrationTests {
@@ -41,15 +41,15 @@ func TestOpClientKeccak256MalformedInputs(t *testing.T) {
 
 	// nil commitment. Should return an error but currently is not. This needs to be fixed by OP
 	// Ref: https://github.com/ethereum-optimism/optimism/issues/11987
-	// daClient := op_plasma.NewDAClient(ts.Address(), false, true)
+	// daClient := altda.NewDAClient(ts.Address(), false, true)
 	// t.Run("nil commitment case", func(t *testing.T) {
-	//	var commit op_plasma.CommitmentData
+	//	var commit altda.CommitmentData
 	//	_, err := daClient.GetInput(ts.Ctx, commit)
 	//	require.Error(t, err)
 	//	assert.True(t, !isPanic(err.Error()))
 	// })
 
-	daClientPcFalse := op_plasma.NewDAClient(ts.Address(), false, false)
+	daClientPcFalse := altda.NewDAClient(ts.Address(), false, false)
 
 	t.Run("input bad data to SetInput & GetInput", func(t *testing.T) {
 		testPreimage := []byte("") // Empty preimage
@@ -60,7 +60,7 @@ func TestOpClientKeccak256MalformedInputs(t *testing.T) {
 		assert.True(t, strings.Contains(err.Error(), "invalid input") && !isNilPtrDerefPanic(err.Error()))
 
 		// The below test panics silently.
-		input := op_plasma.NewGenericCommitment([]byte(""))
+		input := altda.NewGenericCommitment([]byte(""))
 		_, err = daClientPcFalse.GetInput(ts.Ctx, input)
 		require.Error(t, err)
 
@@ -85,7 +85,7 @@ func TestOptimismClientWithKeccak256Commitment(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(t, tsConfig)
 	defer kill()
 
-	daClient := op_plasma.NewDAClient(ts.Address(), false, true)
+	daClient := altda.NewDAClient(ts.Address(), false, true)
 
 	t.Run("normal case", func(t *testing.T) {
 		testPreimage := []byte(e2e.RandString(100))
@@ -114,7 +114,7 @@ func TestKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(t, tsConfig)
 	defer kill()
 
-	daClient := op_plasma.NewDAClient(ts.Address(), false, true)
+	daClient := altda.NewDAClient(ts.Address(), false, true)
 
 	testPreimage := []byte(e2e.RandString(100))
 
@@ -139,7 +139,7 @@ func TestOptimismClientWithGenericCommitment(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(t, tsConfig)
 	defer kill()
 
-	daClient := op_plasma.NewDAClient(ts.Address(), false, false)
+	daClient := altda.NewDAClient(ts.Address(), false, false)
 
 	testPreimage := []byte(e2e.RandString(100))
 

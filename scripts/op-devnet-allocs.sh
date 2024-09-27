@@ -12,7 +12,7 @@ cd ${REPO_NAME}
 echo "Initializing monorepo..."
 make install-geth &&
 git submodule update --init --recursive &&
-make DEVNET_PLASMA=true GENERIC_PLASMA=false devnet-allocs &&
+make DEVNET_ALTDA=true GENERIC_ALTDA=false devnet-allocs &&
 cp -R .devnet ../. &&
 mv packages/contracts-bedrock/deploy-config/devnetL1.json ../.devnet/devnetL1.json
 
