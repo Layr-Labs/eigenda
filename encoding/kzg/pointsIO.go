@@ -100,8 +100,7 @@ func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bn254.G2Affine, error
 func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	g1f, err := os.Open(filepath)
 	if err != nil {
-		log.Println("Cannot ReadG1Points", filepath, err)
-		return nil, fmt.Errorf("error cannot open g1 points file %w", err)
+		return nil, fmt.Errorf("error cannot open g1 points file %s: %w", filepath, err)
 	}
 
 	defer func() {
@@ -170,8 +169,7 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 	}
 	g1f, err := os.Open(filepath)
 	if err != nil {
-		log.Println("ReadG1PointSection.ERR.0", err)
-		return nil, err
+		return nil, fmt.Errorf("error cannot open g1 points file %w", err)
 	}
 
 	defer func() {
