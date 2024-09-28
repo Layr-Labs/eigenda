@@ -3,7 +3,7 @@ module github.com/Layr-Labs/eigenda-proxy
 go 1.21
 
 require (
-	github.com/Layr-Labs/eigenda v0.8.4-0.20240918205210-351526af1e80
+	github.com/Layr-Labs/eigenda v0.8.4
 	github.com/consensys/gnark-crypto v0.12.1
 	github.com/ethereum-optimism/optimism v1.9.2
 	github.com/ethereum/go-ethereum v1.14.8
@@ -154,7 +154,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
