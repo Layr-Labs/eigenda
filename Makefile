@@ -73,6 +73,10 @@ lint:
 
 	@golangci-lint run
 
+.PHONY: format
+format:
+	@go fmt ./...
+
 go-gen-mocks:
 	@echo "generating go mocks..."
 	@GO111MODULE=on go generate --run "mockgen*" ./...

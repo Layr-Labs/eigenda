@@ -132,7 +132,7 @@ func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
 				CacheDir:        "../resources/SRSTables",
 				SRSOrder:        268435456,
 				SRSNumberToLoad: maxBlobLengthBytes / 32,
-				NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+				NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 			},
 		},
 		MemstoreEnabled: testCfg.UseMemory,

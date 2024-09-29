@@ -80,23 +80,27 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Name:    G1PathFlagName,
 			Usage:   "Directory path to g1.point file.",
 			EnvVars: withEnvPrefix(envPrefix, "TARGET_KZG_G1_PATH"),
-			// TODO: should use absolute path wrt root directory to prevent future errors
-			//       in case we move this file around
-			Value:    "../resources/g1.point",
+			// we use a relative path so that the path works for both the binary and the docker container
+			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			Value:    "resources/g1.point",
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:     G2TauFlagName,
-			Usage:    "Directory path to g2.point.powerOf2 file.",
-			EnvVars:  withEnvPrefix(envPrefix, "TARGET_G2_TAU_PATH"),
-			Value:    "../resources/g2.point.powerOf2",
+			Name:    G2TauFlagName,
+			Usage:   "Directory path to g2.point.powerOf2 file.",
+			EnvVars: withEnvPrefix(envPrefix, "TARGET_G2_TAU_PATH"),
+			// we use a relative path so that the path works for both the binary and the docker container
+			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			Value:    "resources/g2.point.powerOf2",
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:     CachePathFlagName,
-			Usage:    "Directory path to SRS tables for caching.",
-			EnvVars:  withEnvPrefix(envPrefix, "TARGET_CACHE_PATH"),
-			Value:    "../resources/SRSTables/",
+			Name:    CachePathFlagName,
+			Usage:   "Directory path to SRS tables for caching.",
+			EnvVars: withEnvPrefix(envPrefix, "TARGET_CACHE_PATH"),
+			// we use a relative path so that the path works for both the binary and the docker container
+			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			Value:    "resources/SRSTables/",
 			Category: category,
 		},
 		// TODO: can we use a genericFlag for this, and automatically parse the string into a uint64?
