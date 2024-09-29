@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/flags"
@@ -25,7 +26,11 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
-	log.Info("Initializing EigenDA proxy server...")
+	configJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	log.Info(fmt.Sprintf("Initializing EigenDA proxy server with config: %v", string(configJSON)))
 
 	daRouter, err := server.LoadStoreRouter(ctx, cfg, log)
 	if err != nil {

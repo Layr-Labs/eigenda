@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
@@ -17,6 +18,7 @@ const (
 	MemstoreFlagsCategory = "Memstore (replaces EigenDA when enabled)"
 	RedisCategory         = "Redis Cache/Fallback"
 	S3Category            = "S3 Cache/Fallback"
+	VerifierCategory      = "KZG and Cert Verifier"
 )
 
 const (
@@ -77,4 +79,5 @@ func init() {
 	Flags = append(Flags, redis.CLIFlags(EnvVarPrefix, RedisCategory)...)
 	Flags = append(Flags, s3.CLIFlags(EnvVarPrefix, S3Category)...)
 	Flags = append(Flags, memstore.CLIFlags(EnvVarPrefix, MemstoreFlagsCategory)...)
+	Flags = append(Flags, verify.CLIFlags(EnvVarPrefix, VerifierCategory)...)
 }

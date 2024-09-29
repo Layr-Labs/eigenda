@@ -109,6 +109,9 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:   "Maximum blob length to be written or read from EigenDA. Determines the number of SRS points loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size slightly exceeds 1GB.",
 			EnvVars: withEnvPrefix(envPrefix, "MAX_BLOB_LENGTH"),
 			Value:   "16MiB",
+			// set to true to force action to run on the default Value
+			// see https://github.com/urfave/cli/issues/1973
+			HasBeenSet: true,
 			Action: func(_ *cli.Context, maxBlobLengthStr string) error {
 				// parse the string to a uint64 and set the maxBlobLengthBytes var to be used by ReadConfig()
 				numBytes, err := utils.ParseBytesAmount(maxBlobLengthStr)
