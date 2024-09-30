@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 var _ kvstore.Table = &tableView{}
@@ -54,14 +55,70 @@ func (t *tableView) Delete(key []byte) error {
 	return t.base.Delete(k)
 }
 
+// iteratorWrapper wraps the base iterator to iterate only over keys in the table.
+type iteratorWrapper struct {
+	base iterator.Iterator
+}
+
+func (i *iteratorWrapper) First() bool {
+	return i.base.First()
+}
+
+func (i *iteratorWrapper) Last() bool {
+	return i.base.Last()
+}
+
+func (i *iteratorWrapper) Seek(key []byte) bool {
+	return i.base.Seek(key)
+}
+
+func (i *iteratorWrapper) Next() bool {
+	return i.base.Next()
+}
+
+func (i *iteratorWrapper) Prev() bool {
+	return i.base.Prev()
+}
+
+func (i *iteratorWrapper) Release() {
+	i.base.Release()
+}
+
+func (i *iteratorWrapper) SetReleaser(releaser util.Releaser) {
+	i.base.SetReleaser(releaser)
+}
+
+func (i *iteratorWrapper) Valid() bool {
+	return i.base.Valid()
+}
+
+func (i *iteratorWrapper) Error() error {
+	return i.base.Error()
+}
+
+func (i *iteratorWrapper) Key() []byte {
+	baseKey := i.base.Key()
+	return baseKey[4:]
+}
+
+func (i *iteratorWrapper) Value() []byte {
+	return i.base.Value()
+}
+
 // NewIterator creates a new iterator. Only keys prefixed with the given prefix will be iterated.
 func (t *tableView) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	if prefix == nil {
 		prefix = []byte{}
 	}
 
-	p := t.TableKey(prefix)
-	return t.base.NewIterator(p)
+	it, err := t.base.NewIterator(t.TableKey(prefix))
+	if err != nil {
+		return nil, err
+	}
+
+	return &iteratorWrapper{
+		base: it,
+	}, nil
 }
 
 // TODO it shouldn't be possible to shut down a table like this

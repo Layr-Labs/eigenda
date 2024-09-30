@@ -21,6 +21,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return mapstore.NewStore(), nil
 	},
+
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return ttl.TTLWrapper(context.Background(), logger, mapstore.NewStore(), 0), nil
 	},

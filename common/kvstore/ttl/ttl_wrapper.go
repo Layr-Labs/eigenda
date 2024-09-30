@@ -205,9 +205,35 @@ func (store *ttlStore) Delete(key []byte) error {
 	return store.store.Delete(prefixedKey)
 }
 
+var _ kvstore.Batch[[]byte] = &batch{}
+
+type batch struct {
+	base kvstore.Batch[[]byte]
+}
+
+func (b *batch) Put(key []byte, value []byte) {
+	prefixedKey := append(keyPrefix, key...)
+	b.base.Put(prefixedKey, value)
+}
+
+func (b *batch) Delete(key []byte) {
+	prefixedKey := append(keyPrefix, key...)
+	b.base.Delete(prefixedKey)
+}
+
+func (b *batch) Apply() error {
+	return b.base.Apply()
+}
+
+func (b *batch) Size() uint32 {
+	return b.base.Size()
+}
+
 // NewBatch creates a new batch for the store.
 func (store *ttlStore) NewBatch() kvstore.Batch[[]byte] {
-	return store.store.NewBatch()
+	return &batch{
+		base: store.store.NewBatch(),
+	}
 }
 
 type ttlIterator struct {
