@@ -34,7 +34,7 @@ func TestTableCount(t *testing.T) {
 	assert.NoError(t, err)
 
 	base := mapstore.NewStore()
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	// table count needs to fit into 32 bytes, and two tables are reserved for internal use
@@ -69,7 +69,7 @@ func TestTableList(t *testing.T) {
 
 	base, err := leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	tables := store.GetTables()
@@ -123,7 +123,7 @@ func TestTableList(t *testing.T) {
 
 	base, err = leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err = TableStoreWrapper(logger, base)
+	store, err = Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	tables = store.GetTables()
@@ -152,7 +152,7 @@ func TestTableList(t *testing.T) {
 
 	base, err = leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err = TableStoreWrapper(logger, base)
+	store, err = Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	tables = store.GetTables()
@@ -196,7 +196,7 @@ func TestUniqueKeySpace(t *testing.T) {
 	assert.NoError(t, err)
 
 	base := mapstore.NewStore()
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -237,7 +237,7 @@ func TestBatchOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	base := mapstore.NewStore()
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -413,7 +413,7 @@ func TestDropTable(t *testing.T) {
 	assert.NoError(t, err)
 
 	base := mapstore.NewStore()
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -530,7 +530,7 @@ func TestIteration(t *testing.T) {
 	assert.NoError(t, err)
 
 	base := mapstore.NewStore()
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -685,7 +685,7 @@ func TestRestart(t *testing.T) {
 
 	base, err := leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -716,7 +716,7 @@ func TestRestart(t *testing.T) {
 
 	base, err = leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err = TableStoreWrapper(logger, base)
+	store, err = Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	table1, err = store.GetTable("table1")
@@ -765,7 +765,7 @@ func TestRandomOperations(t *testing.T) {
 
 	base, err := leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err := TableStoreWrapper(logger, base)
+	store, err := Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	tables := make(map[string]kvstore.Table)
@@ -782,7 +782,7 @@ func TestRandomOperations(t *testing.T) {
 
 			base, err = leveldb.NewStore(logger, dbPath)
 			assert.NoError(t, err)
-			store, err = TableStoreWrapper(logger, base)
+			store, err = Wrapper(logger, base)
 			assert.NoError(t, err)
 
 			for tableName := range tables {
@@ -929,7 +929,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 		deletionsRemaining: 50,
 	}
 
-	store, err := TableStoreWrapper(logger, explodingBase)
+	store, err := Wrapper(logger, explodingBase)
 	assert.NoError(t, err)
 
 	// Create a few tables
@@ -964,7 +964,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	// Restart the store. The table should be gone by the time the method returns.
 	base, err = leveldb.NewStore(logger, dbPath)
 	assert.NoError(t, err)
-	store, err = TableStoreWrapper(logger, base)
+	store, err = Wrapper(logger, base)
 	assert.NoError(t, err)
 
 	tables := store.GetTables()

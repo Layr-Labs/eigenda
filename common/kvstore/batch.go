@@ -2,7 +2,6 @@ package kvstore
 
 // Batch is a collection of operations that can be applied atomically to a TableStore.
 type Batch[T any] interface {
-	// TODO test nil value case
 	// Put stores the given key / value pair in the batch, overwriting any existing value for that key.
 	// If nil is passed as the value, a byte slice of length 0 will be stored.
 	Put(key T, value []byte)

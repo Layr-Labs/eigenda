@@ -39,6 +39,10 @@ func (t *tableView) Name() string {
 
 // Put adds a key-value pair to the table.
 func (t *tableView) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
+
 	k := t.TableKey(key)
 	return t.base.Put(k, value)
 }
@@ -140,6 +144,9 @@ type tableBatch struct {
 
 // Put schedules a key-value pair to be added to the table.
 func (t *tableBatch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{}
+	}
 	k := t.table.TableKey(key)
 	t.batch.Put(k, value)
 }

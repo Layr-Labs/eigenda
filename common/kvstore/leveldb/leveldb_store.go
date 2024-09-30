@@ -41,6 +41,9 @@ func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 
 // Put stores a data in the store.
 func (store *levelDBStore) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
 	return store.db.Put(key, value, nil)
 }
 
@@ -99,7 +102,7 @@ type levelDBBatch struct {
 
 func (m *levelDBBatch) Put(key []byte, value []byte) {
 	if value == nil {
-		value = []byte{0}
+		value = []byte{}
 	}
 	m.batch.Put(key, value)
 }

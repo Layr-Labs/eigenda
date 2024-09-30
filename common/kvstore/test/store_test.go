@@ -37,7 +37,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		store := mapstore.NewStore()
-		tableStore, err := tablestore.TableStoreWrapper(logger, store)
+		tableStore, err := tablestore.Wrapper(logger, store)
 		if err != nil {
 			return nil, err
 		}
@@ -52,7 +52,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		if err != nil {
 			return nil, err
 		}
-		tableStore, err := tablestore.TableStoreWrapper(logger, store)
+		tableStore, err := tablestore.Wrapper(logger, store)
 		if err != nil {
 			return nil, err
 		}
@@ -160,8 +160,6 @@ func TestRandomOperations(t *testing.T) {
 	}
 }
 
-// TODO test mixed batch
-
 func writeBatchTest(t *testing.T, store kvstore.Store) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
@@ -174,11 +172,22 @@ func writeBatchTest(t *testing.T, store kvstore.Store) {
 	for i := 0; i < 1000; i++ {
 		// Write a random value.
 		key := tu.RandomBytes(32)
-		value := tu.RandomBytes(32)
+
+		var value []byte
+		if i%50 == 0 {
+			// nil values are interpreted as empty slices.
+			value = nil
+		} else {
+			value = tu.RandomBytes(32)
+		}
 
 		batch.Put(key, value)
 
-		expectedData[string(key)] = value
+		if value == nil {
+			expectedData[string(key)] = []byte{}
+		} else {
+			expectedData[string(key)] = value
+		}
 
 		if i%10 == 0 {
 			// Every so often, apply the batch and check that the store matches the expected data.
@@ -419,5 +428,34 @@ func TestIterationWithPrefix(t *testing.T) {
 		store, err := builder(logger, dbPath)
 		assert.NoError(t, err)
 		iterationWithPrefixTest(t, store)
+	}
+}
+
+func putNilTest(t *testing.T, store kvstore.Store) {
+	tu.InitializeRandom()
+	deleteDBDirectory(t)
+
+	key := tu.RandomBytes(32)
+
+	err := store.Put(key, nil)
+	assert.NoError(t, err)
+
+	value, err := store.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte{}, value)
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+	verifyDBIsDeleted(t)
+}
+
+func TestPutNil(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	for _, builder := range storeBuilders {
+		store, err := builder(logger, dbPath)
+		assert.NoError(t, err)
+		putNilTest(t, store)
 	}
 }

@@ -191,6 +191,10 @@ func (store *ttlStore) expireKeys(now time.Time) error {
 }
 
 func (store *ttlStore) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
+
 	prefixedKey := append(keyPrefix, key...)
 	return store.store.Put(prefixedKey, value)
 }
@@ -212,6 +216,9 @@ type batch struct {
 }
 
 func (b *batch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{}
+	}
 	prefixedKey := append(keyPrefix, key...)
 	b.base.Put(prefixedKey, value)
 }

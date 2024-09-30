@@ -27,6 +27,10 @@ func NewStore() kvstore.Store {
 
 // Put adds a key-value pair to the store.
 func (store *mapStore) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
+
 	store.lock.Lock()
 	defer store.lock.Unlock()
 
@@ -93,7 +97,7 @@ type batch struct {
 // Put stores the given key / value pair in the batch, overwriting any existing value for that key.
 func (m *batch) Put(key []byte, value []byte) {
 	if value == nil {
-		value = []byte{0}
+		value = []byte{}
 	}
 	m.keys = append(m.keys, key)
 	m.values = append(m.values, value)

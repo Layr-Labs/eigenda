@@ -60,12 +60,12 @@ type tableStore struct {
 	namespaceTable kvstore.Table
 }
 
-// TableStoreWrapper wraps the given Store to create a TableStore.
+// Wrapper wraps the given Store to create a TableStore.
 //
 // WARNING: it is not safe to access the wrapped store directly while the TableStore is in use. The TableStore uses
 // special key formatting, and direct access to the wrapped store may violate the TableStore's invariants, resulting
 // in undefined behavior.
-func TableStoreWrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, error) {
+func Wrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, error) {
 
 	tableIDMap := make(map[string]uint32)
 	tableIdSet := make(map[uint32]bool)
@@ -313,6 +313,9 @@ type tableStoreBatch struct {
 
 // Put adds a key-value pair to the batch.
 func (t *tableStoreBatch) Put(key kvstore.TableKey, value []byte) {
+	if value == nil {
+		value = []byte{}
+	}
 	t.batch.Put(key, value)
 }
 

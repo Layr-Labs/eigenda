@@ -17,6 +17,7 @@ type Store interface {
 	BatchOperator[[]byte]
 
 	// Put stores the given key / value pair in the database, overwriting any existing value for that key.
+	// If nil is passed as the value, a byte slice of length 0 will be stored.
 	Put(key []byte, value []byte) error
 
 	// Get retrieves the value for the given key. Returns a ErrNotFound error if the key does not exist.
