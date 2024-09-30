@@ -127,6 +127,10 @@ func RunDataApi(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
 	}
 
+	if len(config.EthClientConfig.RPCURLs) > 1 {
+		logger.Info("Fallback chain RPC enabled")
+	}
+
 	// Setup channel to listen for termination signals
 	quit := make(chan os.Signal, 1)
 	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)

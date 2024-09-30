@@ -59,6 +59,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	if len(config.EthClientConfig.RPCURLs) > 1 {
+		logger.Info("Fallback chain RPC enabled")
+	}
+
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)

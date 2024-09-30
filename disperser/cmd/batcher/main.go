@@ -118,12 +118,18 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to get public key from KMS: %w", err)
 		}
+
+		if len(config.EthClientConfig.RPCURLs) > 1 {
+			logger.Info("Fallback chain RPC enabled")
+		}
+
 		addr := crypto.PubkeyToAddress(*pubKey)
 		client, err = geth.NewMultiHomingClient(config.EthClientConfig, addr, logger)
 		if err != nil {
 			logger.Error("Cannot create chain.Client", "err", err)
 			return err
 		}
+
 		chainID, err := client.ChainID(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to get chain ID: %w", err)
