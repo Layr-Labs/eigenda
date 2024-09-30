@@ -1,27 +1,19 @@
 package kvstore
 
-// TableKey is a key that can be used for batch operations that modify a table.
+// TableKey is a key scoped to a particular table. It can be used to perform batch operations that modify multiple
+// table keys atomically.
 type TableKey []byte
 
 // Table can be used to operate on data in a specific table in a TableStore.
 type Table interface {
+	// Store permits access to the table as if it were a store.
 	Store
 
 	// Name returns the name of the table.
 	Name() string
 
-	// TableKey creates a new key that can be used for batch operations that modify this table.
+	// TableKey creates a new key scoped to this table that can be used for batch operations that modify this table.
 	TableKey(key []byte) TableKey
-}
-
-// Batch is a collection of operations that can be applied atomically to a TableStore.
-type Batch interface {
-	// Put stores the given key / value pair in the batch, overwriting any existing value for that key.
-	Put(key TableKey, value []byte)
-	// Delete removes the key from the batch. Does not return an error if the key does not exist.
-	Delete(key TableKey)
-	// Apply atomically writes all the key / value pairs in the batch to the database.
-	Apply() error
 }
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.
@@ -33,6 +25,8 @@ type Batch interface {
 //
 // Implementations of this interface are expected to be thread-safe, except where noted.
 type TableStore interface {
+	// BatchOperator allows for batch operations that span multiple tables.
+	BatchOperator[TableKey]
 
 	// GetTable gets the table with the given name. If the table does not exist, it is first created.
 	//
@@ -57,8 +51,8 @@ type TableStore interface {
 	// GetTables returns a list of all tables in the store (excluding internal tables utilized by the store).
 	GetTables() []Table
 
-	// NewBatch creates a new batch that can be used to perform multiple operations atomically.
-	NewBatch() Batch
+	// NewBatch creates a new batch that can be used to perform multiple operations across tables atomically.
+	NewBatch() Batch[TableKey]
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
 	//

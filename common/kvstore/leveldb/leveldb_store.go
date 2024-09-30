@@ -84,6 +84,31 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 	return store.db.Write(batch, nil)
 }
 
+// NewBatch creates a new batch for the store.
+func (store *levelDBStore) NewBatch() kvstore.Batch[[]byte] {
+	return &batch{
+		store: store,
+		batch: new(leveldb.Batch),
+	}
+}
+
+type batch struct {
+	store *levelDBStore
+	batch *leveldb.Batch
+}
+
+func (m *batch) Put(key []byte, value []byte) {
+	m.batch.Put(key, value)
+}
+
+func (m *batch) Delete(key []byte) {
+	m.batch.Delete(key)
+}
+
+func (m *batch) Apply() error {
+	return m.store.db.Write(m.batch, nil)
+}
+
 // Shutdown shuts down the store.
 //
 // Warning: it is not thread safe to call this method concurrently with other methods on this class,

@@ -13,6 +13,9 @@ var ErrNotFound = errors.New("not found")
 // Implementations of this interface are expected to be thread-safe.
 type Store interface {
 
+	// BatchOperator performs batch operations on the store.
+	BatchOperator[[]byte]
+
 	// Put stores the given key / value pair in the database, overwriting any existing value for that key.
 	Put(key []byte, value []byte) error
 
@@ -22,15 +25,6 @@ type Store interface {
 
 	// Delete removes the key from the database. Does not return an error if the key does not exist.
 	Delete(key []byte) error
-
-	// TODO delete this
-	// DeleteBatch atomically removes a list of keys from the database.
-	DeleteBatch(keys [][]byte) error
-
-	// TODO delete this
-	// WriteBatch atomically writes a list of key / value pairs to the database. The key at index i in the keys slice
-	// corresponds to the value at index i in the values slice.
-	WriteBatch(keys, values [][]byte) error
 
 	// NewIterator returns an iterator that can be used to iterate over a subset of the keys in the database.
 	// Only keys with the given prefix will be iterated. The iterator must be closed by calling Release() when done.
