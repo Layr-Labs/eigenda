@@ -9,47 +9,35 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+/* HEAVILY MOCKED */
 // PaymentAccounts (For reservations and on-demand payments)
 
-type TokenAmount uint64
-
-//TODO: make this a big.Int
-// type tokenAmount = *big.Int
+type TokenAmount uint64 // TODO: change to uint128
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
-	DataRate    uint32 // Bandwidth being reserved
-	StartEpoch  uint64 // Index of epoch where reservation begins
-	EndEpoch    uint64 // Index of epoch where reservation ends
-	QuorumSplit []byte // Each byte is a percentage at the corresponding quorum index
+	DataRate    uint32 // Bandwidth per reservation bin
+	StartEpoch  uint64
+	EndEpoch    uint64
+	QuorumSplit []byte
 }
 
 type OnDemandPayment struct {
 	CumulativePayment TokenAmount // Total amount deposited by the user
-	// TODO: Consider adding this for UI
-	// AmountCollected  *big.Int //Total amount collected by the disperser
 }
 
 // ActiveReservations contains information about the current state of active reservations
+// map account ID to the ActiveReservation for that account.
 type ActiveReservations struct {
-	// Reservations is a map from account ID to the ActiveReservation for that account.
 	Reservations map[string]*ActiveReservation
 }
 
 // OnDemandPayments contains information about the current state of on-demand payments
+// Map from account ID to the OnDemandPayment for that account.
 type OnDemandPayments struct {
-	// Payments is a map from account ID to the OnDemandPayment for that account.
 	Payments map[string]*OnDemandPayment
 }
-
-// // PaymentChainState is an interface for getting information about the current chain state.
-// type PaymentChainState interface {
-// 	GetActiveReservations(ctx context.Context, blockNumber uint) (map[string]*ActiveReservations, error)
-// 	GetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*ActiveReservation, error)
-// 	GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]*OnDemandPayments, error)
-// 	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error)
-// }
 
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPaymentState struct {
@@ -60,19 +48,6 @@ type OnchainPaymentState struct {
 	// GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]*OnDemandPayments, error)
 	// GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error)
 }
-
-// func NewOnchainPaymentState(tx *eth.Transactor, paymentChainState PaymentChainState) (*OnchainPaymentState, error) {
-// 	if tx == nil {
-// 		return nil, errors.New("tx is nil")
-// 	}
-// 	if paymentChainState == nil {
-// 		return nil, errors.New("paymentChainState is nil")
-// 	}
-// 	return &OnchainPaymentState{
-// 		tx: tx,
-// 		// paymentChainState: paymentChainState,
-// 	}, nil
-// }
 
 type MockedOnchainPaymentState struct {
 	MockActiveReservations *ActiveReservations

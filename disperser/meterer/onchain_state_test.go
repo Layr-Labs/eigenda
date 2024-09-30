@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockOnchainPaymentState is a mock implementation of OnchainPaymentState
+// MockOnchainPaymentState : TO BE REPLACED WITH ACTUAL IMPLEMENTATION
 type MockOnchainPaymentState struct {
 	mock.Mock
 }

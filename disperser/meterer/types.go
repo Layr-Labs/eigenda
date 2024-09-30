@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
+/* SUBJECT TO BIG MODIFICATIONS */
+
 // BlobQuorumParam represents the parameters for a specific quorum
 type BlobQuorumParam struct {
 	QuorumID           core.QuorumID
@@ -61,45 +63,6 @@ type OnDemand struct {
 	amountDeposited big.Int
 	amountCollected big.Int
 }
-
-// // Create the typed data for EIP-712 signature verification
-// typedData := apitypes.TypedData{
-// 	Types: apitypes.Types{
-// 		"EIP712Domain": []apitypes.Type{
-// 			{Name: "name", Type: "string"},
-// 			{Name: "version", Type: "string"},
-// 			{Name: "chainId", Type: "uint256"},
-// 			{Name: "verifyingContract", Type: "address"},
-// 		},
-// 		"BlobHeader": []apitypes.Type{
-// 			{Name: "version", Type: "uint32"},
-// 			{Name: "accountID", Type: "string"},
-// 			{Name: "nonce", Type: "uint32"},
-// 			{Name: "binIndex", Type: "uint32"},
-// 			{Name: "cumulativePayment", Type: "uint64"},
-// 			{Name: "commitment", Type: "bytes"},
-// 			{Name: "dataLength", Type: "uint32"},
-// 			{Name: "blobQuorumParams", Type: "BlobQuorumParam[]"},
-// 		},
-// 		"BlobQuorumParam": []apitypes.Type{
-// 			{Name: "quorumID", Type: "uint8"},
-// 			{Name: "adversaryThreshold", Type: "uint32"},
-// 			{Name: "quorumThreshold", Type: "uint32"},
-// 		},
-// 	},
-// 	Domain:      EIP712Domain,
-// 	PrimaryType: "BlobHeader",
-// 	Message: apitypes.TypedDataMessage{
-// 		"version":           header.Version,
-// 		"accountID":         header.AccountID,
-// 		"nonce":             header.Nonce,
-// 		"binIndex":          header.BinIndex,
-// 		"cumulativePayment": header.CumulativePayment,
-// 		"commitment":        header.Commitment.Bytes(),
-// 		"dataLength":        header.DataLength,
-// 		"blobQuorumParams":  header.BlobQuorumParams,
-// 	},
-// }
 
 // EIP712Signer handles EIP-712 signing operations
 type EIP712Signer struct {

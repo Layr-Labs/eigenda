@@ -158,14 +158,12 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, header)
 	assert.NotEmpty(t, header.Signature)
-	// Check that the recovered sender matches the private key
 	recoveredAddress, err := signer.RecoverSender(header)
 	require.NoError(t, err)
 
 	expectedAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 	assert.Equal(t, expectedAddress, recoveredAddress, "Recovered address should match the address derived from the private key")
 
-	// Modify the header after signing
 	header.AccountID = "modifiedAccount"
 
 	addr, err := signer.RecoverSender(header)

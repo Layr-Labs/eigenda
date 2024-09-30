@@ -18,7 +18,6 @@ type TimeoutConfig struct {
 }
 
 type Config struct {
-	// // chain state pull interval
 	// PullInterval             time.Duration
 
 	// network parameters (this should be published on-chain and read through contracts)
@@ -57,24 +56,6 @@ func NewMeterer(
 	logger logging.Logger,
 	// metrics *Metrics,
 ) (*Meterer, error) {
-	// clientConfig := commonaws.ClientConfig{
-	// 	Region:          "us-east-1",
-	// 	AccessKey:       "localstack",
-	// 	SecretAccessKey: "localstack",
-	// 	EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
-	// }
-
-	// store, err := NewOffchainStore(
-	// 	clientConfig,
-	// 	"ReservationBinState",
-	// 	"OnDemandCollectionState",
-	// 	"GlobalBinState",
-	// 	logger,
-	// )
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create offchain store: %w", err)
-	// }
-
 	return &Meterer{
 		Config:        config,
 		TimeoutConfig: timeoutConfig,
@@ -90,7 +71,6 @@ func NewMeterer(
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header BlobHeader) error {
-	// Validate the signature
 	if err := m.ValidateSignature(ctx, header); err != nil {
 		return fmt.Errorf("invalid signature: %w", err)
 	}
@@ -128,7 +108,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header BlobHeader) error {
 	return nil
 }
 
-// TODO: mocked EIP712 domain, need to change to the real thing
+// TODO: mocked EIP712 domain, change to the real thing when available
 // ValidateSignature checks if the signature is valid against all other fields in the header
 // Assuming the signature is an eip712 signature
 func (m *Meterer) ValidateSignature(ctx context.Context, header BlobHeader) error {
@@ -136,16 +116,13 @@ func (m *Meterer) ValidateSignature(ctx context.Context, header BlobHeader) erro
 	//TODO: update the chainID and verifyingContract
 	signer := NewEIP712Signer(big.NewInt(17000), common.HexToAddress("0x1234000000000000000000000000000000000000"))
 
-	// Recover the sender's address
 	recoveredAddress, err := signer.RecoverSender(&header)
 	if err != nil {
 		return fmt.Errorf("failed to recover sender: %w", err)
 	}
 
-	// Convert the AccountID to an address for comparison
 	accountAddress := common.HexToAddress(header.AccountID)
 
-	// Compare the recovered address with the AccountID
 	if recoveredAddress != accountAddress {
 		return fmt.Errorf("invalid signature: recovered address %s does not match account ID %s", recoveredAddress.Hex(), accountAddress.Hex())
 	}
@@ -155,14 +132,13 @@ func (m *Meterer) ValidateSignature(ctx context.Context, header BlobHeader) erro
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHeader, reservation *ActiveReservation) error {
-	// Validate the bin index provided in the request
 	if !m.ValidateBinIndex(blobHeader, reservation) {
-		return fmt.Errorf("invalid bin index for reservation") // Reject the request if bin index validation fails
+		return fmt.Errorf("invalid bin index for reservation")
 	}
 
 	// Update bin usage atomically and check against reservation's data rate as the bin limit
 	if err := m.IncrementBinUsage(ctx, blobHeader, reservation.DataRate); err != nil {
-		return fmt.Errorf("bin overflows: %w", err) // bin overflows
+		return fmt.Errorf("bin overflows: %w", err)
 	}
 
 	return nil
@@ -170,7 +146,6 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHe
 
 // ValidateBinIndex checks if the provided bin index is valid
 func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveReservation) bool {
-	// Deterministic function: local clock -> index
 	currentBinIndex := GetCurrentBinIndex()
 	// Valid bin indexes are either the current bin or the previous bin
 	if (blobHeader.BinIndex != currentBinIndex && blobHeader.BinIndex != (currentBinIndex-1)) || (reservation.StartEpoch > blobHeader.BinIndex || blobHeader.BinIndex > reservation.EndEpoch) {
@@ -182,13 +157,6 @@ func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveRes
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, binLimit uint32) error {
-	// //TODO: Decide if we want to do this;
-	// // this check saves ((write_cost-read_cost)*total_req-witrite*read_value_check_ok)
-	// usedLimit := m.Store.ReadBinUsage(blobHeader.BinIndex, account.AccountID)
-	// if usedLimit >= binLimit{
-	//	return false
-	//}
-
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex), blobHeader.BlobSize)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
@@ -202,22 +170,16 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 		return fmt.Errorf("Bin has already been overflowed")
 	}
 
-	// check against the onchain state for overflow
-	// blockNumber, err := m.ChainState.GetCurrentBlockNumber()
+	// check against the onchain state for overflow (TODO: update to real provider calls)
 	blockNumber := uint(0)
-	// if err != nil {
-	// 	return false
-	// }
 	reservation, err := m.ChainState.MockedGetActiveReservationByAccount(ctx, blockNumber, blobHeader.AccountID)
 	if err != nil {
 		return fmt.Errorf("failed to get active reservation by account: %w", err)
 	}
 	if newUsage <= 2*binLimit && blobHeader.BinIndex+2 <= reservation.EndEpoch {
-		// overflowed, the overflowed amount can fit in valid bin 2 intervals down
 		m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex+2), newUsage-binLimit)
 		return nil
 	}
-	// else case: overflowUsage > binLimit
 	return fmt.Errorf("Overflow usage exceeds bin limit")
 }
 
@@ -228,22 +190,18 @@ func GetCurrentBinIndex() uint64 {
 	return uint64(currentTime / int64(binInterval))
 }
 
-func (m *Meterer) addToState(header BlobHeader) error {
-	// Implement logic to add the blob header to the meterer's state
-	// This could involve updating internal data structures or databases
-	return nil
-}
+//TODO: should we track some number of blobHeaders in the meterer state and expose an API? is it stored somewhere else?
+// func (m *Meterer) addToState(header BlobHeader) error {
+// 	return nil
+// }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
-	// Go ahead and update the payment; avoid race conditions
-	err := m.UpdateCumulativePayment(ctx, blobHeader, onDemandPayment)
-	fmt.Println("added cumulative payment")
+	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 	// Validate payments attached
-	fmt.Println("validate payment")
 	err = m.ValidatePayment(ctx, blobHeader, onDemandPayment)
 	if err != nil {
 		fmt.Println("validation failed: %w", err)
@@ -252,57 +210,26 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
-	// // Validate the bin index provided in the request
-	// // (can refactor the ratelimit and state update functions for account/global and limit/payments)
-	// if err := m.ValidateGlobalBinIndex(blobHeader); err != nil {
-	// 	m.RollbackCumulativePayment(blobHeader, account)
-	// 	return fmt.Errorf("invalid global bin index for on-demand request")
-	// }
-
 	// Update bin usage atomically and check against bin capacity
-	fmt.Println("increment global bin usage")
 	if err := m.IncrementGlobalBinUsage(ctx, blobHeader, m.GlobalBytesPerSecond); err != nil {
-		//TODO: conditionally remove the payment based on the error type
+		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
 		m.OffchainStore.RemoveOnDemandPayment(ctx, blobHeader.AccountID, blobHeader.CumulativePayment)
-		return fmt.Errorf("failed global rate limiting") // bin overflows
+		return fmt.Errorf("failed global rate limiting")
 	}
 
 	return nil
 }
 
-// // prevPmt is the largest  cumulative payment strictly less    than blobHeader.cumulativePayment if exists
-// // nextPmt is the smallest cumulative payment strictly greater than blobHeader.cumulativePayment if exists
-// // nextPmtBlobSize is the blobSize of corresponding to nextPmt if exists
-// func (m *Meterer) GetRelevantRecords(account *Account, cumulativePayment uint128) {
-// 	prevReq := account.OnDemandServed.max(|r| r.CumulativePayment < cumulativePayment)
-// 	nextReq := account.OnDemandServed.min(|r| r.CumulativePayment > cumulativePayment)
-// 	if nextReq == nil {
-// 		if prevReq != nil {
-// 			return prevReq.CumulativePayment, nil, nil
-// 		}
-// 		return prevReq, nil, nil
-// 	}
-// 	return prevPmt, nextReq.CumulativePayments, nextReq.BlobSize
-// }
-
 // ValidatePayment checks if the provided payment header is valid against the local accounting
+// prevPmt is the largest  cumulative payment strictly less    than blobHeader.cumulativePayment if exists
+// nextPmt is the smallest cumulative payment strictly greater than blobHeader.cumulativePayment if exists
+// nextPmtBlobSize is the blobSize of corresponding to nextPmt if exists
 func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
 
-	prevPmt, nextPmt, nextPmtBlobSize, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, blobHeader.AccountID, blobHeader.CumulativePayment) // they can be nil
-	fmt.Println("prevPmt", prevPmt)
-	fmt.Println("nextPmt", nextPmt)
-	fmt.Println("nextPmtBlobSize", nextPmtBlobSize)
+	prevPmt, nextPmt, nextPmtBlobSize, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, blobHeader.AccountID, blobHeader.CumulativePayment) // zero if DNE
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
-	// // the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	// if new(big.Int).Add(prevPmt, new(big.Int).Mul(big.NewInt(int64(blobHeader.BlobSize)), big.NewInt(int64(m.Config.PricePerByte)))).Cmp(blobHeader.CumulativePayment) > 0 {
-	// 	return false
-	// }
-	// // the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	// if new(big.Int).Add(blobHeader.CumulativePayment, new(big.Int).Mul(big.NewInt(int64(nextPmtBlobSize)), big.NewInt(int64(m.Config.PricePerByte)))).Cmp(nextPmt) > 0 {
-	// 	return false
-	// }
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
 	if prevPmt+uint64(blobHeader.BlobSize)*m.Config.PricePerByte > blobHeader.CumulativePayment {
 		return fmt.Errorf("insufficient cumulative payment increment")
@@ -311,7 +238,7 @@ func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, on
 	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize)*m.Config.PricePerByte > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
-	// at this point we know the blob can be safely inserted into the set of payments
+	// check passed: blob can be safely inserted into the set of payments
 	// prevPmt + blobHeader.BlobSize * m.FixedFeePerByte <= blobHeader.CumulativePayment
 	//                                                   <= nextPmt - nextPmtBlobSize * m.FixedFeePerByte > nextPmt
 	return nil
@@ -341,31 +268,6 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHe
 	}
 	if newUsage > m.GlobalBytesPerSecond {
 		return fmt.Errorf("global bin usage overflows")
-	}
-	return nil
-}
-
-// func (m *Meterer) UpdateCumulativePayment(blobHeader BlobHeader, account *Account) {
-// 	account.OnDemandServed.add(blobHeader.cumulativePayments)
-// }
-
-// func (m *Meterer) RollbackCumulativePayment(blobHeader BlobHeader, account *Account) {
-// 	account.OnDemandServed.remove(blobHeader.cumulativePayments)
-// }
-
-// // Find the account entry in the store with accountID being the index
-// // TODO: actual impelmentation depends on the store choice; add entries for free tier services
-// func (s *Store) FindAccount(accountID string) {
-// 	s.accounts[accountID]
-// }
-
-// IncrementBinUsage increments the bin usage atomically and checks for overflow
-// TODO: Bin limit should be direct write to the Store
-func (m *Meterer) UpdateCumulativePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
-
-	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
-	if err != nil {
-		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 	return nil
 }

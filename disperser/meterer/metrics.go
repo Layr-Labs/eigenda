@@ -1,5 +1,6 @@
 package meterer
 
+/* NOTHING TO SEE HERE ; NO METRICS YET */
 import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"

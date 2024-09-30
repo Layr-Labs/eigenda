@@ -2,18 +2,24 @@ package meterer
 
 import (
 	"context"
+	"math/big"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) {
+func ConstantCommitment() core.G1Point {
+	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
+	return *commitment
+}
+
+func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
 	ctx := context.Background()
-	// tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-	test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("AccountID"),
@@ -58,14 +64,12 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	// assert.NoError(t, err)
-	// assert.NotNil(t, tableDescription)
+	return err
 }
 
-func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName string) {
+func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
 	ctx := context.Background()
-	// tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-	test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("BinIndex"),
@@ -88,7 +92,7 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 					},
 				},
 				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
+					ProjectionType: types.ProjectionTypeAll,
 				},
 				ProvisionedThroughput: &types.ProvisionedThroughput{
 					ReadCapacityUnits:  aws.Int64(10),
@@ -102,14 +106,12 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	// assert.NoError(t, err)
-	// assert.NotNil(t, tableDescription)
+	return err
 }
 
-func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) {
+func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) error {
 	ctx := context.Background()
-	// tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-	test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("AccountID"),
@@ -140,7 +142,7 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 					},
 				},
 				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
+					ProjectionType: types.ProjectionTypeAll,
 				},
 				ProvisionedThroughput: &types.ProvisionedThroughput{
 					ReadCapacityUnits:  aws.Int64(10),
@@ -154,6 +156,5 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	// assert.NoError(t, err)
-	// assert.NotNil(t, tableDescription)
+	return err
 }
