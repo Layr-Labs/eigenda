@@ -17,6 +17,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang/protobuf v1.5.4
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.11.0
@@ -77,6 +78,7 @@ require (
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233 // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
+	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/docker/cli v25.0.3+incompatible // indirect
 	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
@@ -154,6 +156,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	nhooyr.io/websocket v1.8.6 // indirect
 )
 
 require (

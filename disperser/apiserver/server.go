@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -852,7 +853,10 @@ func (s *DispersalServer) startCombinedServers() error {
 		w.Write([]byte("OK"))
 	})
 
-	// Create a handler that will use gs.ServeHTTP for gRPC-web requests
+	// Wrap the gRPC server with grpc-web
+	wrappedGrpc := grpcweb.WrapServer(gs)
+
+	// Create a handler that will use wrappedGrpc for gRPC-web requests
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Set CORS headers for all requests
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -866,26 +870,25 @@ func (s *DispersalServer) startCombinedServers() error {
 			return
 		}
 
-		if r.ProtoMajor == 2 && (strings.Contains(r.Header.Get("Content-Type"), "application/grpc-web") ||
-			strings.Contains(r.Header.Get("Content-Type"), "application/grpc")) {
-			gs.ServeHTTP(w, r)
+		if wrappedGrpc.IsGrpcWebRequest(r) || wrappedGrpc.IsAcceptableGrpcCorsRequest(r) {
+			wrappedGrpc.ServeHTTP(w, r)
 		} else {
 			mux.ServeHTTP(w, r)
 		}
 	})
+
 	httpServer := &http.Server{
 		Handler: handler,
 	}
 
 	// Start HTTP server
-	s.logger.Info("HTTP Server Listening", "address", httpListener.Addr().String())
+	s.logger.Info("HTTP Server Listening (gRPC-Web enabled)", "address", httpListener.Addr().String())
 	if err := httpServer.Serve(httpListener); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("failed to serve HTTP: %w", err)
 	}
 
 	return nil
 }
-
 func (s *DispersalServer) LoadAllowlist() {
 	al, err := ReadAllowlistFromFile(s.rateConfig.AllowlistFile)
 	if err != nil {
