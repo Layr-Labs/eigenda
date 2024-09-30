@@ -125,7 +125,6 @@ func (t *tableView) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	}, nil
 }
 
-// TODO it shouldn't be possible to shut down a table like this
 // Shutdown shuts down the table.
 func (t *tableView) Shutdown() error {
 	return t.base.Shutdown()
