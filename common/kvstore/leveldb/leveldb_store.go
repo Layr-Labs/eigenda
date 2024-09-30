@@ -98,6 +98,9 @@ type batch struct {
 }
 
 func (m *batch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{0}
+	}
 	m.batch.Put(key, value)
 }
 
@@ -107,6 +110,11 @@ func (m *batch) Delete(key []byte) {
 
 func (m *batch) Apply() error {
 	return m.store.db.Write(m.batch, nil)
+}
+
+// Size returns the number of operations in the batch.
+func (m *batch) Size() uint32 {
+	return uint32(m.batch.Len())
 }
 
 // Shutdown shuts down the store.

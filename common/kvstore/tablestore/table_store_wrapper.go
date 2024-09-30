@@ -277,7 +277,6 @@ func (t *tableStore) DropTable(name string) error {
 	tableKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(tableKey, tableID)
 	err = t.namespaceTable.Delete(tableKey)
-	err = t.base.Delete(tableKey)
 	if err != nil {
 		return fmt.Errorf("error deleting from namespace table: %w", err)
 	}
@@ -334,6 +333,11 @@ func (t *tableStoreBatch) Delete(key kvstore.TableKey) {
 // Apply applies the batch to the store.
 func (t *tableStoreBatch) Apply() error {
 	return t.batch.Apply()
+}
+
+// Size returns the number of operations in the batch.
+func (t *tableStoreBatch) Size() uint32 {
+	return t.batch.Size()
 }
 
 // NewBatch creates a new batch for writing to the store.

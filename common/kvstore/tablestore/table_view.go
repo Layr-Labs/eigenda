@@ -98,6 +98,11 @@ func (t *tableBatch) Apply() error {
 	return t.batch.Apply()
 }
 
+// Size returns the number of operations in the batch.
+func (t *tableBatch) Size() uint32 {
+	return t.batch.Size()
+}
+
 // NewBatch creates a new batch for the table.
 func (t *tableView) NewBatch() kvstore.Batch[[]byte] {
 	return &tableBatch{

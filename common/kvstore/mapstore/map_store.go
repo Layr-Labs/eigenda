@@ -92,6 +92,9 @@ type batch struct {
 
 // Put stores the given key / value pair in the batch, overwriting any existing value for that key.
 func (m *batch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{0}
+	}
 	m.keys = append(m.keys, key)
 	m.values = append(m.values, value)
 }
@@ -118,6 +121,11 @@ func (m *batch) Apply() error {
 		}
 	}
 	return nil
+}
+
+// Size returns the number of operations in the batch.
+func (m *batch) Size() uint32 {
+	return uint32(len(m.keys))
 }
 
 type mapIterator struct {
