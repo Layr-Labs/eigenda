@@ -91,7 +91,7 @@ func TableStoreWrapper(logger logging.Logger, base kvstore.Store) (kvstore.Table
 		onDiskSchemaBytes = make([]byte, 8)
 		binary.BigEndian.PutUint64(onDiskSchemaBytes, currentSchemaVersion)
 
-		err = base.Put(schemaKey, onDiskSchemaBytes)
+		err = metadataTable.Put(schemaKey, onDiskSchemaBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error setting schema version in metadata table: %w", err)
 		}
@@ -282,6 +282,7 @@ func (t *tableStore) DropTable(name string) error {
 	}
 	delete(t.tableIDMap, name)
 	delete(t.tableIDSet, tableID)
+	delete(t.tableMap, tableID)
 
 	// Update highestTableID as needed.
 	for ; t.highestTableID >= 0; t.highestTableID-- {
