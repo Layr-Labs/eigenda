@@ -55,10 +55,10 @@ type tableStore struct {
 	highestTableID int64
 
 	// Builds keys for the metadata table.
-	metadataTable kvstore.KeyBuilder
+	metadataTable kvstore.Table
 
 	// Builds keys for the namespace table.
-	namespaceTable kvstore.KeyBuilder
+	namespaceTable kvstore.Table
 }
 
 // TableStoreWrapper wraps the given Store to create a TableStore.
@@ -184,7 +184,7 @@ func parseKeyBytes(keyBytes []byte) (tableID uint32, key []byte) {
 }
 
 // GetOrCreateTable creates a new table with the given name if one does not exist.
-func (t *tableStore) GetOrCreateTable(name string) (kvstore.KeyBuilder, kvstore.Store, error) {
+func (t *tableStore) GetOrCreateTable(name string) (kvstore.Table, kvstore.Store, error) {
 	tableID, ok := t.tableMap[name]
 	if ok {
 		// Table already exists.

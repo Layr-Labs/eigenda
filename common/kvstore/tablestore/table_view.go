@@ -10,11 +10,11 @@ var _ kvstore.Store = &tableView{}
 // tableView allows a single table in a TableStore to be accessed as if it were the only table in the store.
 type tableView struct {
 	base       kvstore.Store
-	keyBuilder kvstore.KeyBuilder
+	keyBuilder kvstore.Table
 }
 
 // NewTableView creates a new view into a table in a TableStore.
-func newTableView(base kvstore.Store, keyBuilder kvstore.KeyBuilder) kvstore.Store {
+func newTableView(base kvstore.Store, keyBuilder kvstore.Table) kvstore.Store {
 	return &tableView{
 		base:       base,
 		keyBuilder: keyBuilder,

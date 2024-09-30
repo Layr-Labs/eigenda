@@ -658,7 +658,7 @@ func TestRandomOperations(t *testing.T) {
 	store, err := TableStoreWrapper(logger, base)
 	assert.NoError(t, err)
 
-	tables := make(map[string]kvstore.KeyBuilder)
+	tables := make(map[string]kvstore.Table)
 	expectedData := make(map[kvstore.Key][]byte)
 	keysByTable := make(map[string][]kvstore.Key)
 

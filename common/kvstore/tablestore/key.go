@@ -64,7 +64,7 @@ func (k *key) GetRawBytes() []byte {
 }
 
 // GetKeyBuilder returns the key builder for the table that this key belongs to.
-func (k *key) GetKeyBuilder() kvstore.KeyBuilder {
+func (k *key) GetKeyBuilder() kvstore.Table {
 	return &keyBuilder{
 		prefix: k.prefix,
 	}

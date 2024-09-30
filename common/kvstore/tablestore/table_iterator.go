@@ -11,11 +11,11 @@ var _ iterator.Iterator = &tableIterator{}
 // tableIterator is an iterator that iterates over a single table in a TableStore.
 type tableIterator struct {
 	base       iterator.Iterator
-	keyBuilder kvstore.KeyBuilder
+	keyBuilder kvstore.Table
 }
 
 // NewTableIterator creates a new iterator that iterates over a single table in a TableStore.
-func newTableIterator(base iterator.Iterator, keyBuilder kvstore.KeyBuilder) iterator.Iterator {
+func newTableIterator(base iterator.Iterator, keyBuilder kvstore.Table) iterator.Iterator {
 	return &tableIterator{
 		base:       base,
 		keyBuilder: keyBuilder,

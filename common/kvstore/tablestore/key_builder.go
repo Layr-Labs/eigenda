@@ -5,7 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 )
 
-var _ kvstore.KeyBuilder = &keyBuilder{}
+var _ kvstore.Table = &keyBuilder{}
 
 // keyBuilder is used to create new keys in a specific table.
 type keyBuilder struct {

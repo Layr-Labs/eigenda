@@ -23,9 +23,11 @@ type Store interface {
 	// Delete removes the key from the database. Does not return an error if the key does not exist.
 	Delete(key []byte) error
 
+	// TODO delete this
 	// DeleteBatch atomically removes a list of keys from the database.
 	DeleteBatch(keys [][]byte) error
 
+	// TODO delete this
 	// WriteBatch atomically writes a list of key / value pairs to the database. The key at index i in the keys slice
 	// corresponds to the value at index i in the values slice.
 	WriteBatch(keys, values [][]byte) error
