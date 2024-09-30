@@ -65,9 +65,9 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 
-	fallbackRPCURL := ctx.GlobalStringSlice(rpcFallbackUrlFlagName)
+	fallbackRPCURL := ctx.GlobalString(rpcFallbackUrlFlagName)
 	if len(fallbackRPCURL) > 0 {
-		cfg.RPCURLs = append(cfg.RPCURLs, fallbackRPCURL...)
+		cfg.RPCURLs = append(cfg.RPCURLs, []string{fallbackRPCURL}...)
 	}
 
 	return cfg
@@ -81,9 +81,10 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 
-	fallbackRPCURL := ctx.GlobalStringSlice(rpcFallbackUrlFlagName)
+	fallbackRPCURL := ctx.GlobalString(rpcFallbackUrlFlagName)
 	if len(fallbackRPCURL) > 0 {
-		cfg.RPCURLs = append(cfg.RPCURLs, fallbackRPCURL...)
+		cfg.RPCURLs = append(cfg.RPCURLs, []string{fallbackRPCURL}...)
 	}
+
 	return cfg
 }
