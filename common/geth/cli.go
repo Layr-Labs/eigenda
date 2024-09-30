@@ -7,6 +7,7 @@ import (
 
 var (
 	rpcUrlFlagName           = "chain.rpc"
+	rpcFallbackUrlFlagName   = "chain.rpc_fallback"
 	privateKeyFlagName       = "chain.private-key"
 	numConfirmationsFlagName = "chain.num-confirmations"
 	numRetriesFlagName       = "chain.num-retries"
@@ -26,6 +27,13 @@ func EthClientFlags(envPrefix string) []cli.Flag {
 			Usage:    "Chain rpc. Disperser/Batcher can accept multiple comma separated rpc url. Node only uses the first one",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CHAIN_RPC"),
+		},
+		cli.StringFlag{
+			Name:     rpcFallbackUrlFlagName,
+			Usage:    "Fallback chain rpc for Disperser/Batcher/Dataapi",
+			Required: false,
+			Value:    "",
+			EnvVar:   common.PrefixEnvVar(envPrefix, "CHAIN_RPC_FALLBACK"),
 		},
 		cli.StringFlag{
 			Name:     privateKeyFlagName,
@@ -57,6 +65,11 @@ func ReadEthClientConfig(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 
+	fallbackRPCURL := ctx.GlobalStringSlice(rpcFallbackUrlFlagName)
+	if len(fallbackRPCURL) > 0 {
+		cfg.RPCURLs = append(cfg.RPCURLs, fallbackRPCURL...)
+	}
+
 	return cfg
 }
 
@@ -68,5 +81,9 @@ func ReadEthClientConfigRPCOnly(ctx *cli.Context) EthClientConfig {
 	cfg.NumConfirmations = ctx.GlobalInt(numConfirmationsFlagName)
 	cfg.NumRetries = ctx.GlobalInt(numRetriesFlagName)
 
+	fallbackRPCURL := ctx.GlobalStringSlice(rpcFallbackUrlFlagName)
+	if len(fallbackRPCURL) > 0 {
+		cfg.RPCURLs = append(cfg.RPCURLs, fallbackRPCURL...)
+	}
 	return cfg
 }
