@@ -50,11 +50,6 @@ type tableStore struct {
 	// A map from table IDs to tables.
 	tableMap map[uint32]kvstore.Table
 
-	// TODO should we use a queue of unused table IDs?
-	// TODO at the very least combine this with tableMap
-	// A set of table IDs that are currently in use.
-	tableIDSet map[uint32]bool
-
 	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
 	highestTableID int64
 
@@ -74,8 +69,6 @@ func TableStoreWrapper(logger logging.Logger, base kvstore.Store) (kvstore.Table
 
 	tableIDMap := make(map[string]uint32)
 	tableIdSet := make(map[uint32]bool)
-	// TODO properly add stuff
-	// TODO interact with metadata tables through this store
 	tableMap := make(map[uint32]kvstore.Table)
 
 	highestTableID := int64(-1)
@@ -120,7 +113,6 @@ func TableStoreWrapper(logger logging.Logger, base kvstore.Store) (kvstore.Table
 		tableMap:       tableMap,
 		metadataTable:  metadataTable,
 		namespaceTable: namespaceTable,
-		tableIDSet:     tableIdSet,
 		highestTableID: highestTableID,
 	}
 
@@ -226,7 +218,6 @@ func (t *tableStore) GetTable(name string) (kvstore.Table, error) {
 		}
 	}
 
-	t.tableIDSet[tableID] = true
 	t.tableIDMap[name] = tableID
 	table := newTableView(t.base, name, tableID)
 	t.tableMap[tableID] = table
@@ -281,12 +272,11 @@ func (t *tableStore) DropTable(name string) error {
 		return fmt.Errorf("error deleting from namespace table: %w", err)
 	}
 	delete(t.tableIDMap, name)
-	delete(t.tableIDSet, tableID)
 	delete(t.tableMap, tableID)
 
 	// Update highestTableID as needed.
 	for ; t.highestTableID >= 0; t.highestTableID-- {
-		if _, ok := t.tableIDSet[uint32(t.highestTableID)]; ok {
+		if _, ok := t.tableMap[uint32(t.highestTableID)]; ok {
 			break
 		}
 	}
