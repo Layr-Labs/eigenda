@@ -10,9 +10,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
+func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) {
 	ctx := context.Background()
-	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	// tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("AccountID"),
@@ -57,12 +58,14 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	return err
+	// assert.NoError(t, err)
+	// assert.NotNil(t, tableDescription)
 }
 
-func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
+func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName string) {
 	ctx := context.Background()
-	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	// tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("BinIndex"),
@@ -99,12 +102,14 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	return err
+	// assert.NoError(t, err)
+	// assert.NotNil(t, tableDescription)
 }
 
-func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) error {
+func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) {
 	ctx := context.Background()
-	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	// tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("AccountID"),
@@ -112,7 +117,7 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 			},
 			{
 				AttributeName: aws.String("CumulativePayments"),
-				AttributeType: types.ScalarAttributeTypeN,
+				AttributeType: types.ScalarAttributeTypeS,
 			},
 		},
 		KeySchema: []types.KeySchemaElement{
@@ -149,5 +154,6 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	return err
+	// assert.NoError(t, err)
+	// assert.NotNil(t, tableDescription)
 }

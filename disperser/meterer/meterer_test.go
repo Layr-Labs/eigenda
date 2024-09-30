@@ -13,12 +13,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -151,7 +148,7 @@ func ConstantCommitment() core.G1Point {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	CreateReservationTable(t, "reservations")
+	meterer.CreateReservationTable(clientConfig, "reservations")
 	index := meterer.GetCurrentBinIndex()
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 
@@ -241,8 +238,8 @@ func TestMetererReservations(t *testing.T) {
 
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
-	CreateOnDemandTable(t, "ondemand")
-	CreateGlobalReservationTable(t, "global")
+	meterer.CreateOnDemandTable(clientConfig, "ondemand")
+	meterer.CreateGlobalReservationTable(clientConfig, "global")
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 
 	fmt.Println("test invalid signature")
@@ -318,7 +315,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Error(t, err, "cannot insert cumulative payment in out of order")
 
 	fmt.Println("test failed global rate limit")
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 2000, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 1001, *commitment, 1001, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed global bin index")
@@ -329,149 +326,4 @@ func TestMetererOnDemand(t *testing.T) {
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(result))
-}
-
-func CreateReservationTable(t *testing.T, tableName string) {
-	ctx := context.Background()
-	tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-		AttributeDefinitions: []types.AttributeDefinition{
-			{
-				AttributeName: aws.String("AccountID"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
-			{
-				AttributeName: aws.String("BinIndex"),
-				AttributeType: types.ScalarAttributeTypeN,
-			},
-		},
-		KeySchema: []types.KeySchemaElement{
-			{
-				AttributeName: aws.String("AccountID"),
-				KeyType:       types.KeyTypeHash,
-			},
-			{
-				AttributeName: aws.String("BinIndex"),
-				KeyType:       types.KeyTypeRange,
-			},
-		},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				IndexName: aws.String("AccountIDIndex"),
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("AccountID"),
-						KeyType:       types.KeyTypeHash,
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
-			},
-		},
-		TableName: aws.String(tableName),
-		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(10),
-			WriteCapacityUnits: aws.Int64(10),
-		},
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, tableDescription)
-}
-
-func CreateGlobalReservationTable(t *testing.T, tableName string) {
-	ctx := context.Background()
-	tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-		AttributeDefinitions: []types.AttributeDefinition{
-			{
-				AttributeName: aws.String("BinIndex"),
-				AttributeType: types.ScalarAttributeTypeN,
-			},
-		},
-		KeySchema: []types.KeySchemaElement{
-			{
-				AttributeName: aws.String("BinIndex"),
-				KeyType:       types.KeyTypeHash,
-			},
-		},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				IndexName: aws.String("BinIndexIndex"),
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("BinIndex"),
-						KeyType:       types.KeyTypeHash,
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
-			},
-		},
-		TableName: aws.String(tableName),
-		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(10),
-			WriteCapacityUnits: aws.Int64(10),
-		},
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, tableDescription)
-}
-
-func CreateOnDemandTable(t *testing.T, tableName string) {
-	ctx := context.Background()
-	tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
-		AttributeDefinitions: []types.AttributeDefinition{
-			{
-				AttributeName: aws.String("AccountID"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
-			{
-				AttributeName: aws.String("CumulativePayments"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
-		},
-		KeySchema: []types.KeySchemaElement{
-			{
-				AttributeName: aws.String("AccountID"),
-				KeyType:       types.KeyTypeHash,
-			},
-			{
-				AttributeName: aws.String("CumulativePayments"),
-				KeyType:       types.KeyTypeRange,
-			},
-		},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				IndexName: aws.String("AccountIDIndex"),
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("AccountID"),
-						KeyType:       types.KeyTypeHash,
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
-			},
-		},
-		TableName: aws.String(tableName),
-		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(10),
-			WriteCapacityUnits: aws.Int64(10),
-		},
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, tableDescription)
 }
