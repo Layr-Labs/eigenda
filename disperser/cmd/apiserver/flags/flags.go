@@ -37,6 +37,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SHADOW_TABLE_NAME"),
 		Value:    "",
 	}
+	HttpPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "http-port"),
+		Usage:    "Port at which disperser listens for http calls",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "HTTP_PORT"),
+	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "Port at which disperser listens for grpc calls",

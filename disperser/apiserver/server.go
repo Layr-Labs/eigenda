@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -805,15 +806,24 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 			}
 		}
 	}()
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
+
+	go func() {
+		if err := s.startGRPCServer(); err != nil {
+			s.logger.Error("Failed to start gRPC server", "error", err)
+		}
+	}()
+
+	return s.startHTTPServer()
+}
+
+func (s *DispersalServer) startGRPCServer() error {
+	grpcAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
+	listener, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		return errors.New("could not start tcp listener")
+		return fmt.Errorf("could not start gRPC listener: %w", err)
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-
 	gs := grpc.NewServer(opt)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
@@ -822,10 +832,31 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, gs)
 
-	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String(), "maxBlobSize", s.maxBlobSize)
-
+	s.logger.Info("gRPC Server Listening", "address", listener.Addr().String())
 	if err := gs.Serve(listener); err != nil {
-		return errors.New("could not start GRPC server")
+		return fmt.Errorf("failed to serve gRPC: %w", err)
+	}
+
+	return nil
+}
+
+func (s *DispersalServer) startHTTPServer() error {
+	mux := http.NewServeMux()
+
+	// Add your HTTP handlers here
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	httpServer := &http.Server{
+		Addr:    fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.HttpPort),
+		Handler: mux,
+	}
+
+	s.logger.Info("HTTP Server Listening", "address", httpServer.Addr)
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("could not start HTTP server: %w", err)
 	}
 
 	return nil

@@ -7,6 +7,7 @@ const (
 )
 
 type ServerConfig struct {
+	HttpPort    string
 	GrpcPort    string
 	GrpcTimeout time.Duration
 }
