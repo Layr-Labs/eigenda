@@ -807,22 +807,11 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 		}
 	}()
 
-	go func() {
-		if err := s.startGRPCServer(); err != nil {
-			s.logger.Error("Failed to start gRPC server", "error", err)
-		}
-	}()
-
-	return s.startHTTPServer()
+	return s.startCombinedServers()
 }
 
-func (s *DispersalServer) startGRPCServer() error {
-	grpcAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
-	listener, err := net.Listen("tcp", grpcAddr)
-	if err != nil {
-		return fmt.Errorf("could not start gRPC listener: %w", err)
-	}
-
+func (s *DispersalServer) startCombinedServers() error {
+	// Set up gRPC server
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 	gs := grpc.NewServer(opt)
 	reflection.Register(gs)
@@ -832,15 +821,29 @@ func (s *DispersalServer) startGRPCServer() error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, gs)
 
-	s.logger.Info("gRPC Server Listening", "address", listener.Addr().String())
-	if err := gs.Serve(listener); err != nil {
-		return fmt.Errorf("failed to serve gRPC: %w", err)
+	// Set up gRPC listener
+	grpcAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
+	grpcListener, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		return fmt.Errorf("could not start gRPC listener: %w", err)
 	}
 
-	return nil
-}
+	// Start gRPC server in a goroutine
+	go func() {
+		s.logger.Info("gRPC Server Listening", "address", grpcListener.Addr().String())
+		if err := gs.Serve(grpcListener); err != nil {
+			s.logger.Error("failed to serve gRPC", "error", err)
+		}
+	}()
 
-func (s *DispersalServer) startHTTPServer() error {
+	// Set up HTTP server
+	httpAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.HttpPort)
+	httpListener, err := net.Listen("tcp", httpAddr)
+	if err != nil {
+		return fmt.Errorf("could not start HTTP listener: %w", err)
+	}
+
+	// Create a new ServeMux for HTTP handlers
 	mux := http.NewServeMux()
 
 	// Add your HTTP handlers here
@@ -849,14 +852,35 @@ func (s *DispersalServer) startHTTPServer() error {
 		w.Write([]byte("OK"))
 	})
 
+	// Create a handler that will use gs.ServeHTTP for gRPC-web requests
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc-web") {
+			gs.ServeHTTP(w, r)
+		} else {
+			// Handle CORS for HTTP requests
+			if origin := r.Header.Get("Origin"); origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+				w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+			}
+			// Handle preflight requests
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			mux.ServeHTTP(w, r)
+		}
+	})
+
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.HttpPort),
-		Handler: mux,
+		Handler: handler,
 	}
 
-	s.logger.Info("HTTP Server Listening", "address", httpServer.Addr)
-	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("could not start HTTP server: %w", err)
+	// Start HTTP server
+	s.logger.Info("HTTP Server Listening", "address", httpListener.Addr().String())
+	if err := httpServer.Serve(httpListener); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("failed to serve HTTP: %w", err)
 	}
 
 	return nil
