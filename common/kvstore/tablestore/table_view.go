@@ -56,6 +56,10 @@ func (t *tableView) Delete(key []byte) error {
 
 // NewIterator creates a new iterator. Only keys prefixed with the given prefix will be iterated.
 func (t *tableView) NewIterator(prefix []byte) (iterator.Iterator, error) {
+	if prefix == nil {
+		prefix = []byte{}
+	}
+
 	p := t.TableKey(prefix)
 	return t.base.NewIterator(p)
 }

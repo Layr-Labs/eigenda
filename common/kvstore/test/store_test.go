@@ -40,7 +40,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		if err != nil {
 			return nil, err
 		}
-		_, store, err = tableStore.GetOrCreateTable("test")
+		store, err = tableStore.GetTable("test")
 		if err != nil {
 			return nil, err
 		}
@@ -55,7 +55,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		if err != nil {
 			return nil, err
 		}
-		_, store, err = tableStore.GetOrCreateTable("test")
+		store, err = tableStore.GetTable("test")
 		if err != nil {
 			return nil, err
 		}
@@ -159,6 +159,8 @@ func TestRandomOperations(t *testing.T) {
 	}
 }
 
+// TODO test mixed batch
+
 func writeBatchTest(t *testing.T, store kvstore.Store) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
@@ -166,40 +168,32 @@ func writeBatchTest(t *testing.T, store kvstore.Store) {
 	var err error
 
 	expectedData := make(map[string][]byte)
-
-	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := store.NewBatch()
 
 	for i := 0; i < 1000; i++ {
-
 		// Write a random value.
-
 		key := tu.RandomBytes(32)
 		value := tu.RandomBytes(32)
 
-		keys = append(keys, key)
-		values = append(values, value)
+		batch.Put(key, value)
 
 		expectedData[string(key)] = value
 
 		if i%10 == 0 {
 			// Every so often, apply the batch and check that the store matches the expected data.
 
-			err := store.WriteBatch(keys, values)
+			err = batch.Apply()
 			assert.NoError(t, err)
 
-			keys = make([][]byte, 0)
-			values = make([][]byte, 0)
-
 			for key, expectedValue := range expectedData {
-				value, err := store.Get([]byte(key))
+				value, err = store.Get([]byte(key))
 				assert.NoError(t, err)
 				assert.Equal(t, expectedValue, value)
 			}
 
 			// Try and get a value that isn't in the store.
-			key := tu.RandomBytes(32)
-			value, err := store.Get(key)
+			key = tu.RandomBytes(32)
+			value, err = store.Get(key)
 			assert.Equal(t, kvstore.ErrNotFound, err)
 			assert.Nil(t, value)
 		}
@@ -229,7 +223,7 @@ func deleteBatchTest(t *testing.T, store kvstore.Store) {
 
 	expectedData := make(map[string][]byte)
 
-	keys := make([][]byte, 0)
+	batch := store.NewBatch()
 
 	// Add some data to the store.
 	for i := 0; i < 1000; i++ {
@@ -246,15 +240,15 @@ func deleteBatchTest(t *testing.T, store kvstore.Store) {
 	for key := range expectedData {
 		choice := rand.Float64()
 		if choice < 0.5 {
-			keys = append(keys, []byte(key))
+			batch.Delete([]byte(key))
 			delete(expectedData, key)
 		} else if choice < 0.75 {
 			// Delete a non-existent key.
-			keys = append(keys, tu.RandomBytes(32))
+			batch.Delete(tu.RandomBytes(32))
 		}
 	}
 
-	err := store.DeleteBatch(keys)
+	err := batch.Apply()
 	assert.NoError(t, err)
 
 	// Check that the store matches the expected data.
