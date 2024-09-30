@@ -112,6 +112,7 @@ var (
 var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	DynamoDBTableNameFlag,
+	HttpPortFlag,
 	GrpcPortFlag,
 	BucketTableName,
 	BlsOperatorStateRetrieverFlag,
