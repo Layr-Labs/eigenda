@@ -11,7 +11,7 @@ type Table interface {
 	Name() string
 
 	// TableKey creates a new key that can be used for batch operations that modify this table.
-	BatchKey(key []byte) TableKey
+	TableKey(key []byte) TableKey
 }
 
 // Batch is a collection of operations that can be applied atomically to a TableStore.
