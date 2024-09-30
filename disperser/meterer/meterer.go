@@ -222,10 +222,10 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 }
 
 // GetCurrentBinIndex returns the current bin index based on time
-func GetCurrentBinIndex() uint32 {
+func GetCurrentBinIndex() uint64 {
 	currentTime := time.Now().Unix()
 	binInterval := 375 // Interval that allows 3 32MB blobs at minimal throughput
-	return uint32(currentTime / int64(binInterval))
+	return uint64(currentTime / int64(binInterval))
 }
 
 func (m *Meterer) addToState(header BlobHeader) error {
@@ -237,12 +237,19 @@ func (m *Meterer) addToState(header BlobHeader) error {
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
 	// Go ahead and update the payment; avoid race conditions
-	m.UpdateCumulativePayment(ctx, blobHeader, onDemandPayment)
+	err := m.UpdateCumulativePayment(ctx, blobHeader, onDemandPayment)
+	fmt.Println("added cumulative payment")
+	if err != nil {
+		return fmt.Errorf("failed to update cumulative payment: %w", err)
+	}
 	// Validate payments attached
-	if !m.ValidatePayment(ctx, blobHeader, onDemandPayment) {
+	fmt.Println("validate payment")
+	err = m.ValidatePayment(ctx, blobHeader, onDemandPayment)
+	if err != nil {
+		fmt.Println("validation failed: %w", err)
 		//TODO: Make sure this remove always works or handle the error
 		m.OffchainStore.RemoveOnDemandPayment(ctx, blobHeader.AccountID, blobHeader.CumulativePayment)
-		return fmt.Errorf("invalid on-demand payment")
+		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
 	// // Validate the bin index provided in the request
@@ -253,7 +260,8 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 	// }
 
 	// Update bin usage atomically and check against bin capacity
-	if err := m.IncrementGlobalBinUsage(ctx, blobHeader, uint32(m.GlobalBytesPerSecond)); err != nil {
+	fmt.Println("increment global bin usage")
+	if err := m.IncrementGlobalBinUsage(ctx, blobHeader, m.GlobalBytesPerSecond); err != nil {
 		//TODO: conditionally remove the payment based on the error type
 		m.OffchainStore.RemoveOnDemandPayment(ctx, blobHeader.AccountID, blobHeader.CumulativePayment)
 		return fmt.Errorf("failed global rate limiting") // bin overflows
@@ -278,10 +286,14 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 // }
 
 // ValidatePayment checks if the provided payment header is valid against the local accounting
-func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) bool {
+func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
+
 	prevPmt, nextPmt, nextPmtBlobSize, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, blobHeader.AccountID, blobHeader.CumulativePayment) // they can be nil
+	fmt.Println("prevPmt", prevPmt)
+	fmt.Println("nextPmt", nextPmt)
+	fmt.Println("nextPmtBlobSize", nextPmtBlobSize)
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// // the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
 	// if new(big.Int).Add(prevPmt, new(big.Int).Mul(big.NewInt(int64(blobHeader.BlobSize)), big.NewInt(int64(m.Config.PricePerByte)))).Cmp(blobHeader.CumulativePayment) > 0 {
@@ -293,22 +305,22 @@ func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, on
 	// }
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
 	if prevPmt+uint64(blobHeader.BlobSize)*m.Config.PricePerByte > blobHeader.CumulativePayment {
-		return false
+		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if blobHeader.CumulativePayment+uint64(nextPmtBlobSize)*m.Config.PricePerByte > nextPmt {
-		return false
+	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize)*m.Config.PricePerByte > nextPmt {
+		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// at this point we know the blob can be safely inserted into the set of payments
 	// prevPmt + blobHeader.BlobSize * m.FixedFeePerByte <= blobHeader.CumulativePayment
 	//                                                   <= nextPmt - nextPmtBlobSize * m.FixedFeePerByte > nextPmt
-	return true
+	return nil
 }
 
 // ValidateBinIndex checks if the provided bin index is valid
-func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint32, error) {
+func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint64, error) {
 	// Deterministic function: local clock -> index (1second intervals)
-	currentBinIndex := uint32(time.Now().Unix())
+	currentBinIndex := uint64(time.Now().Unix())
 
 	// Valid bin indexes are either the current bin or the previous bin (allow this second or prev sec)
 	if blobHeader.BinIndex != currentBinIndex && blobHeader.BinIndex != (currentBinIndex-1) {
@@ -318,7 +330,7 @@ func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint32, error) 
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader, globalBinIndex uint32) error {
+func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader, globalBinIndex uint64) error {
 	globalIndex, err := m.ValidateGlobalBinIndex(blobHeader)
 	if err != nil {
 		return fmt.Errorf("invalid bin index for on-demand request: %w", err)
@@ -351,7 +363,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHe
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) UpdateCumulativePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
 
-	_, err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
+	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}

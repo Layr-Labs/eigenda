@@ -144,122 +144,44 @@ func teardown() {
 	}
 }
 
-// func setupTestMeterer(t *testing.T) (*meterer.Meterer, *meterer.EIP712Signer, *ecdsa.PrivateKey, *ecdsa.PrivateKey, error) {
-// 	chainID := big.NewInt(17000)
-// 	verifyingContract := gethcommon.HexToAddress("0x1234000000000000000000000000000000000000")
-// 	signer := meterer.NewEIP712Signer(chainID, verifyingContract)
-
-// 	privateKey1, err := crypto.GenerateKey()
-// 	privateKey2, err := crypto.GenerateKey()
-
-// 	logger := logging.NewNoopLogger()
-// 	config := meterer.Config{
-// 		PricePerByte:         1,
-// 		GlobalBytesPerSecond: 1000,
-// 		ReservationWindow:    time.Minute,
-// 	}
-// 	// metrics := metrics.NewNoopMetrics()
-
-// 	paymentChainState := meterer.NewMockedOnchainPaymentState()
-
-// 	paymentChainState.InitializeMockData(privateKey1, privateKey2)
-
-// 	clientConfig := commonaws.ClientConfig{
-// 		Region:          "us-east-1",
-// 		AccessKey:       "localstack",
-// 		SecretAccessKey: "localstack",
-// 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
-// 	}
-
-// 	store, err := meterer.NewOffchainStore(
-// 		clientConfig,
-// 		"reservations",
-// 		"ondemand",
-// 		"global",
-// 		logger,
-// 	)
-// 	if err != nil {
-// 		return nil, nil, nil, nil, fmt.Errorf("failed to create offchain store: %w", err)
-// 	}
-// 	CreateReservationTable(t, "reservations")
-// 	CreateOnDemandTable(t, "ondemand")
-// 	CreateGlobalReservationTable(t, "global")
-
-// 	// add some default sensible configs
-// 	m, err := meterer.NewMeterer(
-// 		config,
-// 		meterer.TimeoutConfig{},
-// 		paymentChainState,
-// 		store,
-// 		logging.NewNoopLogger(),
-// 		// metrics.NewNoopMetrics(),
-// 	)
-// 	if err != nil {
-// 		return nil, nil, nil, nil, err
-// 	}
-
-// 	require.NoError(t, err)
-// 	return m, signer, privateKey1, privateKey2, nil
-
-// }
-
 func ConstantCommitment() core.G1Point {
 	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
 	return *commitment
 }
 
-// func TestReservationMetering(t *testing.T) {
-
-// 	m, _, _, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-
-// 	ctx, cancel := context.WithTimeout(context.Background(), m.TimeoutConfig.ChainReadTimeout)
-// 	defer cancel()
-
-// 	// retreiverID := "testRetriever"
-
-// 	// params := []common.RequestParams{
-// 	// 	{
-// 	// 		RequesterID: retreiverID,
-// 	// 		BlobSize:    10,
-// 	// 		Rate:        100,
-// 	// 	},
-// 	// }
-// 	header := meterer.BlobHeader{
-// 		AccountID: "account1",
-// 		BlobSize:  10,
-// 		BinIndex:  0,
-// 		Nonce:     0,
-// 		Signature: []byte{},
-// 		Version:   0,
-// 	}
-// 	activeReservation := meterer.ActiveReservation{
-// 		StartEpoch: 0,
-// 		EndEpoch:   10,
-// 	}
-
-// 	for i := 0; i < 10; i++ {
-// 		err := m.ServeReservationRequest(ctx, header, &activeReservation)
-// 		assert.NoError(t, err)
-// 	}
-
-// 	//TODO: overflown request
-// 	err = m.ServeReservationRequest(ctx, header, &activeReservation)
-// 	assert.Error(t, err)
-// }
-
-func TestMetererAcceptValidHeader(t *testing.T) {
+func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	CreateReservationTable(t, "reservations")
-	// CreateOnDemandTable(t, "ondemand")
-	// CreateGlobalReservationTable(t, "global")
 	index := meterer.GetCurrentBinIndex()
-	// get 32 raw bytes
-
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 
+	fmt.Println("test invalid signature")
+	invalidHeader := &meterer.BlobHeader{
+		Version:           1,
+		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
+		Nonce:             1,
+		BinIndex:          uint64(time.Now().Unix()),
+		CumulativePayment: 0,
+		Commitment:        *commitment,
+		BlobSize:          2000,
+		BlobQuorumParams:  []meterer.BlobQuorumParam{},
+		Signature:         []byte{78, 212, 55, 45, 156, 217, 21, 240, 47, 141, 18, 213, 226, 196, 4, 51, 245, 110, 20, 106, 244, 142, 142, 49, 213, 21, 34, 151, 118, 254, 46, 89, 48, 84, 250, 46, 179, 228, 46, 51, 106, 164, 122, 11, 26, 101, 10, 10, 243, 2, 30, 46, 95, 125, 189, 237, 236, 91, 130, 224, 240, 151, 106, 204, 1},
+	}
+	err := mt.MeterRequest(ctx, *invalidHeader)
+	assert.Error(t, err, "invalid signature: recovered address * does not match account ID *")
+
+	fmt.Println("test non-existent account")
+	unregisteredUser, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+	header, err := meterer.ConstructBlobHeader(signer, 1, 1, 1, 0, *commitment, 1000, []meterer.BlobQuorumParam{}, unregisteredUser)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "failed to get on-demand payment by account: reservation not found")
+
 	fmt.Println("test invalid index")
-	header, err := meterer.ConstructBlobHeader(signer, 1, 1, index, 0, *commitment, 2000, []meterer.BlobQuorumParam{}, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index, 0, *commitment, 2000, []meterer.BlobQuorumParam{}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid bin index for reservation")
@@ -267,7 +189,6 @@ func TestMetererAcceptValidHeader(t *testing.T) {
 	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index-1, 0, *commitment, 1000, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
-
 	assert.Error(t, err, "invalid bin index for reservation")
 
 	// test bin overflow
@@ -318,91 +239,97 @@ func TestMetererAcceptValidHeader(t *testing.T) {
 	assert.Error(t, err, "Overflow usage exceeds bin limit")
 }
 
-// func TestMetererRejectInvalidSignature(t *testing.T) {
-// 	m, signer, privateKey, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-// 	ctx := context.Background()
+func TestMetererOnDemand(t *testing.T) {
+	ctx := context.Background()
+	CreateOnDemandTable(t, "ondemand")
+	CreateGlobalReservationTable(t, "global")
+	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 
-// 	header, err := meterer.ConstructBlobHeader(signer, 1, 1, 0, 1000, ConstantCommitment(), 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 	assert.NoError(t, err)
-// 	header.Signature = []byte("invalid signature")
-// 	err = m.MeterRequest(ctx, *header)
-// 	assert.Error(t, err)
-// }
+	fmt.Println("test invalid signature")
+	invalidHeader := &meterer.BlobHeader{
+		Version:           1,
+		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
+		Nonce:             1,
+		BinIndex:          uint64(time.Now().Unix()),
+		CumulativePayment: 1,
+		Commitment:        *commitment,
+		BlobSize:          2000,
+		BlobQuorumParams:  []meterer.BlobQuorumParam{},
+		Signature:         []byte{78, 212, 55, 45, 156, 217, 21, 240, 47, 141, 18, 213, 226, 196, 4, 51, 245, 110, 20, 106, 244, 142, 142, 49, 213, 21, 34, 151, 118, 254, 46, 89, 48, 84, 250, 46, 179, 228, 46, 51, 106, 164, 122, 11, 26, 101, 10, 10, 243, 2, 30, 46, 95, 125, 189, 237, 236, 91, 130, 224, 240, 151, 106, 204, 1},
+	}
+	err := mt.MeterRequest(ctx, *invalidHeader)
+	assert.Error(t, err, "invalid signature: recovered address * does not match account ID *")
 
-// func TestMetererRejectInsufficientPayment(t *testing.T) {
-// 	m, signer, privateKey, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-// 	ctx := context.Background()
+	fmt.Println("test unregistered account")
+	unregisteredUser, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+	header, err := meterer.ConstructBlobHeader(signer, 1, 1, 1, 1, *commitment, 1000, []meterer.BlobQuorumParam{}, unregisteredUser)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "failed to get on-demand payment by account: payment not found")
 
-// 	header, err := meterer.ConstructBlobHeader(signer, 1, 1, 0, 500, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header)
-// 	assert.Error(t, err)
-// }
+	fmt.Println("test insufficient cumulative payment")
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 0, 1, *commitment, 2000, []meterer.BlobQuorumParam{}, privateKey1)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "insufficient cumulative payment increment")
+	// Correct rollback (TODO: discuss if there should be a rollback for invalid payments or penalize client)
+	result, err := dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
+		":account": &types.AttributeValueMemberS{
+			Value: crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result))
 
-// func TestMetererRejectInvalidBinIndex(t *testing.T) {
-// 	m, signer, privateKey, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-// 	ctx := context.Background()
+	fmt.Println("test failed global bin index")
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 0, 1, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey1)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "failed global bin index")
+	// Correct rollback
+	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
+		":account": &types.AttributeValueMemberS{
+			Value: crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result))
 
-// 	header, err := meterer.ConstructBlobHeader(signer, 1, 1, 0, 1000000, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey) // Invalid bin index
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header)
-// 	assert.Error(t, err)
-// }
+	fmt.Println("test valid payments")
+	for i := 0; i < 10; i++ {
+		header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), uint64(100*(i+1)), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey1)
+		err = mt.MeterRequest(ctx, *header)
+		fmt.Println("meter request ran", i, err)
+		assert.NoError(t, err)
+	}
 
-// func TestMetererAcceptMultipleValidHeaders(t *testing.T) {
-// 	m, signer, privateKey, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-// 	ctx := context.Background()
+	fmt.Println("test insufficient remaining balance from cumulative payment")
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 1, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey1)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	fmt.Println("meter request ran", err)
+	assert.Error(t, err, "insufficient cumulative payment increment")
 
-// 	header1, err := meterer.ConstructBlobHeader(signer, 1, 1, 0, 1000, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header1)
-// 	assert.NoError(t, err)
+	fmt.Println("test cannot insert cumulative payment in out of order")
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 0, *commitment, 50, []meterer.BlobQuorumParam{}, privateKey2)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "cannot insert cumulative payment in out of order")
 
-// 	header2, err := meterer.ConstructBlobHeader(signer, 1, 2, 1, 2000, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header2)
-// 	assert.NoError(t, err)
-// }
-
-// func TestMetererRejectDuplicateNonce(t *testing.T) {
-// 	m, signer, privateKey, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-// 	ctx := context.Background()
-
-// 	header1, err := meterer.ConstructBlobHeader(signer, 1, 1, 0, 1000, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header1)
-// 	assert.NoError(t, err)
-
-// 	header2, err := meterer.ConstructBlobHeader(signer, 1, 1, 1, 2000, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey) // Same nonce
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header2)
-// 	assert.Error(t, err)
-// }
-
-// func TestMetererRejectGlobalRateLimit(t *testing.T) {
-// 	m, signer, privateKey, err := setupTestMeterer(t)
-// 	assert.NoError(t, err)
-// 	ctx := context.Background()
-
-// 	// Submit requests up to the global rate limit
-// 	for i := 0; i < 1000; i++ {
-// 		header, err := meterer.ConstructBlobHeader(signer, 1, uint32(i), 0, uint64((i+1)*1000), core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 		assert.NoError(t, err)
-// 		err = m.MeterRequest(ctx, *header)
-// 		assert.NoError(t, err)
-// 	}
-
-// 	// This request should be rejected due to exceeding the global rate limit
-// 	header, err := meterer.ConstructBlobHeader(signer, 1, 1000, 0, 1001000, core.G1Point{}, 1000, []meterer.BlobQuorumParam{}, privateKey)
-// 	assert.NoError(t, err)
-// 	err = m.MeterRequest(ctx, *header)
-// 	assert.Error(t, err)
-// }
+	fmt.Println("test failed global rate limit")
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 2000, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey2)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "failed global bin index")
+	// Correct rollback
+	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
+		":account": &types.AttributeValueMemberS{
+			Value: crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(),
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result))
+}
 
 func CreateReservationTable(t *testing.T, tableName string) {
 	ctx := context.Background()

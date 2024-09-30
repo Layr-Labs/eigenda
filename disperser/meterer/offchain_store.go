@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"sort"
 	"strconv"
 	"time"
@@ -62,11 +61,10 @@ type PaymentTuple struct {
 	BlobSize          uint32
 }
 
-type OnDemandCollection struct {
-	AccountID string `dynamodbav:"AccountID"`
-	// Payments  []PaymentTuple `dynamodbav:"payments"`
-	CumulativePayments map[uint64]uint32 `dynamodbav:"CumulativePayments"` // Payment is the key, BlobSize is the value
-}
+// type OnDemandCollection struct {
+// 	// Payments  []PaymentTuple `dynamodbav:"payments"`
+// 	CumulativePayments map[uint64]uint32 `dynamodbav:"CumulativePayments"` // Payment is the key, BlobSize is the value
+// }
 
 type GlobalBin struct {
 	BinIndex  uint64    `dynamodbav:"BinIndex"`
@@ -85,7 +83,7 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 		"BinUsage": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
 	}
 
-	fmt.Printf("updating item %s %+v\n", "BinUsage", update["BinUsage"])
+	// fmt.Printf("updating item %s %+v\n", "BinUsage", update["BinUsage"])
 
 	// fmt.Println("updating reservation bin", accountID, binIndex, size, s.reservationTableName)
 	res, err := s.dynamoClient.UpdateItemIncrement(ctx, s.reservationTableName, key, update)
@@ -118,19 +116,24 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 }
 
 // func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID string, binIndex uint64, size uint32) (uint32, error) {
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint32, size uint32) (uint64, error) {
+func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, size uint32) (uint64, error) {
+	// key := map[string]types.AttributeValue{
+	// 	"BinIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(binIndex), 10)},
+	// }
+
+	// update := map[string]types.AttributeValue{
+	// 	":inc": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
+	// 	":now": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+	// }
 	key := map[string]types.AttributeValue{
-		"BinIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(binIndex), 10)},
+		"BinIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
 	}
 
 	update := map[string]types.AttributeValue{
-		":inc": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
-		":now": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+		"BinUsage": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
 	}
-
-	// updateExpression := "ADD BinUsage :inc SET UpdatedAt = :now"
-
-	res, err := s.dynamoClient.UpdateItem(ctx, s.globalBinTableName, key, update)
+	res, err := s.dynamoClient.UpdateItemIncrement(ctx, s.globalBinTableName, key, update)
+	fmt.Println("update global bin", res)
 	if err != nil {
 		return 0, err
 	}
@@ -247,121 +250,105 @@ func (s *OffchainStore) FindReservationBins(ctx context.Context, accountID strin
 	return reservations, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobHeader) (*big.Int, error) {
-	key := map[string]types.AttributeValue{
-		"account_id": &types.AttributeValueMemberS{Value: blobHeader.AccountID},
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobHeader) error {
+	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
+		commondynamodb.Item{
+			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
+			"CumulativePayments": &types.AttributeValueMemberS{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
+		},
+	)
+	if err != nil {
+		fmt.Println("failed to get item: %w", err)
 	}
-	// // Update expression to add the payment with its associated blob size
-	// updateExpression := "SET payment_blobs.#payment = :blobSize ADD CumulativePayments :payment"
-	// expressionAttributeNames := map[string]string{
-	// 	"#payment": fmt.Sprintf("%d", blobHeader.CumulativePayment),
-	// }
-	// expressionAttributeValues := map[string]types.AttributeValue{
-	// 	":blobSize": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", blobHeader.BlobSize)},
-	// 	":payment":  &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", blobHeader.CumulativePayment)},
-	// }
-	update := map[string]types.AttributeValue{
-		":blobSize": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", blobHeader.BlobSize)},
-		":payment":  &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", blobHeader.CumulativePayment)},
+	if result != nil {
+		return fmt.Errorf("payment already exists")
 	}
-
-	// Perform the update
-	res, err := s.dynamoClient.UpdateItem(ctx, s.onDemandTableName, key, update)
+	err = s.dynamoClient.PutItem(ctx, s.onDemandTableName,
+		commondynamodb.Item{
+			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
+			"CumulativePayments": &types.AttributeValueMemberS{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
+			"BlobSize":           &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobHeader.BlobSize), 10)},
+		},
+	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to add payment: %w", err)
+		return fmt.Errorf("failed to add payment: %w", err)
 	}
-
-	cumulativePayments, ok := res["CumulativePayments"]
-	if !ok {
-		return nil, fmt.Errorf("CumulativePayments attribute not found in the response")
-	}
-
-	cumulativePaymentsN, ok := cumulativePayments.(*types.AttributeValueMemberN)
-	if !ok {
-		return nil, fmt.Errorf("CumulativePayments attribute is not of type AttributeValueMemberN")
-	}
-
-	cumulativePaymentsValue, err := strconv.ParseUint(cumulativePaymentsN.Value, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CumulativePayments value: %w", err)
-	}
-
-	return big.NewInt(0).SetUint64(cumulativePaymentsValue), nil
-
-	// _, err := s.dynamoClient.UpdateItem(ctx, s.onDemandTableName, key, update)
-
-	// if err != nil {
-	// 	return err
-	// }
-
-	// return nil
+	return nil
 }
 
 // RemoveOnDemandPayment removes a specific payment from the list for a specific account
 func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID string, payment uint64) error {
-	key := map[string]types.AttributeValue{
-		"account_id": &types.AttributeValueMemberS{Value: accountID},
-	}
-	item := map[string]types.AttributeValue{
-		"payments": &types.AttributeValueMemberNS{Value: []string{fmt.Sprintf("%d", payment)}},
-	}
+	err := s.dynamoClient.DeleteItem(ctx, s.onDemandTableName,
+		commondynamodb.Key{
+			"AccountID":          &types.AttributeValueMemberS{Value: accountID},
+			"CumulativePayments": &types.AttributeValueMemberS{Value: strconv.FormatUint(payment, 10)},
+		},
+	)
 
-	_, err := s.dynamoClient.UpdateItem(ctx, s.onDemandTableName, key, item)
 	if err != nil {
-		return fmt.Errorf("failed to update item: %w", err)
+		return fmt.Errorf("failed to remove payment: %w", err)
 	}
 
 	return nil
 }
 
-// Add this function to get relevant on-demand payment records
+// relevant on-demand payment records: previous cumulative payment, next cumulative payment, blob size of next payment
 func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment uint64) (uint64, uint64, uint32, error) {
 	// Query the DynamoDB table for all payments of the account
-	key := map[string]types.AttributeValue{
-		"account_id": &types.AttributeValueMemberS{Value: accountID},
+	// result, err := s.dynamoClient.QueryIndex(ctx, s.onDemandTableName, "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
+	// 	":account": &types.AttributeValueMemberS{
+	// 		Value: accountID,
+	// 	}})
+	result, err := s.dynamoClient.QueryIndex(ctx, s.onDemandTableName, "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
+		":account": &types.AttributeValueMemberS{
+			Value: accountID,
+		}})
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to query index for account: %w", err)
 	}
 
-	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName, key)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("failed to get item: %w", err)
-	}
+	fmt.Println("grabbed result", result)
 
 	// Extract the payments from the result
-	var payments []OnDemandCollection
-	if paymentsAttr, ok := result["payments"]; ok {
-		if paymentsSet, ok := paymentsAttr.(*types.AttributeValueMemberNS); ok {
-			for _, paymentStr := range paymentsSet.Value {
-				payment, err := strconv.ParseUint(paymentStr, 10, 64)
-				if err != nil {
-					return 0, 0, 0, fmt.Errorf("failed to parse payment: %w", err)
-				}
-				payments = append(payments, OnDemandCollection{CumulativePayments: map[uint64]uint32{payment: 0}})
-			}
+	var payments []PaymentTuple
+	for _, item := range result {
+		payment, err := strconv.ParseUint(item["CumulativePayments"].(*types.AttributeValueMemberS).Value, 10, 64)
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to parse payment: %w", err)
 		}
+		blobSize, err := strconv.ParseUint(item["BlobSize"].(*types.AttributeValueMemberN).Value, 10, 32)
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to parse blob size: %w", err)
+		}
+		payments = append(payments, PaymentTuple{
+			CumulativePayment: payment,
+			BlobSize:          uint32(blobSize),
+		})
 	}
 
-	// Binary search to find the insertion point
+	fmt.Println("payments; now need to sort", payments)
+
+	// SORT payments by cumulative payment
+	sort.SliceStable(payments, func(i, j int) bool {
+		return payments[i].CumulativePayment < payments[j].CumulativePayment
+	})
+
+	fmt.Println("payments sorted", payments)
+
 	index := sort.Search(len(payments), func(i int) bool {
-		return payments[i].CumulativePayments[cumulativePayment] == 0
+		return payments[i].CumulativePayment == cumulativePayment
 	})
 
 	var prevPayment, nextPayment uint64
 	var nextBlobSize uint32
 
 	if index > 0 {
-		for payment, _ := range payments[index-1].CumulativePayments {
-			prevPayment = payment
-			break
-		}
+		prevPayment = payments[index-1].CumulativePayment
 	}
-
 	if index < len(payments)-1 {
-		for payment, blobSize := range payments[index+1].CumulativePayments {
-			nextPayment = payment
-			nextBlobSize = blobSize
-			break
-		}
+		nextPayment = payments[index+1].CumulativePayment
+		nextBlobSize = payments[index+1].BlobSize
 	}
 
 	return prevPayment, nextPayment, nextBlobSize, nil

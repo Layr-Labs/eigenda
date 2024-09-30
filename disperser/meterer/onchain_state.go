@@ -20,8 +20,8 @@ type TokenAmount uint64
 // corresponding to a particular quorum
 type ActiveReservation struct {
 	DataRate    uint32 // Bandwidth being reserved
-	StartEpoch  uint32 // Index of epoch where reservation begins
-	EndEpoch    uint32 // Index of epoch where reservation ends
+	StartEpoch  uint64 // Index of epoch where reservation begins
+	EndEpoch    uint64 // Index of epoch where reservation ends
 	QuorumSplit []byte // Each byte is a percentage at the corresponding quorum index
 }
 

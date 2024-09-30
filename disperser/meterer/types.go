@@ -31,7 +31,7 @@ type BlobHeader struct {
 	Version   uint32
 	AccountID string
 	Nonce     uint32 // use nonce to prevent duplicate payments in the same reservation window
-	BinIndex  uint32
+	BinIndex  uint64
 
 	Signature []byte
 	BlobSize  uint32
@@ -251,10 +251,10 @@ func ConstructBlobHeader(
 	signer *EIP712Signer,
 	version uint32,
 	nonce uint32,
-	binIndex uint32,
+	binIndex uint64,
 	cumulativePayment uint64,
 	commitment core.G1Point,
-	dataLength uint32,
+	blobSize uint32,
 	blobQuorumParams []BlobQuorumParam,
 	privateKey *ecdsa.PrivateKey,
 ) (*BlobHeader, error) {
@@ -266,9 +266,8 @@ func ConstructBlobHeader(
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
 		Commitment:        commitment,
-		DataLength:        dataLength,
 		BlobQuorumParams:  blobQuorumParams,
-		BlobSize:          dataLength, // Assuming BlobSize is the same as DataLength
+		BlobSize:          blobSize,
 	}
 
 	signature, err := signer.SignBlobHeader(header, privateKey)

@@ -164,10 +164,9 @@ func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key 
 			// Cannot update the key
 			continue
 		}
-		fmt.Println("updating item", itemKey, itemValue)
+		// fmt.Println("updating item", itemKey, itemValue)
 		// ADD numeric values
 		if n, ok := itemValue.(*types.AttributeValueMemberN); ok {
-			fmt.Println("is a number", n.Value)
 			// update = update.Add(expression.Name(itemKey), expression.Value(n.Value))
 			// update = update.Add(expression.Name(itemKey), expression.Value(n.Value))
 			f, _ := strconv.ParseFloat(n.Value, 64)
