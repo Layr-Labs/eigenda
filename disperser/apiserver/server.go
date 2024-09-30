@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/status"
 	"math/rand"
 	"net"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/status"
 
 	"github.com/Layr-Labs/eigenda/api"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -20,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -44,6 +46,7 @@ type DispersalServer struct {
 	tx           core.Transactor
 	quorumConfig QuorumConfig
 
+	meterer       *meterer.Meterer
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
@@ -69,6 +72,7 @@ func NewDispersalServer(
 	tx core.Transactor,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
+	meterer *meterer.Meterer,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
 	maxBlobSize int,
@@ -90,6 +94,7 @@ func NewDispersalServer(
 		tx:            tx,
 		metrics:       metrics,
 		logger:        logger,
+		meterer:       meterer,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
 		mu:            &sync.RWMutex{},
@@ -271,7 +276,15 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	if s.ratelimiter != nil {
+	// payments before ratelimits
+	if s.meterer != nil {
+		//TODO: blob request header needs to be updated for payments;
+		// the tests rely on a temporarily defined struct from disperser/meterer/types
+		// err := s.meterer.MeterRequest(ctx, blob.RequestHeader)
+		// if err != nil {
+		// 	return nil, err
+		// }
+	} else if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
 		if err != nil {
 			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.

@@ -10,9 +10,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	mt "github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -95,6 +98,49 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	reg := prometheus.NewRegistry()
 
+	var meterer *mt.Meterer
+	if config.EnablePaymentMeterer {
+		config := mt.Config{
+			PricePerByte:         1,
+			GlobalBytesPerSecond: 1000,
+			ReservationWindow:    time.Minute,
+		}
+
+		paymentChainState := mt.NewMockedOnchainPaymentState()
+
+		paymentChainState.InitializeOnchainPaymentState()
+
+		clientConfig := commonaws.ClientConfig{
+			Region:          "us-east-1",
+			AccessKey:       "localstack",
+			SecretAccessKey: "localstack",
+			EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+		}
+
+		store, err := mt.NewOffchainStore(
+			clientConfig,
+			"reservations",
+			"ondemand",
+			"global",
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		// add some default sensible configs
+		meterer, err = mt.NewMeterer(
+			config,
+			mt.TimeoutConfig{},
+			paymentChainState,
+			store,
+			logging.NewNoopLogger(),
+			// metrics.NewNoopMetrics(),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create meterer: %w", err)
+		}
+	}
+
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
@@ -130,6 +176,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		transactor,
 		logger,
 		metrics,
+		meterer,
 		ratelimiter,
 		config.RateConfig,
 		config.MaxBlobSize,

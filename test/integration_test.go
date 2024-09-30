@@ -23,9 +23,11 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -194,7 +196,39 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	tx := &coremock.MockTransactor{}
 	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
 	tx.On("GetQuorumCount").Return(1, nil)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig, testMaxBlobSize)
+
+	meterConfig := meterer.Config{
+		PricePerByte:         1,
+		GlobalBytesPerSecond: 1000,
+		ReservationWindow:    time.Minute,
+	}
+
+	paymentChainState := meterer.NewMockedOnchainPaymentState()
+
+	paymentChainState.InitializeOnchainPaymentState()
+
+	clientConfig := commonaws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+	}
+
+	offchainStore, err := meterer.NewOffchainStore(
+		clientConfig,
+		"reservations",
+		"ondemand",
+		"global",
+		logger,
+	)
+	if err != nil {
+		panic("failed to create offchain store")
+	}
+	meterer, err := meterer.NewMeterer(meterConfig, meterer.TimeoutConfig{}, paymentChainState, offchainStore, logger)
+	if err != nil {
+		panic("failed to create meterer")
+	}
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
 		batcher:       batcher,

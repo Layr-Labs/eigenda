@@ -76,6 +76,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	EnablePaymentMeterer = cli.BoolFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "enable-payment-meterer"),
+		Usage:  "enable payment meterer",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_PAYMENT_METERER"),
+	}
 	EnableRatelimiter = cli.BoolFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "enable-ratelimiter"),
 		Usage:  "enable rate limiter",

@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -645,6 +647,38 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create bucket store")
 	}
+	meterConfig := meterer.Config{
+		PricePerByte:         1,
+		GlobalBytesPerSecond: 1000,
+		ReservationWindow:    time.Minute,
+	}
+
+	paymentChainState := meterer.NewMockedOnchainPaymentState()
+
+	paymentChainState.InitializeOnchainPaymentState()
+
+	clientConfig := commonaws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+	}
+
+	store, err := meterer.NewOffchainStore(
+		clientConfig,
+		"reservations",
+		"ondemand",
+		"global",
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+	meterer, err := meterer.NewMeterer(meterConfig, meterer.TimeoutConfig{}, paymentChainState, store, logger)
+	if err != nil {
+		panic("failed to create meterer")
+	}
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{
@@ -701,7 +735,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig, testMaxBlobSize)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), meterer, ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

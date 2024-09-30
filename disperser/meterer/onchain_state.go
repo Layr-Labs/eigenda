@@ -50,48 +50,54 @@ type OnchainPaymentState struct {
 }
 
 type MockedOnchainPaymentState struct {
-	MockActiveReservations *ActiveReservations
-	MockOnDemandPayments   *OnDemandPayments
+	ActiveReservations *ActiveReservations
+	OnDemandPayments   *OnDemandPayments
 }
 
 func NewMockedOnchainPaymentState() *MockedOnchainPaymentState {
 	return &MockedOnchainPaymentState{
-		MockActiveReservations: &ActiveReservations{},
-		MockOnDemandPayments:   &OnDemandPayments{},
+		ActiveReservations: &ActiveReservations{},
+		OnDemandPayments:   &OnDemandPayments{},
 	}
+}
+
+// Mock data initialization method (mocked structs)
+func (pcs *MockedOnchainPaymentState) InitializeOnchainPaymentState() {
+	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{}
+	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{}
 }
 
 // Mock data initialization method
 func (pcs *MockedOnchainPaymentState) InitializeMockData(privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
 	// Initialize mock active reservations
 	binIndex := GetCurrentBinIndex()
-	pcs.MockActiveReservations.Reservations = map[string]*ActiveReservation{
+	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}},
 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}},
 	}
-	pcs.MockOnDemandPayments.Payments = map[string]*OnDemandPayment{
+	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1000},
 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 3000},
 	}
 }
 
 func (pcs *MockedOnchainPaymentState) MockedGetActiveReservations(ctx context.Context, blockNumber uint) (*ActiveReservations, error) {
-	return pcs.MockActiveReservations, nil
+	return pcs.ActiveReservations, nil
 }
 
 func (pcs *MockedOnchainPaymentState) MockedGetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*ActiveReservation, error) {
-	if reservation, ok := pcs.MockActiveReservations.Reservations[accountID]; ok {
+	if reservation, ok := pcs.ActiveReservations.Reservations[accountID]; ok {
 		return reservation, nil
 	}
 	return nil, errors.New("reservation not found")
 }
 
 func (pcs *MockedOnchainPaymentState) MockedGetOnDemandPayments(ctx context.Context, blockNumber uint) (*OnDemandPayments, error) {
-	return pcs.MockOnDemandPayments, nil
+	return pcs.OnDemandPayments, nil
 }
 
 func (pcs *MockedOnchainPaymentState) MockedGetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error) {
-	if payment, ok := pcs.MockOnDemandPayments.Payments[accountID]; ok {
+	if payment, ok := pcs.OnDemandPayments.Payments[accountID]; ok {
 		return payment, nil
 	}
 	return nil, errors.New("payment not found")
