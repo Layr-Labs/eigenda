@@ -810,8 +810,16 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	// Combined handler for gRPC and HTTP
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Info("Received request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"proto", r.Proto,
+			"content-type", r.Header.Get("Content-Type"),
+		)
+
 		// Handle OPTIONS requests
 		if r.Method == "OPTIONS" {
+			s.logger.Info("Handling OPTIONS request")
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
@@ -820,9 +828,10 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 		}
 
 		if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
+			s.logger.Info("Handling gRPC request")
 			grpcServer.ServeHTTP(w, r)
 		} else {
-			// Handle regular HTTP requests
+			s.logger.Info("Handling regular HTTP request")
 			http.NotFound(w, r)
 		}
 	})
@@ -836,7 +845,7 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 		Handler: h2Handler,
 	}
 
-	s.logger.Info("Server Listening (HTTP/1.1, HTTP/2, and gRPC enabled)", "address", addr)
+	s.logger.Info("Server Listening (HTTP/1.1, HTTP/2, gRPC, and OPTIONS enabled)", "address", addr)
 
 	go func() {
 		<-ctx.Done()
