@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc/status"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -813,36 +815,23 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 func (s *DispersalServer) startCombinedServers() error {
 	// Set up gRPC server
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
-	reflection.Register(gs)
-	pb.RegisterDisperserServer(gs, s)
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(1024 * 1024 * 300), // 300 MiB
+	)
+	reflection.Register(grpcServer)
+	pb.RegisterDisperserServer(grpcServer, s)
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
+	healthcheck.RegisterHealthServer(name, grpcServer)
 
-	// Set up gRPC listener
-	grpcAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
-	grpcListener, err := net.Listen("tcp", grpcAddr)
-	if err != nil {
-		return fmt.Errorf("could not start gRPC listener: %w", err)
-	}
-
-	// Start gRPC server in a goroutine
-	go func() {
-		s.logger.Info("gRPC Server Listening", "address", grpcListener.Addr().String())
-		if err := gs.Serve(grpcListener); err != nil {
-			s.logger.Error("failed to serve gRPC", "error", err)
-		}
-	}()
-
-	// Set up HTTP server
-	httpAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.HttpPort)
-	httpListener, err := net.Listen("tcp", httpAddr)
-	if err != nil {
-		return fmt.Errorf("could not start HTTP listener: %w", err)
-	}
+	// Wrap the gRPC server with grpc-web
+	wrappedGrpc := grpcweb.WrapServer(grpcServer,
+		grpcweb.WithOriginFunc(func(origin string) bool {
+			return true // Allow all origins
+		}),
+		grpcweb.WithAllowNonRootResource(true),
+	)
 
 	// Create a new ServeMux for HTTP handlers
 	mux := http.NewServeMux()
@@ -852,9 +841,6 @@ func (s *DispersalServer) startCombinedServers() error {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
-
-	// Wrap the gRPC server with grpc-web
-	wrappedGrpc := grpcweb.WrapServer(gs)
 
 	// Create a handler that will use wrappedGrpc for gRPC-web requests
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -871,24 +857,36 @@ func (s *DispersalServer) startCombinedServers() error {
 		}
 
 		if wrappedGrpc.IsGrpcWebRequest(r) || wrappedGrpc.IsAcceptableGrpcCorsRequest(r) {
+			s.logger.Info("Handling gRPC-Web request", "path", r.URL.Path)
 			wrappedGrpc.ServeHTTP(w, r)
 		} else {
+			s.logger.Info("Handling HTTP request", "path", r.URL.Path)
 			mux.ServeHTTP(w, r)
 		}
 	})
 
-	httpServer := &http.Server{
-		Handler: handler,
+	// Create a server that supports HTTP/2 and HTTP/1.1
+	h2s := &http2.Server{}
+	combinedServer := &http.Server{
+		Handler: h2c.NewHandler(handler, h2s),
 	}
 
-	// Start HTTP server
-	s.logger.Info("HTTP Server Listening (gRPC-Web enabled)", "address", httpListener.Addr().String())
-	if err := httpServer.Serve(httpListener); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("failed to serve HTTP: %w", err)
+	// Set up listener
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.HttpPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not start listener: %w", err)
+	}
+
+	// Start the combined server
+	s.logger.Info("Combined Server Listening (HTTP/1.1, HTTP/2, gRPC, and gRPC-Web enabled)", "address", listener.Addr().String())
+	if err := combinedServer.Serve(listener); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("failed to serve: %w", err)
 	}
 
 	return nil
 }
+
 func (s *DispersalServer) LoadAllowlist() {
 	al, err := ReadAllowlistFromFile(s.rateConfig.AllowlistFile)
 	if err != nil {
