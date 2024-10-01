@@ -810,6 +810,15 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	// Combined handler for gRPC and HTTP
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Handle OPTIONS requests
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
 			grpcServer.ServeHTTP(w, r)
 		} else {
