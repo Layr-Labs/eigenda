@@ -817,15 +817,19 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 			"content-type", r.Header.Get("Content-Type"),
 		)
 
-		// Handle OPTIONS requests
+		// Handle CORS preflight requests
 		if r.Method == "OPTIONS" {
 			s.logger.Info("Handling OPTIONS request")
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-User-Agent, X-Grpc-Web")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+
+		// Set CORS headers for all responses
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-User-Agent, X-Grpc-Web")
 
 		if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
 			s.logger.Info("Handling gRPC request")
