@@ -825,6 +825,21 @@ func (s *DispersalServer) startCombinedServers() error {
 	name := pb.Disperser_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, grpcServer)
 
+	// Set up gRPC listener
+	grpcAddr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
+	grpcListener, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		return fmt.Errorf("could not start gRPC listener: %w", err)
+	}
+
+	// Start gRPC server in a goroutine
+	go func() {
+		s.logger.Info("gRPC Server Listening", "address", grpcListener.Addr().String())
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			s.logger.Error("failed to serve gRPC", "error", err)
+		}
+	}()
+
 	// Wrap the gRPC server with grpc-web
 	wrappedGrpc := grpcweb.WrapServer(grpcServer,
 		grpcweb.WithOriginFunc(func(origin string) bool {
@@ -856,7 +871,17 @@ func (s *DispersalServer) startCombinedServers() error {
 			return
 		}
 
-		if wrappedGrpc.IsGrpcWebRequest(r) || wrappedGrpc.IsAcceptableGrpcCorsRequest(r) {
+		isGrpcWebRequest := wrappedGrpc.IsGrpcWebRequest(r)
+		isAcceptableGrpcCorsRequest := wrappedGrpc.IsAcceptableGrpcCorsRequest(r)
+
+		s.logger.Info("Request details",
+			"path", r.URL.Path,
+			"method", r.Method,
+			"headers", r.Header,
+			"isGrpcWebRequest", isGrpcWebRequest,
+			"isAcceptableGrpcCorsRequest", isAcceptableGrpcCorsRequest)
+
+		if isGrpcWebRequest || isAcceptableGrpcCorsRequest {
 			s.logger.Info("Handling gRPC-Web request", "path", r.URL.Path)
 			wrappedGrpc.ServeHTTP(w, r)
 		} else {
