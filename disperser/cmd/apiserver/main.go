@@ -101,8 +101,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
 		config := mt.Config{
-			PricePerByte:         1,
-			GlobalBytesPerSecond: 1000,
+			PricePerChargeable:   config.PricePerChargeable,
+			GlobalBytesPerSecond: config.OnDemandGlobalLimit,
+			MinChargeableSize:    config.MinChargeableSize,
 			ReservationWindow:    time.Minute,
 		}
 

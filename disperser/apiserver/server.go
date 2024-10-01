@@ -278,12 +278,12 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	// payments before ratelimits
 	if s.meterer != nil {
-		//TODO: blob request header needs to be updated for payments;
-		// the tests rely on a temporarily defined struct from disperser/meterer/types
-		// err := s.meterer.MeterRequest(ctx, blob.RequestHeader)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		//TODO: blob request header needs to be updated for payments; this empty header is a placeholder
+		paymentHeader := meterer.BlobHeader{}
+		err := s.meterer.MeterRequest(ctx, paymentHeader)
+		if err != nil {
+			return nil, err
+		}
 	} else if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
 		if err != nil {

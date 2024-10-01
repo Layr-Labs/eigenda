@@ -91,7 +91,8 @@ func setup(_ *testing.M) {
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
-		PricePerByte:         1,
+		PricePerChargeable:   1,
+		MinChargeableSize:    1,
 		GlobalBytesPerSecond: 1000,
 		ReservationWindow:    time.Minute,
 	}

@@ -198,7 +198,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	tx.On("GetQuorumCount").Return(1, nil)
 
 	meterConfig := meterer.Config{
-		PricePerByte:         1,
+		PricePerChargeable:   1,
 		GlobalBytesPerSecond: 1000,
 		ReservationWindow:    time.Minute,
 	}

@@ -648,7 +648,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		panic("failed to create bucket store")
 	}
 	meterConfig := meterer.Config{
-		PricePerByte:         1,
+		PricePerChargeable:   1,
 		GlobalBytesPerSecond: 1000,
 		ReservationWindow:    time.Minute,
 	}

@@ -21,8 +21,9 @@ type Config struct {
 	// PullInterval             time.Duration
 
 	// network parameters (this should be published on-chain and read through contracts)
-	PricePerByte         uint64
+	PricePerChargeable   uint64
 	GlobalBytesPerSecond uint64
+	MinChargeableSize    uint64
 	ReservationWindow    time.Duration
 }
 
@@ -157,7 +158,9 @@ func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveRes
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, binLimit uint32) error {
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex), blobHeader.BlobSize)
+	//todo: sizes use uint64?
+	recordedSize := max(blobHeader.BlobSize, uint32(m.MinChargeableSize))
+	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex), recordedSize)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -165,9 +168,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 	// metered usage stays within the bin limit
 	if newUsage <= binLimit {
 		return nil
-	} else if newUsage-blobHeader.BlobSize >= binLimit {
+	} else if newUsage-recordedSize >= binLimit {
 		// metered usage before updating the size already exceeded the limit
-		return fmt.Errorf("Bin has already been overflowed")
+		return fmt.Errorf("Bin has already been filled")
 	}
 
 	// check against the onchain state for overflow (TODO: update to real provider calls)
@@ -197,6 +200,8 @@ func GetCurrentBinIndex() uint64 {
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
+	// update blob header to use the miniumum chargeable size
+	blobHeader.BlobSize = max(blobHeader.BlobSize, uint32(m.MinChargeableSize))
 	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
@@ -211,7 +216,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 	}
 
 	// Update bin usage atomically and check against bin capacity
-	if err := m.IncrementGlobalBinUsage(ctx, blobHeader, m.GlobalBytesPerSecond); err != nil {
+	if err := m.IncrementGlobalBinUsage(ctx, blobHeader); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
 		m.OffchainStore.RemoveOnDemandPayment(ctx, blobHeader.AccountID, blobHeader.CumulativePayment)
 		return fmt.Errorf("failed global rate limiting")
@@ -231,11 +236,11 @@ func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, on
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+uint64(blobHeader.BlobSize)*m.Config.PricePerByte > blobHeader.CumulativePayment {
+	if prevPmt+uint64(blobHeader.BlobSize)*m.Config.PricePerChargeable/m.Config.MinChargeableSize > blobHeader.CumulativePayment {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize)*m.Config.PricePerByte > nextPmt {
+	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize)*m.Config.PricePerChargeable/m.Config.MinChargeableSize > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
@@ -257,7 +262,7 @@ func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint64, error) 
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader, globalBinIndex uint64) error {
+func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader) error {
 	globalIndex, err := m.ValidateGlobalBinIndex(blobHeader)
 	if err != nil {
 		return fmt.Errorf("invalid bin index for on-demand request: %w", err)
