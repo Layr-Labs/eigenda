@@ -154,13 +154,24 @@ func (b *Batcher) RecoverState(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
 	}
+	expired := 0
+	processing := 0
 	for _, meta := range metas {
-		err = b.Queue.MarkBlobProcessing(ctx, meta.GetBlobKey())
-		if err != nil {
-			return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
+		if meta.Expiry == 0 || meta.Expiry < uint64(time.Now().Unix()) {
+			err = b.Queue.MarkBlobFailed(ctx, meta.GetBlobKey())
+			if err != nil {
+				return fmt.Errorf("failed to mark blob (%s) as failed: %w", meta.GetBlobKey(), err)
+			}
+			expired += 1
+		} else {
+			err = b.Queue.MarkBlobProcessing(ctx, meta.GetBlobKey())
+			if err != nil {
+				return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
+			}
+			processing += 1
 		}
 	}
-	b.logger.Info("Recovering state took", "duration", time.Since(start), "numBlobs", len(metas))
+	b.logger.Info("Recovering state took", "duration", time.Since(start), "numBlobs", len(metas), "expired", expired, "processing", processing)
 	return nil
 }
 

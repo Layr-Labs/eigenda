@@ -40,7 +40,7 @@ var (
 type batcherComponents struct {
 	transactor       *coremock.MockTransactor
 	txnManager       *batchermock.MockTxnManager
-	blobStore        disperser.BlobStore
+	blobStore        *inmem.BlobStore
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
 	ethClient        *cmock.MockEthClient
@@ -101,7 +101,10 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 
 	// Disperser Components
 	dispatcher := dmock.NewDispatcher(state)
-	blobStore := inmem.NewBlobStore()
+	blobStore := &inmem.BlobStore{
+		Blobs:    make(map[disperser.BlobHash]*inmem.BlobHolder),
+		Metadata: make(map[disperser.BlobKey]*disperser.BlobMetadata),
+	}
 
 	pullInterval := 100 * time.Millisecond
 	config := bat.Config{
@@ -779,31 +782,57 @@ func TestBatcherRecoverState(t *testing.T) {
 		},
 	})
 
+	blob2 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
 	components, batcher, _ := makeBatcher(t)
 
 	blobStore := components.blobStore
 	ctx := context.Background()
-	_, key1 := queueBlob(t, ctx, &blob0, blobStore)
-	_, _ = queueBlob(t, ctx, &blob1, blobStore)
+	_, key0 := queueBlob(t, ctx, &blob0, blobStore)
+	_, key1 := queueBlob(t, ctx, &blob1, blobStore)
+	_, key2 := queueBlob(t, ctx, &blob2, blobStore)
+	components.blobStore.Metadata[key2].Expiry = uint64(time.Now().Add(time.Hour * (-24)).Unix())
 
-	err := blobStore.MarkBlobDispersing(ctx, key1)
+	err := blobStore.MarkBlobDispersing(ctx, key0)
 	assert.NoError(t, err)
-	processingBlobs, err := blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	err = blobStore.MarkBlobDispersing(ctx, key2)
 	assert.NoError(t, err)
-	assert.Len(t, processingBlobs, 1)
 
-	dispersingBlobs, err := blobStore.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
+	b0, err := blobStore.GetBlobMetadata(ctx, key0)
 	assert.NoError(t, err)
-	assert.Len(t, dispersingBlobs, 1)
+	assert.Equal(t, b0.BlobStatus, disperser.Dispersing)
+
+	b1, err := blobStore.GetBlobMetadata(ctx, key1)
+	assert.NoError(t, err)
+	assert.Equal(t, b1.BlobStatus, disperser.Processing)
+
+	b2, err := blobStore.GetBlobMetadata(ctx, key2)
+	assert.NoError(t, err)
+	assert.Equal(t, b2.BlobStatus, disperser.Dispersing)
 
 	err = batcher.RecoverState(context.Background())
 	assert.NoError(t, err)
 
-	processingBlobs, err = blobStore.GetBlobMetadataByStatus(ctx, disperser.Processing)
+	b0, err = blobStore.GetBlobMetadata(ctx, key0)
 	assert.NoError(t, err)
-	assert.Len(t, processingBlobs, 2)
+	assert.Equal(t, b0.BlobStatus, disperser.Processing)
 
-	dispersingBlobs, err = blobStore.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
+	b1, err = blobStore.GetBlobMetadata(ctx, key1)
 	assert.NoError(t, err)
-	assert.Len(t, dispersingBlobs, 0)
+	assert.Equal(t, b1.BlobStatus, disperser.Processing)
+
+	b2, err = blobStore.GetBlobMetadata(ctx, key2)
+	assert.NoError(t, err)
+	assert.Equal(t, b2.BlobStatus, disperser.Failed)
 }

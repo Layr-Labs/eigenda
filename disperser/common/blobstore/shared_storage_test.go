@@ -56,14 +56,12 @@ func TestSharedBlobStore(t *testing.T) {
 	err = sharedStorage.IncrementBlobRetryCount(ctx, metadata1)
 	assert.Nil(t, err)
 	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
-	fmt.Println("Num Retries", metadata1.NumRetries)
 	assert.Nil(t, err)
 	assert.Equal(t, uint(1), metadata1.NumRetries)
 
 	err = sharedStorage.IncrementBlobRetryCount(ctx, metadata1)
 	assert.Nil(t, err)
 	metadata1, err = sharedStorage.GetBlobMetadata(ctx, blobKey)
-	fmt.Println("Num Retries", metadata1.NumRetries)
 	assert.Nil(t, err)
 	assert.Equal(t, uint(2), metadata1.NumRetries)
 
@@ -198,11 +196,12 @@ func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) 
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
 	}
+	expiry := uint64(time.Now().Add(time.Hour).Unix())
 	metadata1 := &disperser.BlobMetadata{
 		MetadataHash: blobKey1.MetadataHash,
 		BlobHash:     blobHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,
@@ -218,7 +217,7 @@ func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) 
 		MetadataHash: blobKey2.MetadataHash,
 		BlobHash:     blobKey2.BlobHash,
 		BlobStatus:   disperser.Finalized,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: blob.RequestHeader,

@@ -19,6 +19,7 @@ import (
 const (
 	statusIndexName = "StatusIndex"
 	batchIndexName  = "BatchIndex"
+	expiryIndexName = "Status-Expiry-Index"
 )
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -121,7 +122,7 @@ func (s *BlobMetadataStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
 func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status disperser.BlobStatus) ([]*disperser.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -143,11 +144,11 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
-// GetBlobMetadataByStatusCount returns the count of all the metadata with the given status
+// GetBlobMetadataCountByStatus returns the count of all the metadata with the given status
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
-func (s *BlobMetadataStore) GetBlobMetadataByStatusCount(ctx context.Context, status disperser.BlobStatus) (int32, error) {
-	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status disperser.BlobStatus) (int32, error) {
+	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -180,7 +181,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		}
 	}
 
-	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, statusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -440,6 +441,10 @@ func GenerateTableSchema(metadataTableName string, readCapacityUnits int64, writ
 				AttributeName: aws.String("BlobIndex"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("Expiry"),
+				AttributeType: types.ScalarAttributeTypeN,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -482,6 +487,26 @@ func GenerateTableSchema(metadataTableName string, readCapacityUnits int64, writ
 					},
 					{
 						AttributeName: aws.String("BlobIndex"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
+				IndexName: aws.String(expiryIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("BlobStatus"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("Expiry"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
