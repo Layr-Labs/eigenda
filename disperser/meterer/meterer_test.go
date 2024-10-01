@@ -46,6 +46,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// Mock data initialization method
+func InitializeMockData(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
+	// Initialize mock active reservations
+	binIndex := meterer.GetCurrentBinIndex()
+	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
+		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}},
+		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}},
+	}
+	pcs.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
+		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1000},
+		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 3000},
+	}
+}
+
 func setup(_ *testing.M) {
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
@@ -97,9 +111,9 @@ func setup(_ *testing.M) {
 		ReservationWindow:    time.Minute,
 	}
 
-	paymentChainState := meterer.NewMockedOnchainPaymentState()
+	paymentChainState := meterer.NewOnchainPaymentState()
 
-	paymentChainState.InitializeMockData(privateKey1, privateKey2)
+	InitializeMockData(paymentChainState, privateKey1, privateKey2)
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",

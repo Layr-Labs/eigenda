@@ -107,7 +107,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			ReservationWindow:    time.Minute,
 		}
 
-		paymentChainState := mt.NewMockedOnchainPaymentState()
+		paymentChainState := mt.NewOnchainPaymentState()
 
 		paymentChainState.InitializeOnchainPaymentState()
 

@@ -203,7 +203,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		ReservationWindow:    time.Minute,
 	}
 
-	paymentChainState := meterer.NewMockedOnchainPaymentState()
+	paymentChainState := meterer.NewOnchainPaymentState()
 
 	paymentChainState.InitializeOnchainPaymentState()
 

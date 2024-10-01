@@ -2,11 +2,9 @@ package meterer
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 /* HEAVILY MOCKED */
@@ -43,60 +41,45 @@ type OnDemandPayments struct {
 type OnchainPaymentState struct {
 	tx *eth.Transactor
 
+	ActiveReservations *ActiveReservations
+	OnDemandPayments   *OnDemandPayments
+	// FUNCTIONS IF THIS STRUCT WAS AN INTERFACE?
 	// GetActiveReservations(ctx context.Context, blockNumber uint) (map[string]*ActiveReservations, error)
 	// GetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*ActiveReservation, error)
 	// GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]*OnDemandPayments, error)
 	// GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error)
 }
 
-type MockedOnchainPaymentState struct {
-	ActiveReservations *ActiveReservations
-	OnDemandPayments   *OnDemandPayments
-}
-
-func NewMockedOnchainPaymentState() *MockedOnchainPaymentState {
-	return &MockedOnchainPaymentState{
+func NewOnchainPaymentState() *OnchainPaymentState {
+	return &OnchainPaymentState{
 		ActiveReservations: &ActiveReservations{},
 		OnDemandPayments:   &OnDemandPayments{},
 	}
 }
 
 // Mock data initialization method (mocked structs)
-func (pcs *MockedOnchainPaymentState) InitializeOnchainPaymentState() {
+func (pcs *OnchainPaymentState) InitializeOnchainPaymentState() {
+	// update with a pull from chain (write pulling functions in/core/eth/tx.go)
 	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{}
 	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{}
 }
 
-// Mock data initialization method
-func (pcs *MockedOnchainPaymentState) InitializeMockData(privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
-	// Initialize mock active reservations
-	binIndex := GetCurrentBinIndex()
-	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{
-		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}},
-		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}},
-	}
-	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{
-		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1000},
-		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 3000},
-	}
-}
-
-func (pcs *MockedOnchainPaymentState) MockedGetActiveReservations(ctx context.Context, blockNumber uint) (*ActiveReservations, error) {
+func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint) (*ActiveReservations, error) {
 	return pcs.ActiveReservations, nil
 }
 
-func (pcs *MockedOnchainPaymentState) MockedGetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*ActiveReservation, error) {
+func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*ActiveReservation, error) {
 	if reservation, ok := pcs.ActiveReservations.Reservations[accountID]; ok {
 		return reservation, nil
 	}
 	return nil, errors.New("reservation not found")
 }
 
-func (pcs *MockedOnchainPaymentState) MockedGetOnDemandPayments(ctx context.Context, blockNumber uint) (*OnDemandPayments, error) {
+func (pcs *OnchainPaymentState) GetOnDemandPayments(ctx context.Context, blockNumber uint) (*OnDemandPayments, error) {
 	return pcs.OnDemandPayments, nil
 }
 
-func (pcs *MockedOnchainPaymentState) MockedGetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error) {
+func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error) {
 	if payment, ok := pcs.OnDemandPayments.Payments[accountID]; ok {
 		return payment, nil
 	}

@@ -42,7 +42,7 @@ type Meterer struct {
 	Config
 	TimeoutConfig
 
-	ChainState    *MockedOnchainPaymentState
+	ChainState    *OnchainPaymentState
 	OffchainStore *OffchainStore
 
 	// Metrics *Metrics
@@ -52,11 +52,12 @@ type Meterer struct {
 func NewMeterer(
 	config Config,
 	timeoutConfig TimeoutConfig,
-	paymentChainState *MockedOnchainPaymentState,
+	paymentChainState *OnchainPaymentState,
 	offchainStore *OffchainStore,
 	logger logging.Logger,
 	// metrics *Metrics,
 ) (*Meterer, error) {
+	// TODO: create a separate thread to pull from the chain and update chain state
 	return &Meterer{
 		Config:        config,
 		TimeoutConfig: timeoutConfig,
@@ -84,7 +85,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header BlobHeader) error {
 
 	// Validate against the payment method
 	if header.CumulativePayment == 0 {
-		reservation, err := m.ChainState.MockedGetActiveReservationByAccount(ctx, blockNumber, header.AccountID)
+		reservation, err := m.ChainState.GetActiveReservationByAccount(ctx, blockNumber, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
@@ -92,7 +93,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header BlobHeader) error {
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainState.MockedGetOnDemandPaymentByAccount(ctx, blockNumber, header.AccountID)
+		onDemandPayment, err := m.ChainState.GetOnDemandPaymentByAccount(ctx, blockNumber, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
@@ -138,7 +139,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHe
 	}
 
 	// Update bin usage atomically and check against reservation's data rate as the bin limit
-	if err := m.IncrementBinUsage(ctx, blobHeader, reservation.DataRate); err != nil {
+	if err := m.IncrementBinUsage(ctx, blobHeader, reservation); err != nil {
 		return fmt.Errorf("bin overflows: %w", err)
 	}
 
@@ -157,7 +158,7 @@ func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveRes
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 // TODO: Bin limit should be direct write to the Store
-func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, binLimit uint32) error {
+func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, reservation *ActiveReservation) error {
 	//todo: sizes use uint64?
 	recordedSize := max(blobHeader.BlobSize, uint32(m.MinChargeableSize))
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex), recordedSize)
@@ -166,21 +167,14 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 	}
 
 	// metered usage stays within the bin limit
-	if newUsage <= binLimit {
+	if newUsage <= reservation.DataRate {
 		return nil
-	} else if newUsage-recordedSize >= binLimit {
+	} else if newUsage-recordedSize >= reservation.DataRate {
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("Bin has already been filled")
 	}
-
-	// check against the onchain state for overflow (TODO: update to real provider calls)
-	blockNumber := uint(0)
-	reservation, err := m.ChainState.MockedGetActiveReservationByAccount(ctx, blockNumber, blobHeader.AccountID)
-	if err != nil {
-		return fmt.Errorf("failed to get active reservation by account: %w", err)
-	}
-	if newUsage <= 2*binLimit && blobHeader.BinIndex+2 <= reservation.EndEpoch {
-		m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex+2), newUsage-binLimit)
+	if newUsage <= 2*reservation.DataRate && blobHeader.BinIndex+2 <= reservation.EndEpoch {
+		m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex+2), newUsage-reservation.DataRate)
 		return nil
 	}
 	return fmt.Errorf("Overflow usage exceeds bin limit")

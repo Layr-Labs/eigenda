@@ -653,7 +653,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		ReservationWindow:    time.Minute,
 	}
 
-	paymentChainState := meterer.NewMockedOnchainPaymentState()
+	paymentChainState := meterer.NewOnchainPaymentState()
 
 	paymentChainState.InitializeOnchainPaymentState()
 
