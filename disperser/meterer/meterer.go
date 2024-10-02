@@ -24,7 +24,7 @@ type Config struct {
 	PricePerChargeable   uint64
 	GlobalBytesPerSecond uint64
 	MinChargeableSize    uint64
-	ReservationWindow    time.Duration
+	ReservationWindow    uint64
 }
 
 // disperser API server will receive requests from clients. these requests will be with a blobHeader with payments information (CumulativePayments, BinIndex, and Signature)
@@ -148,7 +148,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHe
 
 // ValidateBinIndex checks if the provided bin index is valid
 func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveReservation) bool {
-	currentBinIndex := GetCurrentBinIndex()
+	currentBinIndex := GetCurrentBinIndex(m.ReservationWindow)
 	// Valid bin indexes are either the current bin or the previous bin
 	if (blobHeader.BinIndex != currentBinIndex && blobHeader.BinIndex != (currentBinIndex-1)) || (reservation.StartEpoch > blobHeader.BinIndex || blobHeader.BinIndex > reservation.EndEpoch) {
 		return false
@@ -181,10 +181,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 }
 
 // GetCurrentBinIndex returns the current bin index based on time
-func GetCurrentBinIndex() uint64 {
+func GetCurrentBinIndex(binInterval uint64) uint64 {
 	currentTime := time.Now().Unix()
-	binInterval := 375 // Interval that allows 3 32MB blobs at minimal throughput
-	return uint64(currentTime / int64(binInterval))
+	return uint64(currentTime) / binInterval
 }
 
 //TODO: should we track some number of blobHeaders in the meterer state and expose an API? is it stored somewhere else?

@@ -104,7 +104,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			PricePerChargeable:   config.PricePerChargeable,
 			GlobalBytesPerSecond: config.OnDemandGlobalLimit,
 			MinChargeableSize:    config.MinChargeableSize,
-			ReservationWindow:    time.Minute,
+			ReservationWindow:    config.ReservationWindow,
 		}
 
 		paymentChainState := mt.NewOnchainPaymentState()

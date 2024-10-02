@@ -1,7 +1,6 @@
 package meterer_test
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -167,8 +166,6 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 	header.AccountID = "modifiedAccount"
 
 	addr, err := signer.RecoverSender(header)
-	fmt.Println("addr", addr)
-	fmt.Println("err", err)
 	require.NotEqual(t, expectedAddress, addr)
 }
 

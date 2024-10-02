@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 // Mock data initialization method
 func InitializeMockData(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
 	// Initialize mock active reservations
-	binIndex := meterer.GetCurrentBinIndex()
+	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}},
 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}},
@@ -108,12 +108,10 @@ func setup(_ *testing.M) {
 		PricePerChargeable:   1,
 		MinChargeableSize:    1,
 		GlobalBytesPerSecond: 1000,
-		ReservationWindow:    time.Minute,
+		ReservationWindow:    60,
 	}
 
 	paymentChainState := meterer.NewOnchainPaymentState()
-
-	InitializeMockData(paymentChainState, privateKey1, privateKey2)
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
@@ -143,6 +141,9 @@ func setup(_ *testing.M) {
 		logging.NewNoopLogger(),
 		// metrics.NewNoopMetrics(),
 	)
+
+	InitializeMockData(paymentChainState, privateKey1, privateKey2)
+
 	if err != nil {
 		teardown()
 		panic("failed to create meterer")
@@ -158,7 +159,7 @@ func teardown() {
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	meterer.CreateReservationTable(clientConfig, "reservations")
-	index := meterer.GetCurrentBinIndex()
+	index := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 
 	// test invalid signature

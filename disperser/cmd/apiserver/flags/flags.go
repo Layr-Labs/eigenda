@@ -81,6 +81,12 @@ var (
 		Usage:  "enable payment meterer",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_PAYMENT_METERER"),
 	}
+	ReservationWindow = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "reservation-window"),
+		Usage:  "reservation window (seconds)",
+		Value:  375, // Interval that allows 3 32MB blobs at minimal throughput
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "RESERVATION_WINDOW"),
+	}
 	MinChargeableSize = cli.UintFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "min-chargeable-size"),
 		Usage:  "min chargeable size",
@@ -140,6 +146,7 @@ var optionalFlags = []cli.Flag{
 	EnableMetrics,
 	EnableRatelimiter,
 	EnablePaymentMeterer,
+	ReservationWindow,
 	MinChargeableSize,
 	OnDemandGlobalLimit,
 	PricePerChargeable,

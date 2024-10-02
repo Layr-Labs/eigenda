@@ -25,6 +25,7 @@ type Config struct {
 	MinChargeableSize    uint64 // in bytes
 	PricePerChargeable   uint64
 	OnDemandGlobalLimit  uint64
+	ReservationWindow    uint64 // in seconds
 	BucketTableName      string
 	ShadowTableName      string
 	BucketStoreSize      int
@@ -72,6 +73,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		RateConfig:           rateConfig,
 		EnableRatelimiter:    ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer: ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservationWindow:    ctx.GlobalUint64(flags.ReservationWindow.Name),
 		MinChargeableSize:    ctx.GlobalUint64(flags.MinChargeableSize.Name),
 		PricePerChargeable:   ctx.GlobalUint64(flags.PricePerChargeable.Name),
 		OnDemandGlobalLimit:  ctx.GlobalUint64(flags.OnDemandGlobalLimit.Name),

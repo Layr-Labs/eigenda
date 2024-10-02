@@ -243,10 +243,6 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberS{Value: "1"},
 	})
-	fmt.Println(item)
-	fmt.Println(item["AccountID"].(*types.AttributeValueMemberS).Value)
-	fmt.Println(item["CumulativePayments"].(*types.AttributeValueMemberS).Value)
-	fmt.Println(item["BlobSize"].(*types.AttributeValueMemberN).Value)
 	assert.NoError(t, err)
 	assert.Equal(t, "3000", item["BlobSize"].(*types.AttributeValueMemberN).Value)
 }
