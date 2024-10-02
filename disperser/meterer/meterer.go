@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -134,6 +135,9 @@ func (m *Meterer) ValidateSignature(ctx context.Context, header BlobHeader) erro
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHeader, reservation *ActiveReservation) error {
+	if err := m.ValidateQuorum(blobHeader, reservation); err != nil {
+		return fmt.Errorf("invalid quorum for reservation: %w", err)
+	}
 	if !m.ValidateBinIndex(blobHeader, reservation) {
 		return fmt.Errorf("invalid bin index for reservation")
 	}
@@ -143,6 +147,21 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHe
 		return fmt.Errorf("bin overflows: %w", err)
 	}
 
+	return nil
+}
+
+func (m *Meterer) ValidateQuorum(blobHeader BlobHeader, reservation *ActiveReservation) error {
+	if len(blobHeader.QuorumNumbers) == 0 {
+		return fmt.Errorf("no quorum params in blob header")
+	}
+
+	// check that all the quorum ids are in ActiveReservation's
+	for _, q := range blobHeader.QuorumNumbers {
+		if !slices.Contains(reservation.QuorumNumbers, q) {
+			// fail the entire request if there's a quorum number mismatch
+			return fmt.Errorf("quorum number mismatch: %d", q)
+		}
+	}
 	return nil
 }
 

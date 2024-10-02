@@ -15,10 +15,12 @@ type TokenAmount uint64 // TODO: change to uint128
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
-	DataRate    uint32 // Bandwidth per reservation bin
-	StartEpoch  uint64
-	EndEpoch    uint64
-	QuorumSplit []byte
+	DataRate   uint32 // Bandwidth per reservation bin
+	StartEpoch uint64
+	EndEpoch   uint64
+
+	QuorumNumbers []uint32
+	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
 }
 
 type OnDemandPayment struct {

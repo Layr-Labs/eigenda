@@ -20,14 +20,15 @@ type BlobQuorumParam struct {
 	QuorumID           core.QuorumID
 	AdversaryThreshold uint32
 	QuorumThreshold    uint32
+	//TODO: include split, ensure split sum is <=100
 }
 
 // BlobHeader represents the header information for a blob
 type BlobHeader struct {
 	// Existing fields
-	Commitment       core.G1Point
-	DataLength       uint32
-	BlobQuorumParams []BlobQuorumParam
+	Commitment    core.G1Point
+	DataLength    uint32
+	QuorumNumbers []uint32
 
 	// New fields
 	Version   uint32
@@ -42,13 +43,13 @@ type BlobHeader struct {
 	CumulativePayment uint64
 }
 
-// EIP712Domain represents the EIP-712 domain for our blob headers
-var EIP712Domain = apitypes.TypedDataDomain{
-	Name:              "EigenDA",
-	Version:           "1",
-	ChainId:           (*math.HexOrDecimal256)(big.NewInt(17000)),
-	VerifyingContract: common.HexToAddress("0x1234000000000000000000000000000000000000").Hex(),
-}
+// // EIP712Domain represents the EIP-712 domain for our blob headers
+// var EIP712Domain = apitypes.TypedDataDomain{
+// 	Name:              "EigenDA",
+// 	Version:           "1",
+// 	ChainId:           (*math.HexOrDecimal256)(big.NewInt(17000)),
+// 	VerifyingContract: common.HexToAddress("0x1234000000000000000000000000000000000000").Hex(),
+// }
 
 // Protocol defines parameters: epoch length and rate-limit window interval
 type Reservation struct {
@@ -94,12 +95,7 @@ func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712
 				{Name: "cumulativePayment", Type: "uint64"},
 				{Name: "commitment", Type: "bytes"},
 				{Name: "dataLength", Type: "uint32"},
-				{Name: "blobQuorumParams", Type: "BlobQuorumParam[]"},
-			},
-			"BlobQuorumParam": []apitypes.Type{
-				{Name: "quorumID", Type: "uint8"},
-				{Name: "adversaryThreshold", Type: "uint32"},
-				{Name: "quorumThreshold", Type: "uint32"},
+				{Name: "quorumNumbers", Type: "uint32[]"},
 			},
 		},
 	}
@@ -120,7 +116,7 @@ func (s *EIP712Signer) SignBlobHeader(header *BlobHeader, privateKey *ecdsa.Priv
 			"cumulativePayment": fmt.Sprintf("%d", header.CumulativePayment),
 			"commitment":        hexutil.Encode(commitment),
 			"dataLength":        fmt.Sprintf("%d", header.DataLength),
-			"blobQuorumParams":  convertBlobQuorumParamsToSlice(header.BlobQuorumParams),
+			"quorumNumbers":     convertUint32SliceToMap(header.QuorumNumbers),
 		},
 	}
 
@@ -132,14 +128,10 @@ func (s *EIP712Signer) SignBlobHeader(header *BlobHeader, privateKey *ecdsa.Priv
 	return signature, nil
 }
 
-func convertBlobQuorumParamsToSlice(params []BlobQuorumParam) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(params))
+func convertUint32SliceToMap(params []uint32) []string {
+	result := make([]string, len(params))
 	for i, param := range params {
-		result[i] = map[string]interface{}{
-			"quorumID":           fmt.Sprintf("%d", param.QuorumID),
-			"adversaryThreshold": fmt.Sprintf("%d", param.AdversaryThreshold),
-			"quorumThreshold":    fmt.Sprintf("%d", param.QuorumThreshold),
-		}
+		result[i] = fmt.Sprintf("%d", param) // Converting uint32 to string
 	}
 	return result
 }
@@ -158,7 +150,7 @@ func (s *EIP712Signer) RecoverSender(header *BlobHeader) (common.Address, error)
 			"cumulativePayment": fmt.Sprintf("%d", header.CumulativePayment),
 			"commitment":        hexutil.Encode(header.Commitment.Serialize()),
 			"dataLength":        fmt.Sprintf("%d", header.DataLength),
-			"blobQuorumParams":  convertBlobQuorumParamsToSlice(header.BlobQuorumParams),
+			"quorumNumbers":     convertUint32SliceToMap(header.QuorumNumbers),
 		},
 	}
 
@@ -218,7 +210,7 @@ func ConstructBlobHeader(
 	cumulativePayment uint64,
 	commitment core.G1Point,
 	blobSize uint32,
-	blobQuorumParams []BlobQuorumParam,
+	quorumNumbers []uint32,
 	privateKey *ecdsa.PrivateKey,
 ) (*BlobHeader, error) {
 	accountID := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
@@ -229,8 +221,9 @@ func ConstructBlobHeader(
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
 		Commitment:        commitment,
-		BlobQuorumParams:  blobQuorumParams,
+		QuorumNumbers:     quorumNumbers,
 		BlobSize:          blobSize,
+		DataLength:        blobSize,
 	}
 
 	signature, err := signer.SignBlobHeader(header, privateKey)
