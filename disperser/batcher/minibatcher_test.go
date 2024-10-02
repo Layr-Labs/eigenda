@@ -198,7 +198,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, mapping1.BlobKey, &blobKey1)
 	assert.Equal(t, mapping1.BatchID, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, mapping1.MinibatchIndex, uint(0))
-	assert.Equal(t, mapping1.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
+	assert.Equal(t, mapping1.BlobCertificate.QuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
 	serializedCommitment1, err := encoded1.Commitment.Commitment.Serialize()
 	assert.NoError(t, err)
 	expectedCommitment1, err := mapping1.Commitment.Serialize()
@@ -222,7 +222,7 @@ func TestDisperseMinibatch(t *testing.T) {
 	assert.Equal(t, mapping2.BlobKey, &blobKey2)
 	assert.Equal(t, mapping2.BatchID, c.minibatcher.CurrentBatchID)
 	assert.Equal(t, mapping2.MinibatchIndex, uint(0))
-	assert.Equal(t, mapping2.BlobHeader.QuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
+	assert.Equal(t, mapping2.BlobCertificate.QuorumInfos, []*core.BlobQuorumInfo{encoded1.BlobQuorumInfo})
 	if mapping1.BlobIndex != 0 {
 		assert.Equal(t, mapping2.BlobIndex, uint(1))
 	} else if mapping1.BlobIndex != 1 {

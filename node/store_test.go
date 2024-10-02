@@ -94,12 +94,14 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 
 	blobMessage := []*core.BlobMessage{
 		{
-			BlobHeader: &core.BlobHeader{
-				BlobCommitments: encoding.BlobCommitments{
-					Commitment:       (*encoding.G1Commitment)(&commitment),
-					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-					LengthProof:      (*encoding.LengthProof)(&lengthProof),
-					Length:           48,
+			BlobCert: &core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: encoding.BlobCommitments{
+						Commitment:       (*encoding.G1Commitment)(&commitment),
+						LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+						LengthProof:      (*encoding.LengthProof)(&lengthProof),
+						Length:           48,
+					},
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
@@ -110,12 +112,14 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 			},
 		},
 		{
-			BlobHeader: &core.BlobHeader{
-				BlobCommitments: encoding.BlobCommitments{
-					Commitment:       (*encoding.G1Commitment)(&commitment),
-					LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
-					LengthProof:      (*encoding.G2Commitment)(&lengthProof),
-					Length:           50,
+			BlobCert: &core.BlobCertificate{
+				BlobHeader: core.BlobHeader{
+					BlobCommitments: encoding.BlobCommitments{
+						Commitment:       (*encoding.G1Commitment)(&commitment),
+						LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
+						LengthProof:      (*encoding.G2Commitment)(&lengthProof),
+						Length:           50,
+					},
 				},
 				QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 			},
@@ -376,11 +380,11 @@ func TestStoreBlobsSuccess(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Check existence: blob headers.
-	blobHeaderHash0, err := blobs[0].BlobHeader.GetBlobHeaderHash()
+	blobHeaderHash0, err := blobs[0].BlobCert.GetHash()
 	assert.Nil(t, err)
 	blobHeaderKey0 := node.EncodeBlobHeaderKeyByHash(blobHeaderHash0)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey0))
-	blobHeaderHash1, err := blobs[1].BlobHeader.GetBlobHeaderHash()
+	blobHeaderHash1, err := blobs[1].BlobCert.GetHash()
 	assert.Nil(t, err)
 	blobHeaderKey1 := node.EncodeBlobHeaderKeyByHash(blobHeaderHash1)
 	assert.True(t, s.HasKey(ctx, blobHeaderKey1))
@@ -436,9 +440,9 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	batchHeader, blobs, blobsProto := CreateBatch(t)
 	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 	assert.Nil(t, err)
-	blobHeaderHash0, err := blobs[0].BlobHeader.GetBlobHeaderHash()
+	blobHeaderHash0, err := blobs[0].BlobCert.GetHash()
 	assert.Nil(t, err)
-	blobHeaderHash1, err := blobs[1].BlobHeader.GetBlobHeaderHash()
+	blobHeaderHash1, err := blobs[1].BlobCert.GetHash()
 	assert.Nil(t, err)
 
 	// Store a batch.
@@ -475,17 +479,17 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.Nil(t, err)
 	err = proto.Unmarshal(blobHeaderBytes0, &protoBlobHeader)
 	assert.Nil(t, err)
-	blobHeader0, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	blobHeader0, err := node.GetBlobCertFromProto(&protoBlobHeader)
 	assert.Nil(t, err)
 
-	assert.Equal(t, blobHeader0, blobs[0].BlobHeader)
+	assert.Equal(t, blobHeader0, blobs[0].BlobCert)
 	blobHeaderBytes1, err := s.GetBlobHeader(ctx, batchHeaderHash, 1)
 	assert.Nil(t, err)
 	err = proto.Unmarshal(blobHeaderBytes1, &protoBlobHeader)
 	assert.Nil(t, err)
-	blobHeader1, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	blobHeader1, err := node.GetBlobCertFromProto(&protoBlobHeader)
 	assert.Nil(t, err)
-	assert.Equal(t, blobHeader1, blobs[1].BlobHeader)
+	assert.Equal(t, blobHeader1, blobs[1].BlobCert)
 	blobHeaderBytes2, err := s.GetBlobHeader(ctx, batchHeaderHash, 2)
 	assert.ErrorIs(t, err, node.ErrKeyNotFound)
 	assert.Nil(t, blobHeaderBytes2)

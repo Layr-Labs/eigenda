@@ -22,7 +22,7 @@ func TestAuthentication(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	testHeader := core.BlobAuthHeader{
+	testHeader := core.BlobHeader{
 		BlobCommitments:    encoding.BlobCommitments{},
 		AccountID:          accountId,
 		Nonce:              rand.Uint32(),
@@ -52,7 +52,7 @@ func TestAuthenticationFail(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	testHeader := core.BlobAuthHeader{
+	testHeader := core.BlobHeader{
 		BlobCommitments:    encoding.BlobCommitments{},
 		AccountID:          accountId,
 		Nonce:              rand.Uint32(),
@@ -78,7 +78,7 @@ func TestNoopSignerFail(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.EqualError(t, err, "noop signer cannot get accountID")
 
-	testHeader := core.BlobAuthHeader{
+	testHeader := core.BlobHeader{
 		BlobCommitments:    encoding.BlobCommitments{},
 		AccountID:          accountId,
 		Nonce:              rand.Uint32(),

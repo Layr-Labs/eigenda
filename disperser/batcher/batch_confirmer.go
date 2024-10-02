@@ -360,7 +360,7 @@ func (b *BatchConfirmer) HandleSingleBatch(ctx context.Context) error {
 	}
 	blobHeaderHashes := make([][32]byte, 0)
 	for _, blobHeader := range batchState.BlobHeaders {
-		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+		blobHeaderHash, err := blobHeader.GetHash()
 		if err != nil {
 			return fmt.Errorf("error getting blob header hash: %w", err)
 		}

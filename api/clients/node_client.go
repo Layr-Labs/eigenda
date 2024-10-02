@@ -21,7 +21,7 @@ type RetrievedChunks struct {
 }
 
 type NodeClient interface {
-	GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobHeader, *merkletree.Proof, error)
+	GetBlobCert(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobCertificate, *merkletree.Proof, error)
 	GetChunks(ctx context.Context, opID core.OperatorID, opInfo *core.IndexedOperatorInfo, batchHeaderHash [32]byte, blobIndex uint32, quorumID core.QuorumID, chunksChan chan RetrievedChunks)
 }
 
@@ -35,12 +35,12 @@ func NewNodeClient(timeout time.Duration) NodeClient {
 	}
 }
 
-func (c client) GetBlobHeader(
+func (c client) GetBlobCert(
 	ctx context.Context,
 	socket string,
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
-) (*core.BlobHeader, *merkletree.Proof, error) {
+) (*core.BlobCertificate, *merkletree.Proof, error) {
 	conn, err := grpc.Dial(
 		core.OperatorSocket(socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -64,7 +64,7 @@ func (c client) GetBlobHeader(
 		return nil, nil, err
 	}
 
-	blobHeader, err := node.GetBlobHeaderFromProto(reply.GetBlobHeader())
+	blobCert, err := node.GetBlobCertFromProto(reply.GetBlobHeader())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,7 +74,7 @@ func (c client) GetBlobHeader(
 		Index:  uint64(reply.GetProof().GetIndex()),
 	}
 
-	return blobHeader, proof, nil
+	return blobCert, proof, nil
 }
 
 func (c client) GetChunks(

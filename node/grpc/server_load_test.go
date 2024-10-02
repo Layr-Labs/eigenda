@@ -20,7 +20,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 	assert.NoError(t, err)
 	asn := &core.StdAssignmentCoordinator{}
 
-	blobHeaders := make([]*core.BlobHeader, numBlobs)
+	blobCerts := make([]*core.BlobCertificate, numBlobs)
 	blobChunks := make([][]*encoding.Frame, numBlobs)
 	blobMessagesByOp := make(map[core.OperatorID][]*core.EncodedBlobMessage)
 	for i := 0; i < numBlobs; i++ {
@@ -75,15 +75,17 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		}
 
 		// populate blob header
-		blobHeaders[i] = &core.BlobHeader{
-			BlobCommitments: commits,
-			QuorumInfos:     []*core.BlobQuorumInfo{blobQuorumInfo},
+		blobCerts[i] = &core.BlobCertificate{
+			BlobHeader: core.BlobHeader{
+				BlobCommitments: commits,
+			},
+			QuorumInfos: []*core.BlobQuorumInfo{blobQuorumInfo},
 		}
 
 		// populate blob messages
 		for opID, assignment := range quorumInfo.Assignments {
 			blobMessagesByOp[opID] = append(blobMessagesByOp[opID], &core.EncodedBlobMessage{
-				BlobHeader:     blobHeaders[i],
+				BlobCert:       blobCerts[i],
 				EncodedBundles: make(core.EncodedBundles),
 			})
 			blobMessagesByOp[opID][i].EncodedBundles[0].Format = core.GobChunkEncodingFormat
@@ -96,7 +98,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		ReferenceBlockNumber: refBlockNumber,
 		BatchRoot:            [32]byte{},
 	}
-	_, err = batchHeader.SetBatchRoot(blobHeaders)
+	_, err = batchHeader.SetBatchRoot(blobCerts)
 	assert.NoError(t, err)
 	return batchHeader, blobMessagesByOp
 }

@@ -58,9 +58,9 @@ var (
 	nodeClient        *clientsmock.MockNodeClient
 	coordinator       *core.StdAssignmentCoordinator
 	retrievalClient   clients.RetrievalClient
-	blobHeader        *core.BlobHeader
+	blobCert          *core.BlobCertificate
 	encodedBlob       core.EncodedBlob = core.EncodedBlob{
-		BlobHeader:               nil,
+		BlobCert:                 nil,
 		EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 	}
 	batchHeaderHash        [32]byte
@@ -165,17 +165,19 @@ func setup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blobHeader = &core.BlobHeader{
-		BlobCommitments: encoding.BlobCommitments{
-			Commitment:       commitments.Commitment,
-			LengthCommitment: commitments.LengthCommitment,
-			LengthProof:      commitments.LengthProof,
-			Length:           commitments.Length,
+	blobCert = &core.BlobCertificate{
+		BlobHeader: core.BlobHeader{
+			BlobCommitments: encoding.BlobCommitments{
+				Commitment:       commitments.Commitment,
+				LengthCommitment: commitments.LengthCommitment,
+				LengthProof:      commitments.LengthProof,
+				Length:           commitments.Length,
+			},
 		},
 		QuorumInfos: []*core.BlobQuorumInfo{quorumHeader},
 	}
 
-	blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
+	blobHeaderHash, err := blobCert.GetHash()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,9 +197,9 @@ func setup(t *testing.T) {
 	}
 
 	for id, assignment := range assignments {
-		bundles := make(map[core.QuorumID]core.Bundle, len(blobHeader.QuorumInfos))
+		bundles := make(map[core.QuorumID]core.Bundle, len(blobCert.QuorumInfos))
 		bundles[quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
-		encodedBlob.BlobHeader = blobHeader
+		encodedBlob.BlobCert = blobCert
 		eb, err := core.Bundles(bundles).ToEncodedBundles()
 		if err != nil {
 			t.Fatal(err)
@@ -244,7 +246,7 @@ func TestInvalidBlobHeader(t *testing.T) {
 	setup(t)
 
 	// TODO: add the blob proof to the response
-	nodeClient.On("GetBlobHeader", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobHeader, [][]byte{{1}}, uint64(0), nil).Times(numOperators)
+	nodeClient.On("GetBlobCert", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobCert, [][]byte{{1}}, uint64(0), nil).Times(numOperators)
 	nodeClient.
 		On("GetChunks", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(encodedBlob)
@@ -265,7 +267,7 @@ func TestValidBlobHeader(t *testing.T) {
 	setup(t)
 
 	// TODO: add the blob proof to the response
-	nodeClient.On("GetBlobHeader", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobHeader, [][]byte{}, uint64(0), nil).Once()
+	nodeClient.On("GetBlobCert", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blobCert, [][]byte{}, uint64(0), nil).Once()
 	nodeClient.
 		On("GetChunks", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(encodedBlob)

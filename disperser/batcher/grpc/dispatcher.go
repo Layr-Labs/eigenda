@@ -63,7 +63,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 					hasAnyBundles = true
 				}
 				blobMessages = append(blobMessages, &core.EncodedBlobMessage{
-					BlobHeader: blob.BlobHeader,
+					BlobCert: blob.BlobCert,
 					// Bundles will be empty if the operator is not in the quorums blob is dispersed on
 					EncodedBundles: blob.EncodedBundlesByOperator[id],
 				})
@@ -321,33 +321,33 @@ func GetStoreBlobsRequest(blobMessages []*core.EncodedBlobMessage, batchHeader *
 }
 
 func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) (*node.Blob, error) {
-	if blob.BlobHeader == nil {
+	if blob.BlobCert == nil {
 		return nil, errors.New("blob header is nil")
 	}
-	if blob.BlobHeader.Commitment == nil {
+	if blob.BlobCert.Commitment == nil {
 		return nil, errors.New("blob header commitment is nil")
 	}
 	commitData := &commonpb.G1Commitment{
-		X: blob.BlobHeader.Commitment.X.Marshal(),
-		Y: blob.BlobHeader.Commitment.Y.Marshal(),
+		X: blob.BlobCert.Commitment.X.Marshal(),
+		Y: blob.BlobCert.Commitment.Y.Marshal(),
 	}
 	var lengthCommitData, lengthProofData node.G2Commitment
-	if blob.BlobHeader.LengthCommitment != nil {
-		lengthCommitData.XA0 = blob.BlobHeader.LengthCommitment.X.A0.Marshal()
-		lengthCommitData.XA1 = blob.BlobHeader.LengthCommitment.X.A1.Marshal()
-		lengthCommitData.YA0 = blob.BlobHeader.LengthCommitment.Y.A0.Marshal()
-		lengthCommitData.YA1 = blob.BlobHeader.LengthCommitment.Y.A1.Marshal()
+	if blob.BlobCert.LengthCommitment != nil {
+		lengthCommitData.XA0 = blob.BlobCert.LengthCommitment.X.A0.Marshal()
+		lengthCommitData.XA1 = blob.BlobCert.LengthCommitment.X.A1.Marshal()
+		lengthCommitData.YA0 = blob.BlobCert.LengthCommitment.Y.A0.Marshal()
+		lengthCommitData.YA1 = blob.BlobCert.LengthCommitment.Y.A1.Marshal()
 	}
-	if blob.BlobHeader.LengthProof != nil {
-		lengthProofData.XA0 = blob.BlobHeader.LengthProof.X.A0.Marshal()
-		lengthProofData.XA1 = blob.BlobHeader.LengthProof.X.A1.Marshal()
-		lengthProofData.YA0 = blob.BlobHeader.LengthProof.Y.A0.Marshal()
-		lengthProofData.YA1 = blob.BlobHeader.LengthProof.Y.A1.Marshal()
+	if blob.BlobCert.LengthProof != nil {
+		lengthProofData.XA0 = blob.BlobCert.LengthProof.X.A0.Marshal()
+		lengthProofData.XA1 = blob.BlobCert.LengthProof.X.A1.Marshal()
+		lengthProofData.YA0 = blob.BlobCert.LengthProof.Y.A0.Marshal()
+		lengthProofData.YA1 = blob.BlobCert.LengthProof.Y.A1.Marshal()
 	}
 
-	quorumHeaders := make([]*node.BlobQuorumInfo, len(blob.BlobHeader.QuorumInfos))
+	quorumHeaders := make([]*node.BlobQuorumInfo, len(blob.BlobCert.QuorumInfos))
 
-	for i, header := range blob.BlobHeader.QuorumInfos {
+	for i, header := range blob.BlobCert.QuorumInfos {
 		quorumHeaders[i] = &node.BlobQuorumInfo{
 			QuorumId:              uint32(header.QuorumID),
 			AdversaryThreshold:    uint32(header.AdversaryThreshold),
@@ -412,7 +412,7 @@ func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) 
 			Commitment:       commitData,
 			LengthCommitment: &lengthCommitData,
 			LengthProof:      &lengthProofData,
-			Length:           uint32(blob.BlobHeader.Length),
+			Length:           uint32(blob.BlobCert.Length),
 			QuorumHeaders:    quorumHeaders,
 		},
 		Bundles: bundles,
