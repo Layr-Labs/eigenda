@@ -31,13 +31,15 @@ type Config struct {
 // disperser API server will receive requests from clients. these requests will be with a blobHeader with payments information (CumulativePayments, BinIndex, and Signature)
 // Disperser will pass the blob header to the meterer, which will check if the payments information is valid. if it is, it will be added to the meterer's state.
 // To check if the payment is valid, the meterer will:
-// 1. check if the signature is valid
-// 		(against the CumulativePayments and BinIndex fields ;
-//		 maybe need something else to secure against using this appraoch for reservations when rev request comes in same bin interval; say that nonce is signed over as well)
-// 2. For reservations, check offchain bin state as demonstrated in pseudocode, also check onchain state before rejecting (since onchain data is pulled)
-// 3. For on-demand, check against payments and the global rates, similar to the reservation case
+//  1. check if the signature is valid
+//     (against the CumulativePayments and BinIndex fields ;
+//     maybe need something else to secure against using this appraoch for reservations when rev request comes in same bin interval; say that nonce is signed over as well)
+//  2. For reservations, check offchain bin state as demonstrated in pseudocode, also check onchain state before rejecting (since onchain data is pulled)
+//  3. For on-demand, check against payments and the global rates, similar to the reservation case
+//
 // If the payment is valid, the meterer will add the blob header to its state and return a success response to the disperser API server.
 // if any of the checks fail, the meterer will return a failure response to the disperser API server.
+var OnDemandQuorumNumbers = []uint32{0, 1}
 
 type Meterer struct {
 	Config
@@ -135,7 +137,7 @@ func (m *Meterer) ValidateSignature(ctx context.Context, header BlobHeader) erro
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHeader, reservation *ActiveReservation) error {
-	if err := m.ValidateQuorum(blobHeader, reservation); err != nil {
+	if err := m.ValidateQuorum(blobHeader, reservation.QuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 	if !m.ValidateBinIndex(blobHeader, reservation) {
@@ -150,14 +152,14 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHe
 	return nil
 }
 
-func (m *Meterer) ValidateQuorum(blobHeader BlobHeader, reservation *ActiveReservation) error {
+func (m *Meterer) ValidateQuorum(blobHeader BlobHeader, allowedQuoroms []uint32) error {
 	if len(blobHeader.QuorumNumbers) == 0 {
 		return fmt.Errorf("no quorum params in blob header")
 	}
 
 	// check that all the quorum ids are in ActiveReservation's
 	for _, q := range blobHeader.QuorumNumbers {
-		if !slices.Contains(reservation.QuorumNumbers, q) {
+		if !slices.Contains(allowedQuoroms, q) {
 			// fail the entire request if there's a quorum number mismatch
 			return fmt.Errorf("quorum number mismatch: %d", q)
 		}
@@ -212,6 +214,9 @@ func GetCurrentBinIndex(binInterval uint64) uint64 {
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
+	if err := m.ValidateQuorum(blobHeader, OnDemandQuorumNumbers); err != nil {
+		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
+	}
 	// update blob header to use the miniumum chargeable size
 	blobHeader.BlobSize = max(blobHeader.BlobSize, uint32(m.MinChargeableSize))
 	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)

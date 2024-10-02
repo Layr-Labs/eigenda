@@ -182,7 +182,6 @@ func TestMetererReservations(t *testing.T) {
 	header, err := meterer.ConstructBlobHeader(signer, 3, 2, 1, 0, *commitment, 1000, []uint32{0, 1, 2}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
-	fmt.Println("meter request ran", err)
 	assert.Error(t, err, "invalid quorum ID")
 
 	// test non-existent account
@@ -283,6 +282,12 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed to get on-demand payment by account: payment not found")
+
+	// test invalid quorom ID
+	header, err = meterer.ConstructBlobHeader(signer, 3, 2, 1, 1, *commitment, 1000, []uint32{0, 1, 2}, privateKey1)
+	assert.NoError(t, err)
+	err = mt.MeterRequest(ctx, *header)
+	assert.Error(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
 	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 0, 1, *commitment, 2000, quorumNumbers, privateKey1)
