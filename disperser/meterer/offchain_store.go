@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"time"
 
@@ -181,7 +180,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobH
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
-			"CumulativePayments": &types.AttributeValueMemberS{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
 		},
 	)
 	if err != nil {
@@ -193,7 +192,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobH
 	err = s.dynamoClient.PutItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
-			"CumulativePayments": &types.AttributeValueMemberS{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
 			"BlobSize":           &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobHeader.BlobSize), 10)},
 		},
 	)
@@ -209,7 +208,7 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 	err := s.dynamoClient.DeleteItem(ctx, s.onDemandTableName,
 		commondynamodb.Key{
 			"AccountID":          &types.AttributeValueMemberS{Value: accountID},
-			"CumulativePayments": &types.AttributeValueMemberS{Value: strconv.FormatUint(payment, 10)},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(payment, 10)},
 		},
 	)
 
@@ -222,47 +221,53 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 
 // relevant on-demand payment records: previous cumulative payment, next cumulative payment, blob size of next payment
 func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment uint64) (uint64, uint64, uint32, error) {
-	result, err := s.dynamoClient.QueryIndex(ctx, s.onDemandTableName, "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID,
-		}})
+	// Fetch the largest entry smaller than the given cumulativePayment
+	smallerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",
+		"AccountID = :account AND CumulativePayments < :cumulativePayment",
+		commondynamodb.ExpresseionValues{
+			":account":           &types.AttributeValueMemberS{Value: accountID},
+			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
+		},
+		false, // Retrieve results in descending order for the largest smaller amount
+		1,
+	)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("failed to query index for account: %w", err)
+		return 0, 0, 0, fmt.Errorf("failed to query smaller payments for account: %w", err)
 	}
 
-	// Extract the payments from the result
-	var payments []PaymentTuple
-	for _, item := range result {
-		payment, err := strconv.ParseUint(item["CumulativePayments"].(*types.AttributeValueMemberS).Value, 10, 64)
+	var prevPayment uint64
+	if len(smallerResult) > 0 {
+		prevPayment, err = strconv.ParseUint(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("failed to parse payment: %w", err)
+			return 0, 0, 0, fmt.Errorf("failed to parse previous payment: %w", err)
 		}
-		blobSize, err := strconv.ParseUint(item["BlobSize"].(*types.AttributeValueMemberN).Value, 10, 32)
+	}
+
+	// Fetch the smallest entry larger than the given cumulativePayment
+	largerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",
+		"AccountID = :account AND CumulativePayments > :cumulativePayment",
+		commondynamodb.ExpresseionValues{
+			":account":           &types.AttributeValueMemberS{Value: accountID},
+			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
+		},
+		true, // Retrieve results in ascending order for the smallest greater amount
+		1,
+	)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
+	}
+	var nextPayment uint64
+	var nextBlobSize uint32
+	if len(largerResult) > 0 {
+		nextPayment, err = strconv.ParseUint(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to parse next payment: %w", err)
+		}
+		blobSize, err := strconv.ParseUint(largerResult[0]["BlobSize"].(*types.AttributeValueMemberN).Value, 10, 32)
 		if err != nil {
 			return 0, 0, 0, fmt.Errorf("failed to parse blob size: %w", err)
 		}
-		payments = append(payments, PaymentTuple{
-			CumulativePayment: payment,
-			BlobSize:          uint32(blobSize),
-		})
-	}
-	// sort payments by cumulative payment to get neighboring payments
-	sort.SliceStable(payments, func(i, j int) bool {
-		return payments[i].CumulativePayment < payments[j].CumulativePayment
-	})
-	index := sort.Search(len(payments), func(i int) bool {
-		return payments[i].CumulativePayment == cumulativePayment
-	})
-
-	var prevPayment, nextPayment uint64
-	var nextBlobSize uint32
-
-	if index > 0 {
-		prevPayment = payments[index-1].CumulativePayment
-	}
-	if index < len(payments)-1 {
-		nextPayment = payments[index+1].CumulativePayment
-		nextBlobSize = payments[index+1].BlobSize
+		nextBlobSize = uint32(blobSize)
 	}
 
 	return prevPayment, nextPayment, nextBlobSize, nil

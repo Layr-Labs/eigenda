@@ -55,8 +55,8 @@ func InitializeMockData(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.Pri
 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}},
 	}
 	pcs.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
-		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1000},
-		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 3000},
+		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1500},
+		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 1000},
 	}
 }
 
@@ -159,7 +159,7 @@ func teardown() {
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	meterer.CreateReservationTable(clientConfig, "reservations")
-	index := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
+	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 
 	// test invalid signature
@@ -167,7 +167,7 @@ func TestMetererReservations(t *testing.T) {
 		Version:           1,
 		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
 		Nonce:             1,
-		BinIndex:          uint64(time.Now().Unix()),
+		BinIndex:          uint64(time.Now().Unix()) / mt.Config.ReservationWindow,
 		CumulativePayment: 0,
 		Commitment:        *commitment,
 		BlobSize:          2000,
@@ -187,13 +187,13 @@ func TestMetererReservations(t *testing.T) {
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed to get on-demand payment by account: reservation not found")
 
-	// test invalid index
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index, 0, *commitment, 2000, []meterer.BlobQuorumParam{}, privateKey1)
+	// test invalid bin index
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 2000, []meterer.BlobQuorumParam{}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid bin index for reservation")
 
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index-1, 0, *commitment, 1000, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex-1, 0, *commitment, 1000, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid bin index for reservation")
@@ -202,43 +202,43 @@ func TestMetererReservations(t *testing.T) {
 	accountID := crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
 	for i := 0; i < 9; i++ {
 		blobSize := 20
-		header, err = meterer.ConstructBlobHeader(signer, 1, 1, index, 0, *commitment, uint32(blobSize), []meterer.BlobQuorumParam{}, privateKey2)
+		header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, uint32(blobSize), []meterer.BlobQuorumParam{}, privateKey2)
 		assert.NoError(t, err)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, "reservations", commondynamodb.Key{
 			"AccountID": &types.AttributeValueMemberS{Value: accountID},
-			"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(index))},
+			"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(binIndex))},
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, accountID, item["AccountID"].(*types.AttributeValueMemberS).Value)
-		assert.Equal(t, strconv.Itoa(int(index)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, strconv.Itoa(int(binIndex)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
 		assert.Equal(t, strconv.Itoa(int((i+1)*blobSize)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	}
 	// frist over flow is allowed
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index, 0, *commitment, 25, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 25, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
-	overflowedIndex := index + 2
+	overflowedBinIndex := binIndex + 2
 	item, err := dynamoClient.GetItem(ctx, "reservations", commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID},
-		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedIndex))},
+		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedBinIndex))},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, accountID, item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, strconv.Itoa(int(overflowedIndex)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, strconv.Itoa(int(overflowedBinIndex)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, strconv.Itoa(int(5)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index, 0, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "Bin has already been overflowed")
 
 	// overwhelming bin overflow
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, index-1, 0, *commitment, 1000, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex-1, 0, *commitment, 1000, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "Overflow usage exceeds bin limit")
@@ -280,50 +280,59 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "insufficient cumulative payment increment")
-	// Correct rollback (TODO: discuss if there should be a rollback for invalid payments or penalize client)
+	// No rollback after meter request
 	result, err := dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
+	assert.Equal(t, 1, len(result))
 
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), uint64(100), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey1)
+	// test duplicated cumulative payments
+	binIndex := uint64(0) // this field doesn't matter for on-demand payments wrt global rate limit
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), uint64(100), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "exact payment already exists")
 
 	// test valid payments
 	for i := 1; i < 10; i++ {
-		header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), uint64(100*(i+1)), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey1)
+		header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100*(i+1)), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey2)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
 	}
 
 	// test insufficient remaining balance from cumulative payment
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 1, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 1, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "insufficient cumulative payment increment")
 
 	// test cannot insert cumulative payment in out of order
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 0, *commitment, 50, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 50, []meterer.BlobQuorumParam{}, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "cannot insert cumulative payment in out of order")
 
+	numRequest := 11
+	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
+		":account": &types.AttributeValueMemberS{
+			Value: crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(),
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, numRequest, len(result))
 	// test failed global rate limit
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), 1001, *commitment, 1001, []meterer.BlobQuorumParam{}, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 1002, *commitment, 1001, []meterer.BlobQuorumParam{}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
-	assert.Error(t, err, "failed global bin index")
+	assert.Error(t, err, "failed global rate limiting")
 	// Correct rollback
 	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
+	assert.Equal(t, numRequest, len(result))
 }

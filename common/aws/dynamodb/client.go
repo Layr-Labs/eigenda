@@ -38,7 +38,7 @@ var (
 
 type Item = map[string]types.AttributeValue
 type Key = map[string]types.AttributeValue
-type ExpresseionValues = map[string]types.AttributeValue
+type ExpresseionValues = map[string]types.AttributeValue // is this a typo? ExpressionValues?
 
 type QueryResult struct {
 	Items            []Item
@@ -183,7 +183,6 @@ func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key 
 		return nil, err
 	}
 
-	fmt.Println("update item increment", expr.Update())
 	resp, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(tableName),
 		Key:                       key,
@@ -196,8 +195,6 @@ func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key 
 		fmt.Println("error updating item", err)
 		return nil, err
 	}
-
-	fmt.Println("update item increment", resp.Attributes)
 
 	return resp.Attributes, nil
 }
@@ -229,6 +226,23 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 		IndexName:                 aws.String(indexName),
 		KeyConditionExpression:    aws.String(keyCondition),
 		ExpressionAttributeValues: expAttributeValues,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Items, nil
+}
+
+// QueryIndexOrderWithLimit returns all items in the index that match the given key
+func (c *Client) QueryIndexOrderWithLimit(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, forward bool, limit int32) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
+		IndexName:                 aws.String(indexName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeValues: expAttributeValues,
+		ScanIndexForward:          &forward,
+		Limit:                     aws.Int32(limit),
 	})
 	if err != nil {
 		return nil, err

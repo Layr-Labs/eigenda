@@ -119,7 +119,7 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 			},
 			{
 				AttributeName: aws.String("CumulativePayments"),
-				AttributeType: types.ScalarAttributeTypeS,
+				AttributeType: types.ScalarAttributeTypeN,
 			},
 		},
 		KeySchema: []types.KeySchemaElement{
@@ -139,6 +139,10 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 					{
 						AttributeName: aws.String("AccountID"),
 						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("CumulativePayments"),
+						KeyType:       types.KeyTypeRange, // Sort key
 					},
 				},
 				Projection: &types.Projection{
