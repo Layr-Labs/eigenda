@@ -143,7 +143,7 @@ func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
-	count, err := collector.blobMetadataStore.GetBlobMetadataByStatusCount(context.Background(), disperser.Processing)
+	count, err := collector.blobMetadataStore.GetBlobMetadataCountByStatus(context.Background(), disperser.Processing)
 	if err != nil {
 		collector.logger.Error("failed to get count of blob metadata by status", "err", err)
 		return
