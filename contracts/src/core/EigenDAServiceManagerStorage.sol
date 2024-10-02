@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
@@ -36,26 +37,11 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      */
     uint32 public constant BLOCK_STALE_MEASURE = 300;
 
-    /**
-     * @notice The quorum adversary threshold percentages stored as an ordered bytes array
-     * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
-     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
-     */
-    bytes public constant quorumAdversaryThresholdPercentages = hex"21";
+    IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
 
-    /**
-     * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
-     * this is the percentage of the total stake needed to confirm a blob.
-     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
-     */
-    bytes public constant quorumConfirmationThresholdPercentages = hex"37";
-
-    /**
-     * @notice The quorum numbers required for confirmation stored as an ordered bytes array
-     * these quorum numbers have respective canonical thresholds in the
-     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
-     */
-    bytes public constant quorumNumbersRequired = hex"00";
+    constructor(IEigenDAThresholdRegistry _eigenDAThresholdRegistry) {
+        eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
+    }
 
     /// @notice The current batchId
     uint32 public batchId;

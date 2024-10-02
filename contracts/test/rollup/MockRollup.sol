@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {EigenDARollupUtils} from "../libraries/EigenDARollupUtils.sol";
-import {EigenDAServiceManager} from "../core/EigenDAServiceManager.sol";
-import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {EigenDABlobVerificationUtils} from "../../src/libraries/EigenDABlobVerificationUtils.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {IEigenDABlobVerifier} from "../../src/interfaces/IEigenDABlobVerifier.sol";
 
 struct Commitment {
     address confirmer; // confirmer who posted the commitment
@@ -13,15 +14,16 @@ struct Commitment {
 }
 
 contract MockRollup {
+    using BN254 for BN254.G1Point;
 
-    IEigenDAServiceManager public eigenDAServiceManager; // EigenDASM contract
+    IEigenDABlobVerifier public eigenDABlobVerifier; // EigenDABlobVerifier contract
     BN254.G1Point public tau; //power of tau
 
     ///@notice mapping of timestamps to commitments
     mapping(uint256 => Commitment) public commitments;
 
-    constructor(IEigenDAServiceManager _eigenDAServiceManager, BN254.G1Point memory _tau) {
-        eigenDAServiceManager = _eigenDAServiceManager;
+    constructor(IEigenDABlobVerifier _eigenDABlobVerifier, BN254.G1Point memory _tau) {
+        eigenDABlobVerifier = _eigenDABlobVerifier;
         tau = _tau;
     }
 
@@ -32,13 +34,13 @@ contract MockRollup {
      */
     function postCommitment(
         IEigenDAServiceManager.BlobHeader memory blobHeader, 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof
+        EigenDABlobVerificationUtils.BlobVerificationProof memory blobVerificationProof
     ) external { 
         // require commitment has not already been posted
         require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
 
         // verify that the blob was included in the batch
-        EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
+        eigenDABlobVerifier.verifyBlobV1(blobHeader, blobVerificationProof);
 
         // store the commitment
         commitments[block.timestamp] = Commitment(msg.sender, blobHeader.dataLength, blobHeader.commitment);
@@ -59,8 +61,14 @@ contract MockRollup {
         // point on the polynomial must be less than the length of the data stored
         require(point < commitment.dataLength, "MockRollup.challengeCommitment: Point must be less than data length");
 
-        // verify that the commitment contains the challenge value
-        return EigenDARollupUtils.openCommitment(point, challengeValue, tau, commitment.polynomialCommitment, proof);
+        BN254.G1Point memory negGeneratorG1 = BN254.generatorG1().negate();
+        //e([s]_1 - w[1]_1, [pi(x)]_2) = e([p(x)]_1 - p(w)[1]_1, [1]_2)
+        return BN254.pairing(
+            tau.plus(negGeneratorG1.scalar_mul(point)), 
+            proof, 
+            commitment.polynomialCommitment.plus(negGeneratorG1.scalar_mul(challengeValue)), 
+            BN254.negGeneratorG2()
+        );
     }
 
 }

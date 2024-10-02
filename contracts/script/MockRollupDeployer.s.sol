@@ -3,7 +3,7 @@
 pragma solidity ^0.8.9;
 
 import "forge-std/Script.sol";
-import "../src/rollup/MockRollup.sol";
+import "../test/rollup/MockRollup.sol";
 import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
 
 contract MockRollupDeployer is Script {
@@ -13,12 +13,12 @@ contract MockRollupDeployer is Script {
 
     BN254.G1Point public s1 = BN254.generatorG1().scalar_mul(2);
     
-    // forge script script/MockRollupDeployer.s.sol:MockRollupDeployer --sig "run(address)" <DASM address> --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvvv // --broadcast
-    function run(address _eigenDAServiceManager) external {
+    // forge script script/MockRollupDeployer.s.sol:MockRollupDeployer --sig "run(address)" <DABV address> --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvvv // --broadcast
+    function run(address _eigenDABlobVerifier) external {
         vm.startBroadcast();
 
         mockRollup = new MockRollup(
-            IEigenDAServiceManager(_eigenDAServiceManager),
+            IEigenDABlobVerifier(_eigenDABlobVerifier),
             s1
         );
 
