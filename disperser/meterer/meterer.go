@@ -202,9 +202,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 	// Validate payments attached
 	err = m.ValidatePayment(ctx, blobHeader, onDemandPayment)
 	if err != nil {
-		fmt.Println("validation failed: %w", err)
-		//TODO: Make sure this remove always works or handle the error
-		m.OffchainStore.RemoveOnDemandPayment(ctx, blobHeader.AccountID, blobHeader.CumulativePayment)
+		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
@@ -223,6 +221,9 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 // nextPmt is the smallest cumulative payment strictly greater than blobHeader.cumulativePayment if exists
 // nextPmtBlobSize is the blobSize of corresponding to nextPmt if exists
 func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
+	if blobHeader.CumulativePayment > uint64(onDemandPayment.CumulativePayment) {
+		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
+	}
 
 	prevPmt, nextPmt, nextPmtBlobSize, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, blobHeader.AccountID, blobHeader.CumulativePayment) // zero if DNE
 	if err != nil {
