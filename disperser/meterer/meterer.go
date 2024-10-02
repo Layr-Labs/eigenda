@@ -256,10 +256,7 @@ func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint64, error) 
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader) error {
-	globalIndex, err := m.ValidateGlobalBinIndex(blobHeader)
-	if err != nil {
-		return fmt.Errorf("invalid bin index for on-demand request: %w", err)
-	}
+	globalIndex := uint64(time.Now().Unix())
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, blobHeader.BlobSize)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)

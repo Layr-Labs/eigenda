@@ -288,19 +288,6 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(result))
 
-	// test failed global bin index
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 0, 1, *commitment, 1, []meterer.BlobQuorumParam{}, privateKey1)
-	assert.NoError(t, err)
-	err = mt.MeterRequest(ctx, *header)
-	assert.Error(t, err, "failed global bin index")
-	// Correct rollback
-	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpresseionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
-		}})
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
-
 	header, err = meterer.ConstructBlobHeader(signer, 1, 1, uint64(time.Now().Unix()), uint64(100), *commitment, 100, []meterer.BlobQuorumParam{}, privateKey1)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
