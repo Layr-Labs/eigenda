@@ -15,8 +15,12 @@ variable "SEMVER" {
   default = "v0.0.0"
 }
 
-variable "GITCOMMIT" {
-  default = "dev"
+variable "GIT_SHA" {
+  default = ""
+}
+
+variable "GIT_SHORT_SHA" {
+  default = ""
 }
 
 variable "GITDATE" {
@@ -30,20 +34,27 @@ group "default" {
 }
 
 group "all" {
-  targets = ["node-group", "disperser-group", "retriever", "churner"]
+  targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi"]
 }
 
 group "node-group" {
   targets = ["node", "nodeplugin"]
 }
 
-group "disperser-group" {
-  targets = ["batcher", "disperser", "encoder"]
-}
-
 group "node-group-release" {
   targets = ["node-release", "nodeplugin-release"]
 }
+
+# CI builds
+group "ci-release" {
+  targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi"]
+}
+
+# internal devops builds
+group "internal-release" {
+  targets = ["batcher-release", "disperser-release", "encoder-release", "churner-release", "dataapi-release"]
+}
+
 
 # DOCKER METADATA TARGET
 # See https://github.com/docker/metadata-action?tab=readme-ov-file#bake-definition
@@ -53,31 +64,51 @@ target "docker-metadata-action" {}
 # DISPERSER TARGETS
 
 target "batcher" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "batcher"
   tags       = ["${REGISTRY}/${REPO}/batcher:${BUILD_TAG}"]
 }
 
+target "batcher-release" {
+  inherits = ["batcher"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-batcher:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-batcher:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-batcher:sha-${GIT_SHORT_SHA}",
+               ]
+}
+
 target "disperser" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "apiserver"
   tags       = ["${REGISTRY}/${REPO}/apiserver:${BUILD_TAG}"]
 }
 
+target "disperser-release" {
+  inherits = ["disperser"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-disperser:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-disperser:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-disperser:sha-${GIT_SHORT_SHA}",
+               ]
+}
+
 target "encoder" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "encoder"
   tags       = ["${REGISTRY}/${REPO}/encoder:${BUILD_TAG}"]
 }
 
+target "encoder-release" {
+  inherits = ["encoder"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-encoder:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-encoder:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-encoder:sha-${GIT_SHORT_SHA}",
+               ]
+}
+
 target "retriever" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "retriever"
@@ -85,27 +116,48 @@ target "retriever" {
 }
 
 target "churner" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "churner"
   tags       = ["${REGISTRY}/${REPO}/churner:${BUILD_TAG}"]
 }
 
+target "churner-release" {
+  inherits = ["churner"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-churner:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-churner:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-churner:sha-${GIT_SHORT_SHA}",
+               ]
+}
+
 target "traffic-generator" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./trafficgenerator.Dockerfile"
   target     = "trafficgenerator"
-  tags       = ["${REGISTRY}/${REPO}/trafficgenerator:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPO}/traffic-generator:${BUILD_TAG}"]
+}
+
+target "traffic-generator-release" {
+  inherits = ["traffic-generator"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-traffic-generator:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-traffic-generator:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-traffic-generator:sha-${GIT_SHORT_SHA}",
+               ]
 }
 
 target "dataapi" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "dataapi"
   tags       = ["${REGISTRY}/${REPO}/dataapi:${BUILD_TAG}"]
+}
+
+target "dataapi-release" {
+  inherits = ["dataapi"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-dataapi:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-dataapi:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-dataapi:sha-${GIT_SHORT_SHA}",
+               ]
 }
 
 # NODE TARGETS
@@ -117,7 +169,7 @@ target "node" {
   target     = "node"
   args = {
     SEMVER    = "${SEMVER}"
-    GITCOMMIT = "${GITCOMMIT}"
+    GITCOMMIT = "${GIT_SHORT_SHA}"
     GITDATE   = "${GITDATE}"
   }
   tags = ["${REGISTRY}/${REPO}/node:${BUILD_TAG}"]
@@ -146,4 +198,3 @@ target "nodeplugin-release" {
   inherits = ["nodeplugin", "_release"]
   tags     = ["${REGISTRY}/${REPO}/opr-nodeplugin:${BUILD_TAG}"]
 }
-
