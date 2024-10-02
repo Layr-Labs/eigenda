@@ -60,7 +60,7 @@ func NewLocalNoopSigner() *LocalNoopSigner {
 	return &LocalNoopSigner{}
 }
 
-func (s *LocalNoopSigner) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
+func (s *LocalNoopSigner) SignBlobRequest(header core.BlobHeader) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 
