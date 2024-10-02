@@ -30,6 +30,7 @@ func validCfg() *Config {
 			Bucket:          "test-bucket",
 			Path:            "",
 			Endpoint:        "http://localhost:9000",
+			EnableTLS:       false,
 			AccessKeyID:     "access-key-id",
 			AccessKeySecret: "access-key-secret",
 		},

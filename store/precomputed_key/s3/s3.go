@@ -39,6 +39,7 @@ type CredentialType string
 type Config struct {
 	CredentialType  CredentialType
 	Endpoint        string
+	EnableTLS       bool
 	AccessKeyID     string
 	AccessKeySecret string
 	Bucket          string
@@ -57,7 +58,7 @@ type Store struct {
 func NewS3(cfg Config) (*Store, error) {
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  creds(cfg),
-		Secure: false,
+		Secure: cfg.EnableTLS,
 	})
 	if err != nil {
 		return nil, err

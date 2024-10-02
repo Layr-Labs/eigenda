@@ -81,6 +81,7 @@ func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 		Bucket:          bucketName,
 		Path:            "",
 		Endpoint:        "localhost:4566",
+		EnableTLS:       false,
 		AccessKeySecret: "minioadmin",
 		AccessKeyID:     "minioadmin",
 		CredentialType:  s3.CredentialTypeStatic,
