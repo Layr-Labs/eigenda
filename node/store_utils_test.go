@@ -1,11 +1,11 @@
 package node_test
 
 import (
-	"os"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/node"
-	"github.com/Layr-Labs/eigenda/node/leveldb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,9 +39,15 @@ func TestEncodeDecodeBatchMappingExpirationKey(t *testing.T) {
 
 func TestBatchMappingExpirationKeyOrdering(t *testing.T) {
 	dbPath := t.TempDir()
-	defer os.Remove(dbPath)
 
-	db, err := leveldb.NewLevelDBStore(dbPath)
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	db, err := leveldb.NewStore(logger, dbPath)
+	defer func() {
+		err = db.Destroy()
+		assert.NoError(t, err)
+	}()
 	assert.NoError(t, err)
 
 	keys := make([][]byte, 0)
@@ -68,7 +74,7 @@ func TestBatchMappingExpirationKeyOrdering(t *testing.T) {
 	err = db.WriteBatch(keys, values)
 	assert.NoError(t, err)
 
-	iter := db.NewIterator(node.EncodeBatchMappingExpirationKeyPrefix())
+	iter, err := db.NewIterator(node.EncodeBatchMappingExpirationKeyPrefix())
 	assert.NoError(t, err)
 	defer iter.Release()
 	i := 0

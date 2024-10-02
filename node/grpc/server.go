@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"reflect"
 	"runtime"
 	"sync"
@@ -154,6 +156,10 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
 }
 
+func (s *Server) StreamBlobHeaders(pb.Retrieval_StreamBlobHeadersServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamBlobHeaders not implemented")
+}
+
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	start := time.Now()
 
@@ -232,7 +238,6 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 			bundleSize += proto.Size(bundle)
 		}
 	}
-	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf message (over about 2GiB).
 	s.node.Logger.Info("StoreChunks RPC request received", "num of blobs", len(in.Blobs), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
 
 	// Validate the request.
@@ -307,7 +312,6 @@ func (s *Server) StoreBlobs(ctx context.Context, in *pb.StoreBlobsRequest) (*pb.
 			bundleSize += proto.Size(bundle)
 		}
 	}
-	// Caveat: proto.Size() returns int, so this log will not work for larger protobuf message (over about 2GiB).
 	s.node.Logger.Info("StoreBlobs RPC request received", "numBlobs", len(in.Blobs), "reqMsgSize", proto.Size(in), "blobHeadersSize", blobHeadersSize, "bundleSize", bundleSize, "referenceBlockNumber", in.GetReferenceBlockNumber())
 
 	// Process the request

@@ -107,6 +107,32 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	if c.signer == nil {
+		return nil, nil, fmt.Errorf("uninitialized signer for authenticated dispersal")
+	}
+
+	// first check if signer is valid
+	accountId, err := c.signer.GetAccountID()
+	if err != nil {
+		return nil, nil, fmt.Errorf("please configure signer key if you want to use authenticated endpoint %w", err)
+	}
+
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
+	}
+
+	// check every 32 bytes of data are within the valid range for a bn254 field element
+	_, err = rs.ToFrArray(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
+	}
+
+	request := &disperser_rpc.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: quorumNumbers,
+		AccountId:           accountId,
+	}
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
@@ -126,22 +152,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	stream, err := disperserClient.DisperseBlobAuthenticated(ctxTimeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error while calling DisperseBlobAuthenticated: %w", err)
-	}
-
-	quorumNumbers := make([]uint32, len(quorums))
-	for i, q := range quorums {
-		quorumNumbers[i] = uint32(q)
-	}
-
-	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err = rs.ToFrArray(data)
-	if err != nil {
-		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
-	}
-	request := &disperser_rpc.DisperseBlobRequest{
-		Data:                data,
-		CustomQuorumNumbers: quorumNumbers,
-		AccountId:           c.signer.GetAccountID(),
 	}
 
 	// Send the initial request

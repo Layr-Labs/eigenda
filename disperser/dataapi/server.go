@@ -153,20 +153,25 @@ type (
 		DispersalOnline bool   `json:"dispersal_online"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 	}
+	SemverReportResponse struct {
+		Semver map[string]int `json:"semver"`
+	}
+
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
 
 	server struct {
-		serverMode     string
-		socketAddr     string
-		allowOrigins   []string
-		logger         logging.Logger
-		blobstore      disperser.BlobStore
-		promClient     PrometheusClient
-		subgraphClient SubgraphClient
-		transactor     core.Transactor
-		chainState     core.ChainState
+		serverMode        string
+		socketAddr        string
+		allowOrigins      []string
+		logger            logging.Logger
+		blobstore         disperser.BlobStore
+		promClient        PrometheusClient
+		subgraphClient    SubgraphClient
+		transactor        core.Transactor
+		chainState        core.ChainState
+		indexedChainState core.IndexedChainState
 
 		metrics                   *Metrics
 		disperserHostName         string
@@ -184,6 +189,7 @@ func NewServer(
 	subgraphClient SubgraphClient,
 	transactor core.Transactor,
 	chainState core.ChainState,
+	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
 	metrics *Metrics,
 	grpcConn GRPCConn,
@@ -214,6 +220,7 @@ func NewServer(
 		subgraphClient:            subgraphClient,
 		transactor:                transactor,
 		chainState:                chainState,
+		indexedChainState:         indexedChainState,
 		metrics:                   metrics,
 		disperserHostName:         config.DisperserHostname,
 		churnerHostName:           config.ChurnerHostname,
@@ -246,6 +253,7 @@ func (s *server) Start() error {
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
+			operatorsInfo.GET("/semver-scan", s.SemverScan)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -801,6 +809,30 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
 	c.JSON(http.StatusOK, portCheckResponse)
+}
+
+// Semver scan godoc
+//
+//	@Summary	Active operator semver scan
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200	{object}	SemverReportResponse
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/semver-scan [get]
+func (s *server) SemverScan(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("SemverScan", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	report, err := s.scanOperatorsHostInfo(c.Request.Context())
+	if err != nil {
+		s.logger.Error("failed to scan operators host info", "error", err)
+		s.metrics.IncrementFailedRequestNum("SemverScan")
+		errorResponse(c, err)
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, report)
 }
 
 // FetchDisperserServiceAvailability godoc

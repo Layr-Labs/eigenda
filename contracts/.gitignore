@@ -17,4 +17,4 @@ docs/
 data/
 
 script/output/*
-script/eigenda_deploy_config.json
+script/input/eigenda_deploy_config.json

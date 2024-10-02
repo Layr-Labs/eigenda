@@ -51,7 +51,8 @@ type FinalizerMetrics struct {
 }
 
 type DispatcherMetrics struct {
-	Latency *prometheus.SummaryVec
+	Latency         *prometheus.SummaryVec
+	OperatorLatency *prometheus.GaugeVec
 }
 
 type Metrics struct {
@@ -67,6 +68,7 @@ type Metrics struct {
 	BatchProcLatency          *prometheus.SummaryVec
 	BatchProcLatencyHistogram *prometheus.HistogramVec
 	BlobAge                   *prometheus.SummaryVec
+	BlobSizeTotal             *prometheus.CounterVec
 	Attestation               *prometheus.GaugeVec
 	BatchError                *prometheus.CounterVec
 
@@ -177,6 +179,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"operator_id", "status"},
 		),
+		OperatorLatency: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "operator_attestation_latency_ms",
+				Help:      "attestation latency in ms observed for operators",
+			},
+			[]string{"operator_id"},
+		),
 	}
 
 	metrics := &Metrics{
@@ -188,7 +198,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and unencoded size of total dispersal blobs",
+				Help:      "the number and unencoded size of total dispersal blobs, if a blob is in multiple quorums, it'll only be counted once",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
@@ -229,6 +239,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			// The stage would be:
 			// encoding_requested -> encoded -> batched -> attestation_requested -> attested -> confirmed
 			[]string{"stage"},
+		),
+		BlobSizeTotal: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "blob_size_total",
+				Help:      "the size in bytes of unencoded blobs, if a blob is in multiple quorums, it'll be acounted multiple times",
+			},
+			[]string{"stage", "quorum"},
 		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -279,7 +297,14 @@ func (t *DispatcherMetrics) ObserveLatency(operatorId string, success bool, late
 	if !success {
 		label = "failure"
 	}
-	t.Latency.WithLabelValues(operatorId, label).Observe(latencyMS)
+	// The Latency metric has "operator_id" but we null it out because it's separately
+	// tracked in OperatorLatency.
+	t.Latency.WithLabelValues("", label).Observe(latencyMS)
+	// Only tracks successful requests, so there is one stream per operator.
+	// This is sufficient to provide insights of operators' performance.
+	if success {
+		t.OperatorLatency.WithLabelValues(operatorId).Set(latencyMS)
+	}
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.
@@ -318,6 +343,10 @@ func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 
 func (g *Metrics) ObserveBlobAge(stage string, ageMs float64) {
 	g.BlobAge.WithLabelValues(stage).Observe(ageMs)
+}
+
+func (g *Metrics) IncrementBlobSize(stage string, quorumId core.QuorumID, blobSize int) {
+	g.BlobSizeTotal.WithLabelValues(stage, fmt.Sprintf("%d", quorumId)).Add(float64(blobSize))
 }
 
 func (g *Metrics) Start(ctx context.Context) {

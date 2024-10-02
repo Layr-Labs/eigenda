@@ -23,6 +23,7 @@ const (
 	Disperser_DisperseBlobAuthenticated_FullMethodName = "/disperser.Disperser/DisperseBlobAuthenticated"
 	Disperser_GetBlobStatus_FullMethodName             = "/disperser.Disperser/GetBlobStatus"
 	Disperser_RetrieveBlob_FullMethodName              = "/disperser.Disperser/RetrieveBlob"
+	Disperser_GetChunk_FullMethodName                  = "/disperser.Disperser/GetChunk"
 )
 
 // DisperserClient is the client API for Disperser service.
@@ -52,6 +53,8 @@ type DisperserClient interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(ctx context.Context, in *RetrieveBlobRequest, opts ...grpc.CallOption) (*RetrieveBlobReply, error)
+	// Retrieves the requested chunk from the Disperser's backend.
+	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
 }
 
 type disperserClient struct {
@@ -120,6 +123,15 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, in *RetrieveBlobRequ
 	return out, nil
 }
 
+func (c *disperserClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error) {
+	out := new(GetChunkReply)
+	err := c.cc.Invoke(ctx, Disperser_GetChunk_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DisperserServer is the server API for Disperser service.
 // All implementations must embed UnimplementedDisperserServer
 // for forward compatibility
@@ -147,6 +159,8 @@ type DisperserServer interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error)
+	// Retrieves the requested chunk from the Disperser's backend.
+	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -165,6 +179,9 @@ func (UnimplementedDisperserServer) GetBlobStatus(context.Context, *BlobStatusRe
 }
 func (UnimplementedDisperserServer) RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveBlob not implemented")
+}
+func (UnimplementedDisperserServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
 
@@ -259,6 +276,24 @@ func _Disperser_RetrieveBlob_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Disperser_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).GetChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_GetChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).GetChunk(ctx, req.(*GetChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Disperser_ServiceDesc is the grpc.ServiceDesc for Disperser service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -277,6 +312,10 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RetrieveBlob",
 			Handler:    _Disperser_RetrieveBlob_Handler,
+		},
+		{
+			MethodName: "GetChunk",
+			Handler:    _Disperser_GetChunk_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

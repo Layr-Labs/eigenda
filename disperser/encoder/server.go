@@ -44,6 +44,7 @@ func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prove
 }
 
 func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
+	startTime := time.Now()
 	select {
 	case s.requestPool <- struct{}{}:
 	default:
@@ -59,12 +60,15 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 		return nil, ctx.Err()
 	}
 
+	s.metrics.ObserveLatency("queuing", time.Since(startTime))
 	reply, err := s.handleEncoding(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedBlobRequestNum(len(req.GetData()))
 	} else {
 		s.metrics.IncrementSuccessfulBlobRequestNum(len(req.GetData()))
 	}
+	s.metrics.ObserveLatency("total", time.Since(startTime))
+
 	return reply, err
 }
 
@@ -74,6 +78,7 @@ func (s *Server) popRequest() {
 }
 
 func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
+
 	begin := time.Now()
 
 	if len(req.Data) == 0 {
@@ -97,7 +102,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		return nil, err
 	}
 
-	encodingTime := time.Since(begin)
+	s.metrics.ObserveLatency("encoding", time.Since(begin))
+	begin = time.Now()
 
 	commitData, err := commits.Commitment.Serialize()
 	if err != nil {
@@ -116,8 +122,20 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	var chunksData [][]byte
 
+	var format pb.ChunkEncodingFormat
+	if s.config.EnableGnarkChunkEncoding {
+		format = pb.ChunkEncodingFormat_GNARK
+	} else {
+		format = pb.ChunkEncodingFormat_GOB
+	}
+
 	for _, chunk := range chunks {
-		chunkSerialized, err := chunk.Serialize()
+		var chunkSerialized []byte
+		if s.config.EnableGnarkChunkEncoding {
+			chunkSerialized, err = chunk.SerializeGnark()
+		} else {
+			chunkSerialized, err = chunk.Serialize()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -125,8 +143,7 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		chunksData = append(chunksData, chunkSerialized)
 	}
 
-	totalTime := time.Since(begin)
-	s.metrics.TakeLatency(encodingTime, totalTime)
+	s.metrics.ObserveLatency("serialization", time.Since(begin))
 
 	return &pb.EncodeBlobReply{
 		Commitment: &pb.BlobCommitment{
@@ -135,7 +152,8 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 			LengthProof:      lengthProofData,
 			Length:           uint32(commits.Length),
 		},
-		Chunks: chunksData,
+		Chunks:              chunksData,
+		ChunkEncodingFormat: format,
 	}, nil
 }
 

@@ -15,7 +15,7 @@ import (
 //   before return to users from APIs.
 
 func NewGRPCError(code codes.Code, msg string) error {
-	return status.Errorf(code, msg)
+	return status.Error(code, msg)
 }
 
 // HTTP Mapping: 400 Bad Request

@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree/v2"
+	grpc_metadata "google.golang.org/grpc/metadata"
 )
 
 const encodingInterval = 2 * time.Second
@@ -377,6 +378,14 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 		e.mu.Lock()
 		e.encodingCtxCancelFuncs = append(e.encodingCtxCancelFuncs, cancel)
 		e.mu.Unlock()
+
+		// Add headers for routing
+		md := grpc_metadata.New(map[string]string{
+			"content-type":   "application/grpc",
+			"x-payload-size": fmt.Sprintf("%d", len(blob.Data)),
+		})
+		encodingCtx = grpc_metadata.NewOutgoingContext(encodingCtx, md)
+
 		e.Pool.Submit(func() {
 			defer cancel()
 			start := time.Now()
@@ -420,6 +429,7 @@ func (e *EncodingStreamer) ProcessEncodedBlobs(ctx context.Context, result Encod
 
 	requestTime := time.Unix(0, int64(result.BlobMetadata.RequestMetadata.RequestedAt))
 	e.batcherMetrics.ObserveBlobAge("encoded", float64(time.Since(requestTime).Milliseconds()))
+	e.batcherMetrics.IncrementBlobSize("encoded", result.BlobQuorumInfo.QuorumID, int(result.BlobMetadata.RequestMetadata.BlobSize))
 
 	count, encodedSize := e.EncodedBlobstore.GetEncodedResultSize()
 	e.metrics.UpdateEncodedBlobs(count, encodedSize)
@@ -566,6 +576,9 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -577,6 +590,9 @@ func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) 
 
 	_, err = batchHeader.SetBatchRoot(blobHeaders)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -700,19 +716,17 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 	}
 
 	// Transform maps to slices so orders in different slices match
-	encodedBlobs := make([]core.EncodedBlob, len(metadataByKey))
-	blobHeaders := make([]*core.BlobCertificate, len(metadataByKey))
-	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
-	i := 0
+	encodedBlobs := make([]core.EncodedBlob, 0, len(metadataByKey))
+	blobHeaders := make([]*core.BlobCertificate, 0, len(metadataByKey))
+	metadatas := make([]*disperser.BlobMetadata, 0, len(metadataByKey))
 	for key := range metadataByKey {
 		err := e.transitionBlobToDispersing(ctx, metadataByKey[key])
 		if err != nil {
 			continue
 		}
-		encodedBlobs[i] = encodedBlobByKey[key]
-		blobHeaders[i] = blobHeaderByKey[key]
-		metadatas[i] = metadataByKey[key]
-		i++
+		encodedBlobs = append(encodedBlobs, encodedBlobByKey[key])
+		blobHeaders = append(blobHeaders, blobHeaderByKey[key])
+		metadatas = append(metadatas, metadataByKey[key])
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), e.ChainStateTimeout)
@@ -720,6 +734,9 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -731,6 +748,9 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	tree, err := batchHeader.SetBatchRoot(blobHeaders)
 	if err != nil {
+		for _, metadata := range metadatas {
+			_ = e.handleFailedMetadata(ctx, metadata)
+		}
 		return nil, err
 	}
 
@@ -744,6 +764,15 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 		State:        state,
 		MerkleTree:   tree,
 	}, nil
+}
+
+func (e *EncodingStreamer) handleFailedMetadata(ctx context.Context, metadata *disperser.BlobMetadata) error {
+	err := e.blobStore.MarkBlobProcessing(ctx, metadata.GetBlobKey())
+	if err != nil {
+		e.logger.Error("error marking blob as processing", "err", err)
+	}
+
+	return err
 }
 
 func (e *EncodingStreamer) transitionBlobToDispersing(ctx context.Context, metadata *disperser.BlobMetadata) error {

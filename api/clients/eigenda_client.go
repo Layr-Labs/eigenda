@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/log"
@@ -41,7 +42,15 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, fmt.Errorf("failed to parse EigenDA RPC: %w", err)
 	}
 
-	signer := auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
+	var signer core.BlobRequestSigner
+	if len(config.SignerPrivateKeyHex) == 64 {
+		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
+	} else if len(config.SignerPrivateKeyHex) == 0 {
+		signer = auth.NewLocalNoopSigner()
+	} else {
+		return nil, fmt.Errorf("invalid length for signer private key")
+	}
+
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
 
@@ -156,6 +165,8 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 	ctx, cancel = context.WithTimeout(ctx, m.Config.StatusQueryTimeout)
 	defer cancel()
 
+	alreadyWaitingForDispersal := false
+	alreadyWaitingForFinalization := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -170,7 +181,13 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 
 			switch statusRes.Status {
 			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
-				m.Log.Info("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
+				// to prevent log clutter, we only log at info level once
+				if alreadyWaitingForDispersal {
+					m.Log.Debug("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
+				} else {
+					m.Log.Info("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
+					alreadyWaitingForDispersal = true
+				}
 			case grpcdisperser.BlobStatus_FAILED:
 				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
 				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
@@ -181,7 +198,13 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 				return
 			case grpcdisperser.BlobStatus_CONFIRMED:
 				if m.Config.WaitForFinalization {
-					m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
+					// to prevent log clutter, we only log at info level once
+					if alreadyWaitingForFinalization {
+						m.Log.Debug("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
+					} else {
+						m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
+						alreadyWaitingForFinalization = true
+					}
 				} else {
 					m.Log.Info("EigenDA blob confirmed", "requestID", base64RequestID)
 					resultChan <- statusRes.Info

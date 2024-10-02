@@ -225,12 +225,15 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 		stream.Close()
 	}()
 
-	err := stream.SendFromClient(&pb.AuthenticatedRequest{
+	accountId, err := signer.GetAccountID()
+	assert.NoError(t, err)
+
+	err = stream.SendFromClient(&pb.AuthenticatedRequest{
 		Payload: &pb.AuthenticatedRequest_DisperseRequest{
 			DisperseRequest: &pb.DisperseBlobRequest{
 				Data:                data,
 				CustomQuorumNumbers: quorums,
-				AccountId:           signer.GetAccountID(),
+				AccountId:           accountId,
 			},
 		},
 	})
