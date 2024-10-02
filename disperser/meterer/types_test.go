@@ -29,7 +29,7 @@ func TestEIP712Signer(t *testing.T) {
 		CumulativePayment: 1000,
 		Commitment:        *commitment,
 		DataLength:        1024,
-		QuorumNumbers:     []uint32{1},
+		QuorumNumbers:     []uint8{1},
 		BlobSize:          1024,
 	}
 
@@ -70,7 +70,7 @@ func TestConstructBlobHeader(t *testing.T) {
 		1000,        // cumulativePayment
 		*commitment, // core.G1Point
 		1024,        // dataLength
-		[]uint32{1},
+		[]uint8{1},
 		privateKey,
 	)
 
@@ -106,7 +106,7 @@ func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 		1000,
 		*commitment,
 		1024,
-		[]uint32{1},
+		[]uint8{1},
 		privateKey1,
 	)
 
@@ -142,7 +142,7 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 		1000,
 		*commitment,
 		1024,
-		[]uint32{1},
+		[]uint8{1},
 		privateKey,
 	)
 
@@ -181,7 +181,7 @@ func TestEIP712SignerWithDifferentChainID(t *testing.T) {
 		1000,
 		*commitment,
 		1024,
-		[]uint32{1},
+		[]uint8{1},
 		privateKey,
 	)
 

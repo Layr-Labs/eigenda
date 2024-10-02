@@ -51,8 +51,8 @@ func InitializeMockData(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.Pri
 	// Initialize mock active reservations
 	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
-		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint32{0, 1}},
-		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint32{0, 1}},
+		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
+		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
 	}
 	pcs.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1500},
@@ -161,25 +161,25 @@ func TestMetererReservations(t *testing.T) {
 	meterer.CreateReservationTable(clientConfig, "reservations")
 	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
-	quoromNumbers := []uint32{0, 1}
+	quoromNumbers := []uint8{0, 1}
 
 	// test invalid signature
 	invalidHeader := &meterer.BlobHeader{
 		Version:           1,
 		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
 		Nonce:             1,
-		BinIndex:          uint64(time.Now().Unix()) / mt.Config.ReservationWindow,
+		BinIndex:          uint32(time.Now().Unix()) / mt.Config.ReservationWindow,
 		CumulativePayment: 0,
 		Commitment:        *commitment,
 		BlobSize:          2000,
-		QuorumNumbers:     []uint32{0},
+		QuorumNumbers:     []uint8{0},
 		Signature:         []byte{78, 212, 55, 45, 156, 217, 21, 240, 47, 141, 18, 213, 226, 196, 4, 51, 245, 110, 20, 106, 244, 142, 142, 49, 213, 21, 34, 151, 118, 254, 46, 89, 48, 84, 250, 46, 179, 228, 46, 51, 106, 164, 122, 11, 26, 101, 10, 10, 243, 2, 30, 46, 95, 125, 189, 237, 236, 91, 130, 224, 240, 151, 106, 204, 1},
 	}
 	err := mt.MeterRequest(ctx, *invalidHeader)
 	assert.Error(t, err, "invalid signature: recovered address * does not match account ID *")
 
 	// test invalid quorom ID
-	header, err := meterer.ConstructBlobHeader(signer, 3, 2, 1, 0, *commitment, 1000, []uint32{0, 1, 2}, privateKey1)
+	header, err := meterer.ConstructBlobHeader(signer, 3, 2, 1, 0, *commitment, 1000, []uint8{0, 1, 2}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid quorum ID")
@@ -189,7 +189,7 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 1, 0, *commitment, 1000, []uint32{0, 1, 2}, unregisteredUser)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 1, 0, *commitment, 1000, []uint8{0, 1, 2}, unregisteredUser)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed to get on-demand payment by account: reservation not found")
@@ -256,14 +256,15 @@ func TestMetererOnDemand(t *testing.T) {
 	meterer.CreateOnDemandTable(clientConfig, "ondemand")
 	meterer.CreateGlobalReservationTable(clientConfig, "global")
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
-	quorumNumbers := []uint32{0, 1}
+	quorumNumbers := []uint8{0, 1}
+	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
 
 	// test invalid signature
 	invalidHeader := &meterer.BlobHeader{
 		Version:           1,
 		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
 		Nonce:             1,
-		BinIndex:          uint64(time.Now().Unix()),
+		BinIndex:          binIndex,
 		CumulativePayment: 1,
 		Commitment:        *commitment,
 		BlobSize:          2000,
@@ -284,7 +285,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Error(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	header, err = meterer.ConstructBlobHeader(signer, 3, 2, 1, 1, *commitment, 1000, []uint32{0, 1, 2}, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, 3, 2, 1, 1, *commitment, 1000, []uint8{0, 1, 2}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid quorum for On-Demand Request")
@@ -303,7 +304,6 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// test duplicated cumulative payments
-	binIndex := uint64(0) // this field doesn't matter for on-demand payments wrt global rate limit
 	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100), *commitment, 100, quorumNumbers, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)

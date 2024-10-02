@@ -22,10 +22,10 @@ type Config struct {
 	// PullInterval             time.Duration
 
 	// network parameters (this should be published on-chain and read through contracts)
-	PricePerChargeable   uint64
-	GlobalBytesPerSecond uint64
-	MinChargeableSize    uint64
-	ReservationWindow    uint64
+	GlobalBytesPerSecond uint64 // 2^64 bytes ~= 18 exabytes per second; if we use uint32, that's ~4GB/s
+	PricePerChargeable   uint32 // 2^64 gwei ~= 18M Eth; uint32 => ~4ETH
+	MinChargeableSize    uint32
+	ReservationWindow    uint32
 }
 
 // disperser API server will receive requests from clients. these requests will be with a blobHeader with payments information (CumulativePayments, BinIndex, and Signature)
@@ -39,7 +39,7 @@ type Config struct {
 //
 // If the payment is valid, the meterer will add the blob header to its state and return a success response to the disperser API server.
 // if any of the checks fail, the meterer will return a failure response to the disperser API server.
-var OnDemandQuorumNumbers = []uint32{0, 1}
+var OnDemandQuorumNumbers = []uint8{0, 1}
 
 type Meterer struct {
 	Config
@@ -152,7 +152,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, blobHeader BlobHe
 	return nil
 }
 
-func (m *Meterer) ValidateQuorum(blobHeader BlobHeader, allowedQuoroms []uint32) error {
+func (m *Meterer) ValidateQuorum(blobHeader BlobHeader, allowedQuoroms []uint8) error {
 	if len(blobHeader.QuorumNumbers) == 0 {
 		return fmt.Errorf("no quorum params in blob header")
 	}
@@ -202,9 +202,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 }
 
 // GetCurrentBinIndex returns the current bin index based on time
-func GetCurrentBinIndex(binInterval uint64) uint64 {
+func GetCurrentBinIndex(binInterval uint32) uint32 {
 	currentTime := time.Now().Unix()
-	return uint64(currentTime) / binInterval
+	return uint32(currentTime) / binInterval
 }
 
 //TODO: should we track some number of blobHeaders in the meterer state and expose an API? is it stored somewhere else?
@@ -254,11 +254,11 @@ func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, on
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+uint64(blobHeader.BlobSize)*m.Config.PricePerChargeable/m.Config.MinChargeableSize > blobHeader.CumulativePayment {
+	if prevPmt+uint64(blobHeader.BlobSize*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > blobHeader.CumulativePayment {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize)*m.Config.PricePerChargeable/m.Config.MinChargeableSize > nextPmt {
+	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
@@ -268,9 +268,9 @@ func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, on
 }
 
 // ValidateBinIndex checks if the provided bin index is valid
-func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint64, error) {
+func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint32, error) {
 	// Deterministic function: local clock -> index (1second intervals)
-	currentBinIndex := uint64(time.Now().Unix())
+	currentBinIndex := uint32(time.Now().Unix())
 
 	// Valid bin indexes are either the current bin or the previous bin (allow this second or prev sec)
 	if blobHeader.BinIndex != currentBinIndex && blobHeader.BinIndex != (currentBinIndex-1) {

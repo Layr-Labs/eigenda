@@ -16,10 +16,10 @@ type TokenAmount uint64 // TODO: change to uint128
 // corresponding to a particular quorum
 type ActiveReservation struct {
 	DataRate   uint32 // Bandwidth per reservation bin
-	StartEpoch uint64
-	EndEpoch   uint64
+	StartEpoch uint32
+	EndEpoch   uint32
 
-	QuorumNumbers []uint32
+	QuorumNumbers []uint8
 	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
 }
 

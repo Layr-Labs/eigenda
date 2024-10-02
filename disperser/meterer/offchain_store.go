@@ -50,7 +50,7 @@ func NewOffchainStore(
 
 type ReservationBin struct {
 	AccountID string
-	BinIndex  uint64
+	BinIndex  uint32
 	BinUsage  uint32
 	UpdatedAt time.Time
 }
@@ -61,7 +61,7 @@ type PaymentTuple struct {
 }
 
 type GlobalBin struct {
-	BinIndex  uint64
+	BinIndex  uint32
 	BinUsage  uint64
 	UpdatedAt time.Time
 }
