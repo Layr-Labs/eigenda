@@ -47,12 +47,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set release PUSH_FLAG
-        run: echo "PUSH_FLAG=--push" >> $GITHUB_ENV
+      # Build And Push Images
+      - name: Build Docker images
+        run: docker buildx bake ci-release
+      - name: Push Docker images
         if: github.ref == 'refs/heads/master'
-
-      - name: Build (and potentially push) docker image release
-        run: PUSH_FLAG=$PUSH_FLAG make docker-ci-release
+        run: docker buildx bake ci-release --push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}

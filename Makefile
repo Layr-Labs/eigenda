@@ -82,10 +82,6 @@ integration-tests-dataapi:
 	make dataapi-build
 	go test -v ./disperser/dataapi
 
-docker-ci-release:
-	SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake ci-release ${PUSH_FLAG}
-
 docker-internal-release:
 	BUILD_TAG=${BRANCH} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake internal-release ${PUSH_FLAG}
