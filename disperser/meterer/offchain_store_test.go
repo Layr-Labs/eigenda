@@ -182,7 +182,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-			"BlobSize":           &types.AttributeValueMemberN{Value: "1000"},
+			"DataLength":         &types.AttributeValueMemberN{Value: "1000"},
 		},
 	)
 	assert.NoError(t, err)
@@ -194,7 +194,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 		items[i] = commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: fmt.Sprintf("account%d", i%repetitions)},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
-			"BlobSize":           &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i*1000)},
+			"DataLength":         &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i*1000)},
 		}
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
@@ -208,7 +208,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "1", item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", item["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1000", item["DataLength"].(*types.AttributeValueMemberN).Value)
 
 	queryResult, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "AccountID = :account", commondynamodb.ExpresseionValues{
 		":account": &types.AttributeValueMemberS{
@@ -218,7 +218,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	assert.Len(t, queryResult, numItems/repetitions)
 	for _, item := range queryResult {
 		cumulativePayments, _ := strconv.Atoi(item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, fmt.Sprintf("%d", cumulativePayments*1000), item["BlobSize"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, fmt.Sprintf("%d", cumulativePayments*1000), item["DataLength"].(*types.AttributeValueMemberN).Value)
 	}
 	queryResult, err = dynamoClient.QueryIndex(ctx, tableName, indexName, "AccountID = :account_id", commondynamodb.ExpresseionValues{
 		":account_id": &types.AttributeValueMemberS{
@@ -234,15 +234,15 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	}, commondynamodb.Item{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "3"},
-		"BlobSize":           &types.AttributeValueMemberN{Value: "3000"},
+		"DataLength":         &types.AttributeValueMemberN{Value: "3000"},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "3000", updatedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "3000", updatedItem["DataLength"].(*types.AttributeValueMemberN).Value)
 
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "3000", item["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "3000", item["DataLength"].(*types.AttributeValueMemberN).Value)
 }

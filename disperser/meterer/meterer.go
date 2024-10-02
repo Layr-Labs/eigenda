@@ -181,7 +181,7 @@ func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveRes
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, reservation *ActiveReservation) error {
 	//todo: sizes use uint64?
-	recordedSize := max(blobHeader.BlobSize, uint32(m.MinChargeableSize))
+	recordedSize := max(blobHeader.DataLength, uint32(m.MinChargeableSize))
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex), recordedSize)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
@@ -218,7 +218,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 	// update blob header to use the miniumum chargeable size
-	blobHeader.BlobSize = max(blobHeader.BlobSize, uint32(m.MinChargeableSize))
+	blobHeader.DataLength = max(blobHeader.DataLength, uint32(m.MinChargeableSize))
 	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
@@ -243,27 +243,27 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 // ValidatePayment checks if the provided payment header is valid against the local accounting
 // prevPmt is the largest  cumulative payment strictly less    than blobHeader.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than blobHeader.cumulativePayment if exists
-// nextPmtBlobSize is the blobSize of corresponding to nextPmt if exists
+// nextPmtDataLength is the dataLength of corresponding to nextPmt if exists
 func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
 	if blobHeader.CumulativePayment > uint64(onDemandPayment.CumulativePayment) {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	prevPmt, nextPmt, nextPmtBlobSize, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, blobHeader.AccountID, blobHeader.CumulativePayment) // zero if DNE
+	prevPmt, nextPmt, nextPmtDataLength, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, blobHeader.AccountID, blobHeader.CumulativePayment) // zero if DNE
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+uint64(blobHeader.BlobSize*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > blobHeader.CumulativePayment {
+	if prevPmt+uint64(blobHeader.DataLength*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > blobHeader.CumulativePayment {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtBlobSize*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > nextPmt {
+	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtDataLength*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
-	// prevPmt + blobHeader.BlobSize * m.FixedFeePerByte <= blobHeader.CumulativePayment
-	//                                                   <= nextPmt - nextPmtBlobSize * m.FixedFeePerByte > nextPmt
+	// prevPmt + blobHeader.DataLength * m.FixedFeePerByte <= blobHeader.CumulativePayment
+	//                                                   <= nextPmt - nextPmtDataLength * m.FixedFeePerByte > nextPmt
 	return nil
 }
 
@@ -282,7 +282,7 @@ func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint32, error) 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader) error {
 	globalIndex := uint64(time.Now().Unix())
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, blobHeader.BlobSize)
+	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, blobHeader.DataLength)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}

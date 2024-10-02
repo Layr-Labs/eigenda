@@ -57,7 +57,7 @@ type ReservationBin struct {
 
 type PaymentTuple struct {
 	CumulativePayment uint64
-	BlobSize          uint32
+	DataLength        uint32
 }
 
 type GlobalBin struct {
@@ -193,7 +193,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobH
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
-			"BlobSize":           &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobHeader.BlobSize), 10)},
+			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobHeader.DataLength), 10)},
 		},
 	)
 
@@ -257,18 +257,18 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 		return 0, 0, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
 	}
 	var nextPayment uint64
-	var nextBlobSize uint32
+	var nextDataLength uint32
 	if len(largerResult) > 0 {
 		nextPayment, err = strconv.ParseUint(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
 		if err != nil {
 			return 0, 0, 0, fmt.Errorf("failed to parse next payment: %w", err)
 		}
-		blobSize, err := strconv.ParseUint(largerResult[0]["BlobSize"].(*types.AttributeValueMemberN).Value, 10, 32)
+		dataLength, err := strconv.ParseUint(largerResult[0]["DataLength"].(*types.AttributeValueMemberN).Value, 10, 32)
 		if err != nil {
 			return 0, 0, 0, fmt.Errorf("failed to parse blob size: %w", err)
 		}
-		nextBlobSize = uint32(blobSize)
+		nextDataLength = uint32(dataLength)
 	}
 
-	return prevPayment, nextPayment, nextBlobSize, nil
+	return prevPayment, nextPayment, nextDataLength, nil
 }

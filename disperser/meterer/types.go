@@ -29,32 +29,9 @@ type BlobHeader struct {
 	BinIndex  uint32
 
 	Signature []byte
-	BlobSize  uint32
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
 	CumulativePayment uint64
-}
-
-// // EIP712Domain represents the EIP-712 domain for our blob headers
-// var EIP712Domain = apitypes.TypedDataDomain{
-// 	Name:              "EigenDA",
-// 	Version:           "1",
-// 	ChainId:           (*math.HexOrDecimal256)(big.NewInt(17000)),
-// 	VerifyingContract: common.HexToAddress("0x1234000000000000000000000000000000000000").Hex(),
-// }
-
-// Protocol defines parameters: epoch length and rate-limit window interval
-type Reservation struct {
-	dataRate    uint32 // bandwith being reserved
-	startEpoch  uint32 // index of epoch where reservation begins
-	endEpoch    uint32 // index of epoch where reservation ends
-	quorumSplit []byte // each byte is a percentage at the corresponding quorum index
-}
-
-// Protocol defines parameters: FixedFeePerByte; fine to leave global rate-limit offchain atm
-type OnDemand struct {
-	amountDeposited big.Int
-	amountCollected big.Int
 }
 
 // EIP712Signer handles EIP-712 signing operations
@@ -201,7 +178,7 @@ func ConstructBlobHeader(
 	binIndex uint32,
 	cumulativePayment uint64,
 	commitment core.G1Point,
-	blobSize uint32,
+	dataLength uint32,
 	quorumNumbers []uint8,
 	privateKey *ecdsa.PrivateKey,
 ) (*BlobHeader, error) {
@@ -214,8 +191,7 @@ func ConstructBlobHeader(
 		CumulativePayment: cumulativePayment,
 		Commitment:        commitment,
 		QuorumNumbers:     quorumNumbers,
-		BlobSize:          blobSize,
-		DataLength:        blobSize,
+		DataLength:        dataLength,
 	}
 
 	signature, err := signer.SignBlobHeader(header, privateKey)

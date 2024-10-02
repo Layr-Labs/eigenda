@@ -30,7 +30,6 @@ func TestEIP712Signer(t *testing.T) {
 		Commitment:        *commitment,
 		DataLength:        1024,
 		QuorumNumbers:     []uint8{1},
-		BlobSize:          1024,
 	}
 
 	t.Run("SignBlobHeader", func(t *testing.T) {

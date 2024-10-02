@@ -171,7 +171,7 @@ func TestMetererReservations(t *testing.T) {
 		BinIndex:          uint32(time.Now().Unix()) / mt.Config.ReservationWindow,
 		CumulativePayment: 0,
 		Commitment:        *commitment,
-		BlobSize:          2000,
+		DataLength:        2000,
 		QuorumNumbers:     []uint8{0},
 		Signature:         []byte{78, 212, 55, 45, 156, 217, 21, 240, 47, 141, 18, 213, 226, 196, 4, 51, 245, 110, 20, 106, 244, 142, 142, 49, 213, 21, 34, 151, 118, 254, 46, 89, 48, 84, 250, 46, 179, 228, 46, 51, 106, 164, 122, 11, 26, 101, 10, 10, 243, 2, 30, 46, 95, 125, 189, 237, 236, 91, 130, 224, 240, 151, 106, 204, 1},
 	}
@@ -208,8 +208,8 @@ func TestMetererReservations(t *testing.T) {
 	// test bin usage
 	accountID := crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
 	for i := 0; i < 9; i++ {
-		blobSize := 20
-		header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, uint32(blobSize), quoromNumbers, privateKey2)
+		dataLength := 20
+		header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, uint32(dataLength), quoromNumbers, privateKey2)
 		assert.NoError(t, err)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
@@ -220,7 +220,7 @@ func TestMetererReservations(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, accountID, item["AccountID"].(*types.AttributeValueMemberS).Value)
 		assert.Equal(t, strconv.Itoa(int(binIndex)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, strconv.Itoa(int((i+1)*blobSize)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, strconv.Itoa(int((i+1)*dataLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	}
 	// frist over flow is allowed
@@ -267,7 +267,7 @@ func TestMetererOnDemand(t *testing.T) {
 		BinIndex:          binIndex,
 		CumulativePayment: 1,
 		Commitment:        *commitment,
-		BlobSize:          2000,
+		DataLength:        2000,
 		QuorumNumbers:     quorumNumbers,
 		Signature:         []byte{78, 212, 55, 45, 156, 217, 21, 240, 47, 141, 18, 213, 226, 196, 4, 51, 245, 110, 20, 106, 244, 142, 142, 49, 213, 21, 34, 151, 118, 254, 46, 89, 48, 84, 250, 46, 179, 228, 46, 51, 106, 164, 122, 11, 26, 101, 10, 10, 243, 2, 30, 46, 95, 125, 189, 237, 236, 91, 130, 224, 240, 151, 106, 204, 1},
 	}
