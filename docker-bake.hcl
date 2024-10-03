@@ -55,7 +55,7 @@ group "ci-release" {
 
 # Internal devops builds
 group "internal-release" {
-  targets = ["node-internal-release", "batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release", "traffic-generator-release"]
+  targets = ["node-internal", "batcher-internal", "disperser-internal", "encoder-internal", "retriever-internal", "churner-internal", "dataapi-internal", "traffic-generator-internal"]
 }
 
 
@@ -68,7 +68,7 @@ target "batcher" {
   tags       = ["${REGISTRY}/${REPO}/batcher:${BUILD_TAG}"]
 }
 
-target "batcher-release" {
+target "batcher-internal" {
   inherits = ["batcher"]
   tags       = ["${REGISTRY}/eigenda-batcher:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-batcher:${GIT_SHA}",
@@ -83,7 +83,7 @@ target "disperser" {
   tags       = ["${REGISTRY}/${REPO}/apiserver:${BUILD_TAG}"]
 }
 
-target "disperser-release" {
+target "disperser-internal" {
   inherits = ["disperser"]
   tags       = ["${REGISTRY}/eigenda-disperser:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-disperser:${GIT_SHA}",
@@ -98,7 +98,7 @@ target "encoder" {
   tags       = ["${REGISTRY}/${REPO}/encoder:${BUILD_TAG}"]
 }
 
-target "encoder-release" {
+target "encoder-internal" {
   inherits = ["encoder"]
   tags       = ["${REGISTRY}/eigenda-encoder:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-encoder:${GIT_SHA}",
@@ -113,7 +113,7 @@ target "retriever" {
   tags       = ["${REGISTRY}/${REPO}/retriever:${BUILD_TAG}"]
 }
 
-target "retriever-release" {
+target "retriever-internal" {
   inherits = ["retriever"]
   tags       = ["${REGISTRY}/eigenda-retriever:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-retriever:${GIT_SHA}",
@@ -128,7 +128,7 @@ target "churner" {
   tags       = ["${REGISTRY}/${REPO}/churner:${BUILD_TAG}"]
 }
 
-target "churner-release" {
+target "churner-internal" {
   inherits = ["churner"]
   tags       = ["${REGISTRY}/eigenda-churner:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-churner:${GIT_SHA}",
@@ -143,7 +143,7 @@ target "traffic-generator" {
   tags       = ["${REGISTRY}/${REPO}/traffic-generator:${BUILD_TAG}"]
 }
 
-target "traffic-generator-release" {
+target "traffic-generator-internal" {
   inherits = ["traffic-generator"]
   tags       = ["${REGISTRY}/eigenda-traffic-generator:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-traffic-generator:${GIT_SHA}",
@@ -158,7 +158,7 @@ target "dataapi" {
   tags       = ["${REGISTRY}/${REPO}/dataapi:${BUILD_TAG}"]
 }
 
-target "dataapi-release" {
+target "dataapi-internal" {
   inherits = ["dataapi"]
   tags       = ["${REGISTRY}/eigenda-dataapi:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-dataapi:${GIT_SHA}",
@@ -180,7 +180,7 @@ target "node" {
   tags = ["${REGISTRY}/${REPO}/node:${BUILD_TAG}"]
 }
 
-target "node-internal-release" {
+target "node-internal" {
   inherits = ["node"]
   tags       = ["${REGISTRY}/eigenda-node:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-node:${GIT_SHA}",
