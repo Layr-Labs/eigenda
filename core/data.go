@@ -226,21 +226,21 @@ type Blob struct {
 // multiple times (Replay attack).
 type BlobHeader struct {
 	// Commitments
-	encoding.BlobCommitments `json:"commitments"`
+	encoding.BlobCommitments
 	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
-	AccountID AccountID `json:"account_id"`
+	AccountID AccountID
 	// Nonce
-	Nonce uint32 `json:"nonce"`
+	Nonce uint32
 	// AuthenticationData is the signature of the blob header by the account ID
-	AuthenticationData []byte `json:"authentication_data"`
+	AuthenticationData []byte
 }
 
 // BlobRequestHeader contains the original data size of a blob and the security required
 type BlobRequestHeader struct {
 	// BlobAuthHeader
-	BlobHeader `json:"blob_auth_header"`
+	BlobHeader
 	// For a blob to be accepted by EigenDA, it satisfy the AdversaryThreshold of each quorum contained in SecurityParams
-	SecurityParams []*SecurityParam `json:"security_params"`
+	SecurityParams []*SecurityParam
 }
 
 func ValidateSecurityParam(confirmationThreshold, adversaryThreshold uint32) error {
