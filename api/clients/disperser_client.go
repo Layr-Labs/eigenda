@@ -69,10 +69,11 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	// disperser client checks with the accountant; accountant provides payment fields
 	// if cannot pay, error (or attempt anyway without payment info?)
-	binIndex, cumulativePayment, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
+	header, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
 	if err != nil {
 		return nil, nil, err
 	}
+	fmt.Printf("header: %v\n", header)
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
@@ -100,8 +101,6 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
-		BinIndex:            binIndex,
-		CumulativePayment:   cumulativePayment,
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)

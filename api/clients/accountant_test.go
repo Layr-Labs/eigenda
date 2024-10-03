@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser/meterer"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,10 @@ func TestNewAccountant(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
+	defer accountant.Stop()
 
 	assert.Equal(t, reservation, accountant.reservation)
 	assert.Equal(t, onDemand, accountant.onDemand)
@@ -51,33 +55,36 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
+	defer accountant.Stop()
 
 	ctx := context.Background()
 	dataLength := uint64(500)
 	quorums := []uint8{0, 1}
 
-	binIndex, payment, err := accountant.AccountBlob(ctx, dataLength, quorums)
+	header, err := accountant.AccountBlob(ctx, dataLength, quorums)
 
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), binIndex)
-	assert.Equal(t, uint64(0), payment)
+	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, uint64(0), header.CumulativePayment)
 	assert.Equal(t, []uint64{500, 0, 0}, accountant.binUsages)
 
 	dataLength = uint64(700)
 
-	binIndex, payment, err = accountant.AccountBlob(ctx, dataLength, quorums)
+	header, err = accountant.AccountBlob(ctx, dataLength, quorums)
 
 	assert.NoError(t, err)
-	assert.NotEqual(t, 0, binIndex)
-	assert.Equal(t, uint64(0), payment)
+	assert.NotEqual(t, 0, header.BinIndex)
+	assert.Equal(t, uint64(0), header.CumulativePayment)
 	assert.Equal(t, []uint64{1200, 0, 200}, accountant.binUsages)
 
 	// Second call should use on-demand payment
-	binIndex, payment, err = accountant.AccountBlob(ctx, 300, quorums)
+	header, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), binIndex)
-	assert.Equal(t, uint64(3), payment)
+	assert.Equal(t, uint32(0), header.BinIndex)
+	assert.Equal(t, uint64(3), header.CumulativePayment)
 }
 
 func TestAccountBlob_OnDemand(t *testing.T) {
@@ -95,18 +102,21 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
+	defer accountant.Stop()
 
 	ctx := context.Background()
 	dataLength := uint64(1500)
 	quorums := []uint8{0, 1}
 
-	binIndex, payment, err := accountant.AccountBlob(ctx, dataLength, quorums)
+	header, err := accountant.AccountBlob(ctx, dataLength, quorums)
 
 	expectedPayment := uint64(dataLength * uint64(pricePerChargeable) / uint64(minChargeableSize))
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), binIndex)
-	assert.Equal(t, expectedPayment, payment)
+	assert.Equal(t, uint32(0), header.BinIndex)
+	assert.Equal(t, expectedPayment, header.CumulativePayment)
 	assert.Equal(t, []uint64{0, 0, 0}, accountant.binUsages)
 	assert.Equal(t, expectedPayment, accountant.cumulativePayment)
 }
@@ -120,13 +130,16 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	pricePerChargeable := uint32(100)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
+	defer accountant.Stop()
 
 	ctx := context.Background()
 	dataLength := uint64(2000)
 	quorums := []uint8{0, 1}
 
-	_, _, err := accountant.AccountBlob(ctx, dataLength, quorums)
+	_, err = accountant.AccountBlob(ctx, dataLength, quorums)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Accountant cannot approve payment for this blob")
@@ -147,31 +160,34 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	pricePerChargeable := uint32(100)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
+	defer accountant.Stop()
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// First call: Use reservation
-	binIndex, payment, err := accountant.AccountBlob(ctx, 800, quorums)
+	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), binIndex)
-	assert.Equal(t, uint64(0), payment)
+	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, uint64(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
-	binIndex, payment, err = accountant.AccountBlob(ctx, 300, quorums)
+	header, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), binIndex)
-	assert.Equal(t, uint64(0), payment)
+	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, uint64(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
-	binIndex, payment, err = accountant.AccountBlob(ctx, 500, quorums)
+	header, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), binIndex)
-	assert.Equal(t, uint64(500), payment)
+	assert.Equal(t, uint32(0), header.BinIndex)
+	assert.Equal(t, uint64(500), header.CumulativePayment)
 
 	// Fourth call: Insufficient on-demand
-	_, _, err = accountant.AccountBlob(ctx, 600, quorums)
+	_, err = accountant.AccountBlob(ctx, 600, quorums)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Accountant cannot approve payment for this blob")
 }
@@ -190,15 +206,16 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	reservationWindow := uint32(1) // Set to 1 second for testing
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
-
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
 	defer accountant.Stop()
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// First call
-	_, _, err := accountant.AccountBlob(ctx, 800, quorums)
+	_, err = accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{800, 0, 0}, accountant.binUsages)
 
@@ -206,12 +223,12 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Second call after bin rotation
-	_, _, err = accountant.AccountBlob(ctx, 300, quorums)
+	_, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{300, 0, 0}, accountant.binUsages)
 
 	// Third call
-	_, _, err = accountant.AccountBlob(ctx, 500, quorums)
+	_, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{800, 0, 0}, accountant.binUsages)
 }
@@ -231,33 +248,35 @@ func TestBinRotation(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
 	defer accountant.Stop()
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// First call
-	_, _, err := accountant.AccountBlob(ctx, 800, quorums)
+	_, err = accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{800, 0, 0}, accountant.binUsages)
 
 	// Second call for overflow
-	_, _, err = accountant.AccountBlob(ctx, 800, quorums)
+	_, err = accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1600, 0, 600}, accountant.binUsages)
 
 	// Wait for bin rotation
 	time.Sleep(1200 * time.Millisecond)
 
-	_, _, err = accountant.AccountBlob(ctx, 300, quorums)
+	_, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{300, 600, 0}, accountant.binUsages)
 
 	// another bin rotation
 	time.Sleep(1200 * time.Millisecond)
 
-	_, _, err = accountant.AccountBlob(ctx, 500, quorums)
+	_, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1100, 0, 100}, accountant.binUsages)
 }
@@ -277,7 +296,9 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -290,7 +311,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 5; j++ {
-				_, _, err := accountant.AccountBlob(ctx, 100, quorums)
+				_, err := accountant.AccountBlob(ctx, 100, quorums)
 				assert.NoError(t, err)
 				time.Sleep(500 * time.Millisecond)
 			}
@@ -319,29 +340,31 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
-
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
+	defer accountant.Stop()
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// Okay reservation
-	binIndex, payment, err := accountant.AccountBlob(ctx, 800, quorums)
+	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), binIndex)
-	assert.Equal(t, uint64(0), payment)
+	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, uint64(0), header.CumulativePayment)
 	assert.Equal(t, []uint64{800, 0, 0}, accountant.binUsages)
 
 	// Second call: Allow one overflow
-	_, payment, err = accountant.AccountBlob(ctx, 500, quorums)
+	header, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), payment)
+	assert.Equal(t, uint64(0), header.CumulativePayment)
 	assert.Equal(t, []uint64{1300, 0, 300}, accountant.binUsages)
 
 	// Third call: Should use on-demand payment
-	binIndex, payment, err = accountant.AccountBlob(ctx, 200, quorums)
+	header, err = accountant.AccountBlob(ctx, 200, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), binIndex)
-	assert.Equal(t, uint64(2), payment)
+	assert.Equal(t, uint32(0), header.BinIndex)
+	assert.Equal(t, uint64(2), header.CumulativePayment)
 	assert.Equal(t, []uint64{1300, 0, 300}, accountant.binUsages)
 }
 
@@ -360,27 +383,30 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(100)
 
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize)
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, privateKey1)
 	defer accountant.Stop()
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// full reservation
-	_, _, err := accountant.AccountBlob(ctx, 1000, quorums)
+	_, err = accountant.AccountBlob(ctx, 1000, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1000, 0, 0}, accountant.binUsages)
 
 	// no overflow
-	_, payment, err := accountant.AccountBlob(ctx, 500, quorums)
+	header, err := accountant.AccountBlob(ctx, 500, quorums)
+	assert.NoError(t, err)
 	assert.Equal(t, []uint64{1000, 0, 0}, accountant.binUsages)
-	assert.Equal(t, uint64(5), payment)
+	assert.Equal(t, uint64(5), header.CumulativePayment)
 
 	// Wait for bin rotation
 	time.Sleep(1500 * time.Millisecond)
 
 	// Third call: Should use new bin and allow overflow again
-	_, _, err = accountant.AccountBlob(ctx, 500, quorums)
+	_, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, []uint64{500, 0, 0}, accountant.binUsages)
 }

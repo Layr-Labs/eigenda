@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/meterer"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -80,7 +81,13 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,
 	}
-	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerChargeable, minChargeableSize)
+
+	privateKey, err := crypto.HexToECDSA(config.SignerPrivateKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerChargeable, minChargeableSize, privateKey)
 
 	llClient := NewDisperserClient(llConfig, signer, accountant)
 
