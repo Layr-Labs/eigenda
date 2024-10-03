@@ -10,12 +10,10 @@ import (
 // randomMetadata generates a random BlobMetadata instance.
 func randomMetadata(t *testing.T, permits int) *BlobMetadata {
 	key := make([]byte, 32)
-	batchHeaderHash := [32]byte{}
 	checksum := [16]byte{}
 	_, _ = rand.Read(key)
 	_, _ = rand.Read(checksum[:])
-	_, _ = rand.Read(batchHeaderHash[:])
-
+	batchHeaderHash := [32]byte{}
 	metadata, err := NewBlobMetadata(key, checksum, 1024, 0, batchHeaderHash, permits)
 	assert.Nil(t, err)
 
