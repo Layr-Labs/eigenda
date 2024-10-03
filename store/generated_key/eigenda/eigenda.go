@@ -147,6 +147,6 @@ func (e Store) Verify(key []byte, value []byte) error {
 		return fmt.Errorf("failed to verify commitment: %w", err)
 	}
 
-	// verify DA certificate against on-chain
+	// verify DA certificate against EigenDA's batch metadata that's bridged to Ethereum
 	return e.verifier.VerifyCert(&cert)
 }

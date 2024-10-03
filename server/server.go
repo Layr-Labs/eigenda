@@ -261,8 +261,10 @@ func (svr *Server) HandlePut(w http.ResponseWriter, r *http.Request) (commitment
 	}
 
 	svr.log.Info(fmt.Sprintf("response commitment: %x\n", responseCommit))
-	// write out encoded commitment
-	svr.WriteResponse(w, responseCommit)
+	// write commitment to resp body if not in OptimismKeccak mode
+	if meta.Mode != commitments.OptimismKeccak {
+		svr.WriteResponse(w, responseCommit)
+	}
 	return meta, nil
 }
 

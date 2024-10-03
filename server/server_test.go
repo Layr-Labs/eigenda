@@ -242,7 +242,7 @@ func TestPutHandler(t *testing.T) {
 				mockRouter.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
 			expectedCode:           http.StatusOK,
-			expectedBody:           opKeccakPrefix + testCommitStr,
+			expectedBody:           "",
 			expectError:            false,
 			expectedCommitmentMeta: commitments.CommitmentMeta{Mode: commitments.OptimismKeccak, CertVersion: 0},
 		},
@@ -274,8 +274,12 @@ func TestPutHandler(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.Equal(t, tt.expectedCode, rec.Code)
-			if !tt.expectError {
+			if !tt.expectError && tt.expectedBody != "" {
 				require.Equal(t, []byte(tt.expectedBody), rec.Body.Bytes())
+			}
+
+			if !tt.expectError && tt.expectedBody == "" {
+				require.Equal(t, []byte(nil), rec.Body.Bytes())
 			}
 			require.Equal(t, tt.expectedCommitmentMeta, meta)
 		})
