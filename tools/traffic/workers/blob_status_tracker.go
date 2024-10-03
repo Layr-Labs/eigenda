@@ -209,11 +209,8 @@ func (tracker *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperser
 	if err != nil {
 		tracker.getStatusErrorCountMetric.Increment()
 		return nil, err
-	} else {
-		end := time.Now()
-		duration := end.Sub(start)
-		tracker.getStatusLatencyMetric.ReportLatency(duration)
 	}
+	tracker.getStatusLatencyMetric.ReportLatency(time.Since(start))
 
 	return status, nil
 }

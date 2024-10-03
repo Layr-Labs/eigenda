@@ -110,7 +110,7 @@ func (r *BlobReader) Start() {
 			case <-(*r.ctx).Done():
 				err := (*r.ctx).Err()
 				if err != nil {
-					r.logger.Info("blob r context closed", "err:", err)
+					r.logger.Info("blob reader context closed", "err:", err)
 				}
 				return
 			case <-ticker.C:
@@ -144,11 +144,8 @@ func (r *BlobReader) randomRead() {
 		r.logger.Error("failed to get batch header", "err:", err)
 		r.metrics.fetchBatchHeaderFailure.Increment()
 		return
-	} else {
-		end := time.Now()
-		duration := end.Sub(start)
-		r.metrics.fetchBatchHeaderMetric.ReportLatency(duration)
 	}
+	r.metrics.fetchBatchHeaderMetric.ReportLatency(time.Since(start))
 
 	r.metrics.fetchBatchHeaderSuccess.Increment()
 
@@ -167,11 +164,9 @@ func (r *BlobReader) randomRead() {
 		r.logger.Error("failed to read chunks", "err:", err)
 		r.metrics.readFailureMetric.Increment()
 		return
-	} else {
-		end := time.Now()
-		duration := end.Sub(start)
-		r.metrics.readLatencyMetric.ReportLatency(duration)
 	}
+	r.metrics.readLatencyMetric.ReportLatency(time.Since(start))
+
 	r.metrics.readSuccessMetric.Increment()
 
 	assignments := chunks.Assignments
