@@ -52,7 +52,7 @@ group "ci-release" {
 
 # internal devops builds
 group "internal-release" {
-  targets = ["batcher-release", "disperser-release", "encoder-release", "churner-release", "dataapi-release"]
+  targets = ["batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release"]
 }
 
 
@@ -113,6 +113,14 @@ target "retriever" {
   dockerfile = "./Dockerfile"
   target     = "retriever"
   tags       = ["${REGISTRY}/${REPO}/retriever:${BUILD_TAG}"]
+}
+
+target "retriever-release" {
+  inherits = ["retriever"]
+  tags       = ["${REGISTRY}/${REPO}/eigenda-retriever:${BUILD_TAG}",
+                "${REGISTRY}/${REPO}/eigenda-retriever:${GIT_SHA}",
+                "${REGISTRY}/${REPO}/eigenda-retriever:sha-${GIT_SHORT_SHA}",
+               ]
 }
 
 target "churner" {
