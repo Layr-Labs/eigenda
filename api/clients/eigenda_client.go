@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/log"
@@ -41,7 +42,15 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, fmt.Errorf("failed to parse EigenDA RPC: %w", err)
 	}
 
-	signer := auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
+	var signer core.BlobRequestSigner
+	if len(config.SignerPrivateKeyHex) == 64 {
+		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
+	} else if len(config.SignerPrivateKeyHex) == 0 {
+		signer = auth.NewLocalNoopSigner()
+	} else {
+		return nil, fmt.Errorf("invalid length for signer private key")
+	}
+
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	llClient := NewDisperserClient(llConfig, signer)
 

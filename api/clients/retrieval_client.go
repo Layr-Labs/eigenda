@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/wealdtech/go-merkletree/v2"
 
 	"github.com/gammazero/workerpool"
-	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 

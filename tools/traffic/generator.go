@@ -115,7 +115,6 @@ func NewTrafficGenerator(config *config.Config) (*Generator, error) {
 			&ctx,
 			&waitGroup,
 			logger,
-			workers.NewTicker(config.WorkerConfig.ReadRequestInterval),
 			&config.WorkerConfig,
 			retriever,
 			chainClient,

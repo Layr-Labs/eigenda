@@ -192,13 +192,6 @@ var (
 		Value:    3.0,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "REQUIRED_DOWNLOADS"),
 	}
-	ReadOverflowTableSizeFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "read-overflow-table-size"),
-		Usage:    "Size of the overflow table for read requests.",
-		Required: false,
-		Value:    1024,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "READ_OVERFLOW_TABLE_SIZE"),
-	}
 	FetchBatchHeaderTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "fetch-batch-header-timeout"),
 		Usage:    "Amount of time to wait for a batch header to be fetched.",
@@ -243,7 +236,6 @@ var optionalFlags = []cli.Flag{
 	FetchBatchHeaderTimeoutFlag,
 	RetrieveBlobChunksTimeoutFlag,
 	GetBlobStatusTimeoutFlag,
-	ReadOverflowTableSizeFlag,
 	WriteTimeoutFlag,
 	VerificationChannelCapacityFlag,
 }

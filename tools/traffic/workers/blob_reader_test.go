@@ -1,22 +1,26 @@
-package test
+package workers
 
 import (
 	"context"
 	"crypto/md5"
+	"github.com/Layr-Labs/eigenda/api/clients"
+	apiMock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	retrieverMock "github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
-	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/rand"
 	"sync"
 	"testing"
 	"time"
 )
 
-// TestBlobReaderNoOptionalReads tests the BlobReader's basic functionality
+// TestBlobReaderNoOptionalReads tests the BlobReader's basic functionality'
 func TestBlobReader(t *testing.T) {
 	tu.InitializeRandom()
 
@@ -24,27 +28,26 @@ func TestBlobReader(t *testing.T) {
 	waitGroup := sync.WaitGroup{}
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.Nil(t, err)
-	startTime := time.Unix(rand.Int63()%2_000_000_000, 0)
-	ticker := newMockTicker(startTime)
-
-	config := &config.WorkerConfig{
-		ReadOverflowTableSize: 0,
-	}
 
 	blobTable := table.NewBlobStore()
 
 	readerMetrics := metrics.NewMockMetrics()
 
-	lock := sync.Mutex{}
-	chainClient := newMockChainClient(&lock)
-	retrievalClient := newMockRetrievalClient(t, &lock)
+	chainClient := &retrieverMock.MockChainClient{}
+	chainClient.On(
+		"FetchBatchHeader",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(&binding.IEigenDAServiceManagerBatchHeader{}, nil)
+	retrievalClient := &apiMock.MockRetrievalClient{}
 
-	blobReader := workers.NewBlobReader(
+	blobReader := NewBlobReader(
 		&ctx,
 		&waitGroup,
 		logger,
-		ticker,
-		config,
+		&config.WorkerConfig{},
 		retrievalClient,
 		chainClient,
 		blobTable,
@@ -90,23 +93,28 @@ func TestBlobReader(t *testing.T) {
 			readPermits)
 		assert.Nil(t, err)
 
-		retrievalClient.AddBlob(blobMetadata, blobData)
+		// Simplify tracking by hijacking the BlobHeaderLength field to store the blob index,
+		// which is used as a unique identifier within this test.
+		chunks := &clients.BlobChunks{BlobHeaderLength: blobMetadata.BlobIndex}
+		retrievalClient.On("RetrieveBlobChunks",
+			blobMetadata.BatchHeaderHash,
+			uint32(blobMetadata.BlobIndex),
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).Return(chunks, nil)
+		retrievalClient.On("CombineChunks", chunks).Return(blobData, nil)
 
 		blobTable.Add(blobMetadata)
 	}
 
-	blobReader.Start()
-
 	// Do a bunch of reads.
 	expectedTotalReads := uint(readPermits * blobCount)
 	for i := uint(0); i < expectedTotalReads; i++ {
-		ticker.Tick(time.Second)
+		blobReader.randomRead()
 
-		tu.AssertEventuallyTrue(t, func() bool {
-			return retrievalClient.RetrieveBlobChunksCount == i+1 &&
-				retrievalClient.CombineChunksCount == i+1 &&
-				chainClient.Count == i+1
-		}, time.Second)
+		chainClient.AssertNumberOfCalls(t, "FetchBatchHeader", int(i+1))
+		retrievalClient.AssertNumberOfCalls(t, "RetrieveBlobChunks", int(i+1))
+		retrievalClient.AssertNumberOfCalls(t, "CombineChunks", int(i+1))
 
 		remainingPermits := uint(0)
 		for _, metadata := range blobTable.GetAll() {
@@ -114,29 +122,22 @@ func TestBlobReader(t *testing.T) {
 		}
 		assert.Equal(t, remainingPermits, expectedTotalReads-i-1)
 
-		tu.AssertEventuallyTrue(t, func() bool {
-			return uint(readerMetrics.GetCount("read_success")) == i+1 &&
-				uint(readerMetrics.GetCount("fetch_batch_header_success")) == i+1 &&
-				uint(readerMetrics.GetCount("recombination_success")) == i+1
-		}, time.Second)
+		assert.Equal(t, i+1, uint(readerMetrics.GetCount("read_success")))
+		assert.Equal(t, i+1, uint(readerMetrics.GetCount("fetch_batch_header_success")))
+		assert.Equal(t, i+1, uint(readerMetrics.GetCount("recombination_success")))
 	}
 
 	expectedInvalidBlobs := uint(invalidBlobCount * readPermits)
 	expectedValidBlobs := expectedTotalReads - expectedInvalidBlobs
-	tu.AssertEventuallyEquals(t, expectedValidBlobs,
-		func() any {
-			return uint(readerMetrics.GetCount("valid_blob"))
-		}, time.Second)
-	tu.AssertEventuallyEquals(t, expectedInvalidBlobs,
-		func() any {
-			return uint(readerMetrics.GetCount("invalid_blob"))
-		}, time.Second)
 
+	assert.Equal(t, expectedValidBlobs, uint(readerMetrics.GetCount("valid_blob")))
+	assert.Equal(t, expectedInvalidBlobs, uint(readerMetrics.GetCount("invalid_blob")))
 	assert.Equal(t, uint(0), uint(readerMetrics.GetGaugeValue("required_read_pool_size")))
 	assert.Equal(t, uint(0), uint(readerMetrics.GetGaugeValue("optional_read_pool_size")))
 
-	// Table is empty, so ticking time forward should not result in any reads.
-	ticker.Tick(time.Second)
+	// Table is empty, so doing a random read should have no effect.
+	blobReader.randomRead()
+
 	// Give the system a moment to attempt to do work. This should not result in any reads.
 	time.Sleep(time.Second / 10)
 	assert.Equal(t, expectedTotalReads, uint(readerMetrics.GetCount("read_success")))
@@ -146,7 +147,4 @@ func TestBlobReader(t *testing.T) {
 	assert.Equal(t, expectedInvalidBlobs, uint(readerMetrics.GetCount("invalid_blob")))
 
 	cancel()
-	tu.ExecuteWithTimeout(func() {
-		waitGroup.Wait()
-	}, time.Second)
 }

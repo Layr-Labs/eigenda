@@ -99,7 +99,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			NumReadInstances:             ctx.GlobalUint(NumReadInstancesFlag.Name),
 			ReadRequestInterval:          ctx.Duration(ReadRequestIntervalFlag.Name),
 			RequiredDownloads:            ctx.Float64(RequiredDownloadsFlag.Name),
-			ReadOverflowTableSize:        ctx.Uint(ReadOverflowTableSizeFlag.Name),
 			FetchBatchHeaderTimeout:      ctx.Duration(FetchBatchHeaderTimeoutFlag.Name),
 			RetrieveBlobChunksTimeout:    ctx.Duration(RetrieveBlobChunksTimeoutFlag.Name),
 			StatusTrackerChannelCapacity: ctx.Uint(VerificationChannelCapacityFlag.Name),

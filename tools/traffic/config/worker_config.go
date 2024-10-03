@@ -31,10 +31,6 @@ type WorkerConfig struct {
 	// 0 or 1 times with the specified probability (e.g. 0.2 means each blob has a 20% chance of being downloaded).
 	// If greater than 1.0, then each blob will be downloaded the specified number of times.
 	RequiredDownloads float64
-	// The size of a table of blobs to optionally read when we run out of blobs that we are required to read. Blobs
-	// that are no longer required are added to this table, and when the table is at capacity they are randomly retired.
-	// Set this to 0 to disable this feature.
-	ReadOverflowTableSize uint
 	// The amount of time to wait for a batch header to be fetched.
 	FetchBatchHeaderTimeout time.Duration
 	// The amount of time to wait for a blob to be retrieved.

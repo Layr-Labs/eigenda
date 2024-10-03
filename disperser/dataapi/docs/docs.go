@@ -610,6 +610,31 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/operators-info/semver-scan": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Active operator semver scan",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.SemverReportResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -849,6 +874,17 @@ const docTemplate = `{
                 },
                 "meta": {
                     "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.SemverReportResponse": {
+            "type": "object",
+            "properties": {
+                "semver": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
                 }
             }
         },

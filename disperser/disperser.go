@@ -132,7 +132,7 @@ type BlobStoreExclusiveStartKey struct {
 	BlobHash     BlobHash
 	MetadataHash MetadataHash
 	BlobStatus   int32 // BlobStatus is an integer
-	RequestedAt  int64 //  RequestedAt is epoch time in seconds
+	Expiry       int64 // Expiry is epoch time in seconds
 }
 
 type BatchIndexExclusiveStartKey struct {

@@ -59,6 +59,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
