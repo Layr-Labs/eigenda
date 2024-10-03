@@ -72,9 +72,9 @@ target "batcher" {
 
 target "batcher-release" {
   inherits = ["batcher"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-batcher:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-batcher:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-batcher:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-batcher:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-batcher:${GIT_SHA}",
+                "${REGISTRY}/eigenda-batcher:sha-${GIT_SHORT_SHA}",
                ]
 }
 
@@ -87,9 +87,9 @@ target "disperser" {
 
 target "disperser-release" {
   inherits = ["disperser"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-disperser:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-disperser:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-disperser:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-disperser:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-disperser:${GIT_SHA}",
+                "${REGISTRY}/eigenda-disperser:sha-${GIT_SHORT_SHA}",
                ]
 }
 
@@ -102,9 +102,9 @@ target "encoder" {
 
 target "encoder-release" {
   inherits = ["encoder"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-encoder:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-encoder:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-encoder:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-encoder:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-encoder:${GIT_SHA}",
+                "${REGISTRY}/eigenda-encoder:sha-${GIT_SHORT_SHA}",
                ]
 }
 
@@ -117,9 +117,9 @@ target "retriever" {
 
 target "retriever-release" {
   inherits = ["retriever"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-retriever:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-retriever:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-retriever:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-retriever:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-retriever:${GIT_SHA}",
+                "${REGISTRY}/eigenda-retriever:sha-${GIT_SHORT_SHA}",
                ]
 }
 
@@ -132,9 +132,9 @@ target "churner" {
 
 target "churner-release" {
   inherits = ["churner"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-churner:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-churner:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-churner:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-churner:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-churner:${GIT_SHA}",
+                "${REGISTRY}/eigenda-churner:sha-${GIT_SHORT_SHA}",
                ]
 }
 
@@ -147,9 +147,9 @@ target "traffic-generator" {
 
 target "traffic-generator-release" {
   inherits = ["traffic-generator"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-traffic-generator:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-traffic-generator:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-traffic-generator:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-traffic-generator:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-traffic-generator:${GIT_SHA}",
+                "${REGISTRY}/eigenda-traffic-generator:sha-${GIT_SHORT_SHA}",
                ]
 }
 
@@ -162,9 +162,9 @@ target "dataapi" {
 
 target "dataapi-release" {
   inherits = ["dataapi"]
-  tags       = ["${REGISTRY}/${REPO}/eigenda-dataapi:${BUILD_TAG}",
-                "${REGISTRY}/${REPO}/eigenda-dataapi:${GIT_SHA}",
-                "${REGISTRY}/${REPO}/eigenda-dataapi:sha-${GIT_SHORT_SHA}",
+  tags       = ["${REGISTRY}/eigenda-dataapi:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-dataapi:${GIT_SHA}",
+                "${REGISTRY}/eigenda-dataapi:sha-${GIT_SHORT_SHA}",
                ]
 }
 
