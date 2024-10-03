@@ -3,6 +3,7 @@ package deploy
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"os"
@@ -91,7 +92,7 @@ func (env *Config) deployEigenDAContracts() {
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	writeFile("script/eigenda_deploy_config.json", data)
+	writeFile("script/input/eigenda_deploy_config.json", data)
 
 	execForgeScript("script/SetUpEigenDA.s.sol:SetupEigenDA", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, nil)
 
@@ -126,7 +127,7 @@ func (env *Config) DeployExperiment() {
 		log.Panicf("error opening file: %v", err)
 	}
 	defer f.Close()
-	log.SetOutput(f)
+	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
 	// Create a new experiment and deploy the contracts
 

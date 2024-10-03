@@ -160,6 +160,7 @@ func execForgeScript(script, privateKey string, deployer *ContractDeployer, extr
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
+	log.Println("Executing forge script with command: ", cmd.String())
 	err := cmd.Run()
 	if err != nil {
 		log.Panicf("Failed to execute forge script: %s\n Err: %s\n--- std out ---\n%s\n--- std err ---\n%s\n",

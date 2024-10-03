@@ -41,10 +41,17 @@ jobs:
         run: ./test.sh -coverprofile=coverage.out
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: coverage
           path: coverage.out
+
+      - name: Extract coverage
+        shell: bash
+        run: |
+          COVERAGE=$(go tool cover -func="coverage.out" | tail -1 | grep -Eo '[0-9]+\.[0-9]')
+          echo "coverage: $COVERAGE% of statements"
+
 
   coverage-report:
     name: Coverage Report

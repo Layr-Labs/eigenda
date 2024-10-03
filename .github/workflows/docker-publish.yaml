@@ -47,12 +47,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build And Push Image
-      - name: Build Docker image
-        run: docker compose -f docker-compose-internal.yaml build
-      - name: Push Docker image
+      # Build And Push Images
+      - name: Build Docker images
+        run: docker buildx bake
+      - name: Push Docker images
         if: github.ref == 'refs/heads/master'
-        run: docker compose -f docker-compose-internal.yaml push
+        run: docker buildx bake --push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}

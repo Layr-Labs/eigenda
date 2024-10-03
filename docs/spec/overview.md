@@ -66,7 +66,7 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 
 **Bridging**. For a DA attestation to be consumed by the L2 end-user (e.g. a rollup), the it must be bridged to a chain from which the L2 can read. This might simply be the Ethereum L1 itself, but in many cases it is more economical to bridge directly into the L2 since this drastically decreases signature verification costs. For the time being all attestations are bridged to the L1 by the disperser. 
 
-**Retrieval**. Interested parties such as rollup challengers that want to obtain rollup blob data can retrieve a blob by downloading the encoded chunks from the DA nodes and decoding them. The blob lookup information contained in the request is obtained from the from the bridged attestation to the DA nodes.
+**Retrieval**. Interested parties such as rollup challengers that want to obtain rollup blob data can retrieve a blob by downloading the encoded chunks from the DA nodes and decoding them. The blob lookup information contained in the request is obtained from the bridged attestation to the DA nodes.
 
 
 ## Protocol Overview

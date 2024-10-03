@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/status"
 	"math/rand"
 	"net"
 	"slices"
@@ -133,14 +134,14 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
+		return api.NewInvalidArgError(fmt.Sprintf("failed to decode account ID (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", blob.RequestHeader.AccountID, err))
+		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", hexutil.Encode(publicKeyBytes), err))
 	}
 
 	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
@@ -771,6 +772,10 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	return &pb.RetrieveBlobReply{
 		Data: data,
 	}, nil
+}
+
+func (s *DispersalServer) GetChunk(context.Context, *pb.GetChunkRequest) (*pb.GetChunkReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 
 func (s *DispersalServer) GetRateConfig() *RateConfig {
