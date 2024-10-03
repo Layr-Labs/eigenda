@@ -141,7 +141,7 @@ target "churner-release" {
 target "traffic-generator" {
   context    = "."
   dockerfile = "./trafficgenerator.Dockerfile"
-  target     = "trafficgenerator"
+  target     = "traffic-generator"
   tags       = ["${REGISTRY}/${REPO}/traffic-generator:${BUILD_TAG}"]
 }
 
