@@ -15,12 +15,14 @@ variable "SEMVER" {
   default = "v0.0.0"
 }
 
+# Release targets will fail if GIT_SHA env is not exported. See Makefile:docker-release-build
 variable "GIT_SHA" {
-  default = "$GIT_SHA"
+  default = "$GIT_SHA NOT DEFINED"
 }
 
+# Release targets will fail if GIT_SHORT_SHA env is not exported. See Makefile:docker-release-build
 variable "GIT_SHORT_SHA" {
-  default = "$GIT_SHORT_SHA"
+  default = "$GIT_SHORT_SHA NOT DEFINED"
 }
 
 variable "GITDATE" {
@@ -53,7 +55,7 @@ group "ci-release" {
 
 # Internal devops builds
 group "internal-release" {
-  targets = ["node-internal", "batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release", "traffic-generator-release"]
+  targets = ["node-internal-release", "batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release", "traffic-generator-release"]
 }
 
 
@@ -178,7 +180,7 @@ target "node" {
   tags = ["${REGISTRY}/${REPO}/node:${BUILD_TAG}"]
 }
 
-target "node-internal" {
+target "node-internal-release" {
   inherits = ["node"]
   tags       = ["${REGISTRY}/eigenda-node:${BUILD_TAG}",
                 "${REGISTRY}/eigenda-node:${GIT_SHA}",
