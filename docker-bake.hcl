@@ -41,25 +41,21 @@ group "node-group" {
   targets = ["node", "nodeplugin"]
 }
 
+# Github public releases
 group "node-group-release" {
   targets = ["node-release", "nodeplugin-release"]
 }
 
-# CI builds
+# Github CI builds
 group "ci-release" {
   targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi"]
 }
 
-# internal devops builds
+# Internal devops builds
 group "internal-release" {
-  targets = ["batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release"]
+  targets = ["node-internal", "batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release"]
 }
 
-
-# DOCKER METADATA TARGET
-# See https://github.com/docker/metadata-action?tab=readme-ov-file#bake-definition
-
-target "docker-metadata-action" {}
 
 # DISPERSER TARGETS
 
@@ -171,7 +167,6 @@ target "dataapi-release" {
 # NODE TARGETS
 
 target "node" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
@@ -183,15 +178,22 @@ target "node" {
   tags = ["${REGISTRY}/${REPO}/node:${BUILD_TAG}"]
 }
 
+target "node-internal" {
+  inherits = ["node"]
+  tags       = ["${REGISTRY}/eigenda-node:${BUILD_TAG}",
+                "${REGISTRY}/eigenda-node:${GIT_SHA}",
+                "${REGISTRY}/eigenda-node:sha-${GIT_SHORT_SHA}",
+               ]
+}
+
 target "nodeplugin" {
-  inherits = ["docker-metadata-action"]
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "nodeplugin"
   tags       = ["${REGISTRY}/${REPO}/nodeplugin:${BUILD_TAG}"]
 }
 
-# RELEASE TARGETS
+# PUBLIC RELEASE TARGETS
 
 target "_release" {
   platforms = ["linux/amd64", "linux/arm64"]
