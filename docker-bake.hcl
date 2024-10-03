@@ -16,11 +16,11 @@ variable "SEMVER" {
 }
 
 variable "GIT_SHA" {
-  default = ""
+  default = "$GIT_SHA"
 }
 
 variable "GIT_SHORT_SHA" {
-  default = ""
+  default = "$GIT_SHORT_SHA"
 }
 
 variable "GITDATE" {
@@ -53,7 +53,7 @@ group "ci-release" {
 
 # Internal devops builds
 group "internal-release" {
-  targets = ["node-internal", "batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release"]
+  targets = ["node-internal", "batcher-release", "disperser-release", "encoder-release", "retriever-release", "churner-release", "dataapi-release", "traffic-generator-release"]
 }
 
 
