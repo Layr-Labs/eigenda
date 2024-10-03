@@ -41,16 +41,18 @@ type DisperserClient interface {
 }
 
 type disperserClient struct {
-	config *Config
-	signer core.BlobRequestSigner
+	config     *Config
+	signer     core.BlobRequestSigner
+	accountant Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
 
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner) DisperserClient {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant Accountant) DisperserClient {
 	return &disperserClient{
-		config: config,
-		signer: signer,
+		config:     config,
+		signer:     signer,
+		accountant: accountant,
 	}
 }
 
@@ -65,6 +67,13 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 }
 
 func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	// disperser client checks with the accountant; accountant provides payment fields
+	// if cannot pay, error (or attempt anyway without payment info?)
+	binIndex, cumulativePayment, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -91,6 +100,8 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	request := &disperser_rpc.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
+		BinIndex:            binIndex,
+		CumulativePayment:   cumulativePayment,
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)

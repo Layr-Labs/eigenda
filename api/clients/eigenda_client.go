@@ -12,6 +12,7 @@ import (
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -21,11 +22,32 @@ type IEigenDAClient interface {
 	GetCodec() codecs.BlobCodec
 }
 
+// type Accountant struct {
+// 	reservation meterer.ActiveReservation
+// 	onDemand    meterer.OnDemandPayment
+// 	// contains 3 bins; 0 for current bin, 1 for next bin, 2 for overflowed bin
+// 	binUsages         []uint64
+// 	cumulativePayment uint64
+// }
+
+// func NewAccountant(reservation meterer.ActiveReservation, onDemand meterer.OnDemandPayment) *Accountant {
+// 	return &Accountant{
+// 		reservation: reservation,
+// 		onDemand:    onDemand,
+// 		// add cache for local states
+// 		// concurrent thread to update bin usage every binInterval
+// 		// delete bin0, shift bin_i to bin_{i-1}, add 0 to bin2
+// 		binUsages:         []uint64{0, 0, 0},
+// 		cumulativePayment: 0,
+// 	}
+// }
+
 type EigenDAClient struct {
-	Config EigenDAClientConfig
-	Log    log.Logger
-	Client DisperserClient
-	Codec  codecs.BlobCodec
+	Config     EigenDAClientConfig
+	Log        log.Logger
+	Client     DisperserClient
+	Codec      codecs.BlobCodec
+	accountant Accountant
 }
 
 var _ IEigenDAClient = EigenDAClient{}
@@ -43,7 +65,24 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 
 	signer := auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
-	llClient := NewDisperserClient(llConfig, signer)
+	// use an eth-rpc to grab on-chain information from payment chain-state
+	// Mock for now
+	binInterval := uint32(time.Minute.Seconds())
+	pricePerChargeable := uint32(1)
+	minChargeableSize := uint32(1)
+	reservation := meterer.ActiveReservation{
+		DataRate:      100,
+		StartEpoch:    meterer.GetCurrentBinIndex(binInterval),
+		EndEpoch:      meterer.GetCurrentBinIndex(binInterval) + 120,
+		QuorumSplit:   []byte{50, 50},
+		QuorumNumbers: []uint8{0, 1},
+	}
+	onDemand := meterer.OnDemandPayment{
+		CumulativePayment: 1000,
+	}
+	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerChargeable, minChargeableSize)
+
+	llClient := NewDisperserClient(llConfig, signer, accountant)
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {

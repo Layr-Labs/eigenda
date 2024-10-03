@@ -181,7 +181,7 @@ func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveRes
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, reservation *ActiveReservation) error {
 	//todo: sizes use uint64?
-	recordedSize := max(blobHeader.DataLength, uint32(m.MinChargeableSize))
+	recordedSize := uint64(max(blobHeader.DataLength, uint32(m.MinChargeableSize)))
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex), recordedSize)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
@@ -201,7 +201,8 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 	return fmt.Errorf("Overflow usage exceeds bin limit")
 }
 
-// GetCurrentBinIndex returns the current bin index based on time
+// GetCurrentBinIndex returns the current bin index by chunking time by the bin interval;
+// bin interval used by the disperser should be public information
 func GetCurrentBinIndex(binInterval uint32) uint32 {
 	currentTime := time.Now().Unix()
 	return uint32(currentTime) / binInterval

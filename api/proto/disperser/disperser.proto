@@ -94,6 +94,12 @@ message DisperseBlobRequest {
 	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
 	// corresponding to the key used by the client to sign the BlobAuthHeader.
 	string account_id = 3;
+
+	// The bin index of the blob.
+	uint32 bin_index = 6;
+	// The cumulative payment of the blob.
+	uint64 cumulative_payment = 7;
+
 }
 
 message DisperseBlobReply {

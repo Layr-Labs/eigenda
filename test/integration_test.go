@@ -200,7 +200,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	meterConfig := meterer.Config{
 		PricePerChargeable:   1,
 		GlobalBytesPerSecond: 1000,
-		ReservationWindow:    time.Minute,
+		ReservationWindow:    uint32(60),
 	}
 
 	paymentChainState := meterer.NewOnchainPaymentState()

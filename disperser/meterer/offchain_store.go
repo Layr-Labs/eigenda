@@ -66,7 +66,7 @@ type GlobalBin struct {
 	UpdatedAt time.Time
 }
 
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID string, binIndex uint64, size uint32) (uint32, error) {
+func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID string, binIndex uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID},
 		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
@@ -96,7 +96,7 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}
 
-	return uint32(binUsageValue), nil
+	return binUsageValue, nil
 }
 
 func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, size uint32) (uint64, error) {
