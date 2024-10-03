@@ -34,6 +34,3 @@ run: build
 	TRAFFIC_GENERATOR_CHAIN_RPC=http://localhost:8545 \
 	TRAFFIC_GENERATOR_NUM_RETRIES=2 \
 	./bin/server
-
-
-# TODO figure out what the appropriate values are for this prior to merging. These are the values that worked for me locally.
