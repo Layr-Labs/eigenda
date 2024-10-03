@@ -10,10 +10,10 @@ import (
 	"sort"
 )
 
-// Table ID 0 is reserved for use internal use by the metadata table.
+// The table ID reserved for the metadata table.
 const metadataTableID uint32 = math.MaxUint32
 
-// Table ID 1 is reserved for use by the namespace table. This stores a mapping between IDs and table names.
+// The table ID reserved for the namespace table.
 const namespaceTableID uint32 = math.MaxUint32 - 1
 
 // The number of tables reserved for internal use.

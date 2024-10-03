@@ -25,8 +25,6 @@ type Table interface {
 //
 // Implementations of this interface are expected to be thread-safe, except where noted.
 type TableStore interface {
-	// BatchOperator allows for batch operations that span multiple tables.
-	BatchOperator[TableKey]
 
 	// GetTable gets the table with the given name. If the table does not exist, it is first created.
 	//

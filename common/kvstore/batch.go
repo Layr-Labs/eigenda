@@ -12,9 +12,3 @@ type Batch[T any] interface {
 	// Size returns the number of operations in the batch.
 	Size() uint32
 }
-
-// BatchOperator is an interface for creating new batches.
-type BatchOperator[T any] interface {
-	// NewBatch creates a new batch that can be used to perform multiple operations atomically.
-	NewBatch() Batch[T]
-}
