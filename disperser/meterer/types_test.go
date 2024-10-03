@@ -23,8 +23,6 @@ func TestEIP712Signer(t *testing.T) {
 	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
 
 	header := &meterer.BlobHeader{
-		Version:           1,
-		Nonce:             1,
 		BinIndex:          0,
 		CumulativePayment: 1000,
 		Commitment:        *commitment,
@@ -63,8 +61,6 @@ func TestConstructBlobHeader(t *testing.T) {
 
 	header, err := meterer.ConstructBlobHeader(
 		signer,
-		1,           // version
-		1,           // nonce
 		0,           // binIndex
 		1000,        // cumulativePayment
 		*commitment, // core.G1Point
@@ -99,8 +95,6 @@ func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 
 	header, err := meterer.ConstructBlobHeader(
 		signer,
-		1,
-		1,
 		0,
 		1000,
 		*commitment,
@@ -135,8 +129,6 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 
 	header, err := meterer.ConstructBlobHeader(
 		signer,
-		1,
-		1,
 		0,
 		1000,
 		*commitment,
@@ -174,8 +166,6 @@ func TestEIP712SignerWithDifferentChainID(t *testing.T) {
 
 	header, err := meterer.ConstructBlobHeader(
 		signer1,
-		1,
-		1,
 		0,
 		1000,
 		*commitment,

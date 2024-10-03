@@ -165,9 +165,7 @@ func TestMetererReservations(t *testing.T) {
 
 	// test invalid signature
 	invalidHeader := &meterer.BlobHeader{
-		Version:           1,
 		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
-		Nonce:             1,
 		BinIndex:          uint32(time.Now().Unix()) / mt.Config.ReservationWindow,
 		CumulativePayment: 0,
 		Commitment:        *commitment,
@@ -179,7 +177,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.Error(t, err, "invalid signature: recovered address * does not match account ID *")
 
 	// test invalid quorom ID
-	header, err := meterer.ConstructBlobHeader(signer, 3, 2, 1, 0, *commitment, 1000, []uint8{0, 1, 2}, privateKey1)
+	header, err := meterer.ConstructBlobHeader(signer, 1, 0, *commitment, 1000, []uint8{0, 1, 2}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid quorum ID")
@@ -189,18 +187,18 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 1, 0, *commitment, 1000, []uint8{0, 1, 2}, unregisteredUser)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 0, *commitment, 1000, []uint8{0, 1, 2}, unregisteredUser)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed to get on-demand payment by account: reservation not found")
 
 	// test invalid bin index
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 2000, quoromNumbers, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, 0, *commitment, 2000, quoromNumbers, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid bin index for reservation")
 
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex-1, 0, *commitment, 1000, quoromNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex-1, 0, *commitment, 1000, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid bin index for reservation")
@@ -209,7 +207,7 @@ func TestMetererReservations(t *testing.T) {
 	accountID := crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
 	for i := 0; i < 9; i++ {
 		dataLength := 20
-		header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, uint32(dataLength), quoromNumbers, privateKey2)
+		header, err = meterer.ConstructBlobHeader(signer, binIndex, 0, *commitment, uint32(dataLength), quoromNumbers, privateKey2)
 		assert.NoError(t, err)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
@@ -224,7 +222,7 @@ func TestMetererReservations(t *testing.T) {
 
 	}
 	// frist over flow is allowed
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 25, quoromNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, 0, *commitment, 25, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
@@ -239,13 +237,13 @@ func TestMetererReservations(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(int(5)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 1, quoromNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, 0, *commitment, 1, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "Bin has already been overflowed")
 
 	// overwhelming bin overflow
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex-1, 0, *commitment, 1000, quoromNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex-1, 0, *commitment, 1000, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "Overflow usage exceeds bin limit")
@@ -261,9 +259,7 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test invalid signature
 	invalidHeader := &meterer.BlobHeader{
-		Version:           1,
 		AccountID:         crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
-		Nonce:             1,
 		BinIndex:          binIndex,
 		CumulativePayment: 1,
 		Commitment:        *commitment,
@@ -279,19 +275,19 @@ func TestMetererOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header, err := meterer.ConstructBlobHeader(signer, 1, 1, 1, 1, *commitment, 1000, quorumNumbers, unregisteredUser)
+	header, err := meterer.ConstructBlobHeader(signer, 1, 1, *commitment, 1000, quorumNumbers, unregisteredUser)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	header, err = meterer.ConstructBlobHeader(signer, 3, 2, 1, 1, *commitment, 1000, []uint8{0, 1, 2}, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, 1, 1, *commitment, 1000, []uint8{0, 1, 2}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, 0, 1, *commitment, 2000, quorumNumbers, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, 0, 1, *commitment, 2000, quorumNumbers, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "insufficient cumulative payment increment")
@@ -304,28 +300,28 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// test duplicated cumulative payments
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100), *commitment, 100, quorumNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, uint64(100), *commitment, 100, quorumNumbers, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100), *commitment, 100, quorumNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, uint64(100), *commitment, 100, quorumNumbers, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "exact payment already exists")
 
 	// test valid payments
 	for i := 1; i < 10; i++ {
-		header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, uint64(100*(i+1)), *commitment, 100, quorumNumbers, privateKey2)
+		header, err = meterer.ConstructBlobHeader(signer, binIndex, uint64(100*(i+1)), *commitment, 100, quorumNumbers, privateKey2)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
 	}
 
 	// test insufficient remaining balance from cumulative payment
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 1, *commitment, 1, quorumNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, 1, *commitment, 1, quorumNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "insufficient cumulative payment increment")
 
 	// test cannot insert cumulative payment in out of order
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 0, *commitment, 50, quorumNumbers, privateKey2)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, 0, *commitment, 50, quorumNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "cannot insert cumulative payment in out of order")
@@ -338,7 +334,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, numRequest, len(result))
 	// test failed global rate limit
-	header, err = meterer.ConstructBlobHeader(signer, 1, 1, binIndex, 1002, *commitment, 1001, quorumNumbers, privateKey1)
+	header, err = meterer.ConstructBlobHeader(signer, binIndex, 1002, *commitment, 1001, quorumNumbers, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.Error(t, err, "failed global rate limiting")

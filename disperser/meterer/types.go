@@ -21,17 +21,15 @@ type BlobHeader struct {
 	Commitment    core.G1Point
 	DataLength    uint32
 	QuorumNumbers []uint8
+	AccountID     string
 
 	// New fields
-	Version   uint32
-	AccountID string
-	Nonce     uint32 // use nonce to prevent duplicate payments in the same reservation window
-	BinIndex  uint32
-
-	Signature []byte
+	BinIndex uint32
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
 	CumulativePayment uint64
+
+	Signature []byte
 }
 
 // EIP712Signer handles EIP-712 signing operations
@@ -57,9 +55,7 @@ func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712
 				{Name: "verifyingContract", Type: "address"},
 			},
 			"BlobHeader": []apitypes.Type{
-				{Name: "version", Type: "uint32"},
 				{Name: "accountID", Type: "string"},
-				{Name: "nonce", Type: "uint32"},
 				{Name: "binIndex", Type: "uint32"},
 				{Name: "cumulativePayment", Type: "uint64"},
 				{Name: "commitment", Type: "bytes"},
@@ -78,9 +74,7 @@ func (s *EIP712Signer) SignBlobHeader(header *BlobHeader, privateKey *ecdsa.Priv
 		PrimaryType: "BlobHeader",
 		Domain:      s.domain,
 		Message: apitypes.TypedDataMessage{
-			"version":           fmt.Sprintf("%d", header.Version),
 			"accountID":         header.AccountID,
-			"nonce":             fmt.Sprintf("%d", header.Nonce),
 			"binIndex":          fmt.Sprintf("%d", header.BinIndex),
 			"cumulativePayment": fmt.Sprintf("%d", header.CumulativePayment),
 			"commitment":        hexutil.Encode(commitment),
@@ -112,9 +106,7 @@ func (s *EIP712Signer) RecoverSender(header *BlobHeader) (common.Address, error)
 		PrimaryType: "BlobHeader",
 		Domain:      s.domain,
 		Message: apitypes.TypedDataMessage{
-			"version":           fmt.Sprintf("%d", header.Version),
 			"accountID":         header.AccountID,
-			"nonce":             fmt.Sprintf("%d", header.Nonce),
 			"binIndex":          fmt.Sprintf("%d", header.BinIndex),
 			"cumulativePayment": fmt.Sprintf("%d", header.CumulativePayment),
 			"commitment":        hexutil.Encode(header.Commitment.Serialize()),
@@ -173,8 +165,6 @@ func (s *EIP712Signer) recoverTypedData(typedData apitypes.TypedData, signature 
 // ConstructBlobHeader creates a BlobHeader with a valid signature
 func ConstructBlobHeader(
 	signer *EIP712Signer,
-	version uint32,
-	nonce uint32,
 	binIndex uint32,
 	cumulativePayment uint64,
 	commitment core.G1Point,
@@ -184,9 +174,7 @@ func ConstructBlobHeader(
 ) (*BlobHeader, error) {
 	accountID := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 	header := &BlobHeader{
-		Version:           version,
 		AccountID:         accountID,
-		Nonce:             nonce,
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
 		Commitment:        commitment,
