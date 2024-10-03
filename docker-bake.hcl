@@ -34,7 +34,7 @@ group "default" {
 }
 
 group "all" {
-  targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi"]
+  targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi", "traffic-generator"]
 }
 
 group "node-group" {
@@ -137,7 +137,7 @@ target "churner-release" {
 target "traffic-generator" {
   context    = "."
   dockerfile = "./trafficgenerator.Dockerfile"
-  target     = "traffic-generator"
+  target     = "generator"
   tags       = ["${REGISTRY}/${REPO}/traffic-generator:${BUILD_TAG}"]
 }
 
