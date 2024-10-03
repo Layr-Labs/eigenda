@@ -42,7 +42,7 @@ func RatelimiterCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 		},
 		cli.BoolFlag{
 			Name:   common.PrefixFlag(flagPrefix, CountFailedFlagName),
-			Usage:  "DisperseCount failed requests",
+			Usage:  "Count failed requests",
 			EnvVar: common.PrefixEnvVar(envPrefix, "COUNT_FAILED"),
 		},
 		cli.IntFlag{
