@@ -5,7 +5,7 @@ import (
 )
 
 // ConvertByPaddingEmptyByte takes bytes and insert an empty byte at the front of every 31 byte.
-// The empty byte is padded at the low address, because we use big endian to interpret a fiedl element.
+// The empty byte is padded at the low address, because we use big endian to interpret a field element.
 // This ensure every 32 bytes are within the valid range of a field element for bn254 curve.
 // If the input data is not a multiple of 31, the reminder is added to the output by
 // inserting a 0 and the reminder. The output does not necessarily be a multipler of 32

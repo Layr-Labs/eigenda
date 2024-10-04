@@ -12,6 +12,8 @@ import (
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	. "github.com/onsi/ginkgo/v2"
@@ -36,11 +38,20 @@ var _ = Describe("Inabox Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
+		privateKey, err := crypto.HexToECDSA(privateKeyHex[2:]) // Remove "0x" prefix
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.Accountant{})
+		}, signer, clients.NewAccountant(meterer.ActiveReservation{
+			DataRate:      1000,
+			StartEpoch:    100,
+			EndEpoch:      200,
+			QuorumSplit:   []byte{50, 50},
+			QuorumNumbers: []uint8{0, 1},
+		}, meterer.OnDemandPayment{
+			CumulativePayment: 500,
+		}, 60, 100, 100, privateKey))
 
 		Expect(disp).To(Not(BeNil()))
 

@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 }
 
 // Mock data initialization method
-func InitializeMockData(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
+func InitializeMockPayments(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
 	// Initialize mock active reservations
 	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
@@ -142,7 +142,7 @@ func setup(_ *testing.M) {
 		// metrics.NewNoopMetrics(),
 	)
 
-	InitializeMockData(paymentChainState, privateKey1, privateKey2)
+	InitializeMockPayments(paymentChainState, privateKey1, privateKey2)
 
 	if err != nil {
 		teardown()
