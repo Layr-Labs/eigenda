@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -23,9 +24,11 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -51,6 +54,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -194,7 +198,62 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	tx := &coremock.MockTransactor{}
 	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
 	tx.On("GetQuorumCount").Return(1, nil)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig, testMaxBlobSize)
+
+	minimumChargeableSize := uint32(128)
+	minimumChargeablePayment := uint32(128)
+	reservationBytesLimit := uint64(1024)
+	paymentLimit := meterer.TokenAmount(512)
+	meterConfig := meterer.Config{
+		GlobalBytesPerSecond: 1024,
+		PricePerChargeable:   minimumChargeablePayment,
+		MinChargeableSize:    minimumChargeableSize,
+		ReservationWindow:    uint32(60),
+	}
+
+	paymentChainState := meterer.NewOnchainPaymentState()
+
+	paymentChainState.InitializeOnchainPaymentState()
+
+	// TODO: replace with better mocking of payment contract state
+	// Initialize mock active reservations
+	// this is disperser client's private key used in tests
+	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
+	if err != nil {
+		panic("failed to convert hex to ECDSA")
+	}
+
+	dummyReservation := meterer.ActiveReservation{DataRate: reservationBytesLimit, StartEpoch: 0, EndEpoch: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	dummyOnDemandPayment := meterer.OnDemandPayment{CumulativePayment: paymentLimit}
+
+	paymentChainState.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
+		crypto.PubkeyToAddress(privateKey.PublicKey).Hex(): &dummyReservation,
+	}
+	paymentChainState.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
+		crypto.PubkeyToAddress(privateKey.PublicKey).Hex(): &dummyOnDemandPayment,
+	}
+
+	clientConfig := commonaws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+	}
+
+	offchainStore, err := meterer.NewOffchainStore(
+		clientConfig,
+		"reservations",
+		"ondemand",
+		"global",
+		logger,
+	)
+	if err != nil {
+		panic("failed to create offchain store")
+	}
+	meterer, err := meterer.NewMeterer(meterConfig, meterer.TimeoutConfig{}, paymentChainState, offchainStore, logger)
+	if err != nil {
+		panic("failed to create meterer")
+	}
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
 		batcher:       batcher,

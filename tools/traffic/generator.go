@@ -32,7 +32,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 
 	return &TrafficGenerator{
 		Logger:          logger,
-		DisperserClient: clients.NewDisperserClient(&config.Config, signer),
+		DisperserClient: clients.NewDisperserClient(&config.Config, signer, clients.Accountant{}),
 		Config:          config,
 	}, nil
 }

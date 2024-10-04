@@ -111,7 +111,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 		Hostname: "localhost",
 		Port:     testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
 		Timeout:  10 * time.Second,
-	}, nil)
+	}, nil, clients.Accountant{})
 	assert.NotNil(t, disp)
 
 	data := make([]byte, c.blobSize)

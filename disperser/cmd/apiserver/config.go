@@ -13,19 +13,24 @@ import (
 )
 
 type Config struct {
-	AwsClientConfig   aws.ClientConfig
-	BlobstoreConfig   blobstore.Config
-	ServerConfig      disperser.ServerConfig
-	LoggerConfig      common.LoggerConfig
-	MetricsConfig     disperser.MetricsConfig
-	RatelimiterConfig ratelimit.Config
-	RateConfig        apiserver.RateConfig
-	EnableRatelimiter bool
-	BucketTableName   string
-	ShadowTableName   string
-	BucketStoreSize   int
-	EthClientConfig   geth.EthClientConfig
-	MaxBlobSize       int
+	AwsClientConfig      aws.ClientConfig
+	BlobstoreConfig      blobstore.Config
+	ServerConfig         disperser.ServerConfig
+	LoggerConfig         common.LoggerConfig
+	MetricsConfig        disperser.MetricsConfig
+	RatelimiterConfig    ratelimit.Config
+	RateConfig           apiserver.RateConfig
+	EnableRatelimiter    bool
+	EnablePaymentMeterer bool
+	MinChargeableSize    uint32 // in bytes
+	PricePerChargeable   uint32
+	OnDemandGlobalLimit  uint64
+	ReservationWindow    uint32 // in seconds
+	BucketTableName      string
+	ShadowTableName      string
+	BucketStoreSize      int
+	EthClientConfig      geth.EthClientConfig
+	MaxBlobSize          int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -64,13 +69,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-		RatelimiterConfig: ratelimiterConfig,
-		RateConfig:        rateConfig,
-		EnableRatelimiter: ctx.GlobalBool(flags.EnableRatelimiter.Name),
-		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
-		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
-		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
-		MaxBlobSize:       ctx.GlobalInt(flags.MaxBlobSize.Name),
+		RatelimiterConfig:    ratelimiterConfig,
+		RateConfig:           rateConfig,
+		EnableRatelimiter:    ctx.GlobalBool(flags.EnableRatelimiter.Name),
+		EnablePaymentMeterer: ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservationWindow:    uint32(ctx.GlobalUint64(flags.ReservationWindow.Name)),
+		MinChargeableSize:    uint32(ctx.GlobalUint64(flags.MinChargeableSize.Name)),
+		PricePerChargeable:   uint32(ctx.GlobalUint64(flags.PricePerChargeable.Name)),
+		OnDemandGlobalLimit:  ctx.GlobalUint64(flags.OnDemandGlobalLimit.Name),
+		BucketTableName:      ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:      ctx.GlobalInt(flags.BucketStoreSize.Name),
+		EthClientConfig:      geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:          ctx.GlobalInt(flags.MaxBlobSize.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),

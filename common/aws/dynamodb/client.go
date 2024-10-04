@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -37,7 +38,7 @@ var (
 
 type Item = map[string]types.AttributeValue
 type Key = map[string]types.AttributeValue
-type ExpresseionValues = map[string]types.AttributeValue
+type ExpresseionValues = map[string]types.AttributeValue // is this a typo? ExpressionValues?
 
 type QueryResult struct {
 	Items            []Item
@@ -156,6 +157,45 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
+func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key Key, item Item) (Item, error) {
+	update := expression.UpdateBuilder{}
+	for itemKey, itemValue := range item {
+		if _, ok := key[itemKey]; ok {
+			// Cannot update the key
+			continue
+		}
+		// ADD numeric values
+		if n, ok := itemValue.(*types.AttributeValueMemberN); ok {
+			f, _ := strconv.ParseFloat(n.Value, 64)
+			update = update.Add(expression.Name(itemKey), expression.Value(aws.Float64(f)))
+
+		} else {
+			// For non-numeric values, use SET as before
+			update = update.Set(expression.Name(itemKey), expression.Value(itemValue))
+		}
+	}
+
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       key,
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	})
+	if err != nil {
+		fmt.Println("error updating item", err)
+		return nil, err
+	}
+
+	return resp.Attributes, nil
+}
+
 func (c *Client) GetItem(ctx context.Context, tableName string, key Key) (Item, error) {
 	resp, err := c.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{Key: key, TableName: aws.String(tableName)})
 	if err != nil {
@@ -183,6 +223,23 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 		IndexName:                 aws.String(indexName),
 		KeyConditionExpression:    aws.String(keyCondition),
 		ExpressionAttributeValues: expAttributeValues,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Items, nil
+}
+
+// QueryIndexOrderWithLimit returns all items in the index that match the given key
+func (c *Client) QueryIndexOrderWithLimit(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, forward bool, limit int32) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
+		IndexName:                 aws.String(indexName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeValues: expAttributeValues,
+		ScanIndexForward:          &forward,
+		Limit:                     aws.Int32(limit),
 	})
 	if err != nil {
 		return nil, err
