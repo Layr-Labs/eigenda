@@ -3,11 +3,27 @@ package meterer
 import (
 	"context"
 	"errors"
+	"log"
+	"math"
 
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 /* HEAVILY MOCKED */
+
+var (
+	DummyReservationBytesLimit    = uint64(1024)
+	DummyPaymentLimit             = TokenAmount(512)
+	DummyMinimumChargeableSize    = uint32(128)
+	DummyMinimumChargeablePayment = uint32(128)
+
+	DummyReservation     = ActiveReservation{DataRate: DummyReservationBytesLimit, StartEpoch: 0, EndEpoch: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	DummyOnDemandPayment = OnDemandPayment{CumulativePayment: DummyPaymentLimit}
+)
+
 // PaymentAccounts (For reservations and on-demand payments)
 
 type TokenAmount uint64 // TODO: change to uint128
@@ -62,8 +78,24 @@ func NewOnchainPaymentState() *OnchainPaymentState {
 // Mock data initialization method (mocked structs)
 func (pcs *OnchainPaymentState) InitializeOnchainPaymentState() {
 	// update with a pull from chain (write pulling functions in/core/eth/tx.go)
-	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{}
-	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{}
+	// TODO: update with pulling from chain; currently use a dummy
+	privateKeyHex := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+	privateKeyBytes := common.FromHex(privateKeyHex)
+	privateKey, err := crypto.ToECDSA(privateKeyBytes)
+	if err != nil {
+		log.Fatalf("Failed to parse private key: %v", err)
+	}
+
+	publicKey := privateKey.PublicKey
+	publicKeyBytes := crypto.FromECDSAPub(&publicKey)
+	publicKeyString := hexutil.Encode(publicKeyBytes)
+
+	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{
+		publicKeyString: &DummyReservation,
+	}
+	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{
+		publicKeyString: &DummyOnDemandPayment,
+	}
 }
 
 func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint) (*ActiveReservations, error) {

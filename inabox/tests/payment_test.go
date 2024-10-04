@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"math"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -17,16 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-)
-
-var (
-	ReservationBytesLimit    = uint64(1024)
-	PaymentLimit             = meterer.TokenAmount(512)
-	MinimumChargeableSize    = uint32(128)
-	MinimumChargeablePayment = uint32(128)
-
-	DummyReservation     = meterer.ActiveReservation{DataRate: ReservationBytesLimit, StartEpoch: 0, EndEpoch: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	DummyOnDemandPayment = meterer.OnDemandPayment{CumulativePayment: PaymentLimit}
 )
 
 var _ = Describe("Inabox Integration", func() {
@@ -50,11 +39,11 @@ var _ = Describe("Inabox Integration", func() {
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(DummyReservation, DummyOnDemandPayment, 60, MinimumChargeableSize, MinimumChargeablePayment, privateKey))
+		}, signer, clients.NewAccountant(meterer.DummyReservation, meterer.DummyOnDemandPayment, 60, meterer.DummyMinimumChargeableSize, meterer.DummyMinimumChargeablePayment, privateKey))
 
 		Expect(disp).To(Not(BeNil()))
 
-		singleBlobSize := MinimumChargeableSize
+		singleBlobSize := meterer.DummyMinimumChargeableSize
 		data := make([]byte, singleBlobSize)
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
@@ -64,7 +53,7 @@ var _ = Describe("Inabox Integration", func() {
 		// requests that count towards either reservation or payments
 		paidBlobStatus := []disperser.BlobStatus{}
 		paidKeys := [][]byte{}
-		for i := 0; i < (int(ReservationBytesLimit)+int(PaymentLimit))/int(singleBlobSize); i++ {
+		for i := 0; i < (int(meterer.DummyReservationBytesLimit)+int(meterer.DummyPaymentLimit))/int(singleBlobSize); i++ {
 			blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{})
 			Expect(err).To(BeNil())
 			Expect(key).To(Not(BeNil()))

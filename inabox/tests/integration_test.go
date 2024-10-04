@@ -43,15 +43,7 @@ var _ = Describe("Inabox Integration", func() {
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(meterer.ActiveReservation{
-			DataRate:      1000,
-			StartEpoch:    100,
-			EndEpoch:      200,
-			QuorumSplit:   []byte{50, 50},
-			QuorumNumbers: []uint8{0, 1},
-		}, meterer.OnDemandPayment{
-			CumulativePayment: 500,
-		}, 60, 100, 100, privateKey))
+		}, signer, clients.NewAccountant(meterer.DummyReservation, meterer.DummyOnDemandPayment, 60, meterer.DummyMinimumChargeableSize, meterer.DummyMinimumChargeablePayment, privateKey))
 
 		Expect(disp).To(Not(BeNil()))
 
