@@ -36,27 +36,22 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		return ttl.TTLWrapper(context.Background(), logger, store, 0), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		store := mapstore.NewStore()
-		tableStore, err := tablestore.Wrapper(logger, store)
+		tableStore, err := tablestore.MapStore.New(logger, path)
 		if err != nil {
 			return nil, err
 		}
-		store, err = tableStore.GetTable("test")
+		store, err := tableStore.GetTable("test")
 		if err != nil {
 			return nil, err
 		}
 		return store, nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		store, err := leveldb.NewStore(logger, path)
+		tableStore, err := tablestore.LevelDB.New(logger, path)
 		if err != nil {
 			return nil, err
 		}
-		tableStore, err := tablestore.Wrapper(logger, store)
-		if err != nil {
-			return nil, err
-		}
-		store, err = tableStore.GetTable("test")
+		store, err := tableStore.GetTable("test")
 		if err != nil {
 			return nil, err
 		}

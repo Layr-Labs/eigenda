@@ -9,7 +9,7 @@ import (
 
 var _ kvstore.Table = &tableView{}
 
-// tableView allows table in a TableStore to be accessed as if it were a Store.
+// tableView allows table in a New to be accessed as if it were a Store.
 type tableView struct {
 	// base is the underlying store.
 	base kvstore.Store
@@ -19,7 +19,7 @@ type tableView struct {
 	prefix uint32
 }
 
-// NewTableView creates a new view into a table in a TableStore.
+// NewTableView creates a new view into a table in a New.
 func newTableView(
 	base kvstore.Store,
 	name string,
@@ -135,7 +135,7 @@ func (t *tableView) Destroy() error {
 	return t.base.Destroy()
 }
 
-// tableBatch is a batch for a table in a TableStore.
+// tableBatch is a batch for a table in a New.
 type tableBatch struct {
 	table kvstore.Table
 	batch kvstore.Batch[[]byte]

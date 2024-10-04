@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"math"
 	"sort"
@@ -37,6 +39,34 @@ var _ kvstore.TableStore = &tableStore{}
 // ERR_TABLE_LIMIT_EXCEEDED is returned when the maximum number of tables has been reached.
 var ERR_TABLE_LIMIT_EXCEEDED = errors.New("table limit exceeded")
 
+// StoreType describes the underlying store implementation.
+type StoreType int
+
+const (
+	// LevelDB is a LevelDB-backed store.
+	LevelDB StoreType = iota
+	// MapStore is an in-memory store. This store does not preserve data across restarts.
+	MapStore
+)
+
+// New creates a new TableStore of the given type. Any data written to disk by the TableStore will be stored in
+// the given path. Can be used to create a new store or to load an existing store from disk.
+func (t StoreType) New(logger logging.Logger, path string) (kvstore.TableStore, error) {
+	switch t {
+	case LevelDB:
+		store, err := leveldb.NewStore(logger, path)
+		if err != nil {
+			return nil, fmt.Errorf("error creating LevelDB store: %w", err)
+		}
+		return wrapper(logger, store)
+	case MapStore:
+		store := mapstore.NewStore()
+		return wrapper(logger, store)
+	default:
+		return nil, fmt.Errorf("unknown store type: %d", t)
+	}
+}
+
 // tableStore is an implementation of TableStore that wraps a Store.
 type tableStore struct {
 	logger logging.Logger
@@ -60,12 +90,15 @@ type tableStore struct {
 	namespaceTable kvstore.Table
 }
 
-// Wrapper wraps the given Store to create a TableStore.
+// Future work: if we ever decide to permit third parties to provide custom store implementations, we will need
+// to make wrapper() into a public function.
+
+// wrapper wraps the given Store to create a TableStore.
 //
 // WARNING: it is not safe to access the wrapped store directly while the TableStore is in use. The TableStore uses
 // special key formatting, and direct access to the wrapped store may violate the TableStore's invariants, resulting
 // in undefined behavior.
-func Wrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, error) {
+func wrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, error) {
 
 	tableIDMap := make(map[string]uint32)
 	tableIdSet := make(map[uint32]bool)
