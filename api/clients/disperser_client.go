@@ -67,14 +67,7 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 }
 
 func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	// disperser client checks with the accountant; accountant provides payment fields
-	// if cannot pay, error (or attempt anyway without payment info?)
-	header, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
-	if err != nil {
-		return nil, nil, err
-	}
-	fmt.Printf("header: %v\n", header)
-
+	fmt.Println("DisperseBlob")
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -104,6 +97,67 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	}
 
 	reply, err := disperserClient.DisperseBlob(ctxTimeout, request)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blobStatus, err := disperser.FromBlobStatusProto(reply.GetResult())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blobStatus, reply.GetRequestId(), nil
+}
+
+func (c *disperserClient) PaidDisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	fmt.Println("PaidDisperseBlob")
+	// disperser client checks with the accountant; accountant provides payment fields
+	// if cannot pay, error (or attempt anyway without payment info?)
+
+	// disperser client first validate the data length with the accountant and get signed payment headers
+	// the client then encode and generate commitments
+	// the client then send the data to the disperser
+	// after getting response from the disperser, the client validate the received blob status;
+	// if there's failure, based on the type of failure, the client rollback local accounting or retry or send off warning to the user
+
+	header, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
+
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = conn.Close() }()
+
+	disperserClient := disperser_rpc.NewDisperserClient(conn)
+	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	defer cancel()
+
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
+	}
+
+	// check every 32 bytes of data are within the valid range for a bn254 field element
+	_, err = rs.ToFrArray(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
+	}
+	request := &disperser_rpc.PaidDisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: quorumNumbers,
+		AccountId:           header.AccountID,
+		BinIndex:            header.BinIndex,
+		CumulativePayment:   header.CumulativePayment,
+		Signature:           header.Signature,
+	}
+
+	reply, err := disperserClient.PaidDisperseBlob(ctxTimeout, request)
 	if err != nil {
 		return nil, nil, err
 	}

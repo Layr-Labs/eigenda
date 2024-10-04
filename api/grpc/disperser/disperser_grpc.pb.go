@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Disperser_DisperseBlob_FullMethodName              = "/disperser.Disperser/DisperseBlob"
+	Disperser_PaidDisperseBlob_FullMethodName          = "/disperser.Disperser/PaidDisperseBlob"
 	Disperser_DisperseBlobAuthenticated_FullMethodName = "/disperser.Disperser/DisperseBlobAuthenticated"
 	Disperser_GetBlobStatus_FullMethodName             = "/disperser.Disperser/GetBlobStatus"
 	Disperser_RetrieveBlob_FullMethodName              = "/disperser.Disperser/RetrieveBlob"
@@ -35,6 +36,11 @@ type DisperserClient interface {
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
+	// This API require valid payments to accept blob to disperse from clients.
+	// This executes the dispersal async, i.e. it returns once the request
+	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// processing status of the blob.
+	PaidDisperseBlob(ctx context.Context, in *PaidDisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
 	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
 	//  1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
@@ -68,6 +74,15 @@ func NewDisperserClient(cc grpc.ClientConnInterface) DisperserClient {
 func (c *disperserClient) DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error) {
 	out := new(DisperseBlobReply)
 	err := c.cc.Invoke(ctx, Disperser_DisperseBlob_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *disperserClient) PaidDisperseBlob(ctx context.Context, in *PaidDisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error) {
+	out := new(DisperseBlobReply)
+	err := c.cc.Invoke(ctx, Disperser_PaidDisperseBlob_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +156,11 @@ type DisperserServer interface {
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
+	// This API require valid payments to accept blob to disperse from clients.
+	// This executes the dispersal async, i.e. it returns once the request
+	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// processing status of the blob.
+	PaidDisperseBlob(context.Context, *PaidDisperseBlobRequest) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
 	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
 	//  1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
@@ -170,6 +190,9 @@ type UnimplementedDisperserServer struct {
 
 func (UnimplementedDisperserServer) DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DisperseBlob not implemented")
+}
+func (UnimplementedDisperserServer) PaidDisperseBlob(context.Context, *PaidDisperseBlobRequest) (*DisperseBlobReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PaidDisperseBlob not implemented")
 }
 func (UnimplementedDisperserServer) DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error {
 	return status.Errorf(codes.Unimplemented, "method DisperseBlobAuthenticated not implemented")
@@ -210,6 +233,24 @@ func _Disperser_DisperseBlob_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DisperserServer).DisperseBlob(ctx, req.(*DisperseBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Disperser_PaidDisperseBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PaidDisperseBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).PaidDisperseBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_PaidDisperseBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).PaidDisperseBlob(ctx, req.(*PaidDisperseBlobRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -304,6 +345,10 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DisperseBlob",
 			Handler:    _Disperser_DisperseBlob_Handler,
+		},
+		{
+			MethodName: "PaidDisperseBlob",
+			Handler:    _Disperser_PaidDisperseBlob_Handler,
 		},
 		{
 			MethodName: "GetBlobStatus",
