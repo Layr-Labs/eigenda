@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -15,6 +16,16 @@ type MockDisperserClient struct {
 }
 
 func (m *MockDisperserClient) DisperseBlob(
+	ctx context.Context,
+	data []byte,
+	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
+
+	args := m.mock.Called(data, customQuorums)
+
+	return args.Get(0).(*disperser.BlobStatus), args.Get(1).([]byte), args.Error(2)
+}
+
+func (m *MockDisperserClient) PaidDisperseBlob(
 	ctx context.Context,
 	data []byte,
 	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
