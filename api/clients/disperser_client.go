@@ -139,7 +139,7 @@ func (c *disperserClient) PaidDisperseBlob(ctx context.Context, data []byte, quo
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
 	defer cancel()
 
-	quorumNumbers := make([]uint32, len(quorums))
+	quorumNumbers := make([]uint32, len(header.QuorumNumbers))
 	for i, q := range quorums {
 		quorumNumbers[i] = uint32(q)
 	}

@@ -51,7 +51,6 @@ func InitializeMockPayments(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa
 	// Initialize mock active reservations
 	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
-		
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
 	}

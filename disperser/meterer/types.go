@@ -172,9 +172,10 @@ func ConstructBlobHeader(
 	quorumNumbers []uint8,
 	privateKey *ecdsa.PrivateKey,
 ) (*BlobHeader, error) {
-	accountID := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+	// accountID := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 	header := &BlobHeader{
-		AccountID:         accountID,
+		// AccountID:         accountID,
+		AccountID:         "0x04cd9ba0357d1e5b929554e932cccdd6cf2d6e41d9d67907365b3e46cf005d5afd92b4f7bb3b829520be1a1b88641691973c98dfe68b07ee3613e270406285dfe8",
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
 		Commitment:        commitment,

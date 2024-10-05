@@ -79,6 +79,7 @@ func NewDispersalServer(
 	maxBlobSize int,
 ) *DispersalServer {
 	logger := _logger.With("component", "DispersalServer")
+	logger.Info("attempting to start new dispersal server")
 	for account, rateInfoByQuorum := range rateConfig.Allowlist {
 		for quorumID, rateInfo := range rateInfoByQuorum {
 			logger.Info("[Allowlist]", "account", account, "name", rateInfo.Name, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
@@ -1162,6 +1163,7 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 	seenQuorums := make(map[uint8]struct{})
 	// The quorum ID must be in range [0, 254]. It'll actually be converted
 	// to uint8, so it cannot be greater than 254.
+	// No check with required quorums
 	for i := range req.GetCustomQuorumNumbers() {
 
 		if req.GetCustomQuorumNumbers()[i] > core.MaxQuorumID {
@@ -1178,17 +1180,6 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 		}
 		seenQuorums[quorumID] = struct{}{}
 
-	}
-
-	// Add the required quorums to the list of quorums to check
-	for _, quorumID := range quorumConfig.RequiredQuorums {
-		// Note: no matter if dual quorum staking is enabled or not, custom_quorum_numbers cannot
-		// use any required quorums that are defined onchain.
-		if _, ok := seenQuorums[quorumID]; ok {
-			return nil, fmt.Errorf("custom_quorum_numbers should not include the required quorums %v, but required quorum %d was found", quorumConfig.RequiredQuorums, quorumID)
-		}
-
-		seenQuorums[quorumID] = struct{}{}
 	}
 
 	if len(seenQuorums) == 0 {

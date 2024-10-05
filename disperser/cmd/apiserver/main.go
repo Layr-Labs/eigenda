@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -100,7 +99,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
-		config := mt.Config{
+		mtConfig := mt.Config{
 			PricePerChargeable:   config.PricePerChargeable,
 			GlobalBytesPerSecond: config.OnDemandGlobalLimit,
 			MinChargeableSize:    config.MinChargeableSize,
@@ -111,15 +110,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		paymentChainState.InitializeOnchainPaymentState()
 
-		clientConfig := commonaws.ClientConfig{
-			Region:          "us-east-1",
-			AccessKey:       "localstack",
-			SecretAccessKey: "localstack",
-			EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
-		}
-
 		store, err := mt.NewOffchainStore(
-			clientConfig,
+			config.AwsClientConfig,
 			"reservations",
 			"ondemand",
 			"global",
@@ -130,7 +122,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		}
 		// add some default sensible configs
 		meterer, err = mt.NewMeterer(
-			config,
+			mtConfig,
 			mt.TimeoutConfig{},
 			paymentChainState,
 			store,

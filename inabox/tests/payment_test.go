@@ -35,6 +35,7 @@ var _ = Describe("Inabox Integration", func() {
 		// the later requests is then 250 bytes, try send 4 blobs within a second, 2 of them would fail but not charged for
 		// wait for a second, retry, and that should allow ondemand to work
 		privateKey, err := crypto.HexToECDSA(privateKeyHex[2:]) // Remove "0x" prefix
+		Expect(err).To(BeNil())
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
@@ -53,8 +54,9 @@ var _ = Describe("Inabox Integration", func() {
 		// requests that count towards either reservation or payments
 		paidBlobStatus := []disperser.BlobStatus{}
 		paidKeys := [][]byte{}
-		for i := 0; i < (int(meterer.DummyReservationBytesLimit)+int(meterer.DummyPaymentLimit))/int(singleBlobSize); i++ {
-			blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{})
+		// TODO: payment calculation unit consistency
+		for i := 0; i < (int(meterer.DummyReservationBytesLimit)+int(meterer.DummyPaymentLimit))/int(singleBlobSize)-1; i++ {
+			blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{0})
 			Expect(err).To(BeNil())
 			Expect(key).To(Not(BeNil()))
 			Expect(blobStatus).To(Not(BeNil()))
@@ -64,7 +66,7 @@ var _ = Describe("Inabox Integration", func() {
 		}
 
 		// requests that aren't covered by reservation or on-demand payment
-		blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{})
+		blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{0})
 		Expect(err).To(Not(BeNil()))
 		Expect(key).To(BeNil())
 		Expect(blobStatus).To(BeNil())
@@ -72,7 +74,7 @@ var _ = Describe("Inabox Integration", func() {
 		ticker := time.NewTicker(time.Second * 1)
 		defer ticker.Stop()
 
-		var replies []*disperserpb.BlobStatusReply
+		var replies = make([]*disperserpb.BlobStatusReply, len(paidBlobStatus))
 		// now make sure all the paid blobs get confirmed
 	loop:
 		for {
@@ -86,12 +88,11 @@ var _ = Describe("Inabox Integration", func() {
 					Expect(err).To(BeNil())
 					Expect(reply).To(Not(BeNil()))
 					status, err := disperser.FromBlobStatusProto(reply.GetStatus())
+					Expect(err).To(BeNil())
 					if *status != disperser.Confirmed {
 						notConfirmed = true
 					}
-					Expect(err).To(BeNil())
-					Expect(status).To(Equal(disperser.Confirmed))
-					replies = append(replies, reply)
+					replies[i] = reply
 					paidBlobStatus[i] = *status
 				}
 

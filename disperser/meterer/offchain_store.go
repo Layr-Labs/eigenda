@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -39,6 +40,21 @@ func NewOffchainStore(
 		return nil, fmt.Errorf("table names cannot be empty")
 	}
 
+	err = CreateReservationTable(cfg, reservationTableName)
+	if err != nil && !strings.Contains(err.Error(), "Table already exists") {
+		fmt.Println("Error creating reservation table:", err)
+		return nil, err
+	}
+	err = CreateGlobalReservationTable(cfg, globalBinTableName)
+	if err != nil && !strings.Contains(err.Error(), "Table already exists") {
+		fmt.Println("Error creating global bin table:", err)
+		return nil, err
+	}
+	err = CreateOnDemandTable(cfg, onDemandTableName)
+	if err != nil && !strings.Contains(err.Error(), "Table already exists") {
+		fmt.Println("Error creating on-demand table:", err)
+		return nil, err
+	}
 	return &OffchainStore{
 		dynamoClient:         dynamoClient,
 		reservationTableName: reservationTableName,
@@ -76,6 +92,7 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 		"BinUsage": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
 	}
 
+	fmt.Println("increment the item in a table", s.reservationTableName)
 	res, err := s.dynamoClient.UpdateItemIncrement(ctx, s.reservationTableName, key, update)
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment bin usage: %w", err)

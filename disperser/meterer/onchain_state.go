@@ -3,13 +3,10 @@ package meterer
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"math"
 
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 /* HEAVILY MOCKED */
@@ -77,25 +74,18 @@ func NewOnchainPaymentState() *OnchainPaymentState {
 
 // Mock data initialization method (mocked structs)
 func (pcs *OnchainPaymentState) InitializeOnchainPaymentState() {
+
 	// update with a pull from chain (write pulling functions in/core/eth/tx.go)
 	// TODO: update with pulling from chain; currently use a dummy
-	privateKeyHex := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	privateKeyBytes := common.FromHex(privateKeyHex)
-	privateKey, err := crypto.ToECDSA(privateKeyBytes)
-	if err != nil {
-		log.Fatalf("Failed to parse private key: %v", err)
-	}
-
-	publicKey := privateKey.PublicKey
-	publicKeyBytes := crypto.FromECDSAPub(&publicKey)
-	publicKeyString := hexutil.Encode(publicKeyBytes)
-
+	pbk := "0x04cd9ba0357d1e5b929554e932cccdd6cf2d6e41d9d67907365b3e46cf005d5afd92b4f7bb3b829520be1a1b88641691973c98dfe68b07ee3613e270406285dfe8"
 	pcs.ActiveReservations.Reservations = map[string]*ActiveReservation{
-		publicKeyString: &DummyReservation,
+		pbk: &DummyReservation,
 	}
 	pcs.OnDemandPayments.Payments = map[string]*OnDemandPayment{
-		publicKeyString: &DummyOnDemandPayment,
+		pbk: &DummyOnDemandPayment,
 	}
+
+	fmt.Println("Initialized payment state with dummy reservation and on-demand payments")
 }
 
 func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint) (*ActiveReservations, error) {

@@ -82,7 +82,7 @@ func (a *Accountant) Stop() {
 }
 
 // accountant calculates and records payment information
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64, quorums []uint8) (uint32, uint64, error) {
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (uint32, uint64, error) {
 	//TODO: do we need to lock the binUsages here in case the rotation happens in the middle of the function?
 	currentBinUsage := a.binUsages[0]
 	currentBinIndex := meterer.GetCurrentBinIndex(a.reservationWindow)
@@ -113,7 +113,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64, quo
 
 // accountant provides and records payment information
 func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums []uint8) (*meterer.BlobHeader, error) {
-	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, dataLength, quorums)
+	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, dataLength)
 	if err != nil {
 		return nil, err
 	}
@@ -125,12 +125,4 @@ func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums
 		return nil, err
 	}
 	return header, nil
-}
-
-func (a *Accountant) signBlobHeader(header *meterer.BlobHeader) (*meterer.BlobHeader, error) {
-	signedHeader, err := meterer.ConstructBlobHeader(a.domainSigner, header.BinIndex, header.CumulativePayment, header.Commitment, header.DataLength, header.QuorumNumbers, a.accountantSigner)
-	if err != nil {
-		return nil, err
-	}
-	return signedHeader, nil
 }
