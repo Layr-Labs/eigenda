@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc/status"
-
 	"github.com/Layr-Labs/eigenda/api"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -782,10 +780,6 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	return &pb.RetrieveBlobReply{
 		Data: data,
 	}, nil
-}
-
-func (s *DispersalServer) GetChunk(context.Context, *pb.GetChunkRequest) (*pb.GetChunkReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
 }
 
 func (s *DispersalServer) GetRateConfig() *RateConfig {

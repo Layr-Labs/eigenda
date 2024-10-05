@@ -1,0 +1,129 @@
+syntax = "proto3";
+package disperser.v2;
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
+
+// WARNING: the following RPCs are experimental and subject to change.
+
+// Disperser defines the public APIs for dispersing blobs.
+service Disperser {
+	// DisperseBlob accepts blob to disperse from clients.
+	// This executes the dispersal asynchronously, i.e. it returns once the request
+	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// processing status of the blob.
+	rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
+
+	// GetBlobStatus is meant to be polled for the blob status.
+	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
+	
+	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+	rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
+}
+
+// Requests and Replys
+
+message DisperseBlobRequest {
+	// The data to be dispersed.
+	// The size of data must be <= 2MiB. Every 32 bytes of data chunk is interpreted as an integer in big endian format
+	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
+	// as a field element on the bn254 curve. The valid range is 
+	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
+	// containing slightly less than 254 bits and more than 253 bits. If any one of the 32 bytes chunk is outside the range, 
+	// the whole request is deemed as invalid, and rejected. 
+	bytes data = 1;
+	BlobHeader blob_header = 2;
+	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
+	bytes authentication_data = 3;
+}
+
+message DisperseBlobReply {
+	// The status of the blob associated with the blob key.
+	BlobStatus result = 1;
+	bytes blob_key = 2;
+}
+
+// BlobStatusRequest is used to query the status of a blob.
+message BlobStatusRequest {
+	bytes blob_key = 1;
+}
+
+message BlobStatusReply {
+	// The status of the blob.
+	BlobStatus status = 1;
+	// The signed blob certificate
+	SignedCertificate signed_certificate = 2;
+}
+
+// Utility method used to generate the commitment of blob given its data.
+// This can be used to construct BlobHeader.commitment
+message BlobCommitmentRequest {
+	bytes data = 1;
+}
+
+message BlobCommitmentReply {
+	common.BlobCommitment blob_commitment = 1;
+}
+
+// Data Types
+
+// BlobStatus represents the status of a blob.
+// The status of a blob is updated as the blob is processed by the disperser.
+// The status of a blob can be queried by the client using the GetBlobStatus API.
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// - QUEUED
+// - ENCODED
+// Terminal states are states that will not be updated to a different state:
+// - CERTIFIED
+// - FAILED
+// - INSUFFICIENT_SIGNATURES
+enum BlobStatus {
+	UNKNOWN = 0;
+
+	// QUEUED means that the blob has been queued by the disperser for processing
+	QUEUED = 1;
+
+	// ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes
+	ENCODED = 2;
+
+	// CERTIFIED means the blob has been dispersed and attested by the DA nodes
+	CERTIFIED = 3;
+
+	// FAILED means that the blob has failed permanently (for reasons other than insufficient
+	// signatures, which is a separate state)
+	FAILED = 4;
+
+	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
+	// for at least one quorum.
+	INSUFFICIENT_SIGNATURES = 5;
+}
+
+message BlobHeader {
+	repeated uint32 quorum_numbers = 1;
+	// API version used to disperse the blob
+	uint32 version = 2;
+	uint32 bin_index = 3;
+	uint64 cumulative_payment = 4;
+	// Ethereum Account Address in Hex string "0x..."
+	string account_id = 5;
+	common.G1Commitment commitment = 6;
+}
+
+message SignedCertificate {
+	common.BlobCertificate blob_certificate = 1;
+  Attestation non_signer_stakes_and_signature = 2;
+}
+
+message Attestation {
+  repeated uint32 nonSignerQuorumBitmapIndices = 1;
+  repeated common.G1Commitment nonSignerPubkeys = 2;
+  repeated common.G1Commitment quorumApks = 3;
+  common.G2Commitment apkG2 = 4;
+  common.G1Commitment sigma = 5;
+  repeated uint32 quorumApkIndices = 6;
+  repeated uint32 totalStakeIndices = 7;
+  repeated NonSignerStakeIndicesForQuorum nonSignerStakeIndices = 8;
+}
+
+message NonSignerStakeIndicesForQuorum {
+  repeated uint32 indices = 1;
+}
