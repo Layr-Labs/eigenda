@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -12,7 +14,15 @@ import (
 	"github.com/urfave/cli"
 )
 
+type DisperserVersion uint
+
+const (
+	V1 DisperserVersion = 1
+	V2 DisperserVersion = 2
+)
+
 type Config struct {
+	DisperserVersion  DisperserVersion
 	AwsClientConfig   aws.ClientConfig
 	BlobstoreConfig   blobstore.Config
 	ServerConfig      disperser.ServerConfig
@@ -32,6 +42,10 @@ type Config struct {
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
+	version := ctx.GlobalUint(flags.DisperserVersionFlag.Name)
+	if version != uint(V1) && version != uint(V2) {
+		return Config{}, fmt.Errorf("unknown disperser version %d", version)
+	}
 
 	ratelimiterConfig, err := ratelimit.ReadCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
@@ -49,7 +63,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 
 	config := Config{
-		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
+		DisperserVersion: DisperserVersion(version),
+		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
 			GrpcPort:    ctx.GlobalString(flags.GrpcPortFlag.Name),
 			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
