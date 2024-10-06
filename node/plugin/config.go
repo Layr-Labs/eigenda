@@ -39,7 +39,7 @@ var (
 	// The files for encrypted private keys.
 	EcdsaKeyFileFlag = cli.StringFlag{
 		Name:     "ecdsa-key-file",
-		Required: true,
+		Required: false,
 		Usage:    "Path to the encrypted ecdsa key",
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "ECDSA_KEY_FILE"),
 	}
@@ -53,7 +53,7 @@ var (
 	// The passwords to decrypt the private keys.
 	EcdsaKeyPasswordFlag = cli.StringFlag{
 		Name:     "ecdsa-key-password",
-		Required: true,
+		Required: false,
 		Usage:    "Password to decrypt the ecdsa key",
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "ECDSA_KEY_PASSWORD"),
 	}
@@ -148,6 +148,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 	if op != OperationOptIn && op != OperationOptOut && op != OperationUpdateSocket && op != OperationListQuorums {
 		return nil, errors.New("unsupported operation type")
+	}
+
+	// ECDSA key is only required for opt-in, opt-out and update-socket operations
+	if (op == OperationOptIn || op == OperationOptOut || op == OperationUpdateSocket) &&
+		len(ctx.GlobalString(EcdsaKeyFileFlag.Name)) == 0 &&
+		len(ctx.GlobalString(EcdsaKeyPasswordFlag.Name)) == 0 {
+		return nil, errors.New("opt-in, opt-out and update-socket operations require ECDSA key file and password")
 	}
 
 	return &Config{
