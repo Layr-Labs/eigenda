@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"math"
+	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -865,235 +869,287 @@ type expectedTableData map[string][]byte
 // Maps table names to expected data for that table.
 type expectedStoreData map[string]expectedTableData
 
-//func TestRandomOperations(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	deleteDBDirectory(t)
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(t, err)
-//
-//	base, err := leveldb.NewStore(logger, dbPath)
-//	assert.NoError(t, err)
-//	store, err := wrapper(logger, base)
-//	assert.NoError(t, err)
-//
-//	tables := make(map[string]kvstore.Table)
-//	expectedData := make(expectedStoreData)
-//
-//	for i := 0; i < 10000; i++ {
-//
-//		choice := rand.Float64()
-//
-//		if choice < 0.01 {
-//			// restart the store
-//			err = store.Shutdown()
-//			assert.NoError(t, err)
-//
-//			base, err = leveldb.NewStore(logger, dbPath)
-//			assert.NoError(t, err)
-//			store, err = wrapper(logger, base)
-//			assert.NoError(t, err)
-//
-//			for tableName := range tables {
-//				table, err := store.GetTable(tableName)
-//				assert.NoError(t, err)
-//				tables[tableName] = table
-//			}
-//		} else if len(tables) == 0 || choice < 0.1 {
-//			// Create a new table.
-//			name := tu.RandomString(8)
-//			table, err := store.GetTable(name)
-//			expectedData[name] = make(expectedTableData)
-//			assert.NoError(t, err)
-//			tables[name] = table
-//		} else if choice < 0.15 {
-//			// Drop a table
-//
-//			var name string
-//			for n := range tables {
-//				name = n
-//				break
-//			}
-//
-//			err := store.DropTable(name)
-//			assert.NoError(t, err)
-//
-//			// Delete all expected data for the table
-//			delete(expectedData, name)
-//			delete(tables, name)
-//		} else if choice < 0.9 || len(expectedData) == 0 {
-//			// Write a value
-//
-//			var tableName string
-//			for n := range tables {
-//				tableName = n
-//				break
-//			}
-//			table := tables[tableName]
-//
-//			k := []byte(tu.RandomString(32))
-//			v := tu.RandomBytes(32)
-//
-//			expectedData[tableName][string(k)] = v
-//
-//			err = table.Put(k, v)
-//			assert.NoError(t, err)
-//		} else {
-//			// Delete a value
-//
-//			var tableName string
-//			for n := range tables {
-//				tableName = n
-//				break
-//			}
-//			table := tables[tableName]
-//
-//			if len(expectedData[tableName]) == 0 {
-//				// no data in this table, skip
-//				continue
-//			}
-//
-//			var k string
-//			for k = range expectedData[tableName] {
-//				break
-//			}
-//
-//			delete(expectedData[tableName], k)
-//			err = table.Delete([]byte(k))
-//			assert.NoError(t, err)
-//		}
-//
-//		// Every once in a while, check that the store matches the expected data
-//		if i%100 == 0 {
-//			// Every so often, check that the store matches the expected data.
-//			for tableName, tableData := range expectedData {
-//				table := tables[tableName]
-//
-//				for k := range tableData {
-//					expectedValue := tableData[k]
-//					value, err := table.Get([]byte(k))
-//					assert.NoError(t, err)
-//					assert.Equal(t, expectedValue, value)
-//				}
-//			}
-//		}
-//	}
-//
-//	err = store.Destroy()
-//	assert.NoError(t, err)
-//}
+func TestRandomOperations(t *testing.T) {
+	tu.InitializeRandom()
 
-//var _ kvstore.Store = &explodingStore{}
-//
-//// explodingStore is a store that returns an error after a certain number of operations.
-//// Used to intentionally crash table deletion to exercise table deletion recovery.
-//type explodingStore struct {
-//	base               kvstore.Store
-//	deletionsRemaining int
-//}
-//
-//func (e *explodingStore) Put(key []byte, value []byte) error {
-//	return e.base.Put(key, value)
-//}
-//
-//func (e *explodingStore) Get(key []byte) ([]byte, error) {
-//	return e.base.Get(key)
-//}
-//
-//func (e *explodingStore) Delete(key []byte) error {
-//	if e.deletionsRemaining == 0 {
-//		return fmt.Errorf("intentional error")
-//	}
-//	e.deletionsRemaining--
-//	return e.base.Delete(key)
-//}
-//
-//func (e *explodingStore) NewBatch() kvstore.Batch[[]byte] {
-//	panic("not used")
-//}
-//
-//func (e *explodingStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
-//	return e.base.NewIterator(prefix)
-//}
-//
-//func (e *explodingStore) Shutdown() error {
-//	return e.base.Shutdown()
-//}
-//
-//func (e *explodingStore) Destroy() error {
-//	return e.base.Destroy()
-//}
-//
-//func TestInterruptedTableDeletion(t *testing.T) {
-//	deleteDBDirectory(t)
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(t, err)
-//
-//	base, err := leveldb.NewStore(logger, dbPath)
-//	assert.NoError(t, err)
-//
-//	explodingBase := &explodingStore{
-//		base:               base,
-//		deletionsRemaining: 50,
-//	}
-//
-//	store, err := wrapper(logger, explodingBase)
-//	assert.NoError(t, err)
-//
-//	// Create a few tables
-//	table1, err := store.GetTable("table1")
-//	assert.NoError(t, err)
-//
-//	table2, err := store.GetTable("table2")
-//	assert.NoError(t, err)
-//
-//	// Write some data to the tables
-//	for i := 0; i < 100; i++ {
-//		k := make([]byte, 8)
-//		binary.BigEndian.PutUint64(k, uint64(i))
-//
-//		value := make([]byte, 8)
-//		binary.BigEndian.PutUint64(value, uint64(i))
-//
-//		err = table1.Put(k, value)
-//		assert.NoError(t, err)
-//
-//		err = table2.Put(k, value)
-//		assert.NoError(t, err)
-//	}
-//
-//	// Drop one of the tables. This should fail partway through.
-//	err = store.DropTable("table1")
-//	assert.Error(t, err)
-//
-//	err = store.Shutdown()
-//	assert.NoError(t, err)
-//
-//	// Restart the store. The table should be gone by the time the method returns.
-//	base, err = leveldb.NewStore(logger, dbPath)
-//	assert.NoError(t, err)
-//	store, err = wrapper(logger, base)
-//	assert.NoError(t, err)
-//
-//	tables := store.GetTables()
-//	assert.Equal(t, 1, len(tables))
-//	assert.Equal(t, "table2", tables[0].Name())
-//	table2, err = store.GetTable("table2")
-//	assert.NoError(t, err)
-//
-//	// Check that the data in the remaining table is still there. We shouldn't see any data from the deleted table.
-//	for i := 0; i < 100; i++ {
-//		k := make([]byte, 8)
-//		binary.BigEndian.PutUint64(k, uint64(i))
-//		value, err := table2.Get(k)
-//		assert.NoError(t, err)
-//		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
-//	}
-//
-//	err = store.Destroy()
-//	assert.NoError(t, err)
-//
-//	verifyDBIsDeleted(t)
-//}
+	deleteDBDirectory(t)
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	builder, err := LevelDB.Builder(logger, dbPath)
+	assert.NoError(t, err)
+
+	store, err := builder.Build()
+	assert.NoError(t, err)
+
+	tables := make(map[string]kvstore.Table)
+	expectedData := make(expectedStoreData)
+
+	for i := 0; i < 10000; i++ {
+
+		choice := rand.Float64()
+
+		if choice < 0.01 {
+			// restart the store
+			err = store.Shutdown()
+			assert.NoError(t, err)
+
+			builder, err = LevelDB.Builder(logger, dbPath)
+			assert.NoError(t, err)
+
+			store, err = builder.Build()
+			assert.NoError(t, err)
+
+			for tableName := range tables {
+				table, err := store.GetTable(tableName)
+				assert.NoError(t, err)
+				tables[tableName] = table
+			}
+		} else if len(tables) == 0 || choice < 0.02 {
+			// Create a new table. Requires the store to be restarted.
+
+			err = store.Shutdown()
+			assert.NoError(t, err)
+
+			builder, err = LevelDB.Builder(logger, dbPath)
+			assert.NoError(t, err)
+
+			name := tu.RandomString(8)
+			err = builder.CreateTable(name)
+			expectedData[name] = make(expectedTableData)
+			assert.NoError(t, err)
+			tables[name] = nil
+
+			store, err = builder.Build()
+			assert.NoError(t, err)
+
+			for tableName := range tables {
+				table, err := store.GetTable(tableName)
+				assert.NoError(t, err)
+				tables[tableName] = table
+			}
+		} else if choice < 0.025 {
+			// Drop a table. Requires the store to be restarted.
+
+			err = store.Shutdown()
+			assert.NoError(t, err)
+
+			builder, err = LevelDB.Builder(logger, dbPath)
+			assert.NoError(t, err)
+
+			store, err = builder.Build()
+			assert.NoError(t, err)
+
+			var name string
+			for n := range tables {
+				name = n
+				break
+			}
+
+			err = builder.DropTable(name)
+			assert.NoError(t, err)
+
+			// Delete all expected data for the table
+			delete(expectedData, name)
+			delete(tables, name)
+
+			for tableName := range tables {
+				table, err := store.GetTable(tableName)
+				assert.NoError(t, err)
+				tables[tableName] = table
+			}
+		} else if choice < 0.9 || len(expectedData) == 0 {
+			// Write a value
+
+			var tableName string
+			for n := range tables {
+				tableName = n
+				break
+			}
+			table := tables[tableName]
+
+			k := []byte(tu.RandomString(32))
+			v := tu.RandomBytes(32)
+
+			expectedData[tableName][string(k)] = v
+
+			err = table.Put(k, v)
+			assert.NoError(t, err)
+		} else {
+			// Delete a value
+
+			var tableName string
+			for n := range tables {
+				tableName = n
+				break
+			}
+			table := tables[tableName]
+
+			if len(expectedData[tableName]) == 0 {
+				// no data in this table, skip
+				continue
+			}
+
+			var k string
+			for k = range expectedData[tableName] {
+				break
+			}
+
+			delete(expectedData[tableName], k)
+			err = table.Delete([]byte(k))
+			assert.NoError(t, err)
+		}
+
+		// Every once in a while, check that the store matches the expected data
+		if i%100 == 0 {
+			// Every so often, check that the store matches the expected data.
+			for tableName, tableData := range expectedData {
+				table := tables[tableName]
+
+				for k := range tableData {
+					expectedValue := tableData[k]
+					value, err := table.Get([]byte(k))
+					assert.NoError(t, err)
+					assert.Equal(t, expectedValue, value)
+				}
+			}
+		}
+	}
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+}
+
+var _ kvstore.Store = &explodingStore{}
+
+// explodingStore is a store that returns an error after a certain number of operations.
+// Used to intentionally crash table deletion to exercise table deletion recovery.
+type explodingStore struct {
+	base               kvstore.Store
+	deletionsRemaining int
+}
+
+func (e *explodingStore) Put(key []byte, value []byte) error {
+	return e.base.Put(key, value)
+}
+
+func (e *explodingStore) Get(key []byte) ([]byte, error) {
+	return e.base.Get(key)
+}
+
+func (e *explodingStore) Delete(key []byte) error {
+	if e.deletionsRemaining == 0 {
+		return fmt.Errorf("intentional error")
+	}
+	e.deletionsRemaining--
+	return e.base.Delete(key)
+}
+
+func (e *explodingStore) NewBatch() kvstore.Batch[[]byte] {
+	panic("not used")
+}
+
+func (e *explodingStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
+	return e.base.NewIterator(prefix)
+}
+
+func (e *explodingStore) Shutdown() error {
+	return e.base.Shutdown()
+}
+
+func (e *explodingStore) Destroy() error {
+	return e.base.Destroy()
+}
+
+func TestInterruptedTableDeletion(t *testing.T) {
+	deleteDBDirectory(t)
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	builder, err := LevelDB.Builder(logger, dbPath)
+	assert.NoError(t, err)
+
+	// Create a few tables
+	err = builder.CreateTable("table1")
+	assert.NoError(t, err)
+
+	err = builder.CreateTable("table2")
+	assert.NoError(t, err)
+
+	store, err := builder.Build()
+	assert.NoError(t, err)
+
+	table1, err := store.GetTable("table1")
+	assert.NoError(t, err)
+
+	table2, err := store.GetTable("table2")
+	assert.NoError(t, err)
+
+	// Write some data to the tables
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		value := make([]byte, 8)
+		binary.BigEndian.PutUint64(value, uint64(i))
+
+		err = table1.Put(k, value)
+		assert.NoError(t, err)
+
+		err = table2.Put(k, value)
+		assert.NoError(t, err)
+	}
+
+	// Drop one of the tables (requires restart). Use a store that causes the drop operation to fail partway through.
+	err = store.Shutdown()
+	assert.NoError(t, err)
+
+	base, err := leveldb.NewStore(logger, dbPath)
+	assert.NoError(t, err)
+
+	explodingBase := &explodingStore{
+		base:               base,
+		deletionsRemaining: 50,
+	}
+
+	builder, err = newTableStoreBuilder(logger, explodingBase)
+	assert.NoError(t, err)
+
+	store, err = builder.Build()
+	assert.NoError(t, err)
+
+	err = builder.DropTable("table1")
+	assert.Error(t, err)
+
+	err = store.Shutdown()
+	assert.NoError(t, err)
+
+	// Restart the store. The table should be gone by the time the method returns.
+	builder, err = LevelDB.Builder(logger, dbPath)
+	assert.NoError(t, err)
+
+	store, err = builder.Build()
+	assert.NoError(t, err)
+
+	tables := store.GetTables()
+	assert.Equal(t, 1, len(tables))
+	assert.Equal(t, "table2", tables[0].Name())
+	table2, err = store.GetTable("table2")
+	assert.NoError(t, err)
+
+	// Check that the data in the remaining table is still there. We shouldn't see any data from the deleted table.
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+		value, err := table2.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
+	}
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+
+	verifyDBIsDeleted(t)
+}
