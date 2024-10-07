@@ -21,8 +21,8 @@ jobs:
       - name: Checkout EigenDA
         uses: actions/checkout@v3
 
-      - name: Build
-        run: make build
+      - name: Build Protobufs
+        run: make protoc
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
