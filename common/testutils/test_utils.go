@@ -84,6 +84,16 @@ func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 	}
 }
 
+// RandomTime returns a random time.
+func RandomTime() time.Time {
+	return time.Unix(int64(rand.Int31()), int64(rand.Intn(int(time.Second))))
+}
+
+// RandomTimeInRange returns a random time within a given range.
+func RandomTimeInRange(start time.Time, end time.Time) time.Time {
+	return start.Add(time.Duration(rand.Int63n(int64(end.Sub(start)))))
+}
+
 // RandomBytes generates a random byte slice of a given length.
 func RandomBytes(length int) []byte {
 	bytes := make([]byte, length)
@@ -92,9 +102,4 @@ func RandomBytes(length int) []byte {
 		panic(err)
 	}
 	return bytes
-}
-
-// RandomTime generates a random time.
-func RandomTime() time.Time {
-	return time.Unix(int64(rand.Int31()), 0)
 }
