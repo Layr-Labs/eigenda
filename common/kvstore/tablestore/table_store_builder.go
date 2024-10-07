@@ -364,7 +364,7 @@ func (t *tableStoreBuilder) Build() (kvstore.TableStore, error) {
 		return nil, errors.New("cannot build a store more than once")
 	}
 
-	tableMap := make(map[string]kvstore.Table, t.GetTableCount())
+	tableMap := make(map[string]kvstore.Table, len(t.tableIDMap))
 
 	for name, tableID := range t.tableIDMap {
 		tableMap[name] = t.tableMap[tableID]
