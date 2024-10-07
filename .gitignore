@@ -1,3 +1,5 @@
+*.pb.go
+
 inabox/testdata/*
 inabox/anvil.pid
 
