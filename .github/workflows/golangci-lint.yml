@@ -18,11 +18,11 @@ jobs:
 
       - run: go version
 
-      - name: Build
-        run: make build
-
       - name: Checkout EigenDA
         uses: actions/checkout@v3
+
+      - name: Build
+        run: make build
 
       - name: Checkout EigenDA
         uses: actions/checkout@v3
