@@ -2,6 +2,8 @@
 
 # This script builds the eigenDA protobufs.
 
+set +x
+
 # The location where this script can be found.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -32,3 +34,5 @@ protoc -I "${DISPERSER_PROTO_DIR}" -I "${PROTO_DIR}" \
 	--go-grpc_out="${DISPERSER_GRPC_DIR}" \
 	--go-grpc_opt=paths=source_relative \
 	"${DISPERSER_PROTO_DIR}"/**/*.proto
+
+set -x
