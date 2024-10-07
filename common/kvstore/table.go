@@ -21,6 +21,9 @@ type Table interface {
 // ErrTableLimitExceeded is returned when the maximum number of tables has been reached.
 var ErrTableLimitExceeded = errors.New("table limit exceeded")
 
+// ErrTableNotFound is returned when a table is not found.
+var ErrTableNotFound = errors.New("table not found")
+
 // TableStoreBuilder is used to create a new TableStore instance. It can be used to add and remove
 // tables from the store. Once the TableStore is created, the TableStoreBuilder instance should not be used again,
 // and no tables may be added or removed from the store. If table modifications are required on an existing
@@ -67,7 +70,11 @@ type TableStoreBuilder interface {
 type TableStore interface {
 
 	// GetTable gets the table with the given name. If the table does not exist, it is first created.
+	// Returns ErrTableNotFound if the table does not exist and cannot be created.
 	GetTable(name string) (Table, error)
+
+	// GetTables returns a list of all tables in the store in no particular order.
+	GetTables() []Table
 
 	// NewBatch creates a new batch that can be used to perform multiple operations across tables atomically.
 	NewBatch() Batch[TableKey]

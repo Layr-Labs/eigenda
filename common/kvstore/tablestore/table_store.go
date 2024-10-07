@@ -1,7 +1,6 @@
 package tablestore
 
 import (
-	"errors"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -40,7 +39,7 @@ func newTableStore(
 func (t *tableStore) GetTable(name string) (kvstore.Table, error) {
 	table, ok := t.tableMap[name]
 	if !ok {
-		return nil, errors.New("table does not exist")
+		return nil, kvstore.ErrTableNotFound
 	}
 
 	return table, nil
