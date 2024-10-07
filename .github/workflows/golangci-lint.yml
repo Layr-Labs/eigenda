@@ -29,3 +29,4 @@ jobs:
         with:
           version: v1.60
           args: --timeout 3m --verbose
+          skip-pkg-cache: true
