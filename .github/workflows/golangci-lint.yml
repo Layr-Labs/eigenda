@@ -24,8 +24,11 @@ jobs:
       - name: Build
         run: make build
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.60
-          args: --timeout 3m --verbose
+      - name: lint
+        run: golangcli-lint run
+
+#      - name: golangci-lint
+#        uses: golangci/golangci-lint-action@v3
+#        with:
+#          version: v1.60
+#          args: --timeout 3m --verbose
