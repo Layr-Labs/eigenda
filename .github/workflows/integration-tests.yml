@@ -38,6 +38,9 @@ jobs:
         run: |
           git submodule update --init --recursive
 
+      - name: Build
+        run: make build
+
       # TODO: add back geth if we need it in tests
       # - name: Install geth
       #   run: |
