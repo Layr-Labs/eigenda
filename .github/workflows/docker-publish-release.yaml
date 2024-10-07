@@ -45,7 +45,9 @@ jobs:
       name: Display SemVer
 
     - name: Build Protobufs
-      run: make protoc
+      run: |
+        make protoc
+        ./api/builder/rm-docker.sh
 
     - name: Setup Buildx
       uses: docker/setup-buildx-action@v1
