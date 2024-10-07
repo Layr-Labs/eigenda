@@ -24,6 +24,9 @@ jobs:
       - name: Checkout EigenDA
         uses: actions/checkout@v3
 
+      - name: Checkout EigenDA
+        uses: actions/checkout@v3
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
