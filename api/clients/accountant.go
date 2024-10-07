@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -83,27 +82,25 @@ func (a *Accountant) Stop() {
 
 // accountant calculates and records payment information
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (uint32, uint64, error) {
-	//TODO: do we need to lock the binUsages here in case the rotation happens in the middle of the function?
-	currentBinUsage := a.binUsages[0]
-	currentBinIndex := meterer.GetCurrentBinIndex(a.reservationWindow)
+	//TODO: do we need to lock the binUsages here in case the blob rotation happens in the middle of the function?
+	binUsage := a.binUsages[0] + dataLength
+	now := time.Now().Unix()
+	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
 
 	// first attempt to use the active reservation
-	if currentBinUsage+dataLength <= a.reservation.DataRate {
-		a.binUsages[0] += dataLength
+	if binUsage <= a.reservation.DataRate {
 		return currentBinIndex, 0, nil
 	}
 
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if a.binUsages[2] == 0 && currentBinUsage < a.reservation.DataRate && dataLength <= a.reservation.DataRate {
-		fmt.Println("in overflow:", currentBinUsage, dataLength, a.reservation.DataRate)
-		a.binUsages[0] += dataLength
-		a.binUsages[2] += currentBinUsage + dataLength - a.reservation.DataRate
+	if a.binUsages[2] == 0 && binUsage-dataLength < a.reservation.DataRate && dataLength <= a.reservation.DataRate {
+		a.binUsages[2] += binUsage - a.reservation.DataRate
 		return currentBinIndex, 0, nil
 	}
 
 	// reservation not available, attempt on-demand
 	//todo: rollback if disperser respond with some type of rejection?
-	incrementRequired := uint64(max(uint32(dataLength), a.minChargeableSize)) * uint64(a.pricePerChargeable) / uint64(a.minChargeableSize)
+	incrementRequired := a.PaymentCharged(uint32(dataLength))
 	a.cumulativePayment += incrementRequired
 	if a.cumulativePayment <= uint64(a.onDemand.CumulativePayment) {
 		return 0, a.cumulativePayment, nil
@@ -125,4 +122,14 @@ func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums
 		return nil, err
 	}
 	return header, nil
+}
+
+// PaymentCharged returns the chargeable price for a given data length
+func (a *Accountant) PaymentCharged(dataLength uint32) uint64 {
+	return uint64(core.RoundUpDivide(uint(a.BlobSizeCharged(dataLength)*a.pricePerChargeable), uint(a.minChargeableSize)))
+}
+
+// BlobSizeCharged returns the chargeable data length for a given data length
+func (a *Accountant) BlobSizeCharged(dataLength uint32) uint32 {
+	return max(dataLength, uint32(a.minChargeableSize))
 }

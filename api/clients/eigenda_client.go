@@ -69,14 +69,15 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	// use an eth-rpc to grab on-chain information from payment chain-state
 	// Mock for now
 	binInterval := uint32(time.Minute.Seconds())
+	now := uint64(time.Now().Unix())
 	pricePerChargeable := uint32(1)
 	minChargeableSize := uint32(1)
 	reservation := meterer.ActiveReservation{
-		DataRate:      100,
-		StartEpoch:    meterer.GetCurrentBinIndex(binInterval),
-		EndEpoch:      meterer.GetCurrentBinIndex(binInterval) + 120,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       100,
+		StartTimestamp: now,
+		EndTimestamp:   now + 1200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,

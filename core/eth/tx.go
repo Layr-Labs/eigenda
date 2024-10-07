@@ -1001,8 +1001,8 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 // 		}
 // 		reservations[account.String()] = &core.ActiveReservation{
 // 			DataRate:    reservation.DataRate,
-// 			StartEpoch:  reservation.StartEpoch,
-// 			EndEpoch:    reservation.EndEpoch,
+// 			StartTimestamp:  reservation.StartTimestamp,
+// 			EndTimestamp:    reservation.EndTimestamp,
 // 			QuorumSplit: reservation.QuorumSplit,
 // 		}
 // 	}
@@ -1025,8 +1025,8 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 
 // 	return &core.ActiveReservation{
 // 		DataRate:    reservation.DataRate,
-// 		StartEpoch:  reservation.StartEpoch,
-// 		EndEpoch:    reservation.EndEpoch,
+// 		StartTimestamp:  reservation.StartTimestamp,
+// 		EndTimestamp:    reservation.EndTimestamp,
 // 		QuorumSplit: reservation.QuorumSplit,
 // 	}, nil
 // }

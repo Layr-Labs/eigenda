@@ -49,11 +49,10 @@ func TestMain(m *testing.M) {
 // Mock data initialization method
 func InitializeMockPayments(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
 	// Initialize mock active reservations
-	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
+	now := uint64(time.Now().Unix())
 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
-
-		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
+		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
+		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
 	}
 	pcs.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1500},
@@ -160,7 +159,7 @@ func teardown() {
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	meterer.CreateReservationTable(clientConfig, "reservations")
-	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
+	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	commitment := core.NewG1Point(big.NewInt(0), big.NewInt(1))
 	quoromNumbers := []uint8{0, 1}
 

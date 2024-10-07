@@ -17,7 +17,7 @@ var (
 	DummyMinimumChargeableSize    = uint32(128)
 	DummyMinimumChargeablePayment = uint32(128)
 
-	DummyReservation     = ActiveReservation{DataRate: DummyReservationBytesLimit, StartEpoch: 0, EndEpoch: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	DummyReservation     = ActiveReservation{DataRate: DummyReservationBytesLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
 	DummyOnDemandPayment = OnDemandPayment{CumulativePayment: DummyPaymentLimit}
 )
 
@@ -28,9 +28,9 @@ type TokenAmount uint64 // TODO: change to uint128
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
-	DataRate   uint64 // Bandwidth per reservation bin
-	StartEpoch uint32
-	EndEpoch   uint32
+	DataRate       uint64 // Bandwidth per reservation bin
+	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
+	EndTimestamp   uint64
 
 	QuorumNumbers []uint8
 	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100

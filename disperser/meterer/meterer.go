@@ -173,9 +173,10 @@ func (m *Meterer) ValidateQuorum(blobHeader BlobHeader, allowedQuoroms []uint8) 
 
 // ValidateBinIndex checks if the provided bin index is valid
 func (m *Meterer) ValidateBinIndex(blobHeader BlobHeader, reservation *ActiveReservation) bool {
-	currentBinIndex := GetCurrentBinIndex(m.ReservationWindow)
+	now := uint64(time.Now().Unix())
+	currentBinIndex := GetBinIndex(now, m.ReservationWindow)
 	// Valid bin indexes are either the current bin or the previous bin
-	if (blobHeader.BinIndex != currentBinIndex && blobHeader.BinIndex != (currentBinIndex-1)) || (reservation.StartEpoch > blobHeader.BinIndex || blobHeader.BinIndex > reservation.EndEpoch) {
+	if (blobHeader.BinIndex != currentBinIndex && blobHeader.BinIndex != (currentBinIndex-1)) || (GetBinIndex(reservation.StartTimestamp, m.ReservationWindow) > blobHeader.BinIndex || blobHeader.BinIndex > GetBinIndex(reservation.EndTimestamp, m.ReservationWindow)) {
 		return false
 	}
 	return true
@@ -198,18 +199,17 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, blobHeader BlobHeader, 
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
-	if newUsage <= 2*reservation.DataRate && blobHeader.BinIndex+2 <= reservation.EndEpoch {
+	if newUsage <= 2*reservation.DataRate && blobHeader.BinIndex+2 <= GetBinIndex(reservation.EndTimestamp, m.ReservationWindow) {
 		m.OffchainStore.UpdateReservationBin(ctx, blobHeader.AccountID, uint64(blobHeader.BinIndex+2), newUsage-reservation.DataRate)
 		return nil
 	}
 	return fmt.Errorf("overflow usage exceeds bin limit")
 }
 
-// GetCurrentBinIndex returns the current bin index by chunking time by the bin interval;
+// GetBinIndex returns the current bin index by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
-func GetCurrentBinIndex(binInterval uint32) uint32 {
-	currentTime := time.Now().Unix()
-	return uint32(currentTime) / binInterval
+func GetBinIndex(timestamp uint64, binInterval uint32) uint32 {
+	return uint32(timestamp) / binInterval
 }
 
 //TODO: should we track some number of blobHeaders in the meterer state and expose an API? is it stored somewhere else?

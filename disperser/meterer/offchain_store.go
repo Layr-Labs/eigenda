@@ -55,6 +55,8 @@ func NewOffchainStore(
 		fmt.Println("Error creating on-demand table:", err)
 		return nil, err
 	}
+	//TODO: add a separate thread to periodically clean up the tables
+	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
 	return &OffchainStore{
 		dynamoClient:         dynamoClient,
 		reservationTableName: reservationTableName,

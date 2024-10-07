@@ -13,11 +13,11 @@ import (
 
 func TestNewAccountant(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 500,
@@ -42,11 +42,11 @@ func TestNewAccountant(t *testing.T) {
 
 func TestAccountBlob_Reservation(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 500,
@@ -67,7 +67,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, dataLength, quorums)
 
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, meterer.GetBinIndex(uint64(time.Now().Unix()), reservationWindow), header.BinIndex)
 	assert.Equal(t, uint64(0), header.CumulativePayment)
 	assert.Equal(t, []uint64{500, 0, 0}, accountant.binUsages)
 
@@ -89,11 +89,11 @@ func TestAccountBlob_Reservation(t *testing.T) {
 
 func TestAccountBlob_OnDemand(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 500,
@@ -147,11 +147,11 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 
 func TestAccountBlobCallSeries(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,
@@ -167,17 +167,18 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
+	now := time.Now().Unix()
 
 	// First call: Use reservation
 	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
 	assert.Equal(t, uint64(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
 	header, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
 	assert.Equal(t, uint64(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
@@ -194,11 +195,11 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 func TestAccountBlob_BinRotation(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,
@@ -235,11 +236,11 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 func TestBinRotation(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,
@@ -283,11 +284,11 @@ func TestBinRotation(t *testing.T) {
 
 func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,
@@ -327,11 +328,11 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 
 func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,
@@ -346,11 +347,12 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	defer accountant.Stop()
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
+	now := time.Now().Unix()
 
 	// Okay reservation
 	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetCurrentBinIndex(reservationWindow), header.BinIndex)
+	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
 	assert.Equal(t, uint64(0), header.CumulativePayment)
 	assert.Equal(t, []uint64{800, 0, 0}, accountant.binUsages)
 
@@ -370,11 +372,11 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	reservation := meterer.ActiveReservation{
-		DataRate:      1000,
-		StartEpoch:    100,
-		EndEpoch:      200,
-		QuorumSplit:   []byte{50, 50},
-		QuorumNumbers: []uint8{0, 1},
+		DataRate:       1000,
+		StartTimestamp: 100,
+		EndTimestamp:   200,
+		QuorumSplit:    []byte{50, 50},
+		QuorumNumbers:  []uint8{0, 1},
 	}
 	onDemand := meterer.OnDemandPayment{
 		CumulativePayment: 1000,

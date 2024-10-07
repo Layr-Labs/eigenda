@@ -79,10 +79,10 @@ func TestGetActiveReservations(t *testing.T) {
 	expectedReservations := &meterer.ActiveReservations{
 		Reservations: map[string]*meterer.ActiveReservation{
 			"account1": {
-				DataRate:    100,
-				StartEpoch:  1000,
-				EndEpoch:    2000,
-				QuorumSplit: []byte{50, 50},
+				DataRate:       100,
+				StartTimestamp: 1000,
+				EndTimestamp:   2000,
+				QuorumSplit:    []byte{50, 50},
 			},
 		},
 	}
