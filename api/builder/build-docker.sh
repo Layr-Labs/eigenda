@@ -22,3 +22,7 @@ docker build \
   --tag pbuf-compiler:latest \
   --build-arg PROTOC_URL="${PROTOC_URL}" \
   .
+
+if [ $? -ne 0 ]; then
+  exit 1
+fi
