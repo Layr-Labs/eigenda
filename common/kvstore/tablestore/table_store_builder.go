@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"math"
 	"sort"
+	"sync"
 )
 
 // The table ID reserved for the metadata table.
@@ -34,11 +35,6 @@ const metadataDeletionKey = "deletion"
 // The current schema version of the metadata table.
 const currentSchemaVersion uint64 = 0
 
-var _ kvstore.TableStore = &tableStore{}
-
-// ERR_TABLE_LIMIT_EXCEEDED is returned when the maximum number of tables has been reached.
-var ERR_TABLE_LIMIT_EXCEEDED = errors.New("table limit exceeded")
-
 // StoreType describes the underlying store implementation.
 type StoreType int
 
@@ -49,29 +45,37 @@ const (
 	MapStore
 )
 
-// New creates a new TableStore of the given type. Any data written to disk by the TableStore will be stored in
-// the given path. Can be used to create a new store or to load an existing store from disk.
-func (t StoreType) New(logger logging.Logger, path string) (kvstore.TableStore, error) {
+// Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
+// we will need to provide a way to instantiate a builder using an instantiated base store.
+
+// Builder creates a new TableStoreBuilder of the given type. Any data written to disk by the TableStoreBuilder
+// (and the eventual TableStore it builds) will be stored in the given path. Can be used to create a new store
+// or to load an existing store from disk.
+func (t StoreType) Builder(logger logging.Logger, path string) (kvstore.TableStoreBuilder, error) {
 	switch t {
 	case LevelDB:
 		store, err := leveldb.NewStore(logger, path)
 		if err != nil {
 			return nil, fmt.Errorf("error creating LevelDB store: %w", err)
 		}
-		return wrapper(logger, store)
+		return newTableStoreBuilder(logger, store)
 	case MapStore:
 		store := mapstore.NewStore()
-		return wrapper(logger, store)
+		return newTableStoreBuilder(logger, store)
 	default:
 		return nil, fmt.Errorf("unknown store type: %d", t)
 	}
 }
 
-// tableStore is an implementation of TableStore that wraps a Store.
-type tableStore struct {
+var _ kvstore.TableStoreBuilder = (*tableStoreBuilder)(nil)
+
+type tableStoreBuilder struct {
 	logger logging.Logger
 
-	// A base store implementation that this TableStore wraps.
+	// Used to make this builder thread-safe.
+	lock sync.Mutex
+
+	// A base store implementation
 	base kvstore.Store
 
 	// A map from table names to table IDs.
@@ -88,17 +92,13 @@ type tableStore struct {
 
 	// Builds keys for the namespace table.
 	namespaceTable kvstore.Table
+
+	// Whether the store has been built.
+	built bool
 }
 
-// Future work: if we ever decide to permit third parties to provide custom store implementations, we will need
-// to make wrapper() into a public function.
-
-// wrapper wraps the given Store to create a TableStore.
-//
-// WARNING: it is not safe to access the wrapped store directly while the TableStore is in use. The TableStore uses
-// special key formatting, and direct access to the wrapped store may violate the TableStore's invariants, resulting
-// in undefined behavior.
-func wrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, error) {
+// newTableStoreBuilder creates a new TableStoreBuilder instance.
+func newTableStoreBuilder(logger logging.Logger, base kvstore.Store) (*tableStoreBuilder, error) {
 
 	tableIDMap := make(map[string]uint32)
 	tableIdSet := make(map[uint32]bool)
@@ -139,7 +139,7 @@ func wrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, err
 		}
 	}
 
-	store := &tableStore{
+	builder := &tableStoreBuilder{
 		logger:         logger,
 		base:           base,
 		tableIDMap:     tableIDMap,
@@ -149,12 +149,35 @@ func wrapper(logger logging.Logger, base kvstore.Store) (kvstore.TableStore, err
 		highestTableID: highestTableID,
 	}
 
-	err = store.handleIncompleteDeletion()
+	err = builder.handleIncompleteDeletion()
 	if err != nil {
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
-	return store, nil
+	return builder, nil
+}
+
+// This method handles cleanup of incomplete deletions. Since deletion of a table requires multiple operations that
+// are not atomic in aggregate, it is possible that a table deletion may have been started without being completed.
+// This method makes sure that any such incomplete deletions are completed.
+func (t *tableStoreBuilder) handleIncompleteDeletion() error {
+	deletionTableNameBytes, err := t.metadataTable.Get([]byte(metadataDeletionKey))
+	if errors.Is(err, kvstore.ErrNotFound) {
+		// No deletion in progress, nothing to do.
+		return nil
+	}
+
+	deletionTableName := string(deletionTableNameBytes)
+	t.logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
+
+	return t.DropTable(deletionTableName)
+}
+
+// Get the prefix for the given table ID and prefix length.
+func getPrefix(tableID uint32) []byte {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, tableID)
+	return bytes
 }
 
 // loadNamespaceTable loads the namespace table from disk into the given map. Returns the highest table ID found.
@@ -191,40 +214,23 @@ func loadNamespaceTable(
 	return highestTableID, nil
 }
 
-// This method handles cleanup of incomplete deletions. Since deletion of a table requires multiple operations that
-// are not atomic in aggregate, it is possible that a table deletion may have been started without being completed.
-// This method makes sure that any such incomplete deletions are completed.
-func (t *tableStore) handleIncompleteDeletion() error {
-	deletionTableNameBytes, err := t.metadataTable.Get([]byte(metadataDeletionKey))
-	if errors.Is(err, kvstore.ErrNotFound) {
-		// No deletion in progress, nothing to do.
-		return nil
+// CreateTable creates a new table with the given name. If a table with the given name already exists,
+// this method becomes a no-op. Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
+func (t *tableStoreBuilder) CreateTable(name string) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.built {
+		return errors.New("cannot modify a built store")
 	}
-
-	deletionTableName := string(deletionTableNameBytes)
-	t.logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
-
-	return t.DropTable(deletionTableName)
-}
-
-// Get the prefix for the given table ID and prefix length.
-func getPrefix(tableID uint32) []byte {
-	bytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(bytes, tableID)
-	return bytes
-}
-
-// GetTable gets the table with the given name. If the table does not exist, it is first created.
-func (t *tableStore) GetTable(name string) (kvstore.Table, error) {
 
 	tableID, ok := t.tableIDMap[name]
 	if ok {
-		return t.tableMap[tableID], nil
+		return nil
 	}
 
 	currentTableCount := uint32(len(t.tableIDMap))
 	if currentTableCount == math.MaxUint32-reservedTableCount {
-		return nil, ERR_TABLE_LIMIT_EXCEEDED
+		return kvstore.ErrTableLimitExceeded
 	}
 
 	if uint32(t.highestTableID+1) == currentTableCount {
@@ -260,14 +266,20 @@ func (t *tableStore) GetTable(name string) (kvstore.Table, error) {
 	err := t.namespaceTable.Put(tableKey, []byte(name))
 
 	if err != nil {
-		return nil, fmt.Errorf("error updating namespace table: %w", err)
+		return fmt.Errorf("error updating namespace table: %w", err)
 	}
 
-	return table, nil
+	return nil
 }
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
-func (t *tableStore) DropTable(name string) error {
+func (t *tableStoreBuilder) DropTable(name string) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.built {
+		return errors.New("cannot modify a built store")
+	}
+
 	tableID, ok := t.tableIDMap[name]
 	if !ok {
 		// Table does not exist, nothing to do.
@@ -318,69 +330,67 @@ func (t *tableStore) DropTable(name string) error {
 	return t.metadataTable.Delete(deletionKey)
 }
 
-// GetMaxTableCount returns the maximum number of tables that can be created in the store.
-func (t *tableStore) GetMaxTableCount() uint32 {
-	return maxUserTableCount
-}
+// GetTableCount returns the current number of tables in the store (excluding internal tables utilized by the store).
+func (t *tableStoreBuilder) GetTableCount() uint32 {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-// GetTableCount returns the current number of tables in the store.
-func (t *tableStore) GetTableCount() uint32 {
 	return uint32(len(t.tableIDMap))
 }
 
-// GetTables returns a list of all tables in the store in no particular order.
-func (t *tableStore) GetTables() []kvstore.Table {
-	tables := make([]kvstore.Table, 0, len(t.tableIDMap))
-	for _, table := range t.tableMap {
-		tables = append(tables, table)
+// GetMaxTableCount returns the maximum number of tables that can be created in the store.
+func (t *tableStoreBuilder) GetMaxTableCount() uint32 {
+	return maxUserTableCount
+}
+
+// GetTableNames returns a list of the names of all tables in the store, in no particular order.
+func (t *tableStoreBuilder) GetTableNames() []string {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	names := make([]string, 0, len(t.tableIDMap))
+	for name := range t.tableIDMap {
+		names = append(names, name)
+	}
+	return names
+}
+
+// Build creates a new TableStore instance with the specified tables. After this method is called,
+// the TableStoreBuilder should not be used again.
+func (t *tableStoreBuilder) Build() (kvstore.TableStore, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.built {
+		return nil, errors.New("cannot build a store more than once")
 	}
 
-	return tables
-}
+	tableMap := make(map[string]kvstore.Table, t.GetTableCount())
 
-// tableStoreBatch is a batch for writing to a table store.
-type tableStoreBatch struct {
-	store *tableStore
-	batch kvstore.Batch[[]byte]
-}
-
-// Put adds a key-value pair to the batch.
-func (t *tableStoreBatch) Put(key kvstore.TableKey, value []byte) {
-	if value == nil {
-		value = []byte{}
+	for name, tableID := range t.tableIDMap {
+		tableMap[name] = t.tableMap[tableID]
 	}
-	t.batch.Put(key, value)
-}
 
-// Delete removes a key-value pair from the batch.
-func (t *tableStoreBatch) Delete(key kvstore.TableKey) {
-	t.batch.Delete(key)
-}
-
-// Apply applies the batch to the store.
-func (t *tableStoreBatch) Apply() error {
-	return t.batch.Apply()
-}
-
-// Size returns the number of operations in the batch.
-func (t *tableStoreBatch) Size() uint32 {
-	return t.batch.Size()
-}
-
-// NewBatch creates a new batch for writing to the store.
-func (t *tableStore) NewBatch() kvstore.Batch[kvstore.TableKey] {
-	return &tableStoreBatch{
-		store: t,
-		batch: t.base.NewBatch(),
-	}
+	return newTableStore(t.logger, t.base, tableMap), nil
 }
 
 // Shutdown shuts down the store, flushing any remaining cached data to disk.
-func (t *tableStore) Shutdown() error {
+func (t *tableStoreBuilder) Shutdown() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.built {
+		return errors.New("the builder cannot be used to shut down a store once it has been built")
+	}
+
 	return t.base.Shutdown()
 }
 
 // Destroy shuts down and permanently deletes all data in the store.
-func (t *tableStore) Destroy() error {
+func (t *tableStoreBuilder) Destroy() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.built {
+		return errors.New("the builder cannot be used to destroy a store once it has been built")
+	}
+
 	return t.base.Destroy()
 }
