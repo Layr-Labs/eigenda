@@ -39,7 +39,7 @@ lint:
 	go tool fix ./..
 	golangci-lint run
 
-build:
+build: protoc
 	cd operators/churner && make build
 	cd disperser && make build
 	cd node && make build
