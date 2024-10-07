@@ -6,6 +6,8 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 ARCH=$(uname -m)
 if [ "${ARCH}" == "arm64" ]; then
   PROTOC_URL='https://github.com/protocolbuffers/protobuf/releases/download/v23.4/protoc-23.4-linux-aarch_64.zip'
+elif [ "${ARCH}" == "x86_64" ]; then
+  PROTOC_URL='https://github.com/protocolbuffers/protobuf/releases/download/v23.4/protoc-23.4-linux-x86_64.zip'
 else
   echo "Unsupported architecture: ${ARCH}"
   exit 1
