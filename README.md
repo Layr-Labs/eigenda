@@ -26,23 +26,23 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | Option | Default Value | Environment Variable | Description |
 |--------|---------------|----------------------|-------------|
 | `--addr` | `"127.0.0.1"` | `$EIGENDA_PROXY_ADDR` | Server listening address |
-| `--eigenda-cache-path` | `"resources/SRSTables/"` | `$EIGENDA_PROXY_TARGET_CACHE_PATH` | Directory path to SRS tables for caching. |
-| `--eigenda-custom-quorum-ids` |  | `$EIGENDA_PROXY_CUSTOM_QUORUM_IDS` | Custom quorum IDs for writing blobs. Should not include default quorums 0 or 1. |
-| `--eigenda-disable-point-verification-mode` | `false` | `$EIGENDA_PROXY_DISABLE_POINT_VERIFICATION_MODE` | Disable point verification mode. This mode performs IFFT on data before writing and FFT on data after reading. Disabling requires supplying the entire blob for verification against the KZG commitment. |
-| `--eigenda-disable-tls` | `false` | `$EIGENDA_PROXY_GRPC_DISABLE_TLS` | Disable TLS for gRPC communication with the EigenDA disperser. Default is false. |
-| --eigenda-cert-verification-enabled | `false` | `$EIGENDA_PROXY_CERT_VERIFICATION_ENABLED` | Whether to verify certificates received from EigenDA disperser. |
-| `--eigenda-disperser-rpc` |  | `$EIGENDA_PROXY_EIGENDA_DISPERSER_RPC` | RPC endpoint of the EigenDA disperser. |
-| `--eigenda-svc-manager-addr` |  | `$EIGENDA_PROXY_SERVICE_MANAGER_ADDR` | The deployed EigenDA service manager address. The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment |
-| `--eigenda-eth-confirmation-depth` | `-1` | `$EIGENDA_PROXY_ETH_CONFIRMATION_DEPTH` | The number of Ethereum blocks of confirmation that the DA bridging transaction must have before it is assumed by the proxy to be final. If set negative the proxy will always wait for blob finalization. |
-| `--eigenda-eth-rpc` |  | `$EIGENDA_PROXY_ETH_RPC` | JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/ |
-| `--eigenda-g1-path` | `"resources/g1.point"` | `$EIGENDA_PROXY_TARGET_KZG_G1_PATH` | Directory path to g1.point file. |
-| `--eigenda-g2-tau-path` | `"resources/g2.point.powerOf2"` | `$EIGENDA_PROXY_TARGET_G2_TAU_PATH` | Directory path to g2.point.powerOf2 file. |
-| `--eigenda-max-blob-length` | `"16MiB"` | `$EIGENDA_PROXY_MAX_BLOB_LENGTH` | Maximum blob length to be written or read from EigenDA. Determines the number of SRS points loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size slightly exceeds 1GB. |
-| `--eigenda-put-blob-encoding-version` | `0` | `$EIGENDA_PROXY_PUT_BLOB_ENCODING_VERSION` | Blob encoding version to use when writing blobs from the high-level interface. |
-| `--eigenda-response-timeout` | `60s` | `$EIGENDA_PROXY_RESPONSE_TIMEOUT` | Total time to wait for a response from the EigenDA disperser. Default is 60 seconds. |
-| `--eigenda-signer-private-key-hex` |  | `$EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX` | Hex-encoded signer private key. This key should not be associated with an Ethereum address holding any funds. |
-| `--eigenda-status-query-retry-interval` | `5s` | `$EIGENDA_PROXY_STATUS_QUERY_INTERVAL` | Interval between retries when awaiting network blob finalization. Default is 5 seconds. |
-| `--eigenda-status-query-timeout` | `30m0s` | `$EIGENDA_PROXY_STATUS_QUERY_TIMEOUT` | Duration to wait for a blob to finalize after being sent for dispersal. Default is 30 minutes. |
+| `--eigenda.cache-path` | `"resources/SRSTables/"` | `$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH` | Directory path to SRS tables for caching. |
+| `--eigenda.custom-quorum-ids` |  | `$EIGENDA_PROXY_EIGENDA_CUSTOM_QUORUM_IDS` | Custom quorum IDs for writing blobs. Should not include default quorums 0 or 1. |
+| `--eigenda.disable-point-verification-mode` | `false` | `$EIGENDA_PROXY_EIGENDA_DISABLE_POINT_VERIFICATION_MODE` | Disable point verification mode. This mode performs IFFT on data before writing and FFT on data after reading. Disabling requires supplying the entire blob for verification against the KZG commitment. |
+| `--eigenda.disable-tls` | `false` | `$EIGENDA_PROXY_EIGENDA_GRPC_DISABLE_TLS` | Disable TLS for gRPC communication with the EigenDA disperser. Default is false. |
+| --eigenda.cert-verification-disabled | `false` | `$EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED` | Whether to verify certificates received from EigenDA disperser. |
+| `--eigenda.disperser-rpc` |  | `$EIGENDA_PROXY_EIGENDA_DISPERSER_RPC` | RPC endpoint of the EigenDA disperser. |
+| `--eigenda.svc-manager-addr` |  | `$EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR` | The deployed EigenDA service manager address. The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment |
+| `--eigenda.eth-confirmation-depth` | `-1` | `$EIGENDA_PROXY_EIGENDA_ETH_CONFIRMATION_DEPTH` | The number of Ethereum blocks of confirmation that the DA bridging transaction must have before it is assumed by the proxy to be final. If set negative the proxy will always wait for blob finalization. |
+| `--eigenda.eth-rpc` |  | `$EIGENDA_PROXY_EIGENDA_ETH_RPC` | JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/ |
+| `--eigenda.g1-path` | `"resources/g1.point"` | `$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH` | Directory path to g1.point file. |
+| `--eigenda.g2-power-of-2-path` | `"resources/g2.point.powerOf2"` | `$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_POWER_OF_2_PATH` | Directory path to g2.point.powerOf2 file. |
+| `--eigenda.max-blob-length` | `"16MiB"` | `$EIGENDA_PROXY_EIGENDA_MAX_BLOB_LENGTH` | Maximum blob length to be written or read from EigenDA. Determines the number of SRS points loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size slightly exceeds 1GB. |
+| `--eigenda.put-blob-encoding-version` | `0` | `$EIGENDA_PROXY_EIGENDA_PUT_BLOB_ENCODING_VERSION` | Blob encoding version to use when writing blobs from the high-level interface. |
+| `--eigenda.response-timeout` | `60s` | `$EIGENDA_PROXY_EIGENDA_RESPONSE_TIMEOUT` | Total time to wait for a response from the EigenDA disperser. Default is 60 seconds. |
+| `--eigenda.signer-private-key-hex` |  | `$EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX` | Hex-encoded signer private key. This key should not be associated with an Ethereum address holding any funds. |
+| `--eigenda.status-query-retry-interval` | `5s` | `$EIGENDA_PROXY_EIGENDA_STATUS_QUERY_INTERVAL` | Interval between retries when awaiting network blob finalization. Default is 5 seconds. |
+| `--eigenda.status-query-timeout` | `30m0s` | `$EIGENDA_PROXY_EIGENDA_STATUS_QUERY_TIMEOUT` | Duration to wait for a blob to finalize after being sent for dispersal. Default is 30 minutes. |
 | `--log.color` | `false` | `$EIGENDA_PROXY_LOG_COLOR` | Color the log output if in terminal mode. |
 | `--log.format` | `text` | `$EIGENDA_PROXY_LOG_FORMAT` | Format the log output. Supported formats: 'text', 'terminal', 'logfmt', 'json', 'json-pretty'. |
 | `--log.level` | `INFO` | `$EIGENDA_PROXY_LOG_LEVEL` | The lowest log level that will be output. |
