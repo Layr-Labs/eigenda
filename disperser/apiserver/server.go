@@ -79,7 +79,6 @@ func NewDispersalServer(
 	maxBlobSize int,
 ) *DispersalServer {
 	logger := _logger.With("component", "DispersalServer")
-	logger.Info("attempting to start new dispersal server")
 	for account, rateInfoByQuorum := range rateConfig.Allowlist {
 		for quorumID, rateInfo := range rateInfoByQuorum {
 			logger.Info("[Allowlist]", "account", account, "name", rateInfo.Name, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)

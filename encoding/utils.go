@@ -19,7 +19,7 @@ func GetBlobSize(blobLength uint) uint {
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetEncodedBlobLength(blobLength uint, quorumThreshold, advThreshold uint8) uint {
-	return roundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
+	return RoundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
 }
 
 func NextPowerOf2(d uint64) uint64 {
@@ -27,6 +27,6 @@ func NextPowerOf2(d uint64) uint64 {
 	return uint64(math.Pow(2.0, nextPower))
 }
 
-func roundUpDivide[T constraints.Integer](a, b T) T {
+func RoundUpDivide[T constraints.Integer](a, b T) T {
 	return (a + b - 1) / b
 }

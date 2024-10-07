@@ -47,14 +47,14 @@ func ParamsFromMins[T constraints.Integer](minChunkLength, minNumChunks T) Encod
 func ParamsFromSysPar(numSys, numPar, dataSize uint64) EncodingParams {
 
 	numNodes := numSys + numPar
-	dataLen := roundUpDivide(dataSize, BYTES_PER_SYMBOL)
-	chunkLen := roundUpDivide(dataLen, numSys)
+	dataLen := RoundUpDivide(dataSize, BYTES_PER_SYMBOL)
+	chunkLen := RoundUpDivide(dataLen, numSys)
 	return ParamsFromMins(chunkLen, numNodes)
 
 }
 
 func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
-	dataLen := roundUpDivide(dataSize, BYTES_PER_SYMBOL)
+	dataLen := RoundUpDivide(dataSize, BYTES_PER_SYMBOL)
 	numSys := dataLen / chunkLen
 	return numSys
 }

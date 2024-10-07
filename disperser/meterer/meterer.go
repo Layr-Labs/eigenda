@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -77,6 +78,7 @@ func NewMeterer(
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header BlobHeader) error {
 	//TODO: fix signing
+	fmt.Println("Received blob header for metering", header)
 	// fmt.Println("Received blob header for metering", header)
 	// if err := m.ValidateSignature(ctx, header); err != nil {
 	// 	return fmt.Errorf("invalid signature: %w", err)
@@ -88,13 +90,10 @@ func (m *Meterer) MeterRequest(ctx context.Context, header BlobHeader) error {
 	// 	return fmt.Errorf("failed to get current block number: %w", err)
 	// }
 
-	fmt.Println(GetCurrentBinIndex(m.ReservationWindow))
 	// Validate against the payment method
 	if header.CumulativePayment == 0 {
 		reservation, err := m.ChainState.GetActiveReservationByAccount(ctx, blockNumber, header.AccountID)
 		if err != nil {
-			fmt.Println("pcs.ActiveReservations.Reservations", m.ChainState.ActiveReservations.Reservations)
-			fmt.Println("accountID", header.AccountID)
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
 		if err := m.ServeReservationRequest(ctx, header, reservation); err != nil {
@@ -224,8 +223,8 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 	// update blob header to use the miniumum chargeable size
-	blobHeader.DataLength = max(blobHeader.DataLength, uint32(m.MinChargeableSize))
-	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader)
+	blobSizeCharged := m.BlobSizeCharged(blobHeader.DataLength)
+	err := m.OffchainStore.AddOnDemandPayment(ctx, blobHeader, blobSizeCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
@@ -237,7 +236,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 	}
 
 	// Update bin usage atomically and check against bin capacity
-	if err := m.IncrementGlobalBinUsage(ctx, blobHeader); err != nil {
+	if err := m.IncrementGlobalBinUsage(ctx, blobSizeCharged); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
 		m.OffchainStore.RemoveOnDemandPayment(ctx, blobHeader.AccountID, blobHeader.CumulativePayment)
 		return fmt.Errorf("failed global rate limiting")
@@ -250,6 +249,9 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, blobHeader BlobHeade
 // prevPmt is the largest  cumulative payment strictly less    than blobHeader.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than blobHeader.cumulativePayment if exists
 // nextPmtDataLength is the dataLength of corresponding to nextPmt if exists
+// prevPmt + blobHeader.DataLength * m.FixedFeePerByte
+// <= blobHeader.CumulativePayment
+// <= nextPmt - nextPmtDataLength * m.FixedFeePerByte > nextPmt
 func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, onDemandPayment *OnDemandPayment) error {
 	if blobHeader.CumulativePayment > uint64(onDemandPayment.CumulativePayment) {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
@@ -260,17 +262,25 @@ func (m *Meterer) ValidatePayment(ctx context.Context, blobHeader BlobHeader, on
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+uint64(blobHeader.DataLength*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > blobHeader.CumulativePayment {
+	if prevPmt+m.PaymentCharged(blobHeader.DataLength) > blobHeader.CumulativePayment {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && blobHeader.CumulativePayment+uint64(nextPmtDataLength*m.Config.PricePerChargeable/m.Config.MinChargeableSize) > nextPmt {
+	if nextPmt != 0 && blobHeader.CumulativePayment+m.PaymentCharged(nextPmtDataLength) > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
-	// prevPmt + blobHeader.DataLength * m.FixedFeePerByte <= blobHeader.CumulativePayment
-	//                                                   <= nextPmt - nextPmtDataLength * m.FixedFeePerByte > nextPmt
 	return nil
+}
+
+// PaymentCharged returns the chargeable price for a given data length
+func (m *Meterer) PaymentCharged(dataLength uint32) uint64 {
+	return uint64(core.RoundUpDivide(uint(m.BlobSizeCharged(dataLength)*m.PricePerChargeable), uint(m.MinChargeableSize)))
+}
+
+// BlobSizeCharged returns the chargeable data length for a given data length
+func (m *Meterer) BlobSizeCharged(dataLength uint32) uint32 {
+	return max(dataLength, uint32(m.MinChargeableSize))
 }
 
 // ValidateBinIndex checks if the provided bin index is valid
@@ -286,9 +296,9 @@ func (m *Meterer) ValidateGlobalBinIndex(blobHeader BlobHeader) (uint32, error) 
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobHeader BlobHeader) error {
+func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, blobSizeCharged uint32) error {
 	globalIndex := uint64(time.Now().Unix())
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, blobHeader.DataLength)
+	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, blobSizeCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}

@@ -36,7 +36,7 @@ var (
 	mt                 *meterer.Meterer
 
 	deployLocalStack bool
-	localStackPort   = "4567"
+	localStackPort   = "4566"
 )
 
 func TestMain(m *testing.M) {
@@ -51,6 +51,7 @@ func InitializeMockPayments(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa
 	// Initialize mock active reservations
 	binIndex := meterer.GetCurrentBinIndex(mt.Config.ReservationWindow)
 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
+
 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartEpoch: binIndex + 2, EndEpoch: binIndex + 5, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartEpoch: binIndex - 2, EndEpoch: binIndex + 10, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
 	}
@@ -345,4 +346,115 @@ func TestMetererOnDemand(t *testing.T) {
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, numRequest, len(result))
+}
+
+func TestMeterer_paymentCharged(t *testing.T) {
+	tests := []struct {
+		name               string
+		dataLength         uint32
+		pricePerChargeable uint32
+		minChargeableSize  uint32
+		expected           uint64
+	}{
+		{
+			name:               "Data length equal to min chargeable size",
+			dataLength:         1024,
+			pricePerChargeable: 100,
+			minChargeableSize:  1024,
+			expected:           100,
+		},
+		{
+			name:               "Data length less than min chargeable size",
+			dataLength:         512,
+			pricePerChargeable: 100,
+			minChargeableSize:  1024,
+			expected:           100,
+		},
+		{
+			name:               "Data length greater than min chargeable size",
+			dataLength:         2048,
+			pricePerChargeable: 100,
+			minChargeableSize:  1024,
+			expected:           200,
+		},
+		{
+			name:               "Large data length",
+			dataLength:         1 << 20, // 1 MB
+			pricePerChargeable: 100,
+			minChargeableSize:  1024,
+			expected:           102400,
+		},
+		{
+			name:               "Price not evenly divisible by min chargeable size",
+			dataLength:         1536,
+			pricePerChargeable: 150,
+			minChargeableSize:  1024,
+			expected:           225,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &meterer.Meterer{
+				Config: meterer.Config{
+					PricePerChargeable: tt.pricePerChargeable,
+					MinChargeableSize:  tt.minChargeableSize,
+				},
+			}
+			result := m.PaymentCharged(tt.dataLength)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMeterer_blobSizeCharged(t *testing.T) {
+	tests := []struct {
+		name              string
+		dataLength        uint32
+		minChargeableSize uint32
+		expected          uint32
+	}{
+		{
+			name:              "Data length equal to min chargeable size",
+			dataLength:        1024,
+			minChargeableSize: 1024,
+			expected:          1024,
+		},
+		{
+			name:              "Data length less than min chargeable size",
+			dataLength:        512,
+			minChargeableSize: 1024,
+			expected:          1024,
+		},
+		{
+			name:              "Data length greater than min chargeable size",
+			dataLength:        2048,
+			minChargeableSize: 1024,
+			expected:          2048,
+		},
+		{
+			name:              "Large data length",
+			dataLength:        1 << 20, // 1 MB
+			minChargeableSize: 1024,
+			expected:          1 << 20,
+		},
+		{
+			name:              "Very small data length",
+			dataLength:        16,
+			minChargeableSize: 1024,
+			expected:          1024,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &meterer.Meterer{
+				Config: meterer.Config{
+					MinChargeableSize: tt.minChargeableSize,
+				},
+			}
+			result := m.BlobSizeCharged(tt.dataLength)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

@@ -55,7 +55,7 @@ var _ = Describe("Inabox Integration", func() {
 		paidBlobStatus := []disperser.BlobStatus{}
 		paidKeys := [][]byte{}
 		// TODO: payment calculation unit consistency
-		for i := 0; i < (int(meterer.DummyReservationBytesLimit)+int(meterer.DummyPaymentLimit))/int(singleBlobSize)-1; i++ {
+		for i := 0; i < (int(meterer.DummyReservationBytesLimit)+int(meterer.DummyPaymentLimit))/int(singleBlobSize); i++ {
 			blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{0})
 			Expect(err).To(BeNil())
 			Expect(key).To(Not(BeNil()))

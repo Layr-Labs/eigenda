@@ -193,7 +193,7 @@ func (s *OffchainStore) FindReservationBins(ctx context.Context, accountID strin
 	return reservations, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobHeader) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobHeader, blobSizeCharged uint32) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
@@ -210,7 +210,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobH
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
-			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobHeader.DataLength), 10)},
+			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobSizeCharged), 10)},
 		},
 	)
 
