@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/flags"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
@@ -23,14 +24,13 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	if err := cfg.Check(); err != nil {
 		return err
 	}
+	err := prettyPrintConfig(cliCtx, log)
+	if err != nil {
+		return fmt.Errorf("failed to pretty print config: %w", err)
+	}
+
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
-
-	configJSON, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	log.Info(fmt.Sprintf("Initializing EigenDA proxy server with config: %v", string(configJSON)))
 
 	daRouter, err := server.LoadStoreRouter(ctx, cfg, log)
 	if err != nil {
@@ -69,4 +69,19 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	}
 
 	return ctxinterrupt.Wait(cliCtx.Context)
+}
+
+// TODO: we should probably just change EdaClientConfig struct definition in eigenda-client
+// to have a `json:"-"` tag on the SignerPrivateKeyHex field, to prevent the privateKey from being marshaled at all
+func prettyPrintConfig(cliCtx *cli.Context, log log.Logger) error {
+	// we read a new config which we modify to hide private info in order to log the rest
+	cfg := server.ReadCLIConfig(cliCtx)
+	cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex = "<HIDDEN>"
+
+	configJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	log.Info(fmt.Sprintf("Initializing EigenDA proxy server with config: %v", string(configJSON)))
+	return nil
 }
