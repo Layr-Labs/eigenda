@@ -15,7 +15,11 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: '1.21' # The Go version to download (if necessary) and use.
+
       - run: go version
+
+      - name: Build
+        run: make build
 
       - name: Checkout EigenDA
         uses: actions/checkout@v3
