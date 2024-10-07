@@ -199,21 +199,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	// EnableMinibatchFlag is a flag to enable minibatch processing
-	// Defaults to false
-	EnableMinibatchFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-minibatch"),
-		Usage:    "Enable minibatch processing",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_MINIBATCH"),
-	}
-	MinibatcherPullIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "minibatcher-pull-interval"),
-		Usage:    "Interval at which to pull from the queue and disperse a minibatch. Only used when minibatching is enabled. Defaults to 5s.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MINIBATCHER_PULL_INTERVAL"),
-		Value:    5 * time.Second,
-	}
 	MaxNodeConnectionsFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-node-connections"),
 		Usage:    "Maximum number of connections to the node. Only used when minibatching is enabled. Defaults to 1024.",
@@ -260,8 +245,6 @@ var optionalFlags = []cli.Flag{
 	TargetNumChunksFlag,
 	MaxBlobsToFetchFromStoreFlag,
 	FinalizationBlockDelayFlag,
-	EnableMinibatchFlag,
-	MinibatcherPullIntervalFlag,
 	MaxNodeConnectionsFlag,
 	MaxNumRetriesPerDispersalFlag,
 	EnableGnarkBundleEncodingFlag,
