@@ -29,8 +29,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Build Protobufs
-      run: make protoc
+#    - name: Build Protobufs
+#      run: make protoc
 
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v1.1.1
