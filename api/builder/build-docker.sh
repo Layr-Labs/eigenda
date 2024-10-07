@@ -16,11 +16,11 @@ fi
 # Add the --no-cache flag to force a rebuild.
 # Add the --progress=plain flag to show verbose output during the build.
 
-# TODO use a different image name for different architectures
 docker build \
   -f "${SCRIPT_DIR}/Dockerfile" \
   --tag pbuf-compiler:latest \
   --build-arg PROTOC_URL="${PROTOC_URL}" \
+  --build-arg UID=$(id -u) \
   .
 
 if [ $? -ne 0 ]; then
