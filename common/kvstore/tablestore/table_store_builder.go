@@ -45,13 +45,63 @@ const (
 	MapStore
 )
 
+// New creates a new TableStore instance of the given type. The store will be created at the given path.
+// This method will set up a table for each table name provided, and will drop all tables not in the list.
+// Dropping a table is irreversible and will delete all data in the table, so be very careful not to call
+// this method with table names omitted by mistake.
+func (t StoreType) New(logger logging.Logger, path string, tables ...string) (kvstore.TableStore, error) {
+	builder, err := t.builder(logger, path) // TODO
+	if err != nil {
+		return nil, fmt.Errorf("error creating store builder: %w", err)
+	}
+
+	originalTables := builder.GetTableNames()
+	originalTablesSet := make(map[string]bool)
+	for _, table := range originalTables {
+		originalTablesSet[table] = true
+	}
+
+	newTablesSet := make(map[string]bool)
+	for _, table := range tables {
+		newTablesSet[table] = true
+	}
+
+	// Add new tables.
+	for _, table := range tables {
+		if !originalTablesSet[table] {
+			err = builder.CreateTable(table)
+			if err != nil {
+				return nil, fmt.Errorf("error creating table %s: %w", table, err)
+			}
+
+		}
+	}
+
+	// Drop tables that are not in the list.
+	for _, table := range originalTables {
+		if !newTablesSet[table] {
+			err = builder.DropTable(table)
+			if err != nil {
+				return nil, fmt.Errorf("error dropping table %s: %w", table, err)
+			}
+		}
+	}
+
+	store, err := builder.Build()
+	if err != nil {
+		return nil, fmt.Errorf("error building store: %w", err)
+	}
+
+	return store, nil
+}
+
 // Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
 // we will need to provide a way to instantiate a builder using an instantiated base store.
 
 // Builder creates a new TableStoreBuilder of the given type. Any data written to disk by the TableStoreBuilder
 // (and the eventual TableStore it builds) will be stored in the given path. Can be used to create a new store
 // or to load an existing store from disk.
-func (t StoreType) Builder(logger logging.Logger, path string) (kvstore.TableStoreBuilder, error) {
+func (t StoreType) builder(logger logging.Logger, path string) (kvstore.TableStoreBuilder, error) {
 	switch t {
 	case LevelDB:
 		store, err := leveldb.NewStore(logger, path)
