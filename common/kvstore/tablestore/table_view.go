@@ -138,7 +138,7 @@ func (t *tableView) Destroy() error {
 // tableBatch is a batch for a table in a New.
 type tableBatch struct {
 	table kvstore.Table
-	batch kvstore.Batch[[]byte]
+	batch kvstore.Batch
 }
 
 // Put schedules a key-value pair to be added to the table.
@@ -167,7 +167,7 @@ func (t *tableBatch) Size() uint32 {
 }
 
 // NewBatch creates a new batch for the table.
-func (t *tableView) NewBatch() kvstore.Batch[[]byte] {
+func (t *tableView) NewBatch() kvstore.Batch {
 	return &tableBatch{
 		table: t,
 		batch: t.base.NewBatch(),

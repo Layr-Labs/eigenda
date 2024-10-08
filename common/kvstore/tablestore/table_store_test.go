@@ -1043,7 +1043,7 @@ func (e *explodingStore) Delete(key []byte) error {
 	return e.base.Delete(key)
 }
 
-func (e *explodingStore) NewBatch() kvstore.Batch[[]byte] {
+func (e *explodingStore) NewBatch() kvstore.Batch {
 	panic("not used")
 }
 

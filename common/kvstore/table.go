@@ -8,10 +8,6 @@ var ErrTableLimitExceeded = errors.New("table limit exceeded")
 // ErrTableNotFound is returned when a table is not found.
 var ErrTableNotFound = errors.New("table not found")
 
-// TableKey is a key scoped to a particular table. It can be used to perform batch operations that modify multiple
-// table keys atomically.
-type TableKey []byte
-
 // Table can be used to operate on data in a specific table in a TableStore.
 type Table interface {
 	// Store permits access to the table as if it were a store.
@@ -22,6 +18,23 @@ type Table interface {
 
 	// TableKey creates a new key scoped to this table that can be used for batch operations that modify this table.
 	TableKey(key []byte) TableKey
+}
+
+// TableKey is a key scoped to a particular table. It can be used to perform batch operations that modify multiple
+// table keys atomically.
+type TableKey []byte
+
+// TableBatch is a collection of operations that can be applied atomically to a TableStore.
+type TableBatch interface {
+	// Put stores the given key / value pair in the batch, overwriting any existing value for that key.
+	// If nil is passed as the value, a byte slice of length 0 will be stored.
+	Put(key TableKey, value []byte)
+	// Delete removes the key from the batch.
+	Delete(key TableKey)
+	// Apply atomically writes all the key / value pairs in the batch to the database.
+	Apply() error
+	// Size returns the number of operations in the batch.
+	Size() uint32
 }
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.
@@ -42,7 +55,7 @@ type TableStore interface {
 	GetTables() []Table
 
 	// NewBatch creates a new batch that can be used to perform multiple operations across tables atomically.
-	NewBatch() Batch[TableKey]
+	NewBatch() TableBatch
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
 	Shutdown() error

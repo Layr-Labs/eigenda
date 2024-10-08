@@ -209,10 +209,10 @@ func (store *ttlStore) Delete(key []byte) error {
 	return store.store.Delete(prefixedKey)
 }
 
-var _ kvstore.Batch[[]byte] = &batch{}
+var _ kvstore.Batch = &batch{}
 
 type batch struct {
-	base kvstore.Batch[[]byte]
+	base kvstore.Batch
 }
 
 func (b *batch) Put(key []byte, value []byte) {
@@ -237,7 +237,7 @@ func (b *batch) Size() uint32 {
 }
 
 // NewBatch creates a new batch for the store.
-func (store *ttlStore) NewBatch() kvstore.Batch[[]byte] {
+func (store *ttlStore) NewBatch() kvstore.Batch {
 	return &batch{
 		base: store.store.NewBatch(),
 	}

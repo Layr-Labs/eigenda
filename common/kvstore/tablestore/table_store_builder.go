@@ -95,11 +95,7 @@ func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstor
 	for tableID, tableName := range tableIDMap {
 		tableMap[tableName] = newTableView(base, tableName, tableID)
 	}
-	return &tableStore{
-		logger:   logger,
-		base:     base,
-		tableMap: tableMap,
-	}, nil
+	return newTableStore(logger, base, tableMap), nil
 }
 
 // validateSchema loads/initiates the schema version in the metadata table.
