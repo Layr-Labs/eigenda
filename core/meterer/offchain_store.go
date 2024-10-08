@@ -11,7 +11,6 @@ import (
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -90,12 +89,7 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
 	}
 
-	update := map[string]types.AttributeValue{
-		"BinUsage": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
-	}
-
-	fmt.Println("increment the item in a table", s.reservationTableName)
-	res, err := s.dynamoClient.UpdateItemIncrement(ctx, s.reservationTableName, key, update)
+	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -118,15 +112,12 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, size uint32) (uint64, error) {
+func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"BinIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
 	}
 
-	update := map[string]types.AttributeValue{
-		"BinUsage": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(size), 10)},
-	}
-	res, err := s.dynamoClient.UpdateItemIncrement(ctx, s.globalBinTableName, key, update)
+	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "BinUsage", size)
 	if err != nil {
 		return 0, err
 	}
@@ -147,52 +138,6 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, si
 	}
 
 	return binUsageValue, nil
-}
-
-func (s *OffchainStore) FindReservationBin(ctx context.Context, accountID string, binIndex uint64) (*ReservationBin, error) {
-	key := map[string]types.AttributeValue{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID},
-		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
-	}
-
-	result, err := s.dynamoClient.GetItem(ctx, s.reservationTableName, key)
-	if err != nil {
-		return nil, err
-	}
-
-	if result == nil {
-		return nil, errors.New("reservation not found")
-	}
-
-	var reservation ReservationBin
-	err = attributevalue.UnmarshalMap(result, &reservation)
-	if err != nil {
-		return nil, err
-	}
-
-	return &reservation, nil
-}
-
-// Find all reservation bins for a given account
-func (s *OffchainStore) FindReservationBins(ctx context.Context, accountID string) ([]ReservationBin, error) {
-	result, err := s.dynamoClient.QueryIndex(ctx, s.reservationTableName, "AccountIDIndex", "AccountID = :accountID", commondynamodb.ExpresseionValues{
-		":accountID": &types.AttributeValueMemberS{Value: accountID},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if result == nil {
-		return nil, errors.New("reservation not found")
-	}
-
-	var reservations []ReservationBin
-	err = attributevalue.UnmarshalListOfMaps(result, &reservations)
-	if err != nil {
-		return nil, err
-	}
-
-	return reservations, nil
 }
 
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobHeader, blobSizeCharged uint32) error {
@@ -238,7 +183,8 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 	return nil
 }
 
-// relevant on-demand payment records: previous cumulative payment, next cumulative payment, blob size of next payment
+// GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, blob size of next payment
+// The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
 func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment uint64) (uint64, uint64, uint32, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
 	smallerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",

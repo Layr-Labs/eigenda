@@ -13,12 +13,14 @@ type TimeoutConfig struct {
 	TxnBroadcastTimeout time.Duration
 }
 
-// network parameters (this should be published on-chain and read through contracts)
+// network parameters that should be published on-chain. We currently configure these params through disperser env vars.
 type Config struct {
-	GlobalBytesPerSecond uint64 // 2^64 bytes ~= 18 exabytes per second; if we use uint32, that's ~4GB/s
-	PricePerChargeable   uint32 // 2^64 gwei ~= 18M Eth; uint32 => ~4ETH
-	MinChargeableSize    uint32
-	ReservationWindow    uint32
+	// for rate limiting 2^64 ~= 18 exabytes per second; 2^32 ~= 4GB/s
+	// for payments      2^64 ~= 18M Eth;                2^32 ~= 4ETH
+	GlobalBytesPerSecond uint64 // Global rate limit in bytes per second for on-demand payments
+	MinChargeableSize    uint32 // Minimum size of a chargeable unit in bytes, used as a floor for on-demand payments
+	PricePerChargeable   uint32 // Price per chargeable unit in gwei, used for on-demand payments
+	ReservationWindow    uint32 // Duration of all reservations in seconds, used to calculate bin indices
 }
 
 // disperser API server will receive requests from clients. these requests will be with a blobHeader with payments information (CumulativePayments, BinIndex, and Signature)
