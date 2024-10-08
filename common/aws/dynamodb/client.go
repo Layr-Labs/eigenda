@@ -127,11 +127,6 @@ func (c *Client) PutItems(ctx context.Context, tableName string, items []Item) (
 }
 
 func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item Item) (Item, error) {
-	err := ensureKeyAttributes(key, item)
-	if err != nil {
-		return nil, err
-	}
-
 	update := expression.UpdateBuilder{}
 	for itemKey, itemValue := range item {
 		// Ignore primary key updates
@@ -412,15 +407,4 @@ func (c *Client) readItems(ctx context.Context, tableName string, keys []Key) ([
 	}
 
 	return items, nil
-}
-
-func ensureKeyAttributes(key Key, item Item) error {
-	for itemKey := range item {
-		if _, ok := key[itemKey]; ok {
-			// Cannot update the key
-			return fmt.Errorf("cannot update key %s", itemKey)
-		}
-	}
-
-	return nil
 }
