@@ -76,7 +76,8 @@ func StartProxySvr(cliCtx *cli.Context) error {
 func prettyPrintConfig(cliCtx *cli.Context, log log.Logger) error {
 	// we read a new config which we modify to hide private info in order to log the rest
 	cfg := server.ReadCLIConfig(cliCtx)
-	cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex = "<HIDDEN>"
+	cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex = "HIDDEN"
+	cfg.EigenDAConfig.VerifierConfig.RPCURL = "HIDDEN"
 
 	configJSON, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
