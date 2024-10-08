@@ -157,15 +157,16 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
-func (c *Client) IncrementBy(ctx context.Context, tableName string, key Key, itemKey string, itemValue uint64) (Item, error) {
+// IncrementBy increments the attribute by the value for item that matches with the key
+func (c *Client) IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error) {
 	// ADD numeric values
-	f, err := strconv.ParseFloat(strconv.FormatUint(itemValue, 10), 64)
+	f, err := strconv.ParseFloat(strconv.FormatUint(value, 10), 64)
 	if err != nil {
 		return nil, err
 	}
 
 	update := expression.UpdateBuilder{}
-	update = update.Add(expression.Name(itemKey), expression.Value(aws.Float64(f)))
+	update = update.Add(expression.Name(attr), expression.Value(aws.Float64(f)))
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 	if err != nil {
 		return nil, err
@@ -222,7 +223,8 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 }
 
 // QueryIndexOrderWithLimit returns all items in the index that match the given key
-func (c *Client) QueryIndexOrderWithLimit(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, forward bool, limit int32) ([]Item, error) {
+// If forward is true, the items are returned in ascending order
+func (c *Client) QueryIndexOrderWithLimit(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, forward bool, limit int32) ([]Item, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(tableName),
 		IndexName:                 aws.String(indexName),
