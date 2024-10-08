@@ -66,10 +66,6 @@ func (t StoreType) Create(logger logging.Logger, path string, tables ...string) 
 }
 
 type tableStoreBuilder struct {
-	logger logging.Logger
-
-	// A base store implementation
-	base kvstore.Store
 
 	// A map from table names to table IDs.
 	tableIDMap map[string]uint32
@@ -79,12 +75,6 @@ type tableStoreBuilder struct {
 
 	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
 	highestTableID int64
-
-	// Builds keys for the metadata table.
-	metadataTable kvstore.Table
-
-	// Builds keys for the namespace table.
-	namespaceTable kvstore.Table
 }
 
 // Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
@@ -119,31 +109,28 @@ func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstor
 	}
 
 	builder := &tableStoreBuilder{
-		logger:         logger,
-		base:           base,
 		tableIDMap:     tableIDMap,
 		tableMap:       tableMap,
-		metadataTable:  metadataTable,
-		namespaceTable: namespaceTable,
 		highestTableID: highestTableID,
 	}
 
-	err = builder.handleIncompleteDeletion()
+	err = builder.handleIncompleteDeletion(logger, base, metadataTable, namespaceTable)
 	if err != nil {
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
-	err = addAndRemoveTables(builder, builder.getTableNames(), tables)
+	err = addAndRemoveTables(base, builder, metadataTable, namespaceTable, builder.getTableNames(), tables)
 	if err != nil {
 		return nil, fmt.Errorf("error adding and removing tables: %w", err)
 	}
 
-	store, err := builder.build()
-	if err != nil {
-		return nil, fmt.Errorf("error building store: %w", err)
+	// TODO are all of these maps necessary?
+	nameToTableMap := make(map[string]kvstore.Table)
+	for name, tableID := range tableIDMap {
+		nameToTableMap[name] = tableMap[tableID]
 	}
 
-	return store, nil
+	return newTableStore(logger, base, nameToTableMap), nil
 }
 
 // loadSchema loads/initiates the schema version in the metadata table. Returns true if the schema version
@@ -182,7 +169,10 @@ func loadSchema(metadataTable kvstore.Table) (bool, error) {
 
 // This method adds and removes tables as needed to match the given list of tables.
 func addAndRemoveTables(
+	base kvstore.Store,
 	builder *tableStoreBuilder,
+	metadataTable kvstore.Table,
+	namespaceTable kvstore.Table,
 	originalTables []string,
 	currentTables []string) error {
 
@@ -199,7 +189,7 @@ func addAndRemoveTables(
 	// Add new tables.
 	for _, table := range currentTables {
 		if !originalTablesSet[table] {
-			err := builder.createTable(table)
+			err := builder.createTable(base, namespaceTable, table)
 			if err != nil {
 				return fmt.Errorf("error creating table %s: %w", table, err)
 			}
@@ -210,7 +200,7 @@ func addAndRemoveTables(
 	// Drop tables that are not in the list.
 	for _, table := range originalTables {
 		if !newTablesSet[table] {
-			err := builder.dropTable(table)
+			err := builder.dropTable(base, metadataTable, namespaceTable, table)
 			if err != nil {
 				return fmt.Errorf("error dropping table %s: %w", table, err)
 			}
@@ -223,17 +213,22 @@ func addAndRemoveTables(
 // This method handles cleanup of incomplete deletions. Since deletion of a table requires multiple operations that
 // are not atomic in aggregate, it is possible that a table deletion may have been started without being completed.
 // This method makes sure that any such incomplete deletions are completed.
-func (t *tableStoreBuilder) handleIncompleteDeletion() error {
-	deletionTableNameBytes, err := t.metadataTable.Get([]byte(metadataDeletionKey))
+func (t *tableStoreBuilder) handleIncompleteDeletion(
+	logger logging.Logger,
+	base kvstore.Store,
+	metadataTable kvstore.Table,
+	namespaceTable kvstore.Table) error {
+
+	deletionTableNameBytes, err := metadataTable.Get([]byte(metadataDeletionKey))
 	if errors.Is(err, kvstore.ErrNotFound) {
 		// No deletion in progress, nothing to do.
 		return nil
 	}
 
 	deletionTableName := string(deletionTableNameBytes)
-	t.logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
+	logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
 
-	return t.dropTable(deletionTableName)
+	return t.dropTable(base, metadataTable, namespaceTable, deletionTableName)
 }
 
 // Get the prefix for the given table ID and prefix length.
@@ -279,7 +274,11 @@ func loadNamespaceTable(
 
 // CreateTable creates a new table with the given name. If a table with the given name already exists,
 // this method becomes a no-op. Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
-func (t *tableStoreBuilder) createTable(name string) error {
+func (t *tableStoreBuilder) createTable(
+	base kvstore.Store,
+	namespaceTable kvstore.Table,
+	name string) error {
+
 	tableID, ok := t.tableIDMap[name]
 	if ok {
 		return nil
@@ -315,12 +314,12 @@ func (t *tableStoreBuilder) createTable(name string) error {
 	}
 
 	t.tableIDMap[name] = tableID
-	table := newTableView(t.base, name, tableID)
+	table := newTableView(base, name, tableID)
 	t.tableMap[tableID] = table
 
 	tableKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(tableKey, tableID)
-	err := t.namespaceTable.Put(tableKey, []byte(name))
+	err := namespaceTable.Put(tableKey, []byte(name))
 
 	if err != nil {
 		return fmt.Errorf("error updating namespace table: %w", err)
@@ -330,7 +329,12 @@ func (t *tableStoreBuilder) createTable(name string) error {
 }
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
-func (t *tableStoreBuilder) dropTable(name string) error {
+func (t *tableStoreBuilder) dropTable(
+	base kvstore.Store,
+	metadataTable kvstore.Table,
+	namespaceTable kvstore.Table,
+	name string) error {
+
 	tableID, ok := t.tableIDMap[name]
 	if !ok {
 		// Table does not exist, nothing to do.
@@ -341,12 +345,12 @@ func (t *tableStoreBuilder) dropTable(name string) error {
 	// in the middle of the operation. When next starting up, if an entry is observed in this location,
 	// then the interrupted deletion can be completed.
 	deletionKey := []byte(metadataDeletionKey)
-	err := t.metadataTable.Put(deletionKey, []byte(name))
+	err := metadataTable.Put(deletionKey, []byte(name))
 	if err != nil {
 		return fmt.Errorf("error updating metadata table for deletion: %w", err)
 	}
 
-	it, err := t.base.NewIterator(getPrefix(tableID))
+	it, err := base.NewIterator(getPrefix(tableID))
 	if err != nil {
 		return fmt.Errorf("error creating iterator for table: %w", err)
 	}
@@ -354,7 +358,7 @@ func (t *tableStoreBuilder) dropTable(name string) error {
 
 	// Future work: if this is a performance bottleneck, use batching.
 	for it.Next() {
-		err = t.base.Delete(it.Key())
+		err = base.Delete(it.Key())
 		if err != nil {
 			return fmt.Errorf("error deleting key from table: %w", err)
 		}
@@ -363,7 +367,7 @@ func (t *tableStoreBuilder) dropTable(name string) error {
 	// All table entries have been deleted. Now delete the table from the namespace table.
 	tableKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(tableKey, tableID)
-	err = t.namespaceTable.Delete(tableKey)
+	err = namespaceTable.Delete(tableKey)
 	if err != nil {
 		return fmt.Errorf("error deleting from namespace table: %w", err)
 	}
@@ -378,7 +382,7 @@ func (t *tableStoreBuilder) dropTable(name string) error {
 	}
 
 	// Finally, remove the deletion key from the metadata table.
-	return t.metadataTable.Delete(deletionKey)
+	return metadataTable.Delete(deletionKey)
 }
 
 // GetTableNames returns a list of the names of all tables in the store, in no particular order.
@@ -389,17 +393,4 @@ func (t *tableStoreBuilder) getTableNames() []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-// Build creates a new TableStore instance with the specified tables. After this method is called,
-// the TableStoreBuilder should not be used again.
-func (t *tableStoreBuilder) build() (kvstore.TableStore, error) {
-
-	tableMap := make(map[string]kvstore.Table, len(t.tableIDMap))
-
-	for name, tableID := range t.tableIDMap {
-		tableMap[name] = t.tableMap[tableID]
-	}
-
-	return newTableStore(t.logger, t.base, tableMap), nil
 }
