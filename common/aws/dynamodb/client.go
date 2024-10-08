@@ -127,13 +127,12 @@ func (c *Client) PutItems(ctx context.Context, tableName string, items []Item) (
 }
 
 func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item Item) (Item, error) {
-	err := ensureKeyAttributes(key, item)
-	if err != nil {
-		return nil, err
-	}
-
 	update := expression.UpdateBuilder{}
 	for itemKey, itemValue := range item {
+		// Ignore primary key updates
+		if _, ok := key[itemKey]; ok {
+			continue
+		}
 		update = update.Set(expression.Name(itemKey), expression.Value(itemValue))
 	}
 
@@ -158,25 +157,15 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
-func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key Key, item Item) (Item, error) {
-	err := ensureKeyAttributes(key, item)
+func (c *Client) IncrementBy(ctx context.Context, tableName string, key Key, itemKey string, itemValue uint64) (Item, error) {
+	// ADD numeric values
+	f, err := strconv.ParseFloat(strconv.FormatUint(itemValue, 10), 64)
 	if err != nil {
 		return nil, err
 	}
 
 	update := expression.UpdateBuilder{}
-	for itemKey, itemValue := range item {
-		// ADD numeric values
-		if n, ok := itemValue.(*types.AttributeValueMemberN); ok {
-			f, _ := strconv.ParseFloat(n.Value, 64)
-			update = update.Add(expression.Name(itemKey), expression.Value(aws.Float64(f)))
-
-		} else {
-			// For non-numeric values, use SET as before
-			update = update.Set(expression.Name(itemKey), expression.Value(itemValue))
-		}
-	}
-
+	update = update.Add(expression.Name(itemKey), expression.Value(aws.Float64(f)))
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 	if err != nil {
 		return nil, err
@@ -191,7 +180,6 @@ func (c *Client) UpdateItemIncrement(ctx context.Context, tableName string, key 
 		ReturnValues:              types.ReturnValueUpdatedNew,
 	})
 	if err != nil {
-		fmt.Println("error updating item", err)
 		return nil, err
 	}
 
@@ -417,15 +405,4 @@ func (c *Client) readItems(ctx context.Context, tableName string, keys []Key) ([
 	}
 
 	return items, nil
-}
-
-func ensureKeyAttributes(key Key, item Item) error {
-	for itemKey := range item {
-		if _, ok := key[itemKey]; ok {
-			// Cannot update the key
-			return fmt.Errorf("cannot update key %s", itemKey)
-		}
-	}
-
-	return nil
 }
