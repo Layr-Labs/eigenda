@@ -45,14 +45,68 @@ const (
 	MapStore
 )
 
-// New creates a new TableStore instance of the given type. The store will be created at the given path.
+// Create creates a new TableStore instance of the given type. The store will be created at the given path.
 // This method will set up a table for each table name provided, and will drop all tables not in the list.
 // Dropping a table is irreversible and will delete all data in the table, so be very careful not to call
 // this method with table names omitted by mistake.
-func (t StoreType) New(logger logging.Logger, path string, tables ...string) (kvstore.TableStore, error) {
-	builder, err := t.builder(logger, path) // TODO
+func (t StoreType) Create(logger logging.Logger, path string, tables ...string) (kvstore.TableStore, error) {
+
+	var base kvstore.Store
+	var err error
+
+	switch t {
+	case LevelDB:
+		base, err = leveldb.NewStore(logger, path)
+		if err != nil {
+			return nil, fmt.Errorf("error creating LevelDB store: %w", err)
+		}
+	case MapStore:
+		base = mapstore.NewStore()
+	default:
+		return nil, fmt.Errorf("unknown store type: %d", t)
+	}
+
+	return create(logger, base, tables...)
+}
+
+var _ kvstore.TableStoreBuilder = (*tableStoreBuilder)(nil)
+
+type tableStoreBuilder struct {
+	logger logging.Logger
+
+	// Used to make this builder thread-safe.
+	lock sync.Mutex
+
+	// A base store implementation
+	base kvstore.Store
+
+	// A map from table names to table IDs.
+	tableIDMap map[string]uint32
+
+	// A map from table IDs to tables.
+	tableMap map[uint32]kvstore.Table
+
+	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
+	highestTableID int64
+
+	// Builds keys for the metadata table.
+	metadataTable kvstore.Table
+
+	// Builds keys for the namespace table.
+	namespaceTable kvstore.Table
+
+	// Whether the store has been built.
+	built bool
+}
+
+// Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
+// we will need to make this method public.
+
+// create creates a new TableStore instance with the given base store and table names.
+func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore.TableStore, error) {
+	builder, err := newTableStoreBuilder(logger, base)
 	if err != nil {
-		return nil, fmt.Errorf("error creating store builder: %w", err)
+		return nil, fmt.Errorf("error creating table store builder: %w", err)
 	}
 
 	originalTables := builder.GetTableNames()
@@ -93,58 +147,6 @@ func (t StoreType) New(logger logging.Logger, path string, tables ...string) (kv
 	}
 
 	return store, nil
-}
-
-// Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
-// we will need to provide a way to instantiate a builder using an instantiated base store.
-
-// Builder creates a new TableStoreBuilder of the given type. Any data written to disk by the TableStoreBuilder
-// (and the eventual TableStore it builds) will be stored in the given path. Can be used to create a new store
-// or to load an existing store from disk.
-func (t StoreType) builder(logger logging.Logger, path string) (kvstore.TableStoreBuilder, error) {
-	switch t {
-	case LevelDB:
-		store, err := leveldb.NewStore(logger, path)
-		if err != nil {
-			return nil, fmt.Errorf("error creating LevelDB store: %w", err)
-		}
-		return newTableStoreBuilder(logger, store)
-	case MapStore:
-		store := mapstore.NewStore()
-		return newTableStoreBuilder(logger, store)
-	default:
-		return nil, fmt.Errorf("unknown store type: %d", t)
-	}
-}
-
-var _ kvstore.TableStoreBuilder = (*tableStoreBuilder)(nil)
-
-type tableStoreBuilder struct {
-	logger logging.Logger
-
-	// Used to make this builder thread-safe.
-	lock sync.Mutex
-
-	// A base store implementation
-	base kvstore.Store
-
-	// A map from table names to table IDs.
-	tableIDMap map[string]uint32
-
-	// A map from table IDs to tables.
-	tableMap map[uint32]kvstore.Table
-
-	// The highest ID of all user tables in the store. Is -1 if there are no user tables.
-	highestTableID int64
-
-	// Builds keys for the metadata table.
-	metadataTable kvstore.Table
-
-	// Builds keys for the namespace table.
-	namespaceTable kvstore.Table
-
-	// Whether the store has been built.
-	built bool
 }
 
 // newTableStoreBuilder creates a new TableStoreBuilder instance.
