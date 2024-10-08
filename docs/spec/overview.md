@@ -25,7 +25,7 @@ Because of this, EigenDA makes use of the EigenLayer state, which is stored on E
 
 Among extant DA solutions, EigenDA takes an approach to scalability which is unique in that it yields true horizontal scalability: Every additional unit of capacity contributed by an operator can increase the total system capacity. 
 
-This property is achieved by using a Reed Solomon erasure encoding scheme to shard the blob data across the DA nodes. While other systems such as Celestia and Danksharding (planned) also make use of Reed Solomon encoding, they do so only for the purpose of supporting certain observability properties of Data Availability Sampling (DAS) by light nodes. On the other hand, all incentivized/full nodes of the system download, store, and serve the full system bandwidth. 
+This property is achieved by using a Reed Solomon erasure encoding scheme to shard the blob data across the DA nodes. While other systems such as Celestia also make use of Reed Solomon encoding, they do so only for the purpose of supporting certain observability properties of Data Availability Sampling (DAS) by light nodes. On the other hand, all incentivized/full nodes of the system download, store, and serve the full system bandwidth. 
 
 Horizontal scalability provides the promise for the technological bottlenecks of DA capacity to continually track demand, which has enormous implications for Layer 2 ecosystems. 
 
