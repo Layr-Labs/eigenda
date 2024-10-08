@@ -92,39 +92,26 @@ type tableStoreBuilder struct {
 
 // create creates a new TableStore instance with the given base store and table names.
 func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore.TableStore, error) {
+	// A map from table name to table ID.
 	tableIDMap := make(map[string]uint32)
+
+	// A set of table IDs.
 	tableIdSet := make(map[uint32]bool)
+
+	// A map from table ID to table.
 	tableMap := make(map[uint32]kvstore.Table)
 
-	highestTableID := int64(-1)
+	highestTableID := int64(-1) // TODO refactor how table IDs are allocated
 
 	metadataTable := newTableView(base, "metadata", metadataTableID)
-	schemaKey := []byte(metadataSchemaVersionKey)
-	onDiskSchemaBytes, err := metadataTable.Get(schemaKey)
-
 	namespaceTable := newTableView(base, "namespace", namespaceTableID)
 
-	if errors.Is(err, kvstore.ErrNotFound) {
-		// This store is new, no on disk schema version exists.
-		onDiskSchemaBytes = make([]byte, 8)
-		binary.BigEndian.PutUint64(onDiskSchemaBytes, currentSchemaVersion)
+	preExisting, err := loadSchema(metadataTable)
+	if err != nil {
+		return nil, fmt.Errorf("error loading schema: %w", err)
+	}
 
-		err = metadataTable.Put(schemaKey, onDiskSchemaBytes)
-		if err != nil {
-			return nil, fmt.Errorf("error setting schema version in metadata table: %w", err)
-		}
-	} else {
-		// This store is not new. Load data from disk.
-
-		// Verify schema version.
-		onDiskSchema := binary.BigEndian.Uint64(onDiskSchemaBytes)
-		if onDiskSchema != currentSchemaVersion {
-			// In the future if we change schema versions, we may need to write migration code here.
-			return nil, fmt.Errorf(
-				"incompatible schema version: code is at version %d, data on disk is at version %d",
-				currentSchemaVersion, onDiskSchema)
-		}
-
+	if preExisting {
 		highestTableID, err = loadNamespaceTable(base, namespaceTable, tableIDMap, tableMap, tableIdSet)
 		if err != nil {
 			return nil, fmt.Errorf("error loading namespace table: %w", err)
@@ -146,36 +133,9 @@ func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstor
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
-	// Determine which tables to keep and which to drop.
-	originalTables := builder.getTableNames()
-	originalTablesSet := make(map[string]bool)
-	for _, table := range originalTables {
-		originalTablesSet[table] = true
-	}
-	newTablesSet := make(map[string]bool)
-	for _, table := range tables {
-		newTablesSet[table] = true
-	}
-
-	// Add new tables.
-	for _, table := range tables {
-		if !originalTablesSet[table] {
-			err = builder.createTable(table)
-			if err != nil {
-				return nil, fmt.Errorf("error creating table %s: %w", table, err)
-			}
-
-		}
-	}
-
-	// Drop tables that are not in the list.
-	for _, table := range originalTables {
-		if !newTablesSet[table] {
-			err = builder.dropTable(table)
-			if err != nil {
-				return nil, fmt.Errorf("error dropping table %s: %w", table, err)
-			}
-		}
+	err = addAndRemoveTables(builder, builder.getTableNames(), tables)
+	if err != nil {
+		return nil, fmt.Errorf("error adding and removing tables: %w", err)
 	}
 
 	store, err := builder.build()
@@ -184,6 +144,80 @@ func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstor
 	}
 
 	return store, nil
+}
+
+// loadSchema loads/initiates the schema version in the metadata table. Returns true if the schema version
+// was found (meaning the store is pre-existing), and false otherwise (meaning the store is new).
+func loadSchema(metadataTable kvstore.Table) (bool, error) {
+
+	schemaKey := []byte(metadataSchemaVersionKey)
+	onDiskSchemaBytes, err := metadataTable.Get(schemaKey)
+
+	if errors.Is(err, kvstore.ErrNotFound) {
+		// This store is new, no on disk schema version exists.
+		onDiskSchemaBytes = make([]byte, 8)
+		binary.BigEndian.PutUint64(onDiskSchemaBytes, currentSchemaVersion)
+
+		err = metadataTable.Put(schemaKey, onDiskSchemaBytes)
+		if err != nil {
+			return false, fmt.Errorf("error setting schema version in metadata table: %w", err)
+		}
+
+		return false, nil
+	} else if err == nil {
+		// Verify schema version.
+		onDiskSchema := binary.BigEndian.Uint64(onDiskSchemaBytes)
+		if onDiskSchema != currentSchemaVersion {
+			// In the future if we change schema versions, we may need to write migration code here.
+			return true, fmt.Errorf(
+				"incompatible schema version: code is at version %d, data on disk is at version %d",
+				currentSchemaVersion, onDiskSchema)
+		}
+
+		return true, nil
+	}
+
+	return false, err
+}
+
+// This method adds and removes tables as needed to match the given list of tables.
+func addAndRemoveTables(
+	builder *tableStoreBuilder,
+	originalTables []string,
+	currentTables []string) error {
+
+	// Determine which tables to keep and which to drop.
+	originalTablesSet := make(map[string]bool)
+	for _, table := range originalTables {
+		originalTablesSet[table] = true
+	}
+	newTablesSet := make(map[string]bool)
+	for _, table := range currentTables {
+		newTablesSet[table] = true
+	}
+
+	// Add new tables.
+	for _, table := range currentTables {
+		if !originalTablesSet[table] {
+			err := builder.createTable(table)
+			if err != nil {
+				return fmt.Errorf("error creating table %s: %w", table, err)
+			}
+
+		}
+	}
+
+	// Drop tables that are not in the list.
+	for _, table := range originalTables {
+		if !newTablesSet[table] {
+			err := builder.dropTable(table)
+			if err != nil {
+				return fmt.Errorf("error dropping table %s: %w", table, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // This method handles cleanup of incomplete deletions. Since deletion of a table requires multiple operations that

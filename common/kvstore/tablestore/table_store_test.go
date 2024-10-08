@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -904,84 +905,75 @@ func (e *explodingStore) Destroy() error {
 	return e.base.Destroy()
 }
 
-//func TestInterruptedTableDeletion(t *testing.T) {
-//	deleteDBDirectory(t)
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(t, err)
-//
-//	store, err := LevelDB.Create(logger, dbPath, "table1", "table2")
-//	assert.NoError(t, err)
-//
-//	table1, err := store.GetTable("table1")
-//	assert.NoError(t, err)
-//
-//	table2, err := store.GetTable("table2")
-//	assert.NoError(t, err)
-//
-//	// Write some data to the tables
-//	for i := 0; i < 100; i++ {
-//		k := make([]byte, 8)
-//		binary.BigEndian.PutUint64(k, uint64(i))
-//
-//		value := make([]byte, 8)
-//		binary.BigEndian.PutUint64(value, uint64(i))
-//
-//		err = table1.Put(k, value)
-//		assert.NoError(t, err)
-//
-//		err = table2.Put(k, value)
-//		assert.NoError(t, err)
-//	}
-//
-//	// Drop one of the tables (requires restart). Use a store that causes the drop operation to fail partway through.
-//	err = store.Shutdown()
-//	assert.NoError(t, err)
-//
-//	base, err := leveldb.NewStore(logger, dbPath)
-//	assert.NoError(t, err)
-//
-//	explodingBase := &explodingStore{
-//		base:               base,
-//		deletionsRemaining: 50,
-//	}
-//
-//	builder, err = newTableStoreBuilder(logger, explodingBase)
-//	assert.NoError(t, err)
-//
-//	store, err = builder.Build()
-//	assert.NoError(t, err)
-//
-//	err = builder.DropTable("table1")
-//	assert.Error(t, err)
-//
-//	err = store.Shutdown()
-//	assert.NoError(t, err)
-//
-//	// Restart the store. The table should be gone by the time the method returns.
-//	builder, err = LevelDB.Builder(logger, dbPath)
-//	assert.NoError(t, err)
-//
-//	store, err = builder.Build()
-//	assert.NoError(t, err)
-//
-//	tables := store.GetTables()
-//	assert.Equal(t, 1, len(tables))
-//	assert.Equal(t, "table2", tables[0].Name())
-//	table2, err = store.GetTable("table2")
-//	assert.NoError(t, err)
-//
-//	// Check that the data in the remaining table is still there. We shouldn't see any data from the deleted table.
-//	for i := 0; i < 100; i++ {
-//		k := make([]byte, 8)
-//		binary.BigEndian.PutUint64(k, uint64(i))
-//		value, err := table2.Get(k)
-//		assert.NoError(t, err)
-//		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
-//	}
-//
-//	err = store.Destroy()
-//	assert.NoError(t, err)
-//
-//	verifyDBIsDeleted(t)
-//}
+func TestInterruptedTableDeletion(t *testing.T) {
+	deleteDBDirectory(t)
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	store, err := LevelDB.Create(logger, dbPath, "table1", "table2")
+	assert.NoError(t, err)
+
+	table1, err := store.GetTable("table1")
+	assert.NoError(t, err)
+
+	table2, err := store.GetTable("table2")
+	assert.NoError(t, err)
+
+	// Write some data to the tables
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		value := make([]byte, 8)
+		binary.BigEndian.PutUint64(value, uint64(i))
+
+		err = table1.Put(k, value)
+		assert.NoError(t, err)
+
+		err = table2.Put(k, value)
+		assert.NoError(t, err)
+	}
+
+	// Drop one of the tables (requires restart). Use a store that causes the drop operation to fail partway through.
+	err = store.Shutdown()
+	assert.NoError(t, err)
+
+	base, err := leveldb.NewStore(logger, dbPath)
+	assert.NoError(t, err)
+
+	explodingBase := &explodingStore{
+		base:               base,
+		deletionsRemaining: 50,
+	}
+
+	_, err = create(logger, explodingBase, "table2")
+	assert.Error(t, err)
+
+	err = explodingBase.Shutdown()
+	assert.NoError(t, err)
+
+	// Restart the store. The table should be gone by the time the method returns.
+	store, err = LevelDB.Create(logger, dbPath, "table2")
+	assert.NoError(t, err)
+
+	tables := store.GetTables()
+	assert.Equal(t, 1, len(tables))
+	assert.Equal(t, "table2", tables[0].Name())
+	table2, err = store.GetTable("table2")
+	assert.NoError(t, err)
+
+	// Check that the data in the remaining table is still there. We shouldn't see any data from the deleted table.
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+		value, err := table2.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
+	}
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+
+	verifyDBIsDeleted(t)
+}
