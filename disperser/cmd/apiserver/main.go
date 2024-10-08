@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	mt "github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -59,7 +61,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
@@ -96,6 +97,43 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	reg := prometheus.NewRegistry()
 
+	var meterer *mt.Meterer
+	if config.EnablePaymentMeterer {
+		mtConfig := mt.Config{
+			PricePerChargeable:   config.PricePerChargeable,
+			GlobalBytesPerSecond: config.OnDemandGlobalLimit,
+			MinChargeableSize:    config.MinChargeableSize,
+			ReservationWindow:    config.ReservationWindow,
+		}
+
+		paymentChainState := mt.NewOnchainPaymentState()
+
+		paymentChainState.InitializeOnchainPaymentState()
+
+		store, err := mt.NewOffchainStore(
+			config.AwsClientConfig,
+			"reservations",
+			"ondemand",
+			"global",
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		// add some default sensible configs
+		meterer, err = mt.NewMeterer(
+			mtConfig,
+			mt.TimeoutConfig{},
+			paymentChainState,
+			store,
+			logging.NewNoopLogger(),
+			// metrics.NewNoopMetrics(),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create meterer: %w", err)
+		}
+	}
+
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
@@ -131,6 +169,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		transactor,
 		logger,
 		metrics,
+		meterer,
 		ratelimiter,
 		config.RateConfig,
 		config.MaxBlobSize,

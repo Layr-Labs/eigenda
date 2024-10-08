@@ -76,6 +76,35 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	EnablePaymentMeterer = cli.BoolFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "enable-payment-meterer"),
+		Usage:  "enable payment meterer",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_PAYMENT_METERER"),
+	}
+	ReservationWindow = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "reservation-window"),
+		Usage:  "reservation window (seconds)",
+		Value:  375, // Interval that allows 3 32MB blobs at minimal throughput
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "RESERVATION_WINDOW"),
+	}
+	MinChargeableSize = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "min-chargeable-size"),
+		Usage:  "min chargeable size",
+		Value:  1000,
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "MIN_CHARGEABLE_SIZE"),
+	}
+	PricePerChargeable = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "price-per-chargeable"),
+		Usage:  "price per chargeable",
+		Value:  1000,
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "PRICE_PER_CHARGEABLE"),
+	}
+	OnDemandGlobalLimit = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "on-demand-global-limit"),
+		Usage:  "on demand global limit (bytes per second)",
+		Value:  1000,
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_GLOBAL_LIMIT"),
+	}
 	EnableRatelimiter = cli.BoolFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "enable-ratelimiter"),
 		Usage:  "enable rate limiter",
@@ -116,6 +145,11 @@ var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	EnableMetrics,
 	EnableRatelimiter,
+	EnablePaymentMeterer,
+	ReservationWindow,
+	MinChargeableSize,
+	OnDemandGlobalLimit,
+	PricePerChargeable,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
 	ShadowTableNameFlag,

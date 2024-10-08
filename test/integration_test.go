@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -20,12 +21,17 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/ory/dockertest/v3"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -51,6 +57,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -64,6 +71,15 @@ var (
 	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 	serviceManagerAddress   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
 	handleBatchLivenessChan = make(chan time.Time, 1)
+
+	dockertestPool     *dockertest.Pool
+	dockertestResource *dockertest.Resource
+	dynamoClient       *commondynamodb.Client
+	clientConfig       commonaws.ClientConfig
+	signer             *meterer.EIP712Signer
+
+	deployLocalStack bool
+	localStackPort   = "4565"
 )
 
 const (
@@ -194,7 +210,81 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	tx := &coremock.MockTransactor{}
 	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
 	tx.On("GetQuorumCount").Return(1, nil)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig, testMaxBlobSize)
+
+	minimumChargeableSize := uint32(128)
+	minimumChargeablePayment := uint32(128)
+	reservationBytesLimit := uint64(1024)
+	paymentLimit := meterer.TokenAmount(512)
+	meterConfig := meterer.Config{
+		GlobalBytesPerSecond: 1024,
+		PricePerChargeable:   minimumChargeablePayment,
+		MinChargeableSize:    minimumChargeableSize,
+		ReservationWindow:    uint32(60),
+	}
+
+	paymentChainState := meterer.NewOnchainPaymentState()
+
+	paymentChainState.InitializeOnchainPaymentState()
+
+	// TODO: replace with better mocking of payment contract state
+	// Initialize mock active reservations
+	// this is disperser client's private key used in tests
+	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
+	if err != nil {
+		panic("failed to convert hex to ECDSA")
+	}
+
+	dummyReservation := meterer.ActiveReservation{DataRate: reservationBytesLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	dummyOnDemandPayment := meterer.OnDemandPayment{CumulativePayment: paymentLimit}
+
+	paymentChainState.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
+		crypto.PubkeyToAddress(privateKey.PublicKey).Hex(): &dummyReservation,
+	}
+	paymentChainState.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
+		crypto.PubkeyToAddress(privateKey.PublicKey).Hex(): &dummyOnDemandPayment,
+	}
+
+	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalStack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+
+	if deployLocalStack {
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			teardown()
+			panic("failed to start localstack container")
+		}
+	}
+
+	if err != nil {
+		teardown()
+		panic("failed to create logger")
+	}
+
+	clientConfig = commonaws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+	}
+
+	offchainStore, err := meterer.NewOffchainStore(
+		clientConfig,
+		"reservations",
+		"ondemand",
+		"global",
+		logging.NewNoopLogger(),
+	)
+	if err != nil {
+		panic("failed to create offchain store")
+	}
+	meterer, err := meterer.NewMeterer(meterConfig, meterer.TimeoutConfig{}, paymentChainState, offchainStore, logger)
+	if err != nil {
+		panic("failed to create meterer")
+	}
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
 		batcher:       batcher,
@@ -345,7 +435,9 @@ func mustMakeRetriever(cst core.IndexedChainState, logger logging.Logger) (*comm
 }
 
 func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+	code := m.Run()
+	teardown()
+	os.Exit(code)
 }
 
 func TestDispersalAndRetrieval(t *testing.T) {
@@ -576,4 +668,10 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	restored = bytes.TrimRight(restored, "\x00")
 	assert.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
+}
+
+func teardown() {
+	if deployLocalStack {
+		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	}
 }
