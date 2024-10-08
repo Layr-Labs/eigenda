@@ -140,11 +140,11 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, si
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobHeader, blobSizeCharged uint32) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata PaymentMetadata, symbolsCharged uint32) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
+			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(paymentMetadata.CumulativePayment, 10)},
 		},
 	)
 	if err != nil {
@@ -155,9 +155,9 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, blobHeader BlobH
 	}
 	err = s.dynamoClient.PutItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: blobHeader.AccountID},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(blobHeader.CumulativePayment, 10)},
-			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(blobSizeCharged), 10)},
+			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(paymentMetadata.CumulativePayment, 10)},
+			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(symbolsCharged), 10)},
 		},
 	)
 
