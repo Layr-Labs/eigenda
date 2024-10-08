@@ -77,7 +77,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:     SignerPrivateKeyHexFlagName,
-			Usage:    "Hex-encoded signer private key. This key should not be associated with an Ethereum address holding any funds.",
+			Usage:    "Hex-encoded signer private key. Used for authn/authz and rate limits on EigenDA disperser. Should not be associated with an Ethereum address holding any funds.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SIGNER_PRIVATE_KEY_HEX")},
 			Category: category,
 		},
