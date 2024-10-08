@@ -491,6 +491,160 @@ func TestDropTable(t *testing.T) {
 	verifyDBIsDeleted(t)
 }
 
+func TestSimultaneousAddAndDrop(t *testing.T) {
+	deleteDBDirectory(t)
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	store, err := LevelDB.Create(logger, dbPath, "table1", "table2", "table3", "table4", "table5")
+	assert.NoError(t, err)
+
+	table1, err := store.GetTable("table1")
+	assert.NoError(t, err)
+
+	table2, err := store.GetTable("table2")
+	assert.NoError(t, err)
+
+	table3, err := store.GetTable("table3")
+	assert.NoError(t, err)
+
+	table4, err := store.GetTable("table4")
+	assert.NoError(t, err)
+
+	table5, err := store.GetTable("table5")
+	assert.NoError(t, err)
+
+	// Insert some data into the tables
+	for i := 0; i < 100; i++ {
+		value := make([]byte, 8)
+		binary.BigEndian.PutUint64(value, uint64(i))
+
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		err = table1.Put(k, value)
+		assert.NoError(t, err)
+
+		err = table2.Put(k, value)
+		assert.NoError(t, err)
+
+		err = table3.Put(k, value)
+		assert.NoError(t, err)
+
+		err = table4.Put(k, value)
+		assert.NoError(t, err)
+
+		err = table5.Put(k, value)
+		assert.NoError(t, err)
+	}
+
+	// Verify the data is there
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		expectedValue := make([]byte, 8)
+		binary.BigEndian.PutUint64(expectedValue, uint64(i))
+
+		value, err := table1.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+
+		value, err = table2.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+
+		value, err = table3.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+
+		value, err = table4.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+
+		value, err = table5.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+	}
+
+	// In order to drop a table, we will need to close the store and reopen it.
+	err = store.Shutdown()
+	assert.NoError(t, err)
+
+	store, err = LevelDB.Create(logger, dbPath, "table1", "table5", "table6", "table7", "table8", "table9")
+	assert.NoError(t, err)
+
+	table1, err = store.GetTable("table1")
+	assert.NoError(t, err)
+
+	_, err = store.GetTable("table2")
+	assert.Equal(t, kvstore.ErrTableNotFound, err)
+
+	_, err = store.GetTable("table3")
+	assert.Equal(t, kvstore.ErrTableNotFound, err)
+
+	_, err = store.GetTable("table4")
+	assert.Equal(t, kvstore.ErrTableNotFound, err)
+
+	table5, err = store.GetTable("table5")
+	assert.NoError(t, err)
+
+	table6, err := store.GetTable("table6")
+	assert.NoError(t, err)
+
+	table7, err := store.GetTable("table7")
+	assert.NoError(t, err)
+
+	table8, err := store.GetTable("table8")
+	assert.NoError(t, err)
+
+	table9, err := store.GetTable("table9")
+	assert.NoError(t, err)
+
+	// Check data in the tables that were not dropped
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		expectedValue := make([]byte, 8)
+		binary.BigEndian.PutUint64(expectedValue, uint64(i))
+
+		value, err := table1.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+
+		value, err = table5.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue, value)
+	}
+
+	// Verify the table IDs. There should be no gaps, and the tables that did not get dropped should have the same IDs
+	// as before.
+	tableView1 := table1.(*tableView)
+	assert.Equal(t, uint32(0), tableView1.prefix)
+
+	tableView5 := table5.(*tableView)
+	assert.Equal(t, uint32(4), tableView5.prefix)
+
+	tableView6 := table6.(*tableView)
+	assert.Equal(t, uint32(1), tableView6.prefix)
+
+	tableView7 := table7.(*tableView)
+	assert.Equal(t, uint32(2), tableView7.prefix)
+
+	tableView8 := table8.(*tableView)
+	assert.Equal(t, uint32(3), tableView8.prefix)
+
+	tableView9 := table9.(*tableView)
+	assert.Equal(t, uint32(5), tableView9.prefix)
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+
+	verifyDBIsDeleted(t)
+}
+
 func TestIteration(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
