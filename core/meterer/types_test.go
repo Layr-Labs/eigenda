@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -20,24 +19,21 @@ func TestEIP712Signer(t *testing.T) {
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
-
-	header := &meterer.BlobHeader{
+	header := &meterer.PaymentMetadata{
 		BinIndex:          0,
 		CumulativePayment: 1000,
-		Commitment:        *commitment,
 		DataLength:        1024,
 		QuorumNumbers:     []uint8{1},
 	}
 
-	t.Run("SignBlobHeader", func(t *testing.T) {
-		signature, err := signer.SignBlobHeader(header, privateKey)
+	t.Run("SignPaymentMetadata", func(t *testing.T) {
+		signature, err := signer.SignPaymentMetadata(header, privateKey)
 		require.NoError(t, err)
 		assert.NotEmpty(t, signature)
 	})
 
 	t.Run("RecoverSender", func(t *testing.T) {
-		signature, err := signer.SignBlobHeader(header, privateKey)
+		signature, err := signer.SignPaymentMetadata(header, privateKey)
 		require.NoError(t, err)
 
 		header.Signature = signature
@@ -49,7 +45,7 @@ func TestEIP712Signer(t *testing.T) {
 	})
 }
 
-func TestConstructBlobHeader(t *testing.T) {
+func TestConstructPaymentMetadata(t *testing.T) {
 	chainID := big.NewInt(17000)
 	verifyingContract := common.HexToAddress("0x1234000000000000000000000000000000000000")
 	signer := meterer.NewEIP712Signer(chainID, verifyingContract)
@@ -57,14 +53,11 @@ func TestConstructBlobHeader(t *testing.T) {
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
-
-	header, err := meterer.ConstructBlobHeader(
+	header, err := meterer.ConstructPaymentMetadata(
 		signer,
-		0,           // binIndex
-		1000,        // cumulativePayment
-		*commitment, // core.G1Point
-		1024,        // dataLength
+		0,    // binIndex
+		1000, // cumulativePayment
+		1024, // dataLength
 		[]uint8{1},
 		privateKey,
 	)
@@ -91,13 +84,10 @@ func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 	privateKey2, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
-
-	header, err := meterer.ConstructBlobHeader(
+	header, err := meterer.ConstructPaymentMetadata(
 		signer,
 		0,
 		1000,
-		*commitment,
 		1024,
 		[]uint8{1},
 		privateKey1,
@@ -125,13 +115,10 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
-
-	header, err := meterer.ConstructBlobHeader(
+	header, err := meterer.ConstructPaymentMetadata(
 		signer,
 		0,
 		1000,
-		*commitment,
 		1024,
 		[]uint8{1},
 		privateKey,
@@ -162,13 +149,10 @@ func TestEIP712SignerWithDifferentChainID(t *testing.T) {
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
-
-	header, err := meterer.ConstructBlobHeader(
+	header, err := meterer.ConstructPaymentMetadata(
 		signer1,
 		0,
 		1000,
-		*commitment,
 		1024,
 		[]uint8{1},
 		privateKey,
