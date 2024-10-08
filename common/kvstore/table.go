@@ -2,6 +2,12 @@ package kvstore
 
 import "errors"
 
+// ErrTableLimitExceeded is returned when the maximum number of tables has been reached.
+var ErrTableLimitExceeded = errors.New("table limit exceeded")
+
+// ErrTableNotFound is returned when a table is not found.
+var ErrTableNotFound = errors.New("table not found")
+
 // TableKey is a key scoped to a particular table. It can be used to perform batch operations that modify multiple
 // table keys atomically.
 type TableKey []byte
@@ -16,47 +22,6 @@ type Table interface {
 
 	// TableKey creates a new key scoped to this table that can be used for batch operations that modify this table.
 	TableKey(key []byte) TableKey
-}
-
-// ErrTableLimitExceeded is returned when the maximum number of tables has been reached.
-var ErrTableLimitExceeded = errors.New("table limit exceeded")
-
-// ErrTableNotFound is returned when a table is not found.
-var ErrTableNotFound = errors.New("table not found")
-
-// TableStoreBuilder is used to create a new TableStore instance. It can be used to add and remove
-// tables from the store. Once the TableStore is created, the TableStoreBuilder instance should not be used again,
-// and no tables may be added or removed from the store. If table modifications are required on an existing
-// TableStore, it should first be shut down and a new TableStoreBuilder should be created.
-type TableStoreBuilder interface {
-
-	// CreateTable creates a new table with the given name. If a table with the given name already exists,
-	// this method becomes a no-op. Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
-	CreateTable(name string) error
-
-	// DropTable deletes the table with the given name. If the table does not exist, this method becomes a no-op.
-	DropTable(name string) error
-
-	// GetMaxTableCount returns the maximum number of tables that can be created in the store
-	// (excluding internal tables utilized by the store).
-	GetMaxTableCount() uint32
-
-	// GetTableCount returns the current number of tables in the store
-	// (excluding internal tables utilized by the store).
-	GetTableCount() uint32
-
-	// GetTableNames returns a list of the names of all tables in the store, in no particular order.
-	GetTableNames() []string
-
-	// Build creates a new TableStore instance with the specified tables. After this method is called,
-	// the TableStoreBuilder should not be used again.
-	Build() (TableStore, error)
-
-	// Shutdown shuts down the store, flushing any remaining data to disk.
-	Shutdown() error
-
-	// Destroy shuts down and permanently deletes all data in the store.
-	Destroy() error
 }
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.

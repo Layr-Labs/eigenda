@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"math"
 	"sort"
-	"sync"
 )
 
 // The table ID reserved for the metadata table.
@@ -21,9 +20,6 @@ const namespaceTableID uint32 = math.MaxUint32 - 1
 
 // The number of tables reserved for internal use.
 const reservedTableCount uint32 = 2
-
-// The first table ID that can be used by user tables.
-const maxUserTableCount = math.MaxUint32 - reservedTableCount
 
 // This key is used to store the schema version in the metadata table.
 const metadataSchemaVersionKey = "schema_version"
@@ -69,13 +65,8 @@ func (t StoreType) Create(logger logging.Logger, path string, tables ...string) 
 	return create(logger, base, tables...)
 }
 
-var _ kvstore.TableStoreBuilder = (*tableStoreBuilder)(nil)
-
 type tableStoreBuilder struct {
 	logger logging.Logger
-
-	// Used to make this builder thread-safe.
-	lock sync.Mutex
 
 	// A base store implementation
 	base kvstore.Store
@@ -94,9 +85,6 @@ type tableStoreBuilder struct {
 
 	// Builds keys for the namespace table.
 	namespaceTable kvstore.Table
-
-	// Whether the store has been built.
-	built bool
 }
 
 // Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
@@ -104,54 +92,6 @@ type tableStoreBuilder struct {
 
 // create creates a new TableStore instance with the given base store and table names.
 func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore.TableStore, error) {
-	builder, err := newTableStoreBuilder(logger, base)
-	if err != nil {
-		return nil, fmt.Errorf("error creating table store builder: %w", err)
-	}
-
-	originalTables := builder.GetTableNames()
-	originalTablesSet := make(map[string]bool)
-	for _, table := range originalTables {
-		originalTablesSet[table] = true
-	}
-
-	newTablesSet := make(map[string]bool)
-	for _, table := range tables {
-		newTablesSet[table] = true
-	}
-
-	// Add new tables.
-	for _, table := range tables {
-		if !originalTablesSet[table] {
-			err = builder.CreateTable(table)
-			if err != nil {
-				return nil, fmt.Errorf("error creating table %s: %w", table, err)
-			}
-
-		}
-	}
-
-	// Drop tables that are not in the list.
-	for _, table := range originalTables {
-		if !newTablesSet[table] {
-			err = builder.DropTable(table)
-			if err != nil {
-				return nil, fmt.Errorf("error dropping table %s: %w", table, err)
-			}
-		}
-	}
-
-	store, err := builder.Build()
-	if err != nil {
-		return nil, fmt.Errorf("error building store: %w", err)
-	}
-
-	return store, nil
-}
-
-// newTableStoreBuilder creates a new TableStoreBuilder instance.
-func newTableStoreBuilder(logger logging.Logger, base kvstore.Store) (*tableStoreBuilder, error) {
-
 	tableIDMap := make(map[string]uint32)
 	tableIdSet := make(map[uint32]bool)
 	tableMap := make(map[uint32]kvstore.Table)
@@ -206,7 +146,44 @@ func newTableStoreBuilder(logger logging.Logger, base kvstore.Store) (*tableStor
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
-	return builder, nil
+	// Determine which tables to keep and which to drop.
+	originalTables := builder.getTableNames()
+	originalTablesSet := make(map[string]bool)
+	for _, table := range originalTables {
+		originalTablesSet[table] = true
+	}
+	newTablesSet := make(map[string]bool)
+	for _, table := range tables {
+		newTablesSet[table] = true
+	}
+
+	// Add new tables.
+	for _, table := range tables {
+		if !originalTablesSet[table] {
+			err = builder.createTable(table)
+			if err != nil {
+				return nil, fmt.Errorf("error creating table %s: %w", table, err)
+			}
+
+		}
+	}
+
+	// Drop tables that are not in the list.
+	for _, table := range originalTables {
+		if !newTablesSet[table] {
+			err = builder.dropTable(table)
+			if err != nil {
+				return nil, fmt.Errorf("error dropping table %s: %w", table, err)
+			}
+		}
+	}
+
+	store, err := builder.build()
+	if err != nil {
+		return nil, fmt.Errorf("error building store: %w", err)
+	}
+
+	return store, nil
 }
 
 // This method handles cleanup of incomplete deletions. Since deletion of a table requires multiple operations that
@@ -222,7 +199,7 @@ func (t *tableStoreBuilder) handleIncompleteDeletion() error {
 	deletionTableName := string(deletionTableNameBytes)
 	t.logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
 
-	return t.DropTable(deletionTableName)
+	return t.dropTable(deletionTableName)
 }
 
 // Get the prefix for the given table ID and prefix length.
@@ -268,13 +245,7 @@ func loadNamespaceTable(
 
 // CreateTable creates a new table with the given name. If a table with the given name already exists,
 // this method becomes a no-op. Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
-func (t *tableStoreBuilder) CreateTable(name string) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.built {
-		return errors.New("cannot modify a built store")
-	}
-
+func (t *tableStoreBuilder) createTable(name string) error {
 	tableID, ok := t.tableIDMap[name]
 	if ok {
 		return nil
@@ -325,13 +296,7 @@ func (t *tableStoreBuilder) CreateTable(name string) error {
 }
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
-func (t *tableStoreBuilder) DropTable(name string) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.built {
-		return errors.New("cannot modify a built store")
-	}
-
+func (t *tableStoreBuilder) dropTable(name string) error {
 	tableID, ok := t.tableIDMap[name]
 	if !ok {
 		// Table does not exist, nothing to do.
@@ -382,23 +347,8 @@ func (t *tableStoreBuilder) DropTable(name string) error {
 	return t.metadataTable.Delete(deletionKey)
 }
 
-// GetTableCount returns the current number of tables in the store (excluding internal tables utilized by the store).
-func (t *tableStoreBuilder) GetTableCount() uint32 {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return uint32(len(t.tableIDMap))
-}
-
-// GetMaxTableCount returns the maximum number of tables that can be created in the store.
-func (t *tableStoreBuilder) GetMaxTableCount() uint32 {
-	return maxUserTableCount
-}
-
 // GetTableNames returns a list of the names of all tables in the store, in no particular order.
-func (t *tableStoreBuilder) GetTableNames() []string {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+func (t *tableStoreBuilder) getTableNames() []string {
 
 	names := make([]string, 0, len(t.tableIDMap))
 	for name := range t.tableIDMap {
@@ -409,12 +359,7 @@ func (t *tableStoreBuilder) GetTableNames() []string {
 
 // Build creates a new TableStore instance with the specified tables. After this method is called,
 // the TableStoreBuilder should not be used again.
-func (t *tableStoreBuilder) Build() (kvstore.TableStore, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.built {
-		return nil, errors.New("cannot build a store more than once")
-	}
+func (t *tableStoreBuilder) build() (kvstore.TableStore, error) {
 
 	tableMap := make(map[string]kvstore.Table, len(t.tableIDMap))
 
@@ -423,26 +368,4 @@ func (t *tableStoreBuilder) Build() (kvstore.TableStore, error) {
 	}
 
 	return newTableStore(t.logger, t.base, tableMap), nil
-}
-
-// Shutdown shuts down the store, flushing any remaining cached data to disk.
-func (t *tableStoreBuilder) Shutdown() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.built {
-		return errors.New("the builder cannot be used to shut down a store once it has been built")
-	}
-
-	return t.base.Shutdown()
-}
-
-// Destroy shuts down and permanently deletes all data in the store.
-func (t *tableStoreBuilder) Destroy() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.built {
-		return errors.New("the builder cannot be used to destroy a store once it has been built")
-	}
-
-	return t.base.Destroy()
 }
