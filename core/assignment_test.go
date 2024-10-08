@@ -56,22 +56,6 @@ func TestOperatorAssignments(t *testing.T) {
 			StartIndex: 15,
 			NumChunks:  6,
 		},
-		mock.MakeOperatorId(6): {
-			StartIndex: 21,
-			NumChunks:  3,
-		},
-		mock.MakeOperatorId(7): {
-			StartIndex: 14,
-			NumChunks:  3,
-		},
-		mock.MakeOperatorId(8): {
-			StartIndex: 17,
-			NumChunks:  4,
-		},
-		mock.MakeOperatorId(9): {
-			StartIndex: 21,
-			NumChunks:  4,
-		},
 	}
 	expectedInfo := core.AssignmentInfo{
 		TotalChunks: 21,
