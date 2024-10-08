@@ -35,23 +35,25 @@ func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag b
 
 type DisperserClient interface {
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
+	PaidDisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
-	PaidDisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 }
 
 type disperserClient struct {
-	config *Config
-	signer core.BlobRequestSigner
+	config     *Config
+	signer     core.BlobRequestSigner
+	accountant Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
 
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner) DisperserClient {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant Accountant) DisperserClient {
 	return &disperserClient{
-		config: config,
-		signer: signer,
+		config:     config,
+		signer:     signer,
+		accountant: accountant,
 	}
 }
 
@@ -66,6 +68,7 @@ func (c *disperserClient) getDialOptions() []grpc.DialOption {
 }
 
 func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	fmt.Println("DisperseBlob")
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -108,21 +111,35 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 }
 
 func (c *disperserClient) PaidDisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, nil
-}
+	fmt.Println("PaidDisperseBlob")
+	// disperser client checks with the accountant; accountant provides payment fields
+	// if cannot pay, error (or attempt anyway without payment info?)
 
-func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	if c.signer == nil {
-		return nil, nil, fmt.Errorf("uninitialized signer for authenticated dispersal")
-	}
+	// disperser client first validate the data length with the accountant and get signed payment headers
+	// the client then encode and generate commitments
+	// the client then send the data to the disperser
+	// after getting response from the disperser, the client validate the received blob status;
+	// if there's failure, based on the type of failure, the client rollback local accounting or retry or send off warning to the user
 
-	// first check if signer is valid
-	accountId, err := c.signer.GetAccountID()
+	header, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
 	if err != nil {
-		return nil, nil, fmt.Errorf("please configure signer key if you want to use authenticated endpoint %w", err)
+		return nil, nil, err
 	}
 
-	quorumNumbers := make([]uint32, len(quorums))
+	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
+
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = conn.Close() }()
+
+	disperserClient := disperser_rpc.NewDisperserClient(conn)
+	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	defer cancel()
+
+	quorumNumbers := make([]uint32, len(header.QuorumNumbers))
 	for i, q := range quorums {
 		quorumNumbers[i] = uint32(q)
 	}
@@ -130,14 +147,31 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err = rs.ToFrArray(data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
-
-	request := &disperser_rpc.DisperseBlobRequest{
+	request := &disperser_rpc.PaidDisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
-		AccountId:           accountId,
+		AccountId:           header.AccountID,
+		BinIndex:            header.BinIndex,
+		CumulativePayment:   header.CumulativePayment,
+		Signature:           header.Signature,
 	}
+
+	reply, err := disperserClient.PaidDisperseBlob(ctxTimeout, request)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blobStatus, err := disperser.FromBlobStatusProto(reply.GetResult())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blobStatus, reply.GetRequestId(), nil
+}
+
+func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
@@ -157,6 +191,22 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	stream, err := disperserClient.DisperseBlobAuthenticated(ctxTimeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error while calling DisperseBlobAuthenticated: %w", err)
+	}
+
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
+	}
+
+	// check every 32 bytes of data are within the valid range for a bn254 field element
+	_, err = rs.ToFrArray(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
+	}
+	request := &disperser_rpc.DisperseBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: quorumNumbers,
+		AccountId:           c.signer.GetAccountID(),
 	}
 
 	// Send the initial request
