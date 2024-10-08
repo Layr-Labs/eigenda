@@ -58,11 +58,6 @@ type OnchainPaymentState struct {
 
 	ActiveReservations *ActiveReservations
 	OnDemandPayments   *OnDemandPayments
-	// FUNCTIONS IF THIS STRUCT WAS AN INTERFACE?
-	// GetActiveReservations(ctx context.Context, blockNumber uint) (map[string]*ActiveReservations, error)
-	// GetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*ActiveReservation, error)
-	// GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]*OnDemandPayments, error)
-	// GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*OnDemandPayment, error)
 }
 
 func NewOnchainPaymentState() *OnchainPaymentState {
