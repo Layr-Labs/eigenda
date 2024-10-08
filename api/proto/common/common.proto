@@ -9,6 +9,35 @@ message G1Commitment {
 	bytes y = 2;
 }
 
+message G2Commitment {
+	// The A0 element of the X coordinate of G2 point.
+	bytes x_a0 = 1;
+	// The A1 element of the X coordinate of G2 point.
+	bytes x_a1 = 2;
+	// The A0 element of the Y coordinate of G2 point.
+	bytes y_a0 = 3;
+	// The A1 element of the Y coordinate of G2 point.
+	bytes y_a1 = 4;
+}
+
+// BlobCommitment represents commitment of a specific blob, containing its
+// KZG commitment, degree proof, the actual degree, and data length in number of symbols.
+message BlobCommitment {
+	G1Commitment commitment = 1;
+	G2Commitment length_commitment = 2;
+	G2Commitment length_proof = 3;
+	uint32 data_length = 4;
+}
+
+// BlobCertificate is what gets attested by the network
+message BlobCertificate {
+	uint32 version = 1;
+	bytes blob_key = 2;
+	BlobCommitment blob_commitment = 3;
+	repeated uint32 quorum_numbers = 4;
+	uint32 reference_block_number = 5;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////
 // Experimental: the following definitions are experimental and subject to change. //
 /////////////////////////////////////////////////////////////////////////////////////

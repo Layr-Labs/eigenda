@@ -1,0 +1,68 @@
+syntax = "proto3";
+package node.v2;
+import "google/protobuf/wrappers.proto";
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node/v2";
+
+// The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
+// for better security and separation of concerns.
+
+// WARNING: the following RPCs are experimental and subject to change.
+service Dispersal {
+	rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
+	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+}
+
+service Retrieval {
+	// GetChunks retrieves the chunks for a blob custodied at the Node.
+	rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
+	// GetBlobHeader is similar to GetChunks, this just returns the header of the blob.
+	rpc GetBlobCertificate(GetBlobCertificateRequest) returns (GetBlobCertificateReply) {}
+	// Retrieve node info metadata
+	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+}
+
+// Requests and replies
+
+message StoreChunksRequest {
+	// list of blob certificates to process
+	repeated common.BlobCertificate blob_certificates = 1;
+}
+
+message StoreChunksReply {
+	repeated google.protobuf.BytesValue signatures = 1;
+}
+
+message GetChunksRequest {
+	bytes blob_key = 1;
+	// Which quorum of the blob to retrieve for (note: a blob can have multiple
+	// quorums and the chunks for different quorums at a Node can be different).
+	// The ID must be in range [0, 254].
+	uint32 quorum_id = 2;
+}
+
+message GetChunksReply {
+	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
+	repeated bytes chunks = 1;
+}
+
+message GetBlobCertificateRequest {
+	bytes blob_key = 1;
+}
+
+message GetBlobCertificateReply {
+	common.BlobCertificate blob_certificate = 1;
+}
+
+// Node info request
+message NodeInfoRequest {
+}
+
+// Node info reply
+message NodeInfoReply {
+	string semver = 1;
+	string arch = 2;
+	string os = 3;
+	uint32 num_cpu = 4;
+	uint64 mem_bytes = 5;
+}

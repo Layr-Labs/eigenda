@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: node/node.proto
+// source: node/v2/node_v2.proto
 
-package node
+package v2
 
 import (
 	context "context"
@@ -19,31 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Dispersal_StoreChunks_FullMethodName = "/node.Dispersal/StoreChunks"
-	Dispersal_StoreBlobs_FullMethodName  = "/node.Dispersal/StoreBlobs"
-	Dispersal_AttestBatch_FullMethodName = "/node.Dispersal/AttestBatch"
-	Dispersal_NodeInfo_FullMethodName    = "/node.Dispersal/NodeInfo"
+	Dispersal_StoreChunks_FullMethodName = "/node.v2.Dispersal/StoreChunks"
+	Dispersal_NodeInfo_FullMethodName    = "/node.v2.Dispersal/NodeInfo"
 )
 
 // DispersalClient is the client API for Dispersal service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DispersalClient interface {
-	// StoreChunks validates that the chunks match what the Node is supposed to receive (
-	// different Nodes are responsible for different chunks, as EigenDA is horizontally
-	// sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
-	// according to the EigenDA protocol. It also stores the chunks along with metadata
-	// for the protocol-defined length of custody. It will return a signature at the
-	// end to attest to the data in this request it has processed.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
-	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
-	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
-	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
-	StoreBlobs(ctx context.Context, in *StoreBlobsRequest, opts ...grpc.CallOption) (*StoreBlobsReply, error)
-	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
-	// It will return a signature at the end to attest to the aggregated batch.
-	AttestBatch(ctx context.Context, in *AttestBatchRequest, opts ...grpc.CallOption) (*AttestBatchReply, error)
-	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
 
@@ -64,24 +48,6 @@ func (c *dispersalClient) StoreChunks(ctx context.Context, in *StoreChunksReques
 	return out, nil
 }
 
-func (c *dispersalClient) StoreBlobs(ctx context.Context, in *StoreBlobsRequest, opts ...grpc.CallOption) (*StoreBlobsReply, error) {
-	out := new(StoreBlobsReply)
-	err := c.cc.Invoke(ctx, Dispersal_StoreBlobs_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *dispersalClient) AttestBatch(ctx context.Context, in *AttestBatchRequest, opts ...grpc.CallOption) (*AttestBatchReply, error) {
-	out := new(AttestBatchReply)
-	err := c.cc.Invoke(ctx, Dispersal_AttestBatch_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *dispersalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
 	out := new(NodeInfoReply)
 	err := c.cc.Invoke(ctx, Dispersal_NodeInfo_FullMethodName, in, out, opts...)
@@ -95,21 +61,7 @@ func (c *dispersalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 // All implementations must embed UnimplementedDispersalServer
 // for forward compatibility
 type DispersalServer interface {
-	// StoreChunks validates that the chunks match what the Node is supposed to receive (
-	// different Nodes are responsible for different chunks, as EigenDA is horizontally
-	// sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
-	// according to the EigenDA protocol. It also stores the chunks along with metadata
-	// for the protocol-defined length of custody. It will return a signature at the
-	// end to attest to the data in this request it has processed.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
-	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
-	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
-	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
-	StoreBlobs(context.Context, *StoreBlobsRequest) (*StoreBlobsReply, error)
-	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
-	// It will return a signature at the end to attest to the aggregated batch.
-	AttestBatch(context.Context, *AttestBatchRequest) (*AttestBatchReply, error)
-	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }
@@ -120,12 +72,6 @@ type UnimplementedDispersalServer struct {
 
 func (UnimplementedDispersalServer) StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StoreChunks not implemented")
-}
-func (UnimplementedDispersalServer) StoreBlobs(context.Context, *StoreBlobsRequest) (*StoreBlobsReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StoreBlobs not implemented")
-}
-func (UnimplementedDispersalServer) AttestBatch(context.Context, *AttestBatchRequest) (*AttestBatchReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AttestBatch not implemented")
 }
 func (UnimplementedDispersalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
@@ -161,42 +107,6 @@ func _Dispersal_StoreChunks_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Dispersal_StoreBlobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StoreBlobsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DispersalServer).StoreBlobs(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Dispersal_StoreBlobs_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DispersalServer).StoreBlobs(ctx, req.(*StoreBlobsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Dispersal_AttestBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AttestBatchRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DispersalServer).AttestBatch(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Dispersal_AttestBatch_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DispersalServer).AttestBatch(ctx, req.(*AttestBatchRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Dispersal_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NodeInfoRequest)
 	if err := dec(in); err != nil {
@@ -219,7 +129,7 @@ func _Dispersal_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Dispersal_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "node.Dispersal",
+	ServiceName: "node.v2.Dispersal",
 	HandlerType: (*DispersalServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -227,36 +137,28 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Dispersal_StoreChunks_Handler,
 		},
 		{
-			MethodName: "StoreBlobs",
-			Handler:    _Dispersal_StoreBlobs_Handler,
-		},
-		{
-			MethodName: "AttestBatch",
-			Handler:    _Dispersal_AttestBatch_Handler,
-		},
-		{
 			MethodName: "NodeInfo",
 			Handler:    _Dispersal_NodeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "node/node.proto",
+	Metadata: "node/v2/node_v2.proto",
 }
 
 const (
-	Retrieval_RetrieveChunks_FullMethodName = "/node.Retrieval/RetrieveChunks"
-	Retrieval_GetBlobHeader_FullMethodName  = "/node.Retrieval/GetBlobHeader"
-	Retrieval_NodeInfo_FullMethodName       = "/node.Retrieval/NodeInfo"
+	Retrieval_GetChunks_FullMethodName          = "/node.v2.Retrieval/GetChunks"
+	Retrieval_GetBlobCertificate_FullMethodName = "/node.v2.Retrieval/GetBlobCertificate"
+	Retrieval_NodeInfo_FullMethodName           = "/node.v2.Retrieval/NodeInfo"
 )
 
 // RetrievalClient is the client API for Retrieval service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RetrievalClient interface {
-	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-	RetrieveChunks(ctx context.Context, in *RetrieveChunksRequest, opts ...grpc.CallOption) (*RetrieveChunksReply, error)
-	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-	GetBlobHeader(ctx context.Context, in *GetBlobHeaderRequest, opts ...grpc.CallOption) (*GetBlobHeaderReply, error)
+	// GetChunks retrieves the chunks for a blob custodied at the Node.
+	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
+	// GetBlobHeader is similar to GetChunks, this just returns the header of the blob.
+	GetBlobCertificate(ctx context.Context, in *GetBlobCertificateRequest, opts ...grpc.CallOption) (*GetBlobCertificateReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
@@ -269,18 +171,18 @@ func NewRetrievalClient(cc grpc.ClientConnInterface) RetrievalClient {
 	return &retrievalClient{cc}
 }
 
-func (c *retrievalClient) RetrieveChunks(ctx context.Context, in *RetrieveChunksRequest, opts ...grpc.CallOption) (*RetrieveChunksReply, error) {
-	out := new(RetrieveChunksReply)
-	err := c.cc.Invoke(ctx, Retrieval_RetrieveChunks_FullMethodName, in, out, opts...)
+func (c *retrievalClient) GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error) {
+	out := new(GetChunksReply)
+	err := c.cc.Invoke(ctx, Retrieval_GetChunks_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *retrievalClient) GetBlobHeader(ctx context.Context, in *GetBlobHeaderRequest, opts ...grpc.CallOption) (*GetBlobHeaderReply, error) {
-	out := new(GetBlobHeaderReply)
-	err := c.cc.Invoke(ctx, Retrieval_GetBlobHeader_FullMethodName, in, out, opts...)
+func (c *retrievalClient) GetBlobCertificate(ctx context.Context, in *GetBlobCertificateRequest, opts ...grpc.CallOption) (*GetBlobCertificateReply, error) {
+	out := new(GetBlobCertificateReply)
+	err := c.cc.Invoke(ctx, Retrieval_GetBlobCertificate_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -300,10 +202,10 @@ func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 // All implementations must embed UnimplementedRetrievalServer
 // for forward compatibility
 type RetrievalServer interface {
-	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-	RetrieveChunks(context.Context, *RetrieveChunksRequest) (*RetrieveChunksReply, error)
-	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-	GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error)
+	// GetChunks retrieves the chunks for a blob custodied at the Node.
+	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
+	// GetBlobHeader is similar to GetChunks, this just returns the header of the blob.
+	GetBlobCertificate(context.Context, *GetBlobCertificateRequest) (*GetBlobCertificateReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedRetrievalServer()
@@ -313,11 +215,11 @@ type RetrievalServer interface {
 type UnimplementedRetrievalServer struct {
 }
 
-func (UnimplementedRetrievalServer) RetrieveChunks(context.Context, *RetrieveChunksRequest) (*RetrieveChunksReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RetrieveChunks not implemented")
+func (UnimplementedRetrievalServer) GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
 }
-func (UnimplementedRetrievalServer) GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlobHeader not implemented")
+func (UnimplementedRetrievalServer) GetBlobCertificate(context.Context, *GetBlobCertificateRequest) (*GetBlobCertificateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlobCertificate not implemented")
 }
 func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
@@ -335,38 +237,38 @@ func RegisterRetrievalServer(s grpc.ServiceRegistrar, srv RetrievalServer) {
 	s.RegisterService(&Retrieval_ServiceDesc, srv)
 }
 
-func _Retrieval_RetrieveChunks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RetrieveChunksRequest)
+func _Retrieval_GetChunks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChunksRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RetrievalServer).RetrieveChunks(ctx, in)
+		return srv.(RetrievalServer).GetChunks(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Retrieval_RetrieveChunks_FullMethodName,
+		FullMethod: Retrieval_GetChunks_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrievalServer).RetrieveChunks(ctx, req.(*RetrieveChunksRequest))
+		return srv.(RetrievalServer).GetChunks(ctx, req.(*GetChunksRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_GetBlobHeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlobHeaderRequest)
+func _Retrieval_GetBlobCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlobCertificateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RetrievalServer).GetBlobHeader(ctx, in)
+		return srv.(RetrievalServer).GetBlobCertificate(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Retrieval_GetBlobHeader_FullMethodName,
+		FullMethod: Retrieval_GetBlobCertificate_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrievalServer).GetBlobHeader(ctx, req.(*GetBlobHeaderRequest))
+		return srv.(RetrievalServer).GetBlobCertificate(ctx, req.(*GetBlobCertificateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -393,16 +295,16 @@ func _Retrieval_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Retrieval_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "node.Retrieval",
+	ServiceName: "node.v2.Retrieval",
 	HandlerType: (*RetrievalServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RetrieveChunks",
-			Handler:    _Retrieval_RetrieveChunks_Handler,
+			MethodName: "GetChunks",
+			Handler:    _Retrieval_GetChunks_Handler,
 		},
 		{
-			MethodName: "GetBlobHeader",
-			Handler:    _Retrieval_GetBlobHeader_Handler,
+			MethodName: "GetBlobCertificate",
+			Handler:    _Retrieval_GetBlobCertificate_Handler,
 		},
 		{
 			MethodName: "NodeInfo",
@@ -410,5 +312,5 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "node/node.proto",
+	Metadata: "node/v2/node_v2.proto",
 }

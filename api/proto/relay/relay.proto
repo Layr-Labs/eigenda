@@ -1,6 +1,5 @@
 syntax = "proto3";
 package node;
-import "google/protobuf/wrappers.proto";
 import "common/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
