@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
@@ -15,11 +13,10 @@ import (
 
 /* SUBJECT TO BIG MODIFICATIONS */
 
-// BlobHeader represents the header information for a blob
-type BlobHeader struct {
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
 	// Existing fields
-	Commitment    core.G1Point
-	DataLength    uint32
+	DataLength    uint32 // length in number of symbols
 	QuorumNumbers []uint8
 	AccountID     string
 
@@ -54,7 +51,7 @@ func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712
 				{Name: "chainId", Type: "uint256"},
 				{Name: "verifyingContract", Type: "address"},
 			},
-			"BlobHeader": []apitypes.Type{
+			"PaymentMetadata": []apitypes.Type{
 				{Name: "accountID", Type: "string"},
 				{Name: "binIndex", Type: "uint32"},
 				{Name: "cumulativePayment", Type: "uint64"},
@@ -66,18 +63,16 @@ func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712
 	}
 }
 
-// SignBlobHeader signs a BlobHeader using EIP-712
-func (s *EIP712Signer) SignBlobHeader(header *BlobHeader, privateKey *ecdsa.PrivateKey) ([]byte, error) {
-	commitment := header.Commitment.Serialize()
+// SignPaymentMetadata signs a PaymentMetadata using EIP-712
+func (s *EIP712Signer) SignPaymentMetadata(header *PaymentMetadata, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	typedData := apitypes.TypedData{
 		Types:       s.types,
-		PrimaryType: "BlobHeader",
+		PrimaryType: "PaymentMetadata",
 		Domain:      s.domain,
 		Message: apitypes.TypedDataMessage{
 			"accountID":         header.AccountID,
 			"binIndex":          fmt.Sprintf("%d", header.BinIndex),
 			"cumulativePayment": fmt.Sprintf("%d", header.CumulativePayment),
-			"commitment":        hexutil.Encode(commitment),
 			"dataLength":        fmt.Sprintf("%d", header.DataLength),
 			"quorumNumbers":     convertUint8SliceToMap(header.QuorumNumbers),
 		},
@@ -99,17 +94,16 @@ func convertUint8SliceToMap(params []uint8) []string {
 	return result
 }
 
-// RecoverSender recovers the sender's address from a signed BlobHeader
-func (s *EIP712Signer) RecoverSender(header *BlobHeader) (common.Address, error) {
+// RecoverSender recovers the sender's address from a signed PaymentMetadata
+func (s *EIP712Signer) RecoverSender(header *PaymentMetadata) (common.Address, error) {
 	typedData := apitypes.TypedData{
 		Types:       s.types,
-		PrimaryType: "BlobHeader",
+		PrimaryType: "PaymentMetadata",
 		Domain:      s.domain,
 		Message: apitypes.TypedDataMessage{
 			"accountID":         header.AccountID,
 			"binIndex":          fmt.Sprintf("%d", header.BinIndex),
 			"cumulativePayment": fmt.Sprintf("%d", header.CumulativePayment),
-			"commitment":        hexutil.Encode(header.Commitment.Serialize()),
 			"dataLength":        fmt.Sprintf("%d", header.DataLength),
 			"quorumNumbers":     convertUint8SliceToMap(header.QuorumNumbers),
 		},
@@ -162,27 +156,25 @@ func (s *EIP712Signer) recoverTypedData(typedData apitypes.TypedData, signature 
 	return crypto.PubkeyToAddress(*pubKey), nil
 }
 
-// ConstructBlobHeader creates a BlobHeader with a valid signature
-func ConstructBlobHeader(
+// ConstructPaymentMetadata creates a PaymentMetadata with a valid signature
+func ConstructPaymentMetadata(
 	signer *EIP712Signer,
 	binIndex uint32,
 	cumulativePayment uint64,
-	commitment core.G1Point,
 	dataLength uint32,
 	quorumNumbers []uint8,
 	privateKey *ecdsa.PrivateKey,
-) (*BlobHeader, error) {
+) (*PaymentMetadata, error) {
 	accountID := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
-	header := &BlobHeader{
+	header := &PaymentMetadata{
 		AccountID:         accountID,
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
-		Commitment:        commitment,
 		QuorumNumbers:     quorumNumbers,
 		DataLength:        dataLength,
 	}
 
-	signature, err := signer.SignBlobHeader(header, privateKey)
+	signature, err := signer.SignPaymentMetadata(header, privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("error signing blob header: %v", err)
 	}
