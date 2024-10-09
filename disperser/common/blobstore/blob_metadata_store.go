@@ -122,7 +122,7 @@ func (s *BlobMetadataStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
 func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status disperser.BlobStatus) ([]*disperser.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -148,7 +148,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // It should only be used to filter "Processing" status. To support other status, a streaming version should be implemented.
 func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status disperser.BlobStatus) (int32, error) {
-	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -181,7 +181,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		}
 	}
 
-	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpresseionValues{
+	queryResult, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, expiryIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -221,7 +221,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 }
 
 func (s *BlobMetadataStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, batchIndexName, "BatchHeaderHash = :batch_header_hash", commondynamodb.ExpresseionValues{
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, batchIndexName, "BatchHeaderHash = :batch_header_hash", commondynamodb.ExpressionValues{
 		":batch_header_hash": &types.AttributeValueMemberB{
 			Value: batchHeaderHash[:],
 		},
@@ -272,7 +272,7 @@ func (s *BlobMetadataStore) GetAllBlobMetadataByBatchWithPagination(
 		s.tableName,
 		batchIndexName,
 		"BatchHeaderHash = :batch_header_hash",
-		commondynamodb.ExpresseionValues{
+		commondynamodb.ExpressionValues{
 			":batch_header_hash": &types.AttributeValueMemberB{
 				Value: batchHeaderHash[:],
 			},
@@ -312,7 +312,7 @@ func (s *BlobMetadataStore) GetAllBlobMetadataByBatchWithPagination(
 }
 
 func (s *BlobMetadataStore) GetBlobMetadataInBatch(ctx context.Context, batchHeaderHash [32]byte, blobIndex uint32) (*disperser.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, batchIndexName, "BatchHeaderHash = :batch_header_hash AND BlobIndex = :blob_index", commondynamodb.ExpresseionValues{
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, batchIndexName, "BatchHeaderHash = :batch_header_hash AND BlobIndex = :blob_index", commondynamodb.ExpressionValues{
 		":batch_header_hash": &types.AttributeValueMemberB{
 			Value: batchHeaderHash[:],
 		},
