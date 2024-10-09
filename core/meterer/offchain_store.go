@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -36,23 +35,17 @@ func NewOffchainStore(
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	if reservationTableName == "" || onDemandTableName == "" || globalBinTableName == "" {
-		return OffchainStore{}, fmt.Errorf("table names cannot be empty")
-	}
 
-	err = CreateReservationTable(cfg, reservationTableName)
-	if err != nil && !strings.Contains(err.Error(), "Table already exists") {
-		fmt.Println("Error creating reservation table:", err)
+	err = dynamoClient.TableCheck(context.Background(), reservationTableName)
+	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = CreateGlobalReservationTable(cfg, globalBinTableName)
-	if err != nil && !strings.Contains(err.Error(), "Table already exists") {
-		fmt.Println("Error creating global bin table:", err)
+	err = dynamoClient.TableCheck(context.Background(), onDemandTableName)
+	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = CreateOnDemandTable(cfg, onDemandTableName)
-	if err != nil && !strings.Contains(err.Error(), "Table already exists") {
-		fmt.Println("Error creating on-demand table:", err)
+	err = dynamoClient.TableCheck(context.Background(), globalBinTableName)
+	if err != nil {
 		return OffchainStore{}, err
 	}
 	//TODO: add a separate thread to periodically clean up the tables
