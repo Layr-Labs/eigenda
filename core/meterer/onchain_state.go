@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core/eth"
 )
@@ -52,9 +53,16 @@ type OnDemandPayments struct {
 	Payments map[string]*OnDemandPayment
 }
 
+// TimeoutConfig contains the timeout configurations for the chain state
+type TimeoutConfig struct {
+	ChainReadTimeout  time.Duration
+	ChainStateTimeout time.Duration
+}
+
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPaymentState struct {
-	tx *eth.Transactor
+	tx            *eth.Transactor
+	TimeoutConfig TimeoutConfig
 
 	ActiveReservations *ActiveReservations
 	OnDemandPayments   *OnDemandPayments

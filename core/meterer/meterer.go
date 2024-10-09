@@ -1,19 +1,10 @@
 package meterer
 
 import (
-	"time"
-
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-type TimeoutConfig struct {
-	ChainReadTimeout    time.Duration
-	ChainWriteTimeout   time.Duration
-	ChainStateTimeout   time.Duration
-	TxnBroadcastTimeout time.Duration
-}
-
-// network parameters that should be published on-chain. We currently configure these params through disperser env vars.
+// Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
 type Config struct {
 	// for rate limiting 2^64 ~= 18 exabytes per second; 2^32 ~= 4GB/s
 	// for payments      2^64 ~= 18M Eth;                2^32 ~= 4ETH
@@ -38,7 +29,6 @@ var OnDemandQuorumNumbers = []uint8{0, 1}
 
 type Meterer struct {
 	Config
-	TimeoutConfig
 
 	ChainState    *OnchainPaymentState
 	OffchainStore *OffchainStore
@@ -48,15 +38,13 @@ type Meterer struct {
 
 func NewMeterer(
 	config Config,
-	timeoutConfig TimeoutConfig,
 	paymentChainState *OnchainPaymentState,
 	offchainStore *OffchainStore,
 	logger logging.Logger,
 ) (*Meterer, error) {
 	// TODO: create a separate thread to pull from the chain and update chain state
 	return &Meterer{
-		Config:        config,
-		TimeoutConfig: timeoutConfig,
+		Config: config,
 
 		ChainState:    paymentChainState,
 		OffchainStore: offchainStore,
