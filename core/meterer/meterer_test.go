@@ -112,6 +112,10 @@ func setup(_ *testing.M) {
 		panic("failed to create global reservation table")
 	}
 
+	meterer.CreateReservationTable(clientConfig, "reservations")
+	meterer.CreateOnDemandTable(clientConfig, "ondemand")
+	meterer.CreateGlobalReservationTable(clientConfig, "global")
+
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
 		"reservations",
@@ -119,6 +123,7 @@ func setup(_ *testing.M) {
 		"global",
 		logger,
 	)
+
 	if err != nil {
 		teardown()
 		panic("failed to create offchain store")
