@@ -34,16 +34,16 @@ var OnDemandQuorumNumbers = []uint8{0, 1}
 type Meterer struct {
 	Config
 
-	ChainState    *OnchainPaymentState
-	OffchainStore *OffchainStore
+	ChainState    OnchainPayment
+	OffchainStore OffchainStore
 
 	logger logging.Logger
 }
 
 func NewMeterer(
 	config Config,
-	paymentChainState *OnchainPaymentState,
-	offchainStore *OffchainStore,
+	paymentChainState OnchainPayment,
+	offchainStore OffchainStore,
 	logger logging.Logger,
 ) (*Meterer, error) {
 	// TODO: create a separate thread to pull from the chain and update chain state

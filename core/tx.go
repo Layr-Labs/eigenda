@@ -146,4 +146,10 @@ type Transactor interface {
 
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
+
+	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
+	GetActiveReservations(ctx context.Context, blockNumber uint32) (map[string]ActiveReservation, error)
+
+	// GetOnDemandPayments returns all on-demand payments
+	GetOnDemandPayments(ctx context.Context, blockNumber uint32) (map[string]OnDemandPayment, error)
 }

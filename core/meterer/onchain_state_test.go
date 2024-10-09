@@ -4,114 +4,102 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	testifymock "github.com/stretchr/testify/mock"
 )
 
-// MockOnchainPaymentState : TO BE REPLACED WITH ACTUAL IMPLEMENTATION
-type MockOnchainPaymentState struct {
-	mock.Mock
-}
+var (
+	dummyActiveReservation = core.ActiveReservation{
+		DataRate:       100,
+		StartTimestamp: 1000,
+		EndTimestamp:   2000,
+		QuorumSplit:    []byte{50, 50},
+	}
+	dummyOnDemandPayment = core.OnDemandPayment{
+		CumulativePayment: core.TokenAmount(1000),
+	}
+)
 
-func (m *MockOnchainPaymentState) GetCurrentBlockNumber() (uint, error) {
-	args := m.Called()
-	return args.Get(0).(uint), args.Error(1)
-}
+func TestGetCurrentOnchainPaymentState(t *testing.T) {
+	mockState := &mock.MockOnchainPaymentState{}
+	ctx := context.Background()
+	mockState.On("CurrentOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(meterer.OnchainPaymentState{
+		ActiveReservations: map[string]core.ActiveReservation{
+			"account1": dummyActiveReservation,
+		},
+		OnDemandPayments: map[string]core.OnDemandPayment{
+			"account1": dummyOnDemandPayment,
+		},
+	}, nil)
 
-func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint) (*meterer.ActiveReservations, error) {
-	args := m.Called(ctx, blockNumber)
-	return args.Get(0).(*meterer.ActiveReservations), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*meterer.ActiveReservation, error) {
-	args := m.Called(ctx, blockNumber, accountID)
-	return args.Get(0).(*meterer.ActiveReservation), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetOnDemandPayments(ctx context.Context, blockNumber uint) (*meterer.OnDemandPayments, error) {
-	args := m.Called(ctx, blockNumber)
-	return args.Get(0).(*meterer.OnDemandPayments), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*meterer.OnDemandPayment, error) {
-	args := m.Called(ctx, blockNumber, accountID)
-	return args.Get(0).(*meterer.OnDemandPayment), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetIndexedActiveReservations(ctx context.Context, blockNumber uint) (*meterer.ActiveReservations, error) {
-	args := m.Called(ctx, blockNumber)
-	return args.Get(0).(*meterer.ActiveReservations), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetIndexedActiveReservationByAccount(ctx context.Context, blockNumber uint, accountID string) (*meterer.ActiveReservation, error) {
-	args := m.Called(ctx, blockNumber, accountID)
-	return args.Get(0).(*meterer.ActiveReservation), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetIndexedOnDemandPayments(ctx context.Context, blockNumber uint) (*meterer.OnDemandPayments, error) {
-	args := m.Called(ctx, blockNumber)
-	return args.Get(0).(*meterer.OnDemandPayments), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetIndexedOnDemandPaymentByAccount(ctx context.Context, blockNumber uint, accountID string) (*meterer.OnDemandPayment, error) {
-	args := m.Called(ctx, blockNumber, accountID)
-	return args.Get(0).(*meterer.OnDemandPayment), args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) Start(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
+	state, err := mockState.CurrentOnchainPaymentState(ctx, &eth.Transactor{})
+	assert.NoError(t, err)
+	assert.Equal(t, meterer.OnchainPaymentState{
+		ActiveReservations: map[string]core.ActiveReservation{
+			"account1": dummyActiveReservation,
+		},
+		OnDemandPayments: map[string]core.OnDemandPayment{
+			"account1": dummyOnDemandPayment,
+		},
+	}, state)
 }
 
 func TestGetCurrentBlockNumber(t *testing.T) {
-	mockState := new(MockOnchainPaymentState)
-	mockState.On("GetCurrentBlockNumber").Return(uint(1000), nil)
-
-	blockNumber, err := mockState.GetCurrentBlockNumber()
+	mockState := &mock.MockOnchainPaymentState{}
+	mockState.On("GetCurrentBlockNumber").Return(uint32(1000), nil)
+	ctx := context.Background()
+	blockNumber, err := mockState.GetCurrentBlockNumber(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, uint(1000), blockNumber)
+	assert.Equal(t, uint32(1000), blockNumber)
 }
 
 func TestGetActiveReservations(t *testing.T) {
-	mockState := new(MockOnchainPaymentState)
+	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	expectedReservations := &meterer.ActiveReservations{
-		Reservations: map[string]*meterer.ActiveReservation{
-			"account1": {
-				DataRate:       100,
-				StartTimestamp: 1000,
-				EndTimestamp:   2000,
-				QuorumSplit:    []byte{50, 50},
-			},
-		},
+	expectedReservations := map[string]core.ActiveReservation{
+		"account1": dummyActiveReservation,
 	}
-	mockState.On("GetActiveReservations", ctx, uint(1000)).Return(expectedReservations, nil)
+	mockState.On("GetActiveReservations", testifymock.Anything, testifymock.Anything).Return(expectedReservations, nil)
 
 	reservations, err := mockState.GetActiveReservations(ctx, 1000)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedReservations, reservations)
 }
 
+func TestGetActiveReservationByAccount(t *testing.T) {
+	mockState := &mock.MockOnchainPaymentState{}
+	ctx := context.Background()
+	mockState.On("GetActiveReservationsByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
+
+	reservation, err := mockState.GetActiveReservationsByAccount(ctx, 1000, "account1")
+	assert.NoError(t, err)
+	assert.Equal(t, dummyActiveReservation, reservation)
+}
+
+func TestGetOnDemandPayments(t *testing.T) {
+	mockState := &mock.MockOnchainPaymentState{}
+	ctx := context.Background()
+	expectedPayments := map[string]core.OnDemandPayment{
+		"account1": dummyOnDemandPayment,
+	}
+	mockState.On("GetOnDemandPayments", testifymock.Anything, testifymock.Anything).Return(expectedPayments, nil)
+
+	payments, err := mockState.GetOnDemandPayments(ctx, 1000)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedPayments, payments)
+}
+
 func TestGetOnDemandPaymentByAccount(t *testing.T) {
-	mockState := new(MockOnchainPaymentState)
+	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
 	accountID := "account1"
-	expectedPayment := &meterer.OnDemandPayment{
-		CumulativePayment: meterer.TokenAmount(1000000),
-	}
-	mockState.On("GetOnDemandPaymentByAccount", ctx, uint(1000), accountID).Return(expectedPayment, nil)
+	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
 
 	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, 1000, accountID)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedPayment, payment)
-}
-
-func TestStart(t *testing.T) {
-	mockState := new(MockOnchainPaymentState)
-	ctx := context.Background()
-	mockState.On("Start", ctx).Return(nil)
-
-	err := mockState.Start(ctx)
-	assert.NoError(t, err)
+	assert.Equal(t, dummyOnDemandPayment, payment)
 }
