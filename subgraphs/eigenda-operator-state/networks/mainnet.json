@@ -1,0 +1,28 @@
+{
+  "mainnet": {
+    "RegistryCoordinator": {
+      "address": "0x0BAAc79acD45A023E19345c352d8a7a83C4e5656",
+      "startBlock": 19592322
+    },
+    "BLSApkRegistry": {
+      "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
+      "startBlock": 19592322
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
+      "startBlock": 19592322
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0x0BAAc79acD45A023E19345c352d8a7a83C4e5656",
+      "startBlock": 19592322
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
+      "startBlock": 19592322
+    },
+    "EjectionManager": {
+      "address": "0x130d8EA0052B45554e4C99079B84df292149Bd5E",
+      "startBlock": 19839949
+    }
+  }
+}
