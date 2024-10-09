@@ -44,20 +44,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// // Mock data initialization method
-// func InitializeMockPayments(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
-// 	// Initialize mock active reservations
-// 	now := uint64(time.Now().Unix())
-// 	pcs.ActiveReservations = map[string]core.ActiveReservation{
-// 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {DataRate: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-// 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {DataRate: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
-// 	}
-// 	pcs.OnDemandPayments = map[string]core.OnDemandPayment{
-// 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1500},
-// 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 1000},
-// 	}
-// }
-
 func setup(_ *testing.M) {
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
@@ -117,6 +103,10 @@ func setup(_ *testing.M) {
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
 	}
 
+	meterer.CreateReservationTable(clientConfig, "reservations")
+	meterer.CreateOnDemandTable(clientConfig, "ondemand")
+	meterer.CreateGlobalReservationTable(clientConfig, "global")
+
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
 		"reservations",
@@ -124,6 +114,7 @@ func setup(_ *testing.M) {
 		"global",
 		logger,
 	)
+
 	if err != nil {
 		teardown()
 		panic("failed to create offchain store")
