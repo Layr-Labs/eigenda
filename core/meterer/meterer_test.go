@@ -119,7 +119,6 @@ func setup(_ *testing.M) {
 		"global",
 		logger,
 	)
-
 	if err != nil {
 		teardown()
 		panic("failed to create offchain store")
