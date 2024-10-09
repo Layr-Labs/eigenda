@@ -12,7 +12,11 @@ import (
 	"sort"
 )
 
-// The table ID reserved for the metadata table.
+// The table ID reserved for the metadata table. The metadata table is used for internal bookkeeping.
+// The following data is currently stored in the metadata table:
+//   - Schema version (in case we ever need to do a schema migration)
+//   - Table deletion markers used to detect a crash during table deletion and to complete
+//     the deletion when the store is next started.
 const metadataTableID uint32 = math.MaxUint32
 
 // The table ID reserved for the namespace table. Keys in the namespace table are table IDs (uint32)
@@ -39,11 +43,12 @@ const (
 	MapStore
 )
 
-// Create creates a new TableStore instance of the given type. The store will be created at the given path.
+// Start creates a new TableStore instance of the given type. The store will be created at the given path.
+// It can be used to instantiate a new store or to load an existing store.
 // This method will set up a table for each table name provided, and will drop all tables not in the list.
 // Dropping a table is irreversible and will delete all data in the table, so be very careful not to call
 // this method with table names omitted by mistake.
-func (t StoreType) Create(logger logging.Logger, path string, tables ...string) (kvstore.TableStore, error) {
+func (t StoreType) Start(logger logging.Logger, path string, tables ...string) (kvstore.TableStore, error) {
 
 	var base kvstore.Store
 	var err error
@@ -60,14 +65,14 @@ func (t StoreType) Create(logger logging.Logger, path string, tables ...string) 
 		return nil, fmt.Errorf("unknown store type: %d", t)
 	}
 
-	return create(logger, base, tables...)
+	return start(logger, base, tables...)
 }
 
 // Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
 // we will need to make this method public.
 
-// create creates a new TableStore instance with the given base store and table names.
-func create(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore.TableStore, error) {
+// start creates a new TableStore instance with the given base store and table names.
+func start(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore.TableStore, error) {
 	metadataTable := newTableView(base, "metadata", metadataTableID)
 	namespaceTable := newTableView(base, "namespace", namespaceTableID)
 
@@ -104,7 +109,11 @@ func validateSchema(metadataTable kvstore.Table) error {
 	schemaKey := []byte(metadataSchemaVersionKey)
 	onDiskSchemaBytes, err := metadataTable.Get(schemaKey)
 
-	if errors.Is(err, kvstore.ErrNotFound) {
+	if err != nil {
+		if !errors.Is(err, kvstore.ErrNotFound) {
+			return err
+		}
+
 		// This store is new, no on disk schema version exists.
 		onDiskSchemaBytes = make([]byte, 8)
 		binary.BigEndian.PutUint64(onDiskSchemaBytes, currentSchemaVersion)
@@ -115,20 +124,18 @@ func validateSchema(metadataTable kvstore.Table) error {
 		}
 
 		return nil
-	} else if err == nil {
-		// Verify schema version.
-		onDiskSchema := binary.BigEndian.Uint64(onDiskSchemaBytes)
-		if onDiskSchema != currentSchemaVersion {
-			// In the future if we change schema versions, we may need to write migration code here.
-			return fmt.Errorf(
-				"incompatible schema version: code is at version %d, data on disk is at version %d",
-				currentSchemaVersion, onDiskSchema)
-		}
-
-		return nil
 	}
 
-	return err
+	// Verify schema version.
+	onDiskSchema := binary.BigEndian.Uint64(onDiskSchemaBytes)
+	if onDiskSchema != currentSchemaVersion {
+		// In the future if we change schema versions, we may need to write migration code here.
+		return fmt.Errorf(
+			"incompatible schema version: code is at version %d, data on disk is at version %d",
+			currentSchemaVersion, onDiskSchema)
+	}
+
+	return nil
 }
 
 // This method adds and removes tables as needed to match the given list of tables. The table ID map is updated

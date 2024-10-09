@@ -9,7 +9,7 @@ import (
 
 var _ kvstore.Table = &tableView{}
 
-// tableView allows table in a New to be accessed as if it were a Store.
+// tableView allows data in a table to be accessed as if it were a Store.
 type tableView struct {
 	// base is the underlying store.
 	base kvstore.Store

@@ -33,7 +33,7 @@ func TestTableList(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	tStore, err := LevelDB.Create(logger, dbPath)
+	tStore, err := LevelDB.Start(logger, dbPath)
 	assert.NoError(t, err)
 
 	tables := tStore.GetTables()
@@ -44,7 +44,7 @@ func TestTableList(t *testing.T) {
 
 	// Add some tables
 
-	tStore, err = LevelDB.Create(logger, dbPath, "table1")
+	tStore, err = LevelDB.Start(logger, dbPath, "table1")
 	assert.NoError(t, err)
 
 	tables = tStore.GetTables()
@@ -54,7 +54,7 @@ func TestTableList(t *testing.T) {
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
-	tStore, err = LevelDB.Create(logger, dbPath, "table1", "table2")
+	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table2")
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 2, len(tables))
@@ -67,7 +67,7 @@ func TestTableList(t *testing.T) {
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
-	tStore, err = LevelDB.Create(logger, dbPath, "table1", "table2", "table3")
+	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table2", "table3")
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 3, len(tables))
@@ -82,7 +82,7 @@ func TestTableList(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Restarting with the same tables should work.
-	tStore, err = LevelDB.Create(logger, dbPath, "table1", "table2", "table3")
+	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table2", "table3")
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 3, len(tables))
@@ -98,7 +98,7 @@ func TestTableList(t *testing.T) {
 
 	// Delete a table
 
-	tStore, err = LevelDB.Create(logger, dbPath, "table1", "table3")
+	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table3")
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 2, len(tables))
@@ -111,7 +111,7 @@ func TestTableList(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Add a table back in (this uses a different code path)
-	tStore, err = LevelDB.Create(logger, dbPath, "table1", "table3", "table4")
+	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table3", "table4")
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 3, len(tables))
@@ -126,7 +126,7 @@ func TestTableList(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Delete the rest of the tables
-	tStore, err = LevelDB.Create(logger, dbPath)
+	tStore, err = LevelDB.Start(logger, dbPath)
 	assert.NoError(t, err)
 
 	tables = tStore.GetTables()
@@ -141,7 +141,7 @@ func TestUniqueKeySpace(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := MapStore.Create(logger, dbPath, "table1", "table2")
+	store, err := MapStore.Start(logger, dbPath, "table1", "table2")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -182,7 +182,7 @@ func TestBatchOperations(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := MapStore.Create(logger, dbPath, "table1", "table2", "table3")
+	store, err := MapStore.Start(logger, dbPath, "table1", "table2", "table3")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -359,7 +359,7 @@ func TestDropTable(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Create(logger, dbPath, "table1", "table2", "table3")
+	store, err := LevelDB.Start(logger, dbPath, "table1", "table2", "table3")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -413,7 +413,7 @@ func TestDropTable(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Create(logger, dbPath, "table1", "table3")
+	store, err = LevelDB.Start(logger, dbPath, "table1", "table3")
 	assert.NoError(t, err)
 
 	table1, err = store.GetTable("table1")
@@ -445,7 +445,7 @@ func TestDropTable(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Create(logger, dbPath, "table3")
+	store, err = LevelDB.Start(logger, dbPath, "table3")
 	assert.NoError(t, err)
 
 	_, err = store.GetTable("table1")
@@ -473,7 +473,7 @@ func TestDropTable(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Create(logger, dbPath)
+	store, err = LevelDB.Start(logger, dbPath)
 	assert.NoError(t, err)
 
 	_, err = store.GetTable("table1")
@@ -497,7 +497,7 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Create(logger, dbPath, "table1", "table2", "table3", "table4", "table5")
+	store, err := LevelDB.Start(logger, dbPath, "table1", "table2", "table3", "table4", "table5")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -572,7 +572,7 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Create(logger, dbPath, "table1", "table5", "table6", "table7", "table8", "table9")
+	store, err = LevelDB.Start(logger, dbPath, "table1", "table5", "table6", "table7", "table8", "table9")
 	assert.NoError(t, err)
 
 	table1, err = store.GetTable("table1")
@@ -649,7 +649,7 @@ func TestIteration(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := MapStore.Create(logger, dbPath, "table1", "table2")
+	store, err := MapStore.Start(logger, dbPath, "table1", "table2")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -802,7 +802,7 @@ func TestRestart(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Create(logger, dbPath, "table1", "table2")
+	store, err := LevelDB.Start(logger, dbPath, "table1", "table2")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -831,7 +831,7 @@ func TestRestart(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Create(logger, dbPath, "table1", "table2")
+	store, err = LevelDB.Start(logger, dbPath, "table1", "table2")
 	assert.NoError(t, err)
 
 	table1, err = store.GetTable("table1")
@@ -887,7 +887,7 @@ func TestRandomOperations(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Create(logger, dbPath)
+	store, err := LevelDB.Start(logger, dbPath)
 	assert.NoError(t, err)
 
 	tables := make(map[string]kvstore.Table)
@@ -902,7 +902,7 @@ func TestRandomOperations(t *testing.T) {
 			err = store.Shutdown()
 			assert.NoError(t, err)
 
-			store, err = LevelDB.Create(logger, dbPath, getTableNameList(tables)...)
+			store, err = LevelDB.Start(logger, dbPath, getTableNameList(tables)...)
 			assert.NoError(t, err)
 
 			for tableName := range tables {
@@ -920,7 +920,7 @@ func TestRandomOperations(t *testing.T) {
 			name := tu.RandomString(8)
 			tableNames = append(tableNames, name)
 
-			store, err = LevelDB.Create(logger, dbPath, tableNames...)
+			store, err = LevelDB.Start(logger, dbPath, tableNames...)
 			assert.NoError(t, err)
 
 			expectedData[name] = make(expectedTableData)
@@ -945,7 +945,7 @@ func TestRandomOperations(t *testing.T) {
 			}
 			delete(tables, name)
 
-			store, err = LevelDB.Create(logger, dbPath, getTableNameList(tables)...)
+			store, err = LevelDB.Start(logger, dbPath, getTableNameList(tables)...)
 			assert.NoError(t, err)
 
 			// Delete all expected data for the table
@@ -1065,7 +1065,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Create(logger, dbPath, "table1", "table2")
+	store, err := LevelDB.Start(logger, dbPath, "table1", "table2")
 	assert.NoError(t, err)
 
 	table1, err := store.GetTable("table1")
@@ -1101,14 +1101,14 @@ func TestInterruptedTableDeletion(t *testing.T) {
 		deletionsRemaining: 50,
 	}
 
-	_, err = create(logger, explodingBase, "table2")
+	_, err = start(logger, explodingBase, "table2")
 	assert.Error(t, err)
 
 	err = explodingBase.Shutdown()
 	assert.NoError(t, err)
 
 	// Restart the store. The table should be gone by the time the method returns.
-	store, err = LevelDB.Create(logger, dbPath, "table2")
+	store, err = LevelDB.Start(logger, dbPath, "table2")
 	assert.NoError(t, err)
 
 	tables := store.GetTables()
