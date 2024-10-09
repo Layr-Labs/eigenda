@@ -43,6 +43,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigenda/node/grpc"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 
 	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -206,8 +207,9 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 }
 
 type TestOperator struct {
-	Node   *node.Node
-	Server *nodegrpc.Server
+	Node     *node.Node
+	ServerV1 *nodegrpc.Server
+	ServerV2 *nodegrpc.ServerV2
 }
 
 func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging.Logger) map[core.OperatorID]TestOperator {
@@ -315,11 +317,13 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
-		s := nodegrpc.NewServer(config, n, logger, ratelimiter)
+		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
+		serverV2 := nodegrpc.NewServerV2(config, n, logger, ratelimiter)
 
 		ops[id] = TestOperator{
-			Node:   n,
-			Server: s,
+			Node:     n,
+			ServerV1: serverV1,
+			ServerV2: serverV2,
 		}
 	}
 
@@ -389,7 +393,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.NoError(t, err)
 
 		fmt.Println("Starting server")
-		go op.Server.Start()
+		err = grpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
+		assert.NoError(t, err)
 	}
 
 	blob := mustMakeTestBlob()
@@ -513,7 +518,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		fmt.Println("Processing operator: ", hexutil.Encode(op.Node.Config.ID[:]))
 
 		// check that blob headers can be retrieved from operators
-		headerReply, err := op.Server.GetBlobHeader(ctx, &nodepb.GetBlobHeaderRequest{
+		headerReply, err := op.ServerV1.GetBlobHeader(ctx, &nodepb.GetBlobHeaderRequest{
 			BatchHeaderHash: batchHeaderHash,
 			BlobIndex:       metadata.ConfirmationInfo.BlobIndex,
 			QuorumId:        uint32(0),
@@ -549,7 +554,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		}
 
 		// check that chunks can be retrieved from operators
-		chunksReply, err := op.Server.RetrieveChunks(ctx, &nodepb.RetrieveChunksRequest{
+		chunksReply, err := op.ServerV1.RetrieveChunks(ctx, &nodepb.RetrieveChunksRequest{
 			BatchHeaderHash: batchHeaderHash,
 			BlobIndex:       metadata.ConfirmationInfo.BlobIndex,
 			QuorumId:        uint32(0),
