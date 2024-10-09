@@ -1,35 +1,20 @@
-package meterer
+package auth
 
 import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
-/* SUBJECT TO BIG MODIFICATIONS */
+/* SUBJECT TO MODIFICATIONS */
 
-// PaymentMetadata represents the header information for a blob
-type PaymentMetadata struct {
-	// Existing fields
-	DataLength    uint32 // length in number of symbols
-	QuorumNumbers []uint8
-	AccountID     string
-
-	// New fields
-	BinIndex uint32
-	// TODO: we are thinking the contract can use uint128 for cumulative payment,
-	// but the definition on v2 uses uint64. Double check with team.
-	CumulativePayment uint64
-
-	Signature []byte
-}
-
-// EIP712Signer handles EIP-712 signing operations
+// EIP712Signer handles EIP-712 domain specific signing operations over typed and structured data
 type EIP712Signer struct {
 	domain apitypes.TypedDataDomain
 	types  apitypes.Types
@@ -64,7 +49,7 @@ func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712
 }
 
 // SignPaymentMetadata signs a PaymentMetadata using EIP-712
-func (s *EIP712Signer) SignPaymentMetadata(header *PaymentMetadata, privateKey *ecdsa.PrivateKey) ([]byte, error) {
+func (s *EIP712Signer) SignPaymentMetadata(header *core.PaymentMetadata, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	typedData := apitypes.TypedData{
 		Types:       s.types,
 		PrimaryType: "PaymentMetadata",
@@ -80,7 +65,7 @@ func (s *EIP712Signer) SignPaymentMetadata(header *PaymentMetadata, privateKey *
 
 	signature, err := s.signTypedData(typedData, privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error signing blob header: %v", err)
+		return nil, fmt.Errorf("error signing payment metadata (header): %v", err)
 	}
 
 	return signature, nil
@@ -95,7 +80,7 @@ func convertUint8SliceToMap(params []uint8) []string {
 }
 
 // RecoverSender recovers the sender's address from a signed PaymentMetadata
-func (s *EIP712Signer) RecoverSender(header *PaymentMetadata) (common.Address, error) {
+func (s *EIP712Signer) RecoverSender(header *core.PaymentMetadata) (common.Address, error) {
 	typedData := apitypes.TypedData{
 		Types:       s.types,
 		PrimaryType: "PaymentMetadata",
@@ -164,9 +149,9 @@ func ConstructPaymentMetadata(
 	dataLength uint32,
 	quorumNumbers []uint8,
 	privateKey *ecdsa.PrivateKey,
-) (*PaymentMetadata, error) {
+) (*core.PaymentMetadata, error) {
 	accountID := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
-	header := &PaymentMetadata{
+	header := &core.PaymentMetadata{
 		AccountID:         accountID,
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
@@ -176,7 +161,7 @@ func ConstructPaymentMetadata(
 
 	signature, err := signer.SignPaymentMetadata(header, privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error signing blob header: %v", err)
+		return nil, fmt.Errorf("error signing payment metadata (header): %v", err)
 	}
 
 	header.Signature = signature

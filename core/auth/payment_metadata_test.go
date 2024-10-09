@@ -1,10 +1,11 @@
-package meterer_test
+package auth_test
 
 import (
 	"math/big"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -14,12 +15,12 @@ import (
 func TestEIP712Signer(t *testing.T) {
 	chainID := big.NewInt(17000)
 	verifyingContract := common.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer := meterer.NewEIP712Signer(chainID, verifyingContract)
+	signer := auth.NewEIP712Signer(chainID, verifyingContract)
 
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	header := &meterer.PaymentMetadata{
+	header := &core.PaymentMetadata{
 		BinIndex:          0,
 		CumulativePayment: 1000,
 		DataLength:        1024,
@@ -48,12 +49,12 @@ func TestEIP712Signer(t *testing.T) {
 func TestConstructPaymentMetadata(t *testing.T) {
 	chainID := big.NewInt(17000)
 	verifyingContract := common.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer := meterer.NewEIP712Signer(chainID, verifyingContract)
+	signer := auth.NewEIP712Signer(chainID, verifyingContract)
 
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	header, err := meterer.ConstructPaymentMetadata(
+	header, err := auth.ConstructPaymentMetadata(
 		signer,
 		0,    // binIndex
 		1000, // cumulativePayment
@@ -76,7 +77,7 @@ func TestConstructPaymentMetadata(t *testing.T) {
 func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 	chainID := big.NewInt(17000)
 	verifyingContract := common.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer := meterer.NewEIP712Signer(chainID, verifyingContract)
+	signer := auth.NewEIP712Signer(chainID, verifyingContract)
 
 	privateKey1, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -84,7 +85,7 @@ func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 	privateKey2, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	header, err := meterer.ConstructPaymentMetadata(
+	header, err := auth.ConstructPaymentMetadata(
 		signer,
 		0,
 		1000,
@@ -110,12 +111,12 @@ func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 	chainID := big.NewInt(17000)
 	verifyingContract := common.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer := meterer.NewEIP712Signer(chainID, verifyingContract)
+	signer := auth.NewEIP712Signer(chainID, verifyingContract)
 
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	header, err := meterer.ConstructPaymentMetadata(
+	header, err := auth.ConstructPaymentMetadata(
 		signer,
 		0,
 		1000,
@@ -143,13 +144,13 @@ func TestEIP712SignerWithDifferentChainID(t *testing.T) {
 	chainID1 := big.NewInt(17000)
 	chainID2 := big.NewInt(17001)
 	verifyingContract := common.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer1 := meterer.NewEIP712Signer(chainID1, verifyingContract)
-	signer2 := meterer.NewEIP712Signer(chainID2, verifyingContract)
+	signer1 := auth.NewEIP712Signer(chainID1, verifyingContract)
+	signer2 := auth.NewEIP712Signer(chainID2, verifyingContract)
 
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	header, err := meterer.ConstructPaymentMetadata(
+	header, err := auth.ConstructPaymentMetadata(
 		signer1,
 		0,
 		1000,
