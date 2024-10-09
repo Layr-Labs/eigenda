@@ -486,3 +486,20 @@ type PaymentMetadata struct {
 
 	Signature []byte
 }
+
+type TokenAmount uint64 // TODO: change to uint128
+
+// OperatorInfo contains information about an operator which is stored on the blockchain state,
+// corresponding to a particular quorum
+type ActiveReservation struct {
+	DataRate       uint64 // Bandwidth per reservation bin
+	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
+	EndTimestamp   uint64
+
+	QuorumNumbers []uint8
+	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+}
+
+type OnDemandPayment struct {
+	CumulativePayment TokenAmount // Total amount deposited by the user
+}

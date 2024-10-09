@@ -200,3 +200,15 @@ func (t *MockTransactor) PubkeyHashToOperator(ctx context.Context, operatorId co
 	result := args.Get(0)
 	return result.(gethcommon.Address), args.Error(1)
 }
+
+func (t *MockTransactor) GetActiveReservations(ctx context.Context, blockNumber uint32) (map[string]core.ActiveReservation, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(map[string]core.ActiveReservation), args.Error(1)
+}
+
+func (t *MockTransactor) GetOnDemandPayments(ctx context.Context, blockNumber uint32) (map[string]core.OnDemandPayment, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(map[string]core.OnDemandPayment), args.Error(1)
+}
