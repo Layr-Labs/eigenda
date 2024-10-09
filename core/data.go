@@ -222,6 +222,14 @@ type Blob struct {
 	Data          []byte
 }
 
+func (b *Blob) GetQuorumNumbers() []uint8 {
+	quorumNumbers := make([]uint8, 0, len(b.RequestHeader.SecurityParams))
+	for _, sp := range b.RequestHeader.SecurityParams {
+		quorumNumbers = append(quorumNumbers, sp.QuorumID)
+	}
+	return quorumNumbers
+}
+
 // BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
 // Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
 // using the signature to charge the user for a different blob or for dispersing the same blob
@@ -506,7 +514,7 @@ func (pm *PaymentMetadata) Hash() []byte {
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
-	DataRate       uint64 // Bandwidth per reservation bin
+	SymbolsPerSec  uint64 // reserve number of symbols per second
 	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
 	EndTimestamp   uint64
 
