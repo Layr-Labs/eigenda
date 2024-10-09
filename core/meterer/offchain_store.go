@@ -10,6 +10,7 @@ import (
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -140,7 +141,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, si
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata PaymentMetadata, symbolsCharged uint32) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, symbolsCharged uint32) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},

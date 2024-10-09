@@ -1,6 +1,8 @@
 package meterer
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -12,6 +14,8 @@ type Config struct {
 	MinChargeableSize    uint32 // Minimum size of a chargeable unit in bytes, used as a floor for on-demand payments
 	PricePerChargeable   uint32 // Price per chargeable unit in gwei, used for on-demand payments
 	ReservationWindow    uint32 // Duration of all reservations in seconds, used to calculate bin indices
+
+	ChainReadTimeout time.Duration // Timeout for reading payment state from chain
 }
 
 // disperser API server will receive requests from clients. these requests will be with a blobHeader with payments information (CumulativePayments, BinIndex, and Signature)
