@@ -17,16 +17,21 @@ import (
 type Config struct {
 	// for rate limiting 2^64 ~= 18 exabytes per second; 2^32 ~= 4GB/s
 	// for payments      2^64 ~= 18M Eth;                2^32 ~= 4ETH
-	GlobalSymbolsPerSecond uint64 // Global rate limit in symbols per second for on-demand payments
-	MinChargeableSize      uint32 // Minimum size of a chargeable unit in bytes, used as a floor for on-demand payments
-	PricePerChargeable     uint32 // Price per chargeable unit in gwei, used for on-demand payments
-	ReservationWindow      uint32 // Duration of all reservations in seconds, used to calculate bin indices
 
+	// General
+	MinNumSymbols    uint32        // Minimum size of a chargeable unit in symbols, round up for all smaller requests (must be in power of 2)
 	ChainReadTimeout time.Duration // Timeout for reading payment state from chain
+
+	// On-Demand specific configs
+	GlobalSymbolsPerSecond uint64 // Global rate limit in symbols per second for on-demand payments
+	PricePerSymbol         uint32 // Price per symbol in gwei, used for on-demand payments
+
+	// Reservation specific config
+	ReservationWindow uint32 // Duration of all reservations in seconds, used to calculate bin indices
 }
 
 // disperser API server will receive requests from clients. these requests will be with a PaymentMetadata with payments information (CumulativePayments, BinIndex, and Signature)
-// Disperser will pass the blob header to the meterer, which will check if the payments information is valid. if it is, it will be added to the meterer's state.
+// Disperser will pass the payment header to the meterer, which will check if the payments information is valid. if it is, it will be added to the meterer's state.
 // To check if the payment is valid, the meterer will:
 //  1. check if the signature is valid
 //     (against the CumulativePayments and BinIndex fields ;
@@ -162,8 +167,8 @@ func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *cor
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation) error {
-	recordedSize := uint64(max(header.DataLength, uint32(m.MinChargeableSize)))
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), recordedSize)
+	numSymbols := uint64(max(header.DataLength, m.MinNumSymbols))
+	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), numSymbols)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -172,7 +177,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	usageLimit := m.GetReservationBinLimit(reservation)
 	if newUsage <= usageLimit {
 		return nil
-	} else if newUsage-recordedSize >= usageLimit {
+	} else if newUsage-numSymbols >= usageLimit {
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
@@ -252,12 +257,12 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 
 // PaymentCharged returns the chargeable price for a given data length
 func (m *Meterer) PaymentCharged(dataLength uint32) uint64 {
-	return uint64(core.RoundUpDivide(uint(m.SymbolsCharged(dataLength)*m.PricePerChargeable), uint(m.MinChargeableSize)))
+	return uint64(m.SymbolsCharged(dataLength)) * uint64(m.PricePerSymbol)
 }
 
 // SymbolsCharged returns the chargeable data length for a given data length
 func (m *Meterer) SymbolsCharged(dataLength uint32) uint32 {
-	return uint32(max(dataLength, m.MinChargeableSize))
+	return uint32(max(dataLength, m.MinNumSymbols))
 }
 
 // ValidateBinIndex checks if the provided bin index is valid
