@@ -14,7 +14,7 @@ import (
 
 var (
 	dummyActiveReservation = core.ActiveReservation{
-		DataRate:       100,
+		SymbolsPerSec:  100,
 		StartTimestamp: 1000,
 		EndTimestamp:   2000,
 		QuorumSplit:    []byte{50, 50},
@@ -65,7 +65,7 @@ func TestGetActiveReservations(t *testing.T) {
 	}
 	mockState.On("GetActiveReservations", testifymock.Anything, testifymock.Anything).Return(expectedReservations, nil)
 
-	reservations, err := mockState.GetActiveReservations(ctx, 1000)
+	reservations, err := mockState.GetActiveReservations(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedReservations, reservations)
 }
@@ -75,7 +75,7 @@ func TestGetActiveReservationByAccount(t *testing.T) {
 	ctx := context.Background()
 	mockState.On("GetActiveReservationsByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
 
-	reservation, err := mockState.GetActiveReservationsByAccount(ctx, 1000, "account1")
+	reservation, err := mockState.GetActiveReservationByAccount(ctx, "account1")
 	assert.NoError(t, err)
 	assert.Equal(t, dummyActiveReservation, reservation)
 }
@@ -88,7 +88,7 @@ func TestGetOnDemandPayments(t *testing.T) {
 	}
 	mockState.On("GetOnDemandPayments", testifymock.Anything, testifymock.Anything).Return(expectedPayments, nil)
 
-	payments, err := mockState.GetOnDemandPayments(ctx, 1000)
+	payments, err := mockState.GetOnDemandPayments(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedPayments, payments)
 }
@@ -99,7 +99,17 @@ func TestGetOnDemandPaymentByAccount(t *testing.T) {
 	accountID := "account1"
 	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
 
-	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, 1000, accountID)
+	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, accountID)
 	assert.NoError(t, err)
 	assert.Equal(t, dummyOnDemandPayment, payment)
+}
+
+func TestGetOnDemandQuorumNumbers(t *testing.T) {
+	mockState := &mock.MockOnchainPaymentState{}
+	ctx := context.Background()
+	mockState.On("GetOnDemandQuorumNumbers", testifymock.Anything, testifymock.Anything).Return([]uint8{0, 1}, nil)
+
+	quorumNumbers, err := mockState.GetOnDemandQuorumNumbers(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, []uint8{0, 1}, quorumNumbers)
 }

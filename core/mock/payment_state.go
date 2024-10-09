@@ -33,7 +33,7 @@ func (m *MockOnchainPaymentState) CurrentOnchainPaymentState(ctx context.Context
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint32) (map[string]core.ActiveReservation, error) {
+func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error) {
 	args := m.Called()
 	var value map[string]core.ActiveReservation
 	if args.Get(0) != nil {
@@ -42,7 +42,7 @@ func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context, blo
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetActiveReservationsByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
+func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
 	args := m.Called()
 	var value core.ActiveReservation
 	if args.Get(0) != nil {
@@ -51,7 +51,7 @@ func (m *MockOnchainPaymentState) GetActiveReservationsByAccount(ctx context.Con
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetOnDemandPayments(ctx context.Context, blockNumber uint32) (map[string]core.OnDemandPayment, error) {
+func (m *MockOnchainPaymentState) GetOnDemandPayments(ctx context.Context) (map[string]core.OnDemandPayment, error) {
 	args := m.Called()
 	var value map[string]core.OnDemandPayment
 	if args.Get(0) != nil {
@@ -60,11 +60,20 @@ func (m *MockOnchainPaymentState) GetOnDemandPayments(ctx context.Context, block
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
+func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
 	args := m.Called()
 	var value core.OnDemandPayment
 	if args.Get(0) != nil {
 		value = args.Get(0).(core.OnDemandPayment)
+	}
+	return value, args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	args := m.Called()
+	var value []uint8
+	if args.Get(0) != nil {
+		value = args.Get(0).([]uint8)
 	}
 	return value, args.Error(1)
 }
