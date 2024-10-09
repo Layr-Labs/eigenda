@@ -205,6 +205,11 @@ func TestBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
+	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, "BlobSize", 1000)
+	assert.NoError(t, err)
+
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
@@ -213,6 +218,7 @@ func TestBasicOperations(t *testing.T) {
 	assert.Equal(t, "Confirmed", item["Status"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, "0x123", item["BatchHeaderHash"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, "0", item["BlobIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1123", item["BlobSize"].(*types.AttributeValueMemberN).Value)
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
 	assert.NoError(t, err)
@@ -595,4 +601,63 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 0)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
+}
+
+func TestQueryIndexOrderWithLimit(t *testing.T) {
+	tableName := "ProcessingQueryIndexOrderWithLimit"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	items := make([]commondynamodb.Item, numItems)
+	for i := 0; i < numItems; i++ {
+		requestedAt := time.Now().Add(-time.Duration(i) * time.Minute).Unix()
+		items[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(requestedAt, 10)},
+		}
+	}
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	// Test forward order with limit
+	queryResult, err := dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, true, 10)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 10)
+	// Check if the items are in ascending order
+	for i := 0; i < len(queryResult)-1; i++ {
+		assert.True(t, queryResult[i]["RequestedAt"].(*types.AttributeValueMemberN).Value <= queryResult[i+1]["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	}
+
+	// Test reverse order with limit
+	queryResult, err = dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, false, 10)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 10)
+	// Check if the items are in descending order
+	for i := 0; i < len(queryResult)-1; i++ {
+		assert.True(t, queryResult[i]["RequestedAt"].(*types.AttributeValueMemberN).Value >= queryResult[i+1]["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	}
+
+	// Test with a smaller limit
+	queryResult, err = dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, true, 5)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 5)
+
+	// Test with a limit larger than the number of items
+	queryResult, err = dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, true, 50)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 30) // Should return all items
 }
