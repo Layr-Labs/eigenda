@@ -183,7 +183,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	// Fetch the largest entry smaller than the given cumulativePayment
 	smallerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",
 		"AccountID = :account AND CumulativePayments < :cumulativePayment",
-		commondynamodb.ExpresseionValues{
+		commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
 			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
 		},
@@ -205,7 +205,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	// Fetch the smallest entry larger than the given cumulativePayment
 	largerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",
 		"AccountID = :account AND CumulativePayments > :cumulativePayment",
-		commondynamodb.ExpresseionValues{
+		commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
 			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
 		},
