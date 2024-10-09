@@ -25,17 +25,7 @@ type Table interface {
 type TableKey []byte
 
 // TableBatch is a collection of operations that can be applied atomically to a TableStore.
-type TableBatch interface {
-	// Put stores the given key / value pair in the batch, overwriting any existing value for that key.
-	// If nil is passed as the value, a byte slice of length 0 will be stored.
-	Put(key TableKey, value []byte)
-	// Delete removes the key from the batch.
-	Delete(key TableKey)
-	// Apply atomically writes all the key / value pairs in the batch to the database.
-	Apply() error
-	// Size returns the number of operations in the batch.
-	Size() uint32
-}
+type TableBatch Batch[TableKey]
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.
 // A "table" in this context is a disjoint keyspace. Keys in one table to not collide with keys in another table,

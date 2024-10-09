@@ -79,7 +79,7 @@ func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 }
 
 // NewBatch creates a new batch for the store.
-func (store *mapStore) NewBatch() kvstore.Batch {
+func (store *mapStore) NewBatch() kvstore.StoreBatch {
 	return &batch{
 		store:  store,
 		keys:   make([][]byte, 0),

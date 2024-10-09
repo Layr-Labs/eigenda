@@ -5,7 +5,7 @@ import "github.com/Layr-Labs/eigenda/common/kvstore"
 // tableStoreBatch is a batch for writing to a table store.
 type tableStoreBatch struct {
 	store *tableStore
-	batch kvstore.Batch
+	batch kvstore.StoreBatch
 }
 
 // Put adds a key-value pair to the batch.

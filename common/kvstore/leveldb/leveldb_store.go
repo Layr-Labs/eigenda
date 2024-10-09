@@ -88,7 +88,7 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 }
 
 // NewBatch creates a new batch for the store.
-func (store *levelDBStore) NewBatch() kvstore.Batch {
+func (store *levelDBStore) NewBatch() kvstore.StoreBatch {
 	return &levelDBBatch{
 		store: store,
 		batch: new(leveldb.Batch),
