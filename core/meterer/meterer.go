@@ -29,7 +29,6 @@ type Config struct {
 //
 // If the payment is valid, the meterer will add the blob header to its state and return a success response to the disperser API server.
 // if any of the checks fail, the meterer will return a failure response to the disperser API server.
-var OnDemandQuorumNumbers = []uint8{0, 1}
 
 type Meterer struct {
 	Config
