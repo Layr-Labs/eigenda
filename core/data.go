@@ -470,3 +470,19 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 	}
 	return c, nil
 }
+
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
+	// Existing fields
+	DataLength    uint32 // length in number of symbols
+	QuorumNumbers []uint8
+	AccountID     string
+
+	// New fields
+	BinIndex uint32
+	// TODO: we are thinking the contract can use uint128 for cumulative payment,
+	// but the definition on v2 uses uint64. Double check with team.
+	CumulativePayment uint64
+
+	Signature []byte
+}
