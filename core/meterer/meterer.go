@@ -14,10 +14,10 @@ import (
 type Config struct {
 	// GlobalSymbolsPerSecond rate limit in symbols per second for on-demand payments
 	GlobalSymbolsPerSecond uint64
-	// MinChargeableSize is the minimum size of a chargeable unit in bytes, used as a floor for on-demand payments
-	MinChargeableSize uint32
-	// PricePerChargeable is the price per chargeable unit in gwei, used for on-demand payments
-	PricePerChargeable uint32
+	// MinNumSymbols is the minimum number of symbols charged, round up for all smaller requests (must be in power of 2)
+	MinNumSymbols uint32
+	// PricePerSymbol is the price per symbol in gwei, used for on-demand payments
+	PricePerSymbol uint32
 	// ReservationWindow is the duration of all reservations in seconds, used to calculate bin indices
 	ReservationWindow uint32
 
@@ -129,8 +129,8 @@ func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *cor
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, blobLength uint) error {
-	recordedSize := uint64(max(blobLength, uint(m.MinChargeableSize)))
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), recordedSize)
+	numSymbols := uint64(max(blobLength, uint(m.MinNumSymbols)))
+	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), numSymbols)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -139,7 +139,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	usageLimit := m.GetReservationBinLimit(reservation)
 	if newUsage <= usageLimit {
 		return nil
-	} else if newUsage-recordedSize >= usageLimit {
+	} else if newUsage-numSymbols >= usageLimit {
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
@@ -221,12 +221,12 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 
 // PaymentCharged returns the chargeable price for a given data length
 func (m *Meterer) PaymentCharged(dataLength uint) uint64 {
-	return uint64(core.RoundUpDivide(uint(m.SymbolsCharged(dataLength)*m.PricePerChargeable), uint(m.MinChargeableSize)))
+	return uint64(m.SymbolsCharged(dataLength)) * uint64(m.PricePerSymbol)
 }
 
 // SymbolsCharged returns the chargeable data length for a given data length
 func (m *Meterer) SymbolsCharged(dataLength uint) uint32 {
-	return uint32(max(uint32(dataLength), m.MinChargeableSize))
+	return uint32(max(uint32(dataLength), m.MinNumSymbols))
 }
 
 // ValidateBinIndex checks if the provided bin index is valid

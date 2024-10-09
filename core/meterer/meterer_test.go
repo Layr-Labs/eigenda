@@ -96,8 +96,8 @@ func setup(_ *testing.M) {
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
-		PricePerChargeable:     1,
-		MinChargeableSize:      1,
+		PricePerSymbol:         1,
+		MinNumSymbols:          1,
 		GlobalSymbolsPerSecond: 1000,
 		ReservationWindow:      1,
 		ChainReadTimeout:       3 * time.Second,
@@ -317,46 +317,46 @@ func TestMetererOnDemand(t *testing.T) {
 
 func TestMeterer_paymentCharged(t *testing.T) {
 	tests := []struct {
-		name               string
-		dataLength         uint
-		pricePerChargeable uint32
-		minChargeableSize  uint32
-		expected           uint64
+		name           string
+		dataLength     uint
+		pricePerSymbol uint32
+		minNumSymbols  uint32
+		expected       uint64
 	}{
 		{
-			name:               "Data length equal to min chargeable size",
-			dataLength:         1024,
-			pricePerChargeable: 100,
-			minChargeableSize:  1024,
-			expected:           100,
+			name:           "Data length equal to min chargeable size",
+			dataLength:     1024,
+			pricePerSymbol: 100,
+			minNumSymbols:  1024,
+			expected:       100,
 		},
 		{
-			name:               "Data length less than min chargeable size",
-			dataLength:         512,
-			pricePerChargeable: 100,
-			minChargeableSize:  1024,
-			expected:           100,
+			name:           "Data length less than min chargeable size",
+			dataLength:     512,
+			pricePerSymbol: 100,
+			minNumSymbols:  1024,
+			expected:       100,
 		},
 		{
-			name:               "Data length greater than min chargeable size",
-			dataLength:         2048,
-			pricePerChargeable: 100,
-			minChargeableSize:  1024,
-			expected:           200,
+			name:           "Data length greater than min chargeable size",
+			dataLength:     2048,
+			pricePerSymbol: 100,
+			minNumSymbols:  1024,
+			expected:       200,
 		},
 		{
-			name:               "Large data length",
-			dataLength:         1 << 20, // 1 MB
-			pricePerChargeable: 100,
-			minChargeableSize:  1024,
-			expected:           102400,
+			name:           "Large data length",
+			dataLength:     1 << 20, // 1 MB
+			pricePerSymbol: 100,
+			minNumSymbols:  1024,
+			expected:       102400,
 		},
 		{
-			name:               "Price not evenly divisible by min chargeable size",
-			dataLength:         1536,
-			pricePerChargeable: 150,
-			minChargeableSize:  1024,
-			expected:           225,
+			name:           "Price not evenly divisible by min chargeable size",
+			dataLength:     1536,
+			pricePerSymbol: 150,
+			minNumSymbols:  1024,
+			expected:       225,
 		},
 	}
 
@@ -364,8 +364,8 @@ func TestMeterer_paymentCharged(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				Config: meterer.Config{
-					PricePerChargeable: tt.pricePerChargeable,
-					MinChargeableSize:  tt.minChargeableSize,
+					PricePerSymbol: tt.pricePerSymbol,
+					MinNumSymbols:  tt.minNumSymbols,
 				},
 			}
 			result := m.PaymentCharged(tt.dataLength)
@@ -376,40 +376,40 @@ func TestMeterer_paymentCharged(t *testing.T) {
 
 func TestMeterer_symbolsCharged(t *testing.T) {
 	tests := []struct {
-		name              string
-		dataLength        uint
-		minChargeableSize uint32
-		expected          uint32
+		name          string
+		dataLength    uint
+		minNumSymbols uint32
+		expected      uint32
 	}{
 		{
-			name:              "Data length equal to min chargeable size",
-			dataLength:        1024,
-			minChargeableSize: 1024,
-			expected:          1024,
+			name:          "Data length equal to min chargeable size",
+			dataLength:    1024,
+			minNumSymbols: 1024,
+			expected:      1024,
 		},
 		{
-			name:              "Data length less than min chargeable size",
-			dataLength:        512,
-			minChargeableSize: 1024,
-			expected:          1024,
+			name:          "Data length less than min chargeable size",
+			dataLength:    512,
+			minNumSymbols: 1024,
+			expected:      1024,
 		},
 		{
-			name:              "Data length greater than min chargeable size",
-			dataLength:        2048,
-			minChargeableSize: 1024,
-			expected:          2048,
+			name:          "Data length greater than min chargeable size",
+			dataLength:    2048,
+			minNumSymbols: 1024,
+			expected:      2048,
 		},
 		{
-			name:              "Large data length",
-			dataLength:        1 << 20, // 1 MB
-			minChargeableSize: 1024,
-			expected:          1 << 20,
+			name:          "Large data length",
+			dataLength:    1 << 20, // 1 MB
+			minNumSymbols: 1024,
+			expected:      1 << 20,
 		},
 		{
-			name:              "Very small data length",
-			dataLength:        16,
-			minChargeableSize: 1024,
-			expected:          1024,
+			name:          "Very small data length",
+			dataLength:    16,
+			minNumSymbols: 1024,
+			expected:      1024,
 		},
 	}
 
@@ -417,7 +417,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				Config: meterer.Config{
-					MinChargeableSize: tt.minChargeableSize,
+					MinNumSymbols: tt.minNumSymbols,
 				},
 			}
 			result := m.SymbolsCharged(tt.dataLength)
