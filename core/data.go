@@ -291,7 +291,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -469,4 +469,37 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 		c[quorum] = fr
 	}
 	return c, nil
+}
+
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
+	// Existing fields
+	DataLength    uint32 // length in number of symbols
+	QuorumNumbers []uint8
+	AccountID     string
+
+	// New fields
+	BinIndex uint32
+	// TODO: we are thinking the contract can use uint128 for cumulative payment,
+	// but the definition on v2 uses uint64. Double check with team.
+	CumulativePayment uint64
+
+	Signature []byte
+}
+
+type TokenAmount uint64 // TODO: change to uint128
+
+// OperatorInfo contains information about an operator which is stored on the blockchain state,
+// corresponding to a particular quorum
+type ActiveReservation struct {
+	DataRate       uint64 // Bandwidth per reservation bin
+	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
+	EndTimestamp   uint64
+
+	QuorumNumbers []uint8
+	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+}
+
+type OnDemandPayment struct {
+	CumulativePayment TokenAmount // Total amount deposited by the user
 }

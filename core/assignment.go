@@ -206,7 +206,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
+		maxChunkLength2 := RoundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
 
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2
@@ -271,7 +271,7 @@ func roundUpDivideBig(a, b *big.Int) *big.Int {
 
 }
 
-func roundUpDivide(a, b uint) uint {
+func RoundUpDivide(a, b uint) uint {
 	return (a + b - 1) / b
 
 }
