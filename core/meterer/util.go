@@ -2,20 +2,13 @@ package meterer
 
 import (
 	"context"
-	"math/big"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
-
-func DummyCommitment() core.G1Point {
-	commitment := core.NewG1Point(big.NewInt(123), big.NewInt(456))
-	return *commitment
-}
 
 func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
 	ctx := context.Background()

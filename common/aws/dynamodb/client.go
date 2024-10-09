@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -407,4 +408,18 @@ func (c *Client) readItems(ctx context.Context, tableName string, keys []Key) ([
 	}
 
 	return items, nil
+}
+
+// TableCheck checks if a table exists and can be described
+func (c *Client) TableCheck(ctx context.Context, name string) error {
+	if name == "" {
+		return errors.New("table name is empty")
+	}
+	_, err := c.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(name),
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
