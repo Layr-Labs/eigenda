@@ -1,0 +1,41 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: EjectionManager
+    network: holesky
+    source:
+      abi: EjectionManager
+      address: "0xEEed164605833263B7690bB521983b777D128698"
+      startBlock: 1367682
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - EjectorUpdated
+        - Initialized
+        - OperatorEjected
+        - OwnershipTransferred
+        - QuorumEjection
+        - QuorumEjectionParamsSet
+      abis:
+        - name: EjectionManager
+          file: ./abis/EjectionManager.json
+      eventHandlers:
+        - event: EjectorUpdated(address,bool)
+          handler: handleEjectorUpdated
+        - event: Initialized(uint8)
+          handler: handleInitialized
+        - event: OperatorEjected(bytes32,uint8)
+          handler: handleOperatorEjected
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: QuorumEjection(uint32,bool)
+          handler: handleQuorumEjection
+        - event: QuorumEjectionParamsSet(uint8,uint32,uint16)
+          handler: handleQuorumEjectionParamsSet
+      file: ./src/ejection-manager.ts

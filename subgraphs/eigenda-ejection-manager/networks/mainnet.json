@@ -1,0 +1,8 @@
+{
+  "mainnet": {
+    "EjectionManager": {
+      "address": "0x130d8EA0052B45554e4C99079B84df292149Bd5E",
+      "startBlock": 19839949
+    }
+  }
+}
