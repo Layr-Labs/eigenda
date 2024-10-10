@@ -7,6 +7,9 @@ build_gpu:
 benchmark_cpu:
 	go run main.go -cpuprofile cpu.prof -memprofile mem.prof
 
+benchmark_gpu:
+	go run -tags=gpu main.go -cpuprofile cpu.prof -memprofile mem.prof
+
 cpu_profile:
 	go tool pprof -http=:8080 cpu.prof
 

@@ -40,8 +40,8 @@ type Config struct {
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
-	flag.Uint64Var(&config.BlobLength, "blob-length", 1048576, "Blob length (power of 2)")
-	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
+	flag.Uint64Var(&config.BlobLength, "blob-length", 131072, "Blob length (power of 2)")
+	flag.Uint64Var(&config.NumChunks, "num-chunks", 1024, "Minimum number of chunks (power of 2)")
 	flag.Uint64Var(&config.NumRuns, "num-runs", 10, "Number of times to run the benchmark")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
@@ -57,9 +57,9 @@ func main() {
 
 	// Setup phase
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "/home/ec2-user/resources/kzg/g1.point",
-		G2Path:          "/home/ec2-user/resources/kzg/g2.point",
-		CacheDir:        "/home/ec2-user/resources/kzg/SRSTables",
+		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
+		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
+		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
 		SRSOrder:        268435456,
 		SRSNumberToLoad: 2097152,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

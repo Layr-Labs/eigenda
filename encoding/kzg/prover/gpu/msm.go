@@ -20,7 +20,7 @@ func (c *KzgGpuProofDevice) MsmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, 
 	var p icicle_bn254.Projective
 	var out core.DeviceSlice
 
-	_, err := out.MallocAsync(totalSize*p.Size(), p.Size(), *c.Stream)
+	_, err := out.MallocAsync(totalSize*p.Size(), totalSize, *c.Stream)
 	// _, err := out.Malloc(totalSize*p.Size(), p.Size())
 	if err != runtime.Success {
 		return out, fmt.Errorf("%v", "Allocating bytes on device for Projective results failed")

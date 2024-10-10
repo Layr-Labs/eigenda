@@ -156,6 +156,11 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	flattenCoeffStoreCopy.CopyToDeviceAsync(&flattenStoreCopyToDevice, *p.Stream, true)
 
 	// compute msm on each rows of the transposed matrix
+	fmt.Println("numPoly", numPoly)
+	fmt.Println("dimE", dimE)
+	fmt.Println("row", p.FlatFFTPointsT[0].Size())
+	fmt.Println("col", len(p.FlatFFTPointsT))
+
 	sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 	if err != nil {
 		return nil, err

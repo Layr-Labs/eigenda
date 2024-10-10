@@ -29,7 +29,7 @@ func (g *GpuComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, er
 
 	scalarsSF := gpu_utils.ConvertFrToScalarFieldsBytes(coeffs)
 
-	scalars := core.HostSliceFromElements(scalarsSF)
+	scalars := core.HostSliceFromElements[bn254_icicle.ScalarField](scalarsSF)
 
 	outputDevice := make(core.HostSlice[bn254_icicle.ScalarField], len(coeffs))
 

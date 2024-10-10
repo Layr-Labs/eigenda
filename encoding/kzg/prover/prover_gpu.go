@@ -71,7 +71,14 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	sfs := fft.NewFFTSettings(t)
 
 	// GPU Setup
+	// trying to choose CUDA if available, or fallback to CPU otherwise (default device)
+	deviceCuda := runtime.CreateDevice("CUDA", 0) // GPU-0
+	if runtime.IsDeviceAvailable(&deviceCuda) {
+		runtime.SetDevice(&deviceCuda)
+	} // else we stay on CPU backend
+		
 	gpuLock := sync.Mutex{}
+
 
 	// Setup NTT
 	nttCfg, icicle_err := gpu_utils.SetupNTT()
