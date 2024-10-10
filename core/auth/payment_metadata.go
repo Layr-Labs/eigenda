@@ -21,8 +21,8 @@ type EIP712Signer struct {
 }
 
 // NewEIP712Signer creates a new EIP712Signer instance
-func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712Signer {
-	return &EIP712Signer{
+func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) EIP712Signer {
+	return EIP712Signer{
 		domain: apitypes.TypedDataDomain{
 			Name:              "EigenDA",
 			Version:           "1",
@@ -40,7 +40,6 @@ func NewEIP712Signer(chainID *big.Int, verifyingContract common.Address) *EIP712
 				{Name: "accountID", Type: "string"},
 				{Name: "binIndex", Type: "uint32"},
 				{Name: "cumulativePayment", Type: "uint64"},
-				{Name: "commitment", Type: "bytes"},
 				{Name: "dataLength", Type: "uint32"},
 				{Name: "quorumNumbers", Type: "uint8[]"},
 			},

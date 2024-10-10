@@ -492,7 +492,7 @@ type TokenAmount uint64 // TODO: change to uint128
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
-	DataRate       uint64 // Bandwidth per reservation bin
+	SymbolsPerSec  uint64 // reserve number of symbols per second
 	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
 	EndTimestamp   uint64
 

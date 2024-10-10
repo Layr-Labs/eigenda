@@ -55,7 +55,7 @@ func TestConstructPaymentMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	header, err := auth.ConstructPaymentMetadata(
-		signer,
+		&signer,
 		0,    // binIndex
 		1000, // cumulativePayment
 		1024, // dataLength
@@ -86,7 +86,7 @@ func TestEIP712SignerWithDifferentKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	header, err := auth.ConstructPaymentMetadata(
-		signer,
+		&signer,
 		0,
 		1000,
 		1024,
@@ -117,7 +117,7 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 	require.NoError(t, err)
 
 	header, err := auth.ConstructPaymentMetadata(
-		signer,
+		&signer,
 		0,
 		1000,
 		1024,
@@ -151,7 +151,7 @@ func TestEIP712SignerWithDifferentChainID(t *testing.T) {
 	require.NoError(t, err)
 
 	header, err := auth.ConstructPaymentMetadata(
-		signer1,
+		&signer1,
 		0,
 		1000,
 		1024,
