@@ -43,7 +43,7 @@ func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context) (ma
 }
 
 func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
-	args := m.Called()
+	args := m.Called(ctx, accountID)
 	var value core.ActiveReservation
 	if args.Get(0) != nil {
 		value = args.Get(0).(core.ActiveReservation)
@@ -61,7 +61,7 @@ func (m *MockOnchainPaymentState) GetOnDemandPayments(ctx context.Context) (map[
 }
 
 func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
-	args := m.Called()
+	args := m.Called(ctx, accountID)
 	var value core.OnDemandPayment
 	if args.Get(0) != nil {
 		value = args.Get(0).(core.OnDemandPayment)

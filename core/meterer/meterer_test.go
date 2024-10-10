@@ -3,6 +3,7 @@ package meterer_test
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -23,19 +24,26 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	dynamoClient       *commondynamodb.Client
-	clientConfig       commonaws.ClientConfig
-	privateKey1        *ecdsa.PrivateKey
-	privateKey2        *ecdsa.PrivateKey
-	signer             *auth.EIP712Signer
-	mt                 *meterer.Meterer
+	dockertestPool           *dockertest.Pool
+	dockertestResource       *dockertest.Resource
+	dynamoClient             *commondynamodb.Client
+	clientConfig             commonaws.ClientConfig
+	privateKey1              *ecdsa.PrivateKey
+	privateKey2              *ecdsa.PrivateKey
+	account1                 string
+	account1Reservations     core.ActiveReservation
+	account1OnDemandPayments core.OnDemandPayment
+	account2                 string
+	account2Reservations     core.ActiveReservation
+	account2OnDemandPayments core.OnDemandPayment
+	signer                   auth.EIP712Signer
+	mt                       *meterer.Meterer
 
 	deployLocalStack  bool
 	localStackPort    = "4566"
@@ -48,20 +56,6 @@ func TestMain(m *testing.M) {
 	teardown()
 	os.Exit(code)
 }
-
-// // Mock data initialization method
-// func InitializeMockPayments(pcs *meterer.OnchainPaymentState, privateKey1 *ecdsa.PrivateKey, privateKey2 *ecdsa.PrivateKey) {
-// 	// Initialize mock active reservations
-// 	now := uint64(time.Now().Unix())
-// 	pcs.ActiveReservations.Reservations = map[string]*meterer.ActiveReservation{
-// 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {BytesPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-// 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {BytesPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}},
-// 	}
-// 	pcs.OnDemandPayments.Payments = map[string]*meterer.OnDemandPayment{
-// 		crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(): {CumulativePayment: 1500},
-// 		crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(): {CumulativePayment: 1000},
-// 	}
-// }
 
 func setup(_ *testing.M) {
 
@@ -99,20 +93,23 @@ func setup(_ *testing.M) {
 		panic("failed to create dynamodb client")
 	}
 
-	chainID := big.NewInt(17000)
-	verifyingContract := gethcommon.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer = auth.NewEIP712Signer(chainID, verifyingContract)
-
 	privateKey1, err = crypto.GenerateKey()
 	privateKey2, err = crypto.GenerateKey()
-
 	logger = logging.NewNoopLogger()
+	signer = auth.NewEIP712Signer(big.NewInt(17000), gethcommon.HexToAddress("0x1234000000000000000000000000000000000000"))
+
+	if err != nil {
+		teardown()
+		panic("failed to create EIP712 signer")
+	}
 	config := meterer.Config{
 		PricePerSymbol:         1,
 		MinNumSymbols:          1,
 		GlobalSymbolsPerSecond: 1000,
 		ReservationWindow:      1,
 		ChainReadTimeout:       3 * time.Second,
+		ChainID:                big.NewInt(17000),
+		VerifyingContract:      gethcommon.HexToAddress("0x1234000000000000000000000000000000000000"),
 	}
 
 	clientConfig := commonaws.ClientConfig{
@@ -125,6 +122,16 @@ func setup(_ *testing.M) {
 	meterer.CreateReservationTable(clientConfig, "reservations")
 	meterer.CreateOnDemandTable(clientConfig, "ondemand")
 	meterer.CreateGlobalReservationTable(clientConfig, "global")
+
+	now := uint64(time.Now().Unix())
+	account1 = crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
+	fmt.Println("account1", account1)
+	account2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
+	fmt.Println("account2", account2)
+	account1Reservations = core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: 1500}
+	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: 1000}
 
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
@@ -147,8 +154,6 @@ func setup(_ *testing.M) {
 		// metrics.NewNoopMetrics(),
 	)
 
-	// InitializeMockPayments(paymentChainState, privateKey1, privateKey2)
-
 	if err != nil {
 		teardown()
 		panic("failed to create meterer")
@@ -166,6 +171,13 @@ func TestMetererReservations(t *testing.T) {
 	meterer.CreateReservationTable(clientConfig, "reservations")
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	quoromNumbers := []uint8{0, 1}
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == account1
+	})).Return(account1Reservations, nil)
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == account2
+	})).Return(account2Reservations, nil)
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(core.ActiveReservation{}, errors.New("reservation not found"))
 
 	// test invalid signature
 	invalidHeader := &core.PaymentMetadata{
@@ -180,7 +192,9 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid signature: recovered address")
 
 	// test invalid quorom ID
-	header, err := auth.ConstructPaymentMetadata(signer, 1, 0, 1000, []uint8{0, 1, 2}, privateKey1)
+	header, err := auth.ConstructPaymentMetadata(&signer, 1, 0, 1000, []uint8{0, 1, 2}, privateKey1)
+	fmt.Println("--- this header test invalid quorum ID ---")
+	fmt.Println("header", header)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "quorum number mismatch")
@@ -190,13 +204,13 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header, err = auth.ConstructPaymentMetadata(signer, 1, 0, 1000, []uint8{0, 1, 2}, unregisteredUser)
+	header, err = auth.ConstructPaymentMetadata(&signer, 1, 0, 1000, []uint8{0, 1, 2}, unregisteredUser)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
 
 	// test invalid bin index
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 0, 2000, quoromNumbers, privateKey1)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 0, 2000, quoromNumbers, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "invalid bin index for reservation")
@@ -205,7 +219,7 @@ func TestMetererReservations(t *testing.T) {
 	accountID := crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
 	for i := 0; i < 9; i++ {
 		dataLength := 20
-		header, err = auth.ConstructPaymentMetadata(signer, binIndex, 0, uint32(dataLength), quoromNumbers, privateKey2)
+		header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 0, uint32(dataLength), quoromNumbers, privateKey2)
 		assert.NoError(t, err)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
@@ -220,7 +234,7 @@ func TestMetererReservations(t *testing.T) {
 
 	}
 	// frist over flow is allowed
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 0, 25, quoromNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 0, 25, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
@@ -235,13 +249,13 @@ func TestMetererReservations(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(int(5)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 0, 1, quoromNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 0, 1, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "bin has already been filled")
 
 	// overwhelming bin overflow for empty bins (assuming all previous requests happened within 1 reservation window)
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex-1, 0, 1000, quoromNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex-1, 0, 1000, quoromNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
@@ -253,6 +267,15 @@ func TestMetererOnDemand(t *testing.T) {
 	meterer.CreateGlobalReservationTable(clientConfig, "global")
 	quorumNumbers := []uint8{0, 1}
 	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
+
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == account1
+	})).Return(account1OnDemandPayments, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == account2
+	})).Return(account2OnDemandPayments, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(core.OnDemandPayment{}, errors.New("payment not found"))
+	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 
 	// test invalid signature
 	invalidHeader := &core.PaymentMetadata{
@@ -271,19 +294,19 @@ func TestMetererOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header, err := auth.ConstructPaymentMetadata(signer, 1, 1, 1000, quorumNumbers, unregisteredUser)
+	header, err := auth.ConstructPaymentMetadata(&signer, 1, 1, 1000, quorumNumbers, unregisteredUser)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	header, err = auth.ConstructPaymentMetadata(signer, 1, 1, 1000, []uint8{0, 1, 2}, privateKey1)
+	header, err = auth.ConstructPaymentMetadata(&signer, 1, 1, 1000, []uint8{0, 1, 2}, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	header, err = auth.ConstructPaymentMetadata(signer, 0, 1, 2000, quorumNumbers, privateKey1)
+	header, err = auth.ConstructPaymentMetadata(&signer, 0, 1, 2000, quorumNumbers, privateKey1)
 
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
@@ -297,34 +320,34 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// test duplicated cumulative payments
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, uint64(100), 100, quorumNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, uint64(100), 100, quorumNumbers, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, uint64(100), 100, quorumNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, uint64(100), 100, quorumNumbers, privateKey2)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "exact payment already exists")
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
-		header, err = auth.ConstructPaymentMetadata(signer, binIndex, uint64(100*(i+1)), 100, quorumNumbers, privateKey2)
+		header, err = auth.ConstructPaymentMetadata(&signer, binIndex, uint64(100*(i+1)), 100, quorumNumbers, privateKey2)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
 	}
 
 	// test cumulative payment on-chain constraint
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 1001, 1, quorumNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 1001, 1, quorumNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "invalid on-demand payment: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 901, 2, quorumNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 901, 2, quorumNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
 
 	// test cannot insert cumulative payment in out of order
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 50, 50, quorumNumbers, privateKey2)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 50, 50, quorumNumbers, privateKey2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
@@ -337,7 +360,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, numPrevRecords, len(result))
 	// test failed global rate limit
-	header, err = auth.ConstructPaymentMetadata(signer, binIndex, 1002, 1001, quorumNumbers, privateKey1)
+	header, err = auth.ConstructPaymentMetadata(&signer, binIndex, 1002, 1001, quorumNumbers, privateKey1)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "failed global rate limiting")
@@ -361,37 +384,37 @@ func TestMeterer_paymentCharged(t *testing.T) {
 		{
 			name:           "Data length equal to min chargeable size",
 			dataLength:     1024,
-			pricePerSymbol: 100,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       100,
+			expected:       1024,
 		},
 		{
 			name:           "Data length less than min chargeable size",
 			dataLength:     512,
-			pricePerSymbol: 100,
+			pricePerSymbol: 2,
 			minNumSymbols:  1024,
-			expected:       100,
+			expected:       2048,
 		},
 		{
 			name:           "Data length greater than min chargeable size",
 			dataLength:     2048,
-			pricePerSymbol: 100,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       200,
+			expected:       2048,
 		},
 		{
 			name:           "Large data length",
 			dataLength:     1 << 20, // 1 MB
-			pricePerSymbol: 100,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       102400,
+			expected:       1 << 20,
 		},
 		{
 			name:           "Price not evenly divisible by min chargeable size",
 			dataLength:     1536,
-			pricePerSymbol: 150,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       225,
+			expected:       2048,
 		},
 	}
 
