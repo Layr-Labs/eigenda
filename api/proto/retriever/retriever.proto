@@ -41,7 +41,3 @@ message BlobReply {
 	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
 	bytes data = 1;
 }
-
-message TestMessageDoNotMerge {
-	string test_message = 1;
-}
