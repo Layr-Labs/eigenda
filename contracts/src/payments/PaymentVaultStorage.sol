@@ -34,8 +34,5 @@ abstract contract PaymentVaultStorage is IPaymentVault {
     /// @notice mapping from user address to current on-demand payment
     mapping(address => uint256) public onDemandPayments;
 
-    
-
-         
-
+    uint256[45] private __GAP;
 }
