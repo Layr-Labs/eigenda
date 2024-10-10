@@ -46,6 +46,7 @@ func NewMeterer(
 	logger logging.Logger,
 ) (*Meterer, error) {
 	// TODO: create a separate thread to pull from the chain and update chain state
+
 	return &Meterer{
 		Config: config,
 
@@ -62,6 +63,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, blob core.Blob, header core.
 	headerQuorums := blob.GetQuorumNumbers()
 	// Validate against the payment method
 	if header.CumulativePayment == 0 {
+		fmt.Println("reservation: ", header.AccountID)
 		reservation, err := m.ChainState.GetActiveReservationByAccount(ctx, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
@@ -224,9 +226,14 @@ func (m *Meterer) PaymentCharged(dataLength uint) uint64 {
 	return uint64(m.SymbolsCharged(dataLength)) * uint64(m.PricePerSymbol)
 }
 
-// SymbolsCharged returns the chargeable data length for a given data length
+// SymbolsCharged returns the number of symbols charged for a given data length
+// being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
 func (m *Meterer) SymbolsCharged(dataLength uint) uint32 {
-	return uint32(max(uint32(dataLength), m.MinNumSymbols))
+	if dataLength <= uint(m.MinNumSymbols) {
+		return m.MinNumSymbols
+	}
+	// Round up to the nearest multiple of MinNumSymbols
+	return uint32(core.RoundUpDivide(uint(dataLength), uint(m.MinNumSymbols))) * m.MinNumSymbols
 }
 
 // ValidateBinIndex checks if the provided bin index is valid

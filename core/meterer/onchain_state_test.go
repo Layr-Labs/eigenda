@@ -74,7 +74,7 @@ func TestGetActiveReservations(t *testing.T) {
 func TestGetActiveReservationByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("GetActiveReservationsByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
+	mockState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
 
 	reservation, err := mockState.GetActiveReservationByAccount(ctx, "account1")
 	assert.NoError(t, err)

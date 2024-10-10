@@ -2,6 +2,7 @@ package meterer_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -20,18 +21,23 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	dynamoClient       *commondynamodb.Client
-	clientConfig       commonaws.ClientConfig
-	accountID1         string
-	accountID2         string
-	mt                 *meterer.Meterer
+	dockertestPool           *dockertest.Pool
+	dockertestResource       *dockertest.Resource
+	dynamoClient             *commondynamodb.Client
+	clientConfig             commonaws.ClientConfig
+	accountID1               string
+	account1Reservations     core.ActiveReservation
+	account1OnDemandPayments core.OnDemandPayment
+	accountID2               string
+	account2Reservations     core.ActiveReservation
+	account2OnDemandPayments core.OnDemandPayment
+	mt                       *meterer.Meterer
 
 	deployLocalStack  bool
 	localStackPort    = "4566"
@@ -119,6 +125,14 @@ func setup(_ *testing.M) {
 		panic("failed to create global reservation table")
 	}
 
+	now := uint64(time.Now().Unix())
+	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
+	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
+	account1Reservations = core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: 1500}
+	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: 1000}
+
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
 		"reservations",
@@ -158,6 +172,14 @@ func TestMetererReservations(t *testing.T) {
 	meterer.CreateReservationTable(clientConfig, "reservations")
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	quoromNumbers := []uint8{0, 1}
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == accountID1
+	})).Return(account1Reservations, nil)
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == accountID2
+	})).Return(account2Reservations, nil)
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(core.ActiveReservation{}, errors.New("reservation not found"))
+
 	// test invalid quorom ID
 	blob, header := createMetererInput(1, 0, 1000, []uint8{0, 1, 2}, accountID1)
 	err := mt.MeterRequest(ctx, *blob, *header)
@@ -230,6 +252,15 @@ func TestMetererOnDemand(t *testing.T) {
 	meterer.CreateGlobalReservationTable(clientConfig, "global")
 	quorumNumbers := []uint8{0, 1}
 	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
+
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == accountID1
+	})).Return(account1OnDemandPayments, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+		return account == accountID2
+	})).Return(account2OnDemandPayments, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(core.OnDemandPayment{}, errors.New("payment not found"))
+	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 
 	// test unregistered account
 	unregisteredUser, err := crypto.GenerateKey()
@@ -326,37 +357,37 @@ func TestMeterer_paymentCharged(t *testing.T) {
 		{
 			name:           "Data length equal to min chargeable size",
 			dataLength:     1024,
-			pricePerSymbol: 100,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       100,
+			expected:       1024,
 		},
 		{
 			name:           "Data length less than min chargeable size",
 			dataLength:     512,
-			pricePerSymbol: 100,
+			pricePerSymbol: 2,
 			minNumSymbols:  1024,
-			expected:       100,
+			expected:       2048,
 		},
 		{
 			name:           "Data length greater than min chargeable size",
 			dataLength:     2048,
-			pricePerSymbol: 100,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       200,
+			expected:       2048,
 		},
 		{
 			name:           "Large data length",
 			dataLength:     1 << 20, // 1 MB
-			pricePerSymbol: 100,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       102400,
+			expected:       1 << 20,
 		},
 		{
 			name:           "Price not evenly divisible by min chargeable size",
 			dataLength:     1536,
-			pricePerSymbol: 150,
+			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       225,
+			expected:       2048,
 		},
 	}
 
