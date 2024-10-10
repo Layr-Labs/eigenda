@@ -5,12 +5,12 @@ package gpu_utils
 
 import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254"
-	icicle_bn254_msm "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/msm"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
+	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-func SetupMsm(rowsG1 [][]bn254.G1Affine, srsG1 []bn254.G1Affine) ([]bn254_icicle.Affine, []bn254_icicle.Affine, core.MSMConfig) {
+func SetupMsm(rowsG1 [][]bn254.G1Affine, srsG1 []bn254.G1Affine) ([]bn254_icicle.Affine, []bn254_icicle.Affine, core.MSMConfig, core.MSMConfig, runtime.EIcicleError) {
 	rowsG1Icicle := make([]bn254_icicle.Affine, 0)
 
 	for _, row := range rowsG1 {
@@ -19,7 +19,23 @@ func SetupMsm(rowsG1 [][]bn254.G1Affine, srsG1 []bn254.G1Affine) ([]bn254_icicle
 
 	srsG1Icicle := BatchConvertGnarkAffineToIcicleAffine(srsG1)
 
-	msmCfg := icicle_bn254_msm.GetDefaultMSMConfig()
+	cfgBn254 := core.GetDefaultMSMConfig()
+	cfgBn254G2 := core.GetDefaultMSMConfig()
+	cfgBn254.IsAsync = true
+	cfgBn254G2.IsAsync = true
 
-	return rowsG1Icicle, srsG1Icicle, msmCfg
+	streamBn254, err := runtime.CreateStream()
+	if err != runtime.Success {
+		return nil, nil, cfgBn254, cfgBn254G2, err
+	}
+
+	streamBn254G2, err := runtime.CreateStream()
+	if err != runtime.Success {
+		return nil, nil, cfgBn254, cfgBn254G2, err
+	}
+
+	cfgBn254.StreamHandle = streamBn254
+	cfgBn254G2.StreamHandle = streamBn254G2
+
+	return rowsG1Icicle, srsG1Icicle, cfgBn254, cfgBn254G2, runtime.Success
 }

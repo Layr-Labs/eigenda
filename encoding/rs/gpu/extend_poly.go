@@ -9,9 +9,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254"
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/ntt"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
+	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 )
 
 type GpuComputeDevice struct {
@@ -29,7 +29,7 @@ func (g *GpuComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, er
 
 	scalarsSF := gpu_utils.ConvertFrToScalarFieldsBytes(coeffs)
 
-	scalars := core.HostSliceFromElements[bn254_icicle.ScalarField](scalarsSF)
+	scalars := core.HostSliceFromElements(scalarsSF)
 
 	outputDevice := make(core.HostSlice[bn254_icicle.ScalarField], len(coeffs))
 

@@ -17,7 +17,7 @@ import (
 	rs_encoder "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	cr "github.com/ingonyama-zk/icicle/v2/wrappers/golang/cuda_runtime"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 
 	_ "go.uber.org/automaxprocs"
 )
@@ -72,17 +72,23 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 	// GPU Setup
 	gpuLock := sync.Mutex{}
-	streamBn254, _ := cr.CreateStream()
 
-	nttCfg := gpu_utils.SetupNTT()
-	nttCfg.IsAsync = true
-	nttCfg.Ctx.Stream = &streamBn254
-	flatFftPointsT, srsG1Icicle, msmCfg := gpu_utils.SetupMsm(fftPointsT, g.Srs.G1[:g.SRSNumberToLoad])
+	// Setup NTT
+	nttCfg, icicle_err := gpu_utils.SetupNTT()
+	if icicle_err != runtime.Success {
+		return nil, fmt.Errorf("could not setup NTT")
+	}
 
-	msmCfg.IsAsync = true
-	msmCfg.Ctx.Stream = &streamBn254
+	// Setup MSM
+	flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, icicle_err := gpu_utils.SetupMsm(fftPointsT, g.Srs.G1[:g.SRSNumberToLoad])
+	if icicle_err != runtime.Success {
+		return nil, fmt.Errorf("could not setup MSM")
+	}
 
-	// heads, trails := gpu_utils.SetupMsmG2(g.Srs.G2[:g.SRSNumberToLoad], g.G2Trailing)
+	stream, icicle_err := runtime.CreateStream()
+	if icicle_err != runtime.Success {
+		return nil, fmt.Errorf("could not create stream")
+	}
 
 	// Set KZG Prover GPU computer
 	computer := &kzg_prover.KzgGpuProofDevice{
@@ -94,9 +100,10 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		G2Trailing:     g.G2Trailing,
 		NttCfg:         nttCfg,
 		MsmCfg:         msmCfg,
+		MsmCfgG2:       msmCfgG2,
 		KzgConfig:      g.KzgConfig,
 		GpuLock:        &gpuLock,
-		CudaStream:     &streamBn254,
+		Stream:         &stream,
 	}
 
 	// Set RS GPU computer

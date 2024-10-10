@@ -8,11 +8,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	cr "github.com/ingonyama-zk/icicle/v2/wrappers/golang/cuda_runtime"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254"
-	ecntt "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/ecntt"
-
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
+	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	ecntt "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ecntt"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 func (c *KzgGpuProofDevice) ECNttToGnarkOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
@@ -27,21 +26,21 @@ func (c *KzgGpuProofDevice) ECNttToGnarkOnDevice(batchPoints core.DeviceSlice, i
 func (c *KzgGpuProofDevice) ECNttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
 	var p icicle_bn254.Projective
 	var out core.DeviceSlice
-	output, err := out.MallocAsync(totalSize*p.Size(), p.Size(), *c.CudaStream)
+	output, err := out.MallocAsync(totalSize*p.Size(), p.Size(), *c.Stream)
 	// output, err := out.Malloc(totalSize*p.Size(), p.Size())
 
-	if err != cr.CudaSuccess {
+	if err != runtime.Success {
 		return out, fmt.Errorf("%v", "Allocating bytes on device for Projective results failed")
 	}
 
 	if isInverse {
 		err := ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, output)
-		if err.CudaErrorCode != cr.CudaSuccess || err.IcicleErrorCode != core.IcicleSuccess {
+		if err != runtime.Success {
 			return out, fmt.Errorf("inverse ecntt failed")
 		}
 	} else {
 		err := ecntt.ECNtt(batchPoints, core.KForward, &c.NttCfg, output)
-		if err.CudaErrorCode != cr.CudaSuccess || err.IcicleErrorCode != core.IcicleSuccess {
+		if err != runtime.Success {
 			return out, fmt.Errorf("forward ecntt failed")
 		}
 	}
@@ -66,12 +65,12 @@ func (c *KzgGpuProofDevice) ECNtt(batchPoints core.HostOrDeviceSlice, isInverse 
 
 	if isInverse {
 		err := ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, output)
-		if err.CudaErrorCode != cr.CudaSuccess || err.IcicleErrorCode != core.IcicleSuccess {
+		if err != runtime.Success {
 			return nil, fmt.Errorf("inverse ecntt failed")
 		}
 	} else {
 		err := ecntt.ECNtt(batchPoints, core.KForward, &c.NttCfg, output)
-		if err.CudaErrorCode != cr.CudaSuccess || err.IcicleErrorCode != core.IcicleSuccess {
+		if err != runtime.Success {
 			return nil, fmt.Errorf("forward ecntt failed")
 		}
 	}

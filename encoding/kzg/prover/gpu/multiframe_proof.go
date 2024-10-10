@@ -15,11 +15,11 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ingonyama-zk/icicle/v2/wrappers/golang/core"
-	cr "github.com/ingonyama-zk/icicle/v2/wrappers/golang/cuda_runtime"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254"
-	bn254_icicle_g2 "github.com/ingonyama-zk/icicle/v2/wrappers/golang/curves/bn254/g2"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
+	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	bn254_icicle_g2 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/g2"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 type WorkerResult struct {
@@ -37,10 +37,11 @@ type KzgGpuProofDevice struct {
 	G2Trailing     []bn254.G2Affine
 	NttCfg         core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
+	MsmCfgG2       core.MSMConfig
 	GpuLock        *sync.Mutex // lock whenever gpu is needed,
 	HeadsG2        []bn254_icicle_g2.G2Affine
 	TrailsG2       []bn254_icicle_g2.G2Affine
-	CudaStream     *cr.CudaStream
+	Stream         *runtime.Stream
 }
 
 func (p *KzgGpuProofDevice) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
@@ -152,7 +153,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	flattenCoeffStoreCopy := core.HostSliceFromElements[bn254_icicle.ScalarField](flattenCoeffStoreSf)
 
 	var flattenStoreCopyToDevice core.DeviceSlice
-	flattenCoeffStoreCopy.CopyToDeviceAsync(&flattenStoreCopyToDevice, *p.CudaStream, true)
+	flattenCoeffStoreCopy.CopyToDeviceAsync(&flattenStoreCopyToDevice, *p.Stream, true)
 
 	// compute msm on each rows of the transposed matrix
 	sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
@@ -162,7 +163,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	msmDone := time.Now()
 
 	// Free the flatten coeff store
-	flattenStoreCopyToDevice.FreeAsync(*p.CudaStream)
+	flattenStoreCopyToDevice.FreeAsync(*p.Stream)
 
 	// compute the first ecntt, and set new batch size for ntt
 	p.NttCfg.BatchSize = int32(numPoly)
@@ -172,7 +173,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	}
 
 	// Free sumVec
-	sumVec.FreeAsync(*p.CudaStream)
+	sumVec.FreeAsync(*p.Stream)
 
 	firstECNttDone := time.Now()
 
@@ -183,11 +184,11 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		return nil, fmt.Errorf("second ECNtt error: %w", err)
 	}
 
-	prunedSumVecInv.FreeAsync(*p.CudaStream)
+	prunedSumVecInv.FreeAsync(*p.Stream)
 
 	flatProofsBatchHost := make(core.HostSlice[icicle_bn254.Projective], int(numPoly)*int(dimE))
-	flatProofsBatchHost.CopyFromDeviceAsync(&flatProofsBatch, *p.CudaStream)
-	flatProofsBatch.FreeAsync(*p.CudaStream)
+	flatProofsBatchHost.CopyFromDeviceAsync(&flatProofsBatch, *p.Stream)
+	flatProofsBatch.FreeAsync(*p.Stream)
 	gpuFFTBatch := gpu_utils.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
 
 	secondECNttDone := time.Now()
@@ -200,7 +201,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		secondECNttDone.Sub(firstECNttDone).String(),
 	)
 
-	cr.SynchronizeStream(*&p.CudaStream)
+	runtime.SynchronizeStream(*p.Stream)
 
 	// only takes the first half
 	return gpuFFTBatch, nil
