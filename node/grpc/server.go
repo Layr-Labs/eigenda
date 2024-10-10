@@ -10,12 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"net"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -27,13 +24,9 @@ import (
 
 	_ "go.uber.org/automaxprocs"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
-
-const localhost = "0.0.0.0"
 
 // Server implements the Node proto APIs.
 type Server struct {
@@ -61,83 +54,6 @@ func NewServer(config *node.Config, node *node.Node, logger logging.Logger, rate
 		ratelimiter: ratelimiter,
 		mu:          &sync.Mutex{},
 	}
-}
-
-func (s *Server) Start() {
-
-	// TODO: In order to facilitate integration testing with multiple nodes, we need to be able to set the port.
-	// TODO: Properly implement the health check.
-	// go func() {
-	// 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-	// 		w.WriteHeader(http.StatusOK)
-	// 	})
-	// }()
-
-	// TODO: Add monitoring
-	go func() {
-		for {
-			err := s.serveDispersal()
-			s.logger.Error("dispersal server failed; restarting.", "err", err)
-		}
-	}()
-
-	go func() {
-		for {
-			err := s.serveRetrieval()
-			s.logger.Error("retrieval server failed; restarting.", "err", err)
-		}
-	}()
-}
-
-func (s *Server) serveDispersal() error {
-
-	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalDispersalPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
-	gs := grpc.NewServer(opt)
-
-	// Register reflection service on gRPC server
-	// This makes "grpcurl -plaintext localhost:9000 list" command work
-	reflection.Register(gs)
-
-	pb.RegisterDispersalServer(gs, s)
-	healthcheck.RegisterHealthServer("node.Dispersal", gs)
-
-	s.logger.Info("port", s.config.InternalDispersalPort, "address", listener.Addr().String(), "GRPC Listening")
-	if err := gs.Serve(listener); err != nil {
-		return err
-	}
-	return nil
-
-}
-
-func (s *Server) serveRetrieval() error {
-	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalRetrievalPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
-
-	// Register reflection service on gRPC server
-	// This makes "grpcurl -plaintext localhost:9000 list" command work
-	reflection.Register(gs)
-
-	pb.RegisterRetrievalServer(gs, s)
-	healthcheck.RegisterHealthServer("node.Retrieval", gs)
-
-	s.logger.Info("port", s.config.InternalRetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
-	if err := gs.Serve(listener); err != nil {
-		return err
-	}
-	return nil
-
 }
 
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
