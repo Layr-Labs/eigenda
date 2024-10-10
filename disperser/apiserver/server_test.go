@@ -41,8 +41,9 @@ import (
 )
 
 var (
-	queue           disperser.BlobStore
-	dispersalServer *apiserver.DispersalServer
+	queue             disperser.BlobStore
+	dispersalServer   *apiserver.DispersalServer
+	dispersalServerV2 *apiserver.DispersalServerV2
 
 	dockertestPool          *dockertest.Pool
 	dockertestResource      *dockertest.Resource
@@ -605,6 +606,7 @@ func setup() {
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
 	dispersalServer = newTestServer(transactor)
+	dispersalServerV2 = newTestServerV2()
 }
 
 func teardown() {
