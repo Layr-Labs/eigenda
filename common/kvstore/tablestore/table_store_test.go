@@ -1101,7 +1101,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 		deletionsRemaining: 50,
 	}
 
-	_, err = start(logger, explodingBase, "table2")
+	_, err = start(logger, explodingBase, true, "table2")
 	assert.Error(t, err)
 
 	err = explodingBase.Shutdown()
@@ -1124,6 +1124,74 @@ func TestInterruptedTableDeletion(t *testing.T) {
 		value, err := table2.Get(k)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
+	}
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+
+	verifyDBIsDeleted(t)
+}
+
+func TestLoadWithoutModifiedSchema(t *testing.T) {
+	deleteDBDirectory(t)
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	store, err := LevelDB.Start(logger, dbPath, "table1", "table2")
+	assert.NoError(t, err)
+
+	table1, err := store.GetTable("table1")
+	assert.NoError(t, err)
+
+	table2, err := store.GetTable("table2")
+	assert.NoError(t, err)
+
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		value1 := make([]byte, 8)
+		binary.BigEndian.PutUint64(value1, uint64(i))
+
+		value2 := make([]byte, 8)
+		binary.BigEndian.PutUint64(value2, uint64(i*2))
+
+		err = table1.Put(k, value1)
+		assert.NoError(t, err)
+
+		err = table2.Put(k, value2)
+		assert.NoError(t, err)
+	}
+
+	err = store.Shutdown()
+	assert.NoError(t, err)
+
+	store, err = LevelDB.Load(logger, dbPath)
+	assert.NoError(t, err)
+
+	table1, err = store.GetTable("table1")
+	assert.NoError(t, err)
+	table2, err = store.GetTable("table2")
+	assert.NoError(t, err)
+
+	for i := 0; i < 100; i++ {
+		k := make([]byte, 8)
+		binary.BigEndian.PutUint64(k, uint64(i))
+
+		expectedValue1 := make([]byte, 8)
+		binary.BigEndian.PutUint64(expectedValue1, uint64(i))
+
+		expectedValue2 := make([]byte, 8)
+		binary.BigEndian.PutUint64(expectedValue2, uint64(i*2))
+
+		value1, err := table1.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue1, value1)
+
+		value2, err := table2.Get(k)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValue2, value2)
 	}
 
 	err = store.Destroy()

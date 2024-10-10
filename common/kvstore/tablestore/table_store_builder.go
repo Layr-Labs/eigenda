@@ -44,35 +44,42 @@ const (
 )
 
 // Start creates a new TableStore instance of the given type. The store will be created at the given path.
-// It can be used to instantiate a new store or to load an existing store.
+// This method can be used to instantiate a new store or to load an existing store.
 // This method will set up a table for each table name provided, and will drop all tables not in the list.
 // Dropping a table is irreversible and will delete all data in the table, so be very careful not to call
 // this method with table names omitted by mistake.
 func (t StoreType) Start(logger logging.Logger, path string, tables ...string) (kvstore.TableStore, error) {
-
-	var base kvstore.Store
-	var err error
-
-	switch t {
-	case LevelDB:
-		base, err = leveldb.NewStore(logger, path)
-		if err != nil {
-			return nil, fmt.Errorf("error creating LevelDB store: %w", err)
-		}
-	case MapStore:
-		base = mapstore.NewStore()
-	default:
-		return nil, fmt.Errorf("unknown store type: %d", t)
+	base, err := buildBaseStore(t, logger, path)
+	if err != nil {
+		return nil, fmt.Errorf("error building base store: %w", err)
 	}
 
-	return start(logger, base, tables...)
+	return start(logger, base, true, tables...)
+}
+
+// Load loads a table store from disk without modifying the table schema. If there is no existing store at the given
+// path, this method will create one and return a store without any tables.
+func (t StoreType) Load(logger logging.Logger, path string) (kvstore.TableStore, error) {
+	base, err := buildBaseStore(t, logger, path)
+	if err != nil {
+		return nil, fmt.Errorf("error building base store: %w", err)
+	}
+
+	return start(logger, base, false)
 }
 
 // Future work: if we ever decide to permit third parties to provide custom store implementations not in this module,
 // we will need to make this method public.
 
-// start creates a new TableStore instance with the given base store and table names.
-func start(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore.TableStore, error) {
+// start creates a new TableStore instance with the given base store and table names. If modifySchema is true, the
+// tables in the store are made to match the given list of tables by adding and removing tables as needed. If
+// modifySchema is false, the tables are loaded as is, and any tables in the provided list are ignored.
+func start(
+	logger logging.Logger,
+	base kvstore.Store,
+	modifySchema bool,
+	tables ...string) (kvstore.TableStore, error) {
+
 	metadataTable := newTableView(base, "metadata", metadataTableID)
 	namespaceTable := newTableView(base, "namespace", namespaceTableID)
 
@@ -91,9 +98,11 @@ func start(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
-	err = addAndRemoveTables(base, metadataTable, namespaceTable, tableIDMap, tables)
-	if err != nil {
-		return nil, fmt.Errorf("error adding and removing tables: %w", err)
+	if modifySchema {
+		err = addAndRemoveTables(base, metadataTable, namespaceTable, tableIDMap, tables)
+		if err != nil {
+			return nil, fmt.Errorf("error adding and removing tables: %w", err)
+		}
 	}
 
 	tableMap := make(map[string]kvstore.Table, len(tableIDMap))
@@ -101,6 +110,18 @@ func start(logger logging.Logger, base kvstore.Store, tables ...string) (kvstore
 		tableMap[tableName] = newTableView(base, tableName, tableID)
 	}
 	return newTableStore(logger, base, tableMap), nil
+}
+
+// buildBaseStore creates a new base store of the given type.
+func buildBaseStore(storeType StoreType, logger logging.Logger, path string) (kvstore.Store, error) {
+	switch storeType {
+	case LevelDB:
+		return leveldb.NewStore(logger, path)
+	case MapStore:
+		return mapstore.NewStore(), nil
+	default:
+		return nil, fmt.Errorf("unknown store type: %d", storeType)
+	}
 }
 
 // validateSchema loads/initiates the schema version in the metadata table.
