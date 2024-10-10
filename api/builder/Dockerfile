@@ -1,11 +1,17 @@
 FROM golang:1.21.12-bookworm
 
+# The URL where the protoc binary can be downloaded. Is different depending on architecture.
+ARG PROTOC_URL
+
+# The UID of the user to create
+ARG UID
+
 # Install core dependencies
 RUN apt update
 RUN apt install -y wget unzip bash
 
 # Set up user
-RUN useradd -m -s /bin/bash user
+RUN useradd -u $UID -m -s /bin/bash user
 USER user
 WORKDIR /home/user
 # Remove default crud
@@ -14,7 +20,7 @@ RUN rm .bash_logout
 RUN rm .profile
 
 # Install protoc
-RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v23.4/protoc-23.4-linux-aarch_64.zip
+RUN wget $PROTOC_URL
 RUN mkdir protoc
 RUN cd protoc && unzip ../*.zip
 RUN rm ./*.zip

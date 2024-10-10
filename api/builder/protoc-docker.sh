@@ -11,8 +11,15 @@ if [ -z "$(docker images -q pbuf-compiler:latest 2> /dev/null)" ]; then
   "${SCRIPT_DIR}"/build-docker.sh
 fi
 
+if [ $? -ne 0 ]; then
+  exit 1
+fi
 
 docker container run \
   --rm \
   --mount "type=bind,source=${ROOT},target=/home/user/eigenda" \
   pbuf-compiler bash -c "source ~/.bashrc && eigenda/api/builder/protoc.sh"
+
+if [ $? -ne 0 ]; then
+  exit 1
+fi
