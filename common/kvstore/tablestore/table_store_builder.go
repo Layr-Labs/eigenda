@@ -20,7 +20,8 @@ import (
 const metadataTableID uint32 = math.MaxUint32
 
 // The table ID reserved for the namespace table. Keys in the namespace table are table IDs (uint32)
-// and values are table names (string).
+// and values are table names (string). Although no two tables are permitted to have share a name or a table ID,
+// once a table is dropped, future tables may be instantiated with the same name and the table ID may be reused.
 const namespaceTableID uint32 = math.MaxUint32 - 1
 
 // This key is used to store the schema version in the metadata table.
@@ -168,29 +169,69 @@ func addAndRemoveTables(
 	tableIDMap map[uint32]string,
 	currentTables []string) error {
 
-	// Determine which tables to keep and which to drop.
-	originalTablesSet := make(map[string]bool)
+	tablesToAdd, tablesToDrop := computeSchemaChange(tableIDMap, currentTables)
+
+	err := dropTables(base, metadataTable, namespaceTable, tableIDMap, tablesToDrop)
+	if err != nil {
+		return fmt.Errorf("error dropping tables: %w", err)
+	}
+
+	err = addTables(namespaceTable, tableIDMap, tablesToAdd)
+	if err != nil {
+		return fmt.Errorf("error adding tables: %w", err)
+	}
+
+	err = sanityCheckNamespaceTable(namespaceTable, tableIDMap, currentTables)
+	if err != nil {
+		return fmt.Errorf("error sanity checking namespace table: %w", err)
+	}
+
+	return nil
+}
+
+// Compute the tables that need to be added and dropped to match the given list of tables.
+func computeSchemaChange(
+	tableIDMap map[uint32]string,
+	currentTables []string) (tablesToAdd []string, tablesToDrop []string) {
+
+	tablesToAdd = make([]string, 0)
+	tablesToDrop = make([]string, 0)
+
+	originalTablesSet := make(map[string]struct{})
 	for _, table := range tableIDMap {
-		originalTablesSet[table] = true
+		originalTablesSet[table] = struct{}{}
 	}
 	newTablesSet := make(map[string]bool)
 	for _, table := range currentTables {
 		newTablesSet[table] = true
 	}
-	tablesToDrop := make([]string, 0, len(originalTablesSet))
 	for table := range originalTablesSet {
 		if !newTablesSet[table] {
 			tablesToDrop = append(tablesToDrop, table)
 		}
 	}
-	tablesToAdd := make([]string, 0, len(newTablesSet))
 	for table := range newTablesSet {
-		if !originalTablesSet[table] {
+		if _, exists := originalTablesSet[table]; !exists {
 			tablesToAdd = append(tablesToAdd, table)
 		}
 	}
 
-	// Drop tables that are not in the list.
+	return tablesToAdd, tablesToDrop
+}
+
+// Drop a list of tables. Updates the table ID map as well as data within the store.
+func dropTables(
+	base kvstore.Store,
+	metadataTable kvstore.Table,
+	namespaceTable kvstore.Table,
+	tableIDMap map[uint32]string,
+	tablesToDrop []string) error {
+
+	if len(tablesToDrop) == 0 {
+		// bail out early
+		return nil
+	}
+
 	reverseTableIDMap := make(map[string]uint32)
 	for tableName, tableID := range tableIDMap {
 		reverseTableIDMap[tableID] = tableName
@@ -203,8 +244,17 @@ func addAndRemoveTables(
 		delete(tableIDMap, reverseTableIDMap[tableName])
 	}
 
+	return nil
+}
+
+// Add tables to the store. Updates the table ID map as well as data within the store.
+func addTables(
+	namespaceTable kvstore.Table,
+	tableIDMap map[uint32]string,
+	tablesToAdd []string) error {
+
 	if len(tablesToAdd) == 0 {
-		// No tables to add, bail out early.
+		// bail out early
 		return nil
 	}
 
@@ -212,16 +262,11 @@ func addAndRemoveTables(
 	// We want to fill gaps prior to assigning new IDs.
 	newTableIDs := make([]uint32, 0, len(tablesToAdd))
 	nextID := uint32(0)
-	for i := 0; i < len(tablesToAdd); i++ {
-		for {
-			_, alreadyUsed := tableIDMap[nextID]
-			if !alreadyUsed {
-				newTableIDs = append(newTableIDs, nextID)
-				nextID++
-				break
-			}
-			nextID++
+	for len(newTableIDs) < len(tablesToAdd) {
+		if _, alreadyUsed := tableIDMap[nextID]; !alreadyUsed {
+			newTableIDs = append(newTableIDs, nextID)
 		}
+		nextID++
 	}
 
 	// Sort tables to add. Ensures deterministic table IDs given the same input.
@@ -235,11 +280,6 @@ func addAndRemoveTables(
 			return fmt.Errorf("error creating table %s: %w", tableName, err)
 		}
 		tableIDMap[tableID] = tableName
-	}
-
-	err := sanityCheckNamespaceTable(namespaceTable, tableIDMap, currentTables)
-	if err != nil {
-		return fmt.Errorf("error sanity checking namespace table: %w", err)
 	}
 
 	return nil
