@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/ttl"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -20,6 +21,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return mapstore.NewStore(), nil
 	},
+
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return ttl.TTLWrapper(context.Background(), logger, mapstore.NewStore(), 0), nil
 	},
@@ -32,6 +34,28 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 			return nil, err
 		}
 		return ttl.TTLWrapper(context.Background(), logger, store, 0), nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		tableStore, err := tablestore.MapStore.Start(logger, path, "test")
+		if err != nil {
+			return nil, err
+		}
+		store, err := tableStore.GetTable("test")
+		if err != nil {
+			return nil, err
+		}
+		return store, nil
+	},
+	func(logger logging.Logger, path string) (kvstore.Store, error) {
+		tableStore, err := tablestore.LevelDB.Start(logger, path, "test")
+		if err != nil {
+			return nil, err
+		}
+		store, err := tableStore.GetTable("test")
+		if err != nil {
+			return nil, err
+		}
+		return store, nil
 	},
 }
 
@@ -138,40 +162,43 @@ func writeBatchTest(t *testing.T, store kvstore.Store) {
 	var err error
 
 	expectedData := make(map[string][]byte)
-
-	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := store.NewBatch()
 
 	for i := 0; i < 1000; i++ {
-
 		// Write a random value.
-
 		key := tu.RandomBytes(32)
-		value := tu.RandomBytes(32)
 
-		keys = append(keys, key)
-		values = append(values, value)
+		var value []byte
+		if i%50 == 0 {
+			// nil values are interpreted as empty slices.
+			value = nil
+		} else {
+			value = tu.RandomBytes(32)
+		}
 
-		expectedData[string(key)] = value
+		batch.Put(key, value)
+
+		if value == nil {
+			expectedData[string(key)] = []byte{}
+		} else {
+			expectedData[string(key)] = value
+		}
 
 		if i%10 == 0 {
 			// Every so often, apply the batch and check that the store matches the expected data.
 
-			err := store.WriteBatch(keys, values)
+			err = batch.Apply()
 			assert.NoError(t, err)
 
-			keys = make([][]byte, 0)
-			values = make([][]byte, 0)
-
 			for key, expectedValue := range expectedData {
-				value, err := store.Get([]byte(key))
+				value, err = store.Get([]byte(key))
 				assert.NoError(t, err)
 				assert.Equal(t, expectedValue, value)
 			}
 
 			// Try and get a value that isn't in the store.
-			key := tu.RandomBytes(32)
-			value, err := store.Get(key)
+			key = tu.RandomBytes(32)
+			value, err = store.Get(key)
 			assert.Equal(t, kvstore.ErrNotFound, err)
 			assert.Nil(t, value)
 		}
@@ -201,7 +228,7 @@ func deleteBatchTest(t *testing.T, store kvstore.Store) {
 
 	expectedData := make(map[string][]byte)
 
-	keys := make([][]byte, 0)
+	batch := store.NewBatch()
 
 	// Add some data to the store.
 	for i := 0; i < 1000; i++ {
@@ -218,15 +245,15 @@ func deleteBatchTest(t *testing.T, store kvstore.Store) {
 	for key := range expectedData {
 		choice := rand.Float64()
 		if choice < 0.5 {
-			keys = append(keys, []byte(key))
+			batch.Delete([]byte(key))
 			delete(expectedData, key)
 		} else if choice < 0.75 {
 			// Delete a non-existent key.
-			keys = append(keys, tu.RandomBytes(32))
+			batch.Delete(tu.RandomBytes(32))
 		}
 	}
 
-	err := store.DeleteBatch(keys)
+	err := batch.Apply()
 	assert.NoError(t, err)
 
 	// Check that the store matches the expected data.
@@ -396,5 +423,34 @@ func TestIterationWithPrefix(t *testing.T) {
 		store, err := builder(logger, dbPath)
 		assert.NoError(t, err)
 		iterationWithPrefixTest(t, store)
+	}
+}
+
+func putNilTest(t *testing.T, store kvstore.Store) {
+	tu.InitializeRandom()
+	deleteDBDirectory(t)
+
+	key := tu.RandomBytes(32)
+
+	err := store.Put(key, nil)
+	assert.NoError(t, err)
+
+	value, err := store.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte{}, value)
+
+	err = store.Destroy()
+	assert.NoError(t, err)
+	verifyDBIsDeleted(t)
+}
+
+func TestPutNil(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	for _, builder := range storeBuilders {
+		store, err := builder(logger, dbPath)
+		assert.NoError(t, err)
+		putNilTest(t, store)
 	}
 }

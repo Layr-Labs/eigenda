@@ -50,28 +50,25 @@ func TestBatchMappingExpirationKeyOrdering(t *testing.T) {
 	}()
 	assert.NoError(t, err)
 
-	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := db.NewBatch()
+
 	// test ordering using expiration time
 	expirationTime := int64(1111111111)
 	batchHeaderHash := [32]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}
 	key := node.EncodeBatchMappingExpirationKey(expirationTime, batchHeaderHash)
-	keys = append(keys, key)
-	values = append(values, []byte("value"))
+	batch.Put(key, []byte("value"))
 
 	expirationTime = int64(2222222222)
 	batchHeaderHash = [32]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}
 	key = node.EncodeBatchMappingExpirationKey(expirationTime, batchHeaderHash)
-	keys = append(keys, key)
-	values = append(values, []byte("value"))
+	batch.Put(key, []byte("value"))
 
 	expirationTime = int64(3333333333)
 	batchHeaderHash = [32]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31}
 	key = node.EncodeBatchMappingExpirationKey(expirationTime, batchHeaderHash)
-	keys = append(keys, key)
-	values = append(values, []byte("value"))
+	batch.Put(key, []byte("value"))
 
-	err = db.WriteBatch(keys, values)
+	err = batch.Apply()
 	assert.NoError(t, err)
 
 	iter, err := db.NewIterator(node.EncodeBatchMappingExpirationKeyPrefix())

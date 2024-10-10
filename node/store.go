@@ -116,7 +116,7 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 	if err != nil {
 		return -1, fmt.Errorf("failed to create an iterator for the expired blobs: %w", err)
 	}
-	expiredKeys := make([][]byte, 0)
+	batch := s.db.NewBatch()
 	expiredBlobHeaders := make([][32]byte, 0)
 	for iter.Next() {
 		ts, err := DecodeBlobExpirationKey(iter.Key())
@@ -128,7 +128,7 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 		if currentTimeUnixSec < ts {
 			break
 		}
-		expiredKeys = append(expiredKeys, copyBytes(iter.Key()))
+		batch.Delete(copyBytes(iter.Key()))
 		blobHeaderBytes := copyBytes(iter.Value())
 		blobHeaders, err := DecodeHashSlice(blobHeaderBytes)
 		if err != nil {
@@ -136,14 +136,14 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 			continue
 		}
 		expiredBlobHeaders = append(expiredBlobHeaders, blobHeaders...)
-		if len(expiredKeys) == numBlobs {
+		if int(batch.Size()) == numBlobs {
 			break
 		}
 	}
 	iter.Release()
 
 	// No expired batch found.
-	if len(expiredKeys) == 0 {
+	if batch.Size() == 0 {
 		return 0, nil
 	}
 
@@ -157,7 +157,7 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 			return -1, fmt.Errorf("failed to create an iterator for the blob headers: %w", err)
 		}
 		for blobHeaderIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
+			batch.Delete(copyBytes(blobHeaderIter.Key()))
 		}
 		blobHeaderIter.Release()
 
@@ -167,14 +167,14 @@ func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int,
 			return -1, fmt.Errorf("failed to create an iterator for the blob chunks: %w", err)
 		}
 		for blobIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
+			batch.Delete(copyBytes(blobIter.Key()))
 			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
 	}
 
 	// Perform the removal.
-	err = s.db.DeleteBatch(expiredKeys)
+	err = batch.Apply()
 	if err != nil {
 		return -1, fmt.Errorf("failed to delete the expired keys in batch: %w", err)
 	}
@@ -194,7 +194,7 @@ func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches i
 	if err != nil {
 		return -1, -1, fmt.Errorf("failed to create an iterator for the expired batch mapping: %w", err)
 	}
-	expiredKeys := make([][]byte, 0)
+	batch := s.db.NewBatch()
 	expiredBatches := make([][]byte, 0)
 	for iter.Next() {
 		ts, err := DecodeBatchMappingExpirationKey(iter.Key())
@@ -206,16 +206,16 @@ func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches i
 		if currentTimeUnixSec < ts {
 			break
 		}
-		expiredKeys = append(expiredKeys, copyBytes(iter.Key()))
+		batch.Delete(copyBytes(iter.Key()))
 		expiredBatches = append(expiredBatches, copyBytes(iter.Value()))
-		if len(expiredKeys) == numBatches {
+		if int(batch.Size()) == numBatches {
 			break
 		}
 	}
 	iter.Release()
 
 	// No expired batch found.
-	if len(expiredKeys) == 0 {
+	if batch.Size() == 0 {
 		return 0, 0, nil
 	}
 
@@ -226,7 +226,7 @@ func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches i
 		copy(batchHeaderHash[:], hash)
 
 		// Batch header.
-		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
+		batch.Delete(EncodeBatchHeaderKey(batchHeaderHash))
 
 		// Blob index mapping.
 		blobIndexIter, err := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
@@ -234,14 +234,14 @@ func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches i
 			return -1, -1, fmt.Errorf("failed to create an iterator for the blob index mapping: %w", err)
 		}
 		for blobIndexIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobIndexIter.Key()))
+			batch.Delete(copyBytes(blobIndexIter.Key()))
 			numMappings++
 		}
 		blobIndexIter.Release()
 	}
 
 	// Perform the removal.
-	err = s.db.DeleteBatch(expiredKeys)
+	err = batch.Apply()
 	if err != nil {
 		return -1, -1, fmt.Errorf("failed to delete the expired keys in batch: %w", err)
 	}
@@ -260,7 +260,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 	if err != nil {
 		return -1, fmt.Errorf("failed to create an iterator for the expired batches: %w", err)
 	}
-	expiredKeys := make([][]byte, 0)
+	batch := s.db.NewBatch()
 	expiredBatches := make([][]byte, 0)
 	for iter.Next() {
 		ts, err := DecodeBatchExpirationKey(iter.Key())
@@ -272,16 +272,16 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		if currentTimeUnixSec < ts {
 			break
 		}
-		expiredKeys = append(expiredKeys, copyBytes(iter.Key()))
+		batch.Delete(copyBytes(iter.Key()))
 		expiredBatches = append(expiredBatches, copyBytes(iter.Value()))
-		if len(expiredKeys) == numBatches {
+		if int(batch.Size()) == numBatches {
 			break
 		}
 	}
 	iter.Release()
 
 	// No expired batch found.
-	if len(expiredKeys) == 0 {
+	if batch.Size() == 0 {
 		return 0, nil
 	}
 
@@ -294,7 +294,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 		copy(batchHeaderHash[:], hash)
 
 		// Batch header.
-		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
+		batch.Delete(EncodeBatchHeaderKey(batchHeaderHash))
 
 		// Blob headers.
 		blobHeaderIter, err := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
@@ -302,7 +302,7 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 			return -1, fmt.Errorf("failed to create an iterator for the blob headers: %w", err)
 		}
 		for blobHeaderIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
+			batch.Delete(copyBytes(blobHeaderIter.Key()))
 			numBlobs++
 		}
 		blobHeaderIter.Release()
@@ -313,16 +313,16 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 			return -1, fmt.Errorf("failed to create an iterator for the blob chunks: %w", err)
 		}
 		for blobIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
+			batch.Delete(copyBytes(blobIter.Key()))
 			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
 	}
 
 	// Perform the removal.
-	err = s.db.DeleteBatch(expiredKeys)
+	err = batch.Apply()
 	if err != nil {
-		s.logger.Error("Failed to delete the expired keys in batch", "keys", expiredKeys, "error", err)
+		s.logger.Error("Failed to delete the expired keys in batch", "error", err)
 		return -1, err
 	}
 
@@ -351,9 +351,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		return nil, err
 	}
 
-	// The key/value pairs that need to be written to the local database.
 	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := s.db.NewBatch()
 
 	// Generate the key/value pair for batch header.
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
@@ -371,12 +370,12 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	}
 
 	keys = append(keys, batchHeaderKey)
-	values = append(values, batchHeaderBytes)
+	batch.Put(batchHeaderKey, batchHeaderBytes)
 
 	expirationTime := s.expirationTime()
 	expirationKey := EncodeBatchExpirationKey(expirationTime)
 	keys = append(keys, expirationKey)
-	values = append(values, batchHeaderHash[:])
+	batch.Put(expirationKey, batchHeaderHash[:])
 
 	// Generate key/value pairs for all blob headers and blob chunks .
 	size := int64(0)
@@ -394,7 +393,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 			return nil, err
 		}
 		keys = append(keys, blobHeaderKey)
-		values = append(values, blobHeaderBytes)
+		batch.Put(blobHeaderKey, blobHeaderBytes)
 
 		// Get raw chunks
 		start := time.Now()
@@ -434,7 +433,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				if ok {
 					size += int64(len(rawBundle))
 					keys = append(keys, key)
-					values = append(values, rawBundle)
+					batch.Put(key, rawBundle)
 				}
 			} else if format == core.GobBundleEncodingFormat {
 				if len(rawChunks[quorumID]) != len(bundle) {
@@ -453,7 +452,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					}
 					size += int64(len(chunkBytes))
 					keys = append(keys, key)
-					values = append(values, chunkBytes)
+					batch.Put(key, chunkBytes)
 				}
 			} else {
 				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
@@ -464,7 +463,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 
 	start := time.Now()
 	// Write all the key/value pairs to the local database atomically.
-	err = s.db.WriteBatch(keys, values)
+	err = batch.Apply()
 	if err != nil {
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
@@ -478,9 +477,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 
 func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobsProto []*node.Blob) (*[][]byte, error) {
 	storeBlobsStart := time.Now()
-	// The key/value pairs that need to be written to the local database.
 	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := s.db.NewBatch()
 
 	expirationTime := s.expirationTime()
 
@@ -501,7 +499,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 		// expiration key
 		expirationKey := EncodeBlobExpirationKey(expirationTime, blobHeaderHash)
 		keys = append(keys, expirationKey)
-		values = append(values, blobHeaderHash[:])
+		batch.Put(expirationKey, blobHeaderHash[:])
 
 		// blob header
 		blobHeaderKey := EncodeBlobHeaderKeyByHash(blobHeaderHash)
@@ -515,7 +513,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 			return nil, fmt.Errorf("failed to serialize the blob header proto: %w", err)
 		}
 		keys = append(keys, blobHeaderKey)
-		values = append(values, blobHeaderBytes)
+		batch.Put(blobHeaderKey, blobHeaderBytes)
 
 		// Get raw chunks
 		start := time.Now()
@@ -550,7 +548,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 				if ok {
 					size += int64(len(rawBundle))
 					keys = append(keys, key)
-					values = append(values, rawBundle)
+					batch.Put(key, rawBundle)
 				}
 			} else if format == core.GobBundleEncodingFormat {
 				if len(rawChunks[quorumID]) != len(bundle) {
@@ -569,7 +567,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 					}
 					size += int64(len(chunkBytes))
 					keys = append(keys, key)
-					values = append(values, chunkBytes)
+					batch.Put(key, chunkBytes)
 				}
 			} else {
 				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
@@ -580,7 +578,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 
 	start := time.Now()
 	// Write all the key/value pairs to the local database atomically.
-	err := s.db.WriteBatch(keys, values)
+	err := batch.Apply()
 	if err != nil {
 		return nil, fmt.Errorf("failed to write the batch into local database: %w", err)
 	}
@@ -593,9 +591,7 @@ func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobs
 
 func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeader *core.BatchHeader, blobHeaderHashes [][32]byte) error {
 	start := time.Now()
-	// The key/value pairs that need to be written to the local database.
-	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := s.db.NewBatch()
 
 	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 	if err != nil {
@@ -604,13 +600,11 @@ func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeader *core.Bat
 
 	expirationTime := s.expirationTime()
 	expirationKey := EncodeBatchMappingExpirationKey(expirationTime, batchHeaderHash)
-	keys = append(keys, expirationKey)
-	values = append(values, batchHeaderHash[:])
+	batch.Put(expirationKey, batchHeaderHash[:])
 
 	for blobIndex, blobHeaderHash := range blobHeaderHashes {
 		blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
-		keys = append(keys, blobIndexKey)
-		values = append(values, copyBytes(blobHeaderHash[:]))
+		batch.Put(blobIndexKey, blobHeaderHash[:])
 	}
 
 	// Generate the key/value pair for batch header.
@@ -619,10 +613,9 @@ func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeader *core.Bat
 	if err != nil {
 		return fmt.Errorf("failed to serialize the batch header: %w", err)
 	}
-	keys = append(keys, batchHeaderKey)
-	values = append(values, batchHeaderBytes)
+	batch.Put(batchHeaderKey, batchHeaderBytes)
 
-	err = s.db.WriteBatch(keys, values)
+	err = batch.Apply()
 	if err != nil {
 		return fmt.Errorf("failed to write the blob index mappings into local database: %w", err)
 	}
@@ -770,7 +763,11 @@ func (s *Store) HasKey(ctx context.Context, key []byte) bool {
 // Note: caller should ensure these keys are exactly all the data items for a single batch
 // to maintain the integrity of the store.
 func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
-	return s.db.DeleteBatch(*keys)
+	batch := s.db.NewBatch()
+	for _, key := range *keys {
+		batch.Delete(key)
+	}
+	return batch.Apply()
 }
 
 // Flattens an array of byte arrays (chunks) into a single byte array
