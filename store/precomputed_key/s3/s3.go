@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"net/url"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/store"
@@ -15,7 +15,6 @@ import (
 	"github.com/minio/minio-go/v7"
 
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/minio/minio-go/v7/pkg/s3utils"
 )
 
 const (
@@ -58,13 +57,13 @@ type Store struct {
 	stats            *store.Stats
 }
 
+func isGoogleEndpoint(endpoint string) bool {
+	return strings.Contains(endpoint, "storage.googleapis.com")
+}
+
 func NewS3(cfg Config) (*Store, error) {
-	endpointURL, err := url.Parse(cfg.Endpoint)
-	if err != nil {
-		return nil, err
-	}
 	putObjectOptions := minio.PutObjectOptions{}
-	if s3utils.IsGoogleEndpoint(*endpointURL) {
+	if isGoogleEndpoint(cfg.Endpoint) {
 		putObjectOptions.DisableContentSha256 = true // Avoid chunk signatures on GCS: https://github.com/minio/minio-go/issues/1922
 	}
 
