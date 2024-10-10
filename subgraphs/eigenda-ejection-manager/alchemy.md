@@ -31,36 +31,38 @@ Redeploying the same subgraph without source code changes* under a new version d
 
 \* In this scenario a new version deployment basically takes an instant since it reuses existing indexed data.
 
-
-## Subgraphs - holesky
-
 ### Deployment
 
-Deployment command:
-
+## mainnet
 ```bash
-# avs-operator-state
-graph deploy avs-operator-state-preprod-holesky \
+graph deploy eigenda-ejection-manager-holesky \
   --version-label v0.0.1 \
-  --network holesky \
+  --network mainnet \
+  --network-file networks/mainnet.json
   --node https://subgraphs.alchemy.com/api/subgraphs/deploy \
   --deploy-key $DEPLOY_KEY \
   --ipfs https://ipfs.satsuma.xyz
 ```
 
-
-## Subgraphs - preprod-holesky
-
-dev environment maps to preprod-holesky entry in `networks.json` file; this entry refers to holesky but references development contracts. Thus, in order to avoid confusion, subgraphs for the dev environment have been added with `preprod-holesky` suffix.
-
-It is worth mentioning that `preprod-holesky` is not a valid network name in Satsuma, so to deploy dev subgraphs, we need to temporarily rename `preprod-holesky` to `holesky` in `networks.json` file. 
-
-### [avs-operator-state-preprod-holesky](https://subgraphs.alchemy.com/subgraphs/2627)
+## testnet
 
 ```bash
-graph deploy avs-operator-state-preprod-holesky \
+graph deploy eigenda-ejection-manager-holesky \
   --version-label v0.0.1 \
   --network holesky \
+  --network-file networks/testnet.json
+  --node https://subgraphs.alchemy.com/api/subgraphs/deploy \
+  --deploy-key $DEPLOY_KEY \
+  --ipfs https://ipfs.satsuma.xyz
+```
+
+## preprod
+
+```bash
+graph deploy eigenda-ejection-manager-preprod-holesky \
+  --version-label v0.0.1 \
+  --network holesky \
+  --network-file networks/preprod.json
   --node https://subgraphs.alchemy.com/api/subgraphs/deploy \
   --deploy-key $DEPLOY_KEY \
   --ipfs https://ipfs.satsuma.xyz

@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: EjectionManager
-    network: mainnet
+    network: holesky
     source:
       abi: EjectionManager
-      address: "0x130d8EA0052B45554e4C99079B84df292149Bd5E"
-      startBlock: 19839949
+      address: "0xEEed164605833263B7690bB521983b777D128698"
+      startBlock: 1367682
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
