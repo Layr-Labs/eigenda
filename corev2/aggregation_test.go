@@ -123,6 +123,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := dat.GetTotalOperatorStateWithQuorums(context.Background(), 0, []corev2.QuorumID{0, 1})
+			assert.NotNil(t, state)
 
 			update := make(chan corev2.SigningMessage)
 			message := [32]byte{1, 2, 3, 4, 5, 6}

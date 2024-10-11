@@ -19,11 +19,10 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 	operatorState := state.OperatorState
-	coordinator := corev2.AssignmentCoordinator{}
 
 	blobVersion := byte(0)
 
-	assignments, err := coordinator.GetAssignments(operatorState, blobVersion, 0)
+	assignments, err := corev2.GetAssignments(operatorState, blobVersion, 0)
 	assert.NoError(t, err)
 	expectedAssignments := map[chainio.OperatorID]corev2.Assignment{
 		mock.MakeOperatorId(0): {
@@ -56,7 +55,7 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
-		assignment, err := coordinator.GetAssignment(operatorState, blobVersion, 0, operatorID)
+		assignment, err := corev2.GetAssignment(operatorState, blobVersion, 0, operatorID)
 		assert.NoError(t, err)
 
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
@@ -72,8 +71,6 @@ func TestMaxNumOperators(t *testing.T) {
 }
 
 func TestAssignmentWithTooManyOperators(t *testing.T) {
-
-	asn := corev2.AssignmentCoordinator{}
 
 	numOperators := maxNumOperators + 1
 
@@ -95,7 +92,7 @@ func TestAssignmentWithTooManyOperators(t *testing.T) {
 
 	blobVersion := byte(0)
 
-	_, err = asn.GetAssignments(state.OperatorState, blobVersion, 0)
+	_, err = corev2.GetAssignments(state.OperatorState, blobVersion, 0)
 	assert.Error(t, err)
 
 }
@@ -103,7 +100,6 @@ func TestAssignmentWithTooManyOperators(t *testing.T) {
 func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	// Add distributions to fuzz
-	asn := &corev2.AssignmentCoordinator{}
 
 	for i := 1; i < 100; i++ {
 		f.Add(i)
@@ -137,7 +133,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		blobVersion := byte(0)
 
-		assignments, err := asn.GetAssignments(state.OperatorState, blobVersion, 0)
+		assignments, err := corev2.GetAssignments(state.OperatorState, blobVersion, 0)
 		assert.NoError(t, err)
 
 		// Check that the total number of chunks is correct
@@ -166,8 +162,6 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 func TestChunkLength(t *testing.T) {
 
-	asn := &corev2.AssignmentCoordinator{}
-
 	blobVersion := byte(0)
 
 	pairs := []struct {
@@ -183,7 +177,7 @@ func TestChunkLength(t *testing.T) {
 
 	for _, pair := range pairs {
 
-		chunkLength, err := asn.GetChunkLength(blobVersion, pair.blobLength)
+		chunkLength, err := corev2.GetChunkLength(blobVersion, pair.blobLength)
 
 		assert.NoError(t, err)
 
@@ -193,8 +187,6 @@ func TestChunkLength(t *testing.T) {
 }
 
 func TestInvalidChunkLength(t *testing.T) {
-
-	asn := &corev2.AssignmentCoordinator{}
 
 	blobVersion := byte(0)
 
@@ -221,7 +213,7 @@ func TestInvalidChunkLength(t *testing.T) {
 
 	for _, length := range invalidLengths {
 
-		_, err := asn.GetChunkLength(blobVersion, length)
+		_, err := corev2.GetChunkLength(blobVersion, length)
 		assert.Error(t, err)
 	}
 

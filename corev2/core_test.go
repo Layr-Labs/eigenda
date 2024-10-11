@@ -6,6 +6,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/chainio/mock"
 	corev2 "github.com/Layr-Labs/eigenda/corev2"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -24,13 +26,13 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	// logger := logging.NewNoopLogger()
-	// transactor := &mock.MockTransactor{}
-	// transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
-	// agg, err = core.NewStdSignatureAggregator(logger, transactor)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	logger := logging.NewNoopLogger()
+	reader := &mock.MockReader{}
+	reader.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err = corev2.NewStdSignatureAggregator(logger, reader)
+	if err != nil {
+		panic(err)
+	}
 
 	code := m.Run()
 	os.Exit(code)

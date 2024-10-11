@@ -22,15 +22,13 @@ type BlobShard struct {
 // shardValidator implements the validation logic that a DA node should apply to its received data
 type ShardValidator struct {
 	verifier   encoding.Verifier
-	assignment AssignmentCoordinator
 	chainState chainio.ChainState
 	operatorID OperatorID
 }
 
-func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst chainio.ChainState, operatorID OperatorID) *ShardValidator {
+func NewShardValidator(v encoding.Verifier, cst chainio.ChainState, operatorID OperatorID) *ShardValidator {
 	return &ShardValidator{
 		verifier:   v,
-		assignment: asgn,
 		chainState: cst,
 		operatorID: operatorID,
 	}
@@ -44,7 +42,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, op
 	}
 
 	// Get the assignments for the quorum
-	assignment, err := v.assignment.GetAssignment(operatorState, blob.Version, quorum, v.operatorID)
+	assignment, err := GetAssignment(operatorState, blob.Version, quorum, v.operatorID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -58,7 +56,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, op
 	}
 
 	// Validate the chunkLength against the confirmation and adversary threshold parameters
-	chunkLength, err := v.assignment.GetChunkLength(blob.Version, uint32(blob.BlobHeader.Length))
+	chunkLength, err := GetChunkLength(blob.Version, uint32(blob.BlobHeader.Length))
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
@@ -94,7 +92,15 @@ func (v *ShardValidator) ValidateBlobs(blobs []*BlobShard, operatorState *chaini
 		// for each quorum
 		for _, quorum := range blob.BlobHeader.QuorumNumbers {
 			chunks, assignment, err := v.validateBlobQuorum(quorum, blob, operatorState)
+			if err != nil {
+				return err
+			}
 			// TODO: Define params for the blob
+			params, err := blob.GetEncodingParams()
+			if err != nil {
+				return err
+			}
+
 			if errors.Is(err, ErrBlobQuorumSkip) {
 				continue
 			} else if err != nil {
@@ -102,7 +108,7 @@ func (v *ShardValidator) ValidateBlobs(blobs []*BlobShard, operatorState *chaini
 			} else {
 				// Check the received chunks against the commitment
 				blobIndex := 0
-				subBatch, ok := subBatchMap[*params]
+				subBatch, ok := subBatchMap[params]
 				if ok {
 					blobIndex = subBatch.NumBlobs
 				}
@@ -120,7 +126,7 @@ func (v *ShardValidator) ValidateBlobs(blobs []*BlobShard, operatorState *chaini
 
 				// update subBatch
 				if !ok {
-					subBatchMap[*params] = &encoding.SubBatch{
+					subBatchMap[params] = &encoding.SubBatch{
 						Samples:  samples,
 						NumBlobs: 1,
 					}

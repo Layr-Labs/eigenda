@@ -44,6 +44,22 @@ type BlobHeader struct {
 	ReferenceBlockNumber uint64
 }
 
+func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
+
+	params := ParametersMap[b.Version]
+
+	length, err := GetChunkLength(b.Version, uint32(b.Length))
+	if err != nil {
+		return encoding.EncodingParams{}, err
+	}
+
+	return encoding.EncodingParams{
+		NumChunks:   uint64(params.NumChunks),
+		ChunkLength: uint64(length),
+	}, nil
+
+}
+
 type PaymentHeader struct {
 	// BlobKey is the hash of the blob header
 	BlobKey [32]byte

@@ -9,10 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-type AssignmentCoordinator struct {
-}
-
-func (c *AssignmentCoordinator) GetAssignments(state *chainio.OperatorState, blobVersion byte, quorum uint8) (map[core.OperatorID]Assignment, error) {
+func GetAssignments(state *chainio.OperatorState, blobVersion byte, quorum uint8) (map[core.OperatorID]Assignment, error) {
 
 	params, ok := ParametersMap[blobVersion]
 	if !ok {
@@ -87,9 +84,9 @@ func (c *AssignmentCoordinator) GetAssignments(state *chainio.OperatorState, blo
 
 }
 
-func (c *AssignmentCoordinator) GetAssignment(state *chainio.OperatorState, blobVersion byte, quorum QuorumID, id core.OperatorID) (Assignment, error) {
+func GetAssignment(state *chainio.OperatorState, blobVersion byte, quorum QuorumID, id core.OperatorID) (Assignment, error) {
 
-	assignments, err := c.GetAssignments(state, blobVersion, quorum)
+	assignments, err := GetAssignments(state, blobVersion, quorum)
 	if err != nil {
 		return Assignment{}, err
 	}
@@ -102,7 +99,7 @@ func (c *AssignmentCoordinator) GetAssignment(state *chainio.OperatorState, blob
 	return assignment, nil
 }
 
-func (c *AssignmentCoordinator) GetChunkLength(blobVersion byte, blobLength uint32) (uint32, error) {
+func GetChunkLength(blobVersion byte, blobLength uint32) (uint32, error) {
 
 	if blobLength == 0 {
 		return 0, fmt.Errorf("blob length must be greater than 0")

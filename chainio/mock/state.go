@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
@@ -37,7 +38,11 @@ type PrivateOperatorState struct {
 }
 
 func MakeOperatorId(id int) chainio.OperatorID {
-	data := [32]byte{uint8(id)}
+
+	// Initialize a [32]byte array
+	var data [32]byte
+	// Encode the integer into a byte slice
+	binary.LittleEndian.PutUint64(data[:8], uint64(id))
 	return data
 }
 
