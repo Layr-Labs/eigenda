@@ -126,3 +126,38 @@ dataSources:
         - event: OperatorRemovedFromQuorums(address,bytes32,bytes)
           handler: handleOperatorRemovedFromQuorums
       file: ./src/quorum-apk-updates.ts
+  - kind: ethereum
+    name: EjectionManager
+    network: devnet
+    source:
+      abi: EjectionManager
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - EjectorUpdated
+        - Initialized
+        - OperatorEjected
+        - OwnershipTransferred
+        - QuorumEjection
+        - QuorumEjectionParamsSet
+      abis:
+        - name: EjectionManager
+          file: ./abis/EjectionManager.json
+      eventHandlers:
+        - event: EjectorUpdated(address,bool)
+          handler: handleEjectorUpdated
+        - event: Initialized(uint8)
+          handler: handleInitialized
+        - event: OperatorEjected(bytes32,uint8)
+          handler: handleOperatorEjected
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: QuorumEjection(uint32,bool)
+          handler: handleQuorumEjection
+        - event: QuorumEjectionParamsSet(uint8,uint32,uint16)
+          handler: handleQuorumEjectionParamsSet
+      file: ./src/ejection-manager.ts

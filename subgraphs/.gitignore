@@ -6,6 +6,8 @@
 
 eigenda-operator-state/networks.json
 eigenda-operator-state/subgraph.yaml
+eigenda-operator-state/Makefile
 
 eigenda-batch-metadata/networks.json
 eigenda-batch-metadata/subgraph.yaml
+eigenda-batch-metadata/Makefile
