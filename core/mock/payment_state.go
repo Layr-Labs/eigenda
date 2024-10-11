@@ -24,13 +24,9 @@ func (m *MockOnchainPaymentState) GetCurrentBlockNumber(ctx context.Context) (ui
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) CurrentOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (meterer.OnchainPaymentState, error) {
-	args := m.Called()
-	var value meterer.OnchainPaymentState
-	if args.Get(0) != nil {
-		value = args.Get(0).(meterer.OnchainPaymentState)
-	}
-	return value, args.Error(1)
+func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error {
+	args := m.Called(ctx, tx)
+	return args.Error(0)
 }
 
 func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error) {
@@ -69,11 +65,11 @@ func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Contex
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
+func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) []uint8 {
 	args := m.Called()
 	var value []uint8
 	if args.Get(0) != nil {
 		value = args.Get(0).([]uint8)
 	}
-	return value, args.Error(1)
+	return value
 }

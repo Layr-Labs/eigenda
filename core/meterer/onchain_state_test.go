@@ -24,10 +24,10 @@ var (
 	}
 )
 
-func TestGetCurrentOnchainPaymentState(t *testing.T) {
+func TestGetRefreshOnchainPaymentState(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("CurrentOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(meterer.OnchainPaymentState{
+	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(meterer.OnchainPaymentState{
 		ActiveReservations: map[string]core.ActiveReservation{
 			"account1": dummyActiveReservation,
 		},
@@ -36,7 +36,7 @@ func TestGetCurrentOnchainPaymentState(t *testing.T) {
 		},
 	}, nil)
 
-	state, err := mockState.CurrentOnchainPaymentState(ctx, &eth.Transactor{})
+	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Transactor{})
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.OnchainPaymentState{
 		ActiveReservations: map[string]core.ActiveReservation{
@@ -45,7 +45,7 @@ func TestGetCurrentOnchainPaymentState(t *testing.T) {
 		OnDemandPayments: map[string]core.OnDemandPayment{
 			"account1": dummyOnDemandPayment,
 		},
-	}, state)
+	}, mockState)
 }
 
 func TestGetCurrentBlockNumber(t *testing.T) {
@@ -109,7 +109,6 @@ func TestGetOnDemandQuorumNumbers(t *testing.T) {
 	ctx := context.Background()
 	mockState.On("GetOnDemandQuorumNumbers", testifymock.Anything, testifymock.Anything).Return([]uint8{0, 1}, nil)
 
-	quorumNumbers, err := mockState.GetOnDemandQuorumNumbers(ctx)
-	assert.NoError(t, err)
+	quorumNumbers := mockState.GetOnDemandQuorumNumbers(ctx)
 	assert.Equal(t, []uint8{0, 1}, quorumNumbers)
 }

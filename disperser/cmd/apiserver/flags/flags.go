@@ -76,6 +76,49 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	EnablePaymentMeterer = cli.BoolFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "enable-payment-meterer"),
+		Usage:  "enable payment meterer",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_PAYMENT_METERER"),
+	}
+	ReservationWindow = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "reservation-window"),
+		Usage:  "duration of all reservation bins in seconds, used to calculate bin indices",
+		Value:  375, // Interval that allows 3 32MB blobs at minimal throughput
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "RESERVATION_WINDOW"),
+	}
+	MinNumSymbols = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "min-chargeable-size"),
+		Usage:  "minimum number of symbols charged",
+		Value:  1024,
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "MIN_NUM_SYMBOLS"),
+	}
+	PricePerSymbol = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "price-per-symbol"),
+		Usage:  "price per symbol in gwei, used for on-demand payments",
+		Value:  1000,
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "PRICE_PER_SYMBOL"),
+	}
+	OnDemandGlobalLimit = cli.UintFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "on-demand-global-limit"),
+		Usage:  "on demand global limit (bytes per second)",
+		Value:  1000,
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_GLOBAL_LIMIT"),
+	}
+	PaymentChainID = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-chain-id"),
+		Usage:    "chain id of the payment chain",
+		Value:    17000,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_CHAIN_ID"),
+		Required: false,
+	}
+	PaymentContractAddress = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-contract-address"),
+		Usage:    "address of the payment contract",
+		Value:    "",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_CONTRACT_ADDRESS"),
+		Required: false,
+	}
 	EnableRatelimiter = cli.BoolFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "enable-ratelimiter"),
 		Usage:  "enable rate limiter",
@@ -116,6 +159,13 @@ var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	EnableMetrics,
 	EnableRatelimiter,
+	EnablePaymentMeterer,
+	ReservationWindow,
+	MinNumSymbols,
+	PricePerSymbol,
+	OnDemandGlobalLimit,
+	PaymentChainID,
+	PaymentContractAddress,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
 	ShadowTableNameFlag,

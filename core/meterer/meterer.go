@@ -191,17 +191,14 @@ func GetBinIndex(timestamp uint64, binInterval uint32) uint32 {
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment) error {
-	quorumNumbers, err := m.ChainState.GetOnDemandQuorumNumbers(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
-	}
+	quorumNumbers := m.ChainState.GetOnDemandQuorumNumbers(ctx)
 
 	if err := m.ValidateQuorum(header, quorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 	// update blob header to use the miniumum chargeable size
 	symbolsCharged := m.SymbolsCharged(header.DataLength)
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
+	err := m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
