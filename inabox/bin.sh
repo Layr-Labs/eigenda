@@ -1,5 +1,4 @@
 #!/bin/bash
-
 pids=""
 function kill_processes {
     echo "STOP"

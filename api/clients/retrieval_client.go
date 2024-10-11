@@ -4,20 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/wealdtech/go-merkletree/v2"
 
 	"github.com/gammazero/workerpool"
+	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
-// RetrievalClient is an object that can retrieve blobs from the network.
 type RetrievalClient interface {
-
-	// RetrieveBlob fetches a blob from the network. This method is equivalent to calling
-	// RetrieveBlobChunks to get the chunks and then CombineChunks to recombine those chunks into the original blob.
 	RetrieveBlob(
 		ctx context.Context,
 		batchHeaderHash [32]byte,
@@ -25,29 +22,6 @@ type RetrievalClient interface {
 		referenceBlockNumber uint,
 		batchRoot [32]byte,
 		quorumID core.QuorumID) ([]byte, error)
-
-	// RetrieveBlobChunks downloads the chunks of a blob from the network but do not recombine them. Use this method
-	// if detailed information about which node returned which chunk is needed. Otherwise, use RetrieveBlob.
-	RetrieveBlobChunks(
-		ctx context.Context,
-		batchHeaderHash [32]byte,
-		blobIndex uint32,
-		referenceBlockNumber uint,
-		batchRoot [32]byte,
-		quorumID core.QuorumID) (*BlobChunks, error)
-
-	// CombineChunks recombines the chunks into the original blob.
-	CombineChunks(chunks *BlobChunks) ([]byte, error)
-}
-
-// BlobChunks is a collection of chunks retrieved from the network which can be recombined into a blob.
-type BlobChunks struct {
-	Chunks           []*encoding.Frame
-	Indices          []encoding.ChunkNumber
-	EncodingParams   encoding.EncodingParams
-	BlobHeaderLength uint
-	Assignments      map[core.OperatorID]core.Assignment
-	AssignmentInfo   core.AssignmentInfo
 }
 
 type retrievalClient struct {
@@ -59,14 +33,16 @@ type retrievalClient struct {
 	numConnections        int
 }
 
-// NewRetrievalClient creates a new retrieval client.
+var _ RetrievalClient = (*retrievalClient)(nil)
+
 func NewRetrievalClient(
 	logger logging.Logger,
 	chainState core.IndexedChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	verifier encoding.Verifier,
-	numConnections int) (RetrievalClient, error) {
+	numConnections int,
+) (*retrievalClient, error) {
 
 	return &retrievalClient{
 		logger:                logger.With("component", "RetrievalClient"),
@@ -78,7 +54,6 @@ func NewRetrievalClient(
 	}, nil
 }
 
-// RetrieveBlob retrieves a blob from the network.
 func (r *retrievalClient) RetrieveBlob(
 	ctx context.Context,
 	batchHeaderHash [32]byte,
@@ -86,23 +61,6 @@ func (r *retrievalClient) RetrieveBlob(
 	referenceBlockNumber uint,
 	batchRoot [32]byte,
 	quorumID core.QuorumID) ([]byte, error) {
-
-	chunks, err := r.RetrieveBlobChunks(ctx, batchHeaderHash, blobIndex, referenceBlockNumber, batchRoot, quorumID)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.CombineChunks(chunks)
-}
-
-// RetrieveBlobChunks retrieves the chunks of a blob from the network but does not recombine them.
-func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
-	batchHeaderHash [32]byte,
-	blobIndex uint32,
-	referenceBlockNumber uint,
-	batchRoot [32]byte,
-	quorumID core.QuorumID) (*BlobChunks, error) {
-
 	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, referenceBlockNumber, []core.QuorumID{quorumID})
 	if err != nil {
 		return nil, err
@@ -215,21 +173,5 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
-	return &BlobChunks{
-		Chunks:           chunks,
-		Indices:          indices,
-		EncodingParams:   encodingParams,
-		BlobHeaderLength: blobHeader.Length,
-		Assignments:      assignments,
-		AssignmentInfo:   info,
-	}, nil
-}
-
-// CombineChunks recombines the chunks into the original blob.
-func (r *retrievalClient) CombineChunks(chunks *BlobChunks) ([]byte, error) {
-	return r.verifier.Decode(
-		chunks.Chunks,
-		chunks.Indices,
-		chunks.EncodingParams,
-		uint64(chunks.BlobHeaderLength)*encoding.BYTES_PER_SYMBOL)
+	return r.verifier.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
 }
