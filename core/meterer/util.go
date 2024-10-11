@@ -35,7 +35,6 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 		},
 		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
 			{
-				IndexName: aws.String("AccountIDIndex"),
 				KeySchema: []types.KeySchemaElement{
 					{
 						AttributeName: aws.String("AccountID"),
@@ -127,7 +126,6 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 		},
 		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
 			{
-				IndexName: aws.String("AccountIDIndex"),
 				KeySchema: []types.KeySchemaElement{
 					{
 						AttributeName: aws.String("AccountID"),
