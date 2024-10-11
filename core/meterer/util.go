@@ -33,23 +33,6 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 				KeyType:       types.KeyTypeRange,
 			},
 		},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("AccountID"),
-						KeyType:       types.KeyTypeHash,
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll, // ProjectionTypeAll means all attributes are projected into the index
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
-			},
-		},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(10),
@@ -122,27 +105,6 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 			{
 				AttributeName: aws.String("CumulativePayments"),
 				KeyType:       types.KeyTypeRange,
-			},
-		},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("AccountID"),
-						KeyType:       types.KeyTypeHash,
-					},
-					{
-						AttributeName: aws.String("CumulativePayments"),
-						KeyType:       types.KeyTypeRange, // Sort key
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll,
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
 			},
 		},
 		TableName: aws.String(tableName),

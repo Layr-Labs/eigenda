@@ -14,11 +14,12 @@ import (
 )
 
 func TestReservationBinsBasicOperations(t *testing.T) {
-	tableName := "reservations"
-	meterer.CreateReservationTable(clientConfig, tableName)
+	tableName := "reservations_test_basic"
+	err := meterer.CreateReservationTable(clientConfig, tableName)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
-	err := dynamoClient.PutItem(ctx, tableName,
+	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
 			"AccountID": &types.AttributeValueMemberS{Value: "account1"},
 			"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
@@ -38,14 +39,13 @@ func TestReservationBinsBasicOperations(t *testing.T) {
 	assert.Equal(t, "1", item["BinIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	// items, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "AccountID = :account", commondynamodb.ExpressionValues{
 	items, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{Value: "account1"},
 	})
 	assert.NoError(t, err)
 	assert.Len(t, items, 1)
 
-	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+	_, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: "account2"},
 	})
 	assert.Error(t, err)
@@ -93,9 +93,9 @@ func TestReservationBinsBasicOperations(t *testing.T) {
 }
 
 func TestGlobalBinsBasicOperations(t *testing.T) {
-	tableName := "global"
-	meterer.CreateGlobalReservationTable(clientConfig, tableName)
-	indexName := "BinIndexIndex"
+	tableName := "global_test_basic"
+	err := meterer.CreateGlobalReservationTable(clientConfig, tableName)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	numItems := 30
@@ -111,8 +111,7 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, unprocessed, 0)
 
-	queryResult, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "BinIndex = :index", commondynamodb.ExpressionValues{
-		// queryResult, err := dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err := dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
@@ -121,8 +120,7 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	assert.Equal(t, "1", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	queryResult, err = dynamoClient.QueryIndex(ctx, tableName, indexName, "BinIndex = :index", commondynamodb.ExpressionValues{
-		// queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
@@ -131,8 +129,7 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	assert.Equal(t, "1", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	queryResult, err = dynamoClient.QueryIndex(ctx, tableName, indexName, "BinIndex = :index", commondynamodb.ExpressionValues{
-		// queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "32",
 		}})
@@ -155,8 +152,7 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	queryResult, err = dynamoClient.QueryIndex(ctx, tableName, indexName, "BinIndex = :index", commondynamodb.ExpressionValues{
-		// queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
@@ -165,8 +161,7 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	assert.Equal(t, "1", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "2000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	queryResult, err = dynamoClient.QueryIndex(ctx, tableName, indexName, "BinIndex = :index", commondynamodb.ExpressionValues{
-		// queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "2",
 		}})
@@ -177,12 +172,13 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 }
 
 func TestOnDemandUsageBasicOperations(t *testing.T) {
-	tableName := "ondemand"
-	meterer.CreateOnDemandTable(clientConfig, tableName)
+	tableName := "ondemand_test_basic"
+	err := meterer.CreateOnDemandTable(clientConfig, tableName)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 
-	err := dynamoClient.PutItem(ctx, tableName,
+	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
@@ -214,7 +210,6 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	assert.Equal(t, "1", item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", item["DataLength"].(*types.AttributeValueMemberN).Value)
 
-	// queryResult, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "AccountID = :account", commondynamodb.ExpressionValues{
 	queryResult, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: "account1",
@@ -225,7 +220,6 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 		cumulativePayments, _ := strconv.Atoi(item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
 		assert.Equal(t, fmt.Sprintf("%d", cumulativePayments*1000), item["DataLength"].(*types.AttributeValueMemberN).Value)
 	}
-	// queryResult, err = dynamoClient.QueryIndex(ctx, tableName, indexName, "AccountID = :account_id", commondynamodb.ExpressionValues{
 	queryResult, err = dynamoClient.Query(ctx, tableName, "AccountID = :account_id", commondynamodb.ExpressionValues{
 		":account_id": &types.AttributeValueMemberS{
 			Value: fmt.Sprintf("account%d", numItems/repetitions+1),

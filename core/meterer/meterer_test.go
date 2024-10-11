@@ -85,7 +85,15 @@ func setup(_ *testing.M) {
 	signer = auth.NewEIP712Signer(chainID, verifyingContract)
 
 	privateKey1, err = crypto.GenerateKey()
+	if err != nil {
+		teardown()
+		panic("failed to generate private key")
+	}
 	privateKey2, err = crypto.GenerateKey()
+	if err != nil {
+		teardown()
+		panic("failed to generate private key")
+	}
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
@@ -96,16 +104,21 @@ func setup(_ *testing.M) {
 		ChainReadTimeout:     3 * time.Second,
 	}
 
-	clientConfig := commonaws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+	err = meterer.CreateReservationTable(clientConfig, "reservations")
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
 	}
-
-	meterer.CreateReservationTable(clientConfig, "reservations")
-	meterer.CreateOnDemandTable(clientConfig, "ondemand")
-	meterer.CreateGlobalReservationTable(clientConfig, "global")
+	err = meterer.CreateOnDemandTable(clientConfig, "ondemand")
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(clientConfig, "global")
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
 
 	store, err := meterer.NewOffchainStore(
 		clientConfig,

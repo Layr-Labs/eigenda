@@ -137,6 +137,7 @@ func TestEIP712SignerWithModifiedHeader(t *testing.T) {
 	header.AccountID = "modifiedAccount"
 
 	addr, err := signer.RecoverSender(header)
+	require.NoError(t, err)
 	require.NotEqual(t, expectedAddress, addr)
 }
 
@@ -165,6 +166,7 @@ func TestEIP712SignerWithDifferentChainID(t *testing.T) {
 
 	// Try to recover the sender using a signer with a different chain ID
 	sender, err := signer2.RecoverSender(header)
+	require.NoError(t, err)
 	expectedAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	require.NotEqual(t, expectedAddress, sender)
