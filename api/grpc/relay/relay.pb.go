@@ -21,20 +21,71 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Request a specific chunk
-type GetChunkRequest struct {
+// The error that occurred while trying to fetch a blob or chunks.
+type RelayError int32
+
+const (
+	// This relay does not know about the requested blob or the requested blob is assigned to a different relay.
+	RelayError_UNKNOWN_BLOB RelayError = 0
+	// The relay is too busy to handle the request.
+	RelayError_BUSY RelayError = 1
+	// An internal relay error occurred while trying to fetch the blob.
+	RelayError_INTERNAL_ERROR RelayError = 2
+)
+
+// Enum value maps for RelayError.
+var (
+	RelayError_name = map[int32]string{
+		0: "UNKNOWN_BLOB",
+		1: "BUSY",
+		2: "INTERNAL_ERROR",
+	}
+	RelayError_value = map[string]int32{
+		"UNKNOWN_BLOB":   0,
+		"BUSY":           1,
+		"INTERNAL_ERROR": 2,
+	}
+)
+
+func (x RelayError) Enum() *RelayError {
+	p := new(RelayError)
+	*p = x
+	return p
+}
+
+func (x RelayError) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RelayError) Descriptor() protoreflect.EnumDescriptor {
+	return file_relay_relay_proto_enumTypes[0].Descriptor()
+}
+
+func (RelayError) Type() protoreflect.EnumType {
+	return &file_relay_relay_proto_enumTypes[0]
+}
+
+func (x RelayError) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RelayError.Descriptor instead.
+func (RelayError) EnumDescriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{0}
+}
+
+// A request to upload one or more blobs.
+type UploadBlobsRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The hash of the blob's header.
-	HeaderHash []byte `protobuf:"bytes,1,opt,name=header_hash,json=headerHash,proto3" json:"header_hash,omitempty"`
-	// The index of the chunk within the blob.
-	ChunkIndex uint32 `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
+	// The blobs to upload.
+	Blobs []*BlobData `protobuf:"bytes,1,rep,name=blobs,proto3" json:"blobs,omitempty"`
 }
 
-func (x *GetChunkRequest) Reset() {
-	*x = GetChunkRequest{}
+func (x *UploadBlobsRequest) Reset() {
+	*x = UploadBlobsRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_relay_relay_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -42,13 +93,13 @@ func (x *GetChunkRequest) Reset() {
 	}
 }
 
-func (x *GetChunkRequest) String() string {
+func (x *UploadBlobsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetChunkRequest) ProtoMessage() {}
+func (*UploadBlobsRequest) ProtoMessage() {}
 
-func (x *GetChunkRequest) ProtoReflect() protoreflect.Message {
+func (x *UploadBlobsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_relay_relay_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -60,37 +111,34 @@ func (x *GetChunkRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetChunkRequest.ProtoReflect.Descriptor instead.
-func (*GetChunkRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use UploadBlobsRequest.ProtoReflect.Descriptor instead.
+func (*UploadBlobsRequest) Descriptor() ([]byte, []int) {
 	return file_relay_relay_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *GetChunkRequest) GetHeaderHash() []byte {
+func (x *UploadBlobsRequest) GetBlobs() []*BlobData {
 	if x != nil {
-		return x.HeaderHash
+		return x.Blobs
 	}
 	return nil
 }
 
-func (x *GetChunkRequest) GetChunkIndex() uint32 {
-	if x != nil {
-		return x.ChunkIndex
-	}
-	return 0
-}
-
-// Reply to GetChunkRequest
-type GetChunkReply struct {
+// A blob, its header, and its encoded chunks.
+type BlobData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The chunk requested.
-	Chunk *common.ChunkData `protobuf:"bytes,1,opt,name=chunk,proto3" json:"chunk,omitempty"`
+	// The header of the blob.
+	Header []byte `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"` // TODO use actual type
+	// The unencoded blob data.
+	Blob []byte `protobuf:"bytes,2,opt,name=blob,proto3" json:"blob,omitempty"`
+	// The encoded blob chunks.
+	Chunks []*common.ChunkData `protobuf:"bytes,3,rep,name=chunks,proto3" json:"chunks,omitempty"`
 }
 
-func (x *GetChunkReply) Reset() {
-	*x = GetChunkReply{}
+func (x *BlobData) Reset() {
+	*x = BlobData{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_relay_relay_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -98,13 +146,13 @@ func (x *GetChunkReply) Reset() {
 	}
 }
 
-func (x *GetChunkReply) String() string {
+func (x *BlobData) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetChunkReply) ProtoMessage() {}
+func (*BlobData) ProtoMessage() {}
 
-func (x *GetChunkReply) ProtoReflect() protoreflect.Message {
+func (x *BlobData) ProtoReflect() protoreflect.Message {
 	mi := &file_relay_relay_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -116,14 +164,557 @@ func (x *GetChunkReply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetChunkReply.ProtoReflect.Descriptor instead.
-func (*GetChunkReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use BlobData.ProtoReflect.Descriptor instead.
+func (*BlobData) Descriptor() ([]byte, []int) {
 	return file_relay_relay_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *GetChunkReply) GetChunk() *common.ChunkData {
+func (x *BlobData) GetHeader() []byte {
 	if x != nil {
-		return x.Chunk
+		return x.Header
+	}
+	return nil
+}
+
+func (x *BlobData) GetBlob() []byte {
+	if x != nil {
+		return x.Blob
+	}
+	return nil
+}
+
+func (x *BlobData) GetChunks() []*common.ChunkData {
+	if x != nil {
+		return x.Chunks
+	}
+	return nil
+}
+
+// The reply to an UploadBlobs request.
+type UploadBlobsReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *UploadBlobsReply) Reset() {
+	*x = UploadBlobsReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UploadBlobsReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadBlobsReply) ProtoMessage() {}
+
+func (x *UploadBlobsReply) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadBlobsReply.ProtoReflect.Descriptor instead.
+func (*UploadBlobsReply) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{2}
+}
+
+// A request to fetch one or more blobs.
+type GetBlobsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The hashes of the blobs to retrieve. The order of these requested headers will
+	// be equal to the order of the blobs in the reply.
+	HeaderHashes [][]byte `protobuf:"bytes,1,rep,name=header_hashes,json=headerHashes,proto3" json:"header_hashes,omitempty"`
+	// If this is an authenticated request, this should hold the ID of the requester. If this
+	// is an unauthenticated request, this field should be empty.
+	RequesterId uint64 `protobuf:"varint,2,opt,name=requesterId,proto3" json:"requesterId,omitempty"`
+	// If this is an authenticated request, this field will hold a signature by the requester
+	// on the header hashes being requested. TODO flesh out the authentication protocol.
+	RequesterSignature []byte `protobuf:"bytes,3,opt,name=requesterSignature,proto3" json:"requesterSignature,omitempty"`
+}
+
+func (x *GetBlobsRequest) Reset() {
+	*x = GetBlobsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetBlobsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlobsRequest) ProtoMessage() {}
+
+func (x *GetBlobsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlobsRequest.ProtoReflect.Descriptor instead.
+func (*GetBlobsRequest) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetBlobsRequest) GetHeaderHashes() [][]byte {
+	if x != nil {
+		return x.HeaderHashes
+	}
+	return nil
+}
+
+func (x *GetBlobsRequest) GetRequesterId() uint64 {
+	if x != nil {
+		return x.RequesterId
+	}
+	return 0
+}
+
+func (x *GetBlobsRequest) GetRequesterSignature() []byte {
+	if x != nil {
+		return x.RequesterSignature
+	}
+	return nil
+}
+
+type GetBlobsReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The blobs requested. The order of these blobs will be equal to the order of the
+	// requested header hashes.
+	Blobs []*RequestedBlob `protobuf:"bytes,1,rep,name=blobs,proto3" json:"blobs,omitempty"`
+}
+
+func (x *GetBlobsReply) Reset() {
+	*x = GetBlobsReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetBlobsReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlobsReply) ProtoMessage() {}
+
+func (x *GetBlobsReply) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlobsReply.ProtoReflect.Descriptor instead.
+func (*GetBlobsReply) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetBlobsReply) GetBlobs() []*RequestedBlob {
+	if x != nil {
+		return x.Blobs
+	}
+	return nil
+}
+
+// A blob that was requested or an error explaining why the requested blob could not be fetched.
+type RequestedBlob struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Blob:
+	//
+	//	*RequestedBlob_BlobData
+	//	*RequestedBlob_ErrorCode
+	Blob isRequestedBlob_Blob `protobuf_oneof:"blob"`
+}
+
+func (x *RequestedBlob) Reset() {
+	*x = RequestedBlob{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RequestedBlob) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestedBlob) ProtoMessage() {}
+
+func (x *RequestedBlob) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestedBlob.ProtoReflect.Descriptor instead.
+func (*RequestedBlob) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{5}
+}
+
+func (m *RequestedBlob) GetBlob() isRequestedBlob_Blob {
+	if m != nil {
+		return m.Blob
+	}
+	return nil
+}
+
+func (x *RequestedBlob) GetBlobData() []byte {
+	if x, ok := x.GetBlob().(*RequestedBlob_BlobData); ok {
+		return x.BlobData
+	}
+	return nil
+}
+
+func (x *RequestedBlob) GetErrorCode() RelayError {
+	if x, ok := x.GetBlob().(*RequestedBlob_ErrorCode); ok {
+		return x.ErrorCode
+	}
+	return RelayError_UNKNOWN_BLOB
+}
+
+type isRequestedBlob_Blob interface {
+	isRequestedBlob_Blob()
+}
+
+type RequestedBlob_BlobData struct {
+	// The blob requested.
+	BlobData []byte `protobuf:"bytes,1,opt,name=blobData,proto3,oneof"`
+}
+
+type RequestedBlob_ErrorCode struct {
+	// The error that occurred while trying to fetch the blob.
+	ErrorCode RelayError `protobuf:"varint,2,opt,name=errorCode,proto3,enum=node.RelayError,oneof"`
+}
+
+func (*RequestedBlob_BlobData) isRequestedBlob_Blob() {}
+
+func (*RequestedBlob_ErrorCode) isRequestedBlob_Blob() {}
+
+// Request chunks from blobs stored by this relay.
+type GetChunksRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The chunk requests. Chunks are returned in the same order as they are requested.
+	ChunkRequests []*ChunkRequest `protobuf:"bytes,1,rep,name=chunk_requests,json=chunkRequests,proto3" json:"chunk_requests,omitempty"`
+}
+
+func (x *GetChunksRequest) Reset() {
+	*x = GetChunksRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetChunksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChunksRequest) ProtoMessage() {}
+
+func (x *GetChunksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChunksRequest.ProtoReflect.Descriptor instead.
+func (*GetChunksRequest) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetChunksRequest) GetChunkRequests() []*ChunkRequest {
+	if x != nil {
+		return x.ChunkRequests
+	}
+	return nil
+}
+
+// A request for chunks within a specific blob.
+type ChunkRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The hash of the blob's header.
+	HeaderHash []byte `protobuf:"bytes,1,opt,name=header_hash,json=headerHash,proto3" json:"header_hash,omitempty"`
+	// The index of the chunk within the blob.
+	ChunkIndices []uint32 `protobuf:"varint,2,rep,packed,name=chunk_indices,json=chunkIndices,proto3" json:"chunk_indices,omitempty"`
+}
+
+func (x *ChunkRequest) Reset() {
+	*x = ChunkRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChunkRequest) ProtoMessage() {}
+
+func (x *ChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChunkRequest.ProtoReflect.Descriptor instead.
+func (*ChunkRequest) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ChunkRequest) GetHeaderHash() []byte {
+	if x != nil {
+		return x.HeaderHash
+	}
+	return nil
+}
+
+func (x *ChunkRequest) GetChunkIndices() []uint32 {
+	if x != nil {
+		return x.ChunkIndices
+	}
+	return nil
+}
+
+// The reply to a GetChunks request.
+type GetChunksReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
+	BlobChunks []*BlobChunks `protobuf:"bytes,1,rep,name=blobChunks,proto3" json:"blobChunks,omitempty"`
+}
+
+func (x *GetChunksReply) Reset() {
+	*x = GetChunksReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetChunksReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChunksReply) ProtoMessage() {}
+
+func (x *GetChunksReply) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChunksReply.ProtoReflect.Descriptor instead.
+func (*GetChunksReply) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetChunksReply) GetBlobChunks() []*BlobChunks {
+	if x != nil {
+		return x.BlobChunks
+	}
+	return nil
+}
+
+// A grouping of chunks from a specific blob that were requested.
+type BlobChunks struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Blob:
+	//
+	//	*BlobChunks_Chunks
+	//	*BlobChunks_ErrorCode
+	Blob isBlobChunks_Blob `protobuf_oneof:"blob"`
+}
+
+func (x *BlobChunks) Reset() {
+	*x = BlobChunks{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *BlobChunks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlobChunks) ProtoMessage() {}
+
+func (x *BlobChunks) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlobChunks.ProtoReflect.Descriptor instead.
+func (*BlobChunks) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{9}
+}
+
+func (m *BlobChunks) GetBlob() isBlobChunks_Blob {
+	if m != nil {
+		return m.Blob
+	}
+	return nil
+}
+
+func (x *BlobChunks) GetChunks() *Chunks {
+	if x, ok := x.GetBlob().(*BlobChunks_Chunks); ok {
+		return x.Chunks
+	}
+	return nil
+}
+
+func (x *BlobChunks) GetErrorCode() RelayError {
+	if x, ok := x.GetBlob().(*BlobChunks_ErrorCode); ok {
+		return x.ErrorCode
+	}
+	return RelayError_UNKNOWN_BLOB
+}
+
+type isBlobChunks_Blob interface {
+	isBlobChunks_Blob()
+}
+
+type BlobChunks_Chunks struct {
+	// The chunks requested.
+	Chunks *Chunks `protobuf:"bytes,1,opt,name=chunks,proto3,oneof"`
+}
+
+type BlobChunks_ErrorCode struct {
+	// The error that occurred while trying to fetch the chunks.
+	ErrorCode RelayError `protobuf:"varint,2,opt,name=errorCode,proto3,enum=node.RelayError,oneof"`
+}
+
+func (*BlobChunks_Chunks) isBlobChunks_Blob() {}
+
+func (*BlobChunks_ErrorCode) isBlobChunks_Blob() {}
+
+type Chunks struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Chunks []*common.ChunkData `protobuf:"bytes,1,rep,name=chunks,proto3" json:"chunks,omitempty"`
+}
+
+func (x *Chunks) Reset() {
+	*x = Chunks{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_relay_relay_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Chunks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Chunks) ProtoMessage() {}
+
+func (x *Chunks) ProtoReflect() protoreflect.Message {
+	mi := &file_relay_relay_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Chunks.ProtoReflect.Descriptor instead.
+func (*Chunks) Descriptor() ([]byte, []int) {
+	return file_relay_relay_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Chunks) GetChunks() []*common.ChunkData {
+	if x != nil {
+		return x.Chunks
 	}
 	return nil
 }
@@ -133,20 +724,79 @@ var File_relay_relay_proto protoreflect.FileDescriptor
 var file_relay_relay_proto_rawDesc = []byte{
 	0x0a, 0x11, 0x72, 0x65, 0x6c, 0x61, 0x79, 0x2f, 0x72, 0x65, 0x6c, 0x61, 0x79, 0x2e, 0x70, 0x72,
 	0x6f, 0x74, 0x6f, 0x12, 0x04, 0x6e, 0x6f, 0x64, 0x65, 0x1a, 0x13, 0x63, 0x6f, 0x6d, 0x6d, 0x6f,
-	0x6e, 0x2f, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x53,
-	0x0a, 0x0f, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
-	0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f, 0x68, 0x61, 0x73, 0x68,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x48, 0x61,
-	0x73, 0x68, 0x12, 0x1f, 0x0a, 0x0b, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x5f, 0x69, 0x6e, 0x64, 0x65,
-	0x78, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x0a, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x49, 0x6e,
-	0x64, 0x65, 0x78, 0x22, 0x38, 0x0a, 0x0d, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x52,
-	0x65, 0x70, 0x6c, 0x79, 0x12, 0x27, 0x0a, 0x05, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x43, 0x68, 0x75,
-	0x6e, 0x6b, 0x44, 0x61, 0x74, 0x61, 0x52, 0x05, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x32, 0x41, 0x0a,
-	0x05, 0x52, 0x65, 0x6c, 0x61, 0x79, 0x12, 0x38, 0x0a, 0x08, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75,
-	0x6e, 0x6b, 0x12, 0x15, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75,
-	0x6e, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x13, 0x2e, 0x6e, 0x6f, 0x64, 0x65,
-	0x2e, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00,
+	0x6e, 0x2f, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x3a,
+	0x0a, 0x12, 0x55, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x24, 0x0a, 0x05, 0x62, 0x6c, 0x6f, 0x62, 0x73, 0x18, 0x01, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x42, 0x6c, 0x6f, 0x62, 0x44,
+	0x61, 0x74, 0x61, 0x52, 0x05, 0x62, 0x6c, 0x6f, 0x62, 0x73, 0x22, 0x61, 0x0a, 0x08, 0x42, 0x6c,
+	0x6f, 0x62, 0x44, 0x61, 0x74, 0x61, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x12,
+	0x0a, 0x04, 0x62, 0x6c, 0x6f, 0x62, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x62, 0x6c,
+	0x6f, 0x62, 0x12, 0x29, 0x0a, 0x06, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x18, 0x03, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x11, 0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x43, 0x68, 0x75, 0x6e,
+	0x6b, 0x44, 0x61, 0x74, 0x61, 0x52, 0x06, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x22, 0x12, 0x0a,
+	0x10, 0x55, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65, 0x70, 0x6c,
+	0x79, 0x22, 0x88, 0x01, 0x0a, 0x0f, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x23, 0x0a, 0x0d, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f,
+	0x68, 0x61, 0x73, 0x68, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x0c, 0x68, 0x65,
+	0x61, 0x64, 0x65, 0x72, 0x48, 0x61, 0x73, 0x68, 0x65, 0x73, 0x12, 0x20, 0x0a, 0x0b, 0x72, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x65, 0x72, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52,
+	0x0b, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x65, 0x72, 0x49, 0x64, 0x12, 0x2e, 0x0a, 0x12,
+	0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x65, 0x72, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75,
+	0x72, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x12, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x65, 0x72, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x22, 0x3a, 0x0a, 0x0d,
+	0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x29, 0x0a,
+	0x05, 0x62, 0x6c, 0x6f, 0x62, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x6e,
+	0x6f, 0x64, 0x65, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x65, 0x64, 0x42, 0x6c, 0x6f,
+	0x62, 0x52, 0x05, 0x62, 0x6c, 0x6f, 0x62, 0x73, 0x22, 0x67, 0x0a, 0x0d, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x65, 0x64, 0x42, 0x6c, 0x6f, 0x62, 0x12, 0x1c, 0x0a, 0x08, 0x62, 0x6c, 0x6f,
+	0x62, 0x44, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x48, 0x00, 0x52, 0x08, 0x62,
+	0x6c, 0x6f, 0x62, 0x44, 0x61, 0x74, 0x61, 0x12, 0x30, 0x0a, 0x09, 0x65, 0x72, 0x72, 0x6f, 0x72,
+	0x43, 0x6f, 0x64, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x10, 0x2e, 0x6e, 0x6f, 0x64,
+	0x65, 0x2e, 0x52, 0x65, 0x6c, 0x61, 0x79, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x48, 0x00, 0x52, 0x09,
+	0x65, 0x72, 0x72, 0x6f, 0x72, 0x43, 0x6f, 0x64, 0x65, 0x42, 0x06, 0x0a, 0x04, 0x62, 0x6c, 0x6f,
+	0x62, 0x22, 0x4d, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x39, 0x0a, 0x0e, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x5f, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x12, 0x2e,
+	0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x52, 0x0d, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x73,
+	0x22, 0x54, 0x0a, 0x0c, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x1f, 0x0a, 0x0b, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x48, 0x61, 0x73,
+	0x68, 0x12, 0x23, 0x0a, 0x0d, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x5f, 0x69, 0x6e, 0x64, 0x69, 0x63,
+	0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0d, 0x52, 0x0c, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x49,
+	0x6e, 0x64, 0x69, 0x63, 0x65, 0x73, 0x22, 0x42, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75,
+	0x6e, 0x6b, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x30, 0x0a, 0x0a, 0x62, 0x6c, 0x6f, 0x62,
+	0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x6e,
+	0x6f, 0x64, 0x65, 0x2e, 0x42, 0x6c, 0x6f, 0x62, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x52, 0x0a,
+	0x62, 0x6c, 0x6f, 0x62, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x22, 0x6e, 0x0a, 0x0a, 0x42, 0x6c,
+	0x6f, 0x62, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x12, 0x26, 0x0a, 0x06, 0x63, 0x68, 0x75, 0x6e,
+	0x6b, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0c, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e,
+	0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x48, 0x00, 0x52, 0x06, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x73,
+	0x12, 0x30, 0x0a, 0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x43, 0x6f, 0x64, 0x65, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0e, 0x32, 0x10, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x52, 0x65, 0x6c, 0x61, 0x79,
+	0x45, 0x72, 0x72, 0x6f, 0x72, 0x48, 0x00, 0x52, 0x09, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x43, 0x6f,
+	0x64, 0x65, 0x42, 0x06, 0x0a, 0x04, 0x62, 0x6c, 0x6f, 0x62, 0x22, 0x33, 0x0a, 0x06, 0x43, 0x68,
+	0x75, 0x6e, 0x6b, 0x73, 0x12, 0x29, 0x0a, 0x06, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x18, 0x01,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x43, 0x68,
+	0x75, 0x6e, 0x6b, 0x44, 0x61, 0x74, 0x61, 0x52, 0x06, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x2a,
+	0x3c, 0x0a, 0x0a, 0x52, 0x65, 0x6c, 0x61, 0x79, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x10, 0x0a,
+	0x0c, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x5f, 0x42, 0x4c, 0x4f, 0x42, 0x10, 0x00, 0x12,
+	0x08, 0x0a, 0x04, 0x42, 0x55, 0x53, 0x59, 0x10, 0x01, 0x12, 0x12, 0x0a, 0x0e, 0x49, 0x4e, 0x54,
+	0x45, 0x52, 0x4e, 0x41, 0x4c, 0x5f, 0x45, 0x52, 0x52, 0x4f, 0x52, 0x10, 0x02, 0x32, 0x51, 0x0a,
+	0x0c, 0x50, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x79, 0x12, 0x41, 0x0a,
+	0x0b, 0x55, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x12, 0x18, 0x2e, 0x6e,
+	0x6f, 0x64, 0x65, 0x2e, 0x55, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x16, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x55, 0x70,
+	0x6c, 0x6f, 0x61, 0x64, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00,
+	0x32, 0x7e, 0x0a, 0x05, 0x52, 0x65, 0x6c, 0x61, 0x79, 0x12, 0x38, 0x0a, 0x08, 0x47, 0x65, 0x74,
+	0x42, 0x6c, 0x6f, 0x62, 0x73, 0x12, 0x15, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x47, 0x65, 0x74,
+	0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x13, 0x2e, 0x6e,
+	0x6f, 0x64, 0x65, 0x2e, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x62, 0x73, 0x52, 0x65, 0x70, 0x6c,
+	0x79, 0x22, 0x00, 0x12, 0x3b, 0x0a, 0x09, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73,
+	0x12, 0x16, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b,
+	0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x6e, 0x6f, 0x64, 0x65, 0x2e,
+	0x47, 0x65, 0x74, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00,
 	0x42, 0x2d, 0x5a, 0x2b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x4c,
 	0x61, 0x79, 0x72, 0x2d, 0x4c, 0x61, 0x62, 0x73, 0x2f, 0x65, 0x69, 0x67, 0x65, 0x6e, 0x64, 0x61,
 	0x2f, 0x61, 0x70, 0x69, 0x2f, 0x67, 0x72, 0x70, 0x63, 0x2f, 0x72, 0x65, 0x6c, 0x61, 0x79, 0x62,
@@ -165,21 +815,44 @@ func file_relay_relay_proto_rawDescGZIP() []byte {
 	return file_relay_relay_proto_rawDescData
 }
 
-var file_relay_relay_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_relay_relay_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_relay_relay_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_relay_relay_proto_goTypes = []interface{}{
-	(*GetChunkRequest)(nil),  // 0: node.GetChunkRequest
-	(*GetChunkReply)(nil),    // 1: node.GetChunkReply
-	(*common.ChunkData)(nil), // 2: common.ChunkData
+	(RelayError)(0),            // 0: node.RelayError
+	(*UploadBlobsRequest)(nil), // 1: node.UploadBlobsRequest
+	(*BlobData)(nil),           // 2: node.BlobData
+	(*UploadBlobsReply)(nil),   // 3: node.UploadBlobsReply
+	(*GetBlobsRequest)(nil),    // 4: node.GetBlobsRequest
+	(*GetBlobsReply)(nil),      // 5: node.GetBlobsReply
+	(*RequestedBlob)(nil),      // 6: node.RequestedBlob
+	(*GetChunksRequest)(nil),   // 7: node.GetChunksRequest
+	(*ChunkRequest)(nil),       // 8: node.ChunkRequest
+	(*GetChunksReply)(nil),     // 9: node.GetChunksReply
+	(*BlobChunks)(nil),         // 10: node.BlobChunks
+	(*Chunks)(nil),             // 11: node.Chunks
+	(*common.ChunkData)(nil),   // 12: common.ChunkData
 }
 var file_relay_relay_proto_depIdxs = []int32{
-	2, // 0: node.GetChunkReply.chunk:type_name -> common.ChunkData
-	0, // 1: node.Relay.GetChunk:input_type -> node.GetChunkRequest
-	1, // 2: node.Relay.GetChunk:output_type -> node.GetChunkReply
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2,  // 0: node.UploadBlobsRequest.blobs:type_name -> node.BlobData
+	12, // 1: node.BlobData.chunks:type_name -> common.ChunkData
+	6,  // 2: node.GetBlobsReply.blobs:type_name -> node.RequestedBlob
+	0,  // 3: node.RequestedBlob.errorCode:type_name -> node.RelayError
+	8,  // 4: node.GetChunksRequest.chunk_requests:type_name -> node.ChunkRequest
+	10, // 5: node.GetChunksReply.blobChunks:type_name -> node.BlobChunks
+	11, // 6: node.BlobChunks.chunks:type_name -> node.Chunks
+	0,  // 7: node.BlobChunks.errorCode:type_name -> node.RelayError
+	12, // 8: node.Chunks.chunks:type_name -> common.ChunkData
+	1,  // 9: node.PrivateRelay.UploadBlobs:input_type -> node.UploadBlobsRequest
+	4,  // 10: node.Relay.GetBlobs:input_type -> node.GetBlobsRequest
+	7,  // 11: node.Relay.GetChunks:input_type -> node.GetChunksRequest
+	3,  // 12: node.PrivateRelay.UploadBlobs:output_type -> node.UploadBlobsReply
+	5,  // 13: node.Relay.GetBlobs:output_type -> node.GetBlobsReply
+	9,  // 14: node.Relay.GetChunks:output_type -> node.GetChunksReply
+	12, // [12:15] is the sub-list for method output_type
+	9,  // [9:12] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_relay_relay_proto_init() }
@@ -189,7 +862,7 @@ func file_relay_relay_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_relay_relay_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetChunkRequest); i {
+			switch v := v.(*UploadBlobsRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -201,7 +874,115 @@ func file_relay_relay_proto_init() {
 			}
 		}
 		file_relay_relay_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetChunkReply); i {
+			switch v := v.(*BlobData); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UploadBlobsReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetBlobsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetBlobsReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RequestedBlob); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetChunksRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ChunkRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetChunksReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BlobChunks); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_relay_relay_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Chunks); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -213,18 +994,27 @@ func file_relay_relay_proto_init() {
 			}
 		}
 	}
+	file_relay_relay_proto_msgTypes[5].OneofWrappers = []interface{}{
+		(*RequestedBlob_BlobData)(nil),
+		(*RequestedBlob_ErrorCode)(nil),
+	}
+	file_relay_relay_proto_msgTypes[9].OneofWrappers = []interface{}{
+		(*BlobChunks_Chunks)(nil),
+		(*BlobChunks_ErrorCode)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_relay_relay_proto_rawDesc,
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   11,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_relay_relay_proto_goTypes,
 		DependencyIndexes: file_relay_relay_proto_depIdxs,
+		EnumInfos:         file_relay_relay_proto_enumTypes,
 		MessageInfos:      file_relay_relay_proto_msgTypes,
 	}.Build()
 	File_relay_relay_proto = out.File
