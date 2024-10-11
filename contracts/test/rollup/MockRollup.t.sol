@@ -5,12 +5,16 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BLSMockAVSDeployer} from "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
-import {MockRollup} from "../../src/rollup/MockRollup.sol";
+import {MockRollup} from "./MockRollup.sol";
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
-import {EigenDARollupUtils} from "../../src/libraries/EigenDARollupUtils.sol";
+import {EigenDABlobVerificationUtils} from "../../src/libraries/EigenDABlobVerificationUtils.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {EigenDABlobVerifier} from "../../src/core/EigenDABlobVerifier.sol";
+import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../../src/core/EigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
 
 import "forge-std/StdStorage.sol";
 
@@ -24,6 +28,8 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
+    EigenDABlobVerifier eigenDABlobVerifier;
+    EigenDAThresholdRegistry eigenDAThresholdRegistry;
 
     uint8 defaultCodingRatioPercentage = 10;
     uint32 defaultReferenceBlockNumber = 100;
@@ -52,47 +58,57 @@ contract MockRollupTest is BLSMockAVSDeployer {
     function setUp() public {
         _setUpBLSMockAVSDeployer();
 
+        eigenDAServiceManager = EigenDAServiceManager(
+            address(
+                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
+            )
+        );
+
+        eigenDAThresholdRegistry = new EigenDAThresholdRegistry(address(eigenDAServiceManager));
+
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
             rewardsCoordinator,
             registryCoordinator,
-            stakeRegistry
+            stakeRegistry,
+            eigenDAThresholdRegistry
         );
 
         address[] memory confirmers = new address[](1);
         confirmers[0] = registryCoordinatorOwner;
 
-        // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
-        eigenDAServiceManager = EigenDAServiceManager(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(eigenDAServiceManagerImplementation),
-                    address(proxyAdmin),
-                    abi.encodeWithSelector(
-                        EigenDAServiceManager.initialize.selector,
-                        pauserRegistry,
-                        0,
-                        registryCoordinatorOwner,
-                        confirmers,
-                        registryCoordinatorOwner
-                    )
-                )
+        cheats.prank(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
+            address(eigenDAServiceManagerImplementation),
+            abi.encodeWithSelector(
+                EigenDAServiceManager.initialize.selector,
+                pauserRegistry,
+                0,
+                registryCoordinatorOwner,
+                confirmers,
+                registryCoordinatorOwner
             )
         );
 
-        mockRollup = new MockRollup(eigenDAServiceManager, s1);
+        eigenDABlobVerifier = new EigenDABlobVerifier(
+            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+            IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
+            IEigenDASignatureVerifier(address(eigenDAServiceManager))
+        );
+
+        mockRollup = new MockRollup(eigenDABlobVerifier, s1);
 
         //hardcode g2 proof
         illegalProof.X[1] = 11151623676041303181597631684634074376466382703418354161831688442589830350329;
         illegalProof.X[0] = 21587740443732524623985464356760343072434825248946003815467233999912459579351;
         illegalProof.Y[1] = 4222041728992406478862708226745479381252734858741080790666424175645694456140;
         illegalProof.Y[0] = 17511259870083276759899704237100059449000397154439723516103658719937845846446;
-
     }
 
     function testChallenge(uint256 pseudoRandomNumber) public {
         //get commitment with illegal value
-        (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
+        (IEigenDAServiceManager.BlobHeader memory blobHeader, EigenDABlobVerificationUtils.BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
         mockRollup.postCommitment(blobHeader, blobVerificationProof);
 
@@ -107,7 +123,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         illegalCommitment = s0.scalar_mul(1).plus(s1.scalar_mul(1)).plus(s2.scalar_mul(1)).plus(s3.scalar_mul(1)).plus(s4.scalar_mul(1));
     }
 
-    function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDARollupUtils.BlobVerificationProof memory){
+    function _getCommitment(uint256 pseudoRandomNumber) internal returns (IEigenDAServiceManager.BlobHeader memory, EigenDABlobVerificationUtils.BlobVerificationProof memory){
         uint256 numQuorumBlobParams = 2;
         IEigenDAServiceManager.BlobHeader[] memory blobHeader = new IEigenDAServiceManager.BlobHeader[](2);
         blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -121,7 +137,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
         for (uint i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers = abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
-            batchHeader.signedStakeForQuorums = abi.encodePacked(batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].adversaryThresholdPercentage + defaultCodingRatioPercentage);
+            batchHeader.signedStakeForQuorums = abi.encodePacked(batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].confirmationThresholdPercentage);
         }
         batchHeader.referenceBlockNumber = uint32(block.number);
 
@@ -137,7 +153,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             .with_key(defaultBatchId)
             .checked_write(batchMetadata.hashBatchMetadata());
 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof;
+        EigenDABlobVerificationUtils.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -173,9 +189,9 @@ contract MockRollupTest is BLSMockAVSDeployer {
                 }
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDABlobVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = blobHeader.quorumBlobParams[i].adversaryThresholdPercentage + 1;
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDABlobVerifier.getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
         for (uint i = 0; i < numQuorumsBlobParams; i++) {
@@ -184,10 +200,4 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
         return blobHeader;
     }
-
-    function testGetQuorumAdversaryThreshold () public {
-        require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 0) == 33, "getQuorumAdversaryThreshold failed");
-        //require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 1) == 33, "getQuorumAdversaryThreshold failed");
-    }
-
 }
