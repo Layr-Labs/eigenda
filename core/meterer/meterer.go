@@ -76,7 +76,6 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata)
 
 	// Validate against the payment method
 	if header.CumulativePayment == 0 {
-		fmt.Println("reservation: ", header.AccountID)
 		reservation, err := m.ChainState.GetActiveReservationByAccount(ctx, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)

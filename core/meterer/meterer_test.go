@@ -30,20 +30,17 @@ import (
 )
 
 var (
-	dockertestPool           *dockertest.Pool
-	dockertestResource       *dockertest.Resource
-	dynamoClient             *commondynamodb.Client
-	clientConfig             commonaws.ClientConfig
-	privateKey1              *ecdsa.PrivateKey
-	privateKey2              *ecdsa.PrivateKey
-	account1                 string
-	account1Reservations     core.ActiveReservation
-	account1OnDemandPayments core.OnDemandPayment
-	account2                 string
-	account2Reservations     core.ActiveReservation
-	account2OnDemandPayments core.OnDemandPayment
-	signer                   auth.EIP712Signer
-	mt                       *meterer.Meterer
+	dockertestPool       *dockertest.Pool
+	dockertestResource   *dockertest.Resource
+	dynamoClient         *commondynamodb.Client
+	clientConfig         commonaws.ClientConfig
+	privateKey1          *ecdsa.PrivateKey
+	privateKey2          *ecdsa.PrivateKey
+	signer               auth.EIP712Signer
+	mt                   *meterer.Meterer
+	reservationTableName string
+	ondemandTableName    string
+	globalTableName      string
 
 	deployLocalStack  bool
 	localStackPort    = "4566"
@@ -116,37 +113,31 @@ func setup(_ *testing.M) {
 		VerifyingContract:      gethcommon.HexToAddress("0x1234000000000000000000000000000000000000"),
 	}
 
-	err = meterer.CreateReservationTable(clientConfig, "reservations")
+	reservationTableName = "reservations-meterer-test"
+	ondemandTableName = "ondemand-meterer-test"
+	globalTableName = "global-meterer-test"
+
+	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
 	if err != nil {
 		teardown()
 		panic("failed to create reservation table")
 	}
-	err = meterer.CreateOnDemandTable(clientConfig, "ondemand")
+	err = meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
 	if err != nil {
 		teardown()
 		panic("failed to create ondemand table")
 	}
-	err = meterer.CreateGlobalReservationTable(clientConfig, "global")
+	err = meterer.CreateGlobalReservationTable(clientConfig, globalTableName)
 	if err != nil {
 		teardown()
 		panic("failed to create global reservation table")
 	}
 
-	now := uint64(time.Now().Unix())
-	account1 = crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
-	fmt.Println("account1", account1)
-	account2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
-	fmt.Println("account2", account2)
-	account1Reservations = core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	account2Reservations = core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
-	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: 1500}
-	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: 1000}
-
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
-		"reservations",
-		"ondemand",
-		"global",
+		reservationTableName,
+		ondemandTableName,
+		globalTableName,
 		logger,
 	)
 	if err != nil {
@@ -177,9 +168,18 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	meterer.CreateReservationTable(clientConfig, "reservations")
+	meterer.CreateReservationTable(clientConfig, reservationTableName)
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	quoromNumbers := []uint8{0, 1}
+	now := uint64(time.Now().Unix())
+	account1Reservations := core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations := core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+
+	account1 := crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
+	account2 := crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
+	fmt.Println("account1", account1)
+	fmt.Println("account2", account2)
+
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
 		return account == account1
 	})).Return(account1Reservations, nil)
@@ -202,8 +202,6 @@ func TestMetererReservations(t *testing.T) {
 
 	// test invalid quorom ID
 	header, err := auth.ConstructPaymentMetadata(&signer, 1, 0, 1000, []uint8{0, 1, 2}, privateKey1)
-	fmt.Println("--- this header test invalid quorum ID ---")
-	fmt.Println("header", header)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "quorum number mismatch")
@@ -232,7 +230,7 @@ func TestMetererReservations(t *testing.T) {
 		assert.NoError(t, err)
 		err = mt.MeterRequest(ctx, *header)
 		assert.NoError(t, err)
-		item, err := dynamoClient.GetItem(ctx, "reservations", commondynamodb.Key{
+		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID": &types.AttributeValueMemberS{Value: accountID},
 			"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(binIndex))},
 		})
@@ -248,7 +246,7 @@ func TestMetererReservations(t *testing.T) {
 	err = mt.MeterRequest(ctx, *header)
 	assert.NoError(t, err)
 	overflowedBinIndex := binIndex + 2
-	item, err := dynamoClient.GetItem(ctx, "reservations", commondynamodb.Key{
+	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID},
 		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedBinIndex))},
 	})
@@ -272,10 +270,16 @@ func TestMetererReservations(t *testing.T) {
 
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
-	meterer.CreateOnDemandTable(clientConfig, "ondemand")
-	meterer.CreateGlobalReservationTable(clientConfig, "global")
+	meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
+	meterer.CreateGlobalReservationTable(clientConfig, globalTableName)
 	quorumNumbers := []uint8{0, 1}
 	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
+	account1OnDemandPayments := core.OnDemandPayment{CumulativePayment: 1500}
+	account2OnDemandPayments := core.OnDemandPayment{CumulativePayment: 1000}
+	account1 := crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
+	account2 := crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
+	fmt.Println("account1", account1)
+	fmt.Println("account2", account2)
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
 		return account == account1
@@ -321,7 +325,7 @@ func TestMetererOnDemand(t *testing.T) {
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	// No rollback after meter request
-	result, err := dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpressionValues{
+	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: crypto.PubkeyToAddress(privateKey1.PublicKey).Hex(),
 		}})
@@ -362,7 +366,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
 	numPrevRecords := 12
-	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpressionValues{
+	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(),
 		}})
@@ -374,7 +378,7 @@ func TestMetererOnDemand(t *testing.T) {
 	err = mt.MeterRequest(ctx, *header)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
-	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpressionValues{
+	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: crypto.PubkeyToAddress(privateKey2.PublicKey).Hex(),
 		}})
