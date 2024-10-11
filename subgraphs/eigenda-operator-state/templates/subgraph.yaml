@@ -1,0 +1,163 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: RegistryCoordinator
+    network: devnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RegistryCoordinator
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ChurnApproverUpdated
+        - Initialized
+        - OperatorDeregistered
+        - OperatorRegistered
+        - OperatorSetParamsUpdated
+        - OperatorSocketUpdate
+      abis:
+        - name: RegistryCoordinator
+          file: ./abis/RegistryCoordinator.json
+      eventHandlers:
+        - event: ChurnApproverUpdated(address,address)
+          handler: handleChurnApproverUpdated
+        - event: OperatorDeregistered(indexed address,indexed bytes32)
+          handler: handleOperatorDeregistered
+        - event: OperatorRegistered(indexed address,indexed bytes32)
+          handler: handleOperatorRegistered
+        - event: OperatorSetParamsUpdated(indexed uint8,(uint32,uint16,uint16))
+          handler: handleOperatorSetParamsUpdated
+        - event: OperatorSocketUpdate(indexed bytes32,string)
+          handler: handleOperatorSocketUpdate
+      file: ./src/registry-coordinator.ts
+  - kind: ethereum
+    name: BLSApkRegistry
+    network: devnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: BLSApkRegistry
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OperatorAddedToQuorums
+        - OperatorRemovedFromQuorums
+      abis:
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
+      eventHandlers:
+        - event: OperatorAddedToQuorums(address,bytes32,bytes)
+          handler: handleOperatorAddedToQuorums
+        - event: OperatorRemovedFromQuorums(address,bytes32,bytes)
+          handler: handleOperatorRemovedFromQuorums
+        - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
+          handler: handleNewPubkeyRegistration
+      file: ./src/bls-apk-registry.ts
+  - kind: ethereum
+    name: BLSApkRegistry_Operator
+    network: devnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: BLSApkRegistry
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Operator
+      abis:
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
+      eventHandlers:
+        - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
+          handler: handleNewPubkeyRegistration
+      file: ./src/operator-creation.ts
+  - kind: ethereum
+    name: RegistryCoordinator_Operator
+    network: devnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: RegistryCoordinator
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OperatorDeregistered
+        - OperatorRegistered
+      abis:
+        - name: RegistryCoordinator
+          file: ./abis/RegistryCoordinator.json
+      eventHandlers:
+        - event: OperatorDeregistered(indexed address,indexed bytes32)
+          handler: handleOperatorDeregistered
+        - event: OperatorRegistered(indexed address,indexed bytes32)
+          handler: handleOperatorRegistered
+      file: ./src/operator-registration-status.ts
+  - kind: ethereum
+    name: BLSApkRegistry_QuorumApkUpdates
+    network: devnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: BLSApkRegistry
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OperatorAddedToQuorums
+        - OperatorRemovedFromQuorums
+      abis:
+        - name: BLSApkRegistry
+          file: ./abis/BLSApkRegistry.json
+      eventHandlers:
+        - event: OperatorAddedToQuorums(address,bytes32,bytes)
+          handler: handleOperatorAddedToQuorums
+        - event: OperatorRemovedFromQuorums(address,bytes32,bytes)
+          handler: handleOperatorRemovedFromQuorums
+      file: ./src/quorum-apk-updates.ts
+  - kind: ethereum
+    name: EjectionManager
+    network: devnet
+    source:
+      abi: EjectionManager
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - EjectorUpdated
+        - Initialized
+        - OperatorEjected
+        - OwnershipTransferred
+        - QuorumEjection
+        - QuorumEjectionParamsSet
+      abis:
+        - name: EjectionManager
+          file: ./abis/EjectionManager.json
+      eventHandlers:
+        - event: EjectorUpdated(address,bool)
+          handler: handleEjectorUpdated
+        - event: Initialized(uint8)
+          handler: handleInitialized
+        - event: OperatorEjected(bytes32,uint8)
+          handler: handleOperatorEjected
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: QuorumEjection(uint32,bool)
+          handler: handleQuorumEjection
+        - event: QuorumEjectionParamsSet(uint8,uint32,uint16)
+          handler: handleQuorumEjectionParamsSet
+      file: ./src/ejection-manager.ts
