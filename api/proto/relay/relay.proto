@@ -31,14 +31,10 @@ message UploadBlobsRequest {
 
 // A blob, its header, and its encoded chunks.
 message BlobData {
-  // The header of the blob.
-  bytes header = 1; // TODO use actual type
   // The unencoded blob data.
-  bytes blob = 2;
+  bytes blob = 1;
   // The encoded blob chunks.
-  repeated common.ChunkData chunks = 3;
-
-  // TODO decide if we need a signature on this message.
+  repeated common.ChunkData chunks = 2;
 }
 
 // The reply to an UploadBlobs request.
@@ -50,17 +46,18 @@ message UploadBlobsReply {
 message GetBlobsRequest {
   // The hashes of the blobs to retrieve. The order of these requested headers will
   // be equal to the order of the blobs in the reply.
-  repeated bytes header_hashes = 1;
+  repeated bytes blob_hashes = 1;
 
   // If this is an authenticated request, this should hold the ID of the requester. If this
   // is an unauthenticated request, this field should be empty.
-  uint64 requesterId = 2;
+  uint64 requester_id = 2;
 
   // If this is an authenticated request, this field will hold a signature by the requester
-  // on the header hashes being requested. TODO flesh out the authentication protocol.
-  bytes requesterSignature = 3;
+  // on the header hashes being requested.
+  bytes requester_signature = 3;
 }
 
+// The reply to a GetBlobs request.
 message GetBlobsReply {
   // The blobs requested. The order of these blobs will be equal to the order of the
   // requested header hashes.
@@ -69,11 +66,11 @@ message GetBlobsReply {
 
 // A blob that was requested or an error explaining why the requested blob could not be fetched.
 message RequestedBlob {
-  oneof blob {
+  oneof data {
     // The blob requested.
-    bytes blobData = 1;
+    bytes blob = 1;
     // The error that occurred while trying to fetch the blob.
-    RelayError errorCode = 2;
+    RelayError error_code = 2;
   }
 }
 
@@ -94,7 +91,7 @@ message ChunkRequest {
 // The reply to a GetChunks request.
 message GetChunksReply {
   // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
-  repeated BlobChunks blobChunks = 1;
+  repeated BlobChunks data = 1;
 }
 
 // A grouping of chunks from a specific blob that were requested.
@@ -103,7 +100,7 @@ message BlobChunks {
     // The chunks requested.
     Chunks chunks = 1;
     // The error that occurred while trying to fetch the chunks.
-    RelayError errorCode = 2;
+    RelayError error_code = 2;
   }
 }
 
