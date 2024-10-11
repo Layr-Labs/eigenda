@@ -89,14 +89,14 @@ func start(
 		return nil, fmt.Errorf("error validating schema: %w", err)
 	}
 
-	tableIDMap, err := loadNamespaceTable(namespaceTable)
-	if err != nil {
-		return nil, fmt.Errorf("error loading namespace table: %w", err)
-	}
-
 	err = handleIncompleteDeletion(logger, base, metadataTable, namespaceTable)
 	if err != nil {
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
+	}
+
+	tableIDMap, err := loadNamespaceTable(namespaceTable)
+	if err != nil {
+		return nil, fmt.Errorf("error loading namespace table: %w", err)
 	}
 
 	if modifySchema {
