@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import "eigenlayer-core/contracts/interfaces/IETHPOSDeposit.sol";
-import "eigenlayer-core/contracts/interfaces/IBeaconChainOracle.sol";
 
 import "eigenlayer-core/contracts/core/StrategyManager.sol";
 import "eigenlayer-core/contracts/core/Slasher.sol";
@@ -19,7 +18,6 @@ import "eigenlayer-core/contracts/strategies/StrategyBaseTVLLimits.sol";
 
 import "eigenlayer-core/contracts/pods/EigenPod.sol";
 import "eigenlayer-core/contracts/pods/EigenPodManager.sol";
-import "eigenlayer-core/contracts/pods/DelayedWithdrawalRouter.sol";
 
 import "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
 
@@ -64,8 +62,6 @@ contract DeployOpenEigenLayer is Script, Test {
     StrategyManager public strategyManagerImplementation;
     EigenPodManager public eigenPodManager;
     EigenPodManager public eigenPodManagerImplementation;
-    DelayedWithdrawalRouter public delayedWithdrawalRouter;
-    DelayedWithdrawalRouter public delayedWithdrawalRouterImplementation;
     AVSDirectory public avsDirectory;
     AVSDirectory public avsDirectoryImplementation;
     RewardsCoordinator public rewardsCoordinator;
@@ -123,9 +119,6 @@ contract DeployOpenEigenLayer is Script, Test {
         eigenPodManager = EigenPodManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
-        delayedWithdrawalRouter = DelayedWithdrawalRouter(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
-        );
         rewardsCoordinator = RewardsCoordinator(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
@@ -133,10 +126,7 @@ contract DeployOpenEigenLayer is Script, Test {
         // ETH POS deposit is 0 address
         eigenPodImplementation = new EigenPod(
             ethPOSDeposit,
-            delayedWithdrawalRouter,
             eigenPodManager,
-            // uint64(MAX_VALIDATOR_BALANCE_GWEI),
-            uint64(32 gwei),
             1000 // temp genesis time
         );
 
@@ -163,7 +153,6 @@ contract DeployOpenEigenLayer is Script, Test {
             slasher,
             delegation
         );
-        delayedWithdrawalRouterImplementation = new DelayedWithdrawalRouter(eigenPodManager);
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         IStrategy[] memory _strategies;
@@ -213,20 +202,8 @@ contract DeployOpenEigenLayer is Script, Test {
             address(eigenPodManagerImplementation),
             abi.encodeWithSelector(
                 EigenPodManager.initialize.selector,
-                IBeaconChainOracle(address(0)),
                 executorMultisig,
                 eigenLayerPauserReg,
-                0
-            )
-        );
-        eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(delayedWithdrawalRouter))),
-            address(delayedWithdrawalRouterImplementation),
-            abi.encodeWithSelector(
-                DelayedWithdrawalRouter.initialize.selector,
-                executorMultisig,
-                eigenLayerPauserReg,
-                0,
                 0
             )
         );
