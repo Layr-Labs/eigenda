@@ -21,7 +21,7 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numW
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorSocket := core.OperatorSocket(operators[operatorId].Socket)
-			dispersalSocket := operatorSocket.GetRetrievalSocket()
+			dispersalSocket := operatorSocket.GetDispersalSocket()
 			semver := GetSemverInfo(context.Background(), dispersalSocket, operatorId, logger, nodeInfoTimeout)
 
 			mu.Lock()
@@ -57,8 +57,7 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 	defer conn.Close()
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	//client := node.NewDispersalClient(conn)
-	client := node.NewRetrievalClient(conn)
+	client := node.NewDispersalClient(conn)
 	reply, err := client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
 	if err != nil {
 		var semver string
