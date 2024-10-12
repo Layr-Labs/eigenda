@@ -88,7 +88,7 @@ func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 
 // SetData writes raw byte data to DA and returns the respective certificate
 func (c *client) SetData(ctx context.Context, b []byte) ([]byte, error) {
-	url := fmt.Sprintf("%s/put/?commitment_mode=simple", c.cfg.URL)
+	url := fmt.Sprintf("%s/put?commitment_mode=simple", c.cfg.URL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
-	"github.com/ethereum-optimism/optimism/op-e2e/actions"
 	"github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
@@ -13,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
+
+	actions "github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 )
 
 var defaultAlloc = &e2eutils.AllocParams{PrefundTestUsers: true}
@@ -88,7 +89,7 @@ func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 	enabled := sd.RollupCfg.AltDAEnabled()
 	require.True(t, enabled)
 
-	sequencer := actions.NewL2Sequencer(t, log, l1F, nil, daMgr, engCl, sd.RollupCfg, 0)
+	sequencer := actions.NewL2Sequencer(t, log, l1F, nil, daMgr, engCl, sd.RollupCfg, 0, nil)
 	miner.ActL1SetFeeRecipient(common.Address{'A'})
 	sequencer.ActL2PipelineFull(t)
 

@@ -24,9 +24,7 @@ var (
 )
 
 const (
-	GetRoute = "/get/"
-	PutRoute = "/put/"
-	Put      = "put"
+	Put = "put"
 
 	CommitmentModeKey = "commitment_mode"
 )
@@ -99,8 +97,12 @@ func WithLogging(
 func (svr *Server) Start() error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(GetRoute, WithLogging(WithMetrics(svr.HandleGet, svr.m), svr.log))
-	mux.HandleFunc(PutRoute, WithLogging(WithMetrics(svr.HandlePut, svr.m), svr.log))
+	mux.HandleFunc("/get/", WithLogging(WithMetrics(svr.HandleGet, svr.m), svr.log))
+	// we need to handle both: see https://github.com/ethereum-optimism/optimism/pull/12081
+	// /put is for generic commitments, and /put/ for keccak256 commitments
+	// TODO: we should probably separate their handlers?
+	mux.HandleFunc("/put", WithLogging(WithMetrics(svr.HandlePut, svr.m), svr.log))
+	mux.HandleFunc("/put/", WithLogging(WithMetrics(svr.HandlePut, svr.m), svr.log))
 	mux.HandleFunc("/health", WithLogging(svr.Health, svr.log))
 
 	svr.httpServer.Handler = mux

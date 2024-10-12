@@ -212,7 +212,7 @@ func TestPutHandler(t *testing.T) {
 		},
 		{
 			name: "Failure OP Mode Alt-DA - InternalServerError",
-			url:  "/put/",
+			url:  "/put",
 			body: []byte("some data that will trigger an internal error"),
 			mockBehavior: func() {
 				mockRouter.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("internal error"))
@@ -224,7 +224,7 @@ func TestPutHandler(t *testing.T) {
 		},
 		{
 			name: "Success OP Mode Alt-DA",
-			url:  "/put/",
+			url:  "/put",
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
 				mockRouter.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return([]byte(testCommitStr), nil)
@@ -248,7 +248,7 @@ func TestPutHandler(t *testing.T) {
 		},
 		{
 			name: "Success Simple Commitment Mode",
-			url:  "/put/?commitment_mode=simple",
+			url:  "/put?commitment_mode=simple",
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
 				mockRouter.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return([]byte(testCommitStr), nil)
