@@ -1,6 +1,6 @@
 # multi container builds ftw
 
-FROM golang:1.21.10-alpine3.19 AS builder
+FROM golang:1.22.8-alpine3.19 AS builder
 
 RUN apk add --no-cache make gcc musl-dev linux-headers jq bash git
 
