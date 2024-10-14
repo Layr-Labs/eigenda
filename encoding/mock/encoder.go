@@ -23,6 +23,18 @@ func (e *MockEncoder) EncodeAndProve(data []byte, params encoding.EncodingParams
 	return args.Get(0).(encoding.BlobCommitments), args.Get(1).([]*encoding.Frame), args.Error(2)
 }
 
+func (e *MockEncoder) GetCommitments(data []byte) (encoding.BlobCommitments, error) {
+	args := e.Called(data)
+	time.Sleep(e.Delay)
+	return args.Get(0).(encoding.BlobCommitments), args.Error(1)
+}
+
+func (e *MockEncoder) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
+	args := e.Called(data, params)
+	time.Sleep(e.Delay)
+	return args.Get(0).([]*encoding.Frame), args.Error(1)
+}
+
 func (e *MockEncoder) VerifyFrames(chunks []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
 	args := e.Called(chunks, indices, commitments, params)
 	time.Sleep(e.Delay)
