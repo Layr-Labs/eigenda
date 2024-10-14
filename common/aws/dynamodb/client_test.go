@@ -205,6 +205,11 @@ func TestBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
+	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, "BlobSize", 1000)
+	assert.NoError(t, err)
+
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
@@ -213,6 +218,7 @@ func TestBasicOperations(t *testing.T) {
 	assert.Equal(t, "Confirmed", item["Status"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, "0x123", item["BatchHeaderHash"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, "0", item["BlobIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1123", item["BlobSize"].(*types.AttributeValueMemberN).Value)
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
 	assert.NoError(t, err)
@@ -310,7 +316,7 @@ func TestQueryIndex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, unprocessed, 0)
 
-	queryResult, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err := dynamoClient.QueryIndex(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}})
@@ -356,14 +362,14 @@ func TestQueryIndexCount(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, unprocessed, 0)
 
-	count, err := dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	count, err := dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, int(count), 10)
 
-	count, err = dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	count, err = dynamoClient.QueryIndexCount(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
@@ -388,7 +394,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	err := dynamoClient.PutItem(ctx, tableName, item)
 	assert.NoError(t, err)
 
-	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 1, nil)
@@ -403,7 +409,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	lastEvaluatedKey := queryResult.LastEvaluatedKey
 
 	// Get the next item using LastEvaluatedKey expect to be nil
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 1, lastEvaluatedKey)
@@ -434,7 +440,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 0, nil)
@@ -447,7 +453,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	lastEvaluatedKey := queryResult.LastEvaluatedKey
 
 	// Get the next item using LastEvaluatedKey expect to be nil
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 2, lastEvaluatedKey)
@@ -463,7 +469,7 @@ func TestQueryIndexPaginationNoStoredItems(t *testing.T) {
 	indexName := "StatusIndex"
 
 	ctx := context.Background()
-	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 1, nil)
@@ -503,7 +509,7 @@ func TestQueryIndexPagination(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, nil)
@@ -515,7 +521,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	assert.Equal(t, "0", queryResult.LastEvaluatedKey["BlobStatus"].(*types.AttributeValueMemberN).Value)
 
 	// Get the next 10 items
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, queryResult.LastEvaluatedKey)
@@ -524,7 +530,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	assert.Equal(t, "key10", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
 
 	// Get the last 10 items
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, queryResult.LastEvaluatedKey)
@@ -533,7 +539,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	assert.Equal(t, "key0", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
 
 	// Empty result Since all items are processed
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, queryResult.LastEvaluatedKey)
@@ -564,7 +570,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	assert.Len(t, unprocessed, 0)
 
 	// Get First 10 items
-	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, nil)
@@ -572,7 +578,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	assert.Len(t, queryResult.Items, 10)
 
 	// Get the next 10 items
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, queryResult.LastEvaluatedKey)
@@ -580,7 +586,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	assert.Len(t, queryResult.Items, 10)
 
 	// Get the last 10 items
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, queryResult.LastEvaluatedKey)
@@ -588,11 +594,70 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	assert.Len(t, queryResult.Items, 10)
 
 	// Empty result Since all items are processed
-	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpresseionValues{
+	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
 		}}, 10, queryResult.LastEvaluatedKey)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 0)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
+}
+
+func TestQueryIndexOrderWithLimit(t *testing.T) {
+	tableName := "ProcessingQueryIndexOrderWithLimit"
+	createTable(t, tableName)
+	indexName := "StatusIndex"
+
+	ctx := context.Background()
+	numItems := 30
+	items := make([]commondynamodb.Item, numItems)
+	for i := 0; i < numItems; i++ {
+		requestedAt := time.Now().Add(-time.Duration(i) * time.Minute).Unix()
+		items[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(requestedAt, 10)},
+		}
+	}
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	// Test forward order with limit
+	queryResult, err := dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, true, 10)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 10)
+	// Check if the items are in ascending order
+	for i := 0; i < len(queryResult)-1; i++ {
+		assert.True(t, queryResult[i]["RequestedAt"].(*types.AttributeValueMemberN).Value <= queryResult[i+1]["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	}
+
+	// Test reverse order with limit
+	queryResult, err = dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, false, 10)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 10)
+	// Check if the items are in descending order
+	for i := 0; i < len(queryResult)-1; i++ {
+		assert.True(t, queryResult[i]["RequestedAt"].(*types.AttributeValueMemberN).Value >= queryResult[i+1]["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	}
+
+	// Test with a smaller limit
+	queryResult, err = dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, true, 5)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 5)
+
+	// Test with a limit larger than the number of items
+	queryResult, err = dynamoClient.QueryIndexOrderWithLimit(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{Value: "0"},
+	}, true, 50)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 30) // Should return all items
 }

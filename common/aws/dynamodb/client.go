@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -37,7 +38,7 @@ var (
 
 type Item = map[string]types.AttributeValue
 type Key = map[string]types.AttributeValue
-type ExpresseionValues = map[string]types.AttributeValue
+type ExpressionValues = map[string]types.AttributeValue
 
 type QueryResult struct {
 	Items            []Item
@@ -128,8 +129,8 @@ func (c *Client) PutItems(ctx context.Context, tableName string, items []Item) (
 func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item Item) (Item, error) {
 	update := expression.UpdateBuilder{}
 	for itemKey, itemValue := range item {
+		// Ignore primary key updates
 		if _, ok := key[itemKey]; ok {
-			// Cannot update the key
 			continue
 		}
 		update = update.Set(expression.Name(itemKey), expression.Value(itemValue))
@@ -156,6 +157,36 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
+// IncrementBy increments the attribute by the value for item that matches with the key
+func (c *Client) IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error) {
+	// ADD numeric values
+	f, err := strconv.ParseFloat(strconv.FormatUint(value, 10), 64)
+	if err != nil {
+		return nil, err
+	}
+
+	update := expression.UpdateBuilder{}
+	update = update.Add(expression.Name(attr), expression.Value(aws.Float64(f)))
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       key,
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Attributes, nil
+}
+
 func (c *Client) GetItem(ctx context.Context, tableName string, key Key) (Item, error) {
 	resp, err := c.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{Key: key, TableName: aws.String(tableName)})
 	if err != nil {
@@ -177,7 +208,7 @@ func (c *Client) GetItems(ctx context.Context, tableName string, keys []Key) ([]
 }
 
 // QueryIndex returns all items in the index that match the given key
-func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues) ([]Item, error) {
+func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(tableName),
 		IndexName:                 aws.String(indexName),
@@ -191,8 +222,26 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	return response.Items, nil
 }
 
+// QueryIndexOrderWithLimit returns all items in the index that match the given key
+// If forward is true, the items are returned in ascending order
+func (c *Client) QueryIndexOrderWithLimit(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, forward bool, limit int32) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
+		TableName:                 aws.String(tableName),
+		IndexName:                 aws.String(indexName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeValues: expAttributeValues,
+		ScanIndexForward:          &forward,
+		Limit:                     aws.Int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Items, nil
+}
+
 // Query returns all items in the primary index that match the given expression
-func (c *Client) Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpresseionValues) ([]Item, error) {
+func (c *Client) Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(tableName),
 		KeyConditionExpression:    aws.String(keyCondition),
@@ -206,7 +255,7 @@ func (c *Client) Query(ctx context.Context, tableName string, keyCondition strin
 }
 
 // QueryIndexCount returns the count of the items in the index that match the given key
-func (c *Client) QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues) (int32, error) {
+func (c *Client) QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) (int32, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:                 aws.String(tableName),
 		IndexName:                 aws.String(indexName),
@@ -224,7 +273,7 @@ func (c *Client) QueryIndexCount(ctx context.Context, tableName string, indexNam
 // QueryIndexWithPagination returns all items in the index that match the given key
 // Results are limited to the given limit and the pagination token is returned
 // When limit is 0, all items are returned
-func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpresseionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
+func (c *Client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
 	var queryInput *dynamodb.QueryInput
 
 	// Fetch all items if limit is 0
