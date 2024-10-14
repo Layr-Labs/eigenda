@@ -1,6 +1,7 @@
 package corev2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -72,11 +73,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, op
 	return chunks, &assignment, nil
 }
 
-func (v *ShardValidator) UpdateOperatorID(operatorID OperatorID) {
-	v.operatorID = operatorID
-}
-
-func (v *ShardValidator) ValidateBlobs(blobs []*BlobShard, operatorState *chainio.OperatorState, pool common.WorkerPool) error {
+func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool) error {
 	var err error
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
@@ -86,12 +83,17 @@ func (v *ShardValidator) ValidateBlobs(blobs []*BlobShard, operatorState *chaini
 			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Chunks), len(blob.BlobHeader.QuorumNumbers))
 		}
 
+		state, err := v.chainState.GetOperatorState(ctx, uint(blob.ReferenceBlockNumber), blob.BlobHeader.QuorumNumbers)
+		if err != nil {
+			return err
+		}
+
 		// Saved for the blob length validation
 		blobCommitmentList[k] = blob.BlobHeader.BlobCommitments
 
 		// for each quorum
 		for _, quorum := range blob.BlobHeader.QuorumNumbers {
-			chunks, assignment, err := v.validateBlobQuorum(quorum, blob, operatorState)
+			chunks, assignment, err := v.validateBlobQuorum(quorum, blob, state)
 			if err != nil {
 				return err
 			}
