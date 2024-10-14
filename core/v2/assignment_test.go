@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/chainio"
 	"github.com/Layr-Labs/eigenda/chainio/mock"
-	corev2 "github.com/Layr-Labs/eigenda/corev2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/stretchr/testify/assert"
 )
 
