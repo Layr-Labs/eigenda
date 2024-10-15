@@ -146,12 +146,12 @@ func (t *tableView) NewIterator(prefix []byte) (iterator.Iterator, error) {
 
 // Shutdown shuts down the table.
 func (t *tableView) Shutdown() error {
-	return t.base.Shutdown()
+	return t.tableStore.Shutdown()
 }
 
 // Destroy shuts down a table and deletes all data in it.
 func (t *tableView) Destroy() error {
-	return t.base.Destroy()
+	return t.tableStore.Destroy()
 }
 
 // NewTTLBatch creates a new batch for the table with time-to-live (TTL) or expiration times.

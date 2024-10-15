@@ -51,6 +51,7 @@ func newTableStore(
 
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := &sync.WaitGroup{}
+	waitGroup.Add(1) // gc goroutine
 
 	store := &tableStore{
 		ctx:             ctx,
