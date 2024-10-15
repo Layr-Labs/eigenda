@@ -200,7 +200,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *c
 
 			// Add to agg signature
 			if aggSigs[quorumID] == nil {
-				aggSigs[quorumID] = &bn254.Signature{sig.Clone()}
+				aggSigs[quorumID] = &bn254.Signature{G1Point: sig.Clone()}
 				aggPubKeys[quorumID] = op.PubkeyG2.Clone()
 			} else {
 				aggSigs[quorumID].Add(sig.G1Point)
@@ -286,7 +286,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics ch
 	for _, quorumID := range quorumIDs {
 		sig := quorumAttestation.AggSignature[quorumID]
 		if aggSig == nil {
-			aggSig = &bn254.Signature{sig.G1Point.Clone()}
+			aggSig = &bn254.Signature{G1Point: sig.G1Point.Clone()}
 		} else {
 			aggSig.Add(sig.G1Point)
 		}

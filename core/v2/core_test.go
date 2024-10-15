@@ -2,8 +2,8 @@ package corev2_test
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"os"
 	"runtime"
 	"testing"
