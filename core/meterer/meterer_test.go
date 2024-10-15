@@ -3,7 +3,6 @@ package meterer_test
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -11,11 +10,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
 
@@ -29,7 +26,6 @@ var (
 	clientConfig       commonaws.ClientConfig
 	privateKey1        *ecdsa.PrivateKey
 	privateKey2        *ecdsa.PrivateKey
-	signer             *auth.EIP712Signer
 	mt                 *meterer.Meterer
 
 	deployLocalStack  bool
@@ -79,10 +75,6 @@ func setup(_ *testing.M) {
 		teardown()
 		panic("failed to create dynamodb client")
 	}
-
-	chainID := big.NewInt(17000)
-	verifyingContract := gethcommon.HexToAddress("0x1234000000000000000000000000000000000000")
-	signer = auth.NewEIP712Signer(chainID, verifyingContract)
 
 	privateKey1, err = crypto.GenerateKey()
 	if err != nil {

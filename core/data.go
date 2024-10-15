@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type AccountID = string
@@ -474,17 +475,31 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
 	// Existing fields
-	DataLength    uint32 // length in number of symbols
-	QuorumNumbers []uint8
-	AccountID     string
+	AccountID string
 
 	// New fields
 	BinIndex uint32
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
 	CumulativePayment uint64
+}
 
-	Signature []byte
+// Hash returns the Keccak256 hash of the PaymentMetadata
+func (pm *PaymentMetadata) Hash() []byte {
+	// Create a byte slice to hold the serialized data
+	data := make([]byte, 0, len(pm.AccountID)+12)
+
+	data = append(data, []byte(pm.AccountID)...)
+
+	binIndexBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(binIndexBytes, pm.BinIndex)
+	data = append(data, binIndexBytes...)
+
+	paymentBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(paymentBytes, pm.CumulativePayment)
+	data = append(data, paymentBytes...)
+
+	return crypto.Keccak256(data)
 }
 
 type TokenAmount uint64 // TODO: change to uint128
