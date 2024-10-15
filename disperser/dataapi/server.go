@@ -17,6 +17,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
@@ -49,6 +50,7 @@ const (
 	maxDisperserAvailabilityAge         = 3
 	maxChurnerAvailabilityAge           = 3
 	maxBatcherAvailabilityAge           = 3
+	maxOperatorsStakeAge                = 300 // not expect the stake change to happen frequently
 )
 
 var errNotFound = errors.New("not found")
@@ -117,6 +119,17 @@ type (
 	OperatorsNonsigningPercentage struct {
 		Meta Meta                                   `json:"meta"`
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
+	}
+
+	OperatorStake struct {
+		QuorumId        string  `json:"quorum_id"`
+		OperatorId      string  `json:"operator_id"`
+		StakePercentage float64 `json:"stake_percentage"`
+		Rank            int     `json:"rank"`
+	}
+
+	OperatorsStakeResponse struct {
+		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
 	QueriedStateOperatorMetadata struct {
@@ -254,6 +267,7 @@ func (s *server) Start() error {
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 			operatorsInfo.GET("/semver-scan", s.SemverScan)
+			operatorsInfo.GET("/operators-stake", s.OperatorsStake)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -673,6 +687,77 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsNonsigningPercentageAge))
 	c.JSON(http.StatusOK, metric)
+}
+
+// OperatorsStake godoc
+//
+//	@Summary	Operator stake distribution query
+//	@Tags		OperatorsStake
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Success	200			{object}	OperatorsStakeResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/operators-stake [get]
+func (s *server) OperatorsStake(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("OperatorsStake", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
+
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("OperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to fetch current block number - %s", err))
+		return
+	}
+	state, err := s.chainState.GetOperatorState(c, currentBlock, []core.QuorumID{0, 1, 2})
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("OperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to fetch indexed operator state - %s", err))
+		return
+	}
+
+	tqs, quorumsStake := operators.GetRankedOperators(state)
+	s.metrics.UpdateOperatorsStake(tqs, quorumsStake)
+
+	stakeRanked := make(map[string][]*OperatorStake)
+	for q, operators := range quorumsStake {
+		quorum := fmt.Sprintf("%d", q)
+		stakeRanked[quorum] = make([]*OperatorStake, 0)
+		for i, op := range operators {
+			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
+					QuorumId:        quorum,
+					OperatorId:      op.OperatorId.Hex(),
+					StakePercentage: op.StakeShare / 100.0,
+					Rank:            i + 1,
+				})
+			}
+		}
+	}
+	stakeRanked["total"] = make([]*OperatorStake, 0)
+	for i, op := range tqs {
+		if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+			stakeRanked["total"] = append(stakeRanked["total"], &OperatorStake{
+				QuorumId:        "total",
+				OperatorId:      op.OperatorId.Hex(),
+				StakePercentage: op.StakeShare / 100.0,
+				Rank:            i + 1,
+			})
+		}
+	}
+	operatorsStakeResponse := &OperatorsStakeResponse{
+		StakeRankedOperators: stakeRanked,
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("OperatorsStake")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsStakeAge))
+	c.JSON(http.StatusOK, operatorsStakeResponse)
 }
 
 // FetchDeregisteredOperators godoc

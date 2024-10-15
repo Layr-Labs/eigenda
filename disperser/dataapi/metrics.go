@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -22,9 +23,10 @@ type MetricsConfig struct {
 type Metrics struct {
 	registry *prometheus.Registry
 
-	NumRequests *prometheus.CounterVec
-	Latency     *prometheus.SummaryVec
-	Semvers     *prometheus.GaugeVec
+	NumRequests    *prometheus.CounterVec
+	Latency        *prometheus.SummaryVec
+	Semvers        *prometheus.GaugeVec
+	OperatorsStake *prometheus.GaugeVec
 
 	httpPort string
 	logger   logging.Logger
@@ -60,6 +62,16 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 				Help: "Node semver install base",
 			},
 			[]string{"semver"},
+		),
+		OperatorsStake: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "operators_stake",
+				Help:      "the sum of stake percentages of top N operators",
+			},
+			// The "quorum" can be: total, 0, 1, ...
+			// The "topn" can be: 1, 2, 3, 5, 8, 10
+			[]string{"quorum", "topn"},
 		),
 		registry: reg,
 		httpPort: httpPort,
@@ -101,6 +113,26 @@ func (g *Metrics) IncrementNotFoundRequestNum(method string) {
 func (g *Metrics) UpdateSemverCounts(semverData map[string]int) {
 	for semver, count := range semverData {
 		g.Semvers.WithLabelValues(semver).Set(float64(count))
+	}
+}
+
+func (g *Metrics) updateStakeMetrics(rankedOperators []*operators.OperatorStakeShare, label string) {
+	indices := []int{0, 1, 2, 4, 7, 9}
+	accuStake := float64(0)
+	idx := 0
+	for i, op := range rankedOperators {
+		accuStake += op.StakeShare
+		if idx < len(indices) && i == indices[idx] {
+			g.OperatorsStake.WithLabelValues(label, fmt.Sprintf("%d", i+1)).Set(accuStake / 100)
+			idx++
+		}
+	}
+}
+
+func (g *Metrics) UpdateOperatorsStake(totalRanked []*operators.OperatorStakeShare, quorumRanked map[uint8][]*operators.OperatorStakeShare) {
+	g.updateStakeMetrics(totalRanked, "total")
+	for q, operators := range quorumRanked {
+		g.updateStakeMetrics(operators, fmt.Sprintf("%d", q))
 	}
 }
 
