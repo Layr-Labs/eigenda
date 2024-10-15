@@ -7,13 +7,6 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 // Experimental: the following definitions are experimental and subject to change. //
 /////////////////////////////////////////////////////////////////////////////////////
 
-// PrivateRelay is a service that provides access to privileged relay functionality
-// that isn't available to the general public.
-service PrivateRelay {
-  // UploadBlobs uploads blobs and encoded blob chunks to the relay.
-  rpc UploadBlobs(UploadBlobsRequest) returns (UploadBlobsReply) {}
-}
-
 // Relay is a service that provides access to public relay functionality.
 service Relay {
   // GetBlobs retrieves blobs stored by the relay.
@@ -21,25 +14,6 @@ service Relay {
 
   // GetChunks retrieves chunks from blobs stored by the relay.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
-}
-
-// A request to upload one or more blobs.
-message UploadBlobsRequest {
-  // The blobs to upload.
-  repeated BlobData blobs = 1;
-}
-
-// A blob, its header, and its encoded chunks.
-message BlobData {
-  // The unencoded blob data.
-  bytes blob = 1;
-  // The encoded blob chunks.
-  repeated common.ChunkData chunks = 2;
-}
-
-// The reply to an UploadBlobs request.
-message UploadBlobsReply {
-
 }
 
 // A request to fetch one or more blobs.
@@ -53,7 +27,7 @@ message GetBlobsRequest {
   uint64 requester_id = 2;
 
   // If this is an authenticated request, this field will hold a signature by the requester
-  // on the header hashes being requested.
+  // on the blob hashes being requested.
   bytes requester_signature = 3;
 }
 
@@ -78,6 +52,14 @@ message RequestedBlob {
 message GetChunksRequest {
   // The chunk requests. Chunks are returned in the same order as they are requested.
   repeated ChunkRequest chunk_requests = 1;
+
+  // If this is an authenticated request, this should hold the ID of the requester. If this
+  // is an unauthenticated request, this field should be empty.
+  uint64 requester_id = 2;
+
+  // If this is an authenticated request, this field will hold a signature by the requester
+  // on the chunks being requested.
+  bytes requester_signature = 3;
 }
 
 // A request for chunks within a specific blob.
