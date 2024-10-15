@@ -16,7 +16,7 @@ var (
 )
 
 type BlobShard struct {
-	BlobHeader
+	BlobCertificate
 	Chunks map[QuorumID][]*encoding.Frame
 }
 

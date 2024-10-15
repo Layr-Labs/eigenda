@@ -40,8 +40,11 @@ type BlobHeader struct {
 	// QuorumInfos contains the quorum specific parameters for the blob
 	QuorumNumbers []uint8
 
-	// ReferenceBlockNumber is the block number of the block at which the operator state will be referenced
-	ReferenceBlockNumber uint64
+	// PaymentHeader contains the payment information for the blob
+	PaymentHeader
+
+	// AuthenticationData is the signature of the blob header by the account ID
+	AuthenticationData []byte `json:"authentication_data"`
 }
 
 func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
@@ -61,9 +64,6 @@ func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
 }
 
 type PaymentHeader struct {
-	// BlobKey is the hash of the blob header
-	BlobKey [32]byte
-
 	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
 	AccountID string
 
@@ -71,9 +71,16 @@ type PaymentHeader struct {
 	CumulativePayment uint64
 
 	BinIndex uint64
+}
 
-	// AuthenticationData is the signature of the blob header by the account ID
-	AuthenticationData []byte `json:"authentication_data"`
+type BlobCertificate struct {
+	BlobHeader
+
+	// ReferenceBlockNumber is the block number of the block at which the operator state will be referenced
+	ReferenceBlockNumber uint64
+
+	// RelayKeys
+	RelayKeys []uint16
 }
 
 type BlobVersionParameters struct {

@@ -64,9 +64,9 @@ func TestMain(m *testing.M) {
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
 func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 	config := &kzg.KzgConfig{
-		G1Path:          "../inabox/resources/kzg/g1.point.300000",
-		G2Path:          "../inabox/resources/kzg/g2.point.300000",
-		CacheDir:        "../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
+		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
+		CacheDir:        "../../inabox/resources/kzg/SRSTables",
 		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
@@ -85,7 +85,7 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 	return p, v, nil
 }
 
-func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber uint64, length int, quorums []corev2.QuorumID) (corev2.BlobHeader, []byte) {
+func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber uint64, length int, quorums []corev2.QuorumID) (corev2.BlobCertificate, []byte) {
 
 	data := make([]byte, length*31)
 	_, err := rand.Read(data)
@@ -100,10 +100,12 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber
 		t.Fatal(err)
 	}
 
-	header := corev2.BlobHeader{
-		Version:              version,
-		QuorumNumbers:        quorums,
-		BlobCommitments:      commitments,
+	header := corev2.BlobCertificate{
+		BlobHeader: corev2.BlobHeader{
+			Version:         version,
+			QuorumNumbers:   quorums,
+			BlobCommitments: commitments,
+		},
 		ReferenceBlockNumber: refBlockNumber,
 	}
 
@@ -113,7 +115,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber
 
 // prepareBatch takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobHeader, blobs [][]byte) (map[corev2.OperatorID][]*corev2.BlobShard, chainio.IndexedChainState) {
+func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertificate, blobs [][]byte) (map[corev2.OperatorID][]*corev2.BlobShard, chainio.IndexedChainState) {
 
 	cst, err := mock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
@@ -176,8 +178,8 @@ func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobHeader,
 				}
 				if len(inverseMap[operatorID]) < blobIndex+1 {
 					inverseMap[operatorID] = append(inverseMap[operatorID], &corev2.BlobShard{
-						BlobHeader: headers[blobIndex],
-						Chunks:     make(map[corev2.QuorumID][]*encoding.Frame),
+						BlobCertificate: headers[blobIndex],
+						Chunks:          make(map[corev2.QuorumID][]*encoding.Frame),
 					})
 				}
 				if len(frames) == 0 {
@@ -244,7 +246,7 @@ func TestValidationSucceeds(t *testing.T) {
 	for _, operatorCount := range operatorCounts {
 
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
-		headers := make([]corev2.BlobHeader, 0)
+		headers := make([]corev2.BlobCertificate, 0)
 		blobs := make([][]byte, 0)
 		for _, blobLength := range blobLengths {
 			for i := 0; i < numBlob; i++ {
