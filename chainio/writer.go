@@ -11,6 +11,7 @@ import (
 )
 
 type Writer interface {
+	Reader
 
 	// RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
 	// If the operator is already registered with a given quorum id, the transaction will fail (noop) and an error

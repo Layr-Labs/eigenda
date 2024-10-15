@@ -14,26 +14,18 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/pingcap/errors"
 
-	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
-	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
-	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
-	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
-	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
-	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
-	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type Writer struct {
+	*Reader
+
 	EthClient common.EthClient
 	Logger    logging.Logger
-	Bindings  *ContractBindings
 }
 
 var _ chainio.Writer = (*Writer)(nil)
@@ -44,9 +36,15 @@ func NewWriter(
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Writer, error) {
 
+	r := &Reader{
+		EthClient: client,
+		Logger:    logger.With("component", "Reader"),
+	}
+
 	e := &Writer{
 		EthClient: client,
 		Logger:    logger.With("component", "Writer"),
+		Reader:    r,
 	}
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
@@ -54,74 +52,6 @@ func NewWriter(
 	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 
 	return e, err
-}
-
-func (t *Writer) getRegistrationParams(
-	ctx context.Context,
-	keypair *bn254.KeyPair,
-	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
-	operatorToAvsRegistrationSigSalt [32]byte,
-	operatorToAvsRegistrationSigExpiry *big.Int,
-) (*regcoordinator.IBLSApkRegistryPubkeyRegistrationParams, *regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry, error) {
-
-	operatorAddress := t.EthClient.GetAccountAddress()
-
-	msgToSignG1_, err := t.Bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
-		Context: ctx,
-	}, operatorAddress)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	msgToSignG1 := bn254.NewG1Point(msgToSignG1_.X, msgToSignG1_.Y)
-	signature := keypair.SignHashedToCurveMessage(msgToSignG1)
-
-	signedMessageHashParam := regcoordinator.BN254G1Point{
-		X: signature.X.BigInt(big.NewInt(0)),
-		Y: signature.Y.BigInt(big.NewInt(0)),
-	}
-
-	g1Point_ := pubKeyG1ToBN254G1Point(keypair.GetPubKeyG1())
-	g1Point := regcoordinator.BN254G1Point{
-		X: g1Point_.X,
-		Y: g1Point_.Y,
-	}
-	g2Point_ := pubKeyG2ToBN254G2Point(keypair.GetPubKeyG2())
-	g2Point := regcoordinator.BN254G2Point{
-		X: g2Point_.X,
-		Y: g2Point_.Y,
-	}
-
-	params := regcoordinator.IBLSApkRegistryPubkeyRegistrationParams{
-		PubkeyRegistrationSignature: signedMessageHashParam,
-		PubkeyG1:                    g1Point,
-		PubkeyG2:                    g2Point,
-	}
-
-	// params to register operator in delegation manager's operator-avs mapping
-	msgToSign, err := t.Bindings.AVSDirectory.CalculateOperatorAVSRegistrationDigestHash(
-		&bind.CallOpts{
-			Context: ctx,
-		}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
-	if err != nil {
-		return nil, nil, err
-	}
-	operatorSignature, err := crypto.Sign(msgToSign[:], operatorEcdsaPrivateKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	// this is annoying, and not sure why its needed, but seems like some historical baggage
-	// see https://github.com/ethereum/go-ethereum/issues/28757#issuecomment-1874525854
-	// and https://twitter.com/pcaversaccio/status/1671488928262529031
-	operatorSignature[64] += 27
-	operatorSignatureWithSaltAndExpiry := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
-		Signature: operatorSignature,
-		Salt:      operatorToAvsRegistrationSigSalt,
-		Expiry:    operatorToAvsRegistrationSigExpiry,
-	}
-
-	return &params, &operatorSignatureWithSaltAndExpiry, nil
-
 }
 
 // RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
@@ -324,119 +254,4 @@ func (t *Writer) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [
 		return nil, err
 	}
 	return t.Bindings.EjectionManager.EjectOperators(opts, byteIdsByQuorum)
-}
-
-func (t *Writer) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
-
-	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
-		return err
-	}
-
-	delegationManagerAddr, err := contractEigenDAServiceManager.Delegation(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch DelegationManager address", "err", err)
-		return err
-	}
-
-	avsDirectoryAddr, err := contractEigenDAServiceManager.AvsDirectory(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch AVSDirectory address", "err", err)
-		return err
-	}
-
-	contractAVSDirectory, err := avsdir.NewContractAVSDirectory(avsDirectoryAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch AVSDirectory contract", "err", err)
-		return err
-	}
-
-	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch DelegationManager contract", "err", err)
-		return err
-	}
-
-	registryCoordinatorAddr, err := contractEigenDAServiceManager.RegistryCoordinator(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch RegistryCoordinator address", "err", err)
-		return err
-	}
-
-	contractIRegistryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
-		return err
-	}
-
-	contractEjectionManagerAddr, err := contractIRegistryCoordinator.Ejector(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch EjectionManager address", "err", err)
-		return err
-	}
-	contractEjectionManager, err := ejectionmg.NewContractEjectionManager(contractEjectionManagerAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch EjectionManager contract", "err", err)
-		return err
-	}
-
-	contractBLSOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch BLSOperatorStateRetriever contract", "err", err)
-		return err
-	}
-
-	blsPubkeyRegistryAddr, err := contractIRegistryCoordinator.BlsApkRegistry(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch BlsPubkeyRegistry address", "err", err)
-		return err
-	}
-
-	t.Logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
-
-	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch IBLSApkRegistry contract", "err", err)
-		return err
-	}
-
-	indexRegistryAddr, err := contractIRegistryCoordinator.IndexRegistry(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch IndexRegistry address", "err", err)
-		return err
-	}
-
-	contractIIndexReg, err := indexreg.NewContractIIndexRegistry(indexRegistryAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch IIndexRegistry contract", "err", err)
-		return err
-	}
-
-	stakeRegistryAddr, err := contractIRegistryCoordinator.StakeRegistry(&bind.CallOpts{})
-	if err != nil {
-		t.Logger.Error("Failed to fetch StakeRegistry address", "err", err)
-		return err
-	}
-
-	contractStakeRegistry, err := stakereg.NewContractStakeRegistry(stakeRegistryAddr, t.EthClient)
-	if err != nil {
-		t.Logger.Error("Failed to fetch StakeRegistry contract", "err", err)
-		return err
-	}
-
-	t.Bindings = &ContractBindings{
-		ServiceManagerAddr:    eigenDAServiceManagerAddr,
-		RegCoordinatorAddr:    registryCoordinatorAddr,
-		AVSDirectory:          contractAVSDirectory,
-		OpStateRetriever:      contractBLSOpStateRetr,
-		BLSApkRegistry:        contractBLSPubkeyReg,
-		IndexRegistry:         contractIIndexReg,
-		RegistryCoordinator:   contractIRegistryCoordinator,
-		EjectionManager:       contractEjectionManager,
-		StakeRegistry:         contractStakeRegistry,
-		EigenDAServiceManager: contractEigenDAServiceManager,
-		DelegationManager:     contractDelegationManager,
-	}
-	return nil
 }

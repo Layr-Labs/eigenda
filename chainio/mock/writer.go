@@ -13,6 +13,7 @@ import (
 )
 
 type MockWriter struct {
+	MockReader
 	mock.Mock
 }
 
