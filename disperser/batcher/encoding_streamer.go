@@ -82,7 +82,7 @@ type EncodingStreamer struct {
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
 
-	operatorStateCache *lru.Cache[string, any]
+	operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
 }
 
 type batch struct {
@@ -116,7 +116,7 @@ func NewEncodingStreamer(
 	if config.EncodingQueueLimit <= 0 {
 		return nil, errors.New("EncodingQueueLimit should be greater than 0")
 	}
-	operatorStateCache, err := lru.New[string, any](operatorStateCacheSize)
+	operatorStateCache, err := lru.New[string, *core.IndexedOperatorState](operatorStateCacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -682,11 +682,7 @@ func (e *EncodingStreamer) getOperatorState(ctx context.Context, metadatas []*di
 
 	cacheKey := computeCacheKey(blockNumber, quorumIds)
 	if val, ok := e.operatorStateCache.Get(cacheKey); ok {
-		state, ok := val.(*core.IndexedOperatorState)
-		if !ok {
-			return nil, errors.New("cached value is not of type *core.IndexedOperatorState")
-		}
-		return state, nil
+		return val, nil
 	}
 	// GetIndexedOperatorState should return state for valid quorums only
 	state, err := e.chainState.GetIndexedOperatorState(ctx, blockNumber, quorumIds)
