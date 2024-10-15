@@ -52,10 +52,9 @@ func NewMetrics(
 	if metricsBlacklist == nil {
 		metricsBlacklist = []string{}
 	}
-
-	fmt.Printf("-------------------------------------------\n")
-	fmt.Printf("metricsBlacklist: %v\n", metricsBlacklist)
-	fmt.Printf("metricsFuzzyBlacklist: %v\n", metricsFuzzyBlacklist)
+	if metricsFuzzyBlacklist == nil {
+		metricsFuzzyBlacklist = []string{}
+	}
 
 	metrics := &metrics{
 		count:                 buildCounterCollector(namespace, reg),
