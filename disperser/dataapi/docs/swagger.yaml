@@ -131,6 +131,17 @@ definitions:
       retrieval_socket:
         type: string
     type: object
+  dataapi.OperatorStake:
+    properties:
+      operator_id:
+        type: string
+      quorum_id:
+        type: string
+      rank:
+        type: integer
+      stake_percentage:
+        type: number
+    type: object
   dataapi.OperatorsNonsigningPercentage:
     properties:
       data:
@@ -139,6 +150,15 @@ definitions:
         type: array
       meta:
         $ref: '#/definitions/dataapi.Meta'
+    type: object
+  dataapi.OperatorsStakeResponse:
+    properties:
+      stake_ranked_operators:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/dataapi.OperatorStake'
+          type: array
+        type: object
     type: object
   dataapi.QueriedStateOperatorMetadata:
     properties:
@@ -585,6 +605,36 @@ paths:
         is a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
+  /operators-info/operators-stake:
+    get:
+      parameters:
+      - description: Operator ID
+        in: query
+        name: operator_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.OperatorsStakeResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Operator stake distribution query
+      tags:
+      - OperatorsStake
   /operators-info/port-check:
     get:
       parameters:
