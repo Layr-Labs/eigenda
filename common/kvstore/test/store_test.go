@@ -1,13 +1,11 @@
 package test
 
 import (
-	"context"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
-	"github.com/Layr-Labs/eigenda/common/kvstore/ttl"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
@@ -21,19 +19,8 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return mapstore.NewStore(), nil
 	},
-
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		return ttl.TTLWrapper(context.Background(), logger, mapstore.NewStore(), 0), nil
-	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		return leveldb.NewStore(logger, path)
-	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		store, err := leveldb.NewStore(logger, path)
-		if err != nil {
-			return nil, err
-		}
-		return ttl.TTLWrapper(context.Background(), logger, store, 0), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
 		tableStore, err := tablestore.MapStore.Start(logger, path, "test")

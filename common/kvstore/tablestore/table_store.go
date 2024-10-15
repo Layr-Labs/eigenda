@@ -1,14 +1,30 @@
 package tablestore
 
 import (
+	"context"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"sync"
+	"time"
 )
 
 var _ kvstore.TableStore = &tableStore{}
 
+// The maximum number of keys to delete in a single batch.
+var maxDeletionBatchSize uint32 = 1024
+
 // tableStore is an implementation of TableStore that wraps a Store.
 type tableStore struct {
+	// the context for the store
+	ctx context.Context
+
+	// the cancel function for the store
+	cancel context.CancelFunc
+
+	// this wait group is completed when the garbage collection goroutine is done
+	waitGroup *sync.WaitGroup
+
+	// the logger for the store
 	logger logging.Logger
 
 	// A base store implementation that this TableStore wraps.
@@ -33,7 +49,13 @@ func newTableStore(
 	tableIDMap map[uint32]string,
 	expirationTable kvstore.Table) kvstore.TableStore {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	waitGroup := &sync.WaitGroup{}
+
 	store := &tableStore{
+		ctx:             ctx,
+		cancel:          cancel,
+		waitGroup:       waitGroup,
 		logger:          logger,
 		base:            base,
 		tableMap:        make(map[string]kvstore.Table),
@@ -44,6 +66,8 @@ func newTableStore(
 		table := newTableView(base, store, name, prefix)
 		store.tableMap[name] = table
 	}
+
+	store.expireKeysInBackground(time.Minute)
 
 	return store
 }
@@ -76,12 +100,74 @@ func (t *tableStore) NewBatch() kvstore.TableStoreBatch {
 	}
 }
 
+// ExpireKeysInBackground spawns a background goroutine that periodically checks for expired keys and deletes them.
+func (t *tableStore) expireKeysInBackground(gcPeriod time.Duration) {
+	ticker := time.NewTicker(gcPeriod)
+	go func() {
+		defer t.waitGroup.Done()
+		for {
+			select {
+			case now := <-ticker.C:
+				err := t.expireKeys(now)
+				if err != nil {
+					t.logger.Error("Error expiring keys", err)
+					continue
+				}
+			case <-t.ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+// Delete all keys with a TTL that has expired.
+func (t *tableStore) expireKeys(now time.Time) error {
+	it, err := t.expirationTable.NewIterator(nil)
+	if err != nil {
+		return err
+	}
+	defer it.Release()
+
+	batch := t.NewBatch()
+
+	for it.Next() {
+		expiryKey := it.Key()
+		expiryTimestamp, baseKey := parsePrependedTimestamp(expiryKey)
+
+		if expiryTimestamp.After(now) {
+			// No more values to expire
+			break
+		}
+
+		batch.Delete(baseKey)
+		batch.Delete(expiryKey)
+
+		if batch.Size() >= maxDeletionBatchSize {
+			err = batch.Apply()
+			if err != nil {
+				return err
+			}
+			batch = t.NewBatch()
+		}
+	}
+
+	if batch.Size() > 0 {
+		return batch.Apply()
+	}
+	return nil
+}
+
 // Shutdown shuts down the store, flushing any remaining cached data to disk.
 func (t *tableStore) Shutdown() error {
+	t.cancel()
+	t.waitGroup.Wait()
 	return t.base.Shutdown()
 }
 
 // Destroy shuts down and permanently deletes all data in the store.
 func (t *tableStore) Destroy() error {
+	t.cancel()
+	t.waitGroup.Wait()
 	return t.base.Destroy()
 }

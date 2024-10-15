@@ -113,7 +113,9 @@ func start(
 		}
 	}
 
-	return newTableStore(logger, base, tableIDMap, expirationTable), nil
+	store := newTableStore(logger, base, tableIDMap, expirationTable)
+
+	return store, nil
 }
 
 // buildBaseStore creates a new base store of the given type.
