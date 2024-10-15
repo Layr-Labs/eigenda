@@ -2,9 +2,9 @@ package batcher
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -720,11 +720,9 @@ func (e *EncodingStreamer) validateMetadataQuorums(metadatas []*disperser.BlobMe
 	return validMetadata
 }
 
-func computeCacheKey(id uint, slice []uint8) string {
-	parts := make([]string, len(slice)+1)
-	parts[0] = strconv.FormatUint(uint64(id), 10)
-	for i, v := range slice {
-		parts[i+1] = strconv.FormatUint(uint64(v), 10)
-	}
-	return strings.Join(parts, "_")
+func computeCacheKey(blockNumber uint, quorumIDs []uint8) string {
+	bytes := make([]byte, 8+len(quorumIDs))
+	binary.LittleEndian.PutUint64(bytes, uint64(blockNumber))
+	copy(bytes[8:], quorumIDs)
+	return string(bytes)
 }
