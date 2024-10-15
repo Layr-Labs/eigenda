@@ -5,14 +5,17 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"time"
 )
 
 var _ kvstore.Table = &tableView{}
 
 // tableView allows data in a table to be accessed as if it were a Store.
 type tableView struct {
-	// base is the underlying store.
+	// base is the underlying base store.
 	base kvstore.Store
+	// tableStore is the underlying table store. This will be nil for tables used internally by the table store.
+	tableStore kvstore.TableStore
 	// name is the name of the table.
 	name string
 	// prefix is the prefix for all keys in the table.
@@ -22,19 +25,35 @@ type tableView struct {
 // NewTableView creates a new view into a table in a New.
 func newTableView(
 	base kvstore.Store,
+	tableStore kvstore.TableStore,
 	name string,
 	prefix uint32) kvstore.Table {
 
 	return &tableView{
-		base:   base,
-		name:   name,
-		prefix: prefix,
+		base:       base,
+		tableStore: tableStore,
+		name:       name,
+		prefix:     prefix,
 	}
 }
 
 // Name returns the name of the table.
 func (t *tableView) Name() string {
 	return t.name
+}
+
+// PutWithTTL adds a key-value pair to the table with a time-to-live (TTL).
+func (t *tableView) PutWithTTL(key []byte, value []byte, ttl time.Duration) error {
+	batch := t.NewTTLBatch()
+	batch.PutWithTTL(key, value, ttl)
+	return batch.Apply()
+}
+
+// PutWithExpiration adds a key-value pair to the table with an expiration time.
+func (t *tableView) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) error {
+	batch := t.NewTTLBatch()
+	batch.PutWithExpiration(key, value, expiryTime)
+	return batch.Apply()
 }
 
 // Put adds a key-value pair to the table.
@@ -135,43 +154,19 @@ func (t *tableView) Destroy() error {
 	return t.base.Destroy()
 }
 
-// tableBatch is a batch for a table in a New.
-type tableBatch struct {
-	table kvstore.Table
-	batch kvstore.StoreBatch
-}
-
-// Put schedules a key-value pair to be added to the table.
-func (t *tableBatch) Put(key []byte, value []byte) {
-	if value == nil {
-		value = []byte{}
+// NewTTLBatch creates a new batch for the table with time-to-live (TTL) or expiration times.
+func (t *tableView) NewTTLBatch() kvstore.TTLStoreBatch {
+	return &tableViewBatch{
+		table: t,
+		batch: t.tableStore.NewBatch(),
 	}
-	k := t.table.TableKey(key)
-	t.batch.Put(k, value)
-}
-
-// Delete schedules a key-value pair to be removed from the table.
-func (t *tableBatch) Delete(key []byte) {
-	k := t.table.TableKey(key)
-	t.batch.Delete(k)
-}
-
-// Apply applies the batch to the table.
-func (t *tableBatch) Apply() error {
-	return t.batch.Apply()
-}
-
-// Size returns the number of operations in the batch.
-func (t *tableBatch) Size() uint32 {
-	return t.batch.Size()
 }
 
 // NewBatch creates a new batch for the table.
 func (t *tableView) NewBatch() kvstore.StoreBatch {
-	return &tableBatch{
-		table: t,
-		batch: t.base.NewBatch(),
-	}
+	// This method is a simple alias for NewTTLBatch. We inherit the need to implement this function from the base
+	// interface, but we don't need to do anything special here.
+	return t.NewTTLBatch()
 }
 
 // TableKey creates a key scoped to this table.

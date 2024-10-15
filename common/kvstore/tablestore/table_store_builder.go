@@ -24,6 +24,12 @@ const metadataTableID uint32 = math.MaxUint32
 // once a table is dropped, future tables may be instantiated with the same name and the table ID may be reused.
 const namespaceTableID uint32 = math.MaxUint32 - 1
 
+// The table ID reserved for the expiration table. The expiration table is used to store expiration times for keys.
+// The keys in the expiration table are created by prepending the expiration time to the key of the data to be expired.
+// The value of the key in this table is an empty byte slice. By iterating over this table in lexicographical order,
+// keys are encountered in order of expiration time.
+const expirationTableID uint32 = math.MaxUint32 - 2
+
 // This key is used to store the schema version in the metadata table.
 const metadataSchemaVersionKey = "schema_version"
 
@@ -81,8 +87,9 @@ func start(
 	modifySchema bool,
 	tables ...string) (kvstore.TableStore, error) {
 
-	metadataTable := newTableView(base, "metadata", metadataTableID)
-	namespaceTable := newTableView(base, "namespace", namespaceTableID)
+	metadataTable := newTableView(base, nil, "metadata", metadataTableID)
+	namespaceTable := newTableView(base, nil, "namespace", namespaceTableID)
+	expirationTable := newTableView(base, nil, "expiration", expirationTableID)
 
 	err := validateSchema(metadataTable)
 	if err != nil {
@@ -106,11 +113,7 @@ func start(
 		}
 	}
 
-	tableMap := make(map[string]kvstore.Table, len(tableIDMap))
-	for tableID, tableName := range tableIDMap {
-		tableMap[tableName] = newTableView(base, tableName, tableID)
-	}
-	return newTableStore(logger, base, tableMap), nil
+	return newTableStore(logger, base, tableIDMap, expirationTable), nil
 }
 
 // buildBaseStore creates a new base store of the given type.

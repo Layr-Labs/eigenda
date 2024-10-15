@@ -3,15 +3,15 @@ package kvstore
 import "errors"
 
 // ErrTableLimitExceeded is returned when the maximum number of tables has been reached.
-var ErrTableLimitExceeded = errors.New("table limit exceeded")
+var ErrTableLimitExceeded = errors.New("table limit exceeded") // TODO
 
 // ErrTableNotFound is returned when a table is not found.
 var ErrTableNotFound = errors.New("table not found")
 
 // Table can be used to operate on data in a specific table in a TableStore.
 type Table interface {
-	// Store permits access to the table as if it were a store.
-	Store
+	// TTLStore permits access to the table as if it were a store.
+	TTLStore
 
 	// Name returns the name of the table.
 	Name() string
@@ -24,8 +24,8 @@ type Table interface {
 // table keys atomically.
 type TableKey []byte
 
-// TableBatch is a collection of operations that can be applied atomically to a TableStore.
-type TableBatch Batch[TableKey]
+// TableStoreBatch is a collection of operations that can be applied atomically to a TableStore.
+type TableStoreBatch TTLBatch[TableKey]
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.
 // A "table" in this context is a disjoint keyspace. Keys in one table to not collide with keys in another table,
@@ -45,7 +45,7 @@ type TableStore interface {
 	GetTables() []Table
 
 	// NewBatch creates a new batch that can be used to perform multiple operations across tables atomically.
-	NewBatch() TableBatch
+	NewBatch() TableStoreBatch
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
 	Shutdown() error

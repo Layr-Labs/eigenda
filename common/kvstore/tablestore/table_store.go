@@ -16,6 +16,10 @@ type tableStore struct {
 
 	// A map from table names to tables.
 	tableMap map[string]kvstore.Table
+
+	// A map containing expiration times. Keys in this table are made up of a timestamp prepended to a key.
+	// The value is an empty byte slice. Iterating over this table will return keys in order of expiration time.
+	expirationTable kvstore.Table
 }
 
 // wrapper wraps the given Store to create a TableStore.
@@ -26,13 +30,22 @@ type tableStore struct {
 func newTableStore(
 	logger logging.Logger,
 	base kvstore.Store,
-	tables map[string]kvstore.Table) kvstore.TableStore {
+	tableIDMap map[uint32]string,
+	expirationTable kvstore.Table) kvstore.TableStore {
 
-	return &tableStore{
-		logger:   logger,
-		base:     base,
-		tableMap: tables,
+	store := &tableStore{
+		logger:          logger,
+		base:            base,
+		tableMap:        make(map[string]kvstore.Table),
+		expirationTable: expirationTable,
 	}
+
+	for prefix, name := range tableIDMap {
+		table := newTableView(base, store, name, prefix)
+		store.tableMap[name] = table
+	}
+
+	return store
 }
 
 // GetTable gets the table with the given name. If the table does not exist, it is first created.
@@ -56,10 +69,10 @@ func (t *tableStore) GetTables() []kvstore.Table {
 }
 
 // NewBatch creates a new batch for writing to the store.
-func (t *tableStore) NewBatch() kvstore.TableBatch {
+func (t *tableStore) NewBatch() kvstore.TableStoreBatch {
 	return &tableStoreBatch{
-		store: t,
-		batch: t.base.NewBatch(),
+		batch:           t.base.NewBatch(),
+		expirationTable: t.expirationTable,
 	}
 }
 
