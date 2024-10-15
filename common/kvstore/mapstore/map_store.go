@@ -27,6 +27,10 @@ func NewStore() kvstore.Store {
 
 // Put adds a key-value pair to the store.
 func (store *mapStore) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
+
 	store.lock.Lock()
 	defer store.lock.Unlock()
 
@@ -72,6 +76,60 @@ func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 		store.data[stringifiedKey] = values[i]
 	}
 	return nil
+}
+
+// NewBatch creates a new batch for the store.
+func (store *mapStore) NewBatch() kvstore.StoreBatch {
+	return &batch{
+		store:  store,
+		keys:   make([][]byte, 0),
+		values: make([][]byte, 0),
+	}
+}
+
+// batch is a collection of operations that can be applied atomically to a mapStore.
+type batch struct {
+	store  *mapStore
+	keys   [][]byte
+	values [][]byte
+}
+
+// Put stores the given key / value pair in the batch, overwriting any existing value for that key.
+func (m *batch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{}
+	}
+	m.keys = append(m.keys, key)
+	m.values = append(m.values, value)
+}
+
+// Delete removes the key from the batch. Does not return an error if the key does not exist.
+func (m *batch) Delete(key []byte) {
+	m.keys = append(m.keys, key)
+	m.values = append(m.values, nil)
+}
+
+// Apply atomically writes & deletes all the key / value pairs in the batch to the database.
+func (m *batch) Apply() error {
+	for i, key := range m.keys {
+		if m.values[i] == nil {
+			err := m.store.Delete(key)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := m.store.Put(key, m.values[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Size returns the number of operations in the batch.
+func (m *batch) Size() uint32 {
+	return uint32(len(m.keys))
 }
 
 type mapIterator struct {

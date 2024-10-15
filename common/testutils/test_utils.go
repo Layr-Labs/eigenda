@@ -98,3 +98,13 @@ func RandomBytes(length int) []byte {
 func RandomTime() time.Time {
 	return time.Unix(int64(rand.Int31()), 0)
 }
+
+// RandomString generates a random string out of printable ASCII characters.
+func RandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}

@@ -57,7 +57,7 @@ func TTLWrapper(
 
 var keyPrefix = []byte("k")
 var expiryPrefix = []byte("e")
-var maxDeletionBatchSize = 1000
+var maxDeletionBatchSize uint32 = 1024
 
 // PutWithTTL adds a key-value pair to the store that expires after a specified time-to-live (TTL).
 // Key is eventually deleted after the TTL elapses.
@@ -105,18 +105,13 @@ func parseExpiryKey(expiryKey []byte) (baseKey []byte, expiryTime time.Time) {
 // PutWithExpiration adds a key-value pair to the store that expires at a specified time.
 // Key is eventually deleted after the expiry time.
 func (store *ttlStore) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) error {
+	batch := store.store.NewBatch()
+
 	prefixedKey := append(keyPrefix, key...)
+	batch.Put(prefixedKey, value)
+	batch.Put(buildExpiryKey(key, expiryTime), nil)
 
-	batchKeys := make([][]byte, 2)
-	batchValues := make([][]byte, 2)
-
-	batchKeys[0] = prefixedKey
-	batchValues[0] = value
-
-	batchKeys[1] = buildExpiryKey(key, expiryTime)
-	batchValues[1] = make([]byte, 0)
-
-	return store.store.WriteBatch(batchKeys, batchValues)
+	return batch.Apply()
 }
 
 // PutBatchWithExpiration adds multiple key-value pairs to the store that expire at a specified time.
@@ -125,20 +120,16 @@ func (store *ttlStore) PutBatchWithExpiration(keys [][]byte, values [][]byte, ex
 		return fmt.Errorf("keys and values must have the same length (keys: %d, values: %d)", len(keys), len(values))
 	}
 
-	batchKeys := make([][]byte, len(keys)*2)
-	batchValues := make([][]byte, len(keys)*2)
+	batch := store.store.NewBatch()
 
 	for i, key := range keys {
 		prefixedKey := append(keyPrefix, key...)
 
-		batchKeys[i*2] = prefixedKey
-		batchValues[i*2] = values[i]
-
-		batchKeys[i*2+1] = buildExpiryKey(key, expiryTime)
-		batchValues[i*2+1] = make([]byte, 0)
+		batch.Put(prefixedKey, values[i])
+		batch.Put(buildExpiryKey(key, expiryTime), nil)
 	}
 
-	return store.store.WriteBatch(batchKeys, batchValues)
+	return batch.Apply()
 }
 
 // Spawns a background goroutine that periodically checks for expired keys and deletes them.
@@ -169,7 +160,7 @@ func (store *ttlStore) expireKeys(now time.Time) error {
 	}
 	defer it.Release()
 
-	keysToDelete := make([][]byte, 0)
+	batch := store.store.NewBatch()
 
 	for it.Next() {
 		expiryKey := it.Key()
@@ -181,25 +172,29 @@ func (store *ttlStore) expireKeys(now time.Time) error {
 		}
 
 		prefixedBaseKey := append(keyPrefix, baseKey...)
-		keysToDelete = append(keysToDelete, expiryKey)
-		keysToDelete = append(keysToDelete, prefixedBaseKey)
+		batch.Delete(prefixedBaseKey)
+		batch.Delete(expiryKey)
 
-		if len(keysToDelete) >= maxDeletionBatchSize {
-			err = store.store.DeleteBatch(keysToDelete)
+		if batch.Size() >= maxDeletionBatchSize {
+			err = batch.Apply()
 			if err != nil {
 				return err
 			}
-			keysToDelete = make([][]byte, 0)
+			batch = store.store.NewBatch()
 		}
 	}
 
-	if len(keysToDelete) > 0 {
-		return store.store.DeleteBatch(keysToDelete)
+	if batch.Size() > 0 {
+		return batch.Apply()
 	}
 	return nil
 }
 
 func (store *ttlStore) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
+
 	prefixedKey := append(keyPrefix, key...)
 	return store.store.Put(prefixedKey, value)
 }
@@ -214,20 +209,38 @@ func (store *ttlStore) Delete(key []byte) error {
 	return store.store.Delete(prefixedKey)
 }
 
-func (store *ttlStore) DeleteBatch(keys [][]byte) error {
-	prefixedKeys := make([][]byte, len(keys))
-	for i, key := range keys {
-		prefixedKeys[i] = append(keyPrefix, key...)
-	}
-	return store.store.DeleteBatch(prefixedKeys)
+var _ kvstore.StoreBatch = &batch{}
+
+type batch struct {
+	base kvstore.StoreBatch
 }
 
-func (store *ttlStore) WriteBatch(keys, values [][]byte) error {
-	prefixedKeys := make([][]byte, len(keys))
-	for i, key := range keys {
-		prefixedKeys[i] = append(keyPrefix, key...)
+func (b *batch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{}
 	}
-	return store.store.WriteBatch(prefixedKeys, values)
+	prefixedKey := append(keyPrefix, key...)
+	b.base.Put(prefixedKey, value)
+}
+
+func (b *batch) Delete(key []byte) {
+	prefixedKey := append(keyPrefix, key...)
+	b.base.Delete(prefixedKey)
+}
+
+func (b *batch) Apply() error {
+	return b.base.Apply()
+}
+
+func (b *batch) Size() uint32 {
+	return b.base.Size()
+}
+
+// NewBatch creates a new batch for the store.
+func (store *ttlStore) NewBatch() kvstore.StoreBatch {
+	return &batch{
+		base: store.store.NewBatch(),
+	}
 }
 
 type ttlIterator struct {
