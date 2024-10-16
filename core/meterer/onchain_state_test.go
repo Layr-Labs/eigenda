@@ -2,6 +2,7 @@ package meterer_test
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -20,7 +21,7 @@ var (
 		QuorumSplit:    []byte{50, 50},
 	}
 	dummyOnDemandPayment = core.OnDemandPayment{
-		CumulativePayment: core.TokenAmount(1000),
+		CumulativePayment: *big.NewInt(1000),
 	}
 )
 

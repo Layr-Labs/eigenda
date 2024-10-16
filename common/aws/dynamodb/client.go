@@ -410,8 +410,8 @@ func (c *Client) readItems(ctx context.Context, tableName string, keys []Key) ([
 	return items, nil
 }
 
-// TableCheck checks if a table exists and can be described
-func (c *Client) TableCheck(ctx context.Context, name string) error {
+// TableExists checks if a table exists and can be described
+func (c *Client) TableExists(ctx context.Context, name string) error {
 	if name == "" {
 		return errors.New("table name is empty")
 	}

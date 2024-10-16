@@ -36,15 +36,15 @@ func NewOffchainStore(
 		return OffchainStore{}, err
 	}
 
-	err = dynamoClient.TableCheck(context.Background(), reservationTableName)
+	err = dynamoClient.TableExists(context.Background(), reservationTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = dynamoClient.TableCheck(context.Background(), onDemandTableName)
+	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = dynamoClient.TableCheck(context.Background(), globalBinTableName)
+	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}

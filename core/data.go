@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -502,8 +503,6 @@ func (pm *PaymentMetadata) Hash() []byte {
 	return crypto.Keccak256(data)
 }
 
-type TokenAmount uint64 // TODO: change to uint128
-
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
@@ -516,5 +515,5 @@ type ActiveReservation struct {
 }
 
 type OnDemandPayment struct {
-	CumulativePayment TokenAmount // Total amount deposited by the user
+	CumulativePayment big.Int // Total amount deposited by the user
 }
