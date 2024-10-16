@@ -161,3 +161,25 @@ func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, st
 
 	return value, args.Error(1)
 }
+
+func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*subgraph.OperatorEjection, error) {
+	args := m.Called()
+
+	var value []*subgraph.OperatorEjection
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.OperatorEjection)
+	}
+
+	return value, args.Error(1)
+}
+
+func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx context.Context, blockTimestamp uint64, operatorId string) ([]*subgraph.OperatorEjection, error) {
+	args := m.Called()
+
+	var value []*subgraph.OperatorEjection
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.OperatorEjection)
+	}
+
+	return value, args.Error(1)
+}
