@@ -546,7 +546,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Operator ID filter",
+                        "description": "Operator ID filter [default: all operators]",
                         "name": "operator_id",
                         "in": "query"
                     },

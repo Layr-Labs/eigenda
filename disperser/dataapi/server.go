@@ -878,7 +878,7 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		days		query		int		false	"Lookback in days [default: 1]"
-//	@Param		operator_id	query		string	false	"Operator ID filter"
+//	@Param		operator_id	query		string	false	"Operator ID filter [default: all operators]"
 //	@Param		first		query		int		false	"Return first N ejections [default: 1000]"
 //	@Param		skip		query		int		false	"Skip first N ejections [default: 0]"
 //	@Success	200			{object}	QueriedOperatorEjectionsResponse
