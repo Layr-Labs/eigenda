@@ -1,74 +1,70 @@
-package ttl
+package tablestore
 
-//
-//import (
-//	"context"
-//	"github.com/Layr-Labs/eigenda/common"
-//	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
-//	tu "github.com/Layr-Labs/eigenda/common/testutils"
-//	"github.com/stretchr/testify/assert"
-//	"math/rand"
-//	"sort"
-//	"testing"
-//	"time"
-//)
-//
-//func TestExpiryKeyParsing(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	for i := 0; i < 1000; i++ {
-//		key := tu.RandomBytes(rand.Intn(100))
-//		expiryTime := tu.RandomTime()
-//		expiryKey := buildExpiryKey(key, expiryTime)
-//		parsedKey, parsedExpiryTime := parseExpiryKey(expiryKey)
-//		assert.Equal(t, key, parsedKey)
-//		assert.Equal(t, expiryTime, parsedExpiryTime)
-//	}
-//
-//	// Try a very large key.
-//	key := tu.RandomBytes(100)
-//	expiryTime := time.Unix(0, 1<<62-1)
-//	expiryKey := buildExpiryKey(key, expiryTime)
-//	parsedKey, parsedExpiryTime := parseExpiryKey(expiryKey)
-//	assert.Equal(t, key, parsedKey)
-//	assert.Equal(t, expiryTime, parsedExpiryTime)
-//}
-//
-//func TestExpiryKeyOrdering(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	expiryKeys := make([][]byte, 0)
-//
-//	for i := 0; i < 1000; i++ {
-//		expiryTime := tu.RandomTime()
-//		expiryKey := buildExpiryKey(tu.RandomBytes(10), expiryTime)
-//		expiryKeys = append(expiryKeys, expiryKey)
-//	}
-//
-//	// Add some keys with very large expiry times.
-//	for i := 0; i < 1000; i++ {
-//		expiryTime := tu.RandomTime().Add(time.Duration(1<<62 - 1))
-//		expiryKey := buildExpiryKey(tu.RandomBytes(10), expiryTime)
-//		expiryKeys = append(expiryKeys, expiryKey)
-//	}
-//
-//	// Sort the keys.
-//	sort.Slice(expiryKeys, func(i, j int) bool {
-//		return string(expiryKeys[i]) < string(expiryKeys[j])
-//	})
-//
-//	// Check that the keys are sorted.
-//	for i := 1; i < len(expiryKeys)-1; i++ {
-//		a := expiryKeys[i-1]
-//		b := expiryKeys[i]
-//
-//		_, aTime := parseExpiryKey(a)
-//		_, bTime := parseExpiryKey(b)
-//
-//		assert.True(t, aTime.Before(bTime))
-//	}
-//}
-//
+import (
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
+	"sort"
+	"testing"
+	"time"
+)
+
+func TestExpiryKeyParsing(t *testing.T) {
+	tu.InitializeRandom()
+
+	for i := 0; i < 1000; i++ {
+		key := tu.RandomBytes(rand.Intn(100))
+		expiryTime := tu.RandomTime()
+		expiryKey := prependTimestamp(expiryTime, key)
+		parsedExpiryTime, parsedKey := parsePrependedTimestamp(expiryKey)
+		assert.Equal(t, key, parsedKey)
+		assert.Equal(t, expiryTime, parsedExpiryTime)
+	}
+
+	// Try a very large key.
+	key := tu.RandomBytes(100)
+	expiryTime := time.Unix(0, 1<<62-1)
+	expiryKey := prependTimestamp(expiryTime, key)
+	parsedExpiryTime, parsedKey := parsePrependedTimestamp(expiryKey)
+	assert.Equal(t, key, parsedKey)
+	assert.Equal(t, expiryTime, parsedExpiryTime)
+}
+
+func TestExpiryKeyOrdering(t *testing.T) {
+	tu.InitializeRandom()
+
+	expiryKeys := make([][]byte, 0)
+
+	for i := 0; i < 1000; i++ {
+		expiryTime := tu.RandomTime()
+		expiryKey := prependTimestamp(expiryTime, tu.RandomBytes(10))
+		expiryKeys = append(expiryKeys, expiryKey)
+	}
+
+	// Add some keys with very large expiry times.
+	for i := 0; i < 1000; i++ {
+		expiryTime := tu.RandomTime().Add(time.Duration(1<<62 - 1))
+		expiryKey := prependTimestamp(expiryTime, tu.RandomBytes(10))
+		expiryKeys = append(expiryKeys, expiryKey)
+	}
+
+	// Sort the keys.
+	sort.Slice(expiryKeys, func(i, j int) bool {
+		return string(expiryKeys[i]) < string(expiryKeys[j])
+	})
+
+	// Check that the keys are sorted.
+	for i := 1; i < len(expiryKeys)-1; i++ {
+		a := expiryKeys[i-1]
+		b := expiryKeys[i]
+
+		aTime, _ := parsePrependedTimestamp(a)
+		bTime, _ := parsePrependedTimestamp(b)
+
+		assert.True(t, aTime.Before(bTime))
+	}
+}
+
 //func TestRandomDataExpired(t *testing.T) {
 //	tu.InitializeRandom()
 //
@@ -76,11 +72,12 @@ package ttl
 //	assert.NoError(t, err)
 //
 //	baseStore := mapstore.NewStore()
-//	store := ttlStore{
-//		store:  baseStore,
-//		ctx:    context.Background(),
-//		logger: logger,
-//	}
+//	//store := ttlStore{
+//	//	store:  baseStore,
+//	//	ctx:    context.Background(),
+//	//	logger: logger,
+//	//}
+//	var store tableStore
 //
 //	data := make(map[string][]byte)
 //	expiryTimes := make(map[string]time.Time)
@@ -131,7 +128,7 @@ package ttl
 //		}
 //	}
 //}
-//
+
 //func TestBatchRandomDataExpired(t *testing.T) {
 //	tu.InitializeRandom()
 //

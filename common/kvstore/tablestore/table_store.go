@@ -10,9 +10,6 @@ import (
 
 var _ kvstore.TableStore = &tableStore{}
 
-// The maximum number of keys to delete in a single batch.
-var maxDeletionBatchSize uint32 = 1024
-
 // tableStore is an implementation of TableStore that wraps a Store.
 type tableStore struct {
 	// the context for the store
@@ -47,11 +44,13 @@ func newTableStore(
 	logger logging.Logger,
 	base kvstore.Store,
 	tableIDMap map[uint32]string,
-	expirationTable kvstore.Table) kvstore.TableStore {
+	expirationTable kvstore.Table,
+	gcEnabled bool,
+	gcPeriod time.Duration,
+	gcBatchSize uint32) kvstore.TableStore {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := &sync.WaitGroup{}
-	waitGroup.Add(1) // gc goroutine
 
 	store := &tableStore{
 		ctx:             ctx,
@@ -68,7 +67,9 @@ func newTableStore(
 		store.tableMap[name] = table
 	}
 
-	store.expireKeysInBackground(time.Minute)
+	if gcEnabled {
+		store.expireKeysInBackground(gcPeriod, gcBatchSize)
+	}
 
 	return store
 }
@@ -102,14 +103,15 @@ func (t *tableStore) NewBatch() kvstore.TableStoreBatch {
 }
 
 // ExpireKeysInBackground spawns a background goroutine that periodically checks for expired keys and deletes them.
-func (t *tableStore) expireKeysInBackground(gcPeriod time.Duration) {
+func (t *tableStore) expireKeysInBackground(gcPeriod time.Duration, gcBatchSize uint32) {
+	t.waitGroup.Add(1)
 	ticker := time.NewTicker(gcPeriod)
 	go func() {
 		defer t.waitGroup.Done()
 		for {
 			select {
 			case now := <-ticker.C:
-				err := t.expireKeys(now)
+				err := t.expireKeys(now, gcBatchSize)
 				if err != nil {
 					t.logger.Error("Error expiring keys", err)
 					continue
@@ -123,7 +125,7 @@ func (t *tableStore) expireKeysInBackground(gcPeriod time.Duration) {
 }
 
 // Delete all keys with a TTL that has expired.
-func (t *tableStore) expireKeys(now time.Time) error {
+func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
 	it, err := t.expirationTable.NewIterator(nil)
 	if err != nil {
 		return err
@@ -144,7 +146,7 @@ func (t *tableStore) expireKeys(now time.Time) error {
 		batch.Delete(baseKey)
 		batch.Delete(expiryKey)
 
-		if batch.Size() >= maxDeletionBatchSize {
+		if batch.Size() >= gcBatchSize {
 			err = batch.Apply()
 			if err != nil {
 				return err

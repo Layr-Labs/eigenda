@@ -23,7 +23,9 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		return leveldb.NewStore(logger, path)
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		tableStore, err := tablestore.MapStore.Start(logger, path, "test")
+		config := tablestore.DefaultMapStoreConfig()
+		config.Schema = []string{"test"}
+		tableStore, err := tablestore.Start(logger, config)
 		if err != nil {
 			return nil, err
 		}
@@ -34,7 +36,9 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, e
 		return store, nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store, error) {
-		tableStore, err := tablestore.LevelDB.Start(logger, path, "test")
+		config := tablestore.DefaultLevelDBConfig(path)
+		config.Schema = []string{"test"}
+		tableStore, err := tablestore.Start(logger, config)
 		if err != nil {
 			return nil, err
 		}
