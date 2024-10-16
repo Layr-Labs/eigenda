@@ -686,6 +686,7 @@ func TestQueryWithInput(t *testing.T) {
 	// Test forward order with limit
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
 		KeyConditionExpression: aws.String("BlobStatus = :status"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":status": &types.AttributeValueMemberN{Value: "0"},
@@ -704,11 +705,12 @@ func TestQueryWithInput(t *testing.T) {
 	// Test reverse order with limit
 	queryInput = &dynamodb.QueryInput{
 		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
 		KeyConditionExpression: aws.String("BlobStatus = :status"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":status": &types.AttributeValueMemberN{Value: "0"},
 		},
-		ScanIndexForward: aws.Bool(true),
+		ScanIndexForward: aws.Bool(false),
 		Limit:            aws.Int32(10),
 	}
 	queryResult, err = dynamoClient.QueryWithInput(ctx, queryInput)
@@ -722,6 +724,7 @@ func TestQueryWithInput(t *testing.T) {
 	// Test with a smaller limit
 	queryInput = &dynamodb.QueryInput{
 		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
 		KeyConditionExpression: aws.String("BlobStatus = :status"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":status": &types.AttributeValueMemberN{Value: "0"},
@@ -735,6 +738,7 @@ func TestQueryWithInput(t *testing.T) {
 	// Test with a limit larger than the number of items
 	queryInput = &dynamodb.QueryInput{
 		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
 		KeyConditionExpression: aws.String("BlobStatus = :status"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":status": &types.AttributeValueMemberN{Value: "0"},
