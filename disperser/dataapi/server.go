@@ -878,7 +878,9 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		days		query		int		false	"Lookback in days [default: 1]"
-//	@Param		operator_id	query		string	false	"Operator ID filter [default: all operators]"
+//	@Param		operator_id	query		string	false	"Operator ID filter"
+//	@Param		first		query		int		false	"Return first N ejections [default: 1000]"
+//	@Param		skip		query		int		false	"Skip first N ejections [default: 0]"
 //	@Success	200			{object}	QueriedOperatorEjectionsResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -891,9 +893,8 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
-	days := c.DefaultQuery("days", "1")             // If not specified, defaults to 1
 
-	// Convert days to integer
+	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
 	daysInt, err := strconv.Atoi(days)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
@@ -905,7 +906,31 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 		return
 	}
 
-	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId)
+	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
+	firstInt, err := strconv.Atoi(first)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter"})
+		return
+	}
+
+	if firstInt < 1 || firstInt > 10000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
+		return
+	}
+
+	skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
+	skipInt, err := strconv.Atoi(skip)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter"})
+		return
+	}
+
+	if skipInt < 0 || skipInt > 1000000000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
+		return
+	}
+
+	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId, uint(firstInt), uint(skipInt))
 	if err != nil {
 		s.logger.Error("Failed to fetch ejected operators", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchOperatorEjections")

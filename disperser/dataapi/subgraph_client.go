@@ -36,7 +36,7 @@ type (
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
 		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
-		QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string) ([]*QueriedOperatorEjections, error)
+		QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -86,13 +86,6 @@ type (
 		Operators map[core.OperatorID]*QueriedOperatorInfo
 	}
 
-	//IndexedQueriedOperatorEjections struct {
-	//	OperatorId      string
-	//	QuorumNumber    uint8
-	//	BlockNumber     uint
-	//	BlockTimestamp  string
-	//	TransactionHash string
-	//}
 	NonSigner struct {
 		OperatorId string
 		Count      int
@@ -283,7 +276,7 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 	}, nil
 }
 
-func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string) ([]*QueriedOperatorEjections, error) {
+func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error) {
 	// Query all operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 
@@ -291,12 +284,12 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 	var ejections []*subgraph.OperatorEjection
 
 	if operatorId == "" {
-		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds)
+		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds, first, skip)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx, lastNDayInSeconds, operatorId)
+		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx, lastNDayInSeconds, operatorId, first, skip)
 		if err != nil {
 			return nil, err
 		}

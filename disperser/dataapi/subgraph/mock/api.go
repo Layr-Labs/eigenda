@@ -162,7 +162,7 @@ func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, st
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*subgraph.OperatorEjection, error) {
+func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64, first uint, skip uint) ([]*subgraph.OperatorEjection, error) {
 	args := m.Called()
 
 	var value []*subgraph.OperatorEjection
@@ -173,7 +173,7 @@ func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestamp(ctx context.Co
 	return value, args.Error(1)
 }
 
-func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx context.Context, blockTimestamp uint64, operatorId string) ([]*subgraph.OperatorEjection, error) {
+func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx context.Context, blockTimestamp uint64, operatorId string, first uint, skip uint) ([]*subgraph.OperatorEjection, error) {
 	args := m.Called()
 
 	var value []*subgraph.OperatorEjection
