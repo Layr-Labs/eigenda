@@ -134,8 +134,6 @@ func TestRandomDataExpired(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TODO test batch spanning multiple tables with TTLs
-
 func TestBatchRandomDataExpired(t *testing.T) {
 	tu.InitializeRandom()
 
@@ -205,6 +203,105 @@ func TestBatchRandomDataExpired(t *testing.T) {
 				assert.NoError(t, err)
 				expectedValue := data[key]
 				assert.Equal(t, expectedValue, value)
+			}
+		}
+	}
+
+	err = tStore.Shutdown()
+	assert.NoError(t, err)
+}
+
+func TestMultiTableBatchRandomDataExpired(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"test1", "test2", "test3"}
+	config.GarbageCollectionEnabled = false
+	tStore, err := Start(logger, config)
+	assert.NoError(t, err)
+
+	tables := tStore.GetTables()
+
+	type tableData map[string][]byte
+	data := make(map[string] /* table name */ tableData)
+	for _, table := range tables {
+		data[table.Name()] = make(tableData)
+	}
+	expiryTimes := make(map[string] /* fully qualified table key */ time.Time)
+
+	startingTime := tu.RandomTime()
+	simulatedSeconds := 1000
+	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
+
+	// Generate some random data
+	for i := 0; i < 100; i++ {
+
+		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
+
+		batch := tStore.NewBatch()
+
+		// Generate a batch of random data
+		for j := 0; j < 10; j++ {
+
+			tableIndex := rand.Intn(len(tables))
+			table := tables[tableIndex]
+
+			key := tu.RandomBytes(10)
+			stringifiedKey := string(key)
+
+			fullyQualifiedKey := table.TableKey(key)
+			stringifiedFullyQualifiedKey := string(fullyQualifiedKey)
+
+			value := tu.RandomBytes(10)
+
+			batch.PutWithExpiration(fullyQualifiedKey, value, expiryTime)
+
+			data[table.Name()][stringifiedKey] = value
+			expiryTimes[stringifiedFullyQualifiedKey] = expiryTime
+		}
+
+		err := batch.Apply()
+		assert.NoError(t, err)
+	}
+
+	currentTime := startingTime
+
+	// Simulate time passing
+	for currentTime.Before(endingTime) {
+
+		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
+		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
+
+		err = (tStore.(*tableStore)).expireKeys(currentTime, 1024)
+		assert.NoError(t, err)
+
+		for tableName := range data {
+			for stringifiedKey := range data[tableName] {
+
+				key := []byte(stringifiedKey)
+				expectedValue := data[tableName][stringifiedKey]
+
+				table, err := tStore.GetTable(tableName)
+				assert.NoError(t, err)
+
+				fullyQualifiedKey := table.TableKey(key)
+				stringifiedFullyQualifiedKey := string(fullyQualifiedKey)
+
+				keyExpirationTime := expiryTimes[stringifiedFullyQualifiedKey]
+				expired := !currentTime.Before(keyExpirationTime)
+
+				if expired {
+					value, err := table.Get(key)
+					assert.Error(t, err)
+					assert.Nil(t, value)
+				} else {
+					value, err := table.Get(key)
+					assert.NoError(t, err)
+					assert.Equal(t, expectedValue, value)
+				}
 			}
 		}
 	}
