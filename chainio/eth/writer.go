@@ -24,8 +24,8 @@ import (
 type Writer struct {
 	*Reader
 
-	EthClient common.EthClient
-	Logger    logging.Logger
+	ethClient common.EthClient
+	logger    logging.Logger
 }
 
 var _ chainio.Writer = (*Writer)(nil)
@@ -37,13 +37,13 @@ func NewWriter(
 	eigenDAServiceManagerHexAddr string) (*Writer, error) {
 
 	r := &Reader{
-		EthClient: client,
-		Logger:    logger.With("component", "Reader"),
+		ethClient: client,
+		logger:    logger.With("component", "Reader"),
 	}
 
 	e := &Writer{
-		EthClient: client,
-		Logger:    logger.With("component", "Writer"),
+		ethClient: client,
+		logger:    logger.With("component", "Writer"),
 		Reader:    r,
 	}
 
@@ -69,27 +69,27 @@ func (t *Writer) RegisterOperator(
 
 	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
-		t.Logger.Error("Failed to get registration params", "err", err)
+		t.logger.Error("Failed to get registration params", "err", err)
 		return err
 	}
 
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
-	opts, err := t.EthClient.GetNoSendTransactOpts()
+	opts, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
-		t.Logger.Error("Failed to generate transact opts", "err", err)
+		t.logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
 
-	tx, err := t.Bindings.RegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, *operatorSignature)
+	tx, err := t.bindings.RegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, *operatorSignature)
 
 	if err != nil {
-		t.Logger.Error("Failed to register operator", "err", err)
+		t.logger.Error("Failed to register operator", "err", err)
 		return err
 	}
 
-	_, err = t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinator1", nil)
+	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinator1", nil)
 	if err != nil {
-		t.Logger.Error("Failed to estimate gas price and limit", "err", err)
+		t.logger.Error("Failed to estimate gas price and limit", "err", err)
 		return err
 	}
 	return nil
@@ -110,7 +110,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 
 	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
-		t.Logger.Error("Failed to get registration params", "err", err)
+		t.logger.Error("Failed to get registration params", "err", err)
 		return err
 	}
 
@@ -136,13 +136,13 @@ func (t *Writer) RegisterOperatorWithChurn(
 		Expiry:    new(big.Int).SetInt64(churnReply.SignatureWithSaltAndExpiry.Expiry),
 	}
 
-	opts, err := t.EthClient.GetNoSendTransactOpts()
+	opts, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
-		t.Logger.Error("Failed to generate transact opts", "err", err)
+		t.logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
 
-	tx, err := t.Bindings.RegistryCoordinator.RegisterOperatorWithChurn(
+	tx, err := t.bindings.RegistryCoordinator.RegisterOperatorWithChurn(
 		opts,
 		quorumNumbers,
 		socket,
@@ -153,13 +153,13 @@ func (t *Writer) RegisterOperatorWithChurn(
 	)
 
 	if err != nil {
-		t.Logger.Error("Failed to register operator with churn", "err", err)
+		t.logger.Error("Failed to register operator with churn", "err", err)
 		return err
 	}
 
-	_, err = t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinatorWithChurn", nil)
+	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinatorWithChurn", nil)
 	if err != nil {
-		t.Logger.Error("Failed to estimate gas price and limit", "err", err)
+		t.logger.Error("Failed to estimate gas price and limit", "err", err)
 		return err
 	}
 	return nil
@@ -176,11 +176,11 @@ func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point
 	}
 	// Make sure the operator is registered in all the quorums it tries to deregister.
 	operatorId := HashPubKeyG1(pubkeyG1)
-	quorumBitmap, _, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
+	quorumBitmap, _, err := t.bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
-	}, t.Bindings.RegCoordinatorAddr, operatorId, blockNumber)
+	}, t.bindings.RegCoordinatorAddr, operatorId, blockNumber)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator state", "err", err)
+		t.logger.Error("Failed to fetch operator state", "err", err)
 		return err
 	}
 
@@ -198,23 +198,23 @@ func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point
 		}
 	}
 
-	opts, err := t.EthClient.GetNoSendTransactOpts()
+	opts, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
-		t.Logger.Error("Failed to generate transact opts", "err", err)
+		t.logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.Bindings.RegistryCoordinator.DeregisterOperator(
+	tx, err := t.bindings.RegistryCoordinator.DeregisterOperator(
 		opts,
 		quorumIds,
 	)
 	if err != nil {
-		t.Logger.Error("Failed to deregister operator", "err", err)
+		t.logger.Error("Failed to deregister operator", "err", err)
 		return err
 	}
 
-	_, err = t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "DeregisterOperatorWithCoordinator", nil)
+	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "DeregisterOperatorWithCoordinator", nil)
 	if err != nil {
-		t.Logger.Error("Failed to estimate gas price and limit", "err", err)
+		t.logger.Error("Failed to estimate gas price and limit", "err", err)
 		return err
 	}
 	return nil
@@ -222,20 +222,20 @@ func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point
 
 // UpdateOperatorSocket updates the socket of the operator in all the quorums that it is
 func (t *Writer) UpdateOperatorSocket(ctx context.Context, socket string) error {
-	opts, err := t.EthClient.GetNoSendTransactOpts()
+	opts, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
-		t.Logger.Error("Failed to generate transact opts", "err", err)
+		t.logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.Bindings.RegistryCoordinator.UpdateSocket(opts, socket)
+	tx, err := t.bindings.RegistryCoordinator.UpdateSocket(opts, socket)
 	if err != nil {
-		t.Logger.Error("Failed to update operator socket", "err", err)
+		t.logger.Error("Failed to update operator socket", "err", err)
 		return err
 	}
 
-	_, err = t.EthClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "UpdateOperatorSocket", nil)
+	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "UpdateOperatorSocket", nil)
 	if err != nil {
-		t.Logger.Error("Failed to estimate gas price and limit", "err", err)
+		t.logger.Error("Failed to estimate gas price and limit", "err", err)
 		return err
 	}
 	return nil
@@ -248,10 +248,10 @@ func (t *Writer) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [
 			byteIdsByQuorum[i] = append(byteIdsByQuorum[i], [32]byte(id))
 		}
 	}
-	opts, err := t.EthClient.GetNoSendTransactOpts()
+	opts, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
-		t.Logger.Error("Failed to generate transact opts", "err", err)
+		t.logger.Error("Failed to generate transact opts", "err", err)
 		return nil, err
 	}
-	return t.Bindings.EjectionManager.EjectOperators(opts, byteIdsByQuorum)
+	return t.bindings.EjectionManager.EjectOperators(opts, byteIdsByQuorum)
 }

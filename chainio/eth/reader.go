@@ -30,9 +30,9 @@ var (
 )
 
 type Reader struct {
-	EthClient common.EthClient
-	Logger    logging.Logger
-	Bindings  *ContractBindings
+	ethClient common.EthClient
+	logger    logging.Logger
+	bindings  *ContractBindings
 }
 
 var _ chainio.Reader = (*Reader)(nil)
@@ -68,8 +68,8 @@ func NewReader(
 	eigenDAServiceManagerHexAddr string) (*Reader, error) {
 
 	e := &Reader{
-		EthClient: client,
-		Logger:    logger.With("component", "Reader"),
+		ethClient: client,
+		logger:    logger.With("component", "Reader"),
 	}
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
@@ -84,14 +84,14 @@ func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator
 	// TODO: Properly handle the case where the operator is not registered in any quorum. The current behavior of the smart contracts is to revert instead of returning an empty bitmap.
 	//  We should probably change this.
 	emptyBitmapErr := "execution reverted: BLSRegistryCoordinator.getCurrentQuorumBitmapByOperatorId: no quorum bitmap history for operatorId"
-	quorumBitmap, err := t.Bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
+	quorumBitmap, err := t.bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operator)
 	if err != nil {
 		if err.Error() == emptyBitmapErr {
 			return []chainio.QuorumID{}, nil
 		} else {
-			t.Logger.Error("Failed to fetch current quorum bitmap", "err", err)
+			t.logger.Error("Failed to fetch current quorum bitmap", "err", err)
 			return nil, err
 		}
 	}
@@ -109,9 +109,9 @@ func (t *Reader) getRegistrationParams(
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) (*regcoordinator.IBLSApkRegistryPubkeyRegistrationParams, *regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry, error) {
 
-	operatorAddress := t.EthClient.GetAccountAddress()
+	operatorAddress := t.ethClient.GetAccountAddress()
 
-	msgToSignG1_, err := t.Bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
+	msgToSignG1_, err := t.bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
 		Context: ctx,
 	}, operatorAddress)
 	if err != nil {
@@ -144,10 +144,10 @@ func (t *Reader) getRegistrationParams(
 	}
 
 	// params to register operator in delegation manager's operator-avs mapping
-	msgToSign, err := t.Bindings.AVSDirectory.CalculateOperatorAVSRegistrationDigestHash(
+	msgToSign, err := t.bindings.AVSDirectory.CalculateOperatorAVSRegistrationDigestHash(
 		&bind.CallOpts{
 			Context: ctx,
-		}, operatorAddress, t.Bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+		}, operatorAddress, t.bindings.ServiceManagerAddr, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -173,11 +173,11 @@ func (t *Reader) getRegistrationParams(
 // is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 // are also returned.
 func (t *Reader) GetOperatorStakes(ctx context.Context, operator [32]byte, blockNumber uint32) (chainio.OperatorStakes, []chainio.QuorumID, error) {
-	quorumBitmap, state_, err := t.Bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
+	quorumBitmap, state_, err := t.bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
-	}, t.Bindings.RegCoordinatorAddr, operator, blockNumber)
+	}, t.bindings.RegCoordinatorAddr, operator, blockNumber)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", chainio.GetOperatorHex(operator))
+		t.logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", chainio.GetOperatorHex(operator))
 		return nil, nil, err
 	}
 
@@ -201,22 +201,22 @@ func (t *Reader) GetOperatorStakes(ctx context.Context, operator [32]byte, block
 }
 
 func (t *Reader) GetBlockStaleMeasure(ctx context.Context) (uint32, error) {
-	blockStaleMeasure, err := t.Bindings.EigenDAServiceManager.BLOCKSTALEMEASURE(&bind.CallOpts{
+	blockStaleMeasure, err := t.bindings.EigenDAServiceManager.BLOCKSTALEMEASURE(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
-		t.Logger.Error("Failed to fetch BLOCK_STALE_MEASURE", err)
+		t.logger.Error("Failed to fetch BLOCK_STALE_MEASURE", err)
 		return *new(uint32), err
 	}
 	return blockStaleMeasure, nil
 }
 
 func (t *Reader) GetStoreDurationBlocks(ctx context.Context) (uint32, error) {
-	blockStaleMeasure, err := t.Bindings.EigenDAServiceManager.STOREDURATIONBLOCKS(&bind.CallOpts{
+	blockStaleMeasure, err := t.bindings.EigenDAServiceManager.STOREDURATIONBLOCKS(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
-		t.Logger.Error("Failed to fetch STORE_DURATION_BLOCKS", err)
+		t.logger.Error("Failed to fetch STORE_DURATION_BLOCKS", err)
 		return *new(uint32), err
 	}
 	return blockStaleMeasure, nil
@@ -231,11 +231,11 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []chai
 	}
 
 	// state_ is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
-	state_, err := t.Bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
+	state_, err := t.bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
 		Context: ctx,
-	}, t.Bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
+	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator state", "err", err)
+		t.logger.Error("Failed to fetch operator state", "err", err)
 		return nil, err
 	}
 
@@ -256,19 +256,19 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []chai
 }
 
 func (t *Reader) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
-	return t.Bindings.RegistryCoordinator.StakeRegistry(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.StakeRegistry(&bind.CallOpts{
 		Context: ctx,
 	})
 }
 
 func (t *Reader) OperatorIDToAddress(ctx context.Context, operatorId chainio.OperatorID) (gethcommon.Address, error) {
-	return t.Bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
+	return t.bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
 
 func (t *Reader) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (chainio.OperatorID, error) {
-	return t.Bindings.BLSApkRegistry.GetOperatorId(&bind.CallOpts{
+	return t.bindings.BLSApkRegistry.GetOperatorId(&bind.CallOpts{
 		Context: ctx,
 	}, address)
 }
@@ -278,18 +278,18 @@ func (t *Reader) BatchOperatorIDToAddress(ctx context.Context, operatorIds []cha
 	for i, id := range operatorIds {
 		byteIds[i] = [32]byte(id)
 	}
-	addresses, err := t.Bindings.OpStateRetriever.GetBatchOperatorFromId(&bind.CallOpts{
+	addresses, err := t.bindings.OpStateRetriever.GetBatchOperatorFromId(&bind.CallOpts{
 		Context: ctx,
-	}, t.Bindings.RegCoordinatorAddr, byteIds)
+	}, t.bindings.RegCoordinatorAddr, byteIds)
 	if err != nil {
-		t.Logger.Error("Failed to get operator address in batch", "err", err)
+		t.logger.Error("Failed to get operator address in batch", "err", err)
 		return nil, err
 	}
 	return addresses, nil
 }
 
 func (t *Reader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId chainio.OperatorID) (*big.Int, error) {
-	return t.Bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
@@ -303,9 +303,9 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 	// RPCs in the general case)
 	if len(operatorIds) == 1 {
 		byteId := [32]byte(operatorIds[0])
-		bitmap, err := t.Bindings.OpStateRetriever.GetQuorumBitmapsAtBlockNumber(&bind.CallOpts{
+		bitmap, err := t.bindings.OpStateRetriever.GetQuorumBitmapsAtBlockNumber(&bind.CallOpts{
 			Context: ctx,
-		}, t.Bindings.RegCoordinatorAddr, [][32]byte{byteId}, blockNumber)
+		}, t.bindings.RegCoordinatorAddr, [][32]byte{byteId}, blockNumber)
 		if err != nil {
 			if err.Error() == "execution reverted: RegistryCoordinator.getQuorumBitmapIndexAtBlockNumber: no bitmap update found for operatorId at block number" {
 				return []*big.Int{big.NewInt(0)}, nil
@@ -325,9 +325,9 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 	for i := 0; i < len(quorumNumbers); i++ {
 		quorumNumbers[i] = byte(uint8(i))
 	}
-	operatorsByQuorum, err := t.Bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
+	operatorsByQuorum, err := t.bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{
 		Context: ctx,
-	}, t.Bindings.RegCoordinatorAddr, quorumNumbers, blockNumber)
+	}, t.bindings.RegCoordinatorAddr, quorumNumbers, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -358,11 +358,11 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 
 func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID chainio.QuorumID) (*chainio.OperatorSetParam, error) {
 
-	operatorSetParams, err := t.Bindings.RegistryCoordinator.GetOperatorSetParams(&bind.CallOpts{
+	operatorSetParams, err := t.bindings.RegistryCoordinator.GetOperatorSetParams(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID)
 	if err != nil {
-		t.Logger.Error("Failed to fetch operator set params", "err", err)
+		t.logger.Error("Failed to fetch operator set params", "err", err)
 		return nil, err
 	}
 
@@ -375,13 +375,13 @@ func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID chainio.Quor
 
 // Returns the number of registered operators for the quorum.
 func (t *Reader) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID chainio.QuorumID) (uint32, error) {
-	return t.Bindings.IndexRegistry.TotalOperatorsForQuorum(&bind.CallOpts{
+	return t.bindings.IndexRegistry.TotalOperatorsForQuorum(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID)
 }
 
 func (t *Reader) WeightOfOperatorForQuorum(ctx context.Context, quorumID chainio.QuorumID, operator gethcommon.Address) (*big.Int, error) {
-	return t.Bindings.StakeRegistry.WeightOfOperatorForQuorum(&bind.CallOpts{
+	return t.bindings.StakeRegistry.WeightOfOperatorForQuorum(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID, operator)
 }
@@ -402,25 +402,25 @@ func (t *Reader) CalculateOperatorChurnApprovalDigestHash(
 			Operator:     operatorsToChurn[i].Operator,
 		}
 	}
-	return t.Bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
 		Context: ctx,
 	}, operatorAddress, operatorId, opKickParams, salt, expiry)
 }
 
 func (t *Reader) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	bn, err := t.EthClient.BlockNumber(ctx)
+	bn, err := t.ethClient.BlockNumber(ctx)
 	return uint32(bn), err
 }
 
 func (t *Reader) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
-	return t.Bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
 }
 
 func (t *Reader) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
-	requiredQuorums, err := t.Bindings.EigenDAServiceManager.QuorumNumbersRequired(&bind.CallOpts{
+	requiredQuorums, err := t.bindings.EigenDAServiceManager.QuorumNumbersRequired(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})
@@ -432,104 +432,104 @@ func (t *Reader) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint3
 
 func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
-	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)
+	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
+		t.logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
 		return err
 	}
 
 	delegationManagerAddr, err := contractEigenDAServiceManager.Delegation(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch DelegationManager address", "err", err)
+		t.logger.Error("Failed to fetch DelegationManager address", "err", err)
 		return err
 	}
 
 	avsDirectoryAddr, err := contractEigenDAServiceManager.AvsDirectory(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch AVSDirectory address", "err", err)
+		t.logger.Error("Failed to fetch AVSDirectory address", "err", err)
 		return err
 	}
 
-	contractAVSDirectory, err := avsdir.NewContractAVSDirectory(avsDirectoryAddr, t.EthClient)
+	contractAVSDirectory, err := avsdir.NewContractAVSDirectory(avsDirectoryAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch AVSDirectory contract", "err", err)
+		t.logger.Error("Failed to fetch AVSDirectory contract", "err", err)
 		return err
 	}
 
-	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.EthClient)
+	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch DelegationManager contract", "err", err)
+		t.logger.Error("Failed to fetch DelegationManager contract", "err", err)
 		return err
 	}
 
 	registryCoordinatorAddr, err := contractEigenDAServiceManager.RegistryCoordinator(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch RegistryCoordinator address", "err", err)
+		t.logger.Error("Failed to fetch RegistryCoordinator address", "err", err)
 		return err
 	}
 
-	contractIRegistryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddr, t.EthClient)
+	contractIRegistryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
+		t.logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
 		return err
 	}
 
 	contractEjectionManagerAddr, err := contractIRegistryCoordinator.Ejector(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch EjectionManager address", "err", err)
+		t.logger.Error("Failed to fetch EjectionManager address", "err", err)
 		return err
 	}
-	contractEjectionManager, err := ejectionmg.NewContractEjectionManager(contractEjectionManagerAddr, t.EthClient)
+	contractEjectionManager, err := ejectionmg.NewContractEjectionManager(contractEjectionManagerAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch EjectionManager contract", "err", err)
+		t.logger.Error("Failed to fetch EjectionManager contract", "err", err)
 		return err
 	}
 
-	contractBLSOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.EthClient)
+	contractBLSOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch BLSOperatorStateRetriever contract", "err", err)
+		t.logger.Error("Failed to fetch BLSOperatorStateRetriever contract", "err", err)
 		return err
 	}
 
 	blsPubkeyRegistryAddr, err := contractIRegistryCoordinator.BlsApkRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch BlsPubkeyRegistry address", "err", err)
+		t.logger.Error("Failed to fetch BlsPubkeyRegistry address", "err", err)
 		return err
 	}
 
-	t.Logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+	t.logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
 
-	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.EthClient)
+	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch IBLSApkRegistry contract", "err", err)
+		t.logger.Error("Failed to fetch IBLSApkRegistry contract", "err", err)
 		return err
 	}
 
 	indexRegistryAddr, err := contractIRegistryCoordinator.IndexRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch IndexRegistry address", "err", err)
+		t.logger.Error("Failed to fetch IndexRegistry address", "err", err)
 		return err
 	}
 
-	contractIIndexReg, err := indexreg.NewContractIIndexRegistry(indexRegistryAddr, t.EthClient)
+	contractIIndexReg, err := indexreg.NewContractIIndexRegistry(indexRegistryAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch IIndexRegistry contract", "err", err)
+		t.logger.Error("Failed to fetch IIndexRegistry contract", "err", err)
 		return err
 	}
 
 	stakeRegistryAddr, err := contractIRegistryCoordinator.StakeRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.Logger.Error("Failed to fetch StakeRegistry address", "err", err)
+		t.logger.Error("Failed to fetch StakeRegistry address", "err", err)
 		return err
 	}
 
-	contractStakeRegistry, err := stakereg.NewContractStakeRegistry(stakeRegistryAddr, t.EthClient)
+	contractStakeRegistry, err := stakereg.NewContractStakeRegistry(stakeRegistryAddr, t.ethClient)
 	if err != nil {
-		t.Logger.Error("Failed to fetch StakeRegistry contract", "err", err)
+		t.logger.Error("Failed to fetch StakeRegistry contract", "err", err)
 		return err
 	}
 
-	t.Bindings = &ContractBindings{
+	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
 		AVSDirectory:          contractAVSDirectory,
