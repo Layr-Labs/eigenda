@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
@@ -13,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/ejections"
 	"github.com/Layr-Labs/eigenda/tools/ejections/flags"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/urfave/cli"
 )
 
@@ -54,25 +57,32 @@ func RunScan(ctx *cli.Context) error {
 		logger.Warn("failed to fetch operator ejections", "operatorId", config.OperatorId, "error", err)
 		return errors.New("operator ejections not found")
 	}
+
+	rowConfigAutoMerge := table.RowConfig{AutoMerge: true}
+
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{"OperatorID", "Quorum", "Timestamp", "Txn"}, rowConfigAutoMerge)
+
+	sort.Slice(ejections, func(i, j int) bool {
+		return ejections[i].OperatorId < ejections[j].OperatorId
+	})
 	for _, ejection := range ejections {
-		logger.Info("ejection", "ts", ejection.BlockTimestamp, "txn", ejection.TransactionHash, "quorum", ejection.Quorum, "operatorId", ejection.OperatorId)
+		logger.Debug("ejection", "ts", ejection.BlockTimestamp, "txn", ejection.TransactionHash, "quorum", ejection.Quorum, "operatorId", ejection.OperatorId)
+		var link_prefix string
+		if strings.Contains(config.SubgraphEndpoint, "holesky") {
+			link_prefix = "https://holesky.etherscan.io/tx/"
+		} else {
+			link_prefix = "https://etherscan.io/tx/"
+		}
+		t.AppendRow(table.Row{ejection.OperatorId, ejection.Quorum, ejection.BlockTimestamp, link_prefix + ejection.TransactionHash}, rowConfigAutoMerge)
 	}
-
+	t.SetAutoIndex(true)
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, AutoMerge: true},
+		{Number: 2, Align: text.AlignCenter},
+	})
+	t.SetStyle(table.StyleLight)
+	t.Style().Options.SeparateRows = true
+	fmt.Println(t.Render())
 	return nil
-}
-
-func displayResults(results map[string]int) {
-	tw := table.NewWriter()
-
-	rowHeader := table.Row{"semver", "count"}
-	tw.AppendHeader(rowHeader)
-
-	total := 0
-	for semver, count := range results {
-		tw.AppendRow(table.Row{semver, count})
-		total += count
-	}
-	tw.AppendFooter(table.Row{"total", total})
-
-	fmt.Println(tw.Render())
 }
