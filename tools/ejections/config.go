@@ -11,6 +11,8 @@ type Config struct {
 	Days             int
 	OperatorId       string
 	SubgraphEndpoint string
+	First            uint
+	Skip             uint
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
@@ -18,6 +20,8 @@ func ReadConfig(ctx *cli.Context) *Config {
 		Days:             ctx.Int(flags.DaysFlag.Name),
 		OperatorId:       ctx.String(flags.OperatorIdFlag.Name),
 		SubgraphEndpoint: ctx.String(flags.SubgraphEndpointFlag.Name),
+		First:            ctx.Uint(flags.FirstFlag.Name),
+		Skip:             ctx.Uint(flags.SkipFlag.Name),
 	}
 }
 

@@ -45,17 +45,17 @@ func RunScan(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	logger.Info("starting ejections scanner", "subgraph", config.SubgraphEndpoint)
+	logger.Info("ejections", "subgraph", config.SubgraphEndpoint, "days", config.Days, "operatorId", config.OperatorId, "first", config.First, "skip", config.Skip)
 	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
 	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
 
-	ejections, err := subgraphClient.QueryOperatorEjectionsForTimeWindow(context.Background(), int32(config.Days), config.OperatorId)
+	ejections, err := subgraphClient.QueryOperatorEjectionsForTimeWindow(context.Background(), int32(config.Days), config.OperatorId, config.First, config.Skip)
 	if err != nil {
 		logger.Warn("failed to fetch operator ejections", "operatorId", config.OperatorId, "error", err)
 		return errors.New("operator ejections not found")
 	}
 	for _, ejection := range ejections {
-		logger.Info("ejection", "operatorId", ejection.OperatorId, "timestamp", ejection.BlockTimestamp, "txnHash", ejection.TransactionHash, "quorum", ejection.Quorum)
+		logger.Info("ejection", "ts", ejection.BlockTimestamp, "txn", ejection.TransactionHash, "quorum", ejection.Quorum, "operatorId", ejection.OperatorId)
 	}
 
 	return nil
