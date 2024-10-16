@@ -520,8 +520,8 @@ type ActiveReservation struct {
 	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
 	EndTimestamp   uint64
 
-	QuorumNumbers []uint8
-	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	QuorumNumbers []uint8 // allowed quorums
+	QuorumSplit   []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
 }
 
 type OnDemandPayment struct {

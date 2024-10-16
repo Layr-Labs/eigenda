@@ -219,7 +219,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // <= PaymentMetadata.CumulativePayment
 // <= nextPmt - nextPmtDataLength * m.FixedFeePerByte > nextPmt
 func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, blobLength uint) error {
-	if header.CumulativePayment.Cmp(&onDemandPayment.CumulativePayment) > 0 {
+	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
