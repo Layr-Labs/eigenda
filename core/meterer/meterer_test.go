@@ -187,6 +187,15 @@ func TestMetererReservations(t *testing.T) {
 	err := mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
+	// overwhelming bin overflow for empty bins
+	blob, header = createMetererInput(binIndex-1, 0, 10, quoromNumbers, accountID2)
+	err = mt.MeterRequest(ctx, *blob, *header)
+	assert.NoError(t, err)
+	// overwhelming bin overflow for empty bins
+	blob, header = createMetererInput(binIndex-1, 0, 1000, quoromNumbers, accountID2)
+	err = mt.MeterRequest(ctx, *blob, *header)
+	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
+
 	// test non-existent account
 	unregisteredUser, err := crypto.GenerateKey()
 	if err != nil {
@@ -240,15 +249,6 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "bin has already been filled")
-
-	// overwhelming bin overflow for empty bins (assuming all previous requests happened within the current reservation window)
-	blob, header = createMetererInput(binIndex-1, 0, 10, quoromNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
-	assert.NoError(t, err)
-	// overwhelming bin overflow for empty bins (assuming all previous requests happened within the current reservation window)
-	blob, header = createMetererInput(binIndex-1, 0, 1000, quoromNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
-	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 }
 
 func TestMetererOnDemand(t *testing.T) {
