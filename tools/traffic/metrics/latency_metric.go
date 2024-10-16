@@ -15,14 +15,19 @@ type LatencyMetric interface {
 type latencyMetric struct {
 	metrics     *metrics
 	description string
+	// disabled specifies whether the metrics should behave as a no-op
+	disabled bool
 }
 
 // ReportLatency reports the latency of an operation.
 func (metric *latencyMetric) ReportLatency(latency time.Duration) {
+	if metric.disabled {
+		return
+	}
 	metric.metrics.latency.WithLabelValues(metric.description).Observe(latency.Seconds())
 }
 
-// NewLatencyMetric creates a new prometheus collector for latency metrics.
+// buildLatencyCollector creates a new prometheus collector for latency metrics.
 func buildLatencyCollector(namespace string, registry *prometheus.Registry) *prometheus.SummaryVec {
 	return promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{

@@ -80,6 +80,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "INSTANCE_LAUNCH_INTERVAL"),
 	}
 
+	MetricsBlacklistFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-blacklist"),
+		Usage:    "Any metric with a label exactly matching this string will not be sent to the metrics server.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_BLACKLIST"),
+	}
+
+	MetricsFuzzyBlacklistFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-fuzzy-blacklist"),
+		Usage:    "Any metric that contains any string in this list will not be sent to the metrics server.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_FUZZY_BLACKLIST"),
+	}
+
 	/* Configuration for the blob writer. */
 
 	NumWriteInstancesFlag = cli.UintFlag{
@@ -238,6 +252,8 @@ var optionalFlags = []cli.Flag{
 	GetBlobStatusTimeoutFlag,
 	WriteTimeoutFlag,
 	VerificationChannelCapacityFlag,
+	MetricsBlacklistFlag,
+	MetricsFuzzyBlacklistFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

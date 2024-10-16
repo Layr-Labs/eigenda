@@ -77,7 +77,11 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
 
-	generatorMetrics := metrics.NewMetrics(config.MetricsHTTPPort, logger)
+	generatorMetrics := metrics.NewMetrics(
+		config.MetricsHTTPPort,
+		logger,
+		config.WorkerConfig.MetricsBlacklist,
+		config.WorkerConfig.MetricsFuzzyBlacklist)
 
 	blobTable := table.NewBlobStore()
 
