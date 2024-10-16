@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type AccountID = string
@@ -291,7 +293,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -469,4 +471,49 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 		c[quorum] = fr
 	}
 	return c, nil
+}
+
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
+	// Existing fields
+	AccountID string
+
+	// New fields
+	BinIndex uint32
+	// TODO: we are thinking the contract can use uint128 for cumulative payment,
+	// but the definition on v2 uses uint64. Double check with team.
+	CumulativePayment uint64
+}
+
+// Hash returns the Keccak256 hash of the PaymentMetadata
+func (pm *PaymentMetadata) Hash() []byte {
+	// Create a byte slice to hold the serialized data
+	data := make([]byte, 0, len(pm.AccountID)+12)
+
+	data = append(data, []byte(pm.AccountID)...)
+
+	binIndexBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(binIndexBytes, pm.BinIndex)
+	data = append(data, binIndexBytes...)
+
+	paymentBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(paymentBytes, pm.CumulativePayment)
+	data = append(data, paymentBytes...)
+
+	return crypto.Keccak256(data)
+}
+
+// OperatorInfo contains information about an operator which is stored on the blockchain state,
+// corresponding to a particular quorum
+type ActiveReservation struct {
+	DataRate       uint64 // Bandwidth per reservation bin
+	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
+	EndTimestamp   uint64
+
+	QuorumNumbers []uint8
+	QuorumSplit   []byte // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+}
+
+type OnDemandPayment struct {
+	CumulativePayment *big.Int // Total amount deposited by the user
 }
