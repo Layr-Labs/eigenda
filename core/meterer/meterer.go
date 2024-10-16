@@ -101,6 +101,9 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 }
 
 // ValidateQuorums ensures that the quorums listed in the blobHeader are present within allowedQuorums
+// Note: A reservation that does not utilize all of the allowed quorums will be accepted. However, it
+// will still charge against all of the allowed quorums. A on-demand requrests require and only allow
+// the ETH and EIGEN quorums.
 func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 	if len(headerQuorums) == 0 {
 		return fmt.Errorf("no quorum params in blob header")
@@ -130,8 +133,8 @@ func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *cor
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 // TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, blobLength uint) error {
-	numSymbols := uint64(max(blobLength, uint(m.MinNumSymbols)))
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), numSymbols)
+	numSymbols := m.SymbolsCharged(blobLength)
+	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), uint64(numSymbols))
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -140,7 +143,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	usageLimit := m.GetReservationBinLimit(reservation)
 	if newUsage <= usageLimit {
 		return nil
-	} else if newUsage-numSymbols >= usageLimit {
+	} else if newUsage-uint64(numSymbols) >= usageLimit {
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
