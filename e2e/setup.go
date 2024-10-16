@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,8 @@ import (
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 
 	"github.com/stretchr/testify/require"
+	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
+	redistc "github.com/testcontainers/testcontainers-go/modules/redis"
 )
 
 const (
@@ -36,6 +39,71 @@ const (
 	host       = "127.0.0.1"
 	holeskyDA  = "disperser-holesky.eigenda.xyz:443"
 )
+
+var (
+	// set by startMinioContainer
+	minioEndpoint = ""
+	// set by startRedisContainer
+	redisEndpoint = ""
+)
+
+// TODO: we shouldn't start the containers in the init function like this.
+// Need to find a better way to start the containers and set the endpoints.
+// Even better would be for the endpoints not to be global variables injected into the test configs.
+// Starting the containers on init like this also makes it harder to import this file into other tests.
+func init() {
+	err := startMinIOContainer()
+	if err != nil {
+		panic(err)
+	}
+	err = startRedisContainer()
+	if err != nil {
+		panic(err)
+	}
+}
+
+// startMinIOContainer starts a MinIO container and sets the minioEndpoint global variable
+func startMinIOContainer() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	minioContainer, err := miniotc.Run(ctx,
+		"minio/minio:RELEASE.2024-10-02T17-50-41Z",
+		miniotc.WithUsername("minioadmin"),
+		miniotc.WithPassword("minioadmin"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to start MinIO container: %w", err)
+	}
+
+	endpoint, err := minioContainer.Endpoint(ctx, "")
+	if err != nil {
+		return fmt.Errorf("failed to get MinIO endpoint: %w", err)
+	}
+
+	minioEndpoint = strings.TrimPrefix(endpoint, "http://")
+	return nil
+}
+
+// startRedisContainer starts a Redis container and sets the redisEndpoint global variable
+func startRedisContainer() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	redisContainer, err := redistc.Run(ctx,
+		"docker.io/redis:7",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to start Redis container: %w", err)
+	}
+
+	endpoint, err := redisContainer.Endpoint(ctx, "")
+	if err != nil {
+		return fmt.Errorf("failed to get Redis endpoint: %w", err)
+	}
+	redisEndpoint = endpoint
+	return nil
+}
 
 type Cfg struct {
 	UseMemory  bool
@@ -60,7 +128,7 @@ func TestConfig(useMemory bool) *Cfg {
 
 func createRedisConfig(eigendaCfg server.Config) server.CLIConfig {
 	eigendaCfg.RedisConfig = redis.Config{
-		Endpoint: "127.0.0.1:9001",
+		Endpoint: redisEndpoint,
 		Password: "",
 		DB:       0,
 		Eviction: 10 * time.Minute,
@@ -80,7 +148,7 @@ func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 		Profiling:       true,
 		Bucket:          bucketName,
 		Path:            "",
-		Endpoint:        "localhost:4566",
+		Endpoint:        minioEndpoint,
 		EnableTLS:       false,
 		AccessKeySecret: "minioadmin",
 		AccessKeyID:     "minioadmin",
@@ -222,7 +290,7 @@ func (ts *TestSuite) Address() string {
 
 func createS3Bucket(bucketName string) {
 	// Initialize minio client object.
-	endpoint := "localhost:4566"
+	endpoint := minioEndpoint
 	accessKeyID := "minioadmin"
 	secretAccessKey := "minioadmin"
 	useSSL := false

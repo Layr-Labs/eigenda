@@ -11,9 +11,6 @@ LDFLAGSSTRING +=-X main.Date=$(BUILD_TIME)
 LDFLAGSSTRING +=-X main.Version=$(GIT_TAG)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
-E2ETEST = INTEGRATION=true go test -timeout 1m ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
-HOLESKYTEST = TESTNET=true go test -timeout 50m ./e2e  -parallel 4 -deploy-config ../.devnet/devnetL1.json
-
 .PHONY: eigenda-proxy
 eigenda-proxy:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
@@ -22,22 +19,6 @@ eigenda-proxy:
 docker-build:
 	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
 	@docker build -t ghcr.io/layr-labs/eigenda-proxy:dev .
-
-run-minio:
-	docker run -p 4566:9000 -d -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" --name minio minio/minio server /data
-
-run-redis:
-	docker run -p 9001:6379 -d --name redis redis
-
-stop-minio:
-	@if [ -n "$$(docker ps -q -f name=minio)" ]; then \
-		docker stop minio && docker rm minio; \
-	fi
-
-stop-redis:
-	@if [ -n "$$(docker ps -q -f name=redis)" ]; then \
-		docker stop redis && docker rm redis; \
-	fi
 
 run-memstore-server:
 	./bin/eigenda-proxy --memstore.enabled
@@ -51,15 +32,11 @@ clean:
 test:
 	go test ./... -parallel 4 
 
-e2e-test: stop-minio stop-redis run-minio run-redis
-	$(E2ETEST) && \
-	make stop-minio && \
-	make stop-redis
+e2e-test:
+	INTEGRATION=true go test -timeout 1m ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
 
-holesky-test: stop-minio stop-redis run-minio run-redis
-	$(HOLESKYTEST) && \
-	make stop-minio && \
-	make stop-redis
+holesky-test:
+	TESTNET=true go test -timeout 50m ./e2e  -parallel 4 -deploy-config ../.devnet/devnetL1.json
 
 .PHONY: lint
 lint:

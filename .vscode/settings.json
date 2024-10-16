@@ -1,0 +1,11 @@
+{
+  "go.testEnvVars": {
+    "INTEGRATION": "true"
+  },
+  "go.testFlags": [
+    "-test.parallel",
+    "4",
+    "-deploy-config",
+    "../.devnet/devnetL1.json"
+  ]
+}
