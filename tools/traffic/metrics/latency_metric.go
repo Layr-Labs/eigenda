@@ -15,7 +15,7 @@ type LatencyMetric interface {
 type latencyMetric struct {
 	metrics     *metrics
 	description string
-	// If true, the metric is disabled and should behave as a no-op.
+	// disabled specifies whether the metrics should behave as a no-op
 	disabled bool
 }
 
