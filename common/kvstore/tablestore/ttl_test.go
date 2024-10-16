@@ -288,9 +288,8 @@ func TestMultiTableBatchRandomDataExpired(t *testing.T) {
 				assert.NoError(t, err)
 
 				fullyQualifiedKey := table.TableKey(key)
-				stringifiedFullyQualifiedKey := string(fullyQualifiedKey)
 
-				keyExpirationTime := expiryTimes[stringifiedFullyQualifiedKey]
+				keyExpirationTime := expiryTimes[string(fullyQualifiedKey)]
 				expired := !currentTime.Before(keyExpirationTime)
 
 				if expired {

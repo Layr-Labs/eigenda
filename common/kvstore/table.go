@@ -2,9 +2,6 @@ package kvstore
 
 import "errors"
 
-// ErrTableLimitExceeded is returned when the maximum number of tables has been reached.
-var ErrTableLimitExceeded = errors.New("table limit exceeded") // TODO
-
 // ErrTableNotFound is returned when a table is not found.
 var ErrTableNotFound = errors.New("table not found")
 
