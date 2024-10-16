@@ -625,14 +625,14 @@ paths:
         is a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
-  /operators-info/ejected-operators:
+  /operators-info/operator-ejections:
     get:
       parameters:
       - description: 'Lookback in days [default: 1]'
         in: query
         name: days
         type: integer
-      - description: Operator ID
+      - description: Operator ID filter
         in: query
         name: operator_id
         type: string
@@ -655,7 +655,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch list of operators that have been ejected over lookback days interval.
+      summary: Fetch list of operator ejections over last N days.
       tags:
       - OperatorsInfo
   /operators-info/operators-stake:

@@ -883,7 +883,7 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators-info/ejected-operators [get]
+//	@Router		/operators-info/operator-ejections [get]
 func (s *server) FetchOperatorEjections(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds

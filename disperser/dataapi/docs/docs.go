@@ -528,7 +528,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/ejected-operators": {
+        "/operators-info/operator-ejections": {
             "get": {
                 "produces": [
                     "application/json"
@@ -536,7 +536,7 @@ const docTemplate = `{
                 "tags": [
                     "OperatorsInfo"
                 ],
-                "summary": "Fetch list of operators that have been ejected over lookback days interval.",
+                "summary": "Fetch list of operator ejections over last N days.",
                 "parameters": [
                     {
                         "type": "integer",
@@ -546,7 +546,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Operator ID",
+                        "description": "Operator ID filter",
                         "name": "operator_id",
                         "in": "query"
                     }

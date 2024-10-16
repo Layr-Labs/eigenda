@@ -524,7 +524,7 @@
                 }
             }
         },
-        "/operators-info/ejected-operators": {
+        "/operators-info/operator-ejections": {
             "get": {
                 "produces": [
                     "application/json"
@@ -532,7 +532,7 @@
                 "tags": [
                     "OperatorsInfo"
                 ],
-                "summary": "Fetch list of operators that have been ejected over lookback days interval.",
+                "summary": "Fetch list of operator ejections over last N days.",
                 "parameters": [
                     {
                         "type": "integer",
@@ -542,7 +542,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Operator ID",
+                        "description": "Operator ID filter",
                         "name": "operator_id",
                         "in": "query"
                     }
