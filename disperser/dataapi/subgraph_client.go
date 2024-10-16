@@ -288,7 +288,7 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 
 	var err error
-	var ejections = make([]*subgraph.OperatorEjection, 0)
+	var ejections []*subgraph.OperatorEjection
 
 	if operatorId == "" {
 		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds)

@@ -276,7 +276,7 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
-			operatorsInfo.GET("/ejected-operators", s.FetchEjectedOperators)
+			operatorsInfo.GET("/operator-ejections", s.FetchOperatorEjections)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 			operatorsInfo.GET("/semver-scan", s.SemverScan)
@@ -872,21 +872,21 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 	})
 }
 
-// FetchEjectedOperators godoc
+// FetchOperatorEjections godoc
 //
-//	@Summary	Fetch list of operators that have been ejected over lookback days interval.
+//	@Summary	Fetch list of operator ejections over last N days.
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		days		query		int		false	"Lookback in days [default: 1]"
-//	@Param		operator_id	query		string	false	"Operator ID"
+//	@Param		operator_id	query		string	false	"Operator ID filter"
 //	@Success	200			{object}	QueriedOperatorEjectionsResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/ejected-operators [get]
-func (s *server) FetchEjectedOperators(c *gin.Context) {
+func (s *server) FetchOperatorEjections(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchEjectedOperators", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
@@ -905,15 +905,15 @@ func (s *server) FetchEjectedOperators(c *gin.Context) {
 		return
 	}
 
-	operatorEjections, err := s.getOperatorEjectionsForDays(c.Request.Context(), int32(daysInt), operatorId)
+	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId)
 	if err != nil {
 		s.logger.Error("Failed to fetch ejected operators", "error", err)
-		s.metrics.IncrementFailedRequestNum("FetchEjectedOperators")
+		s.metrics.IncrementFailedRequestNum("FetchOperatorEjections")
 		errorResponse(c, err)
 		return
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchEjectedOperators")
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorEjections")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxEjectedOperatorAge))
 	c.JSON(http.StatusOK, QueriedOperatorEjectionsResponse{
 		Ejections: operatorEjections,
