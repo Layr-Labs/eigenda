@@ -36,11 +36,11 @@ type (
 		BlockTimestamp graphql.String
 	}
 	OperatorEjection struct {
-		OperatorId      graphql.String `graphql:"operatorId"`
-		QuorumNumber    graphql.String `graphql:"quorumNumber"`
-		BlockNumber     graphql.String `graphql:"blockNumber"`
-		BlockTimestamp  graphql.String `graphql:"blockTimestamp"`
-		TransactionHash graphql.String `graphql:"transactionHash"`
+		OperatorId      graphql.String
+		QuorumNumber    graphql.Int
+		BlockNumber     graphql.String
+		BlockTimestamp  graphql.String
+		TransactionHash graphql.String
 	}
 	BatchNonSigningOperatorIds struct {
 		NonSigning struct {

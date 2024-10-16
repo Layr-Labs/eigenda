@@ -149,7 +149,7 @@ type (
 	QueriedOperatorEjections struct {
 		OperatorId      string `json:"operator_id"`
 		Quorum          uint8  `json:"quorum"`
-		BlockNumber     uint   `json:"block_number"`
+		BlockNumber     uint64 `json:"block_number"`
 		BlockTimestamp  string `json:"block_timestamp"`
 		TransactionHash string `json:"transaction_hash"`
 	}

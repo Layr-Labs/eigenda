@@ -304,20 +304,13 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 
 	queriedEjections := make([]*QueriedOperatorEjections, len(ejections))
 	for i, ejection := range ejections {
-		quorumNumber, err := strconv.ParseUint(string(ejection.QuorumNumber), 10, 8)
+		blockNumber, err := strconv.ParseUint(string(ejection.BlockNumber), 10, 64)
 		if err != nil {
-			fmt.Println("Error parsing quorumNumber:", err)
-			return nil, err
-		}
-		blockNumber, err := strconv.ParseUint(string(ejection.BlockNumber), 10, 32)
-		if err != nil {
-			fmt.Println("Error parsing blockNumber:", err)
 			return nil, err
 		}
 
 		timestamp, err := strconv.ParseInt(string(ejection.BlockTimestamp), 10, 64)
 		if err != nil {
-			fmt.Println("Error parsing timestamp:", err)
 			return nil, err
 		}
 
@@ -325,8 +318,8 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 		blockTimestamp := t.Format(time.RFC3339)
 		queriedEjections[i] = &QueriedOperatorEjections{
 			OperatorId:      string(ejection.OperatorId),
-			Quorum:          uint8(quorumNumber),
-			BlockNumber:     uint(blockNumber),
+			Quorum:          uint8(ejection.QuorumNumber),
+			BlockNumber:     blockNumber,
 			BlockTimestamp:  blockTimestamp,
 			TransactionHash: string(ejection.TransactionHash),
 		}
