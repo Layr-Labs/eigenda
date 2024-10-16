@@ -42,7 +42,8 @@ const (
 	maxOperatorsNonsigningPercentageAge = 10
 	maxOperatorPortCheckAge             = 60
 	maxNonSignerAge                     = 10
-	maxDeregisteredOperatorAage         = 10
+	maxDeregisteredOperatorAge          = 10
+	maxEjectedOperatorAge               = 10
 	maxThroughputAge                    = 10
 	maxMetricAage                       = 10
 	maxFeedBlobsAge                     = 10
@@ -143,6 +144,17 @@ type (
 	QueriedStateOperatorsResponse struct {
 		Meta Meta                            `json:"meta"`
 		Data []*QueriedStateOperatorMetadata `json:"data"`
+	}
+
+	QueriedOperatorEjections struct {
+		OperatorId      string `json:"operator_id"`
+		Quorum          uint8  `json:"quorum"`
+		BlockNumber     uint   `json:"block_number"`
+		BlockTimestamp  string `json:"block_timestamp"`
+		TransactionHash string `json:"transaction_hash"`
+	}
+	QueriedOperatorEjectionsResponse struct {
+		Ejections []*QueriedOperatorEjections `json:"ejections"`
 	}
 
 	ServiceAvailability struct {
@@ -264,6 +276,7 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/ejected-operators", s.FetchEjectedOperators)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 			operatorsInfo.GET("/semver-scan", s.SemverScan)
@@ -801,7 +814,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
@@ -850,12 +863,59 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
+	})
+}
+
+// FetchEjectedOperators godoc
+//
+//	@Summary	Fetch list of operators that have been ejected over days. Days is a query parameter with a default value of 1 and max value of 30.
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Success	200	{object}	QueriedStateOperatorsResponse
+//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404	{object}	ErrorResponse	"error: Not found"
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/ejected-operators [get]
+func (s *server) FetchEjectedOperators(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchEjectedOperators", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	// Get query parameters
+	// Default Value 14 days
+	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
+
+	// Convert days to integer
+	daysInt, err := strconv.Atoi(days)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+
+	if daysInt > 30 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
+		return
+	}
+
+	operatorEjections, err := s.getEjectedOperatorForDays(c.Request.Context(), int32(daysInt))
+	if err != nil {
+		s.logger.Error("Failed to fetch ejected operators", "error", err)
+		s.metrics.IncrementFailedRequestNum("FetchEjectedOperators")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchEjectedOperators")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxEjectedOperatorAge))
+	c.JSON(http.StatusOK, QueriedOperatorEjectionsResponse{
+		Ejections: operatorEjections,
 	})
 }
 

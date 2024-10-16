@@ -96,6 +96,21 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 	return RegisteredOperatorMetadata, nil
 }
 
+// Function to get ejected operators for given number of days
+// Queries subgraph for ejected operators
+// Returns list of Operators with their quorum, block number, txn and timestemp they were ejected
+func (s *server) getEjectedOperatorForDays(ctx context.Context, days int32) ([]*QueriedOperatorEjections, error) {
+	startTime := time.Now()
+
+	operatorEjections, err := s.subgraphClient.QueryIndexedOperatorEjectionsForTimeWindow(ctx, days)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Info("Time taken to get ejected operators for days", "days", days, "duration", time.Since(startTime))
+	return operatorEjections, nil
+}
+
 func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
 	operators := queriedOperatorsInfo.Operators
 	wp := workerpool.New(poolSize)

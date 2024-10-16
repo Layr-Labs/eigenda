@@ -35,6 +35,13 @@ type (
 		BlockNumber    graphql.String
 		BlockTimestamp graphql.String
 	}
+	OperatorEjection struct {
+		OperatorId      graphql.String `graphql:"operatorId"`
+		QuorumNumber    graphql.String `graphql:"quorumNumber"`
+		BlockNumber     graphql.String `graphql:"blockNumber"`
+		BlockTimestamp  graphql.String `graphql:"blockTimestamp"`
+		TransactionHash graphql.String `graphql:"transactionHash"`
+	}
 	BatchNonSigningOperatorIds struct {
 		NonSigning struct {
 			NonSigners []struct {
@@ -104,5 +111,11 @@ type (
 	}
 	queryOperatorRemovedFromQuorum struct {
 		OperatorRemovedFromQuorum []*OperatorQuorum `graphql:"operatorRemovedFromQuorums(first: $first, skip: $skip, orderBy: blockTimestamp, where: {and: [{blockNumber_gt: $blockNumber_gt}, {blockNumber_lt: $blockNumber_lt}]})"`
+	}
+	queryOperatorEjectedsGteBlockTimestamp struct {
+		OperatorEjections []*OperatorEjection `graphql:"operatorEjecteds(orderBy: blockTimestamp, where: {blockTimestamp_gte: $blockTimestamp_gte})"`
+	}
+	queryOperatorEjectedsByOperatorID struct {
+		OperatorEjections []*OperatorEjection `graphql:"operatorEjecteds(orderBy: blockTimestamp, where: {and: [{blockTimestamp_gte: $blockTimestamp_gte}, {operatorId: $operatorId}]})"`
 	}
 )

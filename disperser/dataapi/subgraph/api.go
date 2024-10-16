@@ -27,6 +27,8 @@ type (
 		QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, operatorId string, blockNumber uint32) (*IndexedOperatorInfo, error)
 		QueryOperatorAddedToQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
+		QueryOperatorEjectionsByOperatorId(ctx context.Context, operatorId string, blockTimestamp uint64) ([]*OperatorEjection, error)
+		QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*OperatorEjection, error)
 	}
 
 	api struct {
@@ -207,6 +209,37 @@ func (a *api) QueryOperatorInfoByOperatorIdAtBlockNumber(ctx context.Context, op
 	}
 
 	return &query.Operator, nil
+}
+
+func (a *api) QueryOperatorEjectionsByOperatorId(ctx context.Context, operatorId string, blockTimestamp uint64) ([]*OperatorEjection, error) {
+	var (
+		query     queryOperatorEjectedsByOperatorID
+		variables = map[string]any{
+			"blockTimestamp_gte": graphql.Int(blockTimestamp),
+			"operatorId":         graphql.String(fmt.Sprintf("0x%s", operatorId)),
+		}
+	)
+	err := a.operatorStateGql.Query(context.Background(), &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return query.OperatorEjections, nil
+}
+
+func (a *api) QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64) ([]*OperatorEjection, error) {
+	var (
+		query     queryOperatorEjectedsGteBlockTimestamp
+		variables = map[string]any{
+			"blockTimestamp_gte": graphql.Int(blockTimestamp),
+		}
+	)
+	err := a.operatorStateGql.Query(context.Background(), &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return query.OperatorEjections, nil
 }
 
 // QueryOperatorAddedToQuorum finds operators' quorum opt-in history in range [startBlock, endBlock].
