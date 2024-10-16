@@ -490,22 +490,24 @@ type PaymentMetadata struct {
 	BinIndex uint32
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
-	CumulativePayment uint64
+	CumulativePayment big.Int
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
 func (pm *PaymentMetadata) Hash() []byte {
 	// Create a byte slice to hold the serialized data
-	data := make([]byte, 0, len(pm.AccountID)+12)
+	data := make([]byte, 0, len(pm.AccountID)+4+pm.CumulativePayment.BitLen()/8+1)
 
+	// Append AccountID
 	data = append(data, []byte(pm.AccountID)...)
 
+	// Append BinIndex
 	binIndexBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(binIndexBytes, pm.BinIndex)
 	data = append(data, binIndexBytes...)
 
-	paymentBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(paymentBytes, pm.CumulativePayment)
+	// Append CumulativePayment
+	paymentBytes := pm.CumulativePayment.Bytes()
 	data = append(data, paymentBytes...)
 
 	return crypto.Keccak256(data)

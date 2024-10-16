@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -140,7 +141,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(paymentMetadata.CumulativePayment, 10)},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
 		},
 	)
 	if err != nil {
@@ -152,7 +153,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	err = s.dynamoClient.PutItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(paymentMetadata.CumulativePayment, 10)},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
 			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(symbolsCharged), 10)},
 		},
 	)
@@ -164,11 +165,11 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 }
 
 // RemoveOnDemandPayment removes a specific payment from the list for a specific account
-func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID string, payment uint64) error {
+func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID string, payment big.Int) error {
 	err := s.dynamoClient.DeleteItem(ctx, s.onDemandTableName,
 		commondynamodb.Key{
 			"AccountID":          &types.AttributeValueMemberS{Value: accountID},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatUint(payment, 10)},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: payment.String()},
 		},
 	)
 
@@ -181,14 +182,14 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 
 // GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, blob size of next payment
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
-func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment uint64) (uint64, uint64, uint32, error) {
+func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment big.Int) (uint64, uint64, uint32, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.onDemandTableName),
 		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments < :cumulativePayment"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
-			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
+			":cumulativePayment": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
 		},
 		ScanIndexForward: aws.Bool(false),
 		Limit:            aws.Int32(1),
@@ -211,7 +212,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments > :cumulativePayment"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
-			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
+			":cumulativePayment": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
 		},
 		ScanIndexForward: aws.Bool(true),
 		Limit:            aws.Int32(1),

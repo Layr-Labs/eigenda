@@ -62,7 +62,7 @@ func NewMeterer(
 func (m *Meterer) MeterRequest(ctx context.Context, blob core.Blob, header core.PaymentMetadata) error {
 	headerQuorums := blob.GetQuorumNumbers()
 	// Validate against the payment method
-	if header.CumulativePayment == 0 {
+	if header.CumulativePayment.Sign() == 0 {
 		reservation, err := m.ChainState.GetActiveReservationByAccount(ctx, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
@@ -203,7 +203,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // <= PaymentMetadata.CumulativePayment
 // <= nextPmt - nextPmtDataLength * m.FixedFeePerByte > nextPmt
 func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, blobLength uint) error {
-	if header.CumulativePayment > uint64(onDemandPayment.CumulativePayment) {
+	if header.CumulativePayment.Cmp(&onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
@@ -212,11 +212,11 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+m.PaymentCharged(blobLength) > header.CumulativePayment {
+	if prevPmt+m.PaymentCharged(blobLength) > header.CumulativePayment.Uint64() {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && header.CumulativePayment+m.PaymentCharged(uint(nextPmtDataLength)) > nextPmt {
+	if nextPmt != 0 && header.CumulativePayment.Uint64()+m.PaymentCharged(uint(nextPmtDataLength)) > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments

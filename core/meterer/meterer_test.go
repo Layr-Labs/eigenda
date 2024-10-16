@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
 	"testing"
@@ -131,8 +132,8 @@ func setup(_ *testing.M) {
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
 	account1Reservations = core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
 	account2Reservations = core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
-	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: 3864}
-	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: 2000}
+	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: *big.NewInt(3864)}
+	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: *big.NewInt(2000)}
 
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
@@ -483,7 +484,7 @@ func createMetererInput(binIndex uint32, cumulativePayment uint64, dataLength ui
 	header = &core.PaymentMetadata{
 		AccountID:         accountID,
 		BinIndex:          binIndex,
-		CumulativePayment: cumulativePayment,
+		CumulativePayment: *big.NewInt(int64(cumulativePayment)),
 	}
 	return blob, header
 }
