@@ -11,6 +11,8 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -181,19 +183,20 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
 func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment uint64) (uint64, uint64, uint32, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
-	smallerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",
-		"AccountID = :account AND CumulativePayments < :cumulativePayment",
-		commondynamodb.ExpressionValues{
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.onDemandTableName),
+		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments < :cumulativePayment"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
 			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
 		},
-		false, // Retrieve results in descending order for the largest smaller amount
-		1,
-	)
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(1),
+	}
+	smallerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("failed to query smaller payments for account: %w", err)
 	}
-
 	var prevPayment uint64
 	if len(smallerResult) > 0 {
 		prevPayment, err = strconv.ParseUint(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
@@ -203,15 +206,17 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 
 	// Fetch the smallest entry larger than the given cumulativePayment
-	largerResult, err := s.dynamoClient.QueryIndexOrderWithLimit(ctx, s.onDemandTableName, "AccountIDIndex",
-		"AccountID = :account AND CumulativePayments > :cumulativePayment",
-		commondynamodb.ExpressionValues{
+	queryInput = &dynamodb.QueryInput{
+		TableName:              aws.String(s.onDemandTableName),
+		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments > :cumulativePayment"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
 			":cumulativePayment": &types.AttributeValueMemberN{Value: strconv.FormatUint(cumulativePayment, 10)},
 		},
-		true, // Retrieve results in ascending order for the smallest greater amount
-		1,
-	)
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(1),
+	}
+	largerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
 	}

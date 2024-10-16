@@ -39,9 +39,12 @@ var (
 	account2OnDemandPayments core.OnDemandPayment
 	mt                       *meterer.Meterer
 
-	deployLocalStack  bool
-	localStackPort    = "4566"
-	paymentChainState = &mock.MockOnchainPaymentState{}
+	deployLocalStack           bool
+	localStackPort             = "4566"
+	paymentChainState          = &mock.MockOnchainPaymentState{}
+	ondemandTableName          = "ondemand-meterer-test"
+	reservationTableName       = "reservations-meterer-test"
+	globalReservationTableName = "global-reservation-meterer-test"
 )
 
 func TestMain(m *testing.M) {
@@ -92,13 +95,11 @@ func setup(_ *testing.M) {
 		teardown()
 		panic("failed to generate private key")
 	}
-	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
 	privateKey2, err := crypto.GenerateKey()
 	if err != nil {
 		teardown()
 		panic("failed to generate private key")
 	}
-	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
@@ -109,17 +110,17 @@ func setup(_ *testing.M) {
 		ChainReadTimeout:       3 * time.Second,
 	}
 
-	err = meterer.CreateReservationTable(clientConfig, "reservations")
+	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
 	if err != nil {
 		teardown()
 		panic("failed to create reservation table")
 	}
-	err = meterer.CreateOnDemandTable(clientConfig, "ondemand")
+	err = meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
 	if err != nil {
 		teardown()
 		panic("failed to create ondemand table")
 	}
-	err = meterer.CreateGlobalReservationTable(clientConfig, "global")
+	err = meterer.CreateGlobalReservationTable(clientConfig, globalReservationTableName)
 	if err != nil {
 		teardown()
 		panic("failed to create global reservation table")
@@ -135,9 +136,9 @@ func setup(_ *testing.M) {
 
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
-		"reservations",
-		"ondemand",
-		"global",
+		reservationTableName,
+		ondemandTableName,
+		globalReservationTableName,
 		logger,
 	)
 
@@ -169,7 +170,7 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	meterer.CreateReservationTable(clientConfig, "reservations")
+	meterer.CreateReservationTable(clientConfig, reservationTableName)
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	quoromNumbers := []uint8{0, 1}
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
@@ -197,7 +198,6 @@ func TestMetererReservations(t *testing.T) {
 
 	// test invalid bin index
 	blob, header = createMetererInput(binIndex, 0, 2000, quoromNumbers, accountID1)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "invalid bin index for reservation")
 
@@ -205,10 +205,9 @@ func TestMetererReservations(t *testing.T) {
 	dataLength := uint(20)
 	for i := 0; i < 9; i++ {
 		blob, header = createMetererInput(binIndex, 0, dataLength, quoromNumbers, accountID2)
-		assert.NoError(t, err)
 		err = mt.MeterRequest(ctx, *blob, *header)
 		assert.NoError(t, err)
-		item, err := dynamoClient.GetItem(ctx, "reservations", commondynamodb.Key{
+		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID": &types.AttributeValueMemberS{Value: accountID2},
 			"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(binIndex))},
 		})
@@ -224,7 +223,7 @@ func TestMetererReservations(t *testing.T) {
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.NoError(t, err)
 	overflowedBinIndex := binIndex + 2
-	item, err := dynamoClient.GetItem(ctx, "reservations", commondynamodb.Key{
+	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID2},
 		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedBinIndex))},
 	})
@@ -239,17 +238,16 @@ func TestMetererReservations(t *testing.T) {
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "bin has already been filled")
 
-	// overwhelming bin overflow for empty bins (assuming all previous requests happened within 1 reservation window)
+	// overwhelming bin overflow for empty bins (assuming all previous requests happened within the current reservation window)
 	blob, header = createMetererInput(binIndex-1, 0, 1000, quoromNumbers, accountID2)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 }
 
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
-	meterer.CreateOnDemandTable(clientConfig, "ondemand")
-	meterer.CreateGlobalReservationTable(clientConfig, "global")
+	meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
+	meterer.CreateGlobalReservationTable(clientConfig, globalReservationTableName)
 	quorumNumbers := []uint8{0, 1}
 	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
 
@@ -274,18 +272,15 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test invalid quorom ID
 	blob, header = createMetererInput(1, 1, 1000, []uint8{0, 1, 2}, accountID1)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
 	blob, header = createMetererInput(0, 1, 2000, quorumNumbers, accountID1)
-
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	// No rollback after meter request
-	result, err := dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpressionValues{
+	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID1,
 		}})
@@ -309,24 +304,21 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test cumulative payment on-chain constraint
 	blob, header = createMetererInput(binIndex, 1001, 1, quorumNumbers, accountID2)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "invalid on-demand payment: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
 	blob, header = createMetererInput(binIndex, 901, 2, quorumNumbers, accountID2)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
 
 	// test cannot insert cumulative payment in out of order
 	blob, header = createMetererInput(binIndex, 50, 50, quorumNumbers, accountID2)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
 	numPrevRecords := 12
-	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpressionValues{
+	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2,
 		}})
@@ -334,11 +326,10 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, numPrevRecords, len(result))
 	// test failed global rate limit
 	blob, header = createMetererInput(binIndex, 1002, 1001, quorumNumbers, accountID1)
-	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
-	result, err = dynamoClient.QueryIndex(ctx, "ondemand", "AccountIDIndex", "AccountID = :account", commondynamodb.ExpressionValues{
+	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2,
 		}})
