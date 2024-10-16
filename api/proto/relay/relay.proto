@@ -43,8 +43,8 @@ message RequestedBlob {
   oneof data {
     // The blob requested.
     bytes blob = 1;
-    // The error that occurred while trying to fetch the blob.
-    RelayError error_code = 2;
+    // An error (if any) that occurred while trying to fetch the blob.
+    RelayError error = 2;
   }
 }
 
@@ -81,8 +81,8 @@ message BlobChunks {
   oneof blob {
     // The chunks requested.
     Chunks chunks = 1;
-    // The error that occurred while trying to fetch the chunks.
-    RelayError error_code = 2;
+    // An error (if any) that occurred while trying to fetch the chunks.
+    RelayError error = 2;
   }
 }
 
@@ -90,8 +90,16 @@ message Chunks {
   repeated common.ChunkData chunks = 1;
 }
 
-// The error that occurred while trying to fetch a blob or chunks.
-enum RelayError {
+// An error that occurred while trying to fetch a blob or chunks.
+message RelayError {
+  // The error code that occurred while trying to fetch a blob or chunks.
+  RelayErrorCode error_code = 1;
+  // A message explaining the error that occurred.
+  string message = 2;
+}
+
+// The error codes that can occur while trying to fetch a blob or chunks.
+enum RelayErrorCode {
   // This relay does not know about the requested blob or the requested blob is assigned to a different relay.
   UNKNOWN_BLOB = 0;
   // The relay is too busy to handle the request.
