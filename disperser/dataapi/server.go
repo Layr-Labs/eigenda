@@ -878,7 +878,7 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		days		query		int		false	"Lookback in days [default: 1]"
-//	@Param		operator_id	query		string	false	"Operator ID filter"
+//	@Param		operator_id	query		string	false	"Operator ID filter [default: all operators]"
 //	@Success	200			{object}	QueriedOperatorEjectionsResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
