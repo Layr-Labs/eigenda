@@ -7,8 +7,22 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 API_DIR="${SCRIPT_DIR}/.."
 GRPC_DIR="${API_DIR}/grpc"
-find "${GRPC_DIR}" -name '*.pb.go' -type f | xargs rm -rf
+# Delete all compiled protobufs
+files=$(find "${GRPC_DIR}" -name '*.pb.go' -type f)
+for file in $files; do
+    rm -rf $file
+done
+# Delete all empty directories
+find "${GRPC_DIR}" -type d -empty -delete
+
 
 DISPERSER_DIR="$SCRIPT_DIR/../../disperser"
 DISPERSER_GRPC_DIR="$DISPERSER_DIR/api/grpc"
+# Delete all compiled protobufs
 find "${DISPERSER_GRPC_DIR}" -name '*.pb.go' -type f | xargs rm -rf
+files=$(find "${DISPERSER_GRPC_DIR}" -name '*.pb.go' -type f)
+for file in $files; do
+    rm -rf $file
+done
+# Delete all empty directories
+find "${DISPERSER_GRPC_DIR}" -type d -empty -delete
