@@ -147,11 +147,13 @@ type (
 	}
 
 	QueriedOperatorEjections struct {
-		OperatorId      string `json:"operator_id"`
-		Quorum          uint8  `json:"quorum"`
-		BlockNumber     uint64 `json:"block_number"`
-		BlockTimestamp  string `json:"block_timestamp"`
-		TransactionHash string `json:"transaction_hash"`
+		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
+		Quorum          uint8   `json:"quorum"`
+		BlockNumber     uint64  `json:"block_number"`
+		BlockTimestamp  string  `json:"block_timestamp"`
+		TransactionHash string  `json:"transaction_hash"`
+		StakePercentage float64 `json:"stake_percentage"`
 	}
 	QueriedOperatorEjectionsResponse struct {
 		Ejections []*QueriedOperatorEjections `json:"ejections"`
