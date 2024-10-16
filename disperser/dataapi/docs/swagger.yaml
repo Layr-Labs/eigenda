@@ -160,6 +160,26 @@ definitions:
           type: array
         type: object
     type: object
+  dataapi.QueriedOperatorEjections:
+    properties:
+      block_number:
+        type: integer
+      block_timestamp:
+        type: string
+      operator_id:
+        type: string
+      quorum:
+        type: integer
+      transaction_hash:
+        type: string
+    type: object
+  dataapi.QueriedOperatorEjectionsResponse:
+    properties:
+      ejections:
+        items:
+          $ref: '#/definitions/dataapi.QueriedOperatorEjections'
+        type: array
+    type: object
   dataapi.QueriedStateOperatorMetadata:
     properties:
       block_number:
@@ -603,6 +623,39 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch list of operators that have been deregistered for days. Days
         is a query parameter with a default value of 14 and max value of 30.
+      tags:
+      - OperatorsInfo
+  /operators-info/ejected-operators:
+    get:
+      parameters:
+      - description: 'Lookback in days [default: 1]'
+        in: query
+        name: days
+        type: integer
+      - description: Operator ID
+        in: query
+        name: operator_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.QueriedOperatorEjectionsResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch list of operators that have been ejected over lookback days interval.
       tags:
       - OperatorsInfo
   /operators-info/operators-stake:

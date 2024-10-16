@@ -36,7 +36,7 @@ type (
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
 		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
-		QueryIndexedOperatorEjectionsForTimeWindow(ctx context.Context, days int32) ([]*QueriedOperatorEjections, error)
+		QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string) ([]*QueriedOperatorEjections, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -283,13 +283,23 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 	}, nil
 }
 
-func (sc *subgraphClient) QueryIndexedOperatorEjectionsForTimeWindow(ctx context.Context, days int32) ([]*QueriedOperatorEjections, error) {
+func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string) ([]*QueriedOperatorEjections, error) {
 	// Query all operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 
-	ejections, err := sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds)
-	if err != nil {
-		return nil, err
+	var err error
+	var ejections = make([]*subgraph.OperatorEjection, 0)
+
+	if operatorId == "" {
+		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx, lastNDayInSeconds, operatorId)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	queriedEjections := make([]*QueriedOperatorEjections, len(ejections))

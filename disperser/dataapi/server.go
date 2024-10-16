@@ -874,13 +874,15 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 
 // FetchEjectedOperators godoc
 //
-//	@Summary	Fetch list of operators that have been ejected over days. Days is a query parameter with a default value of 1 and max value of 30.
+//	@Summary	Fetch list of operators that have been ejected over lookback days interval.
 //	@Tags		OperatorsInfo
 //	@Produce	json
-//	@Success	200	{object}	QueriedStateOperatorsResponse
-//	@Failure	400	{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404	{object}	ErrorResponse	"error: Not found"
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Param		days		query		int		false	"Lookback in days [default: 1]"
+//	@Param		operator_id	query		string	false	"Operator ID"
+//	@Success	200			{object}	QueriedOperatorEjectionsResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/ejected-operators [get]
 func (s *server) FetchEjectedOperators(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -888,9 +890,8 @@ func (s *server) FetchEjectedOperators(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	// Get query parameters
-	// Default Value 14 days
-	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
+	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
+	days := c.DefaultQuery("days", "1")             // If not specified, defaults to 1
 
 	// Convert days to integer
 	daysInt, err := strconv.Atoi(days)
@@ -904,7 +905,7 @@ func (s *server) FetchEjectedOperators(c *gin.Context) {
 		return
 	}
 
-	operatorEjections, err := s.getEjectedOperatorForDays(c.Request.Context(), int32(daysInt))
+	operatorEjections, err := s.getOperatorEjectionsForDays(c.Request.Context(), int32(daysInt), operatorId)
 	if err != nil {
 		s.logger.Error("Failed to fetch ejected operators", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchEjectedOperators")

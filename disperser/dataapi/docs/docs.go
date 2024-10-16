@@ -528,6 +528,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/operators-info/ejected-operators": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Fetch list of operators that have been ejected over lookback days interval.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lookback in days [default: 1]",
+                        "name": "days",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "operator_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.QueriedOperatorEjectionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/operators-info/operators-stake": {
             "get": {
                 "produces": [
@@ -916,6 +967,37 @@ const docTemplate = `{
                         "items": {
                             "$ref": "#/definitions/dataapi.OperatorStake"
                         }
+                    }
+                }
+            }
+        },
+        "dataapi.QueriedOperatorEjections": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "block_timestamp": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum": {
+                    "type": "integer"
+                },
+                "transaction_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.QueriedOperatorEjectionsResponse": {
+            "type": "object",
+            "properties": {
+                "ejections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.QueriedOperatorEjections"
                     }
                 }
             }

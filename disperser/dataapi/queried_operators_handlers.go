@@ -98,11 +98,11 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 
 // Function to get ejected operators for given number of days
 // Queries subgraph for ejected operators
-// Returns list of Operators with their quorum, block number, txn and timestemp they were ejected
-func (s *server) getEjectedOperatorForDays(ctx context.Context, days int32) ([]*QueriedOperatorEjections, error) {
+// Returns list of Ejections with operatorId, quorum, block number, txn and timestemp if ejection
+func (s *server) getOperatorEjectionsForDays(ctx context.Context, days int32, operatorId string) ([]*QueriedOperatorEjections, error) {
 	startTime := time.Now()
 
-	operatorEjections, err := s.subgraphClient.QueryIndexedOperatorEjectionsForTimeWindow(ctx, days)
+	operatorEjections, err := s.subgraphClient.QueryOperatorEjectionsForTimeWindow(ctx, days, operatorId)
 	if err != nil {
 		return nil, err
 	}
