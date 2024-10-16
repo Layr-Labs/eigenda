@@ -1,8 +1,6 @@
 package ejections
 
 import (
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/tools/ejections/flags"
 	"github.com/urfave/cli"
@@ -10,16 +8,14 @@ import (
 
 type Config struct {
 	LoggerConfig     common.LoggerConfig
-	MaxConnections   int
+	Days             int
 	OperatorId       string
 	SubgraphEndpoint string
-	Timeout          time.Duration
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Timeout:          ctx.Duration(flags.TimeoutFlag.Name),
-		MaxConnections:   ctx.Int(flags.MaxConnectionsFlag.Name),
+		Days:             ctx.Int(flags.DaysFlag.Name),
 		OperatorId:       ctx.String(flags.OperatorIdFlag.Name),
 		SubgraphEndpoint: ctx.String(flags.SubgraphEndpointFlag.Name),
 	}

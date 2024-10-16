@@ -1,8 +1,6 @@
 package flags
 
 import (
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
@@ -15,32 +13,24 @@ const (
 var (
 	/* Required Flags*/
 	SubgraphEndpointFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "subgraph-endpoint"),
-		Usage:    "Subgraph endpoint to query operator state",
+		Name:     common.PrefixFlag(FlagPrefix, "subgraph"),
+		Usage:    "Subgraph URL to query operator state",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "SUBGRAPH_ENDPOINT"),
-	}
-	/* Optional Flags*/
-	TimeoutFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
-		Usage:    "seconds to wait for GPRC response",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
-		Value:    3 * time.Second,
-	}
-	MaxConnectionsFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "max-connections"),
-		Usage:    "maximum number of connections to DA nodes",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "MAX_CONNECTIONS"),
-		Value:    30,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "SUBGRAPH"),
 	}
 	OperatorIdFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "operator-id"),
-		Usage:    "operator id to scan",
+		Name:     common.PrefixFlag(FlagPrefix, "operator_id"),
+		Usage:    "Query operator id",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "OPERATOR_ID"),
 		Value:    "",
+	}
+	DaysFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "days"),
+		Usage:    "Lookback days",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DAYS"),
+		Value:    1,
 	}
 )
 
@@ -49,9 +39,8 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
-	TimeoutFlag,
-	MaxConnectionsFlag,
 	OperatorIdFlag,
+	DaysFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
