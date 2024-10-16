@@ -42,7 +42,8 @@ const (
 	maxOperatorsNonsigningPercentageAge = 10
 	maxOperatorPortCheckAge             = 60
 	maxNonSignerAge                     = 10
-	maxDeregisteredOperatorAage         = 10
+	maxDeregisteredOperatorAge          = 10
+	maxEjectedOperatorAge               = 10
 	maxThroughputAge                    = 10
 	maxMetricAage                       = 10
 	maxFeedBlobsAge                     = 10
@@ -143,6 +144,17 @@ type (
 	QueriedStateOperatorsResponse struct {
 		Meta Meta                            `json:"meta"`
 		Data []*QueriedStateOperatorMetadata `json:"data"`
+	}
+
+	QueriedOperatorEjections struct {
+		OperatorId      string `json:"operator_id"`
+		Quorum          uint8  `json:"quorum"`
+		BlockNumber     uint64 `json:"block_number"`
+		BlockTimestamp  string `json:"block_timestamp"`
+		TransactionHash string `json:"transaction_hash"`
+	}
+	QueriedOperatorEjectionsResponse struct {
+		Ejections []*QueriedOperatorEjections `json:"ejections"`
 	}
 
 	ServiceAvailability struct {
@@ -264,6 +276,7 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/operator-ejections", s.FetchOperatorEjections)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 			operatorsInfo.GET("/semver-scan", s.SemverScan)
@@ -801,7 +814,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
@@ -850,12 +863,80 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
+	})
+}
+
+// FetchOperatorEjections godoc
+//
+//	@Summary	Fetch list of operator ejections over last N days.
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Param		days		query		int		false	"Lookback in days [default: 1]"
+//	@Param		operator_id	query		string	false	"Operator ID filter [default: all operators]"
+//	@Param		first		query		int		false	"Return first N ejections [default: 1000]"
+//	@Param		skip		query		int		false	"Skip first N ejections [default: 0]"
+//	@Success	200			{object}	QueriedOperatorEjectionsResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/operator-ejections [get]
+func (s *server) FetchOperatorEjections(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
+
+	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
+	daysInt, err := strconv.Atoi(days)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+
+	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
+	firstInt, err := strconv.Atoi(first)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter"})
+		return
+	}
+
+	if firstInt < 1 || firstInt > 10000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
+		return
+	}
+
+	skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
+	skipInt, err := strconv.Atoi(skip)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter"})
+		return
+	}
+
+	if skipInt < 0 || skipInt > 1000000000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
+		return
+	}
+
+	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId, uint(firstInt), uint(skipInt))
+	if err != nil {
+		s.logger.Error("Failed to fetch ejected operators", "error", err)
+		s.metrics.IncrementFailedRequestNum("FetchOperatorEjections")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorEjections")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxEjectedOperatorAge))
+	c.JSON(http.StatusOK, QueriedOperatorEjectionsResponse{
+		Ejections: operatorEjections,
 	})
 }
 
