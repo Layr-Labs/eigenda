@@ -296,6 +296,7 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 	}
 
 	queriedEjections := make([]*QueriedOperatorEjections, len(ejections))
+	fmt.Println("ejections", len(ejections))
 	for i, ejection := range ejections {
 		blockNumber, err := strconv.ParseUint(string(ejection.BlockNumber), 10, 64)
 		if err != nil {
