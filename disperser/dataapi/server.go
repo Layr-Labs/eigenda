@@ -901,11 +901,6 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 		return
 	}
 
-	if daysInt > 90 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 90"})
-		return
-	}
-
 	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
 	firstInt, err := strconv.Atoi(first)
 	if err != nil {
