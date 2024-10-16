@@ -26,7 +26,7 @@ func (c *KzgGpuProofDevice) ECNttToGnarkOnDevice(batchPoints core.DeviceSlice, i
 func (c *KzgGpuProofDevice) ECNttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
 	var p icicle_bn254.Projective
 	var out core.DeviceSlice
-	output, err := out.MallocAsync(totalSize*p.Size(), p.Size(), *c.Stream)
+	output, err := out.MallocAsync(totalSize*p.Size(), totalSize, *c.Stream)
 	// output, err := out.Malloc(totalSize*p.Size(), p.Size())
 
 	if err != runtime.Success {

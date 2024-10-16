@@ -5,6 +5,7 @@ package gpu
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -82,6 +83,7 @@ func (p *KzgGpuProofDevice) ComputeLengthCommitment(coeffs []fr.Element) (*bn254
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
 func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+	log.Println("Starting ComputeMultiFrameProof")
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
@@ -152,30 +154,40 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	flattenCoeffStoreSf := gpu_utils.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[bn254_icicle.ScalarField](flattenCoeffStoreSf)
 
+	// Time to copy to device
+	copyStart := time.Now()
+	log.Println("copying to device")
 	var flattenStoreCopyToDevice core.DeviceSlice
 	flattenCoeffStoreCopy.CopyToDeviceAsync(&flattenStoreCopyToDevice, *p.Stream, true)
+	copyDone := time.Now()
+
+	log.Printf("Copy to device time: %s\n", copyDone.Sub(copyStart).String())
 
 	// compute msm on each rows of the transposed matrix
-	fmt.Println("numPoly", numPoly)
-	fmt.Println("dimE", dimE)
-	fmt.Println("row", p.FlatFFTPointsT[0].Size())
-	fmt.Println("col", len(p.FlatFFTPointsT))
+	log.Println("numPoly", numPoly)
+	log.Println("dimE", dimE)
+	log.Println("row", p.FlatFFTPointsT[0].Size())
+	log.Println("col", len(p.FlatFFTPointsT))
 
+	log.Println("MSM Batch")
 	sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 	if err != nil {
 		return nil, err
 	}
 	msmDone := time.Now()
+	log.Println("MSM Done")
 
 	// Free the flatten coeff store
 	flattenStoreCopyToDevice.FreeAsync(*p.Stream)
 
+	log.Println("ECNtt")
 	// compute the first ecntt, and set new batch size for ntt
 	p.NttCfg.BatchSize = int32(numPoly)
 	sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
 	if err != nil {
 		return nil, err
 	}
+	log.Println("ECNtt Done")
 
 	// Free sumVec
 	sumVec.FreeAsync(*p.Stream)

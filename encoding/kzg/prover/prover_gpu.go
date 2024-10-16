@@ -41,12 +41,14 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, err
 	}
 
+	log.Println("Getting sub tables")
 	fftPoints, err := subTable.GetSubTables(encoder.NumChunks, encoder.ChunkLength)
 	if err != nil {
 		log.Println("could not get sub tables", err)
 		return nil, err
 	}
 
+	log.Println("Transposing sub tables")
 	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
 	for i := range fftPointsT {
 		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))
@@ -56,12 +58,14 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 	_ = fftPoints
 
+	log.Println("Creating FFT settings")
 	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
 	if encoder.ChunkLength == 1 {
 		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
 	}
 	fs := fft.NewFFTSettings(n)
 
+	log.Println("Creating KZG settings")
 	ks, err := kzg.NewKZGSettings(fs, g.Srs)
 	if err != nil {
 		return nil, err
@@ -71,27 +75,34 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	sfs := fft.NewFFTSettings(t)
 
 	// GPU Setup
+	runtime.LoadBackendFromEnvOrDefault()
+
 	// trying to choose CUDA if available, or fallback to CPU otherwise (default device)
 	deviceCuda := runtime.CreateDevice("CUDA", 0) // GPU-0
 	if runtime.IsDeviceAvailable(&deviceCuda) {
+		log.Println("CUDA device available, setting device")
 		runtime.SetDevice(&deviceCuda)
+	} else {
+		log.Println("CUDA device not available, falling back to CPU")
 	} // else we stay on CPU backend
-		
+
 	gpuLock := sync.Mutex{}
 
-
 	// Setup NTT
+	log.Println("Setting up NTT")
 	nttCfg, icicle_err := gpu_utils.SetupNTT()
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not setup NTT")
 	}
 
 	// Setup MSM
+	log.Println("Setting up MSM")
 	flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, icicle_err := gpu_utils.SetupMsm(fftPointsT, g.Srs.G1[:g.SRSNumberToLoad])
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not setup MSM")
 	}
 
+	log.Println("Creating stream")
 	stream, icicle_err := runtime.CreateStream()
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not create stream")

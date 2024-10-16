@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -135,6 +136,7 @@ func (p *KzgCpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	msmDone := time.Now()
 
 	// only 1 ifft is needed
+	log.Println("sumVec len", len(sumVec))
 	sumVecInv, err := p.Fs.FFTG1(sumVec, true)
 	if err != nil {
 		return nil, fmt.Errorf("fft error: %v", err)
