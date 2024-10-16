@@ -1,6 +1,7 @@
 package tablestore
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -65,187 +66,202 @@ func TestExpiryKeyOrdering(t *testing.T) {
 	}
 }
 
-//func TestRandomDataExpired(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(t, err)
-//
-//	baseStore := mapstore.NewStore()
-//	//store := ttlStore{
-//	//	store:  baseStore,
-//	//	ctx:    context.Background(),
-//	//	logger: logger,
-//	//}
-//	var store tableStore
-//
-//	data := make(map[string][]byte)
-//	expiryTimes := make(map[string]time.Time)
-//
-//	startingTime := tu.RandomTime()
-//	simulatedSeconds := 1000
-//	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
-//
-//	// Generate some random data
-//	for i := 0; i < 1000; i++ {
-//		key := tu.RandomBytes(10)
-//		stringifiedKey := string(key)
-//		value := tu.RandomBytes(10)
-//		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
-//
-//		data[stringifiedKey] = value
-//		expiryTimes[stringifiedKey] = expiryTime
-//
-//		err := store.PutWithExpiration(key, value, expiryTime)
-//		assert.NoError(t, err)
-//	}
-//
-//	currentTime := startingTime
-//
-//	// Simulate time passing
-//	for currentTime.Before(endingTime) {
-//
-//		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
-//		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
-//
-//		err = store.expireKeys(currentTime)
-//		assert.NoError(t, err)
-//
-//		for key := range data {
-//			keyExpirationTime := expiryTimes[key]
-//			expired := !currentTime.Before(keyExpirationTime)
-//
-//			if expired {
-//				value, err := store.Get([]byte(key))
-//				assert.Error(t, err)
-//				assert.Nil(t, value)
-//			} else {
-//				value, err := store.Get([]byte(key))
-//				assert.NoError(t, err)
-//				expectedValue := data[key]
-//				assert.Equal(t, expectedValue, value)
-//			}
-//		}
-//	}
-//}
+func TestRandomDataExpired(t *testing.T) {
+	tu.InitializeRandom()
 
-//func TestBatchRandomDataExpired(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(t, err)
-//
-//	baseStore := mapstore.NewStore()
-//	store := ttlStore{
-//		store:  baseStore,
-//		ctx:    context.Background(),
-//		logger: logger,
-//	}
-//
-//	data := make(map[string][]byte)
-//	expiryTimes := make(map[string]time.Time)
-//
-//	startingTime := tu.RandomTime()
-//	simulatedSeconds := 1000
-//	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
-//
-//	// Generate some random data
-//	for i := 0; i < 100; i++ {
-//
-//		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
-//
-//		keys := make([][]byte, 0)
-//		values := make([][]byte, 0)
-//
-//		// Generate a batch of random data
-//		for j := 0; j < 10; j++ {
-//			key := tu.RandomBytes(10)
-//			keys = append(keys, key)
-//			stringifiedKey := string(key)
-//			value := tu.RandomBytes(10)
-//			values = append(values, value)
-//
-//			data[stringifiedKey] = value
-//			expiryTimes[stringifiedKey] = expiryTime
-//		}
-//
-//		err := store.PutBatchWithExpiration(keys, values, expiryTime)
-//		assert.NoError(t, err)
-//	}
-//
-//	currentTime := startingTime
-//
-//	// Simulate time passing
-//	for currentTime.Before(endingTime) {
-//
-//		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
-//		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
-//
-//		err = store.expireKeys(currentTime)
-//		assert.NoError(t, err)
-//
-//		for key := range data {
-//			keyExpirationTime := expiryTimes[key]
-//			expired := !currentTime.Before(keyExpirationTime)
-//
-//			if expired {
-//				value, err := store.Get([]byte(key))
-//				assert.Error(t, err)
-//				assert.Nil(t, value)
-//			} else {
-//				value, err := store.Get([]byte(key))
-//				assert.NoError(t, err)
-//				expectedValue := data[key]
-//				assert.Equal(t, expectedValue, value)
-//			}
-//		}
-//	}
-//}
-//
-//func TestBigBatchOfDeletions(t *testing.T) {
-//	tu.InitializeRandom()
-//
-//	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-//	assert.NoError(t, err)
-//
-//	baseStore := mapstore.NewStore()
-//	store := ttlStore{
-//		store:  baseStore,
-//		ctx:    context.Background(),
-//		logger: logger,
-//	}
-//
-//	data := make(map[string][]byte)
-//	expiryTimes := make(map[string]time.Time)
-//
-//	startingTime := tu.RandomTime()
-//	simulatedSeconds := 1000
-//
-//	// Generate some random data
-//	for i := 0; i < 2345; i++ {
-//		key := tu.RandomBytes(10)
-//		stringifiedKey := string(key)
-//		value := tu.RandomBytes(10)
-//		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
-//
-//		data[stringifiedKey] = value
-//		expiryTimes[stringifiedKey] = expiryTime
-//
-//		err = store.PutWithExpiration(key, value, expiryTime)
-//		assert.NoError(t, err)
-//	}
-//
-//	// Move time forward by one large step
-//	elapsedSeconds := simulatedSeconds * 2
-//	currentTime := startingTime.Add(time.Duration(elapsedSeconds) * time.Second)
-//
-//	err = store.expireKeys(currentTime)
-//	assert.NoError(t, err)
-//
-//	// All keys should be expired
-//	for key := range data {
-//		value, err := store.Get([]byte(key))
-//		assert.Error(t, err)
-//		assert.Nil(t, value)
-//	}
-//}
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"test"}
+	config.GarbageCollectionEnabled = false
+	tStore, err := Start(logger, config)
+	assert.NoError(t, err)
+
+	table, err := tStore.GetTable("test")
+	assert.NoError(t, err)
+
+	data := make(map[string][]byte)
+	expiryTimes := make(map[string]time.Time)
+
+	startingTime := tu.RandomTime()
+	simulatedSeconds := 1000
+	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
+
+	// Generate some random data
+	for i := 0; i < 1000; i++ {
+		key := tu.RandomBytes(10)
+		stringifiedKey := string(key)
+		value := tu.RandomBytes(10)
+		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
+
+		data[stringifiedKey] = value
+		expiryTimes[stringifiedKey] = expiryTime
+
+		err := table.PutWithExpiration(key, value, expiryTime)
+		assert.NoError(t, err)
+	}
+
+	currentTime := startingTime
+
+	// Simulate time passing
+	for currentTime.Before(endingTime) {
+
+		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
+		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
+
+		err = (tStore.(*tableStore)).expireKeys(currentTime, uint32(1024))
+		assert.NoError(t, err)
+
+		for key := range data {
+			keyExpirationTime := expiryTimes[key]
+			expired := !currentTime.Before(keyExpirationTime)
+
+			if expired {
+				value, err := table.Get([]byte(key))
+				assert.Error(t, err)
+				assert.Nil(t, value)
+			} else {
+				value, err := table.Get([]byte(key))
+				assert.NoError(t, err)
+				expectedValue := data[key]
+				assert.Equal(t, expectedValue, value)
+			}
+		}
+	}
+
+	err = tStore.Shutdown()
+	assert.NoError(t, err)
+}
+
+// TODO test batch spanning multiple tables with TTLs
+
+func TestBatchRandomDataExpired(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"test"}
+	config.GarbageCollectionEnabled = false
+	tStore, err := Start(logger, config)
+	assert.NoError(t, err)
+
+	table, err := tStore.GetTable("test")
+	assert.NoError(t, err)
+
+	data := make(map[string][]byte)
+	expiryTimes := make(map[string]time.Time)
+
+	startingTime := tu.RandomTime()
+	simulatedSeconds := 1000
+	endingTime := startingTime.Add(time.Duration(simulatedSeconds) * time.Second)
+
+	// Generate some random data
+	for i := 0; i < 100; i++ {
+
+		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
+
+		batch := table.NewTTLBatch()
+
+		// Generate a batch of random data
+		for j := 0; j < 10; j++ {
+			key := tu.RandomBytes(10)
+			stringifiedKey := string(key)
+			value := tu.RandomBytes(10)
+
+			batch.PutWithExpiration(key, value, expiryTime)
+
+			data[stringifiedKey] = value
+			expiryTimes[stringifiedKey] = expiryTime
+		}
+
+		err := batch.Apply()
+		assert.NoError(t, err)
+	}
+
+	currentTime := startingTime
+
+	// Simulate time passing
+	for currentTime.Before(endingTime) {
+
+		elapsedSeconds := rand.Intn(simulatedSeconds / 10)
+		currentTime = currentTime.Add(time.Duration(elapsedSeconds) * time.Second)
+
+		err = (tStore.(*tableStore)).expireKeys(currentTime, 1024)
+		assert.NoError(t, err)
+
+		for key := range data {
+			keyExpirationTime := expiryTimes[key]
+			expired := !currentTime.Before(keyExpirationTime)
+
+			if expired {
+				value, err := table.Get([]byte(key))
+				assert.Error(t, err)
+				assert.Nil(t, value)
+			} else {
+				value, err := table.Get([]byte(key))
+				assert.NoError(t, err)
+				expectedValue := data[key]
+				assert.Equal(t, expectedValue, value)
+			}
+		}
+	}
+
+	err = tStore.Shutdown()
+	assert.NoError(t, err)
+}
+
+func TestBigBatchOfDeletions(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	assert.NoError(t, err)
+
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"test"}
+	config.GarbageCollectionEnabled = false
+	tStore, err := Start(logger, config)
+	assert.NoError(t, err)
+
+	table, err := tStore.GetTable("test")
+	assert.NoError(t, err)
+
+	data := make(map[string][]byte)
+	expiryTimes := make(map[string]time.Time)
+
+	startingTime := tu.RandomTime()
+	simulatedSeconds := 1000
+
+	// Generate some random data
+	for i := 0; i < 2345; i++ {
+		key := tu.RandomBytes(10)
+		stringifiedKey := string(key)
+		value := tu.RandomBytes(10)
+		expiryTime := startingTime.Add(time.Duration(rand.Intn(simulatedSeconds)) * time.Second)
+
+		data[stringifiedKey] = value
+		expiryTimes[stringifiedKey] = expiryTime
+
+		err = table.PutWithExpiration(key, value, expiryTime)
+		assert.NoError(t, err)
+	}
+
+	// Move time forward by one large step
+	elapsedSeconds := simulatedSeconds * 2
+	currentTime := startingTime.Add(time.Duration(elapsedSeconds) * time.Second)
+
+	err = (tStore.(*tableStore)).expireKeys(currentTime, 1024)
+	assert.NoError(t, err)
+
+	// All keys should be expired
+	for key := range data {
+		value, err := table.Get([]byte(key))
+		assert.Error(t, err)
+		assert.Nil(t, value)
+	}
+
+	err = tStore.Shutdown()
+	assert.NoError(t, err)
+}
