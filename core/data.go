@@ -515,5 +515,5 @@ type ActiveReservation struct {
 }
 
 type OnDemandPayment struct {
-	CumulativePayment big.Int // Total amount deposited by the user
+	CumulativePayment *big.Int // Total amount deposited by the user
 }

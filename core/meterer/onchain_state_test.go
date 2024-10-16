@@ -21,7 +21,7 @@ var (
 		QuorumSplit:    []byte{50, 50},
 	}
 	dummyOnDemandPayment = core.OnDemandPayment{
-		CumulativePayment: *big.NewInt(1000),
+		CumulativePayment: big.NewInt(1000),
 	}
 )
 
