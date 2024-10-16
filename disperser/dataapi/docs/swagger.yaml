@@ -636,6 +636,14 @@ paths:
         in: query
         name: operator_id
         type: string
+      - description: 'Return first N ejections [default: 1000]'
+        in: query
+        name: first
+        type: integer
+      - description: 'Skip first N ejections [default: 0]'
+        in: query
+        name: skip
+        type: integer
       produces:
       - application/json
       responses:

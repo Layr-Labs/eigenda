@@ -549,6 +549,18 @@ const docTemplate = `{
                         "description": "Operator ID filter",
                         "name": "operator_id",
                         "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Return first N ejections [default: 1000]",
+                        "name": "first",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Skip first N ejections [default: 0]",
+                        "name": "skip",
+                        "in": "query"
                     }
                 ],
                 "responses": {
