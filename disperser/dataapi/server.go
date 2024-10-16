@@ -900,8 +900,8 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 		return
 	}
 
-	if daysInt > 30 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
+	if daysInt > 90 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 90"})
 		return
 	}
 

@@ -106,7 +106,7 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 		return nil, err
 	}
 
-	s.logger.Info("Get operator ejections", "days", days, "operatorId", operatorId, "duration", time.Since(startTime))
+	s.logger.Info("Get operator ejections", "days", days, "operatorId", operatorId, "len", len(operatorEjections), "duration", time.Since(startTime))
 	return operatorEjections, nil
 }
 
