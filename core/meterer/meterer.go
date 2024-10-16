@@ -164,7 +164,10 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		return fmt.Errorf("bin has already been filled")
 	}
 	if newUsage <= 2*usageLimit && header.BinIndex+2 <= GetBinIndex(reservation.EndTimestamp, m.ReservationWindow) {
-		m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex+2), newUsage-usageLimit)
+		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex+2), newUsage-usageLimit)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 	return fmt.Errorf("overflow usage exceeds bin limit")
@@ -204,7 +207,10 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	// Update bin usage atomically and check against bin capacity
 	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
-		m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
+		err := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
+		if err != nil {
+			return err
+		}
 		return fmt.Errorf("failed global rate limiting")
 	}
 

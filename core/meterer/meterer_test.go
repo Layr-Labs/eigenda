@@ -171,7 +171,6 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	meterer.CreateReservationTable(clientConfig, reservationTableName)
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	quoromNumbers := []uint8{0, 1}
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
@@ -253,8 +252,6 @@ func TestMetererReservations(t *testing.T) {
 
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
-	meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
-	meterer.CreateGlobalReservationTable(clientConfig, globalReservationTableName)
 	quorumNumbers := []uint8{0, 1}
 	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
 
