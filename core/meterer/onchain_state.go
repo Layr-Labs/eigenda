@@ -12,7 +12,7 @@ import (
 
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
-	CurrentOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (OnchainPaymentState, error)
+	RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error
 	GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error)
 	GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error)
 	GetOnDemandPayments(ctx context.Context) (map[string]core.OnDemandPayment, error)
@@ -47,7 +47,7 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (OnchainPay
 	}, nil
 }
 
-// CurrentOnchainPaymentState returns the current onchain payment state (TODO: can optimize based on contract interface)
+// RefreshOnchainPaymentState returns the current onchain payment state (TODO: can optimize based on contract interface)
 func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error {
 	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
 	if err != nil {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
@@ -25,28 +24,13 @@ var (
 	}
 )
 
-func TestGetCurrentOnchainPaymentState(t *testing.T) {
+func TestRefreshOnchainPaymentState(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("CurrentOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(meterer.OnchainPaymentState{
-		ActiveReservations: map[string]core.ActiveReservation{
-			"account1": dummyActiveReservation,
-		},
-		OnDemandPayments: map[string]core.OnDemandPayment{
-			"account1": dummyOnDemandPayment,
-		},
-	}, nil)
+	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(nil)
 
-	state, err := mockState.CurrentOnchainPaymentState(ctx, &eth.Transactor{})
+	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Transactor{})
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.OnchainPaymentState{
-		ActiveReservations: map[string]core.ActiveReservation{
-			"account1": dummyActiveReservation,
-		},
-		OnDemandPayments: map[string]core.OnDemandPayment{
-			"account1": dummyOnDemandPayment,
-		},
-	}, state)
 }
 
 func TestGetCurrentBlockNumber(t *testing.T) {

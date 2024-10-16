@@ -30,7 +30,6 @@ type Config struct {
 // payments information is valid.
 type Meterer struct {
 	Config
-
 	// ChainState reads on-chain payment state periodically and cache it in memory
 	ChainState OnchainPayment
 	// OffchainStore uses DynamoDB to track metering and used to validate requests
@@ -45,16 +44,33 @@ func NewMeterer(
 	offchainStore OffchainStore,
 	logger logging.Logger,
 ) (*Meterer, error) {
-	// TODO: create a separate thread to pull from the chain and update chain state
-
-	return &Meterer{
+	ctx := context.Background()
+	m := Meterer{
 		Config: config,
 
 		ChainState:    paymentChainState,
 		OffchainStore: offchainStore,
 
 		logger: logger.With("component", "Meterer"),
-	}, nil
+	}
+	// goroutine to periodically refresh the on-chain state
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := paymentChainState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+					m.logger.Error("Failed to refresh on-chain state", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return &m, nil
 }
 
 // MeterRequest validates a blob header and adds it to the meterer's state
