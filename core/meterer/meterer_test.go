@@ -477,7 +477,7 @@ func createMetererInput(binIndex uint32, cumulativePayment uint64, dataLength ui
 	header = &core.PaymentMetadata{
 		AccountID:         accountID,
 		BinIndex:          binIndex,
-		CumulativePayment: *big.NewInt(int64(cumulativePayment)),
+		CumulativePayment: big.NewInt(int64(cumulativePayment)),
 	}
 	return blob, header
 }

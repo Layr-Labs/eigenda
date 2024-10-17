@@ -147,7 +147,6 @@ func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *cor
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-// TODO: Bin limit should be direct write to the Store
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, blobLength uint) error {
 	numSymbols := m.SymbolsCharged(blobLength)
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), uint64(numSymbols))

@@ -165,7 +165,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 }
 
 // RemoveOnDemandPayment removes a specific payment from the list for a specific account
-func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID string, payment big.Int) error {
+func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID string, payment *big.Int) error {
 	err := s.dynamoClient.DeleteItem(ctx, s.onDemandTableName,
 		commondynamodb.Key{
 			"AccountID":          &types.AttributeValueMemberS{Value: accountID},
@@ -182,7 +182,7 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 
 // GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, blob size of next payment
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
-func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment big.Int) (uint64, uint64, uint32, error) {
+func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (uint64, uint64, uint32, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.onDemandTableName),

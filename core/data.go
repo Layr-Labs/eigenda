@@ -490,7 +490,7 @@ type PaymentMetadata struct {
 	BinIndex uint32
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
-	CumulativePayment big.Int
+	CumulativePayment *big.Int
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
