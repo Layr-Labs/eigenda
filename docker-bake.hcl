@@ -151,6 +151,21 @@ target "traffic-generator-internal" {
                ]
 }
 
+target "traffic-generator2" {
+  context    = "."
+  dockerfile = "./trafficgenerator2.Dockerfile"
+  target     = "generator"
+  tags       = ["${REGISTRY}/${REPO}/traffic-generator2:${BUILD_TAG}"]
+}
+
+target "traffic-generator2-internal" {
+  inherits = ["traffic-generator2"]
+  tags       = ["${REGISTRY}/eigenda-traffic-generator2:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-traffic-generator2:${GIT_SHA}",
+    "${REGISTRY}/eigenda-traffic-generator2:sha-${GIT_SHORT_SHA}",
+  ]
+}
+
 target "dataapi" {
   context    = "."
   dockerfile = "./Dockerfile"
