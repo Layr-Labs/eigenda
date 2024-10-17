@@ -37,6 +37,9 @@ const metadataSchemaVersionKey = "schema_version"
 // This is required for atomic deletion of tables.
 const metadataDeletionKey = "deletion"
 
+// When a new table is created, the ID used for that table is stored in the metadata table under this key.
+const nextTableIDKey = "next_table_id"
+
 // The current schema version of the metadata table.
 const currentSchemaVersion uint64 = 0
 
@@ -177,7 +180,7 @@ func addAndRemoveTables(
 		return fmt.Errorf("error dropping tables: %w", err)
 	}
 
-	err = addTables(namespaceTable, tableIDMap, tablesToAdd)
+	err = addTables(base, metadataTable, namespaceTable, tableIDMap, tablesToAdd)
 	if err != nil {
 		return fmt.Errorf("error adding tables: %w", err)
 	}
@@ -250,6 +253,8 @@ func dropTables(
 
 // Add tables to the store. Updates the table ID map as well as data within the store.
 func addTables(
+	base kvstore.Store,
+	metadataTable kvstore.Table,
 	namespaceTable kvstore.Table,
 	tableIDMap map[uint32]string,
 	tablesToAdd []string) error {
@@ -259,24 +264,12 @@ func addTables(
 		return nil
 	}
 
-	// Determine the table IDs for the new tables to be added.
-	// We want to fill gaps prior to assigning new IDs.
-	newTableIDs := make([]uint32, 0, len(tablesToAdd))
-	nextID := uint32(0)
-	for len(newTableIDs) < len(tablesToAdd) {
-		if _, alreadyUsed := tableIDMap[nextID]; !alreadyUsed {
-			newTableIDs = append(newTableIDs, nextID)
-		}
-		nextID++
-	}
-
 	// Sort tables to add. Ensures deterministic table IDs given the same input.
 	sort.Strings(tablesToAdd)
 
 	// Add new tables.
-	for i, tableName := range tablesToAdd {
-		tableID := newTableIDs[i]
-		err := createTable(namespaceTable, tableName, tableID)
+	for _, tableName := range tablesToAdd {
+		tableID, err := createTable(base, metadataTable, namespaceTable, tableName)
 		if err != nil {
 			return fmt.Errorf("error creating table %s: %w", tableName, err)
 		}
@@ -292,6 +285,8 @@ func sanityCheckNamespaceTable(
 	namespaceTable kvstore.Table,
 	tableIDMap map[uint32]string,
 	currentTableList []string) error {
+
+	// TODO also check that no table has ID greater than next table ID
 
 	parsedNamespaceTable, err := loadNamespaceTable(namespaceTable)
 	if err != nil {
@@ -376,22 +371,46 @@ func loadNamespaceTable(namespaceTable kvstore.Table) (map[uint32]string, error)
 	return tableIDMap, nil
 }
 
-// CreateTable creates a new table with the given name. If a table with the given name already exists,
-// this method becomes a no-op. Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
+// CreateTable creates a new table with the given name.
+// Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
 func createTable(
+	base kvstore.Store,
+	metadataTable kvstore.Table,
 	namespaceTable kvstore.Table,
-	name string,
-	tableID uint32) error {
+	name string) (uint32, error) {
 
-	tableKey := make([]byte, 4)
-	binary.BigEndian.PutUint32(tableKey, tableID)
-	err := namespaceTable.Put(tableKey, []byte(name))
-
-	if err != nil {
-		return fmt.Errorf("error updating namespace table: %w", err)
+	batch := tableStoreBatch{
+		batch: base.NewBatch(),
 	}
 
-	return nil
+	var tableID uint32
+	tableIDBytes, err := metadataTable.Get([]byte(nextTableIDKey))
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			tableIDBytes = make([]byte, 4)
+		} else {
+			return 0, fmt.Errorf("error reading next table ID: %w", err)
+		}
+	}
+	tableID = binary.BigEndian.Uint32(tableIDBytes)
+
+	if tableID == expirationTableID {
+		return 0, errors.New("table limit exceeded")
+	}
+
+	nextTableID := tableID + 1
+	nextTableIDBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(nextTableIDBytes, nextTableID)
+
+	batch.Put(namespaceTable.TableKey(tableIDBytes), []byte(name))
+	batch.Put(metadataTable.TableKey([]byte(nextTableIDKey)), nextTableIDBytes)
+
+	err = batch.Apply()
+	if err != nil {
+		return 0, fmt.Errorf("error updating namespace table: %w", err)
+	}
+
+	return tableID, nil
 }
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.

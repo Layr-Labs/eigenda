@@ -652,8 +652,7 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 		assert.Equal(t, expectedValue, value)
 	}
 
-	// Verify the table IDs. There should be no gaps, and the tables that did not get dropped should have the same IDs
-	// as before.
+	// Verify the table IDs.
 	tableView1 := table1.(*tableView)
 	assert.Equal(t, uint32(0), tableView1.prefix)
 
@@ -661,16 +660,16 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	assert.Equal(t, uint32(4), tableView5.prefix)
 
 	tableView6 := table6.(*tableView)
-	assert.Equal(t, uint32(1), tableView6.prefix)
+	assert.Equal(t, uint32(5), tableView6.prefix)
 
 	tableView7 := table7.(*tableView)
-	assert.Equal(t, uint32(2), tableView7.prefix)
+	assert.Equal(t, uint32(6), tableView7.prefix)
 
 	tableView8 := table8.(*tableView)
-	assert.Equal(t, uint32(3), tableView8.prefix)
+	assert.Equal(t, uint32(7), tableView8.prefix)
 
 	tableView9 := table9.(*tableView)
-	assert.Equal(t, uint32(5), tableView9.prefix)
+	assert.Equal(t, uint32(8), tableView9.prefix)
 
 	err = store.Destroy()
 	assert.NoError(t, err)
