@@ -31,9 +31,16 @@ message DisperseBlobRequest {
 	// containing slightly less than 254 bits and more than 253 bits. If any one of the 32 bytes chunk is outside the range, 
 	// the whole request is deemed as invalid, and rejected. 
 	bytes data = 1;
-	BlobHeader blob_header = 2;
+	common.BlobHeader blob_header = 2;
+	PaymentHeader payment_header = 3;
 	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
-	bytes authentication_data = 3;
+	bytes authentication_data = 4;
+}
+
+message PaymentHeader {
+  string account_id = 1;
+  uint32 bin_index = 2;
+  bytes cumulative_payment = 3;
 }
 
 message DisperseBlobReply {
@@ -95,17 +102,6 @@ enum BlobStatus {
 	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
 	// for at least one quorum.
 	INSUFFICIENT_SIGNATURES = 5;
-}
-
-message BlobHeader {
-	repeated uint32 quorum_numbers = 1;
-	// API version used to disperse the blob
-	uint32 version = 2;
-	uint32 bin_index = 3;
-	uint64 cumulative_payment = 4;
-	// Ethereum Account Address in Hex string "0x..."
-	string account_id = 5;
-	common.G1Commitment commitment = 6;
 }
 
 message SignedCertificate {
