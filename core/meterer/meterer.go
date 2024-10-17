@@ -43,9 +43,8 @@ func NewMeterer(
 	paymentChainState OnchainPayment,
 	offchainStore OffchainStore,
 	logger logging.Logger,
-) (*Meterer, error) {
-	ctx := context.Background()
-	m := Meterer{
+) *Meterer {
+	return &Meterer{
 		Config: config,
 
 		ChainState:    paymentChainState,
@@ -53,7 +52,10 @@ func NewMeterer(
 
 		logger: logger.With("component", "Meterer"),
 	}
-	// goroutine to periodically refresh the on-chain state
+}
+
+// Start starts to periodically refreshing the on-chain state
+func (m *Meterer) Start(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -61,7 +63,7 @@ func NewMeterer(
 		for {
 			select {
 			case <-ticker.C:
-				if err := paymentChainState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+				if err := m.ChainState.RefreshOnchainPaymentState(ctx, nil); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
 			case <-ctx.Done():
@@ -69,8 +71,6 @@ func NewMeterer(
 			}
 		}
 	}()
-
-	return &m, nil
 }
 
 // MeterRequest validates a blob header and adds it to the meterer's state

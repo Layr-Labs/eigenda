@@ -149,18 +149,14 @@ func setup(_ *testing.M) {
 	}
 
 	// add some default sensible configs
-	mt, err = meterer.NewMeterer(
+	mt = meterer.NewMeterer(
 		config,
 		paymentChainState,
 		store,
 		logging.NewNoopLogger(),
 		// metrics.NewNoopMetrics(),
 	)
-
-	if err != nil {
-		teardown()
-		panic("failed to create meterer")
-	}
+	mt.Start(context.Background())
 }
 
 func teardown() {
