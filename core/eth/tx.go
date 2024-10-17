@@ -763,14 +763,24 @@ func (t *Transactor) GetRequiredQuorumNumbers(ctx context.Context, blockNumber u
 	return requiredQuorums, nil
 }
 
-func (t *Transactor) GetActiveReservations(ctx context.Context, blockNumber uint32) (map[string]core.ActiveReservation, error) {
+func (t *Transactor) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {
 	// contract is not implemented yet
 	return map[string]core.ActiveReservation{}, nil
 }
 
-func (t *Transactor) GetOnDemandPayments(ctx context.Context, blockNumber uint32) (map[string]core.OnDemandPayment, error) {
+func (t *Transactor) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
+	// contract is not implemented yet
+	return core.ActiveReservation{}, nil
+}
+
+func (t *Transactor) GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.OnDemandPayment, error) {
 	// contract is not implemented yet
 	return map[string]core.OnDemandPayment{}, nil
+}
+
+func (t *Transactor) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
+	// contract is not implemented yet
+	return core.OnDemandPayment{}, nil
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
