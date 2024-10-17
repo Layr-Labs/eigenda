@@ -67,24 +67,57 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	encodeStart := time.Now()
 
-	rsChan := make(chan RsEncodeResult, 1)
-	lengthCommitmentChan := make(chan LengthCommitmentResult, 1)
-	lengthProofChan := make(chan LengthProofResult, 1)
-	commitmentChan := make(chan CommitmentResult, 1)
-	proofChan := make(chan ProofsResult, 1)
+	type commitments struct {
+		commitment       *bn254.G1Affine
+		lengthCommitment *bn254.G2Affine
+		lengthProof      *bn254.G2Affine
+		Error            error
+	}
+
+	commitmentsChan := make(chan commitments, 1)
 
 	// inputFr is untouched
 	// compute chunks
 	go func() {
-		start := time.Now()
-		frames, indices, err := g.Encoder.Encode(inputFr)
-		rsChan <- RsEncodeResult{
-			Frames:   frames,
-			Indices:  indices,
-			Err:      err,
-			Duration: time.Since(start),
+		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr)
+
+		commitmentsChan <- commitments{
+			commitment:       commitment,
+			lengthCommitment: lengthCommitment,
+			lengthProof:      lengthProof,
+			Error:            err,
 		}
 	}()
+
+	frames, indices, err := g.GetFrames(inputFr)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	commitmentResult := <-commitmentsChan
+	if commitmentResult.Error != nil {
+		return nil, nil, nil, nil, nil, commitmentResult.Error
+	}
+
+	totalProcessingTime := time.Since(encodeStart)
+
+	if g.Verbose {
+		log.Printf("Total encoding took      %v\n", totalProcessingTime)
+	}
+	return commitmentResult.commitment, commitmentResult.lengthCommitment, commitmentResult.lengthProof, frames, indices, nil
+}
+
+func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
+
+	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
+		return nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	}
+
+	encodeStart := time.Now()
+
+	lengthCommitmentChan := make(chan LengthCommitmentResult, 1)
+	lengthProofChan := make(chan LengthProofResult, 1)
+	commitmentChan := make(chan CommitmentResult, 1)
 
 	// compute commit for the full poly
 	go func() {
@@ -117,6 +150,52 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		}
 	}()
 
+	lengthProofResult := <-lengthProofChan
+	lengthCommitmentResult := <-lengthCommitmentChan
+	commitmentResult := <-commitmentChan
+
+	if lengthProofResult.Err != nil || lengthCommitmentResult.Err != nil ||
+		commitmentResult.Err != nil {
+		return nil, nil, nil, multierror.Append(lengthProofResult.Err, lengthCommitmentResult.Err, commitmentResult.Err)
+	}
+	totalProcessingTime := time.Since(encodeStart)
+
+	log.Printf("\n\t\tCommiting     %-v\n\t\tLengthCommit  %-v\n\t\tlengthProof   %-v\n\t\tMetaInfo. order  %-v shift %v\n",
+		commitmentResult.Duration,
+		lengthCommitmentResult.Duration,
+		lengthProofResult.Duration,
+		g.SRSOrder,
+		g.SRSOrder-uint64(len(inputFr)),
+	)
+
+	if g.Verbose {
+		log.Printf("Total encoding took      %v\n", totalProcessingTime)
+	}
+	return &commitmentResult.Commitment, &lengthCommitmentResult.LengthCommitment, &lengthProofResult.LengthProof, nil
+}
+
+func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, []uint32, error) {
+
+	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
+		return nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	}
+
+	proofChan := make(chan ProofsResult, 1)
+	rsChan := make(chan RsEncodeResult, 1)
+
+	// inputFr is untouched
+	// compute chunks
+	go func() {
+		start := time.Now()
+		frames, indices, err := g.Encoder.Encode(inputFr)
+		rsChan <- RsEncodeResult{
+			Frames:   frames,
+			Indices:  indices,
+			Err:      err,
+			Duration: time.Since(start),
+		}
+	}()
+
 	go func() {
 		start := time.Now()
 		// compute proofs
@@ -138,24 +217,15 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		}
 	}()
 
-	lengthProofResult := <-lengthProofChan
-	lengthCommitmentResult := <-lengthCommitmentChan
-	commitmentResult := <-commitmentChan
 	rsResult := <-rsChan
 	proofsResult := <-proofChan
 
-	if lengthProofResult.Err != nil || lengthCommitmentResult.Err != nil ||
-		commitmentResult.Err != nil || rsResult.Err != nil ||
-		proofsResult.Err != nil {
-		return nil, nil, nil, nil, nil, multierror.Append(lengthProofResult.Err, lengthCommitmentResult.Err, commitmentResult.Err, rsResult.Err, proofsResult.Err)
+	if rsResult.Err != nil || proofsResult.Err != nil {
+		return nil, nil, multierror.Append(rsResult.Err, proofsResult.Err)
 	}
-	totalProcessingTime := time.Since(encodeStart)
 
-	log.Printf("\n\t\tRS encode     %-v\n\t\tCommiting     %-v\n\t\tLengthCommit  %-v\n\t\tlengthProof   %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
+	log.Printf("\n\t\tRS encode     %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
 		rsResult.Duration,
-		commitmentResult.Duration,
-		lengthCommitmentResult.Duration,
-		lengthProofResult.Duration,
 		proofsResult.Duration,
 		g.SRSOrder,
 		g.SRSOrder-uint64(len(inputFr)),
@@ -170,8 +240,6 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 		}
 	}
 
-	if g.Verbose {
-		log.Printf("Total encoding took      %v\n", totalProcessingTime)
-	}
-	return &commitmentResult.Commitment, &lengthCommitmentResult.LengthCommitment, &lengthProofResult.LengthProof, kzgFrames, rsResult.Indices, nil
+	return kzgFrames, rsResult.Indices, nil
+
 }
