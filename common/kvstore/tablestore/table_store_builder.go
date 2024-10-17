@@ -65,9 +65,9 @@ func start(
 	base kvstore.Store,
 	config *Config) (kvstore.TableStore, error) {
 
-	metadataTable := newTableView(base, nil, "metadata", metadataTableID)
-	namespaceTable := newTableView(base, nil, "namespace", namespaceTableID)
-	expirationTable := newTableView(base, nil, "expiration", expirationTableID)
+	metadataTable := buildInternalTable(base, metadataTableID)
+	namespaceTable := buildInternalTable(base, namespaceTableID)
+	expirationTable := buildInternalTable(base, expirationTableID)
 
 	err := validateSchema(metadataTable)
 	if err != nil {
@@ -101,6 +101,14 @@ func start(
 		config.GarbageCollectionBatchSize)
 
 	return store, nil
+}
+
+// Build a table for internal use.
+func buildInternalTable(base kvstore.Store, id uint32) kvstore.Table {
+	return &tableView{
+		base:   base,
+		prefix: id,
+	}
 }
 
 // buildBaseStore creates a new base store of the given type.

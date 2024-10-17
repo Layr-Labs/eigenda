@@ -63,7 +63,7 @@ func newTableStore(
 	}
 
 	for prefix, name := range tableIDMap {
-		table := newTableView(base, store, name, prefix)
+		table := newTableView(base, name, prefix, store.Shutdown, store.Destroy, store.NewBatch)
 		store.tableMap[name] = table
 	}
 

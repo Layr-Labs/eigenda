@@ -14,26 +14,34 @@ var _ kvstore.Table = &tableView{}
 type tableView struct {
 	// base is the underlying base store.
 	base kvstore.Store
-	// tableStore is the underlying table store. This will be nil for tables used internally by the table store.
-	tableStore kvstore.TableStore
 	// name is the name of the table.
 	name string
 	// prefix is the prefix for all keys in the table.
 	prefix uint32
+	// shutdown is a function that shuts down the table store.
+	shutdown func() error
+	// destroy is a function that destroys the table store.
+	destroy func() error
+	// newBatch builds batches for the table store.
+	newBatch func() kvstore.TableStoreBatch
 }
 
 // NewTableView creates a new view into a table in a New.
 func newTableView(
 	base kvstore.Store,
-	tableStore kvstore.TableStore,
 	name string,
-	prefix uint32) kvstore.Table {
+	prefix uint32,
+	shutdown func() error,
+	destroy func() error,
+	newBatch func() kvstore.TableStoreBatch) kvstore.Table {
 
 	return &tableView{
-		base:       base,
-		tableStore: tableStore,
-		name:       name,
-		prefix:     prefix,
+		base:     base,
+		name:     name,
+		prefix:   prefix,
+		shutdown: shutdown,
+		destroy:  destroy,
+		newBatch: newBatch,
 	}
 }
 
@@ -146,19 +154,19 @@ func (t *tableView) NewIterator(prefix []byte) (iterator.Iterator, error) {
 
 // Shutdown shuts down the table.
 func (t *tableView) Shutdown() error {
-	return t.tableStore.Shutdown()
+	return t.shutdown()
 }
 
 // Destroy shuts down a table and deletes all data in it.
 func (t *tableView) Destroy() error {
-	return t.tableStore.Destroy()
+	return t.destroy()
 }
 
 // NewTTLBatch creates a new batch for the table with time-to-live (TTL) or expiration times.
 func (t *tableView) NewTTLBatch() kvstore.TTLStoreBatch {
 	return &tableViewBatch{
 		table: t,
-		batch: t.tableStore.NewBatch(),
+		batch: t.newBatch(),
 	}
 }
 
