@@ -252,7 +252,7 @@ func (g *Metrics) collectOnchainMetrics() {
 			continue
 		}
 		_, quorumRankedOperators := operators.GetRankedOperators(state)
-		for q, _ := range state.Operators {
+		for q := range state.Operators {
 			for i, op := range quorumRankedOperators[q] {
 				if op.OperatorId == g.operatorId {
 					g.allQuorumCache[q] = true

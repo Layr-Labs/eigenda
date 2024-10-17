@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
+	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	data = codec.ConvertByPaddingEmptyByte(data)
 	_, err = dispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
 		Data:       data,
-		BlobHeader: &pbv2.BlobHeader{},
+		BlobHeader: &pbcommon.BlobHeader{},
 	})
 	assert.ErrorContains(t, err, "not implemented")
 }
