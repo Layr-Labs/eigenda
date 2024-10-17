@@ -483,14 +483,14 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
-	// Existing fields
-	AccountID string
+	// AccountID is the ETH account address for the payer
+	AccountID string `json:"account_id"`
 
-	// New fields
-	BinIndex uint32
+	// BinIndex represents the range of time at which the dispersal is made
+	BinIndex uint32 `json:"bin_index"`
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
-	CumulativePayment *big.Int
+	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
