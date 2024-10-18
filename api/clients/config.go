@@ -27,6 +27,7 @@ type EigenDAClientConfig struct {
 	WaitForFinalization bool
 
 	// The quorum IDs to write blobs to using this client. Should not include default quorums 0 or 1.
+	// TODO: should we change this to core.QuorumID instead? https://github.com/Layr-Labs/eigenda/blob/style--improve-api-clients-comments/core/data.go#L18
 	CustomQuorumIDs []uint
 
 	// Signer private key in hex encoded format. This key is currently purely used for authn/authz on the disperser.

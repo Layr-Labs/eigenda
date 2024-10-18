@@ -150,7 +150,6 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		return
 	}
 
-	// TODO: should we just use uint8s directly in the config?
 	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {
 		customQuorumNumbers[i] = uint8(e)
