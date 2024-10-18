@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -526,4 +527,28 @@ type ActiveReservation struct {
 
 type OnDemandPayment struct {
 	CumulativePayment *big.Int // Total amount deposited by the user
+}
+
+type BlobVersion uint32
+
+type BlobKey [32]byte
+
+func (b BlobKey) Hex() string {
+	return hex.EncodeToString(b[:])
+}
+
+func HexToBlobKey(h string) (BlobKey, error) {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		return BlobKey{}, err
+	}
+	return BlobKey(b), nil
+}
+
+type BlobHeaderV2 struct {
+	BlobVersion    BlobVersion              `json:"version"`
+	QuorumIDs      []QuorumID               `json:"quorum_ids"`
+	BlobCommitment encoding.BlobCommitments `json:"commitments"`
+
+	PaymentMetadata `json:"payment_metadata"`
 }
