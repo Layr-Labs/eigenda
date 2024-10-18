@@ -113,9 +113,9 @@ func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blob
 	return decodedData, nil
 }
 
-// PutBlob encodes and writes a blob to EigenDA, waiting for it to be finalized
-// before returning. This function is resilient to transient failures and
-// timeouts.
+// PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
+// to be reached (guarded by WaitForFinalization config param) before returning.
+// This function is resilient to transient failures and timeouts.
 // TODO: should we use a pointer receiver instead, to prevent unnecessary copying of the EigenDAClient struct?
 func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
