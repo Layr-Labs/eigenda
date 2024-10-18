@@ -30,7 +30,9 @@ func GenericDecodeBlob(data []byte) ([]byte, error) {
 	if len(data) <= 32 {
 		return nil, fmt.Errorf("data is not of length greater than 32 bytes: %d", len(data))
 	}
-	// TODO: why [1]? What's in [0]?
+	// version byte is stored in [1], because [0] is always 0 to ensure the codecBlobHeader is a valid bn254 element
+	// see https://github.com/Layr-Labs/eigenda/blob/master/api/clients/codecs/default_blob_codec.go#L21
+	// TODO: we should prob be working over a struct with methods such as GetBlobEncodingVersion() to prevent index errors
 	version := BlobEncodingVersion(data[1])
 	codec, err := BlobEncodingVersionToCodec(version)
 	if err != nil {
