@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -475,14 +476,14 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
-	// Existing fields
-	AccountID string
+	// AccountID is the ETH account address for the payer
+	AccountID string `json:"account_id"`
 
-	// New fields
-	BinIndex uint32
+	// BinIndex represents the range of time at which the dispersal is made
+	BinIndex uint32 `json:"bin_index"`
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
-	CumulativePayment uint64
+	CumulativePayment uint64 `json:"cumulative_payment"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -516,4 +517,28 @@ type ActiveReservation struct {
 
 type OnDemandPayment struct {
 	CumulativePayment *big.Int // Total amount deposited by the user
+}
+
+type BlobVersion uint32
+
+type BlobKey [32]byte
+
+func (b BlobKey) Hex() string {
+	return hex.EncodeToString(b[:])
+}
+
+func HexToBlobKey(h string) (BlobKey, error) {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		return BlobKey{}, err
+	}
+	return BlobKey(b), nil
+}
+
+type BlobHeaderV2 struct {
+	BlobVersion    BlobVersion              `json:"version"`
+	QuorumIDs      []QuorumID               `json:"quorum_ids"`
+	BlobCommitment encoding.BlobCommitments `json:"commitments"`
+
+	PaymentMetadata `json:"payment_metadata"`
 }
