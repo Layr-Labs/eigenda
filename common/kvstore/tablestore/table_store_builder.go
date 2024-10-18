@@ -371,7 +371,7 @@ func loadNamespaceTable(namespaceTable kvstore.Table) (map[uint32]string, error)
 	return tableIDMap, nil
 }
 
-// CreateTable creates a new table with the given name.
+// createTable creates a new table with the given name.
 // Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
 func createTable(
 	base kvstore.Store,
