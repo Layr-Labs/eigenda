@@ -123,6 +123,7 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
+	ifftCodec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,
 		Config: clients.EigenDAClientConfig{
@@ -138,7 +139,7 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
+		Codec:  ifftCodec,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -148,7 +149,7 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 
 	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
 	require.NoError(t, err)
-	encodedBlob, err := eigendaClient.GetCodec().EncodeBlob(resultBlob)
+	encodedBlob, err := ifftCodec.EncodeBlob(resultBlob)
 	require.NoError(t, err)
 
 	resultBlob, err = codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()).DecodeBlob(encodedBlob)
