@@ -82,8 +82,8 @@ message DisperseBlobRequest {
 	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
 	// as a field element on the bn254 curve. The valid range is 
 	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
-	// which is a 254 bit number (meaning the first 2 bits of each chunk must always be 00).
 	// If any one of the 32 bytes chunk is outside the range, the whole request is deemed as invalid, and rejected. 
+	// Note that the max allowed field element is a 254 bit number, meaning the first 2 bits of each chunk will always be 00.
 	bytes data = 1;
 	// The quorums to which the blob will be sent, in addition to the required quorums which are configured
 	// on the EigenDA smart contract. If required quorums are included here, an error will be returned.
