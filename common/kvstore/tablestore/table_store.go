@@ -95,7 +95,7 @@ func (t *tableStore) GetTables() []kvstore.Table {
 }
 
 // NewBatch creates a new batch for writing to the store.
-func (t *tableStore) NewBatch() kvstore.TableStoreBatch {
+func (t *tableStore) NewBatch() kvstore.TTLBatch {
 	return &tableStoreBatch{
 		batch:           t.base.NewBatch(),
 		expirationTable: t.expirationTable,

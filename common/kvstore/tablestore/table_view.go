@@ -23,7 +23,7 @@ type tableView struct {
 	// destroy is a function that destroys the table store.
 	destroy func() error
 	// newBatch builds batches for the table store.
-	newBatch func() kvstore.TableStoreBatch
+	newBatch func() kvstore.TTLBatch
 }
 
 // NewTableView creates a new view into a table in a New.
@@ -33,7 +33,7 @@ func newTableView(
 	prefix uint32,
 	shutdown func() error,
 	destroy func() error,
-	newBatch func() kvstore.TableStoreBatch) kvstore.Table {
+	newBatch func() kvstore.TTLBatch) kvstore.Table {
 
 	return &tableView{
 		base:     base,
@@ -163,7 +163,7 @@ func (t *tableView) Destroy() error {
 }
 
 // NewTTLBatch creates a new batch for the table with time-to-live (TTL) or expiration times.
-func (t *tableView) NewTTLBatch() kvstore.TTLStoreBatch {
+func (t *tableView) NewTTLBatch() kvstore.TTLBatch {
 	return &tableViewBatch{
 		table: t,
 		batch: t.newBatch(),
@@ -171,14 +171,14 @@ func (t *tableView) NewTTLBatch() kvstore.TTLStoreBatch {
 }
 
 // NewBatch creates a new batch for the table.
-func (t *tableView) NewBatch() kvstore.StoreBatch {
+func (t *tableView) NewBatch() kvstore.Batch {
 	// This method is a simple alias for NewTTLBatch. We inherit the need to implement this function from the base
 	// interface, but we don't need to do anything special here.
 	return t.NewTTLBatch()
 }
 
 // TableKey creates a key scoped to this table.
-func (t *tableView) TableKey(key []byte) kvstore.TableKey {
+func (t *tableView) TableKey(key []byte) []byte {
 	result := make([]byte, 4+len(key))
 	binary.BigEndian.PutUint32(result, t.prefix)
 	copy(result[4:], key)

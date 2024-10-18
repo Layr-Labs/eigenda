@@ -8,9 +8,6 @@ import (
 // ErrNotFound is returned when a key is not found in the database.
 var ErrNotFound = errors.New("not found")
 
-// StoreBatch is a collection of operations that can be applied atomically to a Store.
-type StoreBatch Batch[[]byte]
-
 // Store implements a key-value store. May be backed by a database like LevelDB.
 //
 // Implementations of this interface are expected to be thread-safe.
@@ -28,7 +25,7 @@ type Store interface {
 	Delete(key []byte) error
 
 	// NewBatch creates a new batch that can be used to perform multiple operations atomically.
-	NewBatch() StoreBatch
+	NewBatch() Batch
 
 	// NewIterator returns an iterator that can be used to iterate over a subset of the keys in the database.
 	// Only keys with the given prefix will be iterated. The iterator must be closed by calling Release() when done.

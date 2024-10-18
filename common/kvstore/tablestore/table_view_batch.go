@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-var _ kvstore.TTLStoreBatch = &tableViewBatch{}
+var _ kvstore.TTLBatch = &tableViewBatch{}
 
 // tableViewBatch is a batch for a table in a TableStore.
 type tableViewBatch struct {
 	table kvstore.Table
-	batch kvstore.TableStoreBatch
+	batch kvstore.TTLBatch
 }
 
 // PutWithTTL schedules a key-value pair to be added to the table with a time-to-live (TTL).

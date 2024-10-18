@@ -8,12 +8,6 @@ import (
 // ErrTableNotFound is returned when a table is not found.
 var ErrTableNotFound = errors.New("table not found")
 
-// TTLStoreBatch is a collection of key / value pairs that will be written atomically to a database with
-// time-to-live (TTL) or expiration times. Although it is thread safe to modify different batches in
-// parallel or to modify a batch while the store is being modified, it is not thread safe to concurrently
-// modify the same batch.
-type TTLStoreBatch TTLBatch[[]byte]
-
 // Table can be used to operate on data in a specific table in a TableStore.
 type Table interface {
 	Store
@@ -22,8 +16,9 @@ type Table interface {
 	Name() string
 
 	// TableKey creates a new key scoped to this table that can be used for TableStoreBatch
-	// operations that modify this table.
-	TableKey(key []byte) TableKey
+	// operations that modify this table. Using keys in TableStore batches that are not created using this method
+	// has undefined behavior. Use of this method in a TableStoreBatch is not optional.
+	TableKey(key []byte) []byte
 
 	// PutWithTTL adds a key-value pair to the store that expires after a specified duration.
 	// Key is eventually deleted after the TTL elapses.
@@ -41,15 +36,8 @@ type Table interface {
 
 	// NewTTLBatch creates a new TTLBatch that can be used to perform multiple operations atomically.
 	// Use this instead of NewBatch to create a batch that supports TTL/expiration.
-	NewTTLBatch() TTLStoreBatch
+	NewTTLBatch() TTLBatch
 }
-
-// TableKey is a key scoped to a particular table. It can be used to perform batch operations that modify multiple
-// table keys atomically.
-type TableKey []byte
-
-// TableStoreBatch is a collection of operations that can be applied atomically to a TableStore.
-type TableStoreBatch TTLBatch[TableKey]
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.
 // A "table" in this context is a disjoint keyspace. Keys in one table to not collide with keys in another table,
@@ -69,7 +57,7 @@ type TableStore interface {
 	GetTables() []Table
 
 	// NewBatch creates a new batch that can be used to perform multiple operations across tables atomically.
-	NewBatch() TableStoreBatch
+	NewBatch() TTLBatch
 
 	// Shutdown shuts down the store, flushing any remaining data to disk.
 	Shutdown() error

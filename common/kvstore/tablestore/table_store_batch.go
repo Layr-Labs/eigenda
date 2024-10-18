@@ -5,22 +5,22 @@ import (
 	"time"
 )
 
-var _ kvstore.TableStoreBatch = &tableStoreBatch{}
+var _ kvstore.TTLBatch = &tableStoreBatch{}
 
 // tableStoreBatch is a batch for writing to a table store.
 type tableStoreBatch struct {
-	batch           kvstore.StoreBatch
+	batch           kvstore.Batch
 	expirationTable kvstore.Table
 }
 
 // PutWithTTL adds a key-value pair to the batch that expires after a specified duration.
-func (t *tableStoreBatch) PutWithTTL(key kvstore.TableKey, value []byte, ttl time.Duration) {
+func (t *tableStoreBatch) PutWithTTL(key []byte, value []byte, ttl time.Duration) {
 	expirationTime := time.Now().Add(ttl)
 	t.PutWithExpiration(key, value, expirationTime)
 }
 
 // PutWithExpiration adds a key-value pair to the batch that expires at a specified time.
-func (t *tableStoreBatch) PutWithExpiration(key kvstore.TableKey, value []byte, expiryTime time.Time) {
+func (t *tableStoreBatch) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) {
 	expirationKey := t.expirationTable.TableKey(prependTimestamp(expiryTime, key))
 
 	t.Put(key, value)
@@ -28,7 +28,7 @@ func (t *tableStoreBatch) PutWithExpiration(key kvstore.TableKey, value []byte, 
 }
 
 // Put adds a key-value pair to the batch.
-func (t *tableStoreBatch) Put(key kvstore.TableKey, value []byte) {
+func (t *tableStoreBatch) Put(key []byte, value []byte) {
 	if value == nil {
 		value = []byte{}
 	}
@@ -36,7 +36,7 @@ func (t *tableStoreBatch) Put(key kvstore.TableKey, value []byte) {
 }
 
 // Delete removes a key-value pair from the batch.
-func (t *tableStoreBatch) Delete(key kvstore.TableKey) {
+func (t *tableStoreBatch) Delete(key []byte) {
 	t.batch.Delete(key)
 }
 
