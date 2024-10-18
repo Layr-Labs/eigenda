@@ -6,6 +6,7 @@ package prover
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"math"
 	"sync"
 
@@ -80,29 +81,26 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	// trying to choose CUDA if available, or fallback to CPU otherwise (default device)
 	deviceCuda := runtime.CreateDevice("CUDA", 0) // GPU-0
 	if runtime.IsDeviceAvailable(&deviceCuda) {
-		log.Println("CUDA device available, setting device")
+		slog.Debug("CUDA device available, setting device")
 		runtime.SetDevice(&deviceCuda)
 	} else {
-		log.Println("CUDA device not available, falling back to CPU")
+		slog.Debug("CUDA device not available, falling back to CPU")
 	} // else we stay on CPU backend
 
 	gpuLock := sync.Mutex{}
 
 	// Setup NTT
-	log.Println("Setting up NTT")
 	nttCfg, icicle_err := gpu_utils.SetupNTT()
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not setup NTT")
 	}
 
 	// Setup MSM
-	log.Println("Setting up MSM")
 	flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, icicle_err := gpu_utils.SetupMsm(fftPointsT, g.Srs.G1[:g.SRSNumberToLoad])
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not setup MSM")
 	}
 
-	log.Println("Creating stream")
 	stream, icicle_err := runtime.CreateStream()
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not create stream")
@@ -122,6 +120,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		KzgConfig:      g.KzgConfig,
 		GpuLock:        &gpuLock,
 		Stream:         &stream,
+		Device:         deviceCuda,
 	}
 
 	// Set RS GPU computer

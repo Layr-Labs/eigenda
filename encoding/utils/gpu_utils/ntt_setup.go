@@ -9,27 +9,25 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/fft"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 // batchSize is number of batches
-func SetupNTT() (core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32], runtime.EIcicleError) {
-	log.Println("Getting default NTT domain")
+func SetupNTT() (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], runtime.EIcicleError) {
 	cfg := core.GetDefaultNTTInitDomainConfig()
 
 	// maximally possible
 	exp := 25
-	initDomain(exp, cfg)
+	e := initDomain(exp, cfg)
+	if e != runtime.Success {
+		log.Println("Error")
+	}
 
-	log.Println("Getting default NTT")
 	cfgBn254 := ntt.GetDefaultNttConfig()
-
 	cfgBn254.IsAsync = true
 	cfgBn254.Ordering = core.KNN
 
-	log.Println("Creating stream")
 	streamBn254, err := runtime.CreateStream()
 	if err != runtime.Success {
 		return cfgBn254, err

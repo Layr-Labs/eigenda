@@ -2,7 +2,7 @@ package cpu
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"time"
 
@@ -136,7 +136,6 @@ func (p *KzgCpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	msmDone := time.Now()
 
 	// only 1 ifft is needed
-	log.Println("sumVec len", len(sumVec))
 	sumVecInv, err := p.Fs.FFTG1(sumVec, true)
 	if err != nil {
 		return nil, fmt.Errorf("fft error: %v", err)
@@ -152,12 +151,12 @@ func (p *KzgCpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 
 	secondECNttDone := time.Now()
 
-	fmt.Printf("Multiproof Time Decomp \n\t\ttotal   %-20s \n\t\tpreproc %-20s \n\t\tmsm     %-20s \n\t\tfft1    %-20s \n\t\tfft2    %-20s\n",
-		secondECNttDone.Sub(begin).String(),
-		preprocessDone.Sub(begin).String(),
-		msmDone.Sub(preprocessDone).String(),
-		firstECNttDone.Sub(msmDone).String(),
-		secondECNttDone.Sub(firstECNttDone).String(),
+	slog.Info("Multiproof Time Decomp",
+		"total", secondECNttDone.Sub(begin),
+		"preproc", preprocessDone.Sub(begin),
+		"msm", msmDone.Sub(preprocessDone),
+		"fft1", firstECNttDone.Sub(msmDone),
+		"fft2", secondECNttDone.Sub(firstECNttDone),
 	)
 
 	return proofs, nil

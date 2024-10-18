@@ -227,11 +227,14 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		return nil, nil, multierror.Append(rsResult.Err, proofsResult.Err)
 	}
 
-	log.Printf("\n\t\tRS encode     %-v\n\t\tmultiProof    %-v\n\t\tMetaInfo. order  %-v shift %v\n",
-		rsResult.Duration,
-		proofsResult.Duration,
-		g.SRSOrder,
-		g.SRSOrder-uint64(len(inputFr)),
+	slog.Info("Encoding process details",
+		"RS_encode_duration", rsResult.Duration,
+		"Commiting_duration", commitmentResult.Duration,
+		"LengthCommit_duration", lengthCommitmentResult.Duration,
+		"lengthProof_duration", lengthProofResult.Duration,
+		"multiProof_duration", proofsResult.Duration,
+		"SRSOrder", g.SRSOrder,
+		"SRSOrder_shift", g.SRSOrder-uint64(len(inputFr)),
 	)
 
 	// assemble frames

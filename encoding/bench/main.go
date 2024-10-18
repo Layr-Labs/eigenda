@@ -41,11 +41,11 @@ func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
 	flag.Uint64Var(&config.BlobLength, "blob-length", 131072, "Blob length (power of 2)")
-	flag.Uint64Var(&config.NumChunks, "num-chunks", 1024, "Minimum number of chunks (power of 2)")
-	flag.Uint64Var(&config.NumRuns, "num-runs", 10, "Number of times to run the benchmark")
+	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
+	flag.Uint64Var(&config.NumRuns, "num-runs", 2, "Number of times to run the benchmark")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
-	flag.BoolVar(&config.EnableVerify, "enable-verify", false, "Verify blobs after encoding")
+	flag.BoolVar(&config.EnableVerify, "enable-verify", true, "Verify blobs after encoding")
 	flag.Parse()
 	return config
 }
@@ -61,7 +61,7 @@ func main() {
 		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
 		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
 		SRSOrder:        268435456,
-		SRSNumberToLoad: 2097152,
+		SRSNumberToLoad: 1048576,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		Verbose:         true,
 	}

@@ -2,7 +2,7 @@ package rs
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -47,7 +47,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 	}
 
 	if g.verbose {
-		log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
+		slog.Info("Extending evaluation duration", "duration", time.Since(intermediate))
 	}
 
 	// create frames to group relevant info
@@ -56,8 +56,12 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 		return nil, nil, err
 	}
 
-	log.Printf("  SUMMARY: RSEncode %v byte among %v numChunks with chunkLength %v takes %v\n",
-		len(inputFr)*encoding.BYTES_PER_SYMBOL, g.NumChunks, g.ChunkLength, time.Since(start))
+	slog.Info("RS Encode Summary",
+		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
+		"num_chunks", g.NumChunks,
+		"chunk_length", g.ChunkLength,
+		"duration", time.Since(start),
+	)
 
 	return frames, indices, nil
 }
