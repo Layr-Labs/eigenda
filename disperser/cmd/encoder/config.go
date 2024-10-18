@@ -13,6 +13,7 @@ type Config struct {
 	LoggerConfig  common.LoggerConfig
 	ServerConfig  *encoder.ServerConfig
 	MetricsConfig encoder.MetrisConfig
+	PprofConfig   encoder.PprofConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -32,6 +33,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MetricsConfig: encoder.MetrisConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
+		},
+		PprofConfig: encoder.PprofConfig{
+			HTTPPort:    ctx.GlobalString(flags.PprofHTTPPort.Name),
+			EnablePprof: ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 	}
 	return config, nil
