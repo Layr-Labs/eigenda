@@ -155,7 +155,7 @@ func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan c
 		customQuorumNumbers[i] = uint8(e)
 	}
 	// disperse blob
-	// TODO: can we consider passing a requestID directly to requests, to get idempotency and tracing?
+	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
 	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
 		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
