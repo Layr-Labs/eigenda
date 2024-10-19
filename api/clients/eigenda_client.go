@@ -101,8 +101,9 @@ func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blob
 	}
 
 	if len(data) == 0 {
-		// TODO: explain when/why/how this can happen
-		return nil, fmt.Errorf("blob has length zero")
+		// This should never happen, because empty blobs are rejected from even entering the system:
+		// https://github.com/Layr-Labs/eigenda/blob/master/disperser/apiserver/server.go#L930
+		return nil, fmt.Errorf("blob has length zero - this should not be possible")
 	}
 
 	decodedData, err := m.Codec.DecodeBlob(data)
