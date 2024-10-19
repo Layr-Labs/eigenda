@@ -35,7 +35,7 @@ type EigenDAClient struct {
 	Codec  codecs.BlobCodec
 }
 
-var _ IEigenDAClient = EigenDAClient{}
+var _ IEigenDAClient = &EigenDAClient{}
 
 func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
 	err := config.CheckAndSetDefaults()
@@ -83,7 +83,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 
 // Deprecated: do not rely on this function. Do not use m.Codec directly either.
 // These will eventually be removed and not exposed.
-func (m EigenDAClient) GetCodec() codecs.BlobCodec {
+func (m *EigenDAClient) GetCodec() codecs.BlobCodec {
 	return m.Codec
 }
 
@@ -93,8 +93,7 @@ func (m EigenDAClient) GetCodec() codecs.BlobCodec {
 // data, which is necessary for generating KZG proofs for data's correctness.
 // The function handles potential errors during blob retrieval, data length
 // checks, and decoding processes.
-// TODO: should we use a pointer receiver instead, to prevent unnecessary copying of the EigenDAClient struct?
-func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
+func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
 	data, err := m.Client.RetrieveBlob(ctx, batchHeaderHash, blobIndex)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve blob: %w", err)
@@ -117,8 +116,7 @@ func (m EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blob
 // PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
 // to be reached (guarded by WaitForFinalization config param) before returning.
 // This function is resilient to transient failures and timeouts.
-// TODO: should we use a pointer receiver instead, to prevent unnecessary copying of the EigenDAClient struct?
-func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
+func (m *EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
 	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
 	case result := <-resultChan:
@@ -128,15 +126,14 @@ func (m EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser
 	}
 }
 
-// TODO: should we use a pointer receiver instead, to prevent unnecessary copying of the EigenDAClient struct?
-func (m EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
+func (m *EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
 	resultChan = make(chan *grpcdisperser.BlobInfo, 1)
 	errChan = make(chan error, 1)
 	go m.putBlob(ctx, data, resultChan, errChan)
 	return
 }
 
-func (m EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
+func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode blob
