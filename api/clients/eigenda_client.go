@@ -1,19 +1,26 @@
 package clients
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"net"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // IEigenDAClient is a wrapper around the DisperserClient interface which
@@ -29,10 +36,12 @@ type IEigenDAClient interface {
 type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
-	Config EigenDAClientConfig
-	Log    log.Logger
-	Client DisperserClient
-	Codec  codecs.BlobCodec
+	Config      EigenDAClientConfig
+	Log         log.Logger
+	Client      DisperserClient
+	ethClient   *ethclient.Client
+	edasmCaller *edasm.ContractEigenDAServiceManagerCaller
+	Codec       codecs.BlobCodec
 }
 
 var _ IEigenDAClient = &EigenDAClient{}
@@ -70,6 +79,20 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, err
 	}
 
+	var ethClient *ethclient.Client
+	var edasmCaller *edasm.ContractEigenDAServiceManagerCaller
+	if config.WaitForConfirmationDepth > 0 {
+		ethClient, err = ethclient.Dial(config.EthRpcUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to dial ETH RPC node: %w", err)
+		}
+		edasmCaller, err = edasm.NewContractEigenDAServiceManagerCaller(common.HexToAddress(config.SvcManagerAddr), ethClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EigenDAServiceManagerCaller: %w", err)
+		}
+
+	}
+
 	host, port, err := net.SplitHostPort(config.RPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse EigenDA RPC: %w", err)
@@ -101,10 +124,12 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	return &EigenDAClient{
-		Log:    log,
-		Config: config,
-		Client: disperserClient,
-		Codec:  codec,
+		Log:         log,
+		Config:      config,
+		Client:      disperserClient,
+		ethClient:   ethClient,
+		edasmCaller: edasmCaller,
+		Codec:       codec,
 	}, nil
 }
 
@@ -204,7 +229,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	defer cancel()
 
 	alreadyWaitingForDispersal := false
-	alreadyWaitingForFinalization := false
+	alreadyWaitingForConfirmationOrFinality := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -235,16 +260,30 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 			case grpcdisperser.BlobStatus_CONFIRMED:
 				if m.Config.WaitForFinalization {
 					// to prevent log clutter, we only log at info level once
-					if alreadyWaitingForFinalization {
-						m.Log.Debug("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
+					if alreadyWaitingForConfirmationOrFinality {
+						m.Log.Debug("EigenDA blob included onchain, waiting for finalization", "requestID", base64RequestID)
 					} else {
-						m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
-						alreadyWaitingForFinalization = true
+						m.Log.Info("EigenDA blob included onchain, waiting for finalization", "requestID", base64RequestID)
+						alreadyWaitingForConfirmationOrFinality = true
 					}
 				} else {
-					m.Log.Info("EigenDA blob confirmed", "requestID", base64RequestID)
-					resultChan <- statusRes.Info
-					return
+					batchId := statusRes.Info.BlobVerificationProof.GetBatchId()
+					batchConfirmed, err := m.batchIdConfirmedAtDepth(ctx, batchId, m.Config.WaitForConfirmationDepth)
+					if err != nil {
+						m.Log.Warn("Error checking if batch ID is confirmed at depth. Will retry...", "requestID", base64RequestID, "err", err)
+					}
+					if batchConfirmed {
+						m.Log.Info("EigenDA blob confirmed", "requestID", base64RequestID, "confirmationDepth", m.Config.WaitForConfirmationDepth)
+						resultChan <- statusRes.Info
+						return
+					}
+					// to prevent log clutter, we only log at info level once
+					if alreadyWaitingForConfirmationOrFinality {
+						m.Log.Debug("EigenDA blob included onchain, waiting for confirmation", "requestID", base64RequestID, "confirmationDepth", m.Config.WaitForConfirmationDepth)
+					} else {
+						m.Log.Info("EigenDA blob included onchain, waiting for confirmation", "requestID", base64RequestID, "confirmationDepth", m.Config.WaitForConfirmationDepth)
+						alreadyWaitingForConfirmationOrFinality = true
+					}
 				}
 			case grpcdisperser.BlobStatus_FINALIZED:
 				batchHeaderHashHex := fmt.Sprintf("0x%s", hex.EncodeToString(statusRes.Info.BlobVerificationProof.BatchMetadata.BatchHeaderHash))
@@ -264,4 +303,34 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 // It is thread safe and can be called multiple times.
 func (c *EigenDAClient) Close() error {
 	return c.Client.Close()
+}
+
+// getConfDeepBlockNumber returns the block number that is `depth` blocks behind the current block number.
+func (m EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64) (*big.Int, error) {
+	curBlockNumber, err := m.ethClient.BlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block number: %w", err)
+	}
+	// If curBlock < depth, this will return the genesis block number (0),
+	// which would cause to accept as confirmed a block that isn't depth deep.
+	// TODO: there's prob a better way to deal with this, like returning a special error
+	return new(big.Int).SetUint64(max(curBlockNumber-depth, 0)), nil
+}
+
+// batchIdConfirmedAtDepth checks if a batch ID has been confirmed at a certain depth.
+// It returns true if the batch ID has been confirmed at the given depth, and false otherwise,
+// or returns an error if any of the network calls fail.
+func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint32, depth uint64) (bool, error) {
+	confDeepBlockNumber, err := m.getConfDeepBlockNumber(ctx, m.Config.WaitForConfirmationDepth)
+	if err != nil {
+		return false, fmt.Errorf("failed to get confirmation deep block number: %w", err)
+	}
+	onchainBatchMetadataHash, err := m.edasmCaller.BatchIdToBatchMetadataHash(&bind.CallOpts{BlockNumber: confDeepBlockNumber}, batchId)
+	if err != nil {
+		return false, fmt.Errorf("failed to get batch metadata hash: %w", err)
+	}
+	if bytes.Equal(onchainBatchMetadataHash[:], make([]byte, 32)) {
+		return false, nil
+	}
+	return true, nil
 }

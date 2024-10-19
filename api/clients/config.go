@@ -2,6 +2,7 @@ package clients
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -22,6 +23,23 @@ type EigenDAClientConfig struct {
 
 	// The amount of time to wait between status queries of a newly dispersed blob
 	StatusQueryRetryInterval time.Duration
+
+	// The Ethereum RPC URL to use for querying the Ethereum blockchain.
+	// This is used to make sure that the blob has been confirmed on-chain.
+	// Only needed when WaitForConfirmationDepth > 0.
+	EthRpcUrl string
+
+	// The address of the EigenDAServiceManager contract, used to make sure that the blob has been confirmed on-chain.
+	// Only needed when WaitForConfirmationDepth > 0.
+	SvcManagerAddr string
+
+	// The number of Ethereum blocks to wait after the blob's batch has been included onchain, before returning from PutBlob calls.
+	// Only makes sense to wait for < 24 blocks (2 epochs). Otherwise, use WaitForFinalization instead.
+	//
+	// When WaitForFinalization is true, this field is ignored.
+	// 
+	// If WaitForConfirmationDepth > 0, then EthRpcUrl and SvcManagerAddr must be set.
+	WaitForConfirmationDepth uint64
 
 	// If true, will wait for the blob to finalize, if false, will wait only for the blob to confirm.
 	WaitForFinalization bool
@@ -51,6 +69,26 @@ type EigenDAClientConfig struct {
 }
 
 func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
+	if c.WaitForFinalization {
+		if c.WaitForConfirmationDepth != 0 {
+			log.Println("Warning: WaitForFinalization is set to true, WaitForConfirmationDepth will be ignored")
+		}
+	} else {
+		if c.WaitForConfirmationDepth > 24 {
+			log.Printf("Warning: WaitForConfirmationDepth is set to %v > 24 (2 epochs == finality). Consider setting WaitForFinalization to true instead.\n", c.WaitForConfirmationDepth)
+		}
+	}
+	if c.WaitForConfirmationDepth > 0 {
+		if c.SvcManagerAddr == "" {
+			return fmt.Errorf("EigenDAClientConfig.SvcManagerAddr not set. Needed because WaitForConfirmationDepth > 0")
+		}
+		if c.EthRpcUrl == "" {
+			return fmt.Errorf("EigenDAClientConfig.EthRpcUrl not set. Needed because WaitForConfirmationDepth > 0")
+		}
+	}
+	if c.SvcManagerAddr == "" && c.WaitForConfirmationDepth > 0 {
+		return fmt.Errorf("EigenDAClientConfig.SvcManagerAddr not set. Needed because WaitForConfirmationDepth > 0")
+	}
 	if c.StatusQueryRetryInterval == 0 {
 		c.StatusQueryRetryInterval = 5 * time.Second
 	}
