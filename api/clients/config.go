@@ -66,7 +66,7 @@ type EigenDAClientConfig struct {
 }
 
 func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
-	if c.WaitForFinalization == true {
+	if c.WaitForFinalization {
 		if c.WaitForConfirmationDepth != 0 {
 			log.Println("Warning: WaitForFinalization is set to true, WaitForConfirmationDepth will be ignored")
 		}
