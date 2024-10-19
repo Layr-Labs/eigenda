@@ -20,6 +20,9 @@ import (
 type Config struct {
 	Hostname          string
 	Port              string
+	// BlobDispersal Timeouts for both authenticated and unauthenticated dispersals
+	// GetBlobStatus and RetrieveBlob timeouts are hardcoded to 60seconds
+	// TODO: do we want to add config timeouts for those separate requests?
 	Timeout           time.Duration
 	UseSecureGrpcFlag bool
 }
