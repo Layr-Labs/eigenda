@@ -34,8 +34,11 @@ type EigenDAClientConfig struct {
 	SvcManagerAddr string
 
 	// The number of Ethereum blocks to wait after the blob's batch has been included onchain, before returning from PutBlob calls.
-	// Only makes sense to wait for < 2 epochs worth of blocks. Otherwise, use WaitForFinalization instead.
+	// Only makes sense to wait for < 24 blocks (2 epochs). Otherwise, use WaitForFinalization instead.
+	//
 	// When WaitForFinalization is true, this field is ignored.
+	// 
+	// If WaitForConfirmationDepth > 0, then EthRpcUrl and SvcManagerAddr must be set.
 	WaitForConfirmationDepth uint64
 
 	// If true, will wait for the blob to finalize, if false, will wait only for the blob to confirm.
