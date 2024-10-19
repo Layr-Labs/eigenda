@@ -23,7 +23,6 @@ func (c *KzgGpuProofDevice) MsmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, 
 	_, err := out.Malloc(p.Size(), totalSize)
 
 	if err != runtime.Success {
-		fmt.Println(err)
 		return out, fmt.Errorf("%v", "Allocating bytes on device for Projective results failed")
 	}
 
