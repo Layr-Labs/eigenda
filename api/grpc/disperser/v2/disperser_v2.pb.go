@@ -102,12 +102,11 @@ type DisperseBlobRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The data to be dispersed.
-	// The size of data must be <= 2MiB. Every 32 bytes of data chunk is interpreted as an integer in big endian format
+	// The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
 	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
 	// as a field element on the bn254 curve. The valid range is
 	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
-	// containing slightly less than 254 bits and more than 253 bits. If any one of the 32 bytes chunk is outside the range,
-	// the whole request is deemed as invalid, and rejected.
+	// If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
 	Data       []byte      `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	BlobHeader *BlobHeader `protobuf:"bytes,2,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
