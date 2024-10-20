@@ -19,7 +19,6 @@ func (me MetaError) Error() string {
 		me.Meta.CertVersion)
 }
 
-// NewMetaError creates a new MetaError
-func NewMetaError(err error, meta commitments.CommitmentMeta) MetaError {
-	return MetaError{Err: err, Meta: meta}
+func (me MetaError) Unwrap() error {
+	return me.Err
 }

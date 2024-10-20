@@ -188,7 +188,7 @@ For `alt-da` clients running on Optimism, the following commitment schema is sup
 
 Both `keccak256` (i.e, S3 storage using hash of pre-image for commitment value) and `generic` (i.e, EigenDA) are supported to ensure cross-compatibility with alt-da storage backends if desired by a rollup operator.
 
-OP Stack itself only has a conception of the first byte (`commit type`) and does no semantical interpretation of any subsequent bytes within the encoding. The `da layer type` byte for EigenDA is always `0x0`. However it is currently unused by OP Stack with name space values still being actively [discussed](https://github.com/ethereum-optimism/specs/discussions/135#discussioncomment-9271282).
+OP Stack itself only has a conception of the first byte (`commit type`) and does no semantical interpretation of any subsequent bytes within the encoding. The `da layer type` byte for EigenDA is always `0x00`. However it is currently unused by OP Stack with name space values still being actively [discussed](https://github.com/ethereum-optimism/specs/discussions/135#discussioncomment-9271282).
 
 ### Simple Commitment Mode
 For simple clients communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:

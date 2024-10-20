@@ -199,21 +199,19 @@ func TestProxyClientServerIntegration(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("get data edge cases", func(t *testing.T) {
-		testCert := []byte("")
+	t.Run("get data edge cases - unsupported version byte 01", func(t *testing.T) {
+		testCert := []byte{1}
 		_, err := daClient.GetData(ts.Ctx, testCert)
 		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(),
-			"commitment is too short") && !isNilPtrDerefPanic(err.Error()))
+		assert.True(t,
+			strings.Contains(err.Error(), "unsupported version byte 01") && !isNilPtrDerefPanic(err.Error()))
+	})
 
-		testCert = []byte{1}
-		_, err = daClient.GetData(ts.Ctx, testCert)
-		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(),
-			"commitment is too short") && !isNilPtrDerefPanic(err.Error()))
-
-		testCert = []byte(e2e.RandString(10000))
-		_, err = daClient.GetData(ts.Ctx, testCert)
+	t.Run("get data edge cases - huge cert", func(t *testing.T) {
+		// TODO: we need to add the 0 version byte at the beginning.
+		// should this not be done automatically by the simple_commitment client?
+		testCert := append([]byte{0}, []byte(e2e.RandString(10000))...)
+		_, err := daClient.GetData(ts.Ctx, testCert)
 		require.Error(t, err)
 		assert.True(t, strings.Contains(err.Error(),
 			"failed to decode DA cert to RLP format: rlp: expected input list for verify.Certificate") &&
