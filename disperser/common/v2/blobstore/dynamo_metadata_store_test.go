@@ -9,8 +9,10 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	core "github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -84,7 +86,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 
 	// attempt to put metadata with the same key should fail
 	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	assert.ErrorIs(t, err, disperser.ErrAlreadyExists)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
 	deleteItems(t, []commondynamodb.Key{
 		{
@@ -141,12 +143,71 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		RelayKeys:            []corev2.RelayKey{0},
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1)
-	assert.ErrorIs(t, err, disperser.ErrAlreadyExists)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
 	deleteItems(t, []commondynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobCertificate"},
+		},
+	})
+}
+
+func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
+	ctx := context.Background()
+	blobHeader := &corev2.BlobHeader{
+		BlobVersion:     0,
+		QuorumNumbers:   []core.QuorumID{0},
+		BlobCommitments: mockCommitment,
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         "0x123",
+			BinIndex:          0,
+			CumulativePayment: big.NewInt(532),
+		},
+	}
+	blobKey, err := blobHeader.BlobKey()
+	assert.NoError(t, err)
+
+	now := time.Now()
+	metadata := &v2.BlobMetadata{
+		BlobHeader: blobHeader,
+		BlobStatus: v2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+	assert.NoError(t, err)
+
+	// Update the blob status to invalid status
+	err = blobMetadataStore.MarkBlobCertified(ctx, blobKey)
+	assert.ErrorIs(t, err, blobstore.ErrInvalidStateTransition)
+
+	// Update the blob status to a valid status
+	err = blobMetadataStore.MarkBlobEncoded(ctx, blobKey, &encoding.FragmentInfo{
+		TotalChunkSizeBytes: 100,
+		NumFragments:        10,
+	})
+	assert.NoError(t, err)
+
+	// Update the blob status to same status
+	err = blobMetadataStore.MarkBlobEncoded(ctx, blobKey, &encoding.FragmentInfo{
+		TotalChunkSizeBytes: 200,
+		NumFragments:        20,
+	})
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, fetchedMetadata.BlobStatus, v2.Encoded)
+	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata.UpdatedAt)
+	assert.Equal(t, fetchedMetadata.TotalChunkSizeBytes, 100)
+	assert.Equal(t, fetchedMetadata.NumFragments, 10)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		},
 	})
 }
