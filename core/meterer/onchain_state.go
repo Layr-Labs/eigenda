@@ -20,6 +20,8 @@ type OnchainPayment interface {
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 }
 
+var _ OnchainPayment = (*OnchainPaymentState)(nil)
+
 type OnchainPaymentState struct {
 	tx *eth.Transactor
 
@@ -79,44 +81,71 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 	return nil
 }
 
-func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint) (map[string]core.ActiveReservation, error) {
+func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error) {
 	return pcs.ActiveReservations, nil
 }
 
 // GetActiveReservationByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
-func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
+func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
 	if reservation, ok := pcs.ActiveReservations[accountID]; ok {
 		return reservation, nil
 	}
-	// pulls the chain state
-	res, err := pcs.tx.GetActiveReservationByAccount(ctx, blockNumber, accountID)
+	res, err := pcs.GetActiveReservationByAccountOnChain(ctx, accountID)
 	if err != nil {
-		return core.ActiveReservation{}, errors.New("payment not found")
+		return core.ActiveReservation{}, err
 	}
 
 	pcs.ActiveReservations[accountID] = res
 	return res, nil
 }
 
-func (pcs *OnchainPaymentState) GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]core.OnDemandPayment, error) {
+// GetActiveReservationByAccountOnChain returns on-chain reservation for the given account ID
+func (pcs *OnchainPaymentState) GetActiveReservationByAccountOnChain(ctx context.Context, accountID string) (core.ActiveReservation, error) {
+	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return core.ActiveReservation{}, err
+	}
+	res, err := pcs.tx.GetActiveReservationByAccount(ctx, blockNumber, accountID)
+	if err != nil {
+		return core.ActiveReservation{}, errors.New("reservation account not found on-chain")
+	}
+	return res, nil
+}
+
+func (pcs OnchainPaymentState) GetOnDemandPayments(ctx context.Context) (map[string]core.OnDemandPayment, error) {
 	return pcs.OnDemandPayments, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
-func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
+func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
 	if payment, ok := pcs.OnDemandPayments[accountID]; ok {
 		return payment, nil
 	}
-	// pulls the chain state
-	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, blockNumber, accountID)
+	res, err := pcs.GetOnDemandPaymentByAccountOnChain(ctx, accountID)
 	if err != nil {
-		return core.OnDemandPayment{}, errors.New("payment not found")
+		return core.OnDemandPayment{}, err
 	}
-
 	pcs.OnDemandPayments[accountID] = res
 	return res, nil
 }
 
-func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
+func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccountOnChain(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
+	// pulls the chain state
+	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return core.OnDemandPayment{}, err
+	}
+	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, blockNumber, accountID)
+	if err != nil {
+		return core.OnDemandPayment{}, errors.New("on-demand not found on-chain")
+	}
+	return res, nil
+}
+
+func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
 }
