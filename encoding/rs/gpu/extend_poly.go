@@ -10,12 +10,12 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 )
 
 type GpuComputeDevice struct {
-	NttCfg  core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	NttCfg  core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
 	GpuLock *sync.Mutex
 
 	encoding.EncodingParams
@@ -29,9 +29,9 @@ func (g *GpuComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, er
 
 	scalarsSF := gpu_utils.ConvertFrToScalarFieldsBytes(coeffs)
 
-	scalars := core.HostSliceFromElements[bn254_icicle.ScalarField](scalarsSF)
+	scalars := core.HostSliceFromElements[icicle_bn254.ScalarField](scalarsSF)
 
-	outputDevice := make(core.HostSlice[bn254_icicle.ScalarField], len(coeffs))
+	outputDevice := make(core.HostSlice[icicle_bn254.ScalarField], len(coeffs))
 
 	ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
 

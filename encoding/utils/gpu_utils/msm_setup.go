@@ -6,12 +6,12 @@ package gpu_utils
 import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-func SetupMsm(rowsG1 [][]bn254.G1Affine, srsG1 []bn254.G1Affine) ([]bn254_icicle.Affine, []bn254_icicle.Affine, core.MSMConfig, core.MSMConfig, runtime.EIcicleError) {
-	rowsG1Icicle := make([]bn254_icicle.Affine, 0)
+func SetupMsm(rowsG1 [][]bn254.G1Affine, srsG1 []bn254.G1Affine) ([]icicle_bn254.Affine, []icicle_bn254.Affine, core.MSMConfig, core.MSMConfig, runtime.EIcicleError) {
+	rowsG1Icicle := make([]icicle_bn254.Affine, 0)
 
 	for _, row := range rowsG1 {
 		rowsG1Icicle = append(rowsG1Icicle, BatchConvertGnarkAffineToIcicleAffine(row)...)

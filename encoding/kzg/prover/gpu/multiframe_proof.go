@@ -17,33 +17,31 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	bn254_icicle "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
-	bn254_icicle_g2 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/g2"
+	icicle_bn254_g2 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/g2"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
-
-type WorkerResult struct {
-	points []bn254.G1Affine
-	err    error
-}
 
 type KzgGpuProofDevice struct {
 	*kzg.KzgConfig
 	Fs             *fft.FFTSettings
-	FlatFFTPointsT []bn254_icicle.Affine
-	SRSIcicle      []bn254_icicle.Affine
+	FlatFFTPointsT []icicle_bn254.Affine
+	SRSIcicle      []icicle_bn254.Affine
 	SFs            *fft.FFTSettings
 	Srs            *kzg.SRS
 	G2Trailing     []bn254.G2Affine
-	NttCfg         core.NTTConfig[[bn254_icicle.SCALAR_LIMBS]uint32]
+	NttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	MsmCfgG2       core.MSMConfig
 	GpuLock        *sync.Mutex // lock whenever gpu is needed,
-	HeadsG2        []bn254_icicle_g2.G2Affine
-	TrailsG2       []bn254_icicle_g2.G2Affine
+	HeadsG2        []icicle_bn254_g2.G2Affine
+	TrailsG2       []icicle_bn254_g2.G2Affine
 	Stream         *runtime.Stream
 	Device         runtime.Device
+}
+
+type WorkerResult struct {
+	err error
 }
 
 func (p *KzgGpuProofDevice) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
@@ -132,7 +130,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	}
 
 	flattenCoeffStoreSf := gpu_utils.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
-	flattenCoeffStoreCopy := core.HostSliceFromElements[bn254_icicle.ScalarField](flattenCoeffStoreSf)
+	flattenCoeffStoreCopy := core.HostSliceFromElements[icicle_bn254.ScalarField](flattenCoeffStoreSf)
 
 	// Start using GPU
 	var gpuFFTBatch []bn254.G1Affine
@@ -203,54 +201,6 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	)
 
 	return gpuFFTBatch, nil
-}
-
-func (p *KzgGpuProofDevice) proofWorkerGPU(
-	polyFr []fr.Element,
-	jobChan <-chan uint64,
-	l uint64,
-	dimE uint64,
-	coeffStore [][]fr.Element,
-	results chan<- WorkerResult,
-) {
-
-	for j := range jobChan {
-		coeffs, err := p.GetSlicesCoeffWithoutFFT(polyFr, dimE, j, l)
-
-		if err != nil {
-			results <- WorkerResult{
-				points: nil,
-				err:    err,
-			}
-		} else {
-			coeffStore[j] = coeffs
-		}
-	}
-
-	results <- WorkerResult{
-		err: nil,
-	}
-}
-
-// capable of batching blobs
-func (p *KzgGpuProofDevice) GetSlicesCoeffWithoutFFT(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
-	// there is a constant term
-	m := uint64(dimE*l) - 1
-	dim := (m - j%l) / l
-	k := j % l
-	q := j / l
-
-	toeV := make([]fr.Element, 2*dimE-1)
-	for i := uint64(0); i < dim; i++ {
-		toeV[i].Set(&polyFr[m+dimE*l*q-(k+i*l)])
-	}
-
-	// use precompute table
-	tm, err := toeplitz.NewToeplitz(toeV, p.SFs)
-	if err != nil {
-		return nil, err
-	}
-	return tm.GetCoeff()
 }
 
 func (p *KzgGpuProofDevice) proofWorker(
