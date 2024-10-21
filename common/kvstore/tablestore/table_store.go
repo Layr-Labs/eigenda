@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"sync"
 	"time"
 )
@@ -25,14 +26,14 @@ type tableStore struct {
 	logger logging.Logger
 
 	// A base store implementation that this TableStore wraps.
-	base kvstore.Store
+	base kvstore.Store[[]byte]
 
-	// A map from table names to tables.
-	tableMap map[string]kvstore.Table
+	// A map from table names to key builders.
+	keyBuilderMap map[string]kvstore.KeyBuilder
 
-	// A map containing expiration times. Keys in this table are made up of a timestamp prepended to a key.
+	// A key builder for the expiration table. Keys in this table are made up of a timestamp prepended to a key.
 	// The value is an empty byte slice. Iterating over this table will return keys in order of expiration time.
-	expirationTable kvstore.Table
+	expirationKeyBuilder kvstore.KeyBuilder
 }
 
 // wrapper wraps the given Store to create a TableStore.
@@ -42,9 +43,9 @@ type tableStore struct {
 // in undefined behavior.
 func newTableStore(
 	logger logging.Logger,
-	base kvstore.Store,
+	base kvstore.Store[[]byte],
 	tableIDMap map[uint32]string,
-	expirationTable kvstore.Table,
+	expirationKeyBuilder kvstore.KeyBuilder,
 	gcEnabled bool,
 	gcPeriod time.Duration,
 	gcBatchSize uint32) kvstore.TableStore {
@@ -53,18 +54,17 @@ func newTableStore(
 	waitGroup := &sync.WaitGroup{}
 
 	store := &tableStore{
-		ctx:             ctx,
-		cancel:          cancel,
-		waitGroup:       waitGroup,
-		logger:          logger,
-		base:            base,
-		tableMap:        make(map[string]kvstore.Table),
-		expirationTable: expirationTable,
+		ctx:                  ctx,
+		cancel:               cancel,
+		waitGroup:            waitGroup,
+		logger:               logger,
+		base:                 base,
+		keyBuilderMap:        make(map[string]kvstore.KeyBuilder),
+		expirationKeyBuilder: expirationKeyBuilder,
 	}
 
 	for prefix, name := range tableIDMap {
-		table := newTableView(base, name, prefix, store.Shutdown, store.Destroy, store.NewBatch)
-		store.tableMap[name] = table
+		store.keyBuilderMap[name] = newKeyBuilder(name, prefix)
 	}
 
 	if gcEnabled {
@@ -74,9 +74,9 @@ func newTableStore(
 	return store
 }
 
-// GetTable gets the table with the given name. If the table does not exist, it is first created.
-func (t *tableStore) GetTable(name string) (kvstore.Table, error) {
-	table, ok := t.tableMap[name]
+// GetKeyBuilder gets the key builder for a particular table. Returns ErrTableNotFound if the table does not exist.
+func (t *tableStore) GetKeyBuilder(name string) (kvstore.KeyBuilder, error) {
+	table, ok := t.keyBuilderMap[name]
 	if !ok {
 		return nil, kvstore.ErrTableNotFound
 	}
@@ -85,21 +85,72 @@ func (t *tableStore) GetTable(name string) (kvstore.Table, error) {
 }
 
 // GetTables returns a list of all tables in the store in no particular order.
-func (t *tableStore) GetTables() []kvstore.Table {
-	tables := make([]kvstore.Table, 0, len(t.tableMap))
-	for _, table := range t.tableMap {
-		tables = append(tables, table)
+func (t *tableStore) GetKeyBuilders() []kvstore.KeyBuilder {
+	tables := make([]kvstore.KeyBuilder, 0, len(t.keyBuilderMap))
+	for _, kb := range t.keyBuilderMap {
+		tables = append(tables, kb)
+	}
+
+	return tables
+}
+
+// GetTables returns a list of all tables in the store in no particular order.
+func (t *tableStore) GetTables() []string {
+	tables := make([]string, 0, len(t.keyBuilderMap))
+	for _, kb := range t.keyBuilderMap {
+		tables = append(tables, kb.TableName())
 	}
 
 	return tables
 }
 
 // NewBatch creates a new batch for writing to the store.
-func (t *tableStore) NewBatch() kvstore.TTLBatch {
-	return &tableStoreBatch{
-		batch:           t.base.NewBatch(),
-		expirationTable: t.expirationTable,
-	}
+func (t *tableStore) NewBatch() kvstore.Batch[kvstore.Key] {
+	return newTableStoreBatch(t.base, t.expirationKeyBuilder)
+}
+
+// NewTTLBatch creates a new batch for writing to the store with TTLs.
+func (t *tableStore) NewTTLBatch() kvstore.TTLBatch[kvstore.Key] {
+	return newTableStoreBatch(t.base, t.expirationKeyBuilder)
+}
+
+// Put adds a key-value pair to the store.
+func (t *tableStore) Put(k kvstore.Key, value []byte) error {
+	return t.base.Put(k.Raw(), value)
+}
+
+// Get retrieves the value for a key from the store.
+func (t *tableStore) Get(k kvstore.Key) ([]byte, error) {
+	return t.base.Get(k.Raw())
+}
+
+// Delete removes a key from the store.
+func (t *tableStore) Delete(k kvstore.Key) error {
+	return t.base.Delete(k.Raw())
+}
+
+// PutWithTTL adds a key-value pair to the store that expires after a specified duration.
+func (t *tableStore) PutWithTTL(key kvstore.Key, value []byte, ttl time.Duration) error {
+	batch := t.NewTTLBatch()
+	batch.PutWithTTL(key, value, ttl)
+	return batch.Apply()
+}
+
+// PutWithExpiration adds a key-value pair to the store that expires at a specified time.
+func (t *tableStore) PutWithExpiration(key kvstore.Key, value []byte, expiryTime time.Time) error {
+	batch := t.NewTTLBatch()
+	batch.PutWithExpiration(key, value, expiryTime)
+	return batch.Apply()
+}
+
+// NewIterator returns an iterator that can be used to iterate over a subset of the keys in the store.
+func (t *tableStore) NewIterator(prefix kvstore.Key) (iterator.Iterator, error) {
+	return t.base.NewIterator(prefix.Raw())
+}
+
+// NewTableIterator returns an iterator that can be used to iterate over all keys in a table.
+func (t *tableStore) NewTableIterator(builder kvstore.KeyBuilder) (iterator.Iterator, error) {
+	return t.NewIterator(builder.Key([]byte{}))
 }
 
 // ExpireKeysInBackground spawns a background goroutine that periodically checks for expired keys and deletes them.
@@ -126,13 +177,13 @@ func (t *tableStore) expireKeysInBackground(gcPeriod time.Duration, gcBatchSize 
 
 // Delete all keys with a TTL that has expired.
 func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
-	it, err := t.expirationTable.NewIterator(nil)
+	it, err := t.NewTableIterator(t.expirationKeyBuilder)
 	if err != nil {
 		return err
 	}
 	defer it.Release()
 
-	batch := t.NewBatch()
+	batch := t.base.NewBatch()
 
 	for it.Next() {
 		expiryKey := it.Key()
@@ -151,7 +202,7 @@ func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
 			if err != nil {
 				return err
 			}
-			batch = t.NewBatch()
+			batch = t.base.NewBatch()
 		}
 	}
 

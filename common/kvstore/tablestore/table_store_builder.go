@@ -65,30 +65,35 @@ func Start(logger logging.Logger, config *Config) (kvstore.TableStore, error) {
 // modifySchema is false, the tables are loaded as is, and any tables in the provided list are ignored.
 func start(
 	logger logging.Logger,
-	base kvstore.Store,
+	base kvstore.Store[[]byte],
 	config *Config) (kvstore.TableStore, error) {
 
-	metadataTable := buildInternalTable(base, metadataTableID)
-	namespaceTable := buildInternalTable(base, namespaceTableID)
-	expirationTable := buildInternalTable(base, expirationTableID)
+	metadataKeyBuilder := newKeyBuilder("metadata", metadataTableID)
+	namespaceKeyBuilder := newKeyBuilder("namespace", namespaceTableID)
+	expirationKeyBuilder := newKeyBuilder("expiration", expirationTableID)
 
-	err := validateSchema(metadataTable)
+	err := validateSchema(base, metadataKeyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("error validating schema: %w", err)
 	}
 
-	err = handleIncompleteDeletion(logger, base, metadataTable, namespaceTable)
+	err = handleIncompleteDeletion(logger, base, metadataKeyBuilder, namespaceKeyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
-	tableIDMap, err := loadNamespaceTable(namespaceTable)
+	tableIDMap, err := loadNamespaceTable(base, namespaceKeyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("error loading namespace table: %w", err)
 	}
 
 	if config.Schema != nil {
-		err = addAndRemoveTables(base, metadataTable, namespaceTable, tableIDMap, config.Schema)
+		err = addAndRemoveTables(
+			base,
+			metadataKeyBuilder,
+			namespaceKeyBuilder,
+			tableIDMap,
+			config.Schema)
 		if err != nil {
 			return nil, fmt.Errorf("error adding and removing tables: %w", err)
 		}
@@ -98,7 +103,7 @@ func start(
 		logger,
 		base,
 		tableIDMap,
-		expirationTable,
+		expirationKeyBuilder,
 		config.GarbageCollectionEnabled,
 		config.GarbageCollectionInterval,
 		config.GarbageCollectionBatchSize)
@@ -106,16 +111,12 @@ func start(
 	return store, nil
 }
 
-// Build a table for internal use.
-func buildInternalTable(base kvstore.Store, id uint32) kvstore.Table {
-	return &tableView{
-		base:   base,
-		prefix: id,
-	}
-}
-
 // buildBaseStore creates a new base store of the given type.
-func buildBaseStore(storeType StoreType, logger logging.Logger, path *string) (kvstore.Store, error) {
+func buildBaseStore(
+	storeType StoreType,
+	logger logging.Logger,
+	path *string) (kvstore.Store[[]byte], error) {
+
 	switch storeType {
 	case LevelDB:
 		if path == nil {
@@ -130,10 +131,12 @@ func buildBaseStore(storeType StoreType, logger logging.Logger, path *string) (k
 }
 
 // validateSchema loads/initiates the schema version in the metadata table.
-func validateSchema(metadataTable kvstore.Table) error {
+func validateSchema(
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder) error {
 
-	schemaKey := []byte(metadataSchemaVersionKey)
-	onDiskSchemaBytes, err := metadataTable.Get(schemaKey)
+	schemaKey := metadataKeyBuilder.StringKey(metadataSchemaVersionKey)
+	onDiskSchemaBytes, err := base.Get(schemaKey.Raw())
 
 	if err != nil {
 		if !errors.Is(err, kvstore.ErrNotFound) {
@@ -144,7 +147,7 @@ func validateSchema(metadataTable kvstore.Table) error {
 		onDiskSchemaBytes = make([]byte, 8)
 		binary.BigEndian.PutUint64(onDiskSchemaBytes, currentSchemaVersion)
 
-		err = metadataTable.Put(schemaKey, onDiskSchemaBytes)
+		err = base.Put(schemaKey.Raw(), onDiskSchemaBytes)
 		if err != nil {
 			return fmt.Errorf("error setting schema version in metadata table: %w", err)
 		}
@@ -167,25 +170,25 @@ func validateSchema(metadataTable kvstore.Table) error {
 // This method adds and removes tables as needed to match the given list of tables. The table ID map is updated
 // to reflect the new state of the tables.
 func addAndRemoveTables(
-	base kvstore.Store,
-	metadataTable kvstore.Table,
-	namespaceTable kvstore.Table,
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder,
+	namespaceKeyBuilder kvstore.KeyBuilder,
 	tableIDMap map[uint32]string,
 	currentTables []string) error {
 
 	tablesToAdd, tablesToDrop := computeSchemaChange(tableIDMap, currentTables)
 
-	err := dropTables(base, metadataTable, namespaceTable, tableIDMap, tablesToDrop)
+	err := dropTables(base, metadataKeyBuilder, namespaceKeyBuilder, tableIDMap, tablesToDrop)
 	if err != nil {
 		return fmt.Errorf("error dropping tables: %w", err)
 	}
 
-	err = addTables(base, metadataTable, namespaceTable, tableIDMap, tablesToAdd)
+	err = addTables(base, metadataKeyBuilder, namespaceKeyBuilder, tableIDMap, tablesToAdd)
 	if err != nil {
 		return fmt.Errorf("error adding tables: %w", err)
 	}
 
-	err = sanityCheckNamespaceTable(namespaceTable, tableIDMap, currentTables)
+	err = sanityCheckNamespaceTable(base, namespaceKeyBuilder, tableIDMap, currentTables)
 	if err != nil {
 		return fmt.Errorf("error sanity checking namespace table: %w", err)
 	}
@@ -225,9 +228,9 @@ func computeSchemaChange(
 
 // Drop a list of tables. Updates the table ID map as well as data within the store.
 func dropTables(
-	base kvstore.Store,
-	metadataTable kvstore.Table,
-	namespaceTable kvstore.Table,
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder,
+	namespaceKeyBuilder kvstore.KeyBuilder,
 	tableIDMap map[uint32]string,
 	tablesToDrop []string) error {
 
@@ -241,7 +244,7 @@ func dropTables(
 		reverseTableIDMap[tableID] = tableName
 	}
 	for _, tableName := range tablesToDrop {
-		err := dropTable(base, metadataTable, namespaceTable, tableName, reverseTableIDMap[tableName])
+		err := dropTable(base, metadataKeyBuilder, namespaceKeyBuilder, tableName, reverseTableIDMap[tableName])
 		if err != nil {
 			return fmt.Errorf("error dropping table %s: %w", tableName, err)
 		}
@@ -253,9 +256,9 @@ func dropTables(
 
 // Add tables to the store. Updates the table ID map as well as data within the store.
 func addTables(
-	base kvstore.Store,
-	metadataTable kvstore.Table,
-	namespaceTable kvstore.Table,
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder,
+	namespaceKeyBuilder kvstore.KeyBuilder,
 	tableIDMap map[uint32]string,
 	tablesToAdd []string) error {
 
@@ -269,7 +272,7 @@ func addTables(
 
 	// Add new tables.
 	for _, tableName := range tablesToAdd {
-		tableID, err := createTable(base, metadataTable, namespaceTable, tableName)
+		tableID, err := createTable(base, metadataKeyBuilder, namespaceKeyBuilder, tableName)
 		if err != nil {
 			return fmt.Errorf("error creating table %s: %w", tableName, err)
 		}
@@ -282,13 +285,14 @@ func addTables(
 // Perform sanity checks on the namespace table.
 // This method makes potential logic in the namespace errors fail fast and visibly.
 func sanityCheckNamespaceTable(
-	namespaceTable kvstore.Table,
+	base kvstore.Store[[]byte],
+	namespaceKeyBuilder kvstore.KeyBuilder,
 	tableIDMap map[uint32]string,
 	currentTableList []string) error {
 
 	// TODO also check that no table has ID greater than next table ID
 
-	parsedNamespaceTable, err := loadNamespaceTable(namespaceTable)
+	parsedNamespaceTable, err := loadNamespaceTable(base, namespaceKeyBuilder)
 	if err != nil {
 		return fmt.Errorf("error loading namespace table: %w", err)
 	}
@@ -320,11 +324,12 @@ func sanityCheckNamespaceTable(
 // This method makes sure that any such incomplete deletions are completed.
 func handleIncompleteDeletion(
 	logger logging.Logger,
-	base kvstore.Store,
-	metadataTable kvstore.Table,
-	namespaceTable kvstore.Table) error {
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder,
+	namespaceKeyBuilder kvstore.KeyBuilder) error {
 
-	deletionValue, err := metadataTable.Get([]byte(metadataDeletionKey))
+	deletionKey := metadataKeyBuilder.StringKey(metadataDeletionKey)
+	deletionValue, err := base.Get(deletionKey.Raw())
 	if errors.Is(err, kvstore.ErrNotFound) {
 		// No deletion in progress, nothing to do.
 		return nil
@@ -338,7 +343,7 @@ func handleIncompleteDeletion(
 	deletionTableName := string(deletionValue[4:])
 
 	logger.Errorf("found incomplete deletion of table %s, completing deletion", deletionTableName)
-	return dropTable(base, metadataTable, namespaceTable, deletionTableName, deletionTableID)
+	return dropTable(base, metadataKeyBuilder, namespaceKeyBuilder, deletionTableName, deletionTableID)
 }
 
 // Get the prefix for the given table ID and prefix length.
@@ -350,11 +355,13 @@ func getPrefix(tableID uint32) []byte {
 
 // loadNamespaceTable loads the namespace table from disk into the given map.
 // Returns a map from table IDs to table names.
-func loadNamespaceTable(namespaceTable kvstore.Table) (map[uint32]string, error) {
+func loadNamespaceTable(
+	base kvstore.Store[[]byte],
+	namespaceKeyBuilder kvstore.KeyBuilder) (map[uint32]string, error) {
 
 	tableIDMap := make(map[uint32]string)
 
-	it, err := namespaceTable.NewIterator(nil)
+	it, err := base.NewIterator(namespaceKeyBuilder.Key([]byte{}).Raw())
 	if err != nil {
 		return nil, fmt.Errorf("error creating namespace table iterator: %w", err)
 	}
@@ -374,17 +381,15 @@ func loadNamespaceTable(namespaceTable kvstore.Table) (map[uint32]string, error)
 // createTable creates a new table with the given name.
 // Returns ErrTableLimitExceeded if the maximum number of tables has been reached.
 func createTable(
-	base kvstore.Store,
-	metadataTable kvstore.Table,
-	namespaceTable kvstore.Table,
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder,
+	namespaceKeyBuilder kvstore.KeyBuilder,
 	name string) (uint32, error) {
 
-	batch := tableStoreBatch{
-		batch: base.NewBatch(),
-	}
+	batch := base.NewBatch()
 
 	var tableID uint32
-	tableIDBytes, err := metadataTable.Get([]byte(nextTableIDKey))
+	tableIDBytes, err := base.Get(metadataKeyBuilder.StringKey(nextTableIDKey).Raw())
 	if err != nil {
 		if errors.Is(err, kvstore.ErrNotFound) {
 			tableIDBytes = make([]byte, 4)
@@ -402,8 +407,8 @@ func createTable(
 	nextTableIDBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(nextTableIDBytes, nextTableID)
 
-	batch.Put(namespaceTable.TableKey(tableIDBytes), []byte(name))
-	batch.Put(metadataTable.TableKey([]byte(nextTableIDKey)), nextTableIDBytes)
+	batch.Put(namespaceKeyBuilder.Uint32Key(tableID).Raw(), []byte(name))
+	batch.Put(namespaceKeyBuilder.StringKey(nextTableIDKey).Raw(), nextTableIDBytes)
 
 	err = batch.Apply()
 	if err != nil {
@@ -415,22 +420,22 @@ func createTable(
 
 // DropTable deletes the table with the given name. This is a no-op if the table does not exist.
 func dropTable(
-	base kvstore.Store,
-	metadataTable kvstore.Table,
-	namespaceTable kvstore.Table,
+	base kvstore.Store[[]byte],
+	metadataKeyBuilder kvstore.KeyBuilder,
+	namespaceKeyBuilder kvstore.KeyBuilder,
 	name string,
 	tableID uint32) error {
 
 	// This single atomic operation ensures that the table is deleted completely, even if we crash
 	// in the middle of the operation. When next starting up, if an entry is observed in this location,
 	// then the interrupted deletion can be completed.
-	deletionKey := []byte(metadataDeletionKey)
+	deletionKey := metadataKeyBuilder.StringKey(metadataDeletionKey)
 
 	deletionValue := make([]byte, 4+len(name))
 	binary.BigEndian.PutUint32(deletionValue, tableID)
 	copy(deletionValue[4:], name)
 
-	err := metadataTable.Put(deletionKey, deletionValue)
+	err := base.Put(deletionKey.Raw(), deletionValue)
 	if err != nil {
 		return fmt.Errorf("error updating metadata table for deletion: %w", err)
 	}
@@ -450,13 +455,12 @@ func dropTable(
 	}
 
 	// All table entries have been deleted. Now delete the table from the namespace table.
-	tableKey := make([]byte, 4)
-	binary.BigEndian.PutUint32(tableKey, tableID)
-	err = namespaceTable.Delete(tableKey)
+	tableKey := namespaceKeyBuilder.Uint32Key(tableID)
+	err = base.Delete(tableKey.Raw())
 	if err != nil {
 		return fmt.Errorf("error deleting from namespace table: %w", err)
 	}
 
 	// Finally, remove the deletion key from the metadata table.
-	return metadataTable.Delete(deletionKey)
+	return base.Delete(deletionKey.Raw())
 }

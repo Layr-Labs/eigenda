@@ -2,42 +2,12 @@ package kvstore
 
 import (
 	"errors"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"time"
 )
 
 // ErrTableNotFound is returned when a table is not found.
 var ErrTableNotFound = errors.New("table not found")
-
-// Table can be used to operate on data in a specific table in a TableStore.
-type Table interface {
-	Store
-
-	// Name returns the name of the table.
-	Name() string
-
-	// TableKey creates a new key scoped to this table that can be used for TableStoreBatch
-	// operations that modify this table. Using keys in TableStore batches that are not created using this method
-	// has undefined behavior. Use of this method in a TableStoreBatch is not optional.
-	TableKey(key []byte) []byte
-
-	// PutWithTTL adds a key-value pair to the store that expires after a specified duration.
-	// Key is eventually deleted after the TTL elapses.
-	//
-	// Warning: updating the value of a key with a ttl/expiration has undefined behavior. Support for this pattern
-	// may be implemented in the future if a use case is identified.
-	PutWithTTL(key []byte, value []byte, ttl time.Duration) error
-
-	// PutWithExpiration adds a key-value pair to the store that expires at a specified time.
-	// Key is eventually deleted after the expiry time.
-	//
-	// Warning: updating the value of a key with a ttl/expiration has undefined behavior. Support for this pattern
-	// may be implemented in the future if a use case is identified.
-	PutWithExpiration(key []byte, value []byte, expiryTime time.Time) error
-
-	// NewTTLBatch creates a new TTLBatch that can be used to perform multiple operations atomically.
-	// Use this instead of NewBatch to create a batch that supports TTL/expiration.
-	NewTTLBatch() TTLBatch
-}
 
 // TableStore implements a key-value store, with the addition of the abstraction of tables.
 // A "table" in this context is a disjoint keyspace. Keys in one table to not collide with keys in another table,
@@ -48,20 +18,40 @@ type Table interface {
 //
 // Implementations of this interface are expected to be thread-safe, except where noted.
 type TableStore interface {
+	Store[Key]
 
-	// GetTable gets the table with the given name. If the table does not exist, it is first created.
-	// Returns ErrTableNotFound if the table does not exist and cannot be created.
-	GetTable(name string) (Table, error)
+	// GetKeyBuilder gets the key builder for a particular table. Returns ErrTableNotFound if the table does not exist.
+	// The returned KeyBuilder can be used to interact with the table.
+	//
+	// Warning: Do not use key builders created by one TableStore instance with another TableStore instance.
+	// This may result in odd and undefined behavior.
+	GetKeyBuilder(name string) (KeyBuilder, error)
 
-	// GetTables returns a list of all tables in the store in no particular order.
-	GetTables() []Table
+	// GetKeyBuilders returns all key builders in the store.
+	GetKeyBuilders() []KeyBuilder
 
-	// NewBatch creates a new batch that can be used to perform multiple operations across tables atomically.
-	NewBatch() TTLBatch
+	// GetTables returns a list of the table names currently in the store.
+	GetTables() []string
 
-	// Shutdown shuts down the store, flushing any remaining data to disk.
-	Shutdown() error
+	// PutWithTTL adds a key-value pair to the store that expires after a specified duration.
+	// Key is eventually deleted after the TTL elapses.
+	//
+	// Warning: updating the value of a key with a ttl/expiration has undefined behavior. Support for this pattern
+	// may be implemented in the future if a use case is identified.
+	PutWithTTL(key Key, value []byte, ttl time.Duration) error
 
-	// Destroy shuts down and permanently deletes all data in the store.
-	Destroy() error
+	// PutWithExpiration adds a key-value pair to the store that expires at a specified time.
+	// Key is eventually deleted after the expiry time.
+	//
+	// Warning: updating the value of a key with a ttl/expiration has undefined behavior. Support for this pattern
+	// may be implemented in the future if a use case is identified.
+	PutWithExpiration(key Key, value []byte, expiryTime time.Time) error
+
+	// NewTTLBatch creates a new TTLBatch that can be used to perform multiple operations atomically.
+	// Use this instead of NewBatch to create a batch that supports TTL/expiration.
+	NewTTLBatch() TTLBatch[Key]
+
+	// NewTableIterator returns an iterator that can be used to iterate over all keys in a table.
+	// Equivalent to NewIterator(keyBuilder.Key([]byte{})).
+	NewTableIterator(keyBuilder KeyBuilder) (iterator.Iterator, error)
 }

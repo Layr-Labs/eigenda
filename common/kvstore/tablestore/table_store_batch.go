@@ -5,47 +5,55 @@ import (
 	"time"
 )
 
-var _ kvstore.TTLBatch = &tableStoreBatch{}
+var _ kvstore.TTLBatch[kvstore.Key] = &tableStoreBatch{}
 
 // tableStoreBatch is a batch for writing to a table store.
 type tableStoreBatch struct {
-	batch           kvstore.Batch
-	expirationTable kvstore.Table
+	baseBatch            kvstore.Batch[[]byte]
+	expirationKeyBuilder kvstore.KeyBuilder
+}
+
+// newTableStoreBatch creates a new batch for writing to a table store.
+func newTableStoreBatch(
+	base kvstore.Store[[]byte],
+	expirationKeyBuilder kvstore.KeyBuilder) kvstore.TTLBatch[kvstore.Key] {
+
+	return &tableStoreBatch{
+		baseBatch:            base.NewBatch(),
+		expirationKeyBuilder: expirationKeyBuilder,
+	}
 }
 
 // PutWithTTL adds a key-value pair to the batch that expires after a specified duration.
-func (t *tableStoreBatch) PutWithTTL(key []byte, value []byte, ttl time.Duration) {
+func (t *tableStoreBatch) PutWithTTL(k kvstore.Key, value []byte, ttl time.Duration) {
 	expirationTime := time.Now().Add(ttl)
-	t.PutWithExpiration(key, value, expirationTime)
+	t.PutWithExpiration(k, value, expirationTime)
 }
 
 // PutWithExpiration adds a key-value pair to the batch that expires at a specified time.
-func (t *tableStoreBatch) PutWithExpiration(key []byte, value []byte, expiryTime time.Time) {
-	expirationKey := t.expirationTable.TableKey(prependTimestamp(expiryTime, key))
+func (t *tableStoreBatch) PutWithExpiration(k kvstore.Key, value []byte, expiryTime time.Time) {
+	expirationKey := t.expirationKeyBuilder.Key(prependTimestamp(expiryTime, k.Raw()))
 
-	t.Put(key, value)
-	t.Put(expirationKey, make([]byte, 0))
+	t.baseBatch.Put(k.Raw(), value)
+	t.baseBatch.Put(expirationKey.Raw(), []byte{})
 }
 
 // Put adds a key-value pair to the batch.
-func (t *tableStoreBatch) Put(key []byte, value []byte) {
-	if value == nil {
-		value = []byte{}
-	}
-	t.batch.Put(key, value)
+func (t *tableStoreBatch) Put(k kvstore.Key, value []byte) {
+	t.baseBatch.Put(k.Raw(), value)
 }
 
 // Delete removes a key-value pair from the batch.
-func (t *tableStoreBatch) Delete(key []byte) {
-	t.batch.Delete(key)
+func (t *tableStoreBatch) Delete(k kvstore.Key) {
+	t.baseBatch.Delete(k.Raw())
 }
 
 // Apply applies the batch to the store.
 func (t *tableStoreBatch) Apply() error {
-	return t.batch.Apply()
+	return t.baseBatch.Apply()
 }
 
 // Size returns the number of operations in the batch.
 func (t *tableStoreBatch) Size() uint32 {
-	return t.batch.Size()
-}
+	return t.baseBatch.Size()
+} // TODO do we ever call this?
