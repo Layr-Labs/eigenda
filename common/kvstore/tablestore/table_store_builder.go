@@ -371,7 +371,7 @@ func loadNamespaceTable(
 		keyBytes := it.Key()
 		valueBytes := it.Value()
 
-		tableID := binary.BigEndian.Uint32(keyBytes)
+		tableID := binary.BigEndian.Uint32(keyBytes[prefixLength:])
 		tableName := string(valueBytes)
 		tableIDMap[tableID] = tableName
 	}
@@ -408,7 +408,7 @@ func createTable(
 	binary.BigEndian.PutUint32(nextTableIDBytes, nextTableID)
 
 	batch.Put(namespaceKeyBuilder.Uint32Key(tableID).Raw(), []byte(name))
-	batch.Put(namespaceKeyBuilder.StringKey(nextTableIDKey).Raw(), nextTableIDBytes)
+	batch.Put(metadataKeyBuilder.StringKey(nextTableIDKey).Raw(), nextTableIDBytes)
 
 	err = batch.Apply()
 	if err != nil {
