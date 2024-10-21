@@ -223,17 +223,10 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	return response.Items, nil
 }
 
-// QueryIndexOrderWithLimit returns all items in the index that match the given key
+// QueryWithOrderLimit returns all items in the index that match the given key
 // If forward is true, the items are returned in ascending order
-func (c *Client) QueryIndexOrderWithLimit(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, forward bool, limit int32) ([]Item, error) {
-	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
-		TableName:                 aws.String(tableName),
-		IndexName:                 aws.String(indexName),
-		KeyConditionExpression:    aws.String(keyCondition),
-		ExpressionAttributeValues: expAttributeValues,
-		ScanIndexForward:          &forward,
-		Limit:                     aws.Int32(limit),
-	})
+func (c *Client) QueryWithInput(ctx context.Context, input *dynamodb.QueryInput) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, input)
 	if err != nil {
 		return nil, err
 	}
