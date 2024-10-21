@@ -3,8 +3,8 @@ package eth
 import (
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/chainio"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -23,7 +23,7 @@ func pubKeyG2ToBN254G2Point(p *bn254.G2Point) eigendasrvmg.BN254G2Point {
 	}
 }
 
-func quorumIDsToQuorumNumbers(quorumIds []chainio.QuorumID) []byte {
+func quorumIDsToQuorumNumbers(quorumIds []corev2.QuorumID) []byte {
 	quorumNumbers := make([]byte, len(quorumIds))
 	for i, quorumId := range quorumIds {
 		quorumNumbers[i] = byte(quorumId)
@@ -40,13 +40,13 @@ func HashPubKeyG1(pk *bn254.G1Point) [32]byte {
 	return crypto.Keccak256Hash(append(xBytes, yBytes...))
 }
 
-func BitmapToQuorumIds(bitmap *big.Int) []chainio.QuorumID {
+func BitmapToQuorumIds(bitmap *big.Int) []corev2.QuorumID {
 	// loop through each index in the bitmap to construct the array
 
-	quorumIds := make([]chainio.QuorumID, 0, maxNumberOfQuorums)
+	quorumIds := make([]corev2.QuorumID, 0, maxNumberOfQuorums)
 	for i := 0; i < maxNumberOfQuorums; i++ {
 		if bitmap.Bit(i) == 1 {
-			quorumIds = append(quorumIds, chainio.QuorumID(i))
+			quorumIds = append(quorumIds, corev2.QuorumID(i))
 		}
 	}
 	return quorumIds

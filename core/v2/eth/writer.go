@@ -8,8 +8,8 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/chainio"
 	"github.com/Layr-Labs/eigenda/common"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/pingcap/errors"
@@ -28,7 +28,7 @@ type Writer struct {
 	logger    logging.Logger
 }
 
-var _ chainio.Writer = (*Writer)(nil)
+var _ corev2.Writer = (*Writer)(nil)
 
 func NewWriter(
 	logger logging.Logger,
@@ -61,7 +61,7 @@ func (t *Writer) RegisterOperator(
 	ctx context.Context,
 	keypair *bn254.KeyPair,
 	socket string,
-	quorumIds []chainio.QuorumID,
+	quorumIds []corev2.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
@@ -101,7 +101,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 	ctx context.Context,
 	keypair *bn254.KeyPair,
 	socket string,
-	quorumIds []chainio.QuorumID,
+	quorumIds []corev2.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
@@ -118,7 +118,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 
 	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.OperatorsToChurn))
 	for i := range churnReply.OperatorsToChurn {
-		if churnReply.OperatorsToChurn[i].QuorumId >= chainio.MaxQuorumID {
+		if churnReply.OperatorsToChurn[i].QuorumId >= corev2.MaxQuorumID {
 			return errors.New("quorum id is out of range")
 		}
 
@@ -170,7 +170,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 // with the current block number.
 // If the operator isn't registered with any of the specified quorums, this function will return error, and
 // no quorum will be deregistered.
-func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point, blockNumber uint32, quorumIds []chainio.QuorumID) error {
+func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point, blockNumber uint32, quorumIds []corev2.QuorumID) error {
 	if len(quorumIds) == 0 {
 		return errors.New("no quorum is specified to deregister from")
 	}

@@ -5,8 +5,8 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/chainio"
 	"github.com/Layr-Labs/eigenda/common"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
@@ -35,7 +35,7 @@ type Reader struct {
 	bindings  *ContractBindings
 }
 
-var _ chainio.Reader = (*Reader)(nil)
+var _ corev2.Reader = (*Reader)(nil)
 
 type ContractBindings struct {
 	RegCoordinatorAddr    gethcommon.Address
@@ -80,7 +80,7 @@ func NewReader(
 }
 
 // GetRegisteredQuorumIdsForOperator returns the quorum ids that the operator is registered in with the given public key.
-func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator chainio.OperatorID) ([]chainio.QuorumID, error) {
+func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator corev2.OperatorID) ([]corev2.QuorumID, error) {
 	// TODO: Properly handle the case where the operator is not registered in any quorum. The current behavior of the smart contracts is to revert instead of returning an empty bitmap.
 	//  We should probably change this.
 	emptyBitmapErr := "execution reverted: BLSRegistryCoordinator.getCurrentQuorumBitmapByOperatorId: no quorum bitmap history for operatorId"
@@ -89,7 +89,7 @@ func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator
 	}, operator)
 	if err != nil {
 		if err.Error() == emptyBitmapErr {
-			return []chainio.QuorumID{}, nil
+			return []corev2.QuorumID{}, nil
 		} else {
 			t.logger.Error("Failed to fetch current quorum bitmap", "err", err)
 			return nil, err
@@ -172,25 +172,25 @@ func (t *Reader) getRegistrationParams(
 // GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
 // is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 // are also returned.
-func (t *Reader) GetOperatorStakes(ctx context.Context, operator [32]byte, blockNumber uint32) (chainio.OperatorStakes, []chainio.QuorumID, error) {
+func (t *Reader) GetOperatorStakes(ctx context.Context, operator [32]byte, blockNumber uint32) (corev2.OperatorStakes, []corev2.QuorumID, error) {
 	quorumBitmap, state_, err := t.bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.bindings.RegCoordinatorAddr, operator, blockNumber)
 	if err != nil {
-		t.logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", chainio.GetOperatorHex(operator))
+		t.logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", corev2.GetOperatorHex(operator))
 		return nil, nil, err
 	}
 
 	// BitmapToQuorumIds returns an ordered list of quorums in ascending order, which is the same order as the state_ returned by the contract
 	quorumIds := BitmapToQuorumIds(quorumBitmap)
 
-	state := make(chainio.OperatorStakes, len(state_))
+	state := make(corev2.OperatorStakes, len(state_))
 	for i := range state_ {
 		quorumID := quorumIds[i]
-		state[quorumID] = make(map[uint32]chainio.OperatorStake, len(state_[i]))
+		state[quorumID] = make(map[uint32]corev2.OperatorStake, len(state_[i]))
 		for j, op := range state_[i] {
 			operatorIndex := uint32(j)
-			state[quorumID][operatorIndex] = chainio.OperatorStake{
+			state[quorumID][operatorIndex] = corev2.OperatorStake{
 				Stake:      op.Stake,
 				OperatorID: op.OperatorId,
 			}
@@ -224,7 +224,7 @@ func (t *Reader) GetStoreDurationBlocks(ctx context.Context) (uint32, error) {
 
 // GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
 // The indices of the operators within each quorum are also returned.
-func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []chainio.QuorumID, blockNumber uint32) (chainio.OperatorStakes, error) {
+func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []corev2.QuorumID, blockNumber uint32) (corev2.OperatorStakes, error) {
 	quorumBytes := make([]byte, len(quorums))
 	for ind, quorum := range quorums {
 		quorumBytes[ind] = byte(uint8(quorum))
@@ -239,13 +239,13 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []chai
 		return nil, err
 	}
 
-	state := make(chainio.OperatorStakes, len(state_))
+	state := make(corev2.OperatorStakes, len(state_))
 	for i := range state_ {
 		quorumID := quorums[i]
-		state[quorumID] = make(map[uint32]chainio.OperatorStake, len(state_[i]))
+		state[quorumID] = make(map[uint32]corev2.OperatorStake, len(state_[i]))
 		for j, op := range state_[i] {
 			operatorIndex := uint32(j)
-			state[quorumID][operatorIndex] = chainio.OperatorStake{
+			state[quorumID][operatorIndex] = corev2.OperatorStake{
 				Stake:      op.Stake,
 				OperatorID: op.OperatorId,
 			}
@@ -261,19 +261,19 @@ func (t *Reader) StakeRegistry(ctx context.Context) (gethcommon.Address, error) 
 	})
 }
 
-func (t *Reader) OperatorIDToAddress(ctx context.Context, operatorId chainio.OperatorID) (gethcommon.Address, error) {
+func (t *Reader) OperatorIDToAddress(ctx context.Context, operatorId corev2.OperatorID) (gethcommon.Address, error) {
 	return t.bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
 
-func (t *Reader) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (chainio.OperatorID, error) {
+func (t *Reader) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (corev2.OperatorID, error) {
 	return t.bindings.BLSApkRegistry.GetOperatorId(&bind.CallOpts{
 		Context: ctx,
 	}, address)
 }
 
-func (t *Reader) BatchOperatorIDToAddress(ctx context.Context, operatorIds []chainio.OperatorID) ([]gethcommon.Address, error) {
+func (t *Reader) BatchOperatorIDToAddress(ctx context.Context, operatorIds []corev2.OperatorID) ([]gethcommon.Address, error) {
 	byteIds := make([][32]byte, len(operatorIds))
 	for i, id := range operatorIds {
 		byteIds[i] = [32]byte(id)
@@ -288,13 +288,13 @@ func (t *Reader) BatchOperatorIDToAddress(ctx context.Context, operatorIds []cha
 	return addresses, nil
 }
 
-func (t *Reader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId chainio.OperatorID) (*big.Int, error) {
+func (t *Reader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId corev2.OperatorID) (*big.Int, error) {
 	return t.bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
 
-func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []chainio.OperatorID, blockNumber uint32) ([]*big.Int, error) {
+func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []corev2.OperatorID, blockNumber uint32) ([]*big.Int, error) {
 	if len(operatorIds) == 0 {
 		return []*big.Int{}, nil
 	}
@@ -332,7 +332,7 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 		return nil, err
 	}
 
-	quorumsByOperator := make(map[chainio.OperatorID]map[uint8]bool)
+	quorumsByOperator := make(map[corev2.OperatorID]map[uint8]bool)
 	for i := range operatorsByQuorum {
 		for _, op := range operatorsByQuorum[i] {
 			if _, ok := quorumsByOperator[op.OperatorId]; !ok {
@@ -356,7 +356,7 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 	return bitmaps, nil
 }
 
-func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID chainio.QuorumID) (*chainio.OperatorSetParam, error) {
+func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID corev2.QuorumID) (*corev2.OperatorSetParam, error) {
 
 	operatorSetParams, err := t.bindings.RegistryCoordinator.GetOperatorSetParams(&bind.CallOpts{
 		Context: ctx,
@@ -366,7 +366,7 @@ func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID chainio.Quor
 		return nil, err
 	}
 
-	return &chainio.OperatorSetParam{
+	return &corev2.OperatorSetParam{
 		MaxOperatorCount:         operatorSetParams.MaxOperatorCount,
 		ChurnBIPsOfOperatorStake: operatorSetParams.KickBIPsOfOperatorStake,
 		ChurnBIPsOfTotalStake:    operatorSetParams.KickBIPsOfTotalStake,
@@ -374,13 +374,13 @@ func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID chainio.Quor
 }
 
 // Returns the number of registered operators for the quorum.
-func (t *Reader) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID chainio.QuorumID) (uint32, error) {
+func (t *Reader) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID corev2.QuorumID) (uint32, error) {
 	return t.bindings.IndexRegistry.TotalOperatorsForQuorum(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID)
 }
 
-func (t *Reader) WeightOfOperatorForQuorum(ctx context.Context, quorumID chainio.QuorumID, operator gethcommon.Address) (*big.Int, error) {
+func (t *Reader) WeightOfOperatorForQuorum(ctx context.Context, quorumID corev2.QuorumID, operator gethcommon.Address) (*big.Int, error) {
 	return t.bindings.StakeRegistry.WeightOfOperatorForQuorum(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID, operator)
@@ -389,8 +389,8 @@ func (t *Reader) WeightOfOperatorForQuorum(ctx context.Context, quorumID chainio
 func (t *Reader) CalculateOperatorChurnApprovalDigestHash(
 	ctx context.Context,
 	operatorAddress gethcommon.Address,
-	operatorId chainio.OperatorID,
-	operatorsToChurn []chainio.OperatorToChurn,
+	operatorId corev2.OperatorID,
+	operatorsToChurn []corev2.OperatorToChurn,
 	salt [32]byte,
 	expiry *big.Int,
 ) ([32]byte, error) {
